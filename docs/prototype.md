@@ -417,6 +417,38 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 - Support repeatable results via seed/session recall.
 - Effect controls should read as musical character, not studio engineering parameters.
 
+## Post-1.0 Evolution Mode (continuous play)
+
+- Intent
+  - `Generate` creates a completely new song state.
+  - `Play` can run in an evolution mode where the current song morphs into new related states over time without hard resets.
+- Playback behavior
+  - Near the end of the current timeline, the engine prepares a successor state in the background.
+  - Transition is seamless (crossfade/overlap boundary), preserving tempo continuity unless intentionally changed by rule.
+  - Result should feel like an endless evolving stream rather than loop restart.
+- Evolution probabilities per transition window
+  - Keep most of current song, mutate a few dimensions:
+    - mutate Lead 1 motif: 55%
+    - mutate Lead 2 motif/entry behavior: 50%
+    - mutate bass pattern: 45%
+    - mutate drum pattern variant: 40%
+    - swap one main instrument sound (non-drum): 35%
+    - swap drum kit: 15%
+    - harmonic-mode shift (static/slow shift/free): 25%
+    - tempo shift small (+/-2 to 4 BPM): 20%
+  - Large-change guardrail:
+    - maximum 2 major mutations per evolution event.
+- Continuity guardrails
+  - Preserve key/mood by default (80%); controlled change allowed (20%).
+  - Preserve at least 4 of 7 track identities at each transition.
+  - Never mutate drums+bass+rhythm all at once in a single transition.
+  - Keep deterministic evolution when seed and settings are unchanged.
+- UX controls (post-1.0)
+  - `Generate New`: hard new song.
+  - `Evolve`: toggle continuous evolution during playback.
+  - `Evolution Rate`: Slow / Medium / Fast (controls mutation frequency/intensity).
+  - `Lock Track`: prevent selected track from mutation across evolution events.
+
 ## Open questions
 
 - Should style be a single selector (Ambient, Motorik, Hybrid) or a blend slider?

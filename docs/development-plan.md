@@ -53,3 +53,7 @@ Named Motorik sound options (v1):
 - [ ] **0.9 Stabilize and Tune**
   - Build: lock probabilities/ranges, improve determinism, performance tuning, preset polishing, and regression tests.
   - Test gate: same seed reproduces same song; CPU/glitch targets met; Motorik coherence pass rate is acceptable.
+
+- [ ] **1.1 Add Evolution Mode (post-1.0)**
+  - Build: add continuous playback evolution where the current song morphs into successor states using probabilistic mutation rules, while `Generate` still creates fully new songs.
+  - Test gate: transitions are seamless, no hard-loop feel, and long sessions avoid obvious repetition while maintaining musical coherence.
