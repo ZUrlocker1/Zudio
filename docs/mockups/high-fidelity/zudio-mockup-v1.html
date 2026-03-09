@@ -3,52 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zudio v1 Mockup</title>
+  <title>Zudio v1 Mockup (Updated)</title>
   <style>
     :root {
-      --bg: #0e1318;
-      --panel: #161f28;
-      --panel2: #1c2732;
-      --line: #2f3b48;
-      --text: #e5edf5;
-      --muted: #98a8ba;
-      --accent: #ef7f2d;
+      --panel: #16202b;
+      --panel2: #1c2835;
+      --line: #31404f;
+      --text: #e6edf5;
+      --muted: #99aaba;
       --lane: #101821;
       --vline: #2b3744;
       --hline: #22303a;
+      --lead: #b9404f;
+      --blue: #2e63bf;
+      --bass: #6a4ec3;
+      --drums: #d3a925;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: linear-gradient(180deg, #0b1014 0%, #111922 65%, #0f1419 100%);
       color: var(--text);
       font-family: "SF Pro Display", "Helvetica Neue", sans-serif;
+      background: linear-gradient(180deg, #0b1014 0%, #111922 65%, #0f1419 100%);
     }
-    .app { min-height: 100vh; padding: 12px; display: grid; gap: 10px; }
+    .app { min-height: 100vh; padding: 12px; display: grid; gap: 0; }
+
     .top {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 10px;
-      padding: 8px;
+      padding: 2px 10px 1px;
       display: grid;
-      grid-template-columns: auto auto 1fr auto;
-      align-items: center;
+      grid-template-columns: 290px 1fr 190px;
       gap: 8px;
+      align-items: start;
+      position: relative;
+      overflow: hidden;
+    }
+    .controls {
+      display: grid;
+      gap: 3px;
+      width: 290px;
+      justify-self: start;
+    }
+    .brandline {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 1px;
+    }
+    .bolt {
+      width: 21px;
+      height: 36px;
+      background: linear-gradient(180deg, #ffd36f, #ff9d2a);
+      clip-path: polygon(40% 0, 100% 0, 62% 40%, 100% 40%, 22% 100%, 42% 55%, 0 55%);
+      filter: drop-shadow(0 0 6px rgba(255, 171, 50, 0.45));
+    }
+    .logo {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      color: #f3f8ff;
+      line-height: 1;
+    }
+    .transport {
+      display: grid;
+      grid-template-columns: repeat(4, 34px) 90px;
+      gap: 6px;
+      width: auto;
+      justify-content: start;
+    }
+    .selectors {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .song-title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: .01em;
+      text-align: center;
+      color: #f2f7ff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      position: absolute;
+      left: 308px;
+      right: 208px;
+      line-height: 1.1;
+      top: 52px;
+      margin: 0;
+      pointer-events: none;
+    }
+    .righttools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      justify-self: end;
+      align-self: start;
+      padding-top: 0;
     }
     .btn {
       border: 0;
       border-radius: 8px;
-      padding: 8px 12px;
+      padding: 7px 11px;
       font-size: 12px;
       font-weight: 700;
       background: var(--panel2);
       color: #d9e5f2;
+      white-space: nowrap;
+      cursor: default;
     }
-    .btn.primary {
-      background: linear-gradient(120deg, #f59e3f, var(--accent));
-      color: #201306;
-    }
-    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn.transport { min-width: 34px; text-align: center; padding: 7px 8px; }
+    .transport .btn { width: 100%; }
+    .btn.play { background: #284d33; color: #9dffbd; border: 1px solid #2f7045; }
+    .btn.stop { background: #512930; color: #ffd4d4; border: 1px solid #7a3b46; }
+    .btn.generate { background: linear-gradient(120deg, #f5a541, #ef7f2d); color: #221204; }
+
     .chip {
       border: 1px solid var(--line);
       background: var(--panel2);
@@ -58,7 +134,9 @@
       font-size: 11px;
       white-space: nowrap;
     }
+    .selectors .chip { width: 100%; text-align: center; }
     .chip strong { color: #fff; }
+
     .board {
       border: 1px solid var(--line);
       border-radius: 10px;
@@ -67,7 +145,7 @@
     }
     .header, .row {
       display: grid;
-      grid-template-columns: 270px 1fr 170px;
+      grid-template-columns: 290px 1fr 190px;
     }
     .header {
       border-bottom: 1px solid var(--line);
@@ -75,14 +153,16 @@
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: .08em;
-      background: #1b2430;
+      background: #1a2430;
     }
     .header div { padding: 7px 8px; border-right: 1px solid var(--line); }
     .header div:last-child { border-right: 0; }
-    .row { min-height: 58px; border-bottom: 1px solid var(--line); }
+
+    .row { min-height: 64px; border-bottom: 1px solid var(--line); }
     .row:last-child { border-bottom: 0; }
+
     .left, .right {
-      padding: 5px 8px;
+      padding: 6px 8px;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -91,15 +171,29 @@
       flex-wrap: nowrap;
     }
     .right { border-right: 0; border-left: 1px solid var(--line); }
-    .name { width: 64px; font-size: 11px; font-weight: 700; }
+
+    .icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      border: 1px solid #4a5b6d;
+      background: #263343;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex: 0 0 auto;
+    }
+    .name { width: 66px; font-size: 11px; font-weight: 700; }
     .small {
       font-size: 10px;
       color: var(--muted);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: 130px;
+      max-width: 104px;
     }
+
     .tag {
       border: 1px solid #425264;
       background: #253140;
@@ -107,23 +201,41 @@
       padding: 2px 6px;
       font-size: 10px;
       color: #d2deea;
+      white-space: nowrap;
     }
+    .regen {
+      border: 1px solid #6d5320;
+      background: #3a2a10;
+      color: #ffd88a;
+      border-radius: 6px;
+      width: 22px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+
     .lane {
       position: relative;
       overflow: hidden;
-      min-height: 58px;
+      min-height: 64px;
       background:
         linear-gradient(to right, var(--vline) 1px, transparent 1px) 0 0 / 42px 100%,
-        linear-gradient(to bottom, var(--hline) 1px, transparent 1px) 0 0 / 100% 12px,
+        linear-gradient(to bottom, var(--hline) 1px, transparent 1px) 0 0 / 100% 14px,
         var(--lane);
     }
-    .row.lead { --c:#b9404f; --e:#7e2734; }
-    .row.blue { --c:#2e63bf; --e:#21468a; }
-    .row.bass { --c:#6a4ec3; --e:#493493; }
-    .row.drums { --c:#d3a925; --e:#98770f; }
+
+    .row.lead { --c: var(--lead); --e: #7e2734; }
+    .row.blue { --c: var(--blue); --e: #21468a; }
+    .row.bass { --c: var(--bass); --e: #493493; }
+    .row.drums { --c: var(--drums); --e: #98770f; }
+
     .clip {
       position: absolute;
-      height: 28px;
+      height: 34px;
       border-radius: 6px;
       border: 1px solid var(--e);
       background: linear-gradient(180deg, color-mix(in srgb, var(--c) 78%, #fff 22%) 0%, var(--c) 100%);
@@ -138,39 +250,86 @@
       border-radius: 2px;
       opacity: .8;
     }
+
+    .status-wrap {
+      display: grid;
+      grid-template-columns: 290px 1fr 190px;
+      margin-top: 8px;
+      border-top: 1px solid var(--line);
+      background: #141d26;
+    }
+    .status {
+      grid-column: 2;
+      margin: 8px;
+      border: 1px solid #405060;
+      background: #0f1620;
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: #d8e5f2;
+      font-size: 11px;
+      line-height: 1.35;
+      height: 82px;
+      overflow-y: auto;
+    }
+    .status .line { margin-bottom: 4px; white-space: nowrap; }
+    .status .line:last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
   <div class="app">
     <header class="top">
-      <button class="btn primary">Generate New</button>
-      <button class="btn">Play</button>
-      <div class="chips">
-        <span class="chip">Style <strong>Motorik Pulse</strong></span>
-        <span class="chip">Mood <strong>Deep</strong></span>
-        <span class="chip">Pace <strong>Drive</strong> 138 BPM</span>
-        <span class="chip">Key <strong>E</strong></span>
-        <span class="chip">Seed <strong>20491</strong></span>
+      <div class="controls">
+        <div class="brandline"><span class="bolt"></span><span class="logo">Zudio</span></div>
+        <div class="transport">
+          <button class="btn transport">&#8592;</button>
+          <button class="btn play transport">&#9654;</button>
+          <button class="btn stop transport">&#9632;</button>
+          <button class="btn transport">&#8594;</button>
+          <button class="btn generate">&#9889; Generate</button>
+        </div>
+        <div class="selectors">
+          <span class="chip">Style <strong>Motorik Pulse</strong></span>
+          <span class="chip">Tempo <strong>138 BPM</strong></span>
+          <span class="chip">Key <strong>E</strong></span>
+          <span class="chip">Mood <strong>Deep</strong></span>
+        </div>
       </div>
-      <div class="chips"><span class="chip">v1: No Effects</span></div>
+
+      <div class="song-title">Neon Highway</div>
+
+      <div class="righttools">
+        <button class="btn">Help</button>
+        <button class="btn">About</button>
+      </div>
     </header>
 
     <section class="board">
-      <div class="header"><div>Track Controls</div><div></div><div>Track Actions</div></div>
+      <div class="header"><div>Track Controls</div><div></div><div>Effects</div></div>
 
-      <div class="row lead"><div class="left"><span class="name">Lead 1</span><span class="tag">M</span><span class="tag">S</span><span class="small">Smooth Analog Lead</span></div><div class="lane"><span class="clip" style="left:8%;top:8px;width:12%"></span><span class="clip" style="left:24%;top:20px;width:10%"></span><span class="clip" style="left:40%;top:11px;width:13%"></span><span class="clip" style="left:58%;top:23px;width:10%"></span><span class="clip" style="left:74%;top:10px;width:12%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+      <div class="row lead"><div class="left"><span class="icon">🎛️</span><span class="name">Lead 1</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Inst</span><span class="small">Smooth Analog Lead</span></div><div class="lane"><span class="clip" style="left:8%;top:8px;width:12%"></span><span class="clip" style="left:24%;top:21px;width:10%"></span><span class="clip" style="left:40%;top:10px;width:13%"></span><span class="clip" style="left:58%;top:24px;width:10%"></span><span class="clip" style="left:74%;top:9px;width:12%"></span></div><div class="right"><span class="tag">Echo</span><span class="tag">Space</span><span class="tag">Grit</span></div></div>
 
-      <div class="row lead"><div class="left"><span class="name">Lead 2</span><span class="tag">M</span><span class="tag">S</span><span class="small">Bell/Pluck Lead</span></div><div class="lane"><span class="clip" style="left:16%;top:18px;width:10%"></span><span class="clip" style="left:45%;top:9px;width:12%"></span><span class="clip" style="left:76%;top:20px;width:9%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+      <div class="row lead"><div class="left"><span class="icon">🎚️</span><span class="name">Lead 2</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Inst</span><span class="small">Bell/Pluck Lead</span></div><div class="lane"><span class="clip" style="left:16%;top:18px;width:10%"></span><span class="clip" style="left:45%;top:8px;width:12%"></span><span class="clip" style="left:76%;top:21px;width:9%"></span></div><div class="right"><span class="tag">Echo</span><span class="tag">Width</span><span class="tag">Tone</span></div></div>
 
-      <div class="row blue"><div class="left"><span class="name">Pads</span><span class="tag">M</span><span class="tag">S</span><span class="small">Smooth Synth Pad</span></div><div class="lane"><span class="clip" style="left:5%;top:9px;width:30%"></span><span class="clip" style="left:39%;top:17px;width:28%"></span><span class="clip" style="left:71%;top:11px;width:21%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+      <div class="row blue"><div class="left"><span class="icon">🎹</span><span class="name">Pads</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Inst</span><span class="small">Warm Synth Pad</span></div><div class="lane"><span class="clip" style="left:5%;top:9px;width:30%"></span><span class="clip" style="left:39%;top:20px;width:28%"></span><span class="clip" style="left:71%;top:12px;width:21%"></span></div><div class="right"><span class="tag">Space</span><span class="tag">Width</span><span class="tag">Tone</span></div></div>
 
-      <div class="row blue"><div class="left"><span class="name">Rhythm</span><span class="tag">M</span><span class="tag">S</span><span class="small">Muted Motorik Guitar Pulse</span></div><div class="lane"><span class="clip" style="left:4%;top:11px;width:11%"></span><span class="clip" style="left:18%;top:20px;width:11%"></span><span class="clip" style="left:32%;top:12px;width:11%"></span><span class="clip" style="left:46%;top:22px;width:11%"></span><span class="clip" style="left:60%;top:12px;width:11%"></span><span class="clip" style="left:74%;top:20px;width:11%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+      <div class="row blue"><div class="left"><span class="icon">🎸</span><span class="name">Rhythm</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Inst</span><span class="small">Muted Guitar Pulse</span></div><div class="lane"><span class="clip" style="left:4%;top:12px;width:11%"></span><span class="clip" style="left:18%;top:24px;width:11%"></span><span class="clip" style="left:32%;top:13px;width:11%"></span><span class="clip" style="left:46%;top:25px;width:11%"></span><span class="clip" style="left:60%;top:13px;width:11%"></span><span class="clip" style="left:74%;top:24px;width:11%"></span></div><div class="right"><span class="tag">Tone</span><span class="tag">Width</span><span class="tag">Echo</span></div></div>
 
-      <div class="row blue"><div class="left"><span class="name">Texture</span><span class="tag">M</span><span class="tag">S</span><span class="small">Tape Air Layer</span></div><div class="lane"><span class="clip" style="left:27%;top:15px;width:13%"></span><span class="clip" style="left:59%;top:18px;width:17%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+      <div class="row blue"><div class="left"><span class="icon">🌫️</span><span class="name">Texture</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Inst</span><span class="small">Tape Air Layer</span></div><div class="lane"><span class="clip" style="left:27%;top:15px;width:13%"></span><span class="clip" style="left:59%;top:19px;width:17%"></span></div><div class="right"><span class="tag">Space</span><span class="tag">Width</span><span class="tag">Tone</span></div></div>
 
-      <div class="row bass"><div class="left"><span class="name">Bass</span><span class="tag">M</span><span class="tag">S</span><span class="small">Analog Motor Bass</span></div><div class="lane"><span class="clip" style="left:6%;top:22px;width:28%"></span><span class="clip" style="left:37%;top:13px;width:24%"></span><span class="clip" style="left:65%;top:23px;width:20%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+      <div class="row bass"><div class="left"><span class="icon">🎸</span><span class="name">Bass</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Inst</span><span class="small">Analog Motor Bass</span></div><div class="lane"><span class="clip" style="left:6%;top:23px;width:28%"></span><span class="clip" style="left:37%;top:12px;width:24%"></span><span class="clip" style="left:65%;top:24px;width:20%"></span></div><div class="right"><span class="tag">Tone</span><span class="tag">Grit</span><span class="tag">Space</span></div></div>
 
-      <div class="row drums"><div class="left"><span class="name">Drums</span><span class="tag">M</span><span class="tag">S</span><span class="small">Vintage Electronic Kit</span></div><div class="lane"><span class="clip" style="left:2%;top:15px;width:18%"></span><span class="clip" style="left:24%;top:9px;width:16%"></span><span class="clip" style="left:46%;top:19px;width:20%"></span><span class="clip" style="left:70%;top:10px;width:14%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Kit A/B</span></div></div>
+      <div class="row drums"><div class="left"><span class="icon">🥁</span><span class="name">Drums</span><span class="tag">M</span><span class="tag">S</span><span class="regen">⚡</span><span class="tag">Kit</span><span class="small">Electronic Kit</span></div><div class="lane"><span class="clip" style="left:2%;top:15px;width:18%"></span><span class="clip" style="left:24%;top:8px;width:16%"></span><span class="clip" style="left:46%;top:20px;width:20%"></span><span class="clip" style="left:70%;top:10px;width:14%"></span></div><div class="right"><span class="tag">Tone</span><span class="tag">Space</span><span class="tag">Grit</span></div></div>
+
+      <div class="status-wrap">
+        <div class="status">
+          <div class="line">Form: Subtle A/B, 16+16 bars, progression I-bVII</div>
+          <div class="line">Intro: Drums + Bass, 4 bars, snare enters bar 3</div>
+          <div class="line">Bass rule: root/fifth anchor, max one passing tone per bar</div>
+          <div class="line">Lead rules: Lead 1 motif-first, Lead 2 enters at bar 16 as response</div>
+          <div class="line">Outro: Drums-only tail, 4 bars, gradual cymbal reduction</div>
+          <div class="line">Texture: sparse boundary swells only, no harmonic clutter</div>
+        </div>
+      </div>
     </section>
   </div>
 </body>

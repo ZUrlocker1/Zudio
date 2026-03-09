@@ -338,6 +338,109 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Outro removes layers progressively (no sudden full stop unless in hard-stop variant).
     - Keep harmonic movement in intro/outro lower than in main body.
 
+### Motorik-adjacent calibration profile (Electric Buddha set)
+
+- Purpose:
+  - Optional probability profile derived from `Time Loops`, `Dark Sun`, `Vanishing Point`, `Into The Night`, `Blakely Lab`, `Schulers Dream 05`.
+  - Use as a secondary preset for more melodic/ambient Motorik-adjacent generation.
+- Tempo family weights:
+  - Fast drive (132-150 BPM): 45%
+  - Mid motorik (116-126 BPM): 40%
+  - Slow cruise (92-108 BPM): 15%
+- Intro family weights:
+  - Fast lock-in intro (1-2 bars): 50%
+  - Medium intro (4 bars): 35%
+  - Long atmospheric intro (8-12 bars): 15%
+- Outro family weights:
+  - Short subtractive (2-4 bars): 60%
+  - Medium subtractive/tail (4-8 bars): 30%
+  - Extended atmospheric tail (8+ bars): 10%
+- Form/section weights:
+  - 3-6 macro blocks (standard mode): 70%
+  - 7-10 micro-variation blocks (long-form mode): 30%
+- Track-writing emphasis:
+  - Bass: root/fifth anchor default; passing tones sparse and boundary-aware.
+  - Lead 1: motif-first with mutations every 8-16 bars.
+  - Lead 2: delayed response role, lower density than Lead 1.
+  - Rhythm: pulse continuity lane, low syncopation.
+  - Pads: slow harmonic bed with low chord-change rate.
+  - Texture: boundary events and late-stage atmosphere, avoid continuous clutter.
+- Instrument/effect implications (for later effects phase):
+  - Drums/Bass: tighter space and mild saturation as default.
+  - Leads: tempo-locked echo with moderate width.
+  - Pads/Texture: wider space and longer tails with controlled low-end.
+
+### Classic calibration profile (Neu! + Harmonia + Cluster)
+
+- Purpose:
+  - Optional stricter profile aligned to classic Motorik corpus (`Hallogallo`, `Fur Immer`, `Neuschnee`, `Seeland`, `Wave Mother`, `Deluxe`, `Walky-Talky`, `Monza`, `Breitengrad 20`, `Hollywood`).
+- Tempo family weights:
+  - Fast drive equivalent (double-time 132-152 / half-time ~66-76): 50%
+  - Mid motorik (116-126): 30%
+  - Slow motorik-adjacent (85-108): 20%
+- Intro family weights:
+  - Short lock-in (1-4 bars): 25%
+  - Medium intro (4-8 bars): 40%
+  - Long build (8-32 bars): 35%
+- Outro family weights:
+  - Short subtractive (2-4 bars): 55%
+  - Medium subtractive/tail (4-8 bars): 35%
+  - Extended tail (8+ bars): 10%
+- Bass-writing weights:
+  - Anchor ostinato (root/fifth, 1-2 bar): 65%
+  - Anchor + sparse passing tones: 25%
+  - Melodic/stepwise bass: 10%
+- Lead-entry and density weights:
+  - Lead 1 entry <=8 bars: 20%
+  - Lead 1 entry 9-16 bars: 45%
+  - Lead 1 entry >16 bars: 35%
+  - Lead 2 entry bar 8: 35%
+  - Lead 2 entry bar 16: 45%
+  - Lead 2 entry >16 bars: 20%
+  - Lead 2 remains response-role at lower density than Lead 1.
+- Rhythm-writing weights:
+  - Strict pulse rhythm (continuous subdivision lock): 60%
+  - Pulse + light accent variation: 30%
+  - Sparse/atmospheric rhythm: 10%
+- Melodic-part defaults (from `Neuschnee`, `Deluxe`, `Hollywood` focused pass):
+  - Lead 1 conservative/repetition-first: 60%
+  - Lead 1 melodic/contour-active: 30%
+  - Lead 1 sparse/atmospheric: 10%
+  - Lead 2 density target: 30-55% of Lead 1 event density.
+  - Lead 2 response mode weights:
+    - off-beat response: 50%
+    - interval complement: 35%
+    - sparse unison punctuation: 15%
+  - Pad mode weights:
+    - long-hold static bed: 55%
+    - slow-shift bed: 35%
+    - motion-rich bed: 10%
+- Form defaults:
+  - Favor long continuity windows and low harmonic churn.
+  - Prefer timbral/rhythmic evolution over progression complexity.
+
+### Creator melodic profile extension (Electric Buddha set)
+
+- Lead 1 interval behavior weights:
+  - repeated/pedal motion: 45%
+  - stepwise (1-2 semitone): 20%
+  - mid leaps (3-5 semitone): 15%
+  - large leap accents (6+ semitone): 20%
+- Lead 1 density mode weights:
+  - low density: 30%
+  - medium density: 45%
+  - high density: 25%
+- Lead 2 mode weights:
+  - sparse off-beat punctuations: 45%
+  - short answering phrases: 35%
+  - interval-shadow counterline: 20%
+  - hard cap: Lead 2 <=55% of Lead 1 event density.
+- Pads mode weights:
+  - static/long-hold bed: 60%
+  - slow-shift bed: 30%
+  - motion-rich bed: 10%
+  - when Lead 1 enters high-leap mode, reduce pad re-voicing rate in that window.
+
 ### Core musical behavior
 
 - Drums
@@ -730,6 +833,6 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 
 ## Open questions
 
-- Should style be a single selector (Ambient, Motorik, Hybrid) or a blend slider?
+- Should style be a single selector (Motorik, Cosmic, Ambient) or a blend slider?
 - Should lead generation be optional by default for more sparse ambient output?
 - Should each track permit independent length/polymeter, or all parts share one loop length in v1?
