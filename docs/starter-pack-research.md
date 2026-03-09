@@ -163,3 +163,70 @@ Optional extension:
   - Leads: Synth Lead programs
   - Pads: Synth Pad/Strings programs
 - Replace DLS placeholders with curated CC0/CC-BY assets as they are validated.
+
+## Apple DLS / General MIDI fallback map (useful presets)
+
+- Lead synth family (GM 81-88)
+  - 81 `Square Wave`
+  - 82 `Saw Wave`
+  - 83 `Syn. Calliope`
+  - 84 `Chiffer Lead`
+  - 85 `Charang`
+  - 86 `Solo Vox`
+  - 87 `5th Saw Wave`
+  - 88 `Bass & Lead`
+- Synth bass family (GM 39-40)
+  - 39 `Synth Bass 1`
+  - 40 `Synth Bass 2`
+- Additional bass family (GM 33-38 subset used in Motorik contexts)
+  - 33 `Acoustic Bass`
+  - 34 `Electric Bass (Finger)`
+  - 35 `Electric Bass (Pick)`
+  - 36 `Fretless Bass`
+- Synth pad family (GM 89-96)
+  - 89 `New Age Pad`
+  - 90 `Warm Pad`
+  - 91 `Polysynth`
+  - 92 `Choir Pad`
+  - 93 `Bowed Glass`
+  - 94 `Metallic Pad`
+  - 95 `Halo Pad`
+  - 96 `Sweep Pad`
+- Synth brass family (GM 63-64)
+  - 63 `Synth Brass 1`
+  - 64 `Synth Brass 2`
+
+### Recommended DLS defaults for Zudio tracks
+
+- Lead 1: 82 (`Saw Wave`), 87 (`5th Saw Wave`), 88 (`Bass & Lead`)
+- Lead 2: 83 (`Syn. Calliope`), 86 (`Solo Vox`), 63 (`Synth Brass 1`)
+- Pads: 90 (`Warm Pad`), 91 (`Polysynth`), 96 (`Sweep Pad`)
+- Rhythm: 82 (`Saw Wave`) or 91 (`Polysynth`) with short gate
+- Texture: 93 (`Bowed Glass`), 94 (`Metallic Pad`), 95 (`Halo Pad`)
+- Bass: 39 (`Synth Bass 1`), 40 (`Synth Bass 2`), 35 (`Electric Bass Pick`)
+
+### Additional DLS audition banks (if needed)
+
+- Guitar (GM 25-32)
+  - 25 `Nylon String Guitar`
+  - 26 `Steel String Guitar`
+  - 27 `Electric Jazz Guitar`
+  - 28 `Electric Clean Guitar`
+  - 29 `Electric Muted Guitar`
+  - 30 `Overdriven Guitar`
+  - 31 `Distortion Guitar`
+  - 32 `Guitar Harmonics`
+- Piano/EP (GM 1-8 subset)
+  - 1 `Acoustic Grand`
+  - 2 `Bright Acoustic`
+  - 3 `Electric Grand`
+  - 5 `Electric Piano 1`
+  - 6 `Electric Piano 2`
+- Organ (GM 17-21)
+  - 17 `Drawbar Organ`
+  - 18 `Percussive Organ`
+  - 19 `Rock Organ`
+  - 20 `Church Organ`
+  - 21 `Reed Organ`
+
+Note: GM guitar and piano can be less realistic than curated samples; use as prototyping options and validate quality at the 0.75 decision gate.

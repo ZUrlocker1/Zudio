@@ -332,6 +332,18 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Vintage Electronic Kit
   - Rock Kit
 
+### Apple DLS fallback presets (prototype safety net)
+
+- If curated assets are missing, use Apple DLS (General MIDI) presets:
+  - Lead 1: GM 82, 87, 88
+  - Lead 2: GM 83, 86, 63
+  - Pads: GM 90, 91, 96
+  - Rhythm: GM 82 or 91 with short gate
+  - Texture: GM 93, 94, 95
+  - Bass: GM 39, 40, 35
+  - Drums kit families available: Standard (0), Room (8), Power (16), Electronic (24), Jazz (32)
+  - Preferred v1 drum pair in GM-first mode: Electronic (24) + Power (16)
+
 ### Effects probabilities (character presets)
 
 - Drums: tight 60%, roomy 25%, gritty 15%
