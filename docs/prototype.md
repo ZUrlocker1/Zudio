@@ -230,6 +230,12 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Single-A continuity: 45%
     - Subtle A/B: 40%
     - Moderate A/B: 15%
+  - Melodic variation template probabilities (optional style flavor)
+    - Core Neu!/Harmonia motorik: 45%
+    - Jenny-style two-chord drive: 20%
+    - Rheinita-style bright cycle: 15%
+    - Theme for Great Cities-style melodic minor loop: 15%
+    - Trans-Europe Express-style sequencer pulse: 5%
 
 ### Core musical behavior
 
@@ -289,6 +295,28 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Writing rules:
     - Sparse transitions only (swell/noise/tail)
     - Mostly non-harmonic to avoid tonal clutter
+
+### Song-inspired melodic variation rules
+
+- Jenny-style two-chord drive (motorik-safe)
+  - Harmony: prioritize two-chord alternation with very high repetition.
+  - Rhythm: steady pulse with minimal fill behavior.
+  - Lead behavior: repetitive short motif with small rhythmic mutation.
+- Rheinita-style bright cycle (melodic variant)
+  - Harmony: allow 4-chord bright major-mode cycle (for example F-C-G-D family movement).
+  - Bass: keep ostinato character even when harmony cycles.
+  - Lead behavior: brighter hook line and slightly higher note density than core mode.
+- Theme for Great Cities-style melodic minor loop
+  - Harmony: minor/modal loop with recurring hook-friendly center.
+  - Bass: repeated arpeggio/anchor figure with occasional step approach.
+  - Lead behavior: delayed-entry melodic hooks and repeating phrases.
+- Trans-Europe Express-style sequencer pulse
+  - Tempo tendency: lower-mid motorik tempo pocket (~103-120).
+  - Harmony: minimal harmonic movement, sequence-first construction.
+  - Rhythm behavior: machine-tight grid with controlled micro-variation.
+- Mother Sky/Cluster-Hollywood-derived additions
+  - Allow long static-vamp windows in selected seeds.
+  - Increase texture and timbre evolution while keeping chord-change rate low.
 
 ### Instrument probabilities (Auto mode)
 
@@ -442,6 +470,67 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Deep: Aeolian (natural minor).
   - Dream: Dorian.
   - Free: hybrid note-pool with weak tonal gravity (avoid strong V-I cadence behavior).
+
+## Motorik Title Generator (v1)
+
+- Behavior
+  - On `Generate New`, generate a new Motorik-inspired song title.
+  - On per-track `Regenerate`, keep the current title unchanged.
+  - Titles are seed-deterministic (same seed/settings => same title).
+- Output format
+  - Typical length: 1-3 words.
+  - Preferred style: short, pulse-oriented, slightly cryptic.
+  - Language mix: English + occasional Germanic styling allowed.
+
+### Title word banks
+
+- User-supplied words (always included)
+  - Ausfart, Koln, Alles, Klar, Dinger, Forest, Zorvaak, Pile, Driver, Elektronischer, Fluss, Nonstop, Buzzkill, Pulse, Vibe, Mother, Jenny, Two, Chord, Rotter, Musik, Kosmiche, ElektroJazz, Lager, Men, Speed, Sound, Pure, Drive
+  - Mittelwerk, Detroit, Tunnel, Bomb, Nordhausen, Von Neumann, Schuler, Waters, Von Braun, Panzinger, Panks, Dieter
+- Place/scene words
+  - Koln, Dusseldorf, Berlin, Ruhr, Autobahn, Tunnel, Nordhausen, Detroit, Forest
+- Motion/energy words
+  - Drive, Pulse, Drift, Flow, Run, Loop, Roll, Counter, Motor, Velocity, Nonstop
+- Texture/tone words
+  - Chrome, Static, Neon, Halo, Tape, Glass, Metal, Buzz, Klang, Kosmiche, Elektronischer
+- Music-structure words
+  - Chord, Pattern, Sequence, Ostinato, Motif, Echo, Signal, Flux, Phase
+- Verified musician-name words (from Neu!/Harmonia/Kraftwerk + related motorik acts)
+  - Klaus, Dinger, Michael, Rother, Thomas, Hans, Lampe
+  - Roedelius, Dieter, Moebius
+  - Ralf, Hutter, Florian, Schneider, Karl, Bartos, Wolfgang, Flur
+- Rearranged title words (from referenced tracks/albums; not exact copies)
+  - Hallo, Immer, Neu, Deluxe, Monza, Hollywood, Express, Europe, Endlos, Dynamik, Weiter
+
+### Generation patterns (weighted)
+
+- `Place + Motion` (22%)
+- `Texture + Motion` (20%)
+- `Name + Motion` (14%)
+- `MusicWord + Motion` (14%)
+- `Adj + Noun` (12%)
+- `Three-word cinematic` (10%)
+- `Phonetic parody blend` (8%)
+
+### Post-processing rules
+
+- Avoid exact known song titles; require at least one token change/reorder.
+- Avoid repeating the same first token in consecutive generated titles.
+- Cap punctuation and symbols (letters/spaces only in v1).
+- Keep phonetic punch: prefer hard consonants and short vowels for one-word titles.
+
+### Example generated titles (additional)
+
+- Mittelwerk Pulse
+- Detroit Driftline
+- Neon Nordhausen
+- Klaus in Tunnel
+- Von Braun Drive
+- Schuler Signal
+- Rother Flux
+- Bomb Pattern
+- Flur Motor
+- Panzinger Echo
 
 ## Constraints for v1
 

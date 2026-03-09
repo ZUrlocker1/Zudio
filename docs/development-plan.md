@@ -35,29 +35,29 @@ General MIDI-first implementation choices (preferred):
   - GM 84 `Chiffer Lead`
   - GM 86 `Solo Vox`
 - Lead 2 (5 choices)
-  - GM 83 `Syn. Calliope`
   - GM 63 `Synth Brass 1`
+  - GM 83 `Syn. Calliope`
   - GM 64 `Synth Brass 2`
-  - GM 85 `Charang`
   - GM 88 `Bass & Lead`
+  - GM 85 `Charang`
 - Pads (5 choices)
   - GM 90 `Warm Pad`
   - GM 91 `Polysynth`
-  - GM 92 `Choir Pad`
-  - GM 95 `Halo Pad`
   - GM 96 `Sweep Pad`
+  - GM 95 `Halo Pad`
+  - GM 92 `Choir Pad`
 - Rhythm (5 choices)
   - GM 29 `Electric Muted Guitar`
-  - GM 28 `Electric Clean Guitar`
   - GM 85 `Charang`
+  - GM 28 `Electric Clean Guitar`
   - GM 91 `Polysynth` (short gate)
   - GM 5 `Electric Piano 1`
 - Texture (5 choices)
-  - GM 93 `Bowed Glass`
   - GM 94 `Metallic Pad`
+  - GM 93 `Bowed Glass`
   - GM 95 `Halo Pad`
-  - GM 89 `New Age Pad`
   - GM 92 `Choir Pad`
+  - GM 89 `New Age Pad`
 - Bass (5 choices)
   - GM 39 `Synth Bass 1`
   - GM 40 `Synth Bass 2`
@@ -65,10 +65,10 @@ General MIDI-first implementation choices (preferred):
   - GM 34 `Electric Bass (Finger)`
   - GM 36 `Fretless Bass`
 - Drums (5 choices)
+  - Kit 24 `Electronic`
+  - Kit 16 `Power`
   - Kit 0 `Standard`
   - Kit 8 `Room`
-  - Kit 16 `Power`
-  - Kit 24 `Electronic`
   - Kit 32 `Jazz`
 - Drums preferred defaults for Motorik: Kit 24 `Electronic`, Kit 16 `Power`
 
@@ -168,14 +168,24 @@ General MIDI audition set (optional during 0.4-0.6):
     - As a user, I can compare the same generated song with GM sounds vs sample-based sounds.
     - As a team, we can choose track-by-track whether to keep GM or switch to samples for v1.
 
+- [ ] **0.76 Upgraded GM Bank Pass**
+  - Build: keep the same GM program workflow but replace Apple DLS with a higher-quality GM SoundFont in the synth engine path.
+  - Recommended bank: `GeneralUser GS v2.x` (free, permissive license for software projects).
+  - Alternate bank: `FluidR3_GM` (MIT-licensed, widely used baseline).
+  - Test gate: confirm audible quality lift vs Apple DLS while preserving instrument mappings and generation behavior.
+  - User stories:
+    - As a user, I hear improved GM timbre quality without changing controls or arrangement logic.
+    - As a team, we can keep GM speed of development while delaying full sample-bank integration.
+
 - [ ] **0.8 Full Generate + UI Cohesion**
   - Build: One-button full-song generation for all tracks, track-level regenerate, M/S, instrument selection, compact per-row piano roll.
-  - Test gate: workflow is fast and stable; each track updates correctly and independently.
+  - Test gate: workflow is fast and stable; each track updates correctly and independently; generated titles update correctly on full generate.
   - User stories:
     - As a user, I can generate a full song with one click and play it immediately.
     - As a user, I can mute/solo tracks and regenerate a single track without losing the rest.
     - As a user, I can cycle instruments per track and always see which instrument is active.
     - As a user, I see per-track piano-roll lanes with color coding, viewport panning behavior, and correct mute/solo grey-state visuals.
+    - As a user, each `Generate New` creates a new Motorik-inspired song title, while per-track regenerate keeps the current title.
 
 - [ ] **0.9 Stabilize and Tune**
   - Build: lock probabilities/ranges, improve determinism, performance tuning, preset polishing, and regression tests.
