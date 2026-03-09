@@ -253,6 +253,19 @@ This pass tightens part-writing behavior using the target corpus (`Hallogallo`, 
 - `Neuschnee`: melodic content present but still pulse-led and repetition-heavy.
 - Harmonia (`Deluxe`, `Walky-Talky`, `Monza`): one-note/octave bass and pulse interplay; tension comes from layering/timbre shifts more than chord churn.
 - Kraftwerk calibration (`Autobahn`, `Aero Dynamik`, `Endless Endless`): electronic minimalism reinforces the "few parts, long consistency, controlled mutation" rule.
+- `Jenny Ondioline`: confirms two-chord, high-repetition motorik drive as a valid strict template.
+- `Rheinita`: supports brighter melodic variant with cycling chord movement while retaining pulse consistency.
+- `Theme for Great Cities`: supports minor/modal melodic loop variant with recurring hook gestures.
+- `Trans-Europe Express`: supports sequence-first, tighter grid variant at slightly lower motorik-adjacent tempo.
+- `Mother Sky` and `Hollywood`: support long-vamp and low harmonic-turnover variants with stronger timbral evolution.
+
+### Additional template rules from selected songs
+
+- Template A (strict motorik): two-chord loop, very low fill count, high ostinato repetition.
+- Template B (bright melodic): 4-chord bright cycle with pulse-first rhythm section.
+- Template C (melodic minor): minor/modal loop with delayed hook entry and repeat-heavy phrasing.
+- Template D (sequencer-leaning): lower-mid tempo pocket, machine-tight sequence behavior.
+- Template E (long-vamp): static harmony windows with texture-driven development.
 
 ### Updated probability constraints for musicality
 

@@ -6,9 +6,15 @@ Sound strategy note: start with Apple General MIDI (Apple DLS Music Device), the
 Locked v1 controls:
 
 - `Generate New`
+- Transport `Previous` (left arrow)
 - Global `Play` (green arrow)
+- Global `Stop` (red square)
+- Transport `Next` (right arrow)
 - Per-track `Mute` / `Solo`
 - Per-track `Regenerate`
+- Global `Help` button (opens Help dialog)
+- Global `About` button (opens About dialog)
+- Bottom status box (user-friendly song status panel)
 
 Instrument minimum rule for v1:
 
@@ -85,13 +91,18 @@ Core generation user stories (cross-cutting):
 
 - As a user, when I press `Generate New`, the app decides a complete song plan using current global parameters (`Style`, `Pace`, `Key`, `Mood`) plus controlled randomization.
 - As a user, the generated song includes structure decisions (section count, section repetition, chord sequence, pattern variation) and then generates notes for each track from that plan.
+- As a user, generated songs include a rule-based intro and outro (2/4/8 bars) with layered instrument entry/exit, not abrupt full-band start/stop.
 - As a user, drums are generated as evolving patterns (fills/intensity changes), not a static 4-bar loop.
 - As a user, bass, pads, rhythm, lead tracks are generated with repeat-and-variation behavior over time, not rigid copy loops.
 - As a user, I can see each generated track as a DAW-style piano-roll/grid lane in the center panel.
+- As a user, each track row shows a small track-type icon to the left of the track name (Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums).
 - As a user, only a viewport portion of the full timeline is shown at once; resizing or scrolling pans to other timeline regions.
 - As a user, each track lane uses the track family color (Lead red, Pads/Rhythm/Texture blue, Bass purple, Drums yellow).
 - As a user, if a track is muted its grid lane is greyed.
 - As a user, if a track is soloed, non-solo tracks are greyed and only solo-appropriate audio is heard.
+- As a user, I can always see a top title section showing generated song title, tempo, key, mood, and style.
+- As a user, I can read a bottom status box that reports user-friendly musical rule decisions (structure, intro, outro, and per-track generation logic) in a compact 3-5 line area.
+- As a user, the bottom status box is scrollable when text exceeds the visible 3-5 lines, with newest messages visible by default.
 
 Track-onboarding visualization rule (applies at every step):
 
@@ -108,7 +119,7 @@ General MIDI audition set (optional during 0.4-0.6):
 - Quality caution: GM guitar and piano realism may be limited; use these primarily for quick functional validation.
 
 - [ ] **0.1 Drums Only**
-  - Build: Generate Motorik/APACHE-style drums with global settings (`Style`, `Pace`, `Key`, `Mood`), dynamic intensity over time, and kit choice (`Vintage Electronic`, `Rock Kit`).
+  - Build: Generate Motorik/APACHE-style drums with global settings (`Style`, `Pace`, `Key`, `Mood`), dynamic intensity over time, kit choice (`Vintage Electronic`, `Rock Kit`), plus a drum-only intro/outro shape.
   - Test gate: 20 seeds sound recognizably motorik; no static 4-bar copy-loop feel; yellow drum MIDI grid updates correctly on generate/play.
   - User stories:
     - As a user, I can press `Generate New` and hear a full dynamic drum performance in motorik style.
@@ -116,6 +127,7 @@ General MIDI audition set (optional during 0.4-0.6):
     - As a user, I can see the active drum kit name in the UI at all times.
     - As a user, I see a yellow drum MIDI grid lane that refreshes to the newly generated notes each time I press `Generate New`.
     - As a user, when I press `Play`, the MIDI grid playhead and viewport scroll in time like a standard DAW.
+    - As a user, the bottom status box shows a simple drum-generation rule summary (pattern family, kit, intro/outro bars) without technical debug noise.
 
 - [ ] **0.2 Add Bass**
   - Build: Add bass generation that locks to drums, follows pulse/intensity changes, and supports at least 3 synth bass instrument options.
@@ -178,7 +190,7 @@ General MIDI audition set (optional during 0.4-0.6):
     - As a team, we can keep GM speed of development while delaying full sample-bank integration.
 
 - [ ] **0.8 Full Generate + UI Cohesion**
-  - Build: One-button full-song generation for all tracks, track-level regenerate, M/S, instrument selection, compact per-row piano roll.
+  - Build: One-button full-song generation for all tracks, intro/outro layer choreography, track-level regenerate, M/S, instrument selection, compact per-row piano roll.
   - Test gate: workflow is fast and stable; each track updates correctly and independently; generated titles update correctly on full generate.
   - User stories:
     - As a user, I can generate a full song with one click and play it immediately.
@@ -186,6 +198,8 @@ General MIDI audition set (optional during 0.4-0.6):
     - As a user, I can cycle instruments per track and always see which instrument is active.
     - As a user, I see per-track piano-roll lanes with color coding, viewport panning behavior, and correct mute/solo grey-state visuals.
     - As a user, each `Generate New` creates a new Motorik-inspired song title, while per-track regenerate keeps the current title.
+    - As a user, the top title section updates on generate and displays song title, tempo, key, mood, and style.
+    - As a user, the bottom status box shows a concise musical decision summary after generation (structure rules, intro/outro rules, track-generation rules, track instruments) with no timestamps, seed data, or transport logs.
 
 - [ ] **0.9 Stabilize and Tune**
   - Build: lock probabilities/ranges, improve determinism, performance tuning, preset polishing, and regression tests.

@@ -164,6 +164,25 @@ Optional extension:
   - Pads: Synth Pad/Strings programs
 - Replace DLS placeholders with curated CC0/CC-BY assets as they are validated.
 
+## Intermediate upgrade before full samples (recommended)
+
+If Apple DLS quality is limiting, keep GM workflow but switch to a better GM bank:
+
+- Primary recommendation: `GeneralUser GS v2.x` (higher-quality GM timbres than many default banks; free with permissive use terms).
+- Alternate: `FluidR3_GM` (MIT license, broad compatibility).
+
+Why this step is useful:
+
+- Preserves the same GM program-number logic already used in the app.
+- Improves timbre quality before committing to full per-track sample curation.
+- Minimizes UI/control changes while improving listening quality.
+
+Reference links:
+
+- GeneralUser GS: https://schristiancollins.com/generaluser.php
+- GeneralUser GS license/readme mirror: https://github.com/sfzinstruments/GeneralUser-GS
+- FluidR3_GM (MIT): https://github.com/nwsw/FluidR3_GM
+
 ## Apple DLS / General MIDI fallback map (useful presets)
 
 - Lead synth family (GM 81-88)
@@ -199,11 +218,12 @@ Optional extension:
 ### Recommended DLS defaults for Zudio tracks
 
 - Lead 1: 82 (`Saw Wave`), 87 (`5th Saw Wave`), 88 (`Bass & Lead`)
-- Lead 2: 83 (`Syn. Calliope`), 86 (`Solo Vox`), 63 (`Synth Brass 1`)
+- Lead 2: 63 (`Synth Brass 1`), 83 (`Syn. Calliope`), 64 (`Synth Brass 2`)
 - Pads: 90 (`Warm Pad`), 91 (`Polysynth`), 96 (`Sweep Pad`)
-- Rhythm: 82 (`Saw Wave`) or 91 (`Polysynth`) with short gate
-- Texture: 93 (`Bowed Glass`), 94 (`Metallic Pad`), 95 (`Halo Pad`)
+- Rhythm: 29 (`Electric Muted Guitar`) or 85 (`Charang`) with short gate
+- Texture: 94 (`Metallic Pad`), 93 (`Bowed Glass`), 95 (`Halo Pad`)
 - Bass: 39 (`Synth Bass 1`), 40 (`Synth Bass 2`), 35 (`Electric Bass Pick`)
+- Drums: Kit 24 (`Electronic`), Kit 16 (`Power`), Kit 0 (`Standard`)
 
 ### Additional DLS audition banks (if needed)
 

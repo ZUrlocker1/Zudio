@@ -30,7 +30,11 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 - Per-track controls for activity, density, variation, and mute/solo.
 - Global controls always visible: Style, Mood, Pace, Key.
 - Primary action: `Generate` creates a full song state across all tracks using current global controls.
-- Global transport includes a `Play` control shown as a green arrow.
+- Global transport includes:
+  - `Previous` (left arrow)
+  - `Play` (green arrow)
+  - `Stop` (red square)
+  - `Next` (right arrow)
 - One-click regenerate options:
   - Regenerate single track
   - Regenerate all tracks while preserving style/mood/pace/key
@@ -41,16 +45,35 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Left: track rows with track-level controls
   - Middle: DAW-like grid/piano-roll visualization and note editing surface
   - Right: per-track effect controls and quick effect actions
+  - Bottom: full-width text status box below all track rows
 - Top global bar contains:
+  - Upper-left logo lockup: stylized `Zudio` wordmark with small lightning bolt mark
+  - Transport: `Previous` (left arrow), `Play` (green arrow), `Stop` (red square), `Next` (right arrow)
   - Primary action: `Generate`
+  - Title section (top-center):
+    - Generated song title
+    - Tempo
+    - Key
+    - Mood
+    - Style
   - Global selectors: `Style`, `Mood`, `Pace`, `Key`
   - Secondary actions: `Regenerate Track`, `Regenerate All`, `Seed/Recall`
+  - Utility actions: `Help`, `About`
   - Global display/readouts: current seed, song length, master transport state
 - Left track-control column (one row per track: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums):
+  - Small track-type icon to the left of each track name
   - Track name and color
   - Instrument selector (`Auto` or manual)
   - Activity/Density/Variation controls
   - Mute/Solo and track regenerate button
+- Track icon mapping (v1 default):
+  - Lead 1: lead-synth/keys icon
+  - Lead 2: secondary-lead synth icon
+  - Pads: pad/strings keyboard icon
+  - Rhythm: rhythm-guitar or pulse-sequencer icon
+  - Texture: waveform/noise-layer icon
+  - Bass: bass instrument icon
+  - Drums: drum-kit icon
 - Middle composition surface:
   - Horizontal timeline for loop/song progression
   - Piano-roll/grid notes per track lane (drums may use lane-per-hit view)
@@ -64,6 +87,59 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - One-click generation always produces a complete song state.
   - UI should make structure visible first, detail second.
   - Advanced controls stay collapsible so first use remains simple.
+
+## Status box (v1)
+
+- A persistent text status box is shown at the bottom of the window, below all tracks.
+- Purpose:
+  - Display high-level, user-friendly information about song generation and musical structure.
+  - Keep testing/debug feedback readable without overwhelming the user.
+- Size/layout:
+  - Width: match the MIDI grid region width.
+  - Height: approximately 3-5 lines of text.
+  - Overflow behavior: vertically scrollable when content exceeds visible height.
+- Message behavior:
+  - Show concise plain-language summaries only.
+  - No timestamps.
+  - No seed values.
+  - No transport event logs.
+  - Auto-scroll to newest message by default, with manual scrollback allowed.
+- Required generation messages (on `Generate New`):
+  - Song-structure rule summary:
+    - section form selected (for example Single-A, subtle A/B)
+    - progression family selected (for example static tonic, I-bVII, i-VII)
+  - Intro rule summary:
+    - intro type selected and intro length
+    - key intro layer-entry decision (for example drums-only start, lead+texture start)
+  - Outro rule summary:
+    - outro type selected and outro length
+    - layer-drop behavior (for example subtractive fade or drums-only tail)
+  - Track-generation rule summary in canonical order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.
+    - Include short plain-language rule notes per track (for example bass = root/fifth anchor with sparse passing tones; Lead 2 = delayed entry/call-response).
+  - Per-track instrument assignment in canonical order.
+- Example compact 3-5 line status output:
+  - `Form: Subtle A/B, 16+16 bars, progression I-bVII`
+  - `Intro: Drums + Bass, 4 bars, snare enters bar 3`
+  - `Bass rule: root/fifth anchor, 1 passing tone max per bar`
+  - `Lead rules: Lead 1 motif-first, Lead 2 enters at bar 16 as response`
+  - `Outro: Drums-only tail, 4 bars, gradual cymbal reduction`
+
+## Help and About dialogs (v1)
+
+- `Help` button behavior:
+  - Opens a modal dialog with concise usage guidance:
+    - Transport controls
+    - `Generate New` vs per-track regenerate
+    - Track `Mute`/`Solo`
+    - Instrument cycling per track
+    - MIDI grid playback/scroll behavior
+  - Includes a close action and optional "do not show again" hint flag.
+- `About` button behavior:
+  - Opens a modal dialog with app identity and attribution basics:
+    - Zudio name and purpose (personal generative music research app)
+    - Version/build string
+    - Credits/license summary for included sound assets
+  - Includes close action and link target placeholder for full credits/licenses doc.
 
 ## Track instrument options (v1)
 
@@ -184,7 +260,7 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Collision checks: if Lead 1 and pads conflict heavily, simplify Lead 1 first; if Lead 1 and Lead 2 conflict, thin Lead 2 first.
   - Deterministic replay: same seed + same controls => same output.
 
-## Motorik most of it’s shot in Baie d’uffe but there are a few scenes downtownation Spec (Consolidated v1.0)
+## Motorik Implementation Spec (Consolidated v1.1)
 
 This is the implementation source of truth for Motorik. It consolidates prior Motorik sections in this document.
 
@@ -236,6 +312,31 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Rheinita-style bright cycle: 15%
     - Theme for Great Cities-style melodic minor loop: 15%
     - Trans-Europe Express-style sequencer pulse: 5%
+- Intro/Outro rules
+  - Intro length probabilities:
+    - 2 bars: 35%
+    - 4 bars: 45%
+    - 8 bars: 20%
+  - Outro length probabilities:
+    - 2 bars: 25%
+    - 4 bars: 50%
+    - 8 bars: 25%
+  - Intro type probabilities:
+    - Drums-only pulse intro: 20%
+    - Lead only melody: 10%
+    - Lead + texture: 10%
+    - Drums + Bass intro: 35%
+    - Drums + Bass + Texture intro: 15%
+    - Full-band filtered intro: 10%
+  - Outro type probabilities:
+    - Drop to Drums + Bass: 35%
+    - Drums-only tail: 30%
+    - Full-band subtractive fade (parts drop every 1-2 bars): 25%
+    - Texture-only tail after hard stop: 10%
+  - Energy contour rules:
+    - Intro builds only upward (do not start at max density).
+    - Outro removes layers progressively (no sudden full stop unless in hard-stop variant).
+    - Keep harmonic movement in intro/outro lower than in main body.
 
 ### Core musical behavior
 
@@ -249,6 +350,12 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Snare: 2/4 default
     - Hat/cymbal: steady subdivision
     - Fill limit: maximum 1 short fill per 16 bars
+    - Intro behavior:
+      - In drums-only intro, use kick+hat first; snare enters by bar 2 or 3.
+      - Allow one pickup fill in final intro bar (35% chance).
+    - Outro behavior:
+      - Reduce cymbal/hat density first, then remove snare ghost accents.
+      - Last bar may end with kick-only pulse (40% chance).
 - Bass
   - Pattern family probabilities:
     - Root/fifth anchor: 50%
@@ -259,12 +366,20 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Repetition target: 70-90% repeated cells per 16 bars
     - Passing tones: max 1-2 per bar
     - Register: low lane, minimal octave jumping
+    - Intro behavior:
+      - If Bass is active in intro, use root-heavy anchor with minimal passing tones.
+    - Outro behavior:
+      - Shift to longer note values and fewer attacks in final 2-4 bars.
 - Rhythm
   - Writing rules:
     - 1-2 bar ostinato, repeat-first behavior
     - 8th/16th pulse bias, minimal syncopation
     - Single-note or dyad-centric voicing
     - No riff-like fills; only accent/timbre shifts
+    - Intro behavior:
+      - Usually absent in first half of intro (75%); enters late to increase momentum.
+    - Outro behavior:
+      - Drop before bass and drums in most seeds.
 - Lead 1
   - Writing rules:
     - Motif-first behavior, 2-6 note motifs
@@ -272,6 +387,10 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Mostly stepwise/small intervals
     - One changed note/rhythm event every 4-8 bars
     - No high-density run longer than 2 bars
+    - Intro behavior:
+      - Suppress in intro by default; optional short pickup motif in last intro bar (20%).
+    - Outro behavior:
+      - End 1-2 bars before final stop unless in full-band subtractive fade type.
 - Lead 2
   - Entry timing probabilities:
     - Enter at bar 8: 60%
@@ -283,11 +402,18 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Off-beat echo response: 50%
       - Interval complement (3rd/6th/octave): 35%
       - Sparse unison punctuation: 15%
+    - Intro/outro behavior:
+      - Never active during intro.
+      - Drop before Lead 1 in outro (default).
 - Pads
   - Writing rules:
     - Sustained harmonic bed with slower motion than Lead 1/Lead 2/Rhythm
     - Chord-change ceiling: 1-2 functional changes per 16 bars
     - Progression shape: loop-first, linear/modal movement, avoid circle-of-fifths behavior
+    - Intro behavior:
+      - Optional low-level pad bed only in full-band filtered intro type.
+    - Outro behavior:
+      - Hold final chord tone through layer drop, then release before texture tail.
 - Texture
   - Event probabilities:
     - Event chance per 8 bars: 35%
@@ -295,6 +421,23 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Writing rules:
     - Sparse transitions only (swell/noise/tail)
     - Mostly non-harmonic to avoid tonal clutter
+    - Intro/outro behavior:
+      - Intro: reserve for low-level swell or filtered noise only.
+      - Outro: highest probability track to remain after rhythmic parts stop.
+
+### Intro/Outro layer order rules
+
+- Intro layer add order (when active):
+  - Rhythm-section intros (`Drums-only`, `Drums + Bass`, `Drums + Bass + Texture`, `Full-band filtered`):
+    - Drums -> Bass -> Pads -> Rhythm -> Lead 1 -> Texture -> Lead 2
+  - Lead-centric intros (`Lead only melody`, `Lead + texture`):
+    - Lead 1 -> Texture -> Drums -> Bass -> Pads -> Rhythm -> Lead 2
+- Outro layer drop order (default): Lead 2 -> Lead 1 -> Rhythm -> Pads -> Bass -> Drums -> Texture
+- Entry/exit timing jitter:
+  - Per-track boundary jitter up to +/- 1 beat (40% chance) for less mechanical transitions.
+- Variation lock:
+  - Intro and outro must still obey selected key and mood profile.
+  - No new progression family may be introduced only in outro.
 
 ### Song-inspired melodic variation rules
 
@@ -487,12 +630,14 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 - User-supplied words (always included)
   - Ausfart, Koln, Alles, Klar, Dinger, Forest, Zorvaak, Pile, Driver, Elektronischer, Fluss, Nonstop, Buzzkill, Pulse, Vibe, Mother, Jenny, Two, Chord, Rotter, Musik, Kosmiche, ElektroJazz, Lager, Men, Speed, Sound, Pure, Drive
   - Mittelwerk, Detroit, Tunnel, Bomb, Nordhausen, Von Neumann, Schuler, Waters, Von Braun, Panzinger, Panks, Dieter
+  - Dark, Light, Moon, Night, Sun, Stars, Exit, Airport, Jetlag, Sick, River, Lake, Road, Glass, Fast
+  - Ausgang, Ausfahrt, Flughafen, Jetlag, Krank, Fluss, See, Strasse, Tunnel, Glas, Geschwindigkeit, Tempo, Schnell, Licht, Dunkel, Nacht, Mond, Sonne, Sterne
 - Place/scene words
-  - Koln, Dusseldorf, Berlin, Ruhr, Autobahn, Tunnel, Nordhausen, Detroit, Forest
+  - Koln, Dusseldorf, Berlin, Ruhr, Autobahn, Tunnel, Nordhausen, Detroit, Forest, Flughafen, Ausgang, Ausfahrt, Strasse, See, Fluss
 - Motion/energy words
-  - Drive, Pulse, Drift, Flow, Run, Loop, Roll, Counter, Motor, Velocity, Nonstop
+  - Drive, Pulse, Drift, Flow, Run, Loop, Roll, Counter, Motor, Velocity, Nonstop, Speed, Fast, Schnell, Tempo, Geschwindigkeit, Exit
 - Texture/tone words
-  - Chrome, Static, Neon, Halo, Tape, Glass, Metal, Buzz, Klang, Kosmiche, Elektronischer
+  - Chrome, Static, Neon, Halo, Tape, Glass, Glas, Metal, Buzz, Klang, Kosmiche, Elektronischer, Light, Dark, Licht, Dunkel, Night, Nacht, Moon, Mond, Sun, Sonne, Stars, Sterne
 - Music-structure words
   - Chord, Pattern, Sequence, Ostinato, Motif, Echo, Signal, Flux, Phase
 - Verified musician-name words (from Neu!/Harmonia/Kraftwerk + related motorik acts)
