@@ -441,6 +441,34 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - motion-rich bed: 10%
   - when Lead 1 enters high-leap mode, reduce pad re-voicing rate in that window.
 
+### Scale and hook rules (Lead 1 / Lead 2)
+
+- Default scale pool for Motorik and Motorik-adjacent generation:
+  - Natural Minor (Aeolian): 40%
+  - Dorian: 25%
+  - Major (Ionian): 20%
+  - Minor Pentatonic: 10%
+  - Major Pentatonic: 5%
+- Lead 1 hook construction:
+  - Use a 5-note subset of the active scale for most motifs.
+  - Degree priority:
+    - Minor-family modes: 1, 2, b3, 5, b7
+    - Major-family modes: 1, 2, 3, 5, 6
+  - Add one mode color tone occasionally (for example Dorian 6) as a signature note event.
+- Lead 1 interval profile for hooks:
+  - repeated tone (0): 25-40%
+  - step movement (1-2 semitones): 30-45%
+  - small leaps (3-5): 15-25%
+  - large leaps (6+): 5-12%
+  - after a large leap, reverse direction in 1-2 notes (target 70%).
+- Lead 2 countermelody scale policy:
+  - Always use the same parent scale/mode as Lead 1.
+  - Use a simpler subset (often pentatonic-biased) to reduce clashes.
+  - Prefer complementary interval targets (3rd/6th/octave) and contrary/oblique motion.
+  - Avoid continuous parallel lockstep with Lead 1.
+- Scale simplification fallback:
+  - If density/clash checks fail, switch current Lead 1 phrase window to pentatonic subset for 8-16 bars.
+
 ### Core musical behavior
 
 - Drums

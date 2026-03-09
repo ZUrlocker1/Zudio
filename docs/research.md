@@ -607,6 +607,33 @@ Focused tracks used:
 - Voice-leading rule:
   - when Lead 1 enters high-leap mode, reduce pad re-voicing rate in the same window.
 
+## Scale-selection guidance for hooks and countermelodies (v0.1)
+
+- Recommended default scale pool:
+  - Natural Minor (Aeolian): 40%
+  - Dorian: 25%
+  - Major (Ionian): 20%
+  - Minor Pentatonic: 10%
+  - Major Pentatonic: 5%
+- Lead 1 hook rule:
+  - Constrain most motifs to a 5-note subset of the active scale.
+  - Degree priority:
+    - minor-family: 1, 2, b3, 5, b7
+    - major-family: 1, 2, 3, 5, 6
+  - Add one occasional color tone (mode-specific) as hook signature.
+- Lead 2 countermelody rule:
+  - Stay in same parent scale/mode as Lead 1.
+  - Prefer simpler subset (often pentatonic-biased) for clarity.
+  - Prioritize contrary/oblique motion and complementary intervals.
+- Hook interval guidance:
+  - repeated note: 25-40%
+  - stepwise: 30-45%
+  - small leap: 15-25%
+  - large leap: 5-12%
+  - after a large leap, prefer reversal in 1-2 notes.
+- Conflict fallback:
+  - If lead collision persists, temporarily force Lead 1 to pentatonic subset for 8-16 bars.
+
 ### Confidence and gaps
 
 - High confidence: pulse architecture, repetition strategy, drum/bass role, long-form variation approach.
