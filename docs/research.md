@@ -177,6 +177,8 @@ Interpretation for Zudio:
   - Allowed BPM range: 126-154
   - Time signature: fixed 4/4 in v1
   - Mood default: `Deep` or `Dream`
+  - Key-center probabilities: E 30%, A 20%, D 15%, G 10%, C 10%, B 8%, F# 7%
+  - Mood probabilities: Deep 55%, Dream 30%, Bright 15%
 - Drum rules
   - Core pattern: kick on 1/2/3/4, snare on 2/4, steady hat/cymbal subdivision.
   - Fill policy: max 1 short fill per 16 bars.
@@ -256,6 +258,11 @@ This pass tightens part-writing behavior using the target corpus (`Hallogallo`, 
 
 - Bass micro-variation every 8 bars: 60%; every 16 bars: 40%.
 - Rhythm timbre-variation event every 8 bars: 55%; every 16 bars: 45%.
+- Chord progression family weights:
+  - Static tonic hold (I or i): 35%
+  - Two-chord alternation (I-bVII): 30%
+  - Minor loop (i-VII or i-VI): 20%
+  - Modal rock cadence (bVI-bVII-I): 15%
 - Lead 1 activity per 8 bars:
   - low density: 35%
   - medium density: 50%
@@ -306,6 +313,8 @@ This pass tightens part-writing behavior using the target corpus (`Hallogallo`, 
 - Coherence constraints
   - Use linked probabilities so high-density choices on one track suppress high-density options on neighbors.
   - Block high-fill drums + high-density Lead 1 coincidence in the same 8-bar window.
+  - Align chord-change moments to strong pulse boundaries (bar starts / kick anchors).
+  - Keep key stable by default; if key shift occurs, prefer step/fifth relation to prior key.
   - Keep full determinism via seeded randomization.
 
 ### Generation algorithm mapping

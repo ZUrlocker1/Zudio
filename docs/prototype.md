@@ -202,10 +202,27 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Meter: fixed 4/4
 - Tonality
   - Mood default: `Deep` (primary), `Dream` (secondary)
+  - Key-center probabilities (Motorik default pool):
+    - E: 30%
+    - A: 20%
+    - D: 15%
+    - G: 10%
+    - C: 10%
+    - B: 8%
+    - F#: 7%
+  - Mood probabilities (Motorik):
+    - Deep: 55%
+    - Dream: 30%
+    - Bright: 15%
   - Harmonic mode probabilities:
     - Static center: 65%
     - Slow shift: 30%
     - Free drift: 5%
+  - Motorik progression family probabilities:
+    - Static tonic hold (I or i): 35%
+    - Two-chord alternation (I-bVII): 30%
+    - Minor loop (i-VII or i-VI): 20%
+    - Modal rock cadence (bVI-bVII-I): 15%
 - Song duration and form
   - Length target: 3:30-6:30 (center near 4:45)
   - Form probabilities:
@@ -263,6 +280,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Writing rules:
     - Sustained harmonic bed with slower motion than Lead 1/Lead 2/Rhythm
     - Chord-change ceiling: 1-2 functional changes per 16 bars
+    - Progression shape: loop-first, linear/modal movement, avoid circle-of-fifths behavior
 - Texture
   - Event probabilities:
     - Event chance per 8 bars: 35%
@@ -334,6 +352,8 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 - Continuity behavior
   - Only 1-2 parameter dimensions may change per track per boundary window.
   - Add/remove one layer at a time; avoid abrupt full-stop transitions.
+  - Chord changes should align with strong pulse boundaries (bar starts, usually with kick anchors).
+  - Key changes are rare in-base generation; if an evolution event shifts key, prefer step/fifth movement.
 
 ### V1 missing spec (now defined)
 
