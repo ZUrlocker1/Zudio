@@ -125,6 +125,13 @@ Orchestral libraries (Philharmonia, VCSL, VSCO 2 CE) are not appropriate for Mot
   - Good for: additional electronic/processed drum one-shots.
   - Use fit: supplemental drum layer source (verify per-pack terms before bundling).
 
+### Built-in fallback source (Apple system)
+
+- Apple General MIDI DLS Sound Bank via Apple DLS Music Device (`Apple General MIDI Down-Loadable Sound (DLS) Sound Bank Synthesiser`)
+  - Use fit: fallback for rapid prototyping when curated external assets are incomplete.
+  - Strength: immediately available, broad coverage across drums/bass/leads/pads.
+  - Limitation: less stylistically distinctive than curated Motorik sample sets.
+
 ### Motorik-focused picks to prioritize first
 
 - Drums
@@ -218,6 +225,11 @@ Implication for Zudio:
 4. Scope for iOS/iPad readiness in v1:
    - architecture-only readiness (recommended)
    - build and run shared target from day one
+
+Current decision:
+
+- Licensing posture selected: `CC0 + CC-BY` with attribution tracking.
+- Attribution location for CC-BY assets: in-app About/Credits and repository docs.
 
 ## Portability guidance (Mac -> iPhone/iPad)
 

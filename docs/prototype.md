@@ -30,6 +30,7 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 - Per-track controls for activity, density, variation, and mute/solo.
 - Global controls always visible: Style, Mood, Pace, Key.
 - Primary action: `Generate` creates a full song state across all tracks using current global controls.
+- Global transport includes a `Play` control shown as a green arrow.
 - One-click regenerate options:
   - Regenerate single track
   - Regenerate all tracks while preserving style/mood/pace/key
@@ -436,6 +437,18 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 - Keep controls shallow and meaningful; avoid DAW-level complexity in first prototype.
 - Support repeatable results via seed/session recall.
 - Effect controls should read as musical character, not studio engineering parameters.
+
+## V1 Feature Lock
+
+- Included:
+  - `Generate New` button
+  - Global `Play` button (green arrow)
+  - Per-track `Mute` and `Solo` buttons
+  - Per-track `Regenerate` button
+  - Track set/order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums
+- Excluded from v1:
+  - Effect editing controls
+  - Evolution mode (continuous morphing playback)
 
 ## Post-1.0 Evolution Mode (continuous play)
 

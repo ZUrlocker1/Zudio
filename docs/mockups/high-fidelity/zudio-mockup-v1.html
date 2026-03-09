@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zudio v1 Mockup</title>
+  <style>
+    :root {
+      --bg: #0e1318;
+      --panel: #161f28;
+      --panel2: #1c2732;
+      --line: #2f3b48;
+      --text: #e5edf5;
+      --muted: #98a8ba;
+      --accent: #ef7f2d;
+      --lane: #101821;
+      --vline: #2b3744;
+      --hline: #22303a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #0b1014 0%, #111922 65%, #0f1419 100%);
+      color: var(--text);
+      font-family: "SF Pro Display", "Helvetica Neue", sans-serif;
+    }
+    .app { min-height: 100vh; padding: 12px; display: grid; gap: 10px; }
+    .top {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--panel2);
+      color: #d9e5f2;
+    }
+    .btn.primary {
+      background: linear-gradient(120deg, #f59e3f, var(--accent));
+      color: #201306;
+    }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .chip strong { color: #fff; }
+    .board {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .header, .row {
+      display: grid;
+      grid-template-columns: 270px 1fr 170px;
+    }
+    .header {
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      background: #1b2430;
+    }
+    .header div { padding: 7px 8px; border-right: 1px solid var(--line); }
+    .header div:last-child { border-right: 0; }
+    .row { min-height: 58px; border-bottom: 1px solid var(--line); }
+    .row:last-child { border-bottom: 0; }
+    .left, .right {
+      padding: 5px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-right: 1px solid var(--line);
+      overflow: hidden;
+      flex-wrap: nowrap;
+    }
+    .right { border-right: 0; border-left: 1px solid var(--line); }
+    .name { width: 64px; font-size: 11px; font-weight: 700; }
+    .small {
+      font-size: 10px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 130px;
+    }
+    .tag {
+      border: 1px solid #425264;
+      background: #253140;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 10px;
+      color: #d2deea;
+    }
+    .lane {
+      position: relative;
+      overflow: hidden;
+      min-height: 58px;
+      background:
+        linear-gradient(to right, var(--vline) 1px, transparent 1px) 0 0 / 42px 100%,
+        linear-gradient(to bottom, var(--hline) 1px, transparent 1px) 0 0 / 100% 12px,
+        var(--lane);
+    }
+    .row.lead { --c:#b9404f; --e:#7e2734; }
+    .row.blue { --c:#2e63bf; --e:#21468a; }
+    .row.bass { --c:#6a4ec3; --e:#493493; }
+    .row.drums { --c:#d3a925; --e:#98770f; }
+    .clip {
+      position: absolute;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--e);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--c) 78%, #fff 22%) 0%, var(--c) 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+    }
+    .clip::after {
+      content: "";
+      position: absolute;
+      left: 7px; right: 7px; bottom: 5px;
+      height: 3px;
+      background: repeating-linear-gradient(to right, rgba(242,238,255,.7) 0, rgba(242,238,255,.7) 3px, transparent 3px, transparent 7px);
+      border-radius: 2px;
+      opacity: .8;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <button class="btn primary">Generate New</button>
+      <button class="btn">Play</button>
+      <div class="chips">
+        <span class="chip">Style <strong>Motorik Pulse</strong></span>
+        <span class="chip">Mood <strong>Deep</strong></span>
+        <span class="chip">Pace <strong>Drive</strong> 138 BPM</span>
+        <span class="chip">Key <strong>E</strong></span>
+        <span class="chip">Seed <strong>20491</strong></span>
+      </div>
+      <div class="chips"><span class="chip">v1: No Effects</span></div>
+    </header>
+
+    <section class="board">
+      <div class="header"><div>Track Controls</div><div></div><div>Track Actions</div></div>
+
+      <div class="row lead"><div class="left"><span class="name">Lead 1</span><span class="tag">M</span><span class="tag">S</span><span class="small">Smooth Analog Lead</span></div><div class="lane"><span class="clip" style="left:8%;top:8px;width:12%"></span><span class="clip" style="left:24%;top:20px;width:10%"></span><span class="clip" style="left:40%;top:11px;width:13%"></span><span class="clip" style="left:58%;top:23px;width:10%"></span><span class="clip" style="left:74%;top:10px;width:12%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+
+      <div class="row lead"><div class="left"><span class="name">Lead 2</span><span class="tag">M</span><span class="tag">S</span><span class="small">Bell/Pluck Lead</span></div><div class="lane"><span class="clip" style="left:16%;top:18px;width:10%"></span><span class="clip" style="left:45%;top:9px;width:12%"></span><span class="clip" style="left:76%;top:20px;width:9%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+
+      <div class="row blue"><div class="left"><span class="name">Pads</span><span class="tag">M</span><span class="tag">S</span><span class="small">Smooth Synth Pad</span></div><div class="lane"><span class="clip" style="left:5%;top:9px;width:30%"></span><span class="clip" style="left:39%;top:17px;width:28%"></span><span class="clip" style="left:71%;top:11px;width:21%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+
+      <div class="row blue"><div class="left"><span class="name">Rhythm</span><span class="tag">M</span><span class="tag">S</span><span class="small">Muted Motorik Guitar Pulse</span></div><div class="lane"><span class="clip" style="left:4%;top:11px;width:11%"></span><span class="clip" style="left:18%;top:20px;width:11%"></span><span class="clip" style="left:32%;top:12px;width:11%"></span><span class="clip" style="left:46%;top:22px;width:11%"></span><span class="clip" style="left:60%;top:12px;width:11%"></span><span class="clip" style="left:74%;top:20px;width:11%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+
+      <div class="row blue"><div class="left"><span class="name">Texture</span><span class="tag">M</span><span class="tag">S</span><span class="small">Tape Air Layer</span></div><div class="lane"><span class="clip" style="left:27%;top:15px;width:13%"></span><span class="clip" style="left:59%;top:18px;width:17%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+
+      <div class="row bass"><div class="left"><span class="name">Bass</span><span class="tag">M</span><span class="tag">S</span><span class="small">Analog Motor Bass</span></div><div class="lane"><span class="clip" style="left:6%;top:22px;width:28%"></span><span class="clip" style="left:37%;top:13px;width:24%"></span><span class="clip" style="left:65%;top:23px;width:20%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Auto</span></div></div>
+
+      <div class="row drums"><div class="left"><span class="name">Drums</span><span class="tag">M</span><span class="tag">S</span><span class="small">Vintage Electronic Kit</span></div><div class="lane"><span class="clip" style="left:2%;top:15px;width:18%"></span><span class="clip" style="left:24%;top:9px;width:16%"></span><span class="clip" style="left:46%;top:19px;width:20%"></span><span class="clip" style="left:70%;top:10px;width:14%"></span></div><div class="right"><span class="tag">Regenerate</span><span class="tag">Kit A/B</span></div></div>
+    </section>
+  </div>
+</body>
+</html>

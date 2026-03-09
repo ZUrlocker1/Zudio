@@ -1,6 +1,13 @@
 # Zudio Development Plan (v0.1 to v0.9)
 
-Scope note: effects are out of scope for this first version.
+Scope note: effects and evolution mode are out of scope for this first version.
+
+Locked v1 controls:
+
+- `Generate New`
+- Global `Play` (green arrow)
+- Per-track `Mute` / `Solo`
+- Per-track `Regenerate`
 
 Instrument minimum rule for v1:
 
