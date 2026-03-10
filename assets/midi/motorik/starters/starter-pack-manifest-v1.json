@@ -7,6 +7,7 @@
     {"track": "Bass", "asset": "bass-starters-v1.json", "count": 6, "type": "pattern_library"},
     {"track": "Pads", "asset": "pads-starters-v1.json", "count": 5, "type": "template_library"},
     {"track": "Lead1", "asset": "lead1-starters-v1.json", "count": 8, "type": "motif_library"},
+    {"track": "Lead1", "asset": "lead1-solo-starters-v2.json", "count": 8, "type": "phrase_library", "usage": "preferred_for_section_length_solos"},
     {"track": "Lead2", "asset": "lead2-starters-v1.json", "count": 6, "type": "counter_motif_library"},
     {"track": "Rhythm", "asset": "rhythm-starters-v1.json", "count": 6, "type": "pattern_library"},
     {"track": "Texture", "asset": "texture-starters-v1.json", "count": 8, "type": "event_library"}

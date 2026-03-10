@@ -1,0 +1,149 @@
+{
+  "track": "Lead1",
+  "version": "v2",
+  "step_resolution": 16,
+  "description": "Longer phrase starters for less repetitive, more developed Lead 1 solos.",
+  "phrases": [
+    {
+      "id": "lead1_phrase_01_statement_answer",
+      "bars": 4,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 88},
+        {"step": 3, "len": 2, "degree": "2", "oct": 1, "vel": 84},
+        {"step": 6, "len": 2, "degree": "b3", "oct": 1, "vel": 86},
+        {"step": 10, "len": 2, "degree": "5", "oct": 1, "vel": 90},
+        {"step": 17, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 21, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 24, "len": 2, "degree": "b3", "oct": 1, "vel": 84},
+        {"step": 28, "len": 3, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 36, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 40, "len": 2, "degree": "b7", "oct": 1, "vel": 84},
+        {"step": 44, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    },
+    {
+      "id": "lead1_phrase_02_sequence_develop",
+      "bars": 4,
+      "events": [
+        {"step": 1, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 4, "len": 2, "degree": "4", "oct": 1, "vel": 84},
+        {"step": 8, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 12, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 17, "len": 2, "degree": "b7", "oct": 1, "vel": 82},
+        {"step": 20, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 24, "len": 2, "degree": "4", "oct": 1, "vel": 84},
+        {"step": 33, "len": 2, "degree": "5", "oct": 1, "vel": 90},
+        {"step": 36, "len": 2, "degree": "6", "oct": 1, "vel": 84},
+        {"step": 40, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 44, "len": 2, "degree": "b3", "oct": 1, "vel": 84},
+        {"step": 52, "len": 2, "degree": "2", "oct": 1, "vel": 80},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 88}
+      ]
+    },
+    {
+      "id": "lead1_phrase_03_register_climb_release",
+      "bars": 4,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 4, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 8, "len": 2, "degree": "b3", "oct": 1, "vel": 84},
+        {"step": 12, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 19, "len": 2, "degree": "1", "oct": 2, "vel": 84},
+        {"step": 22, "len": 2, "degree": "b7", "oct": 1, "vel": 82},
+        {"step": 26, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 34, "len": 2, "degree": "2", "oct": 2, "vel": 84},
+        {"step": 38, "len": 2, "degree": "1", "oct": 2, "vel": 88},
+        {"step": 42, "len": 2, "degree": "b7", "oct": 1, "vel": 82},
+        {"step": 48, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 52, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    },
+    {
+      "id": "lead1_phrase_04_syncopated_space",
+      "bars": 4,
+      "events": [
+        {"step": 2, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 7, "len": 1, "degree": "2", "oct": 1, "vel": 80},
+        {"step": 10, "len": 2, "degree": "b3", "oct": 1, "vel": 84},
+        {"step": 14, "len": 1, "degree": "2", "oct": 1, "vel": 78},
+        {"step": 19, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 23, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 29, "len": 2, "degree": "2", "oct": 1, "vel": 80},
+        {"step": 35, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 41, "len": 2, "degree": "b7", "oct": 1, "vel": 80},
+        {"step": 47, "len": 2, "degree": "5", "oct": 1, "vel": 84},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 88}
+      ]
+    },
+    {
+      "id": "lead1_phrase_05_minor_pentatonic_bias",
+      "bars": 4,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 88},
+        {"step": 4, "len": 2, "degree": "b3", "oct": 1, "vel": 86},
+        {"step": 8, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 12, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 16, "len": 2, "degree": "b7", "oct": 1, "vel": 84},
+        {"step": 22, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 26, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 32, "len": 2, "degree": "1", "oct": 2, "vel": 84},
+        {"step": 38, "len": 2, "degree": "b7", "oct": 1, "vel": 82},
+        {"step": 44, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    },
+    {
+      "id": "lead1_phrase_06_dorian_color",
+      "bars": 4,
+      "events": [
+        {"step": 1, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 5, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 9, "len": 2, "degree": "b3", "oct": 1, "vel": 84},
+        {"step": 13, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 18, "len": 2, "degree": "6", "oct": 1, "vel": 80},
+        {"step": 22, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 28, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 34, "len": 2, "degree": "2", "oct": 1, "vel": 80},
+        {"step": 40, "len": 2, "degree": "1", "oct": 1, "vel": 88},
+        {"step": 46, "len": 2, "degree": "b7", "oct": 1, "vel": 82},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    },
+    {
+      "id": "lead1_phrase_07_sequence_then_break",
+      "bars": 4,
+      "events": [
+        {"step": 0, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 4, "len": 2, "degree": "4", "oct": 1, "vel": 84},
+        {"step": 8, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 12, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 16, "len": 2, "degree": "4", "oct": 1, "vel": 84},
+        {"step": 20, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 24, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 32, "len": 2, "degree": "b7", "oct": 1, "vel": 80},
+        {"step": 40, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 48, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    },
+    {
+      "id": "lead1_phrase_08_peak_and_resolve",
+      "bars": 4,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 86},
+        {"step": 4, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 8, "len": 2, "degree": "b3", "oct": 1, "vel": 84},
+        {"step": 12, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 18, "len": 2, "degree": "b7", "oct": 1, "vel": 84},
+        {"step": 22, "len": 2, "degree": "1", "oct": 2, "vel": 90},
+        {"step": 26, "len": 2, "degree": "b7", "oct": 1, "vel": 84},
+        {"step": 34, "len": 2, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 40, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 46, "len": 2, "degree": "2", "oct": 1, "vel": 80},
+        {"step": 56, "len": 4, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    }
+  ]
+}

@@ -15,6 +15,7 @@ These files provide starter musical content for code generation.
 
 Generation rule:
 1. Pick a starter pattern/template for each track.
+   - For Lead 1 solos, prefer `lead1-solo-starters-v2.json` phrase starters, then mutate.
 2. Map degrees/roles to concrete MIDI notes from song key, mode, and chord map.
 3. Apply section mutations (density, fills, accents, note substitutions) using prototype rules.
 4. Render resulting notes as MIDI events for playback.

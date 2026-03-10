@@ -42,6 +42,12 @@ Method limits:
 - MIDI Association General MIDI overview: https://midi.org/general-midi
 - MIDI Association General MIDI 2 overview: https://midi.org/general-midi-2
 - Roland GM2 rhythm set naming/program mapping reference: https://cdn.roland.com/assets/media/pdf/Fantom-G_Soundlist.pdf
+- Open Music Theory, embellishing tones: https://viva.pressbooks.pub/openmusictheory/chapter/embellishing-tones/
+- Open Music Theory, species counterpoint: https://viva.pressbooks.pub/openmusictheory/chapter/species-counterpoint/
+- Open Music Theory, motives and transformations: https://viva.pressbooks.pub/openmusictheory/chapter/motive/
+- Journal of Experimental Psychology (melodic expectancy): https://pubmed.ncbi.nlm.nih.gov/9377644/
+- Earworm melodic-feature study summary (Goldsmiths): https://research.gold.ac.uk/id/eprint/17510/
+- PNAS earworm study record: https://www.pnas.org/doi/10.1073/pnas.1612226114
 
 Third-party tempo/key reference examples (approximate):
 
@@ -173,3 +179,49 @@ Local analysis tooling:
 Output location convention:
 
 - Choose an output path per run (for example in a temporary working directory or a local analysis folder).
+
+## Pass 2 lead-focused evidence (March 10, 2026)
+
+Analysis run:
+
+- `xcrun swift tools/audio-analysis/analyze-mp3-music.swift --json docs/analysis-motorik-lead-pass2.json ...`
+- Output file: `docs/analysis-motorik-lead-pass2.json`
+- Corpus in this pass: 13 tracks (Neu!/Harmonia/Cluster + Electric Buddha set)
+
+Measured aggregate snapshot (from the JSON output):
+
+- Canonical set (Neu!/Harmonia/Cluster, n=7):
+  - mean BPM proxy: ~129.43
+  - mean pulse regularity: ~0.689
+  - mean subdivision regularity: ~0.523
+  - mean density proxy: ~1812.56
+  - mean intro ratio: ~9.1% of track length
+  - mean outro ratio: ~1.1% of track length
+  - mean section-count proxy: ~7.29
+- Creator set (Electric Buddha, n=6):
+  - mean BPM proxy: ~127.61
+  - mean pulse regularity: ~0.585
+  - mean subdivision regularity: ~0.355
+  - mean density proxy: ~1541.57
+  - mean intro ratio: ~2.6% of track length
+  - mean outro ratio: ~4.8% of track length
+  - mean section-count proxy: ~4.33
+
+Lead-oriented observations from this pass (evidence interpretation):
+
+- Canonical references show higher subdivision regularity and higher density proxies than the creator set, supporting longer continuity-driven lead arcs over short repeated fragments.
+- Creator-set tracks exhibit shorter intros and comparatively larger outro windows, which supports delayed lead entry and clearer lead de-intensification near endings.
+- Higher section-count proxies in canonical tracks support multi-phrase solo development over long timelines instead of short loop-only lead behavior.
+
+## Additional web evidence for melodic hooks and solo continuity
+
+- Embellishing-tone evidence (Open Music Theory) supports placing non-chord tones mainly as controlled passing/neighbor events with stepwise resolution behavior.
+- Counterpoint motion evidence (Open Music Theory) supports using contrary/oblique movement and avoiding excessive parallel lockstep when two lead lines are active.
+- Motive-development evidence (Open Music Theory) supports systematic variation methods (sequence, inversion, rhythmic change, expansion/compression) for maintaining identity while avoiding repetition fatigue.
+- Melodic-expectancy evidence (Journal of Experimental Psychology) supports stepwise continuation and directional recovery after leaps as listener-coherent continuation behavior.
+- Earworm-feature evidence (Goldsmiths/PNAS record) supports memorable hooks using mostly simple contours plus selective distinctive intervals and repetition.
+
+Inference boundary:
+
+- These web sources support general melodic cognition/composition behavior.
+- Motorik-specific adaptation remains an implementation-layer decision in `prototype.md`.

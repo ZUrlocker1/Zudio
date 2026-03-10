@@ -1,0 +1,24 @@
+{
+  "source": "docs/mockups/high-fidelity/zudio-mockup-v1.html",
+  "track_order": ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"],
+  "icons": {
+    "Lead 1": "🎛️",
+    "Lead 2": "🎚️",
+    "Pads": "🎹",
+    "Rhythm": "🎸",
+    "Texture": "🌫️",
+    "Bass": "🎸",
+    "Drums": "🥁",
+    "Regenerate": "⚡"
+  },
+  "assets": {
+    "Lead 1": "assets/icons/tracks/lead1.svg",
+    "Lead 2": "assets/icons/tracks/lead2.svg",
+    "Pads": "assets/icons/tracks/pads.svg",
+    "Rhythm": "assets/icons/tracks/rhythm.svg",
+    "Texture": "assets/icons/tracks/texture.svg",
+    "Bass": "assets/icons/tracks/bass.svg",
+    "Drums": "assets/icons/tracks/drums.svg",
+    "Regenerate": "assets/icons/ui/lightning-bolt.svg"
+  }
+}

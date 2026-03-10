@@ -601,8 +601,8 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Phrase length: 1-2 bars
     - Repetition target: 70-90% repeated cells per 16 bars
     - Passing tones: max 1-2 per bar, weak-beat biased, resolve within <=1 bar
-    - Register: low lane, minimal octave jumping
-    - Preferred register lane: MIDI 28-52 (default center 33-45)
+    - Register: low-mid lane, minimal octave jumping
+    - Preferred register lane: MIDI 40-64 (default center 45-57); allow brief dips below this only for section accents
     - Strong-beat note targets:
       - root: 60-75%
       - fifth: 15-30%
@@ -647,10 +647,62 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 - Lead 1
   - Writing rules:
     - Motif-first behavior, 2-6 note motifs
-    - Phrase length 1-2 bars
+    - Micro-motif length 1-2 bars; macro solo phrase blocks must be 4-8 bars
     - Mostly stepwise/small intervals
     - One changed note/rhythm event every 4-8 bars
     - No high-density run longer than 2 bars
+    - Anti-fragment rule:
+      - Do not emit isolated 1-2 note fragment phrases as a full lead statement.
+      - A phrase block must contain at least one 3+ note statement cell.
+      - 1-2 note cells are allowed only as pickups, echoes, or cadential punctuation.
+    - Repetition/variation floor:
+      - Exact 1-bar repetition max: 2 consecutive bars.
+      - In any 8-bar lead window, require >=3 variation events chosen from:
+        - rhythmic displacement
+        - note-length change
+        - interval expansion/compression
+        - diatonic sequence copy (model/copy)
+        - contour inversion fragment
+        - extension or truncation of previous motif
+    - Rest-space policy:
+      - Target 25-45% silent steps in active lead bars.
+      - Force at least one breath event every 4 bars:
+        - either a half-bar rest
+        - or one full silent bar in each 8-bar phrase block.
+    - Phrase-shape policy (solo musicality):
+      - Use statement -> answer -> development -> cadence behavior over each 8-bar phrase.
+      - Statement/answer should share contour identity but differ in rhythm or ending tone.
+      - Development section should increase rhythmic activity or register by a small amount.
+      - Cadence section should simplify and land on stable chord tone.
+    - Hook-identity model:
+      - Create one primary hook cell per section (target 3-7 notes, usually 4-6).
+      - Require hook restatement every 4-8 bars in transformed form, not exact copy.
+      - Transform operations (weighted):
+        - rhythmic displacement: 30%
+        - ending-tone change on same contour: 25%
+        - interval expansion/compression: 20%
+        - sequence up/down scale degree: 15%
+        - contour inversion fragment: 10%
+      - Identity floor:
+        - keep at least two anchor events unchanged across transformed restatements:
+          - either same opening interval
+          - or same rhythmic accent position
+          - or same cadence target degree
+    - Solo-journey arc (section-scale):
+      - For 16-bar lead windows, use 4x4-bar arc:
+        - bars 1-4: low/medium density statement
+        - bars 5-8: answer with mild variation
+        - bars 9-12: development (slightly wider range or denser rhythm)
+        - bars 13-16: resolution and cadence simplification
+      - Peak policy:
+        - one clear intensity peak per 16 bars (register or density, not both maxed at once)
+        - after peak bar, force de-intensification within next 1-2 bars
+      - Motif memory:
+        - reuse at least one transformed hook from prior section to preserve song identity.
+    - Register/contour policy:
+      - Keep most notes within a stable lane; allow one controlled high-point per 8 bars.
+      - After a large leap (>=6 semitones), recover by opposite-direction motion within 1-2 notes.
+      - Avoid repeated peak-note hammering (>3 hits) without an intervening contour change.
     - Intro behavior:
       - Suppress in intro by default; optional short pickup motif in last intro bar (20%).
     - Outro behavior:
@@ -665,17 +717,21 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Writing rules:
     - 30-60% of Lead 1 event density
     - Secondary response role, not co-lead
+    - Counter-hook policy:
+      - Build from Lead 1 hook anchors (rhythmic echo, interval complement, or delayed answer).
+      - Do not introduce an independent long-form hook when Lead 1 is active.
+      - In 8-bar windows, at least 60% of Lead 2 phrases must begin after Lead 1 phrase onset (call/response feel).
     - Response-mode probabilities:
       - Off-beat echo response: 50%
       - Interval complement (3rd/6th/octave): 35%
       - Sparse unison punctuation: 15%
-    - Intro/outro behavior:
-      - Never active during intro.
-      - Drop before Lead 1 in outro (default).
-    - Embellishment constraints:
-      - Lead 2 is always subordinate to Lead 1.
-      - Keep Lead 2 at 30-55% of Lead 1 event density.
-      - If Lead 1 is high-density, force Lead 2 into low-density response mode.
+  - Intro/outro behavior:
+    - Never active during intro.
+    - Drop before Lead 1 in outro (default).
+  - Embellishment constraints:
+    - Lead 2 is always subordinate to Lead 1.
+    - Keep Lead 2 at 30-55% of Lead 1 event density.
+    - If Lead 1 is high-density, force Lead 2 into low-density response mode.
 - Pads
   - Writing rules:
     - Sustained harmonic bed with slower motion than Lead 1/Lead 2/Rhythm
@@ -879,7 +935,7 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Pads: MIDI 48-84
   - Rhythm: MIDI 45-76
   - Texture: broad/noise bed, avoid dominant 1-3 kHz masking
-  - Bass: MIDI 28-52
+  - Bass: MIDI 40-64
   - Drums: kit-mapped lanes (non-pitched)
 - Transition/fill vocabulary (approved v1)
   - Drum micro-fill: 1-beat snare/tom pickup.
@@ -926,6 +982,7 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
     - `/assets/midi/motorik/starters/pads-starters-v1.json`
   - Lead 1:
     - `/assets/midi/motorik/starters/lead1-starters-v1.json`
+    - `/assets/midi/motorik/starters/lead1-solo-starters-v2.json` (preferred for longer/more developed solos)
   - Lead 2:
     - `/assets/midi/motorik/starters/lead2-starters-v1.json`
   - Rhythm:
@@ -934,6 +991,7 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
     - `/assets/midi/motorik/starters/texture-starters-v1.json`
   - Interpretation:
     - These assets are starter seeds only; generator must still apply section, density, intro/outro, and conflict rules before rendering final MIDI.
+    - For Lead 1, prefer v2 phrase starters when generating section-length solos; use v1 motifs as micro-cells for mutation.
 - Mood-to-scale mapping (implementation defaults)
   - Bright: Ionian (major).
   - Deep: Aeolian (natural minor).
