@@ -469,6 +469,37 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 - Scale simplification fallback:
   - If density/clash checks fail, switch current Lead 1 phrase window to pentatonic subset for 8-16 bars.
 
+### Melody-harmony coherence rules
+
+- Shared harmonic source of truth:
+  - Lead 1 and Lead 2 must read from the same active chord map used by Pads and Bass.
+  - No independent lead scale/mode selection outside the active chord window.
+- Strong-beat chord-tone policy:
+  - On strong beats (1 and 3), require chord tones with these targets:
+    - Lead 1: 70-85%
+    - Lead 2: 80-90%
+- Weak-beat tension policy:
+  - Non-chord tones are mostly allowed on weak beats/offbeats.
+  - Resolve non-chord tension to nearest chord tone within 1-2 notes (<=1 bar).
+- Chord-window note pools:
+  - For each chord window:
+    - Primary pool: chord tones
+    - Secondary pool: scale-compatible non-chord tones
+    - Avoid pool: high-clash tones for that chord
+  - Weighted note selection:
+    - Lead 1: Primary 65%, Secondary 30%, Avoid 5%
+    - Lead 2: Primary 75%, Secondary 22%, Avoid 3%
+- Phrase landing stability:
+  - Phrase-end notes should land on stable tones (root/third/fifth) >=80% of phrase endings.
+- Vertical interval safety (Lead 1 vs Lead 2 overlap):
+  - Prefer consonant overlap intervals (3rd/6th/octave).
+  - Dissonant overlaps are brief passing events (<1 beat), not sustained.
+- Chord-change revalidation:
+  - At every chord boundary, re-check held lead notes.
+  - Keep held notes only if common-tone or quickly resolving; otherwise remap to nearest allowed tone.
+- Auto-repair pass:
+  - After phrase generation, run harmonic clash detection and repair by nearest allowed tone with minimal contour change.
+
 ### Core musical behavior
 
 - Drums

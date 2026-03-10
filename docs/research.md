@@ -634,6 +634,30 @@ Focused tracks used:
 - Conflict fallback:
   - If lead collision persists, temporarily force Lead 1 to pentatonic subset for 8-16 bars.
 
+## Melody-harmony coherence rules (v0.1)
+
+- Shared harmonic source:
+  - Lead 1 and Lead 2 must reference the same active chord map as Pads and Bass.
+  - Do not generate lead notes from a separate independent harmonic timeline.
+- Strong-beat chord-tone targets:
+  - Lead 1 strong-beat chord-tone rate: 70-85%
+  - Lead 2 strong-beat chord-tone rate: 80-90%
+- Weak-beat non-chord policy:
+  - Use non-chord tones mainly on weak beats/offbeats.
+  - Resolve to nearest chord tone within 1-2 notes (<=1 bar).
+- Chord-window note pool weighting:
+  - Lead 1: Primary chord tones 65%, Secondary scale tones 30%, Avoid tones 5%
+  - Lead 2: Primary chord tones 75%, Secondary scale tones 22%, Avoid tones 3%
+- Phrase landing policy:
+  - End phrases on root/third/fifth >=80% of the time.
+- Vertical interval policy (Lead 1 + Lead 2 overlap):
+  - Prefer consonant intervals (3rd/6th/octave).
+  - Keep dissonant overlaps as short passing events (<1 beat).
+- Chord-boundary revalidation:
+  - At each chord change, remap held notes that become high-clash unless they are common tones or immediate resolutions.
+- Post-generation repair:
+  - Run harmonic validation and minimally invasive nearest-tone fixes after initial lead generation.
+
 ### Confidence and gaps
 
 - High confidence: pulse architecture, repetition strategy, drum/bass role, long-form variation approach.
