@@ -172,4 +172,4 @@ Local analysis tooling:
 
 Output location convention:
 
-- `docs/research-data/`
+- Choose an output path per run (for example in a temporary working directory or a local analysis folder).

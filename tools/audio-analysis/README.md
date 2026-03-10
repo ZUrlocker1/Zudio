@@ -24,7 +24,7 @@ It computes:
 
 ```bash
 xcrun swift /Users/urlocker/Downloads/Zudio/tools/audio-analysis/analyze-mp3-music.swift \
-  --json /Users/urlocker/Downloads/Zudio/docs/research-data/neu-set.json \
+  --json /path/to/analysis/neu-set.json \
   "/path/to/track1.mp3" \
   "/path/to/track2.mp3"
 ```
@@ -43,7 +43,7 @@ Then run:
 ```bash
 xcrun swift /Users/urlocker/Downloads/Zudio/tools/audio-analysis/analyze-mp3-music.swift \
   --list /path/to/input-files.txt \
-  --json /Users/urlocker/Downloads/Zudio/docs/research-data/output.json
+  --json /path/to/analysis/output.json
 ```
 
 ## Notes

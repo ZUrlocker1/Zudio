@@ -1,19 +1,53 @@
-# Zudio Music Architecture Research Plan
+# Zudio Music Architecture
 
 ## Goals
 
 - Build a native macOS prototype quickly with reliable real-time audio.
 - Keep the underlying music engine portable to iPhone/iPad later with minimal rewrite.
-- Support generative pattern logic, sample-based playback, synth voices, and per-track effects.
+- Support generative pattern logic with MIDI-first playback for v1.
+
+## V1 Architecture Lock (authoritative)
+
+This section is the source of truth for v1 implementation architecture.
+If any later section conflicts with this lock, this section takes precedence.
+
+- Platform/UI:
+  - Native macOS app using Swift + SwiftUI.
+- Audio engine:
+  - Apple `AVAudioEngine` only in v1.
+  - No AudioKit dependency in v1.
+- Sound source:
+  - Apple DLS / General MIDI is the default source for all tracks.
+  - Drums use two kits in v1:
+    - `Electronic` (GM/GS kit 24)
+    - `Rock Kit` mapped to `Power` (GM/GS kit 16)
+  - Starter musical content is from repo starter assets and generated MIDI notes.
+- Generation/playback model:
+  - Generator produces MIDI events per track from song structure, harmony, and track rules.
+  - Playback renders those MIDI events through selected GM instruments.
+- Product scope constraints (v1):
+  - Style selector is locked to Motorik.
+  - Effects UI appears as disabled placeholders; effect editing is out of scope.
+  - `Previous`/`Next` transport appear but are non-functional placeholders.
+  - No seed/session recall UI in v1.
+  - Authoritative v1 GM instrument/kit mapping is in `docs/prototype.md` (`Apple DLS General MIDI presets (v1 core sound source)`).
+
+## Post-v1 Considerations (not v1 implementation scope)
+
+- Higher-quality GM soundfont upgrade path (0.75+), preserving MIDI workflow.
+- Optional AudioKit integration behind an adapter boundary if iteration speed/quality requires it.
+- Sample-library based instruments/effects workflows.
+- Post-v1 sample-library sourcing/evaluation reference:
+  - `docs/post-v1-sample-library-research.md`
+- iPhone/iPad target delivery work (architecture should remain portable, but implementation is Mac-first).
+- Evolution mode and advanced effects editing.
 
 ## Recommended architecture direction (for Zudio v1)
 
 - App/UI layer: Swift + SwiftUI (macOS now, iOS/iPadOS later).
 - Audio engine layer: Apple `AVAudioEngine` graph with custom scheduling/generation logic.
-- Sound generation layer: hybrid of
-  - sample-based playback for drums and some textures
-  - lightweight synth voices (oscillator/subtractive/FM style) for bass/leads/pads
-- Data model: deterministic seed + weighted probability rules (style profile driven).
+- Sound generation layer: MIDI-first generation rendered by Apple DLS / GM instrument mapping.
+- Data model: weighted probability rules (style profile driven).
 
 Why this direction:
 
@@ -63,17 +97,19 @@ Why this direction:
 
 ### Drums
 
-- Approach 1 (recommended v1): sample kits + per-step velocity/humanization.
-- Approach 2: synthesized drum voices (kick/snare/hat models) for variation.
-- Recommendation: start sample-based, add 1-2 synthesized drum voices later.
+- V1 approach:
+  - GM kit playback with per-step velocity/humanization and section-level variation.
+  - Two-kit policy only (`Electronic` + `Rock/Power`).
+- Later:
+  - sample kits and synthesized drum voices can be evaluated post-v1.
 
 ### Bass / Leads / Pads / Rhythm / Texture
 
-- Hybrid plan:
-  - Bass and Lead 1/2: basic synth voices with optional sample layers.
-  - Pads: synth-based long envelopes + optional texture samples.
-  - Rhythm: pluck/guitar-like sample or short synth pulse engine.
-  - Texture: one-shot and looped noise/swell assets with heavy effects.
+- V1 approach:
+  - Generate MIDI notes per track and render with GM programs (Apple DLS).
+  - Use starter pattern libraries plus mutation rules for musical variation.
+- Later:
+  - optional sample/synth hybrid layer after v1 quality gate.
 
 ## Open-source libraries to evaluate
 
@@ -161,7 +197,7 @@ Orchestral libraries (Philharmonia, VCSL, VSCO 2 CE) are not appropriate for Mot
   - Mixed per-file licensing (`CC0`, `CC-BY`, `CC-BY-NC`, and legacy cases).
   - Implication: use only vetted `CC0` (or `CC-BY` if attribution pipeline is implemented). Exclude `NC` and unclear legacy licenses for app redistribution.
 
-## Suggested v1 content strategy (Motorik-focused)
+## Alternative sample-library strategy (post-v1 reference)
 
 - Drums
   - Primary: FreePats `Electric and Synthesizer Percussion` + one Karoryfer kit.
@@ -197,39 +233,27 @@ Implication for Zudio:
 4. If `CC-BY` is used, generate attribution output automatically in-app and in docs.
 5. Keep raw third-party files in a separate provenance folder for auditing.
 
-## Engine design research tasks (next)
+## Engine design research tasks (post-v1 / contingency)
 
 1. Build a tiny spike app with `AVAudioEngine` that plays 7 track lanes concurrently.
 2. Measure latency, CPU, and glitch behavior at 128/256/512 buffer settings.
 3. Validate deterministic seed replay across at least 50 generated runs.
-4. Prototype two instrument paths:
+4. Prototype optional future instrument paths:
    - sample clip scheduling
    - simple synth voice generation
 5. Evaluate one third-party add-on path:
    - AudioKit-only extension path (first)
    - optional sfizz/FluidSynth integration if sampler flexibility is needed
 
-## Decisions needed from you
+## Decisions status (resolved for v1)
 
-1. Engine approach for v1:
-   - Apple-native only
-   - Apple-native + AudioKit (recommended)
-   - JUCE-first
-2. Sound direction for v1:
-   - mostly sample-based
-   - hybrid sample+synth (recommended)
-   - mostly synth-based
-3. Licensing posture:
-   - strict CC0/internal-only starter library (recommended for simplicity)
-   - CC0 + CC-BY with attribution tracking
-4. Scope for iOS/iPad readiness in v1:
-   - architecture-only readiness (recommended)
-   - build and run shared target from day one
-
-Current decision:
-
-- Licensing posture selected: `CC0 + CC-BY` with attribution tracking.
-- Attribution location for CC-BY assets: in-app About/Credits and repository docs.
+- Engine approach: Apple-native (`AVAudioEngine`) only.
+- Sound direction: Apple DLS / General MIDI only for v1.
+- Style scope: Motorik only in v1.
+- Effects/evolution scope: excluded from functional v1 behavior (effects shown as disabled placeholders).
+- Seed/session recall: excluded from v1 UI.
+- iOS/iPad scope: architecture portability only; no v1 delivery target.
+- Licensing posture: `CC0 + CC-BY` with attribution tracking for any external assets.
 
 ## Portability guidance (Mac -> iPhone/iPad)
 
@@ -282,7 +306,8 @@ Question: can `AVAudioEngine` alone produce credible Motorik songs (in the spiri
 
 - Start v1 with `AVAudioEngine`-first implementation.
 - Keep an adapter boundary so AudioKit modules can be introduced per track later without redesign.
-- Add AudioKit in v1 only if early spike results show either:
+- Default path: defer AudioKit to post-v1.
+- Exception path: add AudioKit during v1 only if early spikes show a hard blocker:
   - slow sound-design iteration, or
   - missing instrument/effect quality relative to target.
 

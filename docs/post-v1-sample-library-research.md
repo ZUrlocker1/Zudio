@@ -1,6 +1,13 @@
-# Zudio Starter Pack Research (Motorik-Focused)
+# Zudio Post-v1 Sample Library Research (Motorik-Focused)
 
-Purpose: identify free/open assets for a v1 starter pack aligned with the Motorik palette.
+Purpose: identify free/open sample/instrument assets for a later, sample-based path aligned with the Motorik palette.
+
+Scope lock:
+
+- This document is post-v1 research only.
+- It is not part of v1 implementation scope.
+- Do not use this document to drive v1 code generation decisions.
+- V1 implementation remains Apple DLS / General MIDI plus repository MIDI starter assets.
 
 ## License tiers used in this list
 
@@ -8,21 +15,21 @@ Purpose: identify free/open assets for a v1 starter pack aligned with the Motori
 - `CC-BY-4.0`: usable if attribution is implemented in app/docs.
 - `Royalty-free (custom terms)`: usable for production; verify redistribution rights per pack before shipping.
 
-## Recommended baseline for v1
+## Recommended baseline for post-v1 sample path
 
 - Prefer `CC0` assets first.
 - Use `CC-BY` when needed (for example a better rock drum kit), with explicit attribution handling.
 - Avoid unclear/custom licenses in the initial shipped pack.
 - If curated assets are missing for a track, use Apple DLS (General MIDI) as a temporary fallback sound source during prototyping.
 
-## Licensing decision (locked)
+## Licensing decision (post-v1 policy)
 
-- Approved for v1: `CC0 + CC-BY-4.0`.
+- Approved for post-v1 sample path: `CC0 + CC-BY-4.0`.
 - Attribution policy for CC-BY: include attribution in both:
   - in-app About/Credits screen
   - repository documentation (`README` or `ATTRIBUTION.md`)
 
-## Drums (v1 target: 2 kits)
+## Drums (post-v1 sample candidates)
 
 1. Vintage Electronic Kit
 - Source: FreePats `Electric and Synthesizer Percussion`
@@ -145,7 +152,7 @@ Optional extension:
 - Link: https://sfzinstruments.github.io/
 - Use fit: quickly identify CC0/CC-BY SFZ instruments by category.
 
-## Proposed v1 import set (minimal and sufficient)
+## Proposed post-v1 import set (minimal and sufficient)
 
 - Drums: FreePats Electric Percussion (CC0), DRS Kit (CC-BY) or Big Rusty Drums (CC0 fallback)
 - Bass: Lately Bass, Synth Bass #1, Synth Bass #2 (all CC0)
@@ -155,16 +162,16 @@ Optional extension:
 - Rhythm: Clean Electric Guitar #1/#2, Synth Lead pulse source (all CC0)
 - Texture: Synth Goblins, Synth Soundtrack, one vetted royalty-free texture source
 
-## Fallback option if any track is under-supplied
+## Migration fallback during post-v1 sample rollout
 
-- Use Apple built-in General MIDI bank via Apple DLS Music Device for temporary placeholder sounds:
+- Use Apple built-in General MIDI bank via Apple DLS Music Device as a temporary compatibility layer while migrating:
   - Drums: Standard/Room kits
   - Bass: Synth Bass programs
   - Leads: Synth Lead programs
   - Pads: Synth Pad/Strings programs
 - Replace DLS placeholders with curated CC0/CC-BY assets as they are validated.
 
-## Intermediate upgrade before full samples (recommended)
+## Intermediate upgrade before full sample migration (recommended)
 
 If Apple DLS quality is limiting, keep GM workflow but switch to a better GM bank:
 
@@ -183,70 +190,9 @@ Reference links:
 - GeneralUser GS license/readme mirror: https://github.com/sfzinstruments/GeneralUser-GS
 - FluidR3_GM (MIT): https://github.com/nwsw/FluidR3_GM
 
-## Apple DLS / General MIDI fallback map (useful presets)
+## GM mapping note (to avoid scope ambiguity)
 
-- Lead synth family (GM 81-88)
-  - 81 `Square Wave`
-  - 82 `Saw Wave`
-  - 83 `Syn. Calliope`
-  - 84 `Chiffer Lead`
-  - 85 `Charang`
-  - 86 `Solo Vox`
-  - 87 `5th Saw Wave`
-  - 88 `Bass & Lead`
-- Synth bass family (GM 39-40)
-  - 39 `Synth Bass 1`
-  - 40 `Synth Bass 2`
-- Additional bass family (GM 33-38 subset used in Motorik contexts)
-  - 33 `Acoustic Bass`
-  - 34 `Electric Bass (Finger)`
-  - 35 `Electric Bass (Pick)`
-  - 36 `Fretless Bass`
-- Synth pad family (GM 89-96)
-  - 89 `New Age Pad`
-  - 90 `Warm Pad`
-  - 91 `Polysynth`
-  - 92 `Choir Pad`
-  - 93 `Bowed Glass`
-  - 94 `Metallic Pad`
-  - 95 `Halo Pad`
-  - 96 `Sweep Pad`
-- Synth brass family (GM 63-64)
-  - 63 `Synth Brass 1`
-  - 64 `Synth Brass 2`
-
-### Recommended DLS defaults for Zudio tracks
-
-- Lead 1: 82 (`Saw Wave`), 87 (`5th Saw Wave`), 88 (`Bass & Lead`)
-- Lead 2: 63 (`Synth Brass 1`), 83 (`Syn. Calliope`), 64 (`Synth Brass 2`)
-- Pads: 90 (`Warm Pad`), 91 (`Polysynth`), 96 (`Sweep Pad`)
-- Rhythm: 29 (`Electric Muted Guitar`) or 85 (`Charang`) with short gate
-- Texture: 94 (`Metallic Pad`), 93 (`Bowed Glass`), 95 (`Halo Pad`)
-- Bass: 39 (`Synth Bass 1`), 40 (`Synth Bass 2`), 35 (`Electric Bass Pick`)
-- Drums: Kit 24 (`Electronic`), Kit 16 (`Power`), Kit 0 (`Standard`)
-
-### Additional DLS audition banks (if needed)
-
-- Guitar (GM 25-32)
-  - 25 `Nylon String Guitar`
-  - 26 `Steel String Guitar`
-  - 27 `Electric Jazz Guitar`
-  - 28 `Electric Clean Guitar`
-  - 29 `Electric Muted Guitar`
-  - 30 `Overdriven Guitar`
-  - 31 `Distortion Guitar`
-  - 32 `Guitar Harmonics`
-- Piano/EP (GM 1-8 subset)
-  - 1 `Acoustic Grand`
-  - 2 `Bright Acoustic`
-  - 3 `Electric Grand`
-  - 5 `Electric Piano 1`
-  - 6 `Electric Piano 2`
-- Organ (GM 17-21)
-  - 17 `Drawbar Organ`
-  - 18 `Percussive Organ`
-  - 19 `Rock Organ`
-  - 20 `Church Organ`
-  - 21 `Reed Organ`
-
-Note: GM guitar and piano can be less realistic than curated samples; use as prototyping options and validate quality at the 0.75 decision gate.
+- Authoritative Apple DLS / GM mapping for v1 is defined in:
+  - `docs/prototype.md` -> `Apple DLS General MIDI presets (v1 core sound source)`
+- This document does not redefine v1 GM mappings.
+- Use this file only for post-v1 sample-library sourcing decisions.

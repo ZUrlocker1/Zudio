@@ -794,12 +794,12 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 ### Apple DLS General MIDI presets (v1 core sound source)
 
 - V1 uses Apple DLS (General MIDI) as the default sound source for all tracks:
-  - Lead 1: GM 82, 87, 88
-  - Lead 2: GM 83, 86, 63
-  - Pads: GM 90, 91, 96
-  - Rhythm: GM 82 or 91 with short gate
-  - Texture: GM 93, 94, 95
-  - Bass: GM 39, 40, 35
+  - Lead 1: GM 82 (`Saw Wave`), GM 87 (`5th Saw Wave`), GM 88 (`Bass & Lead`)
+  - Lead 2: GM 63 (`Synth Brass 1`), GM 83 (`Syn. Calliope`), GM 64 (`Synth Brass 2`)
+  - Pads: GM 90 (`Warm Pad`), GM 91 (`Polysynth`), GM 96 (`Sweep Pad`)
+  - Rhythm: GM 29 (`Electric Muted Guitar`), GM 85 (`Charang`), GM 91 (`Polysynth`) with short gate
+  - Texture: GM 94 (`Metallic Pad`), GM 93 (`Bowed Glass`), GM 95 (`Halo Pad`)
+  - Bass: GM 39 (`Synth Bass 1`), GM 40 (`Synth Bass 2`), GM 35 (`Electric Bass Pick`)
 - Drums kits for v1: Electronic (24) + Power (16)
   - Mapping note: `Rock Kit` = GM/GS `Power` kit (16).
   - Default choice rule:
@@ -807,6 +807,20 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
     - If style profile is electronic-leaning, start with `Electronic` (24).
 - Sample-based instrument libraries are out of scope for v1.
 - 0.75+ may evaluate higher-quality GM soundfonts (for example GeneralUser GS) while keeping the same MIDI generation flow.
+- Implementation instruction (authoritative):
+  - Use only the mappings above for baseline v1 code generation.
+  - Treat these as the required instrument families for generated tracks.
+  - Only switch within these listed candidates when user cycles instrument choices.
+- Audition-only pool (not baseline; use only if quality checks fail):
+  - Lead synth alternates: GM 81, 84, 86
+  - Bass alternates: GM 33, 34, 36
+  - Guitar alternates: GM 25-32
+  - Piano/EP alternates: GM 1, 2, 3, 5, 6
+  - Organ alternates: GM 17-21
+  - Additional drum kits (audition only): Standard (0), Room (8), Jazz (32)
+- Audition-only policy:
+  - These presets are for manual listening tests and 0.75 sound-quality gate only.
+  - They are excluded from default v1 random generation unless explicitly enabled in a debug/test mode.
 
 ### Effects probabilities (character presets)
 
