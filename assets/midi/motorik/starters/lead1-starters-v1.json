@@ -1,0 +1,94 @@
+{
+  "track": "Lead1",
+  "version": "v1",
+  "step_resolution": 16,
+  "motifs": [
+    {
+      "id": "lead1_motif_01",
+      "bars": 1,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 92},
+        {"step": 4, "len": 2, "degree": "2", "oct": 1, "vel": 84},
+        {"step": 8, "len": 2, "degree": "b3", "oct": 1, "vel": 88},
+        {"step": 12, "len": 3, "degree": "2", "oct": 1, "vel": 82}
+      ]
+    },
+    {
+      "id": "lead1_motif_02",
+      "bars": 1,
+      "events": [
+        {"step": 0, "len": 3, "degree": "5", "oct": 1, "vel": 90},
+        {"step": 6, "len": 2, "degree": "b7", "oct": 1, "vel": 84},
+        {"step": 8, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 12, "len": 2, "degree": "4", "oct": 1, "vel": 82}
+      ]
+    },
+    {
+      "id": "lead1_motif_03",
+      "bars": 2,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 92},
+        {"step": 2, "len": 2, "degree": "1", "oct": 1, "vel": 84},
+        {"step": 8, "len": 2, "degree": "2", "oct": 1, "vel": 86},
+        {"step": 10, "len": 2, "degree": "b3", "oct": 1, "vel": 88},
+        {"step": 16, "len": 2, "degree": "1", "oct": 1, "vel": 92},
+        {"step": 24, "len": 2, "degree": "5", "oct": 1, "vel": 90},
+        {"step": 28, "len": 3, "degree": "4", "oct": 1, "vel": 82}
+      ]
+    },
+    {
+      "id": "lead1_motif_04",
+      "bars": 1,
+      "events": [
+        {"step": 1, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 5, "len": 2, "degree": "1", "oct": 1, "vel": 90},
+        {"step": 9, "len": 2, "degree": "b7", "oct": 0, "vel": 84},
+        {"step": 13, "len": 2, "degree": "1", "oct": 1, "vel": 88}
+      ]
+    },
+    {
+      "id": "lead1_motif_05",
+      "bars": 1,
+      "events": [
+        {"step": 0, "len": 4, "degree": "1", "oct": 1, "vel": 88},
+        {"step": 8, "len": 4, "degree": "5", "oct": 1, "vel": 86},
+        {"step": 12, "len": 3, "degree": "4", "oct": 1, "vel": 82}
+      ]
+    },
+    {
+      "id": "lead1_motif_06",
+      "bars": 2,
+      "events": [
+        {"step": 0, "len": 2, "degree": "1", "oct": 1, "vel": 92},
+        {"step": 4, "len": 2, "degree": "2", "oct": 1, "vel": 84},
+        {"step": 8, "len": 2, "degree": "b3", "oct": 1, "vel": 86},
+        {"step": 12, "len": 2, "degree": "5", "oct": 1, "vel": 90},
+        {"step": 16, "len": 2, "degree": "1", "oct": 2, "vel": 84},
+        {"step": 24, "len": 2, "degree": "b7", "oct": 1, "vel": 82},
+        {"step": 28, "len": 2, "degree": "5", "oct": 1, "vel": 88}
+      ]
+    },
+    {
+      "id": "lead1_motif_07",
+      "bars": 1,
+      "events": [
+        {"step": 2, "len": 2, "degree": "5", "oct": 1, "vel": 88},
+        {"step": 6, "len": 2, "degree": "4", "oct": 1, "vel": 82},
+        {"step": 10, "len": 2, "degree": "2", "oct": 1, "vel": 82},
+        {"step": 14, "len": 1, "degree": "1", "oct": 1, "vel": 90}
+      ]
+    },
+    {
+      "id": "lead1_motif_08",
+      "bars": 2,
+      "events": [
+        {"step": 0, "len": 3, "degree": "1", "oct": 1, "vel": 90},
+        {"step": 8, "len": 2, "degree": "2", "oct": 1, "vel": 84},
+        {"step": 12, "len": 2, "degree": "1", "oct": 1, "vel": 88},
+        {"step": 16, "len": 3, "degree": "5", "oct": 1, "vel": 90},
+        {"step": 24, "len": 2, "degree": "4", "oct": 1, "vel": 84},
+        {"step": 28, "len": 2, "degree": "2", "oct": 1, "vel": 82}
+      ]
+    }
+  ]
+}

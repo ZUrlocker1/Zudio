@@ -1,0 +1,14 @@
+{
+  "name": "Zudio Motorik Starter Pack",
+  "version": "v1",
+  "format": "json-pattern-library",
+  "tracks": [
+    {"track": "Drums", "asset": "../drums/Drumscribe - Motorik - MIDI.mid", "count": 1, "type": "midi_seed"},
+    {"track": "Bass", "asset": "bass-starters-v1.json", "count": 6, "type": "pattern_library"},
+    {"track": "Pads", "asset": "pads-starters-v1.json", "count": 5, "type": "template_library"},
+    {"track": "Lead1", "asset": "lead1-starters-v1.json", "count": 8, "type": "motif_library"},
+    {"track": "Lead2", "asset": "lead2-starters-v1.json", "count": 6, "type": "counter_motif_library"},
+    {"track": "Rhythm", "asset": "rhythm-starters-v1.json", "count": 6, "type": "pattern_library"},
+    {"track": "Texture", "asset": "texture-starters-v1.json", "count": 8, "type": "event_library"}
+  ]
+}

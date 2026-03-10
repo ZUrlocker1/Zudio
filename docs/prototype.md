@@ -13,10 +13,10 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Bass
   - Drums
 - Global musical controls
-  - Pace (simple tempo preset, with optional BPM fine tuning)
+  - Tempo (simple tempo preset, with optional BPM fine tuning)
   - Key
   - Mood (instead of scale)
-  - Style (ambient / motorik variants)
+  - Style (Motorik only in v1; other styles are post-v1)
 
 ## Product intent
 
@@ -27,8 +27,8 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 ## Interaction concept (v1)
 
 - A multi-lane timeline or pattern grid with one lane per part: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.
-- Per-track controls for activity, density, variation, and mute/solo.
-- Global controls always visible: Style, Mood, Pace, Key.
+- Per-track controls for instrument selection, mute/solo, and regenerate.
+- Global controls always visible: Style (locked to Motorik in v1), Mood, Tempo, Key.
 - Primary action: `Generate` creates a full song state across all tracks using current global controls.
 - Global transport includes:
   - `Previous` (left arrow)
@@ -37,17 +37,22 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - `Next` (right arrow)
 - One-click regenerate options:
   - Regenerate single track
-  - Regenerate all tracks while preserving style/mood/pace/key
+  - Regenerate all tracks while preserving style/mood/tempo/key
 
 ## Design (v1 layout and UX structure)
 
 - Screen layout is organized into three vertical zones below a global top bar:
   - Left: track rows with track-level controls
   - Middle: DAW-like grid/piano-roll visualization and note editing surface
-  - Right: per-track effect controls and quick effect actions
+  - Right: per-track effect placeholders (disabled in v1)
   - Bottom: full-width text status box below all track rows
 - Top global bar contains:
-  - Upper-left logo lockup: stylized `Zudio` wordmark with small lightning bolt mark
+  - Upper-left logo lockup: use image asset `/assets/images/logo/zudio-logo.png` (transparent PNG), not text rendering
+  - Logo scaling behavior:
+    - preserve aspect ratio
+    - fit height target ~56 px on standard desktop window
+    - allow responsive range ~44-72 px based on window size
+    - center the logo within the left header column width
   - Transport: `Previous` (left arrow), `Play` (green arrow), `Stop` (red square), `Next` (right arrow)
   - Primary action: `Generate`
   - Title section (top-center):
@@ -56,16 +61,20 @@ Zudio should be oriented around visible, editable song parts instead of a purely
     - Key
     - Mood
     - Style
-  - Global selectors: `Style`, `Mood`, `Pace`, `Key`
-  - Secondary actions: `Regenerate Track`, `Regenerate All`, `Seed/Recall`
+  - Global selectors: `Style`, `Mood`, `Tempo`, `Key`
+  - Secondary actions: `Regenerate Track`, `Regenerate All`
   - Utility actions: `Help`, `About`
-  - Global display/readouts: current seed, song length, master transport state
+  - Global display/readouts: song length
 - Left track-control column (one row per track: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums):
   - Small track-type icon to the left of each track name
   - Track name and color
   - Instrument selector (`Auto` or manual)
-  - Activity/Density/Variation controls
   - Mute/Solo and track regenerate button
+- Track family color mapping (v1):
+  - Lead 1 + Lead 2: red family
+  - Pads + Rhythm + Texture: blue family
+  - Bass: purple family
+  - Drums: yellow family
 - Track icon mapping (v1 default):
   - Lead 1: lead-synth/keys icon
   - Lead 2: secondary-lead synth icon
@@ -80,9 +89,9 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Visual cues for motif repeats and variation points
   - Lightweight edit operations: drag note, lengthen/shorten, velocity accent, erase/add note
 - Right effects column:
-  - Per-track effect character controls (`Space`, `Echo`, `Width`, `Grit`, `Tone`) with context-aware subsets
-  - Quick presets per track (for example `Dry`, `Wide`, `Hazy`, `Punchy`)
-  - Simple on/off and depth controls, avoiding full plugin parameter surfaces in v1
+  - Per-track effect character controls (`Space`, `Echo`, `Width`, `Grit`, `Tone`) shown but disabled in v1
+  - Quick presets per track (for example `Dry`, `Wide`, `Hazy`, `Punchy`) shown but disabled in v1
+  - No functional effect editing in v1
 - Interaction principles:
   - One-click generation always produces a complete song state.
   - UI should make structure visible first, detail second.
@@ -108,15 +117,19 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Song-structure rule summary:
     - section form selected (for example Single-A, subtle A/B)
     - progression family selected (for example static tonic, I-bVII, i-VII)
+    - per-section bar counts
+    - per-section chord sequence shown as:
+      - chord names (for example Em-D-Em-D)
+      - Nashville notation (for example i-bVII-i-bVII)
   - Intro rule summary:
     - intro type selected and intro length
     - key intro layer-entry decision (for example drums-only start, lead+texture start)
   - Outro rule summary:
     - outro type selected and outro length
     - layer-drop behavior (for example subtractive fade or drums-only tail)
-  - Track-generation rule summary in canonical order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.
+  - Track-generation rule summary in UI order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.
     - Include short plain-language rule notes per track (for example bass = root/fifth anchor with sparse passing tones; Lead 2 = delayed entry/call-response).
-  - Per-track instrument assignment in canonical order.
+  - Per-track instrument assignment in UI order.
 - Example compact 3-5 line status output:
   - `Form: Subtle A/B, 16+16 bars, progression I-bVII`
   - `Intro: Drums + Bass, 4 bars, snare enters bar 3`
@@ -134,12 +147,24 @@ Zudio should be oriented around visible, editable song parts instead of a purely
     - Instrument cycling per track
     - MIDI grid playback/scroll behavior
   - Includes a close action and optional "do not show again" hint flag.
+  - Default Help text:
+    - `Zudio generates Motorik-inspired music using MIDI tracks.`
+    - `Use Generate New to create a full song, then Play/Stop to audition it.`
+    - `Use M and S on each track to isolate parts, and the lightning bolt to regenerate one track.`
+    - `Use instrument cycle controls to audition alternate MIDI sounds.`
+    - `The center grid shows generated MIDI notes and scrolls during playback.`
 - `About` button behavior:
   - Opens a modal dialog with app identity and attribution basics:
     - Zudio name and purpose (personal generative music research app)
     - Version/build string
     - Credits/license summary for included sound assets
   - Includes close action and link target placeholder for full credits/licenses doc.
+  - Default About text:
+    - `Zudio`
+    - `Personal generative music research prototype for native macOS.`
+    - `Version: 0.1 (prototype)`
+    - `Audio engine: Apple AVAudioEngine with Apple DLS/General MIDI playback.`
+    - `V1 scope: Motorik style only.`
 
 ## Track instrument options (v1)
 
@@ -180,18 +205,34 @@ Zudio should be oriented around visible, editable song parts instead of a purely
     - Upright bass
     - Cello-like low bowed voice
   - Drums
-    - Vintage electronic kit
-    - Modern electronic kit
-    - Jazz kit
+    - Electronic kit
     - Rock kit
 - UX simplification:
   - Show one default instrument per track when `Generate` is pressed.
   - Allow optional manual override per track.
   - Keep an `Auto` mode that reselects instruments during regeneration.
 
-## Track effects approach (v1)
+## Instrument cycling behavior (v1)
 
-- Avoid full effect-chain editing in v1.
+- Each track row includes an instrument-cycle control next to the instrument name.
+- Pressing the control advances to the next instrument in that track's candidate list.
+- Cycling wraps from the last candidate back to the first.
+- On change, playback switches to the new instrument at the next bar boundary (or immediately if transport is stopped).
+- UI always shows the active instrument name after each change.
+- In `Auto` mode, track regeneration chooses from the same per-track candidate list using weighted probabilities.
+
+## MIDI lane behavior (v1)
+
+- `Generate New` regenerates MIDI notes for all active tracks and redraws all lanes.
+- Per-track regenerate redraws only that track lane while preserving others.
+- During playback, lanes scroll with the playhead like a DAW timeline.
+- If a track is muted, its MIDI lane is greyed out.
+- If any track is soloed, non-solo lanes are greyed out and excluded from audio output.
+
+## Track effects approach (post-v1 placeholder)
+
+- Effect editing is excluded from v1.
+- Keep this as a post-v1 design placeholder so naming and routing are ready.
 - Use per-track `Effect Character` presets with 1-2 depth knobs, so users get musical results without technical setup.
 - Keep a small shared effect vocabulary across tracks:
   - Space (reverb/room)
@@ -212,15 +253,19 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 ## One-button generate rules (musical coherence)
 
 - Goal: pressing `Generate` should output a full, stylistically coherent song state in one pass.
+- Generation output is MIDI data:
+  - Each track generation step writes MIDI notes/events aligned to the current song structure, key, mode, and section plan.
+  - Playback renders those generated MIDI events through the selected General MIDI instrument/kit.
 - Use a fixed generation order so dependencies are stable:
-  - 1. Global plan (style, mood, pace, key, seed, loop/song length)
-  - 2. Lead 1 motif plan
-  - 3. Lead 2 counter-motif plan
-  - 4. Pads harmonic-bed plan
-  - 5. Rhythm ostinato plan
-  - 6. Texture-event plan
-  - 7. Bass anchor plan
-  - 8. Drums groove plan
+  - 1. Global musical frame (style, mood, tempo, key center, scale/mode)
+  - 2. Song structure and chord plan (bars, sections, per-section chords)
+  - 3. Drums groove plan (Apache family + section intensity)
+  - 4. Bass anchor plan (from key/mode + section chords)
+  - 5. Pads harmonic-bed plan (explicit chord voicing layer)
+  - 6. Lead layer plan (Lead 1 motif + Lead 2 counter-response)
+  - 7. Rhythm ostinato plan (pulse embellishment)
+  - 8. Texture-event plan (sparse atmosphere embellishment)
+  - 9. Collision/density simplification pass
   - Internal dependency build still starts from drums+bass+rhythm, then applies pads/lead layers.
 - All tracks inherit one shared harmonic map and timeline length:
   - Chord movement complexity depends on style (ambient = slower changes, motorik = tighter loop)
@@ -503,6 +548,9 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 ### Core musical behavior
 
 - Drums
+  - Starter MIDI seed asset:
+    - `/assets/midi/motorik/drums/Drumscribe - Motorik - MIDI.mid`
+    - Use as a baseline groove vocabulary source (timing/accent references), then apply v1 mutation rules for sections, fills, and intensity.
   - Pattern family probabilities:
     - Core motorik pulse: 55%
     - Accent variation: 30%
@@ -512,6 +560,31 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Snare: 2/4 default
     - Hat/cymbal: steady subdivision
     - Fill limit: maximum 1 short fill per 16 bars
+    - Fill placement weights:
+      - section-boundary lead-in: 60%
+      - 8-bar phrase boundary: 30%
+      - other bars: 10%
+    - Fill length weights:
+      - 1 beat: 60%
+      - 2 beats: 30%
+      - 1 bar: 10%
+    - Section intensity model:
+      - low: 20%
+      - medium: 55%
+      - high: 25%
+    - Intensity velocity ranges (0-127):
+      - low: kick 92-106, snare 84-100, hats 62-86
+      - medium: kick 104-118, snare 96-112, hats 72-100
+      - high: kick 112-124, snare 104-120, hats 82-108
+    - Cymbal/hat lane behavior:
+      - closed hat is default drive lane
+      - open-hat lift at phrase/section transitions
+      - ride for sustained medium/high glide sections
+      - crash accents mainly at phrase/section starts
+    - Variation policy:
+      - keep kick/snare backbone stable
+      - vary hats/accents/ghost details first
+      - one notable variation event every 8 bars by default
     - Intro behavior:
       - In drums-only intro, use kick+hat first; snare enters by bar 2 or 3.
       - Allow one pickup fill in final intro bar (35% chance).
@@ -520,14 +593,39 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Last bar may end with kick-only pulse (40% chance).
 - Bass
   - Pattern family probabilities:
-    - Root/fifth anchor: 50%
-    - Anchor + sparse passing tone: 35%
-    - More syncopated anchor: 15%
+    - Root/fifth anchor: 60%
+    - Anchor + sparse passing tone: 25%
+    - Sparse long-note anchor: 10%
+    - Light syncopated anchor variant: 5%
   - Writing rules:
     - Phrase length: 1-2 bars
     - Repetition target: 70-90% repeated cells per 16 bars
-    - Passing tones: max 1-2 per bar
+    - Passing tones: max 1-2 per bar, weak-beat biased, resolve within <=1 bar
     - Register: low lane, minimal octave jumping
+    - Preferred register lane: MIDI 28-52 (default center 33-45)
+    - Strong-beat note targets:
+      - root: 60-75%
+      - fifth: 15-30%
+      - other chord tones: 5-15%
+    - Note-pool policy by chord window:
+      - Primary: root/fifth/octave
+      - Secondary: third and scale-step approaches
+      - Avoid: non-resolving chromatic tones on strong beats
+    - Variation policy:
+      - one micro-variation event per 8 bars by default
+      - use rest-shift, note-length change, or single-note approach into next bar root
+    - Drum-bass lock policy:
+      - Kick-lock onset targets:
+        - strict mode: 75-90% of bass onsets align to kick grid points
+        - variation mode: 60-75%
+      - Avoid placing new bass onsets directly on core snare backbeats (2/4) except intentional accents.
+      - Bass attack density follows drum intensity state (low/medium/high).
+      - After drum fills, bass response event weights:
+        - downbeat root re-anchor: 60%
+        - short approach into root: 30%
+        - octave accent: 10%
+      - When drum lane shifts to ride/open-hat lift, allow slight temporary bass subdivision lift without changing harmonic anchor role.
+      - Align major drum+bass variations to 8/16-bar boundaries; avoid simultaneous high-complexity changes in the same 4-bar window.
     - Intro behavior:
       - If Bass is active in intro, use root-heavy anchor with minimal passing tones.
     - Outro behavior:
@@ -538,6 +636,10 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - 8th/16th pulse bias, minimal syncopation
     - Single-note or dyad-centric voicing
     - No riff-like fills; only accent/timbre shifts
+    - Embellishment constraints:
+      - Rhythm is a pulse enhancer, not a harmonic lead.
+      - Keep rhythm event density below drum transient density.
+      - If rhythm masks Lead 1 range, thin notes or shorten note gates.
     - Intro behavior:
       - Usually absent in first half of intro (75%); enters late to increase momentum.
     - Outro behavior:
@@ -553,6 +655,9 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Suppress in intro by default; optional short pickup motif in last intro bar (20%).
     - Outro behavior:
       - End 1-2 bars before final stop unless in full-band subtractive fade type.
+    - Embellishment constraints:
+      - Lead 1 is melodic foreground but must not mask pad chord identity.
+      - If high-density Lead 1 persists >2 bars, reduce density or shorten notes.
 - Lead 2
   - Entry timing probabilities:
     - Enter at bar 8: 60%
@@ -567,11 +672,29 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Intro/outro behavior:
       - Never active during intro.
       - Drop before Lead 1 in outro (default).
+    - Embellishment constraints:
+      - Lead 2 is always subordinate to Lead 1.
+      - Keep Lead 2 at 30-55% of Lead 1 event density.
+      - If Lead 1 is high-density, force Lead 2 into low-density response mode.
 - Pads
   - Writing rules:
     - Sustained harmonic bed with slower motion than Lead 1/Lead 2/Rhythm
     - Chord-change ceiling: 1-2 functional changes per 16 bars
     - Progression shape: loop-first, linear/modal movement, avoid circle-of-fifths behavior
+    - Pads must follow the section chord plan (no independent progression path).
+    - Chord complexity policy (Motorik-first):
+      - Triads (major/minor): 65%
+      - Sus/add colors (sus2/sus4/add9): 20%
+      - 7th chords: 10%
+      - 9th/11th colors: 5%
+      - Diminished/altered colors: <=2%, transition-only
+    - Substitution policy:
+      - Functional-jazz substitutions are off by default in Motorik mode.
+      - Only mild modal substitutions are allowed when tonal center remains stable.
+    - Voicing density:
+      - Use 2-4 note voicings by default.
+      - Re-voice less often than Lead 1 motif mutation cadence (target every 8-16 bars).
+    - If Lead 1 activity is high, reduce pad re-voicing and keep stable shell voicings.
     - Intro behavior:
       - Optional low-level pad bed only in full-band filtered intro type.
     - Outro behavior:
@@ -583,6 +706,9 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Writing rules:
     - Sparse transitions only (swell/noise/tail)
     - Mostly non-harmonic to avoid tonal clutter
+    - Embellishment constraints:
+      - Texture must remain sparser than Rhythm and Lead 2.
+      - If arrangement feels busy, simplify/remove Texture before altering Lead 1.
     - Intro/outro behavior:
       - Intro: reserve for low-level swell or filtered noise only.
       - Outro: highest probability track to remain after rhythmic parts stop.
@@ -662,20 +788,25 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Digital/FM Pulse Bass (tighter transient, less low bloom)
   - Electric Pick Bass (steady ostinato with controlled attack)
 - Drums (v1 limited set)
-  - Vintage Electronic Kit
+  - Electronic Kit
   - Rock Kit
 
-### Apple DLS fallback presets (prototype safety net)
+### Apple DLS General MIDI presets (v1 core sound source)
 
-- If curated assets are missing, use Apple DLS (General MIDI) presets:
+- V1 uses Apple DLS (General MIDI) as the default sound source for all tracks:
   - Lead 1: GM 82, 87, 88
   - Lead 2: GM 83, 86, 63
   - Pads: GM 90, 91, 96
   - Rhythm: GM 82 or 91 with short gate
   - Texture: GM 93, 94, 95
   - Bass: GM 39, 40, 35
-  - Drums kit families available: Standard (0), Room (8), Power (16), Electronic (24), Jazz (32)
-  - Preferred v1 drum pair in GM-first mode: Electronic (24) + Power (16)
+- Drums kits for v1: Electronic (24) + Power (16)
+  - Mapping note: `Rock Kit` = GM/GS `Power` kit (16).
+  - Default choice rule:
+    - Start with `Rock Kit` (Power 16) for Motorik generation.
+    - If style profile is electronic-leaning, start with `Electronic` (24).
+- Sample-based instrument libraries are out of scope for v1.
+- 0.75+ may evaluate higher-quality GM soundfonts (for example GeneralUser GS) while keeping the same MIDI generation flow.
 
 ### Effects probabilities (character presets)
 
@@ -770,6 +901,25 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Lead 1: 8 motif seeds.
   - Lead 2: 6 counter-motif templates.
   - Texture: 8 transition events.
+- Starter content assets (v1, codegen input)
+  - Manifest:
+    - `/assets/midi/motorik/starters/starter-pack-manifest-v1.json`
+  - Drums:
+    - `/assets/midi/motorik/drums/Drumscribe - Motorik - MIDI.mid`
+  - Bass:
+    - `/assets/midi/motorik/starters/bass-starters-v1.json`
+  - Pads:
+    - `/assets/midi/motorik/starters/pads-starters-v1.json`
+  - Lead 1:
+    - `/assets/midi/motorik/starters/lead1-starters-v1.json`
+  - Lead 2:
+    - `/assets/midi/motorik/starters/lead2-starters-v1.json`
+  - Rhythm:
+    - `/assets/midi/motorik/starters/rhythm-starters-v1.json`
+  - Texture:
+    - `/assets/midi/motorik/starters/texture-starters-v1.json`
+  - Interpretation:
+    - These assets are starter seeds only; generator must still apply section, density, intro/outro, and conflict rules before rendering final MIDI.
 - Mood-to-scale mapping (implementation defaults)
   - Bright: Ionian (major).
   - Deep: Aeolian (natural minor).
@@ -843,20 +993,29 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 
 - Prioritize musical coherence over infinite flexibility.
 - Keep controls shallow and meaningful; avoid DAW-level complexity in first prototype.
-- Support repeatable results via seed/session recall.
 - Effect controls should read as musical character, not studio engineering parameters.
+- No seed/session recall UI in v1 (debug/test mode may add this later).
 
 ## V1 Feature Lock
 
 - Included:
   - `Generate New` button
-  - Global `Play` button (green arrow)
+  - Global transport: `Previous` (disabled placeholder in v1), `Play` (green arrow), `Stop` (red square), `Next` (disabled placeholder in v1)
+  - Global selectors: `Style` (locked to `Motorik` in v1), `Tempo`, `Mood`, `Key`
+  - Header logo image: `/assets/images/logo/zudio-logo.png` (upper-left)
+  - `Help` and `About` dialogs
   - Per-track `Mute` and `Solo` buttons
   - Per-track `Regenerate` button
+  - Right-side effects controls shown as disabled placeholders
   - Track set/order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums
 - Excluded from v1:
   - Effect editing controls
   - Evolution mode (continuous morphing playback)
+
+## Post-v1 Note
+
+- Implementation rule: ignore all post-v1 sections when generating v1 code.
+- Post-v1 content is reference material only and must not expand v1 scope.
 
 ## Post-1.0 Evolution Mode (continuous play)
 
