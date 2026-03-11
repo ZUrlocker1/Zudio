@@ -343,7 +343,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Deep: 55%
     - Dream: 30%
     - Bright: 15%
-  - Harmonic mode probabilities:
+  - Harmonic movement profile probabilities:
     - Static center: 65%
     - Slow shift: 30%
     - Free drift: 5%
@@ -493,6 +493,18 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - motion-rich bed: 20%
   - when Lead 1 enters high-leap mode, reduce pad re-voicing rate in that window.
 
+### Implementation consistency contract (for code generation)
+
+- Purpose:
+  - This section (`Scale and hook rules` through `V1 execution parameters`) defines probability weights and numeric defaults used to tune generation.
+- Precedence:
+  - If any value here conflicts with the `Rule ID Catalog (MIDI-derived v1)`, the Rule ID Catalog is authoritative.
+  - If there is any conflict with `V1 Feature Lock`, the feature lock is authoritative for scope.
+- Interpretation:
+  - `must`, `disallowed`, `always`, and `never` are hard constraints.
+  - percentages, ranges, and weights are probabilistic defaults (tunable) and not hard guarantees per bar.
+  - style examples and song-inspired variants are vocabulary sources, not literal structure copies.
+
 ### Scale and hook rules (Lead 1 / Lead 2)
 
 - Default scale pool for Motorik and Motorik-adjacent generation:
@@ -502,6 +514,8 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Major (Ionian): 15%
   - Minor Pentatonic: 7%
   - Major Pentatonic: 3%
+  - Interpretation:
+    - This pool is a lead-writing default for phrase material and does not override section key/mode selected by tonal governance rules.
 - Lead 1 hook construction:
   - Use a 5-note subset of the active scale for most motifs.
   - Degree priority:
@@ -795,7 +809,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Enter at bar 8: 60%
     - Enter at bar 16: 40%
   - Writing rules:
-    - 30-60% of Lead 1 event density
+    - 30-55% of Lead 1 event density
     - Secondary response role, not co-lead
     - Counter-hook policy:
       - Build from Lead 1 hook anchors (rhythmic echo, interval complement, or delayed answer).
@@ -920,7 +934,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 - Rhythm: muted guitar pulse 45%, mono synth sequence 45%, arpeggiated poly 10%
 - Texture: noise bed 45%, tape/air 35%, metallic/percussive FX 20%
 - Bass: analog synth bass 45%, FM/digital synth bass 30%, electric/upright style bass 25%
-- Drums: vintage electronic kit 45%, modern electronic kit 45%, acoustic/rock kit 10%
+- Drums (v1 only): Electronic Kit 45%, Rock Kit 55%
 
 ### Specific sound options (Motorik v1)
 
@@ -985,7 +999,11 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - These presets are for manual listening tests and 0.75 sound-quality gate only.
   - They are excluded from default v1 random generation unless explicitly enabled in a debug/test mode.
 
-### Effects probabilities (character presets)
+### Effects probabilities (character presets, post-v1 only)
+
+- Scope note:
+  - Effects are non-functional placeholders in v1 and these probabilities are excluded from v1 code generation.
+  - Keep this section only for post-v1 planning.
 
 - Drums: tight 60%, roomy 25%, gritty 15%
 - Bass: focused 65%, warm 25%, saturated 10%
@@ -1007,9 +1025,9 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Only 1-2 parameter dimensions may change per track per boundary window.
   - Add/remove one layer at a time; avoid abrupt full-stop transitions.
   - Chord changes should align with strong pulse boundaries (bar starts, usually with kick anchors).
-  - Key changes are rare in-base generation; if an evolution event shifts key, prefer step/fifth movement.
+  - Key changes are disabled in v1 base generation; keep one key center per section plan.
 
-### V1 missing spec (now defined)
+### V1 execution parameters (now defined)
 
 - Groove/swing microtiming (Motorik)
   - Swing amount target: 50-52% (nearly straight).
