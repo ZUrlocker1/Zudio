@@ -1,0 +1,54 @@
+{
+  "track": "Rhythm",
+  "version": "v1-super16-tab",
+  "source": "assets/midi/references/neu-super16-tab/neu-super16-tab-translation.mid",
+  "step_resolution": 16,
+  "patterns": [
+    {
+      "id": "rhythm_super16_chug_plain_01",
+      "bars": 1,
+      "events": [
+        {"step": 0, "len": 1, "degree": "R", "oct": 0, "vel": 92},
+        {"step": 0, "len": 1, "degree": "5", "oct": 0, "vel": 86},
+        {"step": 2, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 2, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 4, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 4, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 6, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 6, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 8, "len": 1, "degree": "R", "oct": 0, "vel": 92},
+        {"step": 8, "len": 1, "degree": "5", "oct": 0, "vel": 86},
+        {"step": 10, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 10, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 12, "len": 1, "degree": "R", "oct": 0, "vel": 92},
+        {"step": 12, "len": 1, "degree": "5", "oct": 0, "vel": 86},
+        {"step": 14, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 14, "len": 1, "degree": "5", "oct": 0, "vel": 76}
+      ]
+    },
+    {
+      "id": "rhythm_super16_chug_fill_02",
+      "bars": 1,
+      "events": [
+        {"step": 0, "len": 1, "degree": "R", "oct": 0, "vel": 92},
+        {"step": 0, "len": 1, "degree": "5", "oct": 0, "vel": 86},
+        {"step": 2, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 2, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 4, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 4, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 6, "len": 1, "degree": "R", "oct": 0, "vel": 82},
+        {"step": 6, "len": 1, "degree": "5", "oct": 0, "vel": 76},
+        {"step": 8, "len": 1, "degree": "R", "oct": 0, "vel": 92},
+        {"step": 8, "len": 1, "degree": "5", "oct": 0, "vel": 86},
+        {"step": 10, "len": 1, "degree": "2", "oct": 1, "vel": 86},
+        {"step": 12, "len": 1, "degree": "b3", "oct": 1, "vel": 90},
+        {"step": 14, "len": 1, "degree": "1", "oct": 1, "vel": 84}
+      ]
+    },
+    {
+      "id": "rhythm_super16_break_nc_03",
+      "bars": 1,
+      "events": []
+    }
+  ]
+}

@@ -5,11 +5,17 @@
   "tracks": [
     {"track": "Drums", "asset": "../drums/Drumscribe - Motorik - MIDI.mid", "count": 1, "type": "midi_seed"},
     {"track": "Bass", "asset": "bass-starters-v1.json", "count": 6, "type": "pattern_library"},
+    {"track": "Bass", "asset": "bass-starters-hallogallo-v1.json", "count": 2, "type": "pattern_library_variant", "usage": "hallogallo_tab_derived"},
     {"track": "Pads", "asset": "pads-starters-v1.json", "count": 5, "type": "template_library"},
     {"track": "Lead1", "asset": "lead1-starters-v1.json", "count": 8, "type": "motif_library"},
     {"track": "Lead1", "asset": "lead1-solo-starters-v2.json", "count": 8, "type": "phrase_library", "usage": "preferred_for_section_length_solos"},
     {"track": "Lead2", "asset": "lead2-starters-v1.json", "count": 6, "type": "counter_motif_library"},
+    {"track": "Lead2", "asset": "lead2-starters-hallogallo-v1.json", "count": 1, "type": "counter_motif_library_variant", "usage": "hallogallo_tab_derived"},
     {"track": "Rhythm", "asset": "rhythm-starters-v1.json", "count": 6, "type": "pattern_library"},
-    {"track": "Texture", "asset": "texture-starters-v1.json", "count": 8, "type": "event_library"}
+    {"track": "Rhythm", "asset": "rhythm-starters-hallogallo-v1.json", "count": 1, "type": "pattern_library_variant", "usage": "hallogallo_tab_derived"},
+    {"track": "Rhythm", "asset": "rhythm-starters-super16-v1.json", "count": 3, "type": "pattern_library_variant", "usage": "super16_tab_derived"},
+    {"track": "SongStructure", "asset": "progression-templates-super16-v1.json", "count": 1, "type": "structure_template_variant", "usage": "super16_tab_derived"},
+    {"track": "Texture", "asset": "texture-starters-v1.json", "count": 8, "type": "event_library"},
+    {"track": "MultiTrack", "asset": "silly-love-songs-derived-v1.json", "count": 21, "type": "reference_section_library", "usage": "rhythmic_arrangement_vocabulary_only"}
   ]
 }

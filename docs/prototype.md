@@ -113,6 +113,9 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - No seed values.
   - No transport event logs.
   - Auto-scroll to newest message by default, with manual scrollback allowed.
+  - Where practical, include relevant generation rule references in status output as:
+    - rule ID (for example `B-002`)
+    - brief plain-language explanation of how that rule was applied
 - Required generation messages (on `Generate New`):
   - Song-structure rule summary:
     - section form selected (for example Single-A, subtle A/B)
@@ -259,13 +262,14 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 - Use a fixed generation order so dependencies are stable:
   - 1. Global musical frame (style, mood, tempo, key center, scale/mode)
   - 2. Song structure and chord plan (bars, sections, per-section chords)
-  - 3. Drums groove plan (Apache family + section intensity)
-  - 4. Bass anchor plan (from key/mode + section chords)
-  - 5. Pads harmonic-bed plan (explicit chord voicing layer)
-  - 6. Lead layer plan (Lead 1 motif + Lead 2 counter-response)
-  - 7. Rhythm ostinato plan (pulse embellishment)
-  - 8. Texture-event plan (sparse atmosphere embellishment)
-  - 9. Collision/density simplification pass
+  - 3. Tonal-governance map (section note pools + chord-window pitch-class masks)
+  - 4. Drums groove plan (Apache family + section intensity)
+  - 5. Bass anchor plan (from key/mode + section chords)
+  - 6. Pads harmonic-bed plan (explicit chord voicing layer)
+  - 7. Lead layer plan (Lead 1 motif + Lead 2 counter-response)
+  - 8. Rhythm ostinato plan (pulse embellishment)
+  - 9. Texture-event plan (sparse atmosphere embellishment)
+  - 10. Collision/density simplification pass
   - Internal dependency build still starts from drums+bass+rhythm, then applies pads/lead layers.
 - All tracks inherit one shared harmonic map and timeline length:
   - Chord movement complexity depends on style (ambient = slower changes, motorik = tighter loop)
@@ -283,6 +287,9 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Lead 2 should emphasize complementary intervals (third/sixth/octave or contrary motion) against Lead 1.
   - Texture should be mostly non-harmonic or drone-compatible to avoid tonal clutter.
   - If mood is `Free`, constrain interval leaps and avoid strong tonal cadences.
+  - Starter MIDI phrases must be remapped to current key/mode/chord map before rendering:
+    - transposition-only is allowed only if all notes remain in active section note pool
+    - otherwise apply nearest-allowed-note remap per event with contour-preservation bias
 - Register and space rules:
   - Lead 1 sits above pads unless intentionally swapped by preset.
   - Lead 2 sits either just below or just above Lead 1 with automatic spacing offsets.
@@ -444,9 +451,9 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Lead 2 entry >16 bars: 20%
   - Lead 2 remains response-role at lower density than Lead 1.
 - Rhythm-writing weights:
-  - Strict pulse rhythm (continuous subdivision lock): 60%
-  - Pulse + light accent variation: 30%
-  - Sparse/atmospheric rhythm: 10%
+  - Strict pulse rhythm (continuous subdivision lock): 25%
+  - Pulse + light accent variation: 45%
+  - Sparse/atmospheric rhythm: 30%
 - Melodic-part defaults (from `Neuschnee`, `Deluxe`, `Hollywood` focused pass):
   - Lead 1 conservative/repetition-first: 60%
   - Lead 1 melodic/contour-active: 30%
@@ -457,9 +464,9 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - interval complement: 35%
     - sparse unison punctuation: 15%
   - Pad mode weights:
-    - long-hold static bed: 55%
-    - slow-shift bed: 35%
-    - motion-rich bed: 10%
+    - long-hold static bed: 35%
+    - slow-shift bed: 45%
+    - motion-rich bed: 20%
 - Form defaults:
   - Favor long continuity windows and low harmonic churn.
   - Prefer timbral/rhythmic evolution over progression complexity.
@@ -472,28 +479,29 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - mid leaps (3-5 semitone): 15%
   - large leap accents (6+ semitone): 20%
 - Lead 1 density mode weights:
-  - low density: 30%
+  - low density: 40%
   - medium density: 45%
-  - high density: 25%
+  - high density: 15%
 - Lead 2 mode weights:
   - sparse off-beat punctuations: 45%
   - short answering phrases: 35%
   - interval-shadow counterline: 20%
   - hard cap: Lead 2 <=55% of Lead 1 event density.
 - Pads mode weights:
-  - static/long-hold bed: 60%
-  - slow-shift bed: 30%
-  - motion-rich bed: 10%
+  - static/long-hold bed: 35%
+  - slow-shift bed: 45%
+  - motion-rich bed: 20%
   - when Lead 1 enters high-leap mode, reduce pad re-voicing rate in that window.
 
 ### Scale and hook rules (Lead 1 / Lead 2)
 
 - Default scale pool for Motorik and Motorik-adjacent generation:
-  - Natural Minor (Aeolian): 40%
-  - Dorian: 25%
-  - Major (Ionian): 20%
-  - Minor Pentatonic: 10%
-  - Major Pentatonic: 5%
+  - Natural Minor (Aeolian): 35%
+  - Dorian: 20%
+  - Mixolydian: 20%
+  - Major (Ionian): 15%
+  - Minor Pentatonic: 7%
+  - Major Pentatonic: 3%
 - Lead 1 hook construction:
   - Use a 5-note subset of the active scale for most motifs.
   - Degree priority:
@@ -544,6 +552,65 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Keep held notes only if common-tone or quickly resolving; otherwise remap to nearest allowed tone.
 - Auto-repair pass:
   - After phrase generation, run harmonic clash detection and repair by nearest allowed tone with minimal contour change.
+
+### Cross-track tonal-governance rules (strict)
+
+- Global tonal lock:
+  - Every section has exactly one active parent scale/mode and one active chord map.
+  - All pitched tracks (`Bass`, `Pads`, `Rhythm`, `Lead 1`, `Lead 2`) must draw notes from this section map.
+  - Mode changes are section-boundary events only; mid-section mode swaps are disallowed in v1.
+- Chord-window pitch-class masks:
+  - For each chord window, build allowed sets:
+    - `Chord tones` (highest priority)
+    - `Scale-compatible tensions` (secondary priority)
+    - `Avoid tones` (disallowed on strong beats)
+  - Any imported starter MIDI phrase is projected into this mask before playback.
+- Track-specific note-pool quotas (per 4-bar window):
+  - Bass:
+    - chord tones >=85%
+    - scale tensions <=15%
+    - non-scale tones 0% (except explicit pickup rule, max 1 event resolving within <=1 beat)
+  - Rhythm:
+    - chord tones >=80%
+    - scale tensions <=20%
+    - non-scale tones 0%
+  - Pads:
+    - chord tones >=90%
+    - scale tensions <=10%
+    - non-scale tones 0%
+  - Lead 1:
+    - chord tones target 65-85% (already style-dependent)
+    - scale tensions allowed with timed resolution
+    - non-scale tones <=5%, weak-beat only, mandatory rapid resolution
+  - Lead 2:
+    - chord tones >=80%
+    - scale tensions <=20%
+    - non-scale tones <=2%, weak-beat only, mandatory rapid resolution
+- Strong-beat enforcement:
+  - On beats 1/3 (and equivalent section anchors), `Bass`, `Pads`, and `Rhythm` must land on chord tones.
+  - `Lead 2` strong beats prefer chord tones unless explicitly marked as passing response.
+- Mood-consistency guard:
+  - If song mood chooses minor-family mode, major-third emphasis events are constrained to brief passing/borrowed usage.
+  - If song mood chooses major-family mode, minor-third emphasis events are constrained similarly.
+  - If section mode is Mixolydian, treat `b7` as stable but keep major-third/minor-third polarity consistent with major-family behavior.
+  - This prevents simultaneous contradictory major/minor coloration across bass vs lead layers.
+- Bass-vs-Lead2 conflict resolver (priority rule):
+  - If `Bass` and `Lead 2` form a high-clash interval on a strong beat:
+    - keep bass note
+    - remap Lead 2 to nearest allowed consonant target (3rd/6th/octave or chord tone)
+    - if no clean remap within 2 semitones, suppress the Lead 2 event.
+- Starter phrase adaptation rules:
+  - Phrase ingestion pipeline:
+    - detect source phrase intervals/rhythm
+    - map notes to scale degrees against source local center
+    - remap degrees into target section chord window
+    - preserve rhythm first, contour second, exact interval last
+  - For cross-style starter sources (for example Silly Love Songs-derived patterns), harmonic identity is never copied verbatim; only rhythmic/contour vocabulary is retained.
+- Validation gate before render:
+  - Reject and regenerate any 4-bar window if:
+    - any supporting track (`Bass`, `Pads`, `Rhythm`) violates note-pool quotas
+    - more than two strong-beat bass/lead2 clashes remain after repair
+    - mixed major/minor third coloration exceeds the mood-consistency threshold.
 
 ### Core musical behavior
 
@@ -614,6 +681,12 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Variation policy:
       - one micro-variation event per 8 bars by default
       - use rest-shift, note-length change, or single-note approach into next bar root
+      - Layered-bass policy:
+        - Support two bass pattern layers:
+          - layer A (intro/core anchor)
+          - layer B (variation layer entering later)
+        - Use only one active bass layer at a time in v1 render output, but allow section-level switching between A and B.
+        - Layer switch should occur at section boundaries or 4/8-bar boundaries with a short pickup if needed.
     - Drum-bass lock policy:
       - Kick-lock onset targets:
         - strict mode: 75-90% of bass onsets align to kick grid points
@@ -636,6 +709,12 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - 8th/16th pulse bias, minimal syncopation
     - Single-note or dyad-centric voicing
     - No riff-like fills; only accent/timbre shifts
+    - Sparsity/variety policy:
+      - Do not run the same continuous subdivision density for more than 4 bars.
+      - Require a rhythm-density change every 2-4 bars (for example hit-count reduction, gate change, or accent relocation).
+      - Keep at least 20-45% silent steps in active rhythm bars.
+      - Prefer rhythm to be sparser than drums in most sections.
+      - Allow short local fill gestures at section boundaries (for example half-bar pickup), then return to sparse pulse role.
     - Embellishment constraints:
       - Rhythm is a pulse enhancer, not a harmonic lead.
       - Keep rhythm event density below drum transient density.
@@ -669,6 +748,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Force at least one breath event every 4 bars:
         - either a half-bar rest
         - or one full silent bar in each 8-bar phrase block.
+      - Avoid dense opening lead blocks; first active lead phrase should prioritize space over note count.
     - Phrase-shape policy (solo musicality):
       - Use statement -> answer -> development -> cadence behavior over each 8-bar phrase.
       - Statement/answer should share contour identity but differ in rhythm or ending tone.
@@ -732,6 +812,15 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Lead 2 is always subordinate to Lead 1.
     - Keep Lead 2 at 30-55% of Lead 1 event density.
     - If Lead 1 is high-density, force Lead 2 into low-density response mode.
+  - Role-handoff and doubling rules:
+    - If Lead 1 is absent for a section, Lead 2 may temporarily assume Lead 1 role (foreground melody) for that section.
+    - When role-handoff is active, raise Lead 2 density ceiling to Lead-1-like medium profile and allow longer phrase spans.
+    - When Lead 1 returns, Lead 2 must transition back to response role within 1-2 bars.
+    - Allow brief doubling windows where Lead 2 and Rhythm (or Lead 1) play the same motif in unison/octave for emphasis.
+    - Doubling windows are limited:
+      - typical length: 1-4 bars
+      - extended jam mode: up to 8 bars
+    - After a doubling window, require divergence (call/response or complementary contour) for at least 2 bars.
 - Pads
   - Writing rules:
     - Sustained harmonic bed with slower motion than Lead 1/Lead 2/Rhythm
@@ -750,6 +839,11 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Voicing density:
       - Use 2-4 note voicings by default.
       - Re-voice less often than Lead 1 motif mutation cadence (target every 8-16 bars).
+    - Rhythm-shape policy:
+      - Continuous whole-note pad behavior should usually be limited to 4 bars and rarely exceed 8 bars.
+      - After any 4-8 bar whole-note stretch, switch to a different pad rhythm template for at least 2-4 bars.
+      - Alternate pad rhythmic templates over time (hold, half-bar re-voice, add/sus pulse) to avoid static bed monotony.
+      - In busier sections, keep pad rhythm simple but not permanently static.
     - If Lead 1 activity is high, reduce pad re-voicing and keep stable shell voicings.
     - Intro behavior:
       - Optional low-level pad bed only in full-band filtered intro type.
@@ -757,11 +851,14 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Hold final chord tone through layer drop, then release before texture tail.
 - Texture
   - Event probabilities:
-    - Event chance per 8 bars: 35%
-    - Event chance at boundary: 70%
+    - Event chance per 8 bars: 50%
+    - Event chance at boundary: 80%
   - Writing rules:
     - Sparse transitions only (swell/noise/tail)
     - Mostly non-harmonic to avoid tonal clutter
+    - Cadence policy:
+      - Allow repeated texture accents across sections if separated by a short cooldown (typically >=2 bars).
+      - Do not place texture events in every bar; aim for selective punctuation behavior.
     - Embellishment constraints:
       - Texture must remain sparser than Rhythm and Lead 2.
       - If arrangement feels busy, simplify/remove Texture before altering Lead 1.
@@ -797,6 +894,16 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
   - Harmony: minor/modal loop with recurring hook-friendly center.
   - Bass: repeated arpeggio/anchor figure with occasional step approach.
   - Lead behavior: delayed-entry melodic hooks and repeating phrases.
+- L.A. Woman-style Mixolydian drive
+  - Harmony: major-center vamp with `bVII` color and low chord-churn behavior.
+  - Mode basis: Mixolydian-centered note pool (for example A center with D-major note material).
+  - Drums/bass feel: steady four-on-floor drive with simple but evolving bass ostinato.
+  - Bass behavior: repeated 1-5-b7-family anchors plus occasional scalar connectors; avoid over-melodic wandering.
+  - Lead interplay: Lead 1 guitar-like foreground phrases; Lead 2 keyboard response phrases in lower density call/response role.
+  - Section-role evolution:
+    - Lead 2 may become temporary Lead 1 in sections where guitar lead drops out.
+    - Later sections may use keyboard-guitar doubling (same motif) for jam-style lift before returning to differentiated roles.
+  - Cohesion guard: if Bass emphasizes major-family center tones, Lead 2 must stay in same section mode pool (no conflicting minor-family overlays).
 - Trans-Europe Express-style sequencer pulse
   - Tempo tendency: lower-mid motorik tempo pocket (~103-120).
   - Harmony: minimal harmonic movement, sequence-first construction.
@@ -989,14 +1096,94 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
     - `/assets/midi/motorik/starters/rhythm-starters-v1.json`
   - Texture:
     - `/assets/midi/motorik/starters/texture-starters-v1.json`
+  - Cross-style reference section library:
+    - `/assets/midi/motorik/starters/silly-love-songs-derived-v1.json`
+    - Source MIDI:
+      - `/assets/midi/references/wings-silly-love-songs/Wings - Silly Love Songs.mid`
   - Interpretation:
     - These assets are starter seeds only; generator must still apply section, density, intro/outro, and conflict rules before rendering final MIDI.
     - For Lead 1, prefer v2 phrase starters when generating section-length solos; use v1 motifs as micro-cells for mutation.
+    - The Silly Love Songs-derived set is arrangement/rhythm vocabulary only (especially drums+bass lock, section signaling, and electric-piano rhythm comp behavior); do not clone its harmonic identity directly.
 - Mood-to-scale mapping (implementation defaults)
-  - Bright: Ionian (major).
+  - Bright: Ionian (major) primary, Mixolydian secondary.
   - Deep: Aeolian (natural minor).
   - Dream: Dorian.
   - Free: hybrid note-pool with weak tonal gravity (avoid strong V-I cadence behavior).
+
+## Rule ID Catalog (MIDI-derived v1)
+
+This catalog enumerates the current MIDI-derived generation rules with stable IDs for implementation and testing.
+
+### Global rules that describe the overall song generation
+G-001 - Generate in section blocks (intro, A, B, bridge, outro) on 4/8/16-bar boundaries.
+G-002 - Use section-aware arrangement changes rather than static loop-only generation.
+G-003 - Permit jam-style continuity with controlled role evolution across long sections.
+G-004 - Use structure templates from reference MIDI as arrangement vocabulary, not as literal copies.
+
+### Tonal rules that define key/mode, note pools, and harmonic coherence
+T-001 - One parent key/mode per section; all pitched tracks must obey it.
+T-002 - Build chord-window note pools: chord tones, scale tensions, avoid tones.
+T-003 - Enforce strong-beat chord-tone targets for support tracks.
+T-004 - Enforce mood-consistency guard for major/minor coloration across tracks.
+T-005 - Treat Mixolydian b7 as stable while keeping major-family third polarity.
+T-006 - Starter MIDI must be remapped into current key/mode/chord pools before render.
+T-007 - If transposition alone leaves out-of-pool notes, apply nearest-allowed-note remap with contour bias.
+
+### Drum rules
+D-001 - Keep motorik-compatible pulse continuity; vary accents/hats/fills before changing core groove identity.
+D-002 - Use section-intensity drum variants (intro sparse, drive, lift, bridge sparse) for form signaling.
+
+### Bass rules
+B-001 - Keep drum+bass lock as primary rhythmic anchor.
+B-002 - Bass strong-beat note targets: root 60-75%, fifth 15-30%, other chord tones 5-15%.
+B-003 - Bass non-scale tones disallowed except explicit short pickup with rapid resolution.
+B-004 - Use layered bass model: layer A (intro/core), layer B (later variation), one active layer at a time.
+B-005 - Bass layer switches only at section or 4/8-bar boundaries (optionally with pickup).
+
+### Pad rules
+P-001 - Limit continuous whole-note pad behavior to typical <=4 bars, rare max 8 bars.
+P-002 - After long hold blocks, rotate to a different pad rhythm template for 2-4 bars.
+P-003 - Keep pads harmonically authoritative but rhythmically adaptive in busier sections.
+
+### Rhythm rules
+R-001 - Rhythm must stay sparser than drums in most sections.
+R-002 - Do not keep identical subdivision density for more than 4 bars.
+R-003 - Maintain 20-45% silence in active rhythm bars.
+R-004 - Allow short local fill gestures near boundaries, then return to sparse pulse role.
+R-005 - Use fast guitar-chug variants (plain, fill, break) as selectable rhythmic vocabulary.
+
+### Lead 1 rules
+L1-001 - Use phrase arc: statement -> answer -> development -> cadence over section windows.
+L1-002 - Avoid dense opening lead blocks; first active lead phrase prioritizes space.
+L1-003 - Keep transformed hook identity across sections (rhythm/interval/cadence anchors).
+
+### Lead 2 rules
+L2-001 - Default role is response/counterline at 30-55% of Lead 1 density.
+L2-002 - Lead 2 may temporarily assume Lead 1 role when Lead 1 is absent in a section.
+L2-003 - When Lead 1 returns, Lead 2 transitions back to response role within 1-2 bars.
+L2-004 - Lead 2 may use Hallogallo-derived motif variants as counterline vocabulary.
+
+### Texture rules
+X-001 - Reuse texture accents across sections with cooldown (typically >=2 bars).
+X-002 - Do not place texture events in every bar; use selective punctuation behavior.
+X-003 - Keep texture sparse and boundary-weighted (intro swells, transition accents, tail).
+
+### Interplay rules for cross-track behavior
+I-001 - Bass-vs-Lead2 conflict priority: keep bass, remap Lead 2 to consonant target, else suppress.
+I-002 - Allow controlled doubling windows (Lead2+Rhythm or keyboard+guitar) in unison/octave.
+I-003 - Doubling window length: typical 1-4 bars, extended jam up to 8 bars.
+I-004 - After doubling, require at least 2 bars of divergence (call/response or complementary contour).
+
+### Asset rules for starter material usage
+A-001 - silly-love-songs-derived-v1.json is rhythmic/arrangement vocabulary only; do not clone harmonic identity.
+A-002 - Use Hallogallo tab-derived bass/rhythm/lead2 variants as motif and pulse vocabulary.
+A-003 - Use Super16-derived rhythm and structure templates for fast guitar-driven sections and controlled drop bars.
+
+### Quality rules for validation and regeneration
+Q-001 - Reject/regenerate 4-bar windows that violate note-pool quotas for Bass/Pads/Rhythm.
+Q-002 - Reject/regenerate windows with >2 unresolved strong-beat Bass/Lead2 clashes.
+Q-003 - Reject/regenerate windows exceeding mood-consistency major/minor coloration threshold.
+Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 
 ## Motorik Title Generator (v1)
 
@@ -1016,12 +1203,14 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Mittelwerk, Detroit, Tunnel, Bomb, Nordhausen, Von Neumann, Schuler, Waters, Von Braun, Panzinger, Panks, Dieter
   - Dark, Light, Moon, Night, Sun, Stars, Exit, Airport, Jetlag, Sick, River, Lake, Road, Glass, Fast
   - Ausgang, Ausfahrt, Flughafen, Jetlag, Krank, Fluss, See, Strasse, Tunnel, Glas, Geschwindigkeit, Tempo, Schnell, Licht, Dunkel, Nacht, Mond, Sonne, Sterne
+  - Zen, Zoetrope, Zeitgeist, Zietgiest, Zeno, Zug, Zoo, Neon Highway
+  - 1977, '85, No. 7, Part 1, Part 2
 - Place/scene words
   - Koln, Dusseldorf, Berlin, Ruhr, Autobahn, Tunnel, Nordhausen, Detroit, Forest, Flughafen, Ausgang, Ausfahrt, Strasse, See, Fluss
 - Motion/energy words
   - Drive, Pulse, Drift, Flow, Run, Loop, Roll, Counter, Motor, Velocity, Nonstop, Speed, Fast, Schnell, Tempo, Geschwindigkeit, Exit
 - Texture/tone words
-  - Chrome, Static, Neon, Halo, Tape, Glass, Glas, Metal, Buzz, Klang, Kosmiche, Elektronischer, Light, Dark, Licht, Dunkel, Night, Nacht, Moon, Mond, Sun, Sonne, Stars, Sterne
+  - Chrome, Static, Neon, Halo, Tape, Glass, Glas, Metal, Buzz, Klang, Kosmiche, Elektronischer, Light, Dark, Licht, Dunkel, Night, Nacht, Moon, Mond, Sun, Sonne, Stars, Sterne, Zen, Zeitgeist
 - Music-structure words
   - Chord, Pattern, Sequence, Ostinato, Motif, Echo, Signal, Flux, Phase
 - Verified musician-name words (from Neu!/Harmonia/Kraftwerk + related motorik acts)
@@ -1030,6 +1219,12 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Ralf, Hutter, Florian, Schneider, Karl, Bartos, Wolfgang, Flur
 - Rearranged title words (from referenced tracks/albums; not exact copies)
   - Hallo, Immer, Neu, Deluxe, Monza, Hollywood, Express, Europe, Endlos, Dynamik, Weiter
+
+### Additional Z-lexicon suggestions (real + faux Germanic)
+
+- Approved additions:
+  - Zentrale
+  - Zignal
 
 ### Generation patterns (weighted)
 
@@ -1045,7 +1240,7 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 
 - Avoid exact known song titles; require at least one token change/reorder.
 - Avoid repeating the same first token in consecutive generated titles.
-- Cap punctuation and symbols (letters/spaces only in v1).
+- Cap punctuation and symbols (letters/spaces preferred in v1; allow only approved numeric tokens: `1977`, `'85`, `No. 7`, `Part 1`, `Part 2`).
 - Keep phonetic punch: prefer hard consonants and short vowels for one-word titles.
 
 ### Example generated titles (additional)

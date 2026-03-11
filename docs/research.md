@@ -45,9 +45,10 @@ Method limits:
 - Open Music Theory, embellishing tones: https://viva.pressbooks.pub/openmusictheory/chapter/embellishing-tones/
 - Open Music Theory, species counterpoint: https://viva.pressbooks.pub/openmusictheory/chapter/species-counterpoint/
 - Open Music Theory, motives and transformations: https://viva.pressbooks.pub/openmusictheory/chapter/motive/
-- Journal of Experimental Psychology (melodic expectancy): https://pubmed.ncbi.nlm.nih.gov/9377644/
-- Earworm melodic-feature study summary (Goldsmiths): https://research.gold.ac.uk/id/eprint/17510/
-- PNAS earworm study record: https://www.pnas.org/doi/10.1073/pnas.1612226114
+- music21 key-analysis profile methods (Krumhansl/Temperley/Aarden-Essen): https://www.music21.org/music21docs/moduleReference/moduleAnalysisDiscrete.html
+- Essentia KeyExtractor (HPCP key estimation + profile families): https://essentia.upf.edu/reference/streaming_KeyExtractor.html
+- Essentia TonalExtractor (key/chord-strength extraction): https://essentia.upf.edu/reference/std_TonalExtractor.html
+- Key-profile reference set (Krumhansl-Kessler, Temperley, etc.): https://github.com/jackmcarthur/keycor
 
 Third-party tempo/key reference examples (approximate):
 
@@ -218,8 +219,52 @@ Lead-oriented observations from this pass (evidence interpretation):
 - Embellishing-tone evidence (Open Music Theory) supports placing non-chord tones mainly as controlled passing/neighbor events with stepwise resolution behavior.
 - Counterpoint motion evidence (Open Music Theory) supports using contrary/oblique movement and avoiding excessive parallel lockstep when two lead lines are active.
 - Motive-development evidence (Open Music Theory) supports systematic variation methods (sequence, inversion, rhythmic change, expansion/compression) for maintaining identity while avoiding repetition fatigue.
-- Melodic-expectancy evidence (Journal of Experimental Psychology) supports stepwise continuation and directional recovery after leaps as listener-coherent continuation behavior.
-- Earworm-feature evidence (Goldsmiths/PNAS record) supports memorable hooks using mostly simple contours plus selective distinctive intervals and repetition.
+
+## Web evidence for tonal governance and cross-track coherence
+
+- Key-profile evidence (music21 + Essentia + keycor profile sets) supports explicit key/mode estimation and confidence scoring, with profile families such as Krumhansl-Kessler and Temperley used as practical tonal-center models.
+- Open Music Theory embellishing-tone guidance supports treating non-chord tones as controlled events that resolve quickly and are less stable on strong beats.
+- Species counterpoint guidance supports consonance emphasis on structurally strong positions and controlled dissonance treatment on weaker positions.
+- Combined implication for generative rules:
+  - one parent key/mode per section
+  - chord-window note pools per section
+  - strict strong-beat chord-tone enforcement for support layers (bass/pads/rhythm)
+  - explicit clash-repair pass for competing melodic layers (especially bass vs secondary lead).
+
+## User-directed reference hypothesis (The Doors - L.A. Woman)
+
+User-provided observation set:
+
+- Four-on-floor drive is close to motorik pulse feel.
+- Bass is repetitive/drive-forward but not purely root-note static.
+- Lead interplay (guitar foreground + electric-piano response) is relevant to Lead 1/Lead 2 layering.
+- Tonal center observation: A-major center with D-major pitch material (Mixolydian interpretation).
+- MIDI-structure observation from supplied file:
+  - Guitar lead enters around bar 17.
+  - Rhythm guitar enters around bar 28.
+  - Keyboard response layer appears around bar 13 (piano-labeled track in file).
+  - Additional electric-piano lead layer appears around bar 110 and later returns to supportive/doubling behavior.
+  - Two bass tracks show intro-layer then variation-layer entry pattern.
+  - Drums begin around bar 3.
+
+Evidence-use boundary:
+
+- This is treated as a stylistic hypothesis input for rule design.
+- It is not used as canonical motorik evidence by itself; adaptation is constrained by motorik coherence rules.
+
+## Rule ID evidence mapping
+
+Evidence from this document maps to rule IDs in `prototype.md` as follows:
+
+- Structure/continuity evidence -> `G-001`, `G-002`, `G-003`, `G-004`
+- Key/mode and note-pool evidence (music21/Essentia/key-profile references) -> `T-001` through `T-007`
+- Rhythm-section interaction evidence -> `D-001`, `D-002`, `B-001`, `B-002`, `R-001` through `R-005`
+- Bass coherence evidence -> `B-003`, `B-004`, `B-005`
+- Lead/counterlead evidence -> `L1-001`, `L1-002`, `L1-003`, `L2-001`, `L2-004`
+- L.A. Woman role-evolution hypothesis (from supplied MIDI structure) -> `L2-002`, `L2-003`, `I-002`, `I-003`, `I-004`
+- Texture punctuation evidence -> `X-001`, `X-002`, `X-003`
+- Cross-track clash findings and tonal conflict mitigation -> `I-001`, `Q-001`, `Q-002`, `Q-003`, `Q-004`
+- Starter-asset adaptation evidence (Silly/Hallogallo/Super16 derived packs) -> `A-001`, `A-002`, `A-003`
 
 Inference boundary:
 
