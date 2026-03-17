@@ -31,7 +31,7 @@ struct StructureGenerator {
         var cursor = 0
 
         // Intro
-        sections.append(SongSection(startBar: cursor, lengthBars: introBars, label: .intro, intensity: .low, mode: .dorian))
+        sections.append(SongSection(startBar: cursor, lengthBars: introBars, label: .intro, intensity: .low, mode: .Dorian))
         cursor += introBars
 
         // Body sections
@@ -40,7 +40,7 @@ struct StructureGenerator {
         cursor += bodyBars
 
         // Outro
-        sections.append(SongSection(startBar: cursor, lengthBars: outroBars, label: .outro, intensity: .low, mode: bodySections.last?.mode ?? .dorian))
+        sections.append(SongSection(startBar: cursor, lengthBars: outroBars, label: .outro, intensity: .low, mode: bodySections.last?.mode ?? .Dorian))
 
         return sections
     }
@@ -50,7 +50,7 @@ struct StructureGenerator {
     ) -> [SongSection] {
         switch form {
         case .singleA:
-            return [SongSection(startBar: cursor, lengthBars: bodyBars, label: .A, intensity: .medium, mode: .dorian)]
+            return [SongSection(startBar: cursor, lengthBars: bodyBars, label: .A, intensity: .medium, mode: .Dorian)]
         case .subtleAB:
             return buildSubtleAB(bodyBars: bodyBars, cursor: cursor, rng: &rng)
         case .moderateAB:
@@ -68,7 +68,7 @@ struct StructureGenerator {
         let aIntensity: SectionIntensity = rng.nextDouble() < 0.20 ? .low : .medium
         let bMode = Mode.allCases[rng.nextInt(upperBound: Mode.allCases.count)]
         return [
-            SongSection(startBar: cursor, lengthBars: aBars, label: .A, intensity: aIntensity, mode: .dorian),
+            SongSection(startBar: cursor, lengthBars: aBars, label: .A, intensity: aIntensity, mode: .Dorian),
             SongSection(startBar: cursor + aBars, lengthBars: bBars, label: .B, intensity: .high, mode: bMode)
         ]
     }
@@ -87,13 +87,13 @@ struct StructureGenerator {
         let aIntensity: SectionIntensity = rng.nextDouble() < 0.10 ? .low : .medium
         let bMode = Mode.allCases[rng.nextInt(upperBound: Mode.allCases.count)]
         var sections: [SongSection] = [
-            SongSection(startBar: cursor, lengthBars: aBars, label: .A, intensity: aIntensity, mode: .dorian),
+            SongSection(startBar: cursor, lengthBars: aBars, label: .A, intensity: aIntensity, mode: .Dorian),
             SongSection(startBar: cursor + aBars, lengthBars: bBars, label: .B, intensity: .high, mode: bMode)
         ]
         if hasReprise {
             let repriseBars = rng.nextDouble() < 0.5 ? 16 : 32
             let repriseStart = cursor + aBars + bBars
-            sections.append(SongSection(startBar: repriseStart, lengthBars: repriseBars, label: .A, intensity: .medium, mode: .dorian))
+            sections.append(SongSection(startBar: repriseStart, lengthBars: repriseBars, label: .A, intensity: .medium, mode: .Dorian))
         }
         return sections
     }

@@ -8,6 +8,7 @@ let package = Package(
         .executableTarget(
             name: "Zudio",
             path: "Sources/Zudio",
+            exclude: ["Info.plist"],
             resources: [
                 .copy("Resources")
             ],

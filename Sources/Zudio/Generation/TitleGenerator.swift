@@ -3,7 +3,7 @@
 struct TitleGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
         let pattern = patterns[rng.nextInt(upperBound: patterns.count)]
-        return pattern(&frame, &rng)
+        return pattern(frame, &rng)
     }
 
     // MARK: - Word banks (spec §Title word banks)
@@ -26,7 +26,7 @@ struct TitleGenerator {
 
     // MARK: - Generation patterns
 
-    typealias PatternFn = (inout GlobalMusicalFrame, inout SeededRNG) -> String
+    typealias PatternFn = @Sendable (GlobalMusicalFrame, inout SeededRNG) -> String
 
     private static let patterns: [PatternFn] = [
         // German noun compound

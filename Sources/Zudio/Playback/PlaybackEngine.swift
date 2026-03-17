@@ -13,44 +13,43 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Audio graph
 
-    private let engine    = AVAudioEngine()
-    private var samplers  = [AVAudioUnitSampler]()
-    private let mixer     = AVAudioMixerNode()
+    private let engine   = AVAudioEngine()
+    private var samplers = [AVAudioUnitSampler]()
+    private let mixer    = AVAudioMixerNode()
     private var scheduler: StepScheduler?
 
-    // MARK: - Song state (set before play)
+    // MARK: - Song state
 
     private(set) var songState: SongState?
 
-    // Track mute/solo state (indexed by trackIndex)
-    var muteState: [Bool] = Array(repeating: false, count: 7)
-    var soloState: [Bool] = Array(repeating: false, count: 7)
+    // Mute/solo state indexed by trackIndex
+    var muteState: [Bool] = Array(repeating: false, count: 7) {
+        didSet { applyMuteState() }
+    }
+    var soloState: [Bool] = Array(repeating: false, count: 7) {
+        didSet { applyMuteState() }
+    }
 
-    // MARK: - Init
+    // MARK: - Init — engine starts once at launch (spec §Engine setup)
 
     init() {
         setupEngine()
+        startEngine()
     }
 
     // MARK: - Public API
 
     func load(_ state: SongState) {
-        stop()
-        self.songState = state
-        currentBar  = 0
-        currentStep = 0
+        songState = state
+        // Don't reset playhead here; only reset on play/stop
     }
 
     func play() {
         guard !isPlaying, let state = songState else { return }
-        do {
-            if !engine.isRunning { try engine.start() }
-        } catch {
-            print("AVAudioEngine start error: \(error)")
-            return
-        }
-
-        isPlaying = true
+        // Always play from beginning (spec §Playback behavior)
+        currentBar  = 0
+        currentStep = 0
+        isPlaying   = true
         let sched = StepScheduler(engine: self, songState: state)
         scheduler = sched
         sched.start()
@@ -58,31 +57,69 @@ final class PlaybackEngine: ObservableObject {
 
     func stop() {
         scheduler?.stop()
-        scheduler = nil
-        isPlaying  = false
+        scheduler   = nil
+        isPlaying   = false
+        // Playhead returns to bar 1 (spec §Playback behavior)
+        currentBar  = 0
+        currentStep = 0
+        allNotesOff()
     }
 
-    // MARK: - Step callback (called by StepScheduler)
+    // MARK: - Step callback (called by StepScheduler on a background queue)
 
-    func onStep(_ step: Int, bar: Int) {
-        currentStep = step
-        currentBar  = bar
-        guard let state = songState else { return }
+    nonisolated func onStep(_ step: Int, bar: Int) {
+        Task { @MainActor [weak self] in
+            guard let self, let state = self.songState, self.isPlaying else { return }
+            self.currentStep = step
+            self.currentBar  = bar
 
-        let activeTracks = activeTrackIndices()
-        for trackIndex in activeTracks {
-            let events = state.events(forTrack: trackIndex)
-            for ev in events where ev.stepIndex == step {
-                sendMIDINoteOn(note: ev.note, velocity: ev.velocity,
-                               channel: UInt8(trackIndex), samplerIndex: trackIndex)
-                scheduleNoteOff(note: ev.note, channel: UInt8(trackIndex),
-                                samplerIndex: trackIndex, afterSteps: ev.durationSteps,
-                                tempo: state.frame.tempo)
+            // Always dispatch all events (mute is handled by sampler volume, not skipping)
+            for trackIndex in 0..<7 {
+                let events = state.events(forTrack: trackIndex)
+                for ev in events where ev.stepIndex == step {
+                    let channel = gmChannel(trackIndex)
+                    self.samplers[trackIndex].startNote(ev.note, withVelocity: ev.velocity, onChannel: channel)
+                    let delay = Double(ev.durationSteps) * state.frame.secondsPerStep
+                    let sampler = self.samplers[trackIndex]
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        sampler.stopNote(ev.note, onChannel: channel)
+                    }
+                }
             }
         }
     }
 
-    // MARK: - Private helpers
+    // Called by StepScheduler when song ends
+    nonisolated func onSongEnd() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.stop()
+        }
+    }
+
+    // MARK: - Instrument program change (called from TrackRowView via AppState)
+
+    func setProgram(_ program: UInt8, forTrack trackIndex: Int) {
+        guard trackIndex < samplers.count else { return }
+        let isDrum = (trackIndex == kTrackDrums)
+        let bankMSB: UInt8 = isDrum ? 0x78 : 0x79
+        try? samplers[trackIndex].loadSoundBankInstrument(
+            at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
+        )
+    }
+
+    // MARK: - All-notes-off (used by stop())
+
+    private func allNotesOff() {
+        for (i, sampler) in samplers.enumerated() {
+            let ch = gmChannel(i)
+            // CC 120 = All Sound Off, CC 123 = All Notes Off
+            sampler.sendController(120, withValue: 0, onChannel: ch)
+            sampler.sendController(123, withValue: 0, onChannel: ch)
+        }
+    }
+
+    // MARK: - Private setup
 
     private func setupEngine() {
         engine.attach(mixer)
@@ -93,46 +130,43 @@ final class PlaybackEngine: ObservableObject {
             engine.attach(sampler)
             engine.connect(sampler, to: mixer, format: nil)
             samplers.append(sampler)
-            loadGMProgram(trackIndex: i, sampler: sampler)
         }
+        loadGMPrograms()
     }
 
-    private func loadGMProgram(trackIndex: Int, sampler: AVAudioUnitSampler) {
-        let program = kDefaultGMPrograms[trackIndex] ?? 0
-        let isDrum  = trackIndex == kTrackDrums
-        try? sampler.loadSoundBankInstrument(
-            at: gmDLSSoundBankURL(),
-            program: program,
-            bankMSB: isDrum ? UInt8(kAUSampler_DefaultMelodicBankMSB) : UInt8(kAUSampler_DefaultPercussionBankMSB),
-            bankLSB: 0
-        )
+    private func startEngine() {
+        do { try engine.start() }
+        catch { print("AVAudioEngine start error: \(error)") }
+    }
+
+    private func loadGMPrograms() {
+        let bankURL = gmDLSSoundBankURL()
+        for i in 0..<7 {
+            let program = kDefaultGMPrograms[i] ?? 0
+            let isDrum  = (i == kTrackDrums)
+            // bankMSB: 0x79 = melodic GM, 0x78 = percussion (GM drum channel 10)
+            let bankMSB: UInt8 = isDrum ? 0x78 : 0x79
+            try? samplers[i].loadSoundBankInstrument(
+                at: bankURL, program: program, bankMSB: bankMSB, bankLSB: 0
+            )
+        }
     }
 
     private func gmDLSSoundBankURL() -> URL {
-        // Apple DLS GM sound bank (built-in on macOS)
         URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
     }
 
-    private func sendMIDINoteOn(note: UInt8, velocity: UInt8, channel: UInt8, samplerIndex: Int) {
-        guard samplerIndex < samplers.count else { return }
-        samplers[samplerIndex].startNote(note, withVelocity: velocity, onChannel: channel)
+    /// Spec: MIDI channel assignment — drums must use channel 9 (GM drums).
+    private func gmChannel(_ trackIndex: Int) -> UInt8 {
+        trackIndex == kTrackDrums ? 9 : UInt8(trackIndex)
     }
 
-    private func scheduleNoteOff(note: UInt8, channel: UInt8, samplerIndex: Int, afterSteps: Int, tempo: Int) {
-        let secondsPerStep = 60.0 / Double(tempo) / 4.0
-        let delay = Double(afterSteps) * secondsPerStep
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, samplerIndex < self.samplers.count else { return }
-            self.samplers[samplerIndex].stopNote(note, onChannel: channel)
-        }
-    }
-
-    private func activeTrackIndices() -> [Int] {
+    /// Spec §Mute and Solo: set sampler output volume to 0; keep dispatching events for sync.
+    private func applyMuteState() {
         let anySolo = soloState.contains(true)
-        return (0..<7).filter { i in
-            if muteState[i] { return false }
-            if anySolo { return soloState[i] }
-            return true
+        for i in 0..<samplers.count {
+            let muted = muteState[i] || (anySolo && !soloState[i])
+            samplers[i].volume = muted ? 0.0 : 1.0
         }
     }
 }

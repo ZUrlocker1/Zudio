@@ -72,14 +72,14 @@ struct SongStructureTests {
 struct NotePoolBuilderTests {
     @Test func chordTonesNonEmpty() {
         let (tones, _, _) = NotePoolBuilder.build(
-            chordRootDegree: "1", chordType: .minor, key: "C", mode: .aeolian
+            chordRootDegree: "1", chordType: .minor, key: "C", mode: .Aeolian
         )
         #expect(!tones.isEmpty)
     }
 
     @Test func avoidTonesExcludeScaleTones() {
         let (_, tensions, avoids) = NotePoolBuilder.build(
-            chordRootDegree: "1", chordType: .minor, key: "C", mode: .aeolian
+            chordRootDegree: "1", chordType: .minor, key: "C", mode: .Aeolian
         )
         let overlap = tensions.intersection(avoids)
         #expect(overlap.isEmpty)

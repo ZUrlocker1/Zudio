@@ -99,11 +99,12 @@ struct LeadGenerator {
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, trackIndex: Int, rng: inout SeededRNG
     ) -> UInt8 {
         // Prefer chord tones on strong beats (80%), scale tensions allowed (20%)
+        // Must sort sets before indexing to ensure determinism across runs.
         let pool: [Int]
         if rng.nextDouble() < 0.80 {
-            pool = Array(entry.chordWindow.chordTones)
+            pool = entry.chordWindow.chordTones.sorted()
         } else {
-            pool = Array(entry.chordWindow.scaleTensions)
+            pool = entry.chordWindow.scaleTensions.sorted()
         }
 
         guard !pool.isEmpty else {

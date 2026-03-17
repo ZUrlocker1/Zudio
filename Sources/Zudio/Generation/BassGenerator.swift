@@ -54,7 +54,7 @@ struct BassGenerator {
     private static func randomChordTone(
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
     ) -> UInt8 {
-        let tones = Array(entry.chordWindow.chordTones)
+        let tones = entry.chordWindow.chordTones.sorted()
         guard !tones.isEmpty else { return chordRootNote(entry: entry, frame: frame) }
         let pc = tones[rng.nextInt(upperBound: tones.count)]
         let raw = 12 + 2 * 12 + pc

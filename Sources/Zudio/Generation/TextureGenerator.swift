@@ -29,9 +29,10 @@ struct TextureGenerator {
             guard rng.nextDouble() < density else { continue }
 
             // Texture: mostly non-harmonic or drone; prefer scale tensions
-            let pool = Array(entry.chordWindow.scaleTensions.isEmpty
+            // Sort sets for determinism — Set iteration order is non-deterministic in Swift.
+            let pool = (entry.chordWindow.scaleTensions.isEmpty
                 ? entry.chordWindow.chordTones
-                : entry.chordWindow.scaleTensions)
+                : entry.chordWindow.scaleTensions).sorted()
             guard !pool.isEmpty else { continue }
 
             let pc = pool[rng.nextInt(upperBound: pool.count)]

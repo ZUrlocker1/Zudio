@@ -11,37 +11,39 @@ struct ContentView: View {
         VStack(spacing: 0) {
             TopBarView()
 
-            if let song = appState.songState {
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(0..<7, id: \.self) { trackIndex in
-                            TrackRowView(
-                                trackIndex: trackIndex,
-                                label: trackLabels[trackIndex],
-                                events: song.events(forTrack: trackIndex),
-                                totalBars: song.frame.totalBars,
-                                currentStep: appState.playback.currentStep,
-                                isMuted: appState.muteState[trackIndex],
-                                isSolo:  appState.soloState[trackIndex]
-                            )
-                        }
-                    }
-                    .padding(.vertical, 8)
+            // Track rows — plain VStack eliminates gap between last row and status box
+            VStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { trackIndex in
+                    TrackRowView(
+                        trackIndex: trackIndex,
+                        label: trackLabels[trackIndex],
+                        events: appState.songState?.events(forTrack: trackIndex) ?? [],
+                        totalBars: appState.songState?.frame.totalBars ?? 32,
+                        currentStep: appState.playback.currentStep,
+                        isMuted: appState.muteState[trackIndex],
+                        isSolo:  appState.soloState[trackIndex]
+                    )
                 }
-            } else {
-                Spacer()
+            }
+            .padding(.vertical, 4)
+            .overlay {
                 if appState.isGenerating {
                     ProgressView("Generating…")
                         .progressViewStyle(.circular)
-                } else {
-                    Text("Press Generate to create a song")
-                        .foregroundStyle(.secondary)
+                        .padding(16)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                } else if appState.songState == nil {
+                    Text("Press Generate or Play to create a song")
+                        .font(.callout)
+                        .foregroundStyle(Color.white.opacity(0.5))
                 }
-                Spacer()
             }
 
+            // Status box sits directly below the last row with no gap
             StatusBoxView()
         }
         .frame(minWidth: 900, minHeight: 600)
+        .background(Color(white: 0.20))
+        .preferredColorScheme(.dark)
     }
 }

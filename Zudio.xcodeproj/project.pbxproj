@@ -1,0 +1,490 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000000000000000000001 /* ZudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* ZudioApp.swift */; };
+		AA000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000002 /* AppState.swift */; };
+		AA000000000000000000003 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* Types.swift */; };
+		AA000000000000000000004 /* MIDIEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004 /* MIDIEvent.swift */; };
+		AA000000000000000000005 /* GlobalMusicalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000005 /* GlobalMusicalFrame.swift */; };
+		AA000000000000000000006 /* SongStructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000006 /* SongStructure.swift */; };
+		AA000000000000000000007 /* TonalGovernanceMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000007 /* TonalGovernanceMap.swift */; };
+		AA000000000000000000008 /* SongState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008 /* SongState.swift */; };
+		AA000000000000000000009 /* SeededRNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000009 /* SeededRNG.swift */; };
+		AA00000000000000000000A /* SongGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A /* SongGenerator.swift */; };
+		AA00000000000000000000B /* TonalGovernanceBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B /* TonalGovernanceBuilder.swift */; };
+		AA00000000000000000000C /* DrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000C /* DrumGenerator.swift */; };
+		AA00000000000000000000D /* PadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000D /* PadsGenerator.swift */; };
+		AA00000000000000000000E /* DensitySimplifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000E /* DensitySimplifier.swift */; };
+		AA00000000000000000000F /* StructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000F /* StructureGenerator.swift */; };
+		AA000000000000000000010 /* TitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010 /* TitleGenerator.swift */; };
+		AA000000000000000000011 /* MusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000011 /* MusicalFrameGenerator.swift */; };
+		AA000000000000000000012 /* LeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000012 /* LeadGenerator.swift */; };
+		AA000000000000000000013 /* BassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000013 /* BassGenerator.swift */; };
+		AA000000000000000000014 /* TextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000014 /* TextureGenerator.swift */; };
+		AA000000000000000000015 /* RhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000015 /* RhythmGenerator.swift */; };
+		AA000000000000000000016 /* StepScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000016 /* StepScheduler.swift */; };
+		AA000000000000000000017 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000017 /* PlaybackEngine.swift */; };
+		AA000000000000000000018 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000018 /* ContentView.swift */; };
+		AA000000000000000000019 /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000019 /* TrackRowView.swift */; };
+		AA00000000000000000001A /* MIDILaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001A /* MIDILaneView.swift */; };
+		AA00000000000000000001B /* StatusBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001B /* StatusBoxView.swift */; };
+		AA00000000000000000001C /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001C /* TopBarView.swift */; };
+		AA00000000000000000001D /* AssetLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001D /* AssetLoader.swift */; };
+		AA000000000000000000020 /* MIDIFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000022 /* MIDIFileExporter.swift */; };
+		AA00000000000000000001E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
+		AA00000000000000000001F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001F /* assets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		BB000000000000000000001 /* ZudioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioApp.swift; sourceTree = "<group>"; };
+		BB000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		BB000000000000000000003 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
+		BB000000000000000000004 /* MIDIEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIEvent.swift; sourceTree = "<group>"; };
+		BB000000000000000000005 /* GlobalMusicalFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalMusicalFrame.swift; sourceTree = "<group>"; };
+		BB000000000000000000006 /* SongStructure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongStructure.swift; sourceTree = "<group>"; };
+		BB000000000000000000007 /* TonalGovernanceMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TonalGovernanceMap.swift; sourceTree = "<group>"; };
+		BB000000000000000000008 /* SongState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongState.swift; sourceTree = "<group>"; };
+		BB000000000000000000009 /* SeededRNG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeededRNG.swift; sourceTree = "<group>"; };
+		BB00000000000000000000A /* SongGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongGenerator.swift; sourceTree = "<group>"; };
+		BB00000000000000000000B /* TonalGovernanceBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TonalGovernanceBuilder.swift; sourceTree = "<group>"; };
+		BB00000000000000000000C /* DrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumGenerator.swift; sourceTree = "<group>"; };
+		BB00000000000000000000D /* PadsGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadsGenerator.swift; sourceTree = "<group>"; };
+		BB00000000000000000000E /* DensitySimplifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DensitySimplifier.swift; sourceTree = "<group>"; };
+		BB00000000000000000000F /* StructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructureGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000010 /* TitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitleGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000011 /* MusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicalFrameGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000012 /* LeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeadGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000013 /* BassGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BassGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000014 /* TextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000015 /* RhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RhythmGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000016 /* StepScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepScheduler.swift; sourceTree = "<group>"; };
+		BB000000000000000000017 /* PlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
+		BB000000000000000000018 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		BB000000000000000000019 /* TrackRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRowView.swift; sourceTree = "<group>"; };
+		BB00000000000000000001A /* MIDILaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDILaneView.swift; sourceTree = "<group>"; };
+		BB00000000000000000001B /* StatusBoxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBoxView.swift; sourceTree = "<group>"; };
+		BB00000000000000000001C /* TopBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopBarView.swift; sourceTree = "<group>"; };
+		BB00000000000000000001D /* AssetLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLoader.swift; sourceTree = "<group>"; };
+		BB000000000000000000022 /* MIDIFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIFileExporter.swift; sourceTree = "<group>"; };
+		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		BB00000000000000000001F /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
+		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB000000000000000000021 /* Zudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CC000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA00000000000000000001E /* AVFoundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DD000000000000000000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000021 /* Zudio.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000002 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000000000000000001E /* AVFoundation.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000003 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000003 /* Types.swift */,
+				BB000000000000000000004 /* MIDIEvent.swift */,
+				BB000000000000000000005 /* GlobalMusicalFrame.swift */,
+				BB000000000000000000006 /* SongStructure.swift */,
+				BB000000000000000000007 /* TonalGovernanceMap.swift */,
+				BB000000000000000000008 /* SongState.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000004 /* Generation */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000009 /* SeededRNG.swift */,
+				BB00000000000000000000A /* SongGenerator.swift */,
+				BB00000000000000000000B /* TonalGovernanceBuilder.swift */,
+				BB00000000000000000000C /* DrumGenerator.swift */,
+				BB00000000000000000000D /* PadsGenerator.swift */,
+				BB00000000000000000000E /* DensitySimplifier.swift */,
+				BB00000000000000000000F /* StructureGenerator.swift */,
+				BB000000000000000000010 /* TitleGenerator.swift */,
+				BB000000000000000000011 /* MusicalFrameGenerator.swift */,
+				BB000000000000000000012 /* LeadGenerator.swift */,
+				BB000000000000000000013 /* BassGenerator.swift */,
+				BB000000000000000000014 /* TextureGenerator.swift */,
+				BB000000000000000000015 /* RhythmGenerator.swift */,
+			);
+			path = Generation;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000005 /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000016 /* StepScheduler.swift */,
+				BB000000000000000000017 /* PlaybackEngine.swift */,
+			);
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000006 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000018 /* ContentView.swift */,
+				BB000000000000000000019 /* TrackRowView.swift */,
+				BB00000000000000000001A /* MIDILaneView.swift */,
+				BB00000000000000000001B /* StatusBoxView.swift */,
+				BB00000000000000000001C /* TopBarView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000007 /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000000000000000001D /* AssetLoader.swift */,
+				BB000000000000000000022 /* MIDIFileExporter.swift */,
+			);
+			path = Assets;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000008 /* Zudio */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000001 /* ZudioApp.swift */,
+				BB000000000000000000002 /* AppState.swift */,
+				BB000000000000000000020 /* Info.plist */,
+				DD000000000000000000003 /* Models */,
+				DD000000000000000000004 /* Generation */,
+				DD000000000000000000005 /* Playback */,
+				DD000000000000000000006 /* UI */,
+				DD000000000000000000007 /* Assets */,
+			);
+			path = Zudio;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000009 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				DD000000000000000000008 /* Zudio */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		DD00000000000000000000A /* Main */ = {
+			isa = PBXGroup;
+			children = (
+				DD000000000000000000009 /* Sources */,
+				BB00000000000000000001F /* assets */,
+				DD000000000000000000001 /* Products */,
+				DD000000000000000000002 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EE000000000000000000001 /* Zudio */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF000000000000000000002 /* Build configuration list for PBXNativeTarget "Zudio" */;
+			buildPhases = (
+				CC000000000000000000002 /* Sources */,
+				CC000000000000000000001 /* Frameworks */,
+				CC000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Zudio;
+			productName = Zudio;
+			productReference = BB000000000000000000021 /* Zudio.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EE000000000000000000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					EE000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = FF000000000000000000001 /* Build configuration list for PBXProject "Zudio" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = DD00000000000000000000A /* Main */;
+			productRefGroup = DD000000000000000000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EE000000000000000000001 /* Zudio */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CC000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA00000000000000000001F /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CC000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000000000000000000001 /* ZudioApp.swift in Sources */,
+				AA000000000000000000002 /* AppState.swift in Sources */,
+				AA000000000000000000003 /* Types.swift in Sources */,
+				AA000000000000000000004 /* MIDIEvent.swift in Sources */,
+				AA000000000000000000005 /* GlobalMusicalFrame.swift in Sources */,
+				AA000000000000000000006 /* SongStructure.swift in Sources */,
+				AA000000000000000000007 /* TonalGovernanceMap.swift in Sources */,
+				AA000000000000000000008 /* SongState.swift in Sources */,
+				AA000000000000000000009 /* SeededRNG.swift in Sources */,
+				AA00000000000000000000A /* SongGenerator.swift in Sources */,
+				AA00000000000000000000B /* TonalGovernanceBuilder.swift in Sources */,
+				AA00000000000000000000C /* DrumGenerator.swift in Sources */,
+				AA00000000000000000000D /* PadsGenerator.swift in Sources */,
+				AA00000000000000000000E /* DensitySimplifier.swift in Sources */,
+				AA00000000000000000000F /* StructureGenerator.swift in Sources */,
+				AA000000000000000000010 /* TitleGenerator.swift in Sources */,
+				AA000000000000000000011 /* MusicalFrameGenerator.swift in Sources */,
+				AA000000000000000000012 /* LeadGenerator.swift in Sources */,
+				AA000000000000000000013 /* BassGenerator.swift in Sources */,
+				AA000000000000000000014 /* TextureGenerator.swift in Sources */,
+				AA000000000000000000015 /* RhythmGenerator.swift in Sources */,
+				AA000000000000000000016 /* StepScheduler.swift in Sources */,
+				AA000000000000000000017 /* PlaybackEngine.swift in Sources */,
+				AA000000000000000000018 /* ContentView.swift in Sources */,
+				AA000000000000000000019 /* TrackRowView.swift in Sources */,
+				AA00000000000000000001A /* MIDILaneView.swift in Sources */,
+				AA00000000000000000001B /* StatusBoxView.swift in Sources */,
+				AA00000000000000000001C /* TopBarView.swift in Sources */,
+				AA00000000000000000001D /* AssetLoader.swift in Sources */,
+				AA000000000000000000020 /* MIDIFileExporter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		GG000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		GG000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		GG000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = "Sources/Zudio/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.zudio.app";
+				PRODUCT_NAME = Zudio;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		GG000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = "Sources/Zudio/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.zudio.app";
+				PRODUCT_NAME = Zudio;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FF000000000000000000001 /* Build configuration list for PBXProject "Zudio" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				GG000000000000000000001 /* Debug */,
+				GG000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF000000000000000000002 /* Build configuration list for PBXNativeTarget "Zudio" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				GG000000000000000000003 /* Debug */,
+				GG000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = EE000000000000000000002 /* Project object */;
+}

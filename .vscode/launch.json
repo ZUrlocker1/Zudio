@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Zudio}",
+            "name": "Debug Zudio",
+            "target": "Zudio",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Zudio"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Zudio}",
+            "name": "Release Zudio",
+            "target": "Zudio",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Zudio"
+        }
+    ]
+}

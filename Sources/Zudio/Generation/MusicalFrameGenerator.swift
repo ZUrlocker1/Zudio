@@ -1,6 +1,8 @@
 // MusicalFrameGenerator.swift — generation step 1
 // Produces a GlobalMusicalFrame. Key/tempo come from UI overrides when set.
 
+import Foundation
+
 struct MusicalFrameGenerator {
     static func generate(
         rng: inout SeededRNG,
@@ -8,7 +10,7 @@ struct MusicalFrameGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil
     ) -> GlobalMusicalFrame {
-        let key    = keyOverride  ?? pickKey(rng: &rng)
+        let key    = keyOverride   ?? pickKey(rng: &rng)
         let tempo  = tempoOverride ?? pickTempo(rng: &rng)
         let mood   = moodOverride  ?? pickMood(rng: &rng)
         let mode   = modeForMood(mood, rng: &rng)
@@ -27,63 +29,67 @@ struct MusicalFrameGenerator {
 
     // MARK: - Private helpers
 
+    /// Motorik key-center probability table (spec §Key selector):
+    /// E 30%, A 20%, D 15%, G 10%, C 10%, B 8%, F# 7%.
     private static func pickKey(rng: inout SeededRNG) -> String {
-        kAllKeys[rng.nextInt(upperBound: kAllKeys.count)]
+        let keys:    [String] = ["E",  "A",  "D",  "G",  "C",  "B",  "F#"]
+        let weights: [Double] = [0.30, 0.20, 0.15, 0.10, 0.10, 0.08, 0.07]
+        return keys[rng.weightedPick(weights)]
     }
 
-    /// Motorik tempo range 80–140 BPM with probability peak around 115 BPM.
-    /// Full app range: 20–200 BPM (per UI spec).
+    /// Motorik tempo: triangular distribution min=126, peak=138, max=154 BPM (spec §Tempo selector).
     private static func pickTempo(rng: inout SeededRNG) -> Int {
-        // Triangular distribution: min=80, peak=115, max=140 for Motorik
+        let minT: Double = 126, peakT: Double = 138, maxT: Double = 154
         let r = rng.nextDouble()
-        let min: Double = 80, peak: Double = 115, max: Double = 140
-        let fc = (peak - min) / (max - min)
+        let fc = (peakT - minT) / (maxT - minT)
         let raw: Double
         if r < fc {
-            raw = min + (max - min) * fc * r / fc
+            raw = minT + Foundation.sqrt(r * (maxT - minT) * (peakT - minT))
         } else {
-            raw = max - (max - min) * (1 - fc) * (1 - r) / (1 - fc)
+            raw = maxT - Foundation.sqrt((1 - r) * (maxT - minT) * (maxT - peakT))
         }
-        return max(80, min(140, Int(raw.rounded())))
+        return Swift.max(20, Swift.min(200, Int(raw.rounded())))
     }
 
     private static func pickMood(rng: inout SeededRNG) -> Mood {
-        // Weights: Trance 35%, Melancholic 30%, Hypnotic 20%, Free 15%
+        // Motorik mood weights
         let weights: [Double] = [0.35, 0.30, 0.20, 0.15]
-        let all = Mood.allCases
-        return all[rng.weightedPick(weights)]
+        let moods: [Mood] = [.Dream, .Deep, .Bright, .Free]
+        return moods[rng.weightedPick(weights)]
     }
 
     private static func modeForMood(_ mood: Mood, rng: inout SeededRNG) -> Mode {
-        // Mood→mode mapping (spec §Mood-to-mode mapping)
+        // Mood→mode mapping
         switch mood {
-        case .trance:     return rng.nextDouble() < 0.7 ? .dorian : .aeolian
-        case .melancholic: return rng.nextDouble() < 0.6 ? .aeolian : .phrygian
-        case .hypnotic:   return rng.nextDouble() < 0.5 ? .dorian : .mixolydian
-        case .free:       return rng.nextDouble() < 0.4 ? .lydian : .mixolydian
+        case .Dream:  return rng.nextDouble() < 0.7  ? .Dorian     : .Aeolian
+        case .Deep:   return rng.nextDouble() < 0.6  ? .Aeolian    : .Dorian
+        case .Bright: return rng.nextDouble() < 0.5  ? .Dorian     : .Mixolydian
+        case .Free:   return rng.nextDouble() < 0.5  ? .Ionian     : .Mixolydian
         }
     }
 
     private static func pickProgressionFamily(rng: inout SeededRNG) -> ProgressionFamily {
-        let all = ProgressionFamily.allCases
+        let all: [ProgressionFamily] = [
+            .static_tonic, .two_chord_I_bVII, .minor_loop_i_VII,
+            .minor_loop_i_VI, .modal_cadence_bVI_bVII_I
+        ]
         return all[rng.nextInt(upperBound: all.count)]
     }
 
-    /// Triangular distribution: min=210s, peak=285s, max=390s (spec §totalBars)
-    /// +20s bias for Moderate A/B (applied by StructureGenerator after form pick).
+    /// Triangular distribution: min=210s, peak=285s, max=390s (spec §totalBars).
     private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
-        let min: Double = 210, peak: Double = 285, max: Double = 390
+        let minS: Double = 210, peakS: Double = 285, maxS: Double = 390
         let r = rng.nextDouble()
-        let fc = (peak - min) / (max - min)
+        let fc = (peakS - minS) / (maxS - minS)
         let secs: Double
         if r < fc {
-            secs = min + (max - min) * fc * r / fc
+            secs = minS + Foundation.sqrt(r * (maxS - minS) * (peakS - minS))
         } else {
-            secs = max - (max - min) * (1 - fc) * (1 - r) / (1 - fc)
+            secs = maxS - Foundation.sqrt((1 - r) * (maxS - minS) * (maxS - peakS))
         }
         let secondsPerBar = 60.0 / Double(tempo) * 4.0
         let rawBars = Int((secs / secondsPerBar).rounded())
         // Round to nearest multiple of 4
-        return max(8, (rawBars / 4) * 4)
+        return Swift.max(8, (rawBars / 4) * 4)
     }
 }

@@ -47,7 +47,8 @@ struct RhythmGenerator {
         var motif: [MIDIEvent] = []
 
         // Pick a single root pitch for the ostinato
-        let tones = Array(entry.chordWindow.chordTones)
+        // Sort for determinism — Set iteration order is non-deterministic in Swift.
+        let tones = entry.chordWindow.chordTones.sorted()
         let pc = tones.isEmpty ? 0 : tones[rng.nextInt(upperBound: tones.count)]
         let midiNote = noteInRange(pc: pc, low: 48, high: 72)
 
