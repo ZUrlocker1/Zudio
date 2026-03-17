@@ -14,7 +14,7 @@ In scope for this first version:
 - transport controls
 - per-track mute/solo
 - per-track instrument cycling
-- piano-roll style lane visualization
+- piano-roll style lane visualization (display only; no note editing in v1)
 
 Out of scope for first version:
 

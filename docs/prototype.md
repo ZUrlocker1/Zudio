@@ -2,7 +2,7 @@
 
 ## Core musical model
 
-Zudio should be oriented around visible, editable song parts instead of a purely passive ambient generator.
+Zudio should be oriented around visible, regenerable song parts instead of a purely passive ambient generator.
 
 - Track parts
   - Lead 1
@@ -13,14 +13,14 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Bass
   - Drums
 - Global musical controls
-  - Tempo (simple tempo preset, with optional BPM fine tuning)
-  - Key
+  - Tempo — user-settable BPM or `Auto` (generator chooses)
+  - Key — user-settable key or `Auto` (generator chooses)
   - Mood (instead of scale)
   - Style (Motorik only in v1; other styles are post-v1)
 
 ## Product intent
 
-- Keep the ambient-first aesthetic, but allow more direct composition and arrangement control.
+- Keep the motorik-first aesthetic, but allow more direct composition and arrangement control.
 - Make the structure of the piece legible on screen at all times.
 - Let users shape each part independently while preserving coherent overall output.
 
@@ -43,7 +43,7 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 
 - Screen layout is organized into three vertical zones below a global top bar:
   - Left: track rows with track-level controls
-  - Middle: DAW-like grid/piano-roll visualization and note editing surface
+  - Middle: DAW-like grid/piano-roll visualization surface (display only cannot be edited)
   - Right: per-track effect placeholders (disabled in v1)
   - Bottom: full-width text status box below all track rows
 - Top global bar contains:
@@ -64,7 +64,29 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Global selectors: `Style`, `Mood`, `Tempo`, `Key`
   - Secondary actions: `Regenerate Track`, `Regenerate All`
   - Utility actions: `Help`, `About`
-  - Global display/readouts: song length
+  - Global display/readouts: song length (derived from `totalBars` and `tempo`: `totalBars * 4 * 60 / tempo` seconds, displayed as m:ss)
+
+### Key selector behavior
+
+- Control type: dropdown/picker showing all 12 chromatic keys plus an `Auto` option.
+- Key list (display order): `Auto`, `C`, `C#`, `D`, `Eb`, `E`, `F`, `F#`, `G`, `Ab`, `A`, `Bb`, `B`
+- Default state on first launch: `Auto`
+- When set to `Auto`: the generator selects the key on each `Generate New` using the Motorik key-center probability table (E 30%, A 20%, D 15%, G 10%, C 10%, B 8%, F# 7%). After generation the selector still displays `Auto`; the generated key is shown in the title readout area only.
+- When the user selects a specific key: that key is stored as the locked key. All subsequent `Generate New` and `Regenerate All` calls use this key. Per-track `Regenerate` also uses the current locked key.
+- Changing the key selector does not automatically trigger a new generation; the new value takes effect on the next `Generate New` or `Regenerate All`.
+- The locked key persists across multiple `Generate New` calls until the user switches back to `Auto` or selects a different key.
+
+### Tempo selector behavior
+
+- Control type: numeric stepper or direct entry field, integer BPM, range 20–200 BPM, plus an `Auto` option.
+- Default state on first launch: `Auto`
+- When set to `Auto`: the generator selects the tempo on each `Generate New` using the Motorik tempo probability table (126–154 BPM range with default 138 BPM). After generation the selector still displays `Auto`; the generated tempo is shown in the title readout area only.
+- When the user enters a specific BPM value: that value is stored as the locked tempo. All subsequent `Generate New` and `Regenerate All` calls use this tempo. Per-track `Regenerate` also uses the current locked tempo.
+- Valid range: 20–200 BPM. Values outside this range are clamped silently to the nearest bound.
+- Changing the tempo selector does not automatically trigger a new generation; the new value takes effect on the next `Generate New` or `Regenerate All`.
+- The locked tempo persists across multiple `Generate New` calls until the user switches back to `Auto` or changes the value.
+- Song length readout updates immediately when the tempo value changes (even before generating) since it is derived from `totalBars * 4 * 60 / tempo`.
+
 - Left track-control column (one row per track: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums):
   - Small track-type icon to the left of each track name
   - Track name and color
@@ -87,7 +109,7 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Horizontal timeline for loop/song progression
   - Piano-roll/grid notes per track lane (drums may use lane-per-hit view)
   - Visual cues for motif repeats and variation points
-  - Lightweight edit operations: drag note, lengthen/shorten, velocity accent, erase/add note
+  - Visualization only: no note editing, note drawing, drag, erase, or velocity editing
 - Right effects column:
   - Per-track effect character controls (`Space`, `Echo`, `Width`, `Grit`, `Tone`) shown but disabled in v1
   - Quick presets per track (for example `Dry`, `Wide`, `Hazy`, `Punchy`) shown but disabled in v1
@@ -231,8 +253,24 @@ Zudio should be oriented around visible, editable song parts instead of a purely
 - During playback, lanes scroll with the playhead like a DAW timeline.
 - If a track is muted, its MIDI lane is greyed out.
 - If any track is soloed, non-solo lanes are greyed out and excluded from audio output.
+- MIDI lanes are display-only and do not support direct note editing.
+- Per-track state storage (authoritative):
+  - The song state holds a separate array of MIDI events for each track: `trackEvents[trackIndex]` where trackIndex matches the fixed track order (Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6).
+  - `Generate New` runs the full generation pipeline and replaces all seven `trackEvents` arrays.
+  - Per-track `Regenerate` re-runs only that track's generation step using the current `GlobalMusicalFrame` and the fixed `SongStructure`/chord plan from the last full `Generate New`. It does not re-run steps 1 or 2. If the user has changed the Key or Tempo selector since the last full generate, those new locked values are NOT applied by per-track regenerate — they only take effect on the next full `Generate New`. Per-track regenerate always reads key, mode, tempo, totalBars, and progressionFamily from the stored `SongState.frame`, which is the frame produced by the last full generate. Only `trackEvents[trackIndex]` is replaced; all other arrays are untouched.
+  - The playback engine always reads from `trackEvents[trackIndex]` at render time. Swapping one track's array while others remain unchanged is the complete implementation of per-track regenerate — no re-running of other tracks, no re-deriving of the global frame.
+  - If playback is running when per-track regenerate is triggered, the new events for that track take effect at the next bar boundary (do not interrupt mid-bar).
+- Playback behavior (v1 authoritative):
+  - Pressing `Play` starts playback from the beginning of the generated song.
+  - The song plays once through to the end (intro → main sections → outro) and then stops. There is no looping.
+  - When playback reaches the final bar, the audio engine stops and the playhead returns to bar 1.
+  - Pressing `Stop` stops playback immediately (hard stop, no fade). The playhead returns to bar 1.
+  - `Previous` and `Next` are disabled placeholders in v1 and perform no action.
+  - All tracks share one timeline length. There is no per-track independent length or polymeter in v1; all tracks are the same number of bars.
 
 ## Track effects approach (post-v1 placeholder)
+
+> **POST-V1 ONLY — do not implement in v1.** This section is reference and planning material. The v1 feature lock excludes all effect editing controls.
 
 - Effect editing is excluded from v1.
 - Keep this as a post-v1 design placeholder so naming and routing are ready.
@@ -260,7 +298,7 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Each track generation step writes MIDI notes/events aligned to the current song structure, key, mode, and section plan.
   - Playback renders those generated MIDI events through the selected General MIDI instrument/kit.
 - Use a fixed generation order so dependencies are stable:
-  - 1. Global musical frame (style, mood, tempo, key center, scale/mode)
+  - 1. Global musical frame (style, mood, tempo, key center, scale/mode, totalBars) — key and tempo come from the locked selector values if set; otherwise drawn from the probability tables
   - 2. Song structure and chord plan (bars, sections, per-section chords)
   - 3. Tonal-governance map (section note pools + chord-window pitch-class masks)
   - 4. Drums groove plan (Apache family + section intensity)
@@ -312,7 +350,261 @@ Zudio should be oriented around visible, editable song parts instead of a purely
   - Collision checks: if Lead 1 and pads conflict heavily, simplify Lead 1 first; if Lead 1 and Lead 2 conflict, thin Lead 2 first.
   - Deterministic replay: same seed + same controls => same output.
 
-## Motorik Implementation Spec (Consolidated v1.1)
+## MIDI note generation algorithm
+
+### Scope and fundamental rule
+
+Every non-drum track (Bass, Pads, Lead 1, Lead 2, Rhythm, Texture) generates output as a sequence of MIDI note events. All pitch values for these tracks must be derived from the global key and active mode using the formula below. No non-drum track may hardcode absolute MIDI note numbers in its generation logic. This guarantees that a user key change or a new `Generate New` automatically transposes all tracks correctly without special-casing.
+
+Drums are entirely key-independent. Drum tracks use fixed GM kit note numbers and do not participate in key, mode, or chord-window logic at any point.
+
+### Global musical frame (generation step 1 output)
+
+Step 1 of the generation pipeline produces a `GlobalMusicalFrame` record. Every subsequent step reads from this record. Its fields:
+
+- `key`: one of `C`, `C#`, `D`, `Eb`, `E`, `F`, `F#`, `G`, `Ab`, `A`, `Bb`, `B` — value is the locked key selector value if set, otherwise drawn from the Motorik key-center probability table
+- `mode`: one of `Ionian`, `Dorian`, `Mixolydian`, `Aeolian`, `MinorPentatonic`, `MajorPentatonic`
+- `tempo`: integer BPM — value is the locked tempo selector value if set (range 20–200), otherwise drawn from the Motorik tempo probability table
+- `mood`: one of `Bright`, `Deep`, `Dream`, `Free`
+- `progressionFamily`: one of `static_tonic`, `two_chord_I_bVII`, `minor_loop_i_VII`, `minor_loop_i_VI`, `modal_cadence_bVI_bVII_I`
+- `totalBars`: integer — the total length of the song in bars, shared by all tracks
+
+`totalBars` is derived during step 1 from a randomly selected target duration. Selection rules (authoritative):
+
+1. Draw `targetDurationSeconds` from a triangular distribution: minimum 210 s (3:30), peak 285 s (4:45), maximum 390 s (6:30). In the absence of a triangular-distribution primitive, use: draw uniformly from 210–390 s, then bias toward 285 s by averaging the draw with 285 s.
+2. If form is `Moderate A/B`, add 20 s to the draw (clamped to 390 s maximum) to allow room for both A and B sections to be at least 32 bars.
+3. Compute:
+
+```
+totalBars = round((targetDurationSeconds * tempo) / 60 / 4) * 4
+```
+
+The result is rounded to the nearest multiple of 4 bars so that all section boundaries fall on clean bar counts. All tracks must generate exactly `totalBars` bars of MIDI events — no more, no fewer. `totalBars` is authoritative for the entire pipeline in the same way `key` is: no track may use a different bar count or infer it independently.
+
+### Song structure specification (generation step 2 output)
+
+Step 2 produces a `SongStructure` record containing an ordered list of sections and a chord plan. This record must be complete before any track-specific generation (steps 4–9) begins.
+
+#### Intro and outro length selection
+
+Draw `introLength` from the intro length probabilities (2/4/8 bars) and `outroLength` from the outro length probabilities (2/4/8 bars). Both values are multiples of 2.
+
+```
+bodyLength = totalBars - introLength - outroLength
+```
+
+Minimum `bodyLength` is 32 bars. If `bodyLength` < 32 after the initial draw, reduce `outroLength` by one step (8→4 or 4→2) and recalculate. If still < 32 with `outroLength` at 2, reduce `introLength` by one step. These adjustments ensure at least two 16-bar sections always fit in the body.
+
+#### Form and body section bar counts
+
+All drawn section lengths are multiples of 16 bars. B absorbs whatever remains after subtracting A (and A' where applicable) from `bodyLength`; B is therefore not guaranteed to be a multiple of 16, but will always be >= 32 bars after the clamping rules below are applied. This matches real Motorik practice where a long-drive B section simply runs to the outro without a fixed internal grid.
+
+The section lengths below were calibrated against the analyzed corpus: the Drumscribe reference MIDI (~32-bar buildup / ~96-bar drive at 130 BPM), the Electric Buddha set (3–6 macro blocks of 16–32 bars each), and classic reference tracks (Hallogallo, Fur Immer, Neuschnee, Deluxe).
+
+**Single-A (45%)**
+- Layout: intro | A | outro
+- A = `bodyLength` bars (entire body is one section; no formal break)
+- Intensity evolves through three internal sub-phases. Sub-phase lengths rounded to nearest 16 bars:
+  - Phase 1 `low`: first 25% of A
+  - Phase 2 `medium`: middle 50% of A
+  - Phase 3 `high`: final 25% of A
+  - These sub-phases are internal intensity guidance for drum pattern selection and track density — they are not formal section boundaries and do not appear in `SongStructure.sections`
+- This form matches the Hallogallo/Fur Immer long-form model and the Electric Buddha long-form blocks
+
+**Subtle A/B (40%)**
+- Layout: intro | A | B | outro
+- A section length is drawn from this probability table (independent of `bodyLength`):
+  - 32 bars: 25% — short buildup before a long drive (Drumscribe-style ~32 A / ~96 B)
+  - 48 bars: 35% — medium split, most common in 4–5 minute pieces
+  - 64 bars: 30% — near-equal halves, appropriate for 5+ minute pieces
+  - 80 bars: 10% — long A before a shorter B, used in extended builds
+- B = `bodyLength − A`. If B < 32, reduce A by 16 and recalculate. If A has been reduced to 32 and B is still < 32, set A = B = `floor(bodyLength / 32) × 16` (nearest equal split)
+- A and B share the same key, mode, and `progressionFamily`
+- B starting intensity = A ending intensity ± 1 step (clamped: never below `low`, never above `high`)
+- At least one of Lead 1, Pads, or Bass must change its density profile at the A→B boundary
+
+**Moderate A/B (15%)**
+- Layout: intro | A | B | outro — or intro | A | B | A' | outro for the reprise variant
+- A section length:
+  - 32 bars: 30% — punchy setup before main development
+  - 48 bars: 40% — most common
+  - 64 bars: 25% — longer setup for extended pieces
+  - 80 bars: 5% — rare
+- Reprise variant (A' return): probability 30%. A' = 16 bars (50%) or 32 bars (50%). B = `bodyLength − A − A'`
+- Without reprise: B = `bodyLength − A`. In both cases B minimum 32 bars; reduce A by 16 if needed
+- A and B share the same key and `progressionFamily`
+- B starting intensity = A ending intensity + 1 step (max `high`)
+- Lead 1 shifts from motif-first to solo-phrase behavior in B
+- Mode may shift at the A→B boundary (probability 50%): allowed pairs are `Aeolian→Dorian`, `Ionian→Mixolydian`, or `Dorian→Aeolian` only. No other mid-song mode changes in v1
+- A' (reprise, if used): restores A's mode and intensity level; Lead 1 returns to motif-first behavior
+
+#### SongSection record fields
+
+Each entry in `SongStructure.sections`:
+- `startBar`: 0-indexed bar number within the full song (song starts at bar 0)
+- `lengthBars`: number of bars in this section
+- `label`: one of `intro`, `A`, `B`, `outro`
+- `intensity`: one of `low`, `medium`, `high` — derived as follows (authoritative):
+  - `intro`: always `low`
+  - `outro`: always `low`
+  - Single-A body: the A section does not receive a single intensity value; its intensity is read from the sub-phase position at render time (low → medium → high arc). Store the section intensity as `medium` as a neutral default; the actual drum/track selection uses the sub-phase position directly.
+  - Subtle A/B — A section: draw from (`low`: 20%, `medium`: 80%)
+  - Subtle A/B — B section: A-ending intensity ±1 step (clamped low/high; see form rules above)
+  - Moderate A/B — A section: draw from (`low`: 10%, `medium`: 90%)
+  - Moderate A/B — B section: A-ending intensity +1 step (max `high`)
+  - Moderate A/B — A' reprise (if present): same intensity as A section
+- `mode`: active mode for this section (matches `GlobalMusicalFrame.mode` except in Moderate A/B where B may differ)
+
+#### Chord plan
+
+The chord plan is a list of `ChordWindow` entries covering all bars 0 through `totalBars−1`. Rules:
+- `startBar` and `lengthBars` are always multiples of 4
+- No chord window may cross a section boundary
+- The intro and outro each have exactly one chord window spanning their full length
+- Main section chord window lengths are set by `progressionFamily`:
+  - `static_tonic`: one chord window per section (entire section is one chord)
+  - `two_chord_I_bVII`: alternating tonic and bVII windows, 8–16 bars each
+  - `minor_loop_i_VII` or `minor_loop_i_VI`: alternating i and VII/VI windows, 8–12 bars each
+  - `modal_cadence_bVI_bVII_I`: repeating 3-chord groups of 8 bars each (bVI → bVII → I)
+- Each `ChordWindow` stores: `startBar`, `lengthBars`, `chordRoot` (degree string in key), `chordType`, and the three pitch-class sets (`chordTones`, `scaleTensions`, `avoidTones`) derived from the chord type and active section mode
+
+### Mood-to-mode mapping
+
+Authoritative mapping used when mood is chosen and mode is not explicitly overridden:
+
+- Bright → primary: Ionian (major), secondary: Mixolydian
+- Deep → Aeolian (natural minor)
+- Dream → Dorian
+- Free → Aeolian note pool with weak tonal gravity; suppress strong V-I cadence weight
+
+### Key semitone table
+
+Maps key name to semitone offset from C (0-indexed, chromatic):
+
+- C = 0, C#/Db = 1, D = 2, D#/Eb = 3, E = 4, F = 5
+- F#/Gb = 6, G = 7, G#/Ab = 8, A = 9, A#/Bb = 10, B = 11
+
+### Degree string to semitone table
+
+Degree strings are used in starter JSON pattern files and in internal generation. Each degree is a fixed chromatic interval above the chord or key root, regardless of mode.
+
+- "1" = 0 semitones
+- "b2" = 1
+- "2" = 2
+- "b3" = 3
+- "3" = 4
+- "4" = 5
+- "#4" / "b5" = 6
+- "5" = 7
+- "b6" = 8
+- "6" = 9
+- "b7" = 10
+- "7" = 11
+
+### Mode interval tables
+
+Each mode's available scale degrees as semitones above root. Notes outside this set are non-scale tones.
+
+- Ionian (major): 0, 2, 4, 5, 7, 9, 11
+- Dorian: 0, 2, 3, 5, 7, 9, 10
+- Mixolydian: 0, 2, 4, 5, 7, 9, 10
+- Aeolian (natural minor): 0, 2, 3, 5, 7, 8, 10
+- Minor Pentatonic: 0, 3, 5, 7, 10
+- Major Pentatonic: 0, 2, 4, 7, 9
+
+### MIDI note number formula
+
+```
+midiNote = 60 + keySemitone + degreeSemitone + (oct * 12)
+```
+
+- `60` is MIDI middle C (C4). This is the reference base.
+- `keySemitone` comes from the key semitone table.
+- `degreeSemitone` comes from the degree string table.
+- `oct` is the integer octave offset stored in the pattern event or chosen by the generator (negative = lower register, positive = higher register).
+- The result must be clamped to the track's register range (see register boundaries in V1 execution parameters).
+
+Worked examples:
+
+- Key E, degree "1", oct -2: 60 + 4 + 0 − 24 = **40** (E2)
+- Key E, degree "5", oct -2: 60 + 4 + 7 − 24 = **47** (B2)
+- Key E, degree "b7", oct -2: 60 + 4 + 10 − 24 = **50** (D3)
+- Key A, degree "1", oct -2: 60 + 9 + 0 − 24 = **45** (A2)
+- Key A, degree "b3", oct 0: 60 + 9 + 3 + 0 = **72** (C5)
+- Key D, degree "5", oct -1: 60 + 2 + 7 − 12 = **57** (A3)
+
+### Chord-window note pool construction (generation step 3 output)
+
+For each chord window in the song structure, three pitch-class sets are built. All non-drum tracks validate note choices against these sets.
+
+Chord tones by chord type (semitone intervals from chord root):
+
+- Major triad: 0, 4, 7
+- Minor triad: 0, 3, 7
+- Sus2: 0, 2, 7
+- Sus4: 0, 5, 7
+- Add9: 0, 4, 7, 14 (pitch class: 0, 4, 7, 2)
+- Dominant 7th: 0, 4, 7, 10
+- Minor 7th: 0, 3, 7, 10
+
+Derived sets:
+
+- `chordTones`: the intervals above for the active chord type, expressed as pitch classes (mod 12).
+- `scaleTensions`: all mode semitones (from the mode interval table) not already in `chordTones`.
+- `avoidTones`: chromatic semitones not present in the active mode at all. These are disallowed on strong beats for all non-drum tracks.
+
+All three sets are pitch-class sets (mod 12), not absolute MIDI notes, so they apply at any octave.
+
+### Chord root MIDI note derivation
+
+The chord root is the progression family's root degree resolved through the key semitone table and MIDI formula, then placed in the appropriate register for the track. Example: in key E (semitone 4), Aeolian mode, progression `i-VII` — the VII chord root is the bVII degree (semitone 10 = D). The chord root pitch class is `(4 + 10) mod 12 = 2` (D). Each track then constructs its notes relative to this chord root at its own octave register.
+
+### Step grid resolution
+
+All pattern events (starter JSON files and generated output) use a 16-step-per-bar grid:
+
+- 1 bar = 16 steps. Each step = one sixteenth note in 4/4.
+- `step` field: 0-based index within the pattern. 0–15 for 1-bar patterns, 0–31 for 2-bar patterns.
+- `len` field: note duration in steps.
+- Beat positions within a bar: beat 1 = step 0, beat 2 = step 4, beat 3 = step 8, beat 4 = step 12.
+- Strong beats (1 and 3) = steps 0 and 8. Used for chord-tone enforcement rules.
+- Eighth-note offbeats = steps 2, 6, 10, 14. Sixteenth-note offbeats = odd steps (1, 3, 5, 7, 9, 11, 13, 15).
+
+At render time, step index converts to seconds:
+
+```
+secondsPerStep = (60.0 / tempo) / 4.0
+eventTimeSeconds = stepIndex * secondsPerStep
+```
+
+### GM drum note mapping
+
+Drum patterns use these fixed MIDI note numbers. These are the only numbers the drum generator emits. They are used for both audio playback and lane visualization.
+
+Core groove voices:
+- Kick (bass drum): 36
+- Acoustic snare: 38
+- Closed hi-hat: 42
+- Open hi-hat: 46
+- Pedal hi-hat: 44
+- Ride cymbal: 51
+- Crash cymbal 1: 49
+
+Fill and accent voices:
+- Side stick: 37
+- Hi-mid tom: 48
+- Low-mid tom: 47
+- High floor tom: 43
+- Low floor tom: 41
+- High tom: 50
+- Ride bell: 53
+- Crash cymbal 2: 57
+
+Default v1 active voices (core motorik groove): kick 36, snare 38, closed hat 42, open hat 46, ride 51, crash 49, hi-mid tom 48, low-mid tom 47. Side stick and additional crashes are available for variation events.
+
+---
+
+## Motorik Implementation Spec
 
 This is the implementation source of truth for Motorik. It consolidates prior Motorik sections in this document.
 
@@ -394,7 +686,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 
 - Purpose:
   - Optional probability profile derived from `Time Loops`, `Dark Sun`, `Vanishing Point`, `Into The Night`, `Blakely Lab`, `Schulers Dream 05`.
-  - Use as a secondary preset for more melodic/ambient Motorik-adjacent generation.
+  - Use as an in-v1 secondary generation profile for more melodic/ambient Motorik-adjacent output while remaining inside the v1 `Motorik` style scope.
 - Tempo family weights:
   - Fast drive (132-150 BPM): 45%
   - Mid motorik (116-126 BPM): 40%
@@ -629,26 +921,53 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 ### Core musical behavior
 
 - Drums
-  - Starter MIDI seed asset:
+  - Primary drum asset (use this for code generation):
+    - `/assets/midi/motorik/drums/drum-patterns-v1.json`
+    - This is the authoritative drum pattern library. Load and use directly. Do not parse the raw MIDI file at runtime.
+  - Reference MIDI file (do not load at runtime):
     - `/assets/midi/motorik/drums/Drumscribe - Motorik - MIDI.mid`
-    - Use as a baseline groove vocabulary source (timing/accent references), then apply v1 mutation rules for sections, fills, and intensity.
-  - Pattern family probabilities:
-    - Core motorik pulse: 55%
-    - Accent variation: 30%
-    - Sparse variant: 15%
+    - Source material only. It was analysed to produce `drum-patterns-v1.json`. 139 bars at 130 BPM, TPQ=480. The file is highly repetitive (two main groove variants across 64 two-bar blocks) and is not suitable for direct runtime use.
+  - Pattern library contents (`drum-patterns-v1.json`):
+    - 14 named patterns, each covering exactly 1 bar (16 steps)
+    - Each event has: `step` (0-15), `note` (GM MIDI note), `vel` (0-127), `len` (always 1 for drums)
+    - Pattern IDs and families:
+      - Core (repeating groove): `drum_core_a` (medium intensity), `drum_core_b` (high intensity, extra kick at step 10)
+      - Sparse: `drum_sparse` (low intensity, minimal), `drum_intro_kickhat` (kick+hat only, no snare — intro bar 1), `drum_outro_reduce`, `drum_outro_kickonly`
+      - Accent variants: `drum_section_start` (crash on beat 1), `drum_ride` (ride cymbal replaces hat), `drum_open_hat_lift`
+      - Fills (replace one bar at boundary): `drum_fill_short_tom`, `drum_fill_snare_run`, `drum_fill_snare_roll`, `drum_fill_tom_run`, `drum_fill_crash_climax`
+  - How the generator uses these patterns:
+    - The generator selects a base groove pattern for each section and loops it for the section's bar count.
+    - At section or phrase boundaries, substitute one bar with a fill pattern (subject to fill probability rules below).
+    - For the first bar of a new section, substitute `drum_section_start` instead of the regular groove (adds the crash accent).
+    - For intro (all intro types that include drums): the normal pattern-family probability table is suspended for the intro section. Use this fixed sequence instead:
+      - Bar 1: `drum_intro_kickhat` (kick + closed hat only, no snare)
+      - Bar 2: `drum_sparse` (snare enters)
+      - Bar 3 onward (if intro is 4 or 8 bars): `drum_sparse` or `drum_core_a` depending on whether intro type is low-energy (sparse) or building (core_a)
+      - Final intro bar: 35% chance of a pickup fill substitution (draw fill length from the fill length weights)
+      - Resume normal pattern-family probability selection at bar 1 of the A section
+    - For outro, step down: core → `drum_sparse` → `drum_outro_reduce` → `drum_outro_kickonly` (40%) or full stop.
+  - Pattern selection by song section intensity:
+    - Low intensity sections: `drum_sparse`
+    - Medium intensity sections: `drum_core_a`
+    - High intensity sections: `drum_core_b`, optionally `drum_ride` or `drum_open_hat_lift` for contrast
+  - Pattern family probabilities and within-family selection (authoritative):
+    - Core motorik pulse (55%): use `drum_core_a` for the first 8-bar phrase of a section; switch to `drum_core_b` for the next 8-bar phrase; alternate every 8 bars thereafter. Reset to `drum_core_a` at each section boundary.
+    - Accent variation (30%): select randomly at each 4-bar phrase window — `drum_ride` (40%), `drum_open_hat_lift` (40%), `drum_core_b` with velocity +12 above normal range (20%).
+    - Sparse variant (15%): use `drum_sparse` exclusively for the full phrase window.
   - Structural rules:
-    - Kick: 4-on-floor default
-    - Snare: 2/4 default
-    - Hat/cymbal: steady subdivision
-    - Fill limit: maximum 1 short fill per 16 bars
-    - Fill placement weights:
+    - Kick: syncopated motorik pattern (not plain 4-on-floor). Core A: steps 0, 2, 6, 8, 14. Core B: steps 0, 2, 6, 8, 10, 14.
+    - Snare: beats 2 and 4 (steps 4 and 12) in all non-sparse patterns
+    - Hat/cymbal: 8th-note positions (steps 2, 4, 6, 8, 10, 12, 14) with closed hat; open hat or ride for accent variants
+    - Fill limit: maximum 1 fill per 16 bars (any length)
+    - Fill placement weights (where within the 16-bar window the fill lands):
       - section-boundary lead-in: 60%
       - 8-bar phrase boundary: 30%
       - other bars: 10%
     - Fill length weights:
-      - 1 beat: 60%
-      - 2 beats: 30%
-      - 1 bar: 10%
+      - 1 beat (4 steps): 60%
+      - 2 beats (8 steps): 30%
+      - 1 bar (16 steps): 10%
+    - A 1-bar fill replaces the entire bar with a fill pattern from the library. A 1-beat or 2-beat fill occupies the final steps of a bar (tail-end fill) and the remaining steps use the regular groove pattern.
     - Section intensity model:
       - low: 20%
       - medium: 55%
@@ -828,8 +1147,8 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - If Lead 1 is high-density, force Lead 2 into low-density response mode.
   - Role-handoff and doubling rules:
     - If Lead 1 is absent for a section, Lead 2 may temporarily assume Lead 1 role (foreground melody) for that section.
-    - When role-handoff is active, raise Lead 2 density ceiling to Lead-1-like medium profile and allow longer phrase spans.
-    - When Lead 1 returns, Lead 2 must transition back to response role within 1-2 bars.
+    - When role-handoff is active, the 55% density cap is suspended. Lead 2 adopts Lead 1's medium-density profile and may use longer phrase spans. The 30-55% subordinate range does not apply during role-handoff.
+    - When Lead 1 returns, Lead 2 must transition back to response role within 1-2 bars, after which the 55% cap re-applies.
     - Allow brief doubling windows where Lead 2 and Rhythm (or Lead 1) play the same motif in unison/octave for emphasis.
     - Doubling windows are limited:
       - typical length: 1-4 bars
@@ -854,7 +1173,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Use 2-4 note voicings by default.
       - Re-voice less often than Lead 1 motif mutation cadence (target every 8-16 bars).
     - Rhythm-shape policy:
-      - Continuous whole-note pad behavior should usually be limited to 4 bars and rarely exceed 8 bars.
+      - Limit continuous whole-note pad behavior to <=4 bars typical, <=8 bars maximum (rare). (Same as rule P-001.)
       - After any 4-8 bar whole-note stretch, switch to a different pad rhythm template for at least 2-4 bars.
       - Alternate pad rhythmic templates over time (hold, half-bar re-voice, add/sus pulse) to avoid static bed monotony.
       - In busier sections, keep pad rhythm simple but not permanently static.
@@ -1001,6 +1320,8 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 
 ### Effects probabilities (character presets, post-v1 only)
 
+> **POST-V1 ONLY — do not implement in v1.**
+
 - Scope note:
   - Effects are non-functional placeholders in v1 and these probabilities are excluded from v1 code generation.
   - Keep this section only for post-v1 planning.
@@ -1015,6 +1336,18 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
 
 - Seeded determinism
   - Same seed + same controls => same result.
+  - PRNG algorithm: implement a `SeededRNG` struct using **SplitMix64** (a well-known 64-bit algorithm, roughly 10 lines of Swift). Do not use Swift's `SystemRandomNumberGenerator` or `arc4random` — these are not seedable and will break determinism.
+  - Seed lifecycle:
+    - On `Generate New`: generate a new random 64-bit integer seed using any available entropy source (e.g. `UInt64.random(in:)` called once). Store this as the current `globalSeed`.
+    - On per-track `Regenerate`: derive a new sub-seed for that track only (see below). Do not change `globalSeed` or the sub-seeds of any other track.
+  - Per-track sub-seed derivation:
+    - Each track has a fixed numeric index (Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6).
+    - Derive each track's RNG seed as: `trackSeed = splitmix64(globalSeed XOR (trackIndex * 0x9e3779b97f4a7c15))`.
+    - On per-track regenerate, generate a new 64-bit entropy value for that track only and store it as an override: `trackOverride[trackIndex] = UInt64.random(in:)`. All other tracks continue using their globalSeed-derived sub-seeds unchanged.
+    - At render time, each track's RNG is initialised from its override seed if one exists, otherwise from its derived sub-seed.
+  - Seed visibility:
+    - The seed is not shown in the main UI.
+    - In debug/test mode, the status box may print the current `globalSeed` as a plain integer (e.g. `Seed: 14829301847263`) to allow reproducible test runs. This is the only place the seed value appears.
 - Density balancing
   - If one track chooses a high-density option, lower high-density probabilities for adjacent tracks.
 - Conflict prevention
@@ -1026,6 +1359,151 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Add/remove one layer at a time; avoid abrupt full-stop transitions.
   - Chord changes should align with strong pulse boundaries (bar starts, usually with kick anchors).
   - Key changes are disabled in v1 base generation; keep one key center per section plan.
+
+### Chord voicing specification
+
+#### Aesthetic philosophy
+
+Motorik and krautrock keyboard parts are characteristically sparse, open, and modal. Simple triads in open position — not close-stacked chords — are the default. The goal is resonance and space, not harmonic density. Keep voicings lean so that rhythm and texture carry the energy rather than harmonic complexity. Chord changes happen slowly (every 4–16 bars), which means voice leading quality matters more than chord variety.
+
+#### The fundamental voicing rule: no thirds in the low register
+
+Never place a minor third or major third as the lowest interval of any pad voicing in the low-to-mid register. Thirds below MIDI 60 (middle C) sound acoustically muddy and indistinct. The lowest interval in any pad voicing must be a perfect fourth (5 semitones), perfect fifth (7 semitones), or octave (12 semitones). Thirds belong in the middle and upper voices only.
+
+#### Pad chord root placement
+
+The chord root for pads should sit in the range MIDI 48–60 (C3–C4). This allows the voicing to spread upward into the pad register (MIDI 48–84) while keeping the root grounded. Do not place the pad chord root below MIDI 48 — that is the bass register and creates muddy overlap with the bass track.
+
+#### Default open voicing template (major and minor triads)
+
+The standard voicing for both major and minor triads is a four-note open spread: root, then a fifth above, then an octave above the root, then the third (major or minor) above the octave. Expressed as semitone offsets from the chord root:
+
+- Major triad open: 0, +7, +12, +16 (root — fifth — octave — major third)
+- Minor triad open: 0, +7, +12, +15 (root — fifth — octave — minor third)
+
+This places the defining interval (the third, which tells the ear major vs. minor) at the top of the voicing where it sings clearly, while the bass register carries only the stable fifth and octave. This is the single most important voicing template; it should be used for the large majority of pad events.
+
+Example in key E, minor chord (Aeolian i chord), chord root at E3 (MIDI 52):
+- 52 + 0 = 52 (E3, root)
+- 52 + 7 = 59 (B3, fifth)
+- 52 + 12 = 64 (E4, octave)
+- 52 + 15 = 67 (G4, minor third one octave up)
+
+All four notes are within the pad register range (48–84). ✓
+
+#### Alternative voicing: root + fifth only (power/drone voicing)
+
+In sections where maximum harmonic openness or modal ambiguity is desired, use only root and fifth (0, +7 or 0, +7, +12 with octave doubling). This is deliberately neither major nor minor — the lead melody or bass line defines the quality. Use this:
+- Over a drone or static-tonic section where the mood should feel suspended
+- When the melody note would clash with the third of a full triad
+- As a variant to break up repeated full-triad voicings over long sections
+
+#### Voice leading between chords
+
+When the chord changes, apply these rules to choose the voicing of the new chord:
+
+- **Common tone rule**: identify any notes that the two chords share (as pitch classes, mod 12). Keep those notes in place — same MIDI pitch, no movement. Do not re-voice a shared note to a different octave just for variety.
+- **Minimal motion rule**: voices that must move should move by the smallest available interval. Prefer half-step (1 semitone) and whole-step (2 semitone) movement. A third or fourth leap is acceptable. A fifth or larger leap should only happen in the bass voice or when there is no smaller path.
+- **Use inversions**: choose the inversion of the new chord whose MIDI notes are physically closest to the current voicing. Do not default to root position on every chord. A first inversion or second inversion voicing that minimises movement is preferable to root position that requires large leaps.
+- **Avoid parallel fifths and octaves**: do not move two voices in the same direction by a perfect fifth or octave simultaneously. This hollows out the texture. One voice holds while the other moves, or they move in contrary motion.
+
+Practical approach: when the next chord change arrives, look at the target chord's available voicings (root position, first inversion, second inversion, open spread) and pick the one whose notes are nearest to the current notes. The voice leading smoothness of the transition is more important than which inversion sounds "correct" in isolation.
+
+#### Sus2 — the primary Motorik color chord
+
+Sus2 replaces the third with the major second (whole step above the root). It is neither major nor minor, has no directional pull, and sits indefinitely without demanding resolution. This makes it the most stylistically appropriate color chord for Motorik-style pads.
+
+Voicing: 0, +7, +12, +14 (root — fifth — octave — major second)
+
+Use sus2 in these contexts:
+- As a substitute for a major triad on a stable, long-held chord where you want a wistful, floating quality
+- When the melody note is the second/ninth and a full major triad would clash with it
+- Over pedal tones and drone sections where harmonic ambiguity is the intent
+- Alternating slowly between sus2 and the parent major chord on the same root (e.g. hold E — B — E — F#, then move F# down to E — B — E — E) creates gentle internal motion within a static harmonic field
+
+Sus2 should be the first flourish chord considered in any section. Probability guide: in a 16-bar section, 1–2 chord events may use sus2 where a plain major triad is the underlying harmony.
+
+#### Sus4 — tension with implied resolution
+
+Sus4 replaces the third with the perfect fourth. The fourth sits a half step above the fifth, creating an audible tension that the ear wants to resolve downward to the major third.
+
+Voicing: 0, +7, +12, +17 (root — fifth — octave — perfect fourth)
+
+Use sus4 only where you intend and deliver the resolution:
+- Immediately before a return to the major triad on the same root (Esus4 → E major)
+- On the chord one step before the phrase landing point, to add gentle forward momentum
+- As a bar-level ornament: hold sus4 for the first half of a slow chord, resolve to major triad in the second half
+
+Do not use sus4 on a chord that is going to sit unchanged for 4+ bars — the unresolved tension becomes uncomfortable over time. Do not use sus4 on the tonic chord at the end of a section when a feeling of rest is the intent.
+
+Probability guide: sus4 events are rare — no more than 1 per 8-bar window, and only where a resolution follows.
+
+#### Add9 — shimmer on stable chords
+
+Add9 keeps the full major or minor triad and adds the major second (ninth) as a color note above the third. The chord retains its clear major or minor identity; the ninth adds warmth and shimmer.
+
+Voicing (major add9): 0, +7, +12, +16, +26
+- Root — fifth — octave — major third — major ninth (two octaves above root + 2)
+- Or more compactly: 0, +7, +16, +26 (omit octave doubling for a lighter texture)
+
+Critical rule: the ninth must sit above the third in the voicing. Never place the ninth adjacent to the root in the low register (e.g. root at 0, ninth at +2, third at +4 — this sounds like a harsh dissonant cluster). Always: root low, third somewhere in the middle, ninth on top.
+
+Use add9 in these contexts:
+- On the tonic (i or I) chord of a stable section where the ninth is diatonic to the mode
+- On the IV chord for additional warmth
+- As a slow variation: move a long-held major triad into add9 by adding the ninth voice above it, creating movement without a chord change
+
+Do not use add9 on the vii chord (diminished quality with a ninth added sounds unruly) or on any chord where the ninth is a chromatic (out-of-mode) note.
+
+Probability guide: add9 can appear 1–2 times per section on stable tonic or IV-type chords.
+
+#### Dominant 7th and minor 7th — sustained color, non-resolving
+
+In Motorik and modal contexts, 7th chords do not resolve. They are sustained color chords, not functional harmony leading toward a tonic.
+
+Dominant 7th voicing (shell — omit the fifth, which adds no information):
+- 0, +4, +10 (root — major third — minor seventh) — A-voicing
+- Or: 0, +10, +16 (root — minor seventh — major third an octave up) — B-voicing
+- The defining sound is the tritone between the third and seventh (+4 and +10, an interval of 6 semitones). This is the color. Keep both in the voicing.
+
+Minor 7th voicing (shell):
+- 0, +3, +10 (root — minor third — minor seventh) — A-voicing
+- Or: 0, +10, +15 (root — minor seventh — minor third an octave up) — B-voicing
+
+Use 7th chords in these contexts:
+- Dominant 7th: as a color variant of a major chord in Mixolydian sections (the b7 is diatonic to Mixolydian; a G chord in G Mixolydian is naturally a G7). Very characteristic of the Motorik sound in major-mode sections.
+- Minor 7th: as the tonic chord in Dorian sections (Dm7 is the natural tonic of D Dorian, not just a flourish). Also appropriate on the ii chord of any major-mode section.
+- Keep 7th chords sustained and static. Let the tone ring rather than re-voicing frequently.
+
+Do not use the major 7th chord type in v1 Motorik generation. The major 7th interval (half step below the octave) clashing with the root creates a romantic, jazz-adjacent sound that is not characteristic of the Motorik aesthetic.
+
+Probability guide: 7th chords are appropriate 1–2 times per section in the right mode context (Dorian tonic Dm7 freely; dominant 7th in Mixolydian sections freely; elsewhere sparingly).
+
+#### Quartal voicings — maximum modal ambiguity
+
+Stacking perfect fourths instead of thirds (e.g. D-G-C or A-D-G) produces a floating, unresolved sound with no clear major or minor quality. Useful for the most abstract or drone-like sections.
+
+Quartal voicing example (three-note): 0, +5, +10 (root — fourth — minor seventh)
+
+Use sparingly — one chord event per section at most. Apply where maximum harmonic ambiguity is the goal, or as a transitional voicing between two diatonic chords.
+
+#### Voicing probability summary (Pads, v1 Motorik)
+
+Per 16-bar section:
+- Plain major or minor triad in open spread voicing: 70% of chord events
+- Sus2 substitution: 15%
+- Add9 (on stable tonic/IV chords only): 8%
+- Dominant or minor 7th (mode-appropriate): 5%
+- Sus4 (with resolution): 2%
+- Quartal voicing: occasional, up to 1 event per section
+
+#### Chord voicing validation before render
+
+Before emitting a pad chord voicing as MIDI events:
+- Confirm no note falls below MIDI 48 (pad register minimum)
+- Confirm no two adjacent notes in the voicing are less than 3 semitones apart in the low register (below MIDI 60) — if they are, remove or move the lower of the two
+- Confirm the voicing notes are within the active chord-window note pool (chordTones + scaleTensions only; no avoidTones)
+- If a voicing note is an avoidTone on a strong beat, remap it to the nearest chordTone
 
 ### V1 execution parameters (now defined)
 
@@ -1100,7 +1578,8 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Manifest:
     - `/assets/midi/motorik/starters/starter-pack-manifest-v1.json`
   - Drums:
-    - `/assets/midi/motorik/drums/Drumscribe - Motorik - MIDI.mid`
+    - `/assets/midi/motorik/drums/drum-patterns-v1.json` (primary — use this)
+    - `/assets/midi/motorik/drums/Drumscribe - Motorik - MIDI.mid` (reference only, do not load at runtime)
   - Bass:
     - `/assets/midi/motorik/starters/bass-starters-v1.json`
   - Pads:
@@ -1274,6 +1753,186 @@ Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 - Flur Motor
 - Panzinger Echo
 
+## AVAudioEngine playback architecture (v1)
+
+### Chosen approach: AVAudioEngine + AVAudioUnitSampler with manual event scheduling
+
+Do not use `AVAudioSequencer` in v1. It does not support the per-track runtime event-swap that per-track `Regenerate` during live playback requires. Use a manual scheduling loop against the audio engine's `AVAudioTime` timeline instead.
+
+### Engine setup
+
+- Create one `AVAudioUnitSampler` node per track (7 total: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums).
+- Load the Apple DLS General MIDI soundfont into each sampler at startup via `loadSoundBankInstrument(at:program:bankMSB:bankLSB:)`.
+- Connect all sampler output nodes to `AVAudioEngine.mainMixerNode`.
+- Start the engine once at app launch. Do not stop or restart it between songs; stopping and restarting introduces audible glitches and setup latency.
+
+### MIDI channel assignment (v1)
+
+- Lead 1: channel 0
+- Lead 2: channel 1
+- Pads: channel 2
+- Rhythm: channel 3
+- Texture: channel 4
+- Bass: channel 5
+- Drums: channel 9 (GM drums channel, required by Apple DLS)
+
+### Playback timeline and step timer
+
+On `Play`, record the absolute start host time: `playbackStartHostTime = mach_absolute_time()`.
+
+Derived values (recomputed from `tempo` on each step tick):
+```
+secondsPerBeat = 60.0 / tempo
+secondsPerStep = secondsPerBeat / 4.0    // one 16th note
+secondsPerBar  = secondsPerBeat * 4.0
+```
+
+Elapsed playback time at any moment: `elapsedSeconds = hostTimeToSeconds(mach_absolute_time() - playbackStartHostTime)`.
+
+Current bar: `currentBar = Int(elapsedSeconds / secondsPerBar)`.
+
+Run a high-priority `DispatchQueue` step timer at 16th-note resolution:
+- Fire every `secondsPerStep` seconds (use a `DispatchSourceTimer` on a `DispatchQueue` with `.userInteractive` QoS).
+- On each tick, compute the target step index and scan `trackEvents[trackIndex]` for all events whose `stepIndex` matches that step.
+- For each matching event, schedule `noteOn` via the sampler at the computed `AVAudioTime`, then schedule a corresponding `noteOff` at `eventTime + durationSteps × secondsPerStep`.
+
+### Per-track event swap during playback (bar-boundary rule)
+
+When per-track `Regenerate` fires while playback is running:
+1. Compute `nextBarStartStep = (currentBar + 1) × 16`.
+2. Run track generation off the main thread. At 138 BPM one bar is 1.74 seconds; generation completes well within this window.
+3. At the step tick that lands on `nextBarStartStep`, atomically replace `trackEvents[trackIndex]` with the new array.
+4. Cancel any future scheduled events for that track that were pre-queued beyond `nextBarStartStep`. Do not cancel note-off events for notes already sounding (let them decay naturally).
+5. The step timer then reads from the new array starting at `nextBarStartStep`. All other tracks are unaffected.
+
+### Instrument cycling during playback
+
+When the user cycles the instrument on a track while the transport is running, the new GM program is loaded at the next bar boundary using the same bar-boundary mechanism as above. In-flight notes on the old program finish their scheduled note-off.
+
+### Mute and solo
+
+- **Mute**: set `AVAudioUnitSampler` output volume to 0. Continue dispatching MIDI events to keep the track in sync; the audio is simply silent. Unmuting restores volume immediately and the track resumes in phase.
+- **Solo**: mute all non-soloed tracks using the same volume-zero approach.
+
+### Stop and end of song
+
+- On `Stop` (user button): cancel the step timer, send a note-off for every sounding note on every channel, set the UI playhead to bar 0, reset `playbackStartHostTime`.
+- On song end (step timer detects `currentBar >= totalBars`): execute the same procedure as `Stop`. Display the playhead at bar 1 (1-indexed in the UI, bar 0 internally).
+
+## Swift data model sketch (v1)
+
+These are the authoritative Swift type names. Generated code must use them verbatim for consistency across the codebase.
+
+```swift
+// Track index constants — use these named values, never raw integers
+let kTrackLead1   = 0
+let kTrackLead2   = 1
+let kTrackPads    = 2
+let kTrackRhythm  = 3
+let kTrackTexture = 4
+let kTrackBass    = 5
+let kTrackDrums   = 6
+
+// Enumerations
+enum Mode: String, CaseIterable {
+    case Ionian, Dorian, Mixolydian, Aeolian, MinorPentatonic, MajorPentatonic
+}
+enum Mood: String, CaseIterable { case Bright, Deep, Dream, Free }
+enum SectionLabel: String { case intro, A, B, outro }
+enum SectionIntensity: String { case low, medium, high }
+enum ChordType: String {
+    case major, minor, sus2, sus4, add9, dom7, min7, quartal, power
+}
+enum ProgressionFamily: String {
+    case static_tonic
+    case two_chord_I_bVII
+    case minor_loop_i_VII
+    case minor_loop_i_VI
+    case modal_cadence_bVI_bVII_I
+}
+
+// One MIDI note event, step-addressed
+struct MIDIEvent {
+    let stepIndex: Int       // absolute step in the full song (bar × 16 + step-within-bar)
+    let note: UInt8          // MIDI note number 0–127
+    let velocity: UInt8      // MIDI velocity 0–127
+    let durationSteps: Int   // gate length in steps (1 step = one 16th note)
+}
+
+// Generation step 1 output
+struct GlobalMusicalFrame {
+    let key: String          // "C" | "C#" | "D" | "Eb" | "E" | "F" | "F#" | "G" | "Ab" | "A" | "Bb" | "B"
+    let mode: Mode
+    let tempo: Int           // BPM
+    let mood: Mood
+    let progressionFamily: ProgressionFamily
+    let totalBars: Int       // shared by all tracks; authoritative
+}
+
+// One entry in the chord plan
+struct ChordWindow {
+    let startBar: Int
+    let lengthBars: Int
+    let chordRoot: String        // degree string in key ("1", "b7", "b6", etc.)
+    let chordType: ChordType
+    let chordTones: Set<Int>     // pitch classes mod 12
+    let scaleTensions: Set<Int>  // pitch classes mod 12
+    let avoidTones: Set<Int>     // pitch classes mod 12
+}
+
+// One section in the arranged song
+struct SongSection {
+    let startBar: Int
+    let lengthBars: Int
+    let label: SectionLabel
+    let intensity: SectionIntensity
+    let mode: Mode           // usually matches GlobalMusicalFrame.mode;
+                             // may differ for Moderate A/B B-section
+}
+
+// Generation step 2 output
+struct SongStructure {
+    let sections: [SongSection]
+    let chordPlan: [ChordWindow]
+}
+
+// Tonal governance map (generation step 3 output)
+// One entry per chord window; covers the full song timeline
+struct TonalGovernanceEntry {
+    let chordWindow: ChordWindow     // the window this entry governs
+    let sectionLabel: SectionLabel   // which section this window belongs to
+    let sectionMode: Mode            // active mode for this window (from SongSection.mode)
+}
+
+typealias TonalGovernanceMap = [TonalGovernanceEntry]
+// Lookup helper: given a bar index, find the entry whose chordWindow contains that bar.
+// All tracks call this at render time to get the active chordTones/scaleTensions/avoidTones.
+
+// Complete song state (held in memory while the song is loaded)
+struct SongState {
+    let frame: GlobalMusicalFrame
+    let structure: SongStructure
+    let tonalMap: TonalGovernanceMap  // step 3 output; all tracks query this at render time
+    let trackEvents: [[MIDIEvent]]    // indexed by kTrackLead1…kTrackDrums
+    let globalSeed: UInt64
+    var trackOverrides: [Int: UInt64] // trackIndex → override seed set by per-track Regenerate
+    let title: String
+}
+
+// SplitMix64 PRNG — implement exactly this algorithm
+struct SeededRNG {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed }
+    mutating func next() -> UInt64 {
+        state &+= 0x9e3779b97f4a7c15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xbf58476d1ce4e5b9
+        z = (z ^ (z >> 27)) &* 0x94d049bb133111eb
+        return z ^ (z >> 31)
+    }
+}
+```
+
 ## Constraints for v1
 
 - Prioritize musical coherence over infinite flexibility.
@@ -1291,9 +1950,12 @@ Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
   - `Help` and `About` dialogs
   - Per-track `Mute` and `Solo` buttons
   - Per-track `Regenerate` button
+  - MIDI lane visualization and playback scrolling
   - Right-side effects controls shown as disabled placeholders
+  - Motorik core and Motorik-adjacent generation profiles under the single v1 `Motorik` style
   - Track set/order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums
 - Excluded from v1:
+  - Direct note editing in the piano-roll/grid view
   - Effect editing controls
   - Evolution mode (continuous morphing playback)
 
@@ -1301,8 +1963,11 @@ Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 
 - Implementation rule: ignore all post-v1 sections when generating v1 code.
 - Post-v1 content is reference material only and must not expand v1 scope.
+- This does not exclude the Motorik-adjacent calibration profiles defined above; those profiles are part of v1 generation behavior.
 
 ## Post-1.0 Evolution Mode (continuous play)
+
+> **POST-V1 ONLY — do not implement in v1.**
 
 - Intent
   - `Generate` creates a completely new song state.
@@ -1336,6 +2001,6 @@ Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 
 ## Open questions
 
-- Should style be a single selector (Motorik, Cosmic, Ambient) or a blend slider?
-- Should lead generation be optional by default for more sparse ambient output?
-- Should each track permit independent length/polymeter, or all parts share one loop length in v1?
+- ~~Should style be a single selector (Motorik, Cosmic, Ambient) or a blend slider?~~ Resolved: single selector for v1, locked to Motorik. Blend sliders are post-v1.
+- ~~Should lead generation be optional by default for more sparse ambient output?~~ Resolved: Lead 1 and Lead 2 are always generated in v1. The user can mute individual tracks after generation if a sparser result is wanted. Making lead generation optional by default adds UI state complexity that is out of scope for v1.
+- ~~Should each track permit independent length/polymeter, or all parts share one loop length in v1?~~ Resolved: all tracks share one loop length in v1. No polymeter.

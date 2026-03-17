@@ -3,7 +3,8 @@
   "version": "v1",
   "format": "json-pattern-library",
   "tracks": [
-    {"track": "Drums", "asset": "../drums/Drumscribe - Motorik - MIDI.mid", "count": 1, "type": "midi_seed"},
+    {"track": "Drums", "asset": "../drums/Drumscribe - Motorik - MIDI.mid", "count": 1, "type": "midi_seed", "usage": "reference_only_do_not_load_directly"},
+    {"track": "Drums", "asset": "../drums/drum-patterns-v1.json", "count": 14, "type": "pattern_library", "usage": "primary_drum_source"},
     {"track": "Bass", "asset": "bass-starters-v1.json", "count": 6, "type": "pattern_library"},
     {"track": "Bass", "asset": "bass-starters-hallogallo-v1.json", "count": 2, "type": "pattern_library_variant", "usage": "hallogallo_tab_derived"},
     {"track": "Pads", "asset": "pads-starters-v1.json", "count": 5, "type": "template_library"},
