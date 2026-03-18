@@ -417,13 +417,13 @@ Step 2 produces a `SongStructure` record containing an ordered list of sections 
 
 #### Intro and outro length selection
 
-Draw `introLength` from the intro length probabilities (2/4/8 bars) and `outroLength` from the outro length probabilities (2/4/8 bars). Both values are multiples of 2.
+Draw `introLength` from {2 bars, 4 bars} with equal 50/50 probability. Draw `outroLength` from {4 bars, 8 bars} with equal 50/50 probability.
 
 ```
-bodyLength = totalBars - introLength - outroLength
+bodyLength = max(16, totalBars - introLength - outroLength)
 ```
 
-Minimum `bodyLength` is 32 bars. If `bodyLength` < 32 after the initial draw, reduce `outroLength` by one step (8→4 or 4→2) and recalculate. If still < 32 with `outroLength` at 2, reduce `introLength` by one step. These adjustments ensure at least two 16-bar sections always fit in the body.
+Minimum `bodyLength` is 16 bars (clamped if needed). Intro style and outro style are each drawn with equal 33% weight from their three variants; see the Intro/Outro rules section for the full behavioral spec.
 
 #### Form and body section bar counts
 
@@ -497,6 +497,7 @@ The chord plan is a list of `ChordWindow` entries covering all bars 0 through `t
   - `minor_loop_i_VII` or `minor_loop_i_VI`: alternating i and VII/VI windows, 8–12 bars each
   - `modal_cadence_bVI_bVII_I`: repeating 3-chord groups of 8 bars each (bVI → bVII → I)
 - Each `ChordWindow` stores: `startBar`, `lengthBars`, `chordRoot` (degree string in key), `chordType`, and the three pitch-class sets (`chordTones`, `scaleTensions`, `avoidTones`) derived from the chord type and active section mode
+- Intro/outro chord root is always forced to "1" (tonic) during initial chord selection. After the full chord plan is built, the intro chord window is post-processed ("anchored") to match the first body chord's root and type exactly — ensuring intro bass and pads are in the same harmonic world as the opening body bar. Outro chord windows are also forced to "1" tonic but are not anchored to the body (they fade/dissolve from the tonic).
 
 ### Mood-to-mode mapping
 
@@ -687,30 +688,29 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Theme for Great Cities-style melodic minor loop: 15%
     - Trans-Europe Express-style sequencer pulse: 5%
 - Intro/Outro rules
-  - Intro length probabilities:
-    - 2 bars: 35%
-    - 4 bars: 45%
-    - 8 bars: 20%
-  - Outro length probabilities:
-    - 2 bars: 25%
-    - 4 bars: 50%
-    - 8 bars: 25%
-  - Intro type probabilities:
-    - Drums-only pulse intro: 20%
-    - Lead only melody: 10%
-    - Lead + texture: 10%
-    - Drums + Bass intro: 35%
-    - Drums + Bass + Texture intro: 15%
-    - Full-band filtered intro: 10%
-  - Outro type probabilities:
-    - Drop to Drums + Bass: 35%
-    - Drums-only tail: 30%
-    - Full-band subtractive fade (parts drop every 1-2 bars): 25%
-    - Texture-only tail after hard stop: 10%
+  - Intro length: 2 bars (50%) or 4 bars (50%)
+  - Outro length: 4 bars (50%) or 8 bars (50%)
+  - Intro types (equal weight, 33% each):
+    - Already Playing: all tracks present from bar 1 at low velocity, ramping up bar by bar to full body level. The song feels like it was already going before you tuned in.
+    - Progressive Entry: a simplified, stripped-down version of the main bass riff plays throughout the intro — signalling "something is about to happen" without playing the actual groove. Velocity ramps 65%→82% so the body arrival is still felt as a lift. Other tracks hold off.
+    - Cold Start: the intro opens with a short drum fill pickup, and the main groove locks in on bar 1, beat 1. Two sub-variants, equal weight:
+      - Drums-only pickup: bar 0 is a partial drum fill only (2 or 3 beat pickup, starting mid-bar at step 4 or step 8); bass and all other instruments are silent until bar 1.
+      - Bass+drums pickup: bar 0 includes a drum fill plus the simplified bass intro riff (both start mid-bar or from bar 0 at reduced velocity ~72%); all other instruments enter on bar 1.
+  - Outro types (equal weight, 33% each):
+    - Fade: all tracks play through the outro, thinning velocity and density gradually. Pads rarely skip (15% skip chance per bar). The outro decays rather than cuts.
+    - Dissolve: pads never skip — they are the final sound fading out. Other tracks drop progressively but the harmonic bed remains until the last moment.
+    - Cold Stop: tracks cut cleanly on the final bar. Pads are silent on the last bar; a drum fill plays alone as the final event before silence.
+  - Intro harmonic anchoring:
+    - Intro and outro chord windows always use chord root degree "1" (tonic). After the chord plan is built, the intro chord root and type are replaced with the first body chord's root and type, so intro bass and pads sit in the same harmonic world as the opening body bar. This prevents the "different key" jump at the intro→body transition.
+  - Simplified intro bass (for Progressive Entry and Cold Start):
+    - For each bass rule, the intro plays a derived simplified riff, not the body pattern. The purpose is to signal what is coming, not to play it early.
+    - For complex bass rules (BAS-005 through BAS-011): strip back to the minimal identity of the rule — e.g. Moroder Pulse intro plays root-only staccato 8ths; McCartney Drive intro plays the breathe-bar pattern.
+    - For simple bass rules (BAS-001, BAS-003, BAS-004): go in the opposite direction — add interest with an ascending scale walk or arpeggio, since four bars of pure root whole-notes is too static. Example: Hallogallo Lock intro plays an 8th-note scale walk root→2nd→3rd, landing on the fifth held.
   - Energy contour rules:
     - Intro builds only upward (do not start at max density).
-    - Outro removes layers progressively (no sudden full stop unless in hard-stop variant).
+    - Outro removes layers progressively (no sudden full stop unless in cold-stop variant).
     - Keep harmonic movement in intro/outro lower than in main body.
+    - Spotlight and bass evolution annotations (step 4 and 5 of generation) do not extend into the outro — all variation and spotlight logic stops at the first outro bar.
 
 ### Motorik-adjacent calibration profile (Electric Buddha set)
 
@@ -1022,50 +1022,28 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - Reduce cymbal/hat density first, then remove snare ghost accents.
       - Last bar may end with kick-only pulse (40% chance).
 - Bass
-  - Pattern family probabilities:
-    - Root/fifth anchor: 60%
-    - Anchor + sparse passing tone: 25%
-    - Sparse long-note anchor: 10%
-    - Light syncopated anchor variant: 5%
+  - Bass rule catalog (one rule selected per song, used for all body bars):
+    - BAS-001 Root Anchor (10%): root on beat 1 (long sustain), chord tone on beat 3. Clean and kick-locked. Simplest motorik bass.
+    - BAS-002 Motorik Drive (10%): four quarter notes per bar, staccato, velocity accented on beats 1 and 3. Machine-pulse feel.
+    - BAS-003 Crawling Walk (7%): 2-bar root/fifth/approach-note pattern. Slow stepwise motion.
+    - BAS-004 Hallogallo Lock (10%): root on beat 1 (long), fifth on beat 3. Locked tightly to kick on beats 1 and 3. Derived from Hallogallo groove.
+    - BAS-005 McCartney Drive (12%): 8th-note locked groove; bar 1 descends root→m3→5→m3 then repeats, bar 2 is a breathe bar with root sustain plus approach pickup. ~1/3 chance the full 4-bar group stays in all-drive mode (no breathe bar).
+    - BAS-006 LA Woman Sustain (6%): root holds most of the bar, chromatic neighbor shimmer at the end. Sparse and held. Inspired by LA Woman guitar/bass part.
+    - BAS-007 Hook Ascent (11%): high-register melodic bass riff; bar 1 hammers the major third in 8th notes then descends, bar 2 falls to root with minor 6th color and chromatic pickup. Inspired by Peter Hook / Joy Division "She's Lost Control".
+    - BAS-008 Moroder Pulse (9%): sequenced staccato 8th notes root-root-fifth-fifth-b7-b7-root-root. Mechanical, relentless, all chord tones. Inspired by Giorgio Moroder "I Feel Love".
+    - BAS-009 Vitamin Hook (7%): bar 1 climbs root→fifth→octave with chromatic passing tone, bar 2 descends with a long root breathe. Inspired by Holger Czukay / CAN "Vitamin C".
+    - BAS-010 Quo Arc (10%): 2-bar boogie-woogie arc in paired 8th notes; bar 1 ascends 1-1-3-3-5-5-6-b7, bar 2 descends b7-6-5-3-1-1-1-1 back to root. Always uses boogie-woogie scale (1-3-5-6-b7) regardless of chord type. Inspired by Status Quo "Down Down".
+    - BAS-011 Quo Drive (8%): compressed 1-bar boogie arc root-third-fifth-sixth-b7-sixth-fifth-third, with a root-push variant (root-root-third-fifth-sixth-b7-sixth-fifth) applied on even bars. Inspired by Status Quo "Caroline" / "Paper Plane".
+  - All patterns anchor beat 1 (step 0) as the primary attack, matching the kick drum. Syncopation is deliberately minimal — Motorik bass is locked and pulse-forward.
   - Writing rules:
     - Phrase length: 1-2 bars
     - Repetition target: 70-90% repeated cells per 16 bars
     - Passing tones: max 1-2 per bar, weak-beat biased, resolve within <=1 bar
-    - Register: low-mid lane, minimal octave jumping
-    - Preferred register lane: MIDI 40-64 (default center 45-57); allow brief dips below this only for section accents
-    - Strong-beat note targets:
-      - root: 60-75%
-      - fifth: 15-30%
-      - other chord tones: 5-15%
-    - Note-pool policy by chord window:
-      - Primary: root/fifth/octave
-      - Secondary: third and scale-step approaches
-      - Avoid: non-resolving chromatic tones on strong beats
-    - Variation policy:
-      - one micro-variation event per 8 bars by default
-      - use rest-shift, note-length change, or single-note approach into next bar root
-      - Layered-bass policy:
-        - Support two bass pattern layers:
-          - layer A (intro/core anchor)
-          - layer B (variation layer entering later)
-        - Use only one active bass layer at a time in v1 render output, but allow section-level switching between A and B.
-        - Layer switch should occur at section boundaries or 4/8-bar boundaries with a short pickup if needed.
-    - Drum-bass lock policy:
-      - Kick-lock onset targets:
-        - strict mode: 75-90% of bass onsets align to kick grid points
-        - variation mode: 60-75%
-      - Avoid placing new bass onsets directly on core snare backbeats (2/4) except intentional accents.
-      - Bass attack density follows drum intensity state (low/medium/high).
-      - After drum fills, bass response event weights:
-        - downbeat root re-anchor: 60%
-        - short approach into root: 30%
-        - octave accent: 10%
-      - When drum lane shifts to ride/open-hat lift, allow slight temporary bass subdivision lift without changing harmonic anchor role.
-      - Align major drum+bass variations to 8/16-bar boundaries; avoid simultaneous high-complexity changes in the same 4-bar window.
-    - Intro behavior:
-      - If Bass is active in intro, use root-heavy anchor with minimal passing tones.
-    - Outro behavior:
-      - Shift to longer note values and fewer attacks in final 2-4 bars.
+    - Register: MIDI 28-64 (center 40-56); low-mid lane, minimal octave jumping
+    - Strong-beat note targets: root 60-75%, fifth 15-30%, other chord tones 5-15%
+    - Drum-bass lock: 75-90% of bass onsets align to kick grid points in strict mode; 60-75% in variation mode. Avoid placing onsets on snare backbeats (beats 2/4) except intentional accents.
+    - Intro behavior: see Intro/Outro rules — simplified or enriched riff per rule type.
+    - Outro behavior: shift to longer note values and fewer attacks in final 2-4 bars. In cold-stop outros, bass cuts on the final bar.
 - Rhythm
   - Writing rules:
     - 1-2 bar ostinato, repeat-first behavior
@@ -1185,33 +1163,26 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - extended jam mode: up to 8 bars
     - After a doubling window, require divergence (call/response or complementary contour) for at least 2 bars.
 - Pads
+  - Pad style catalog (one primary style selected per song):
+    - PAD-001 Sustained whole-bar (12%): one chord attack per bar, duration 14 steps (leaves a 2-step visual/sonic gap). After 4 consecutive whole-bar sustained bars, automatically injects a PAD-007 Charleston bar to break monotony, then resets the run counter.
+    - PAD-002 Power/drone voicing (10%): same rhythm as PAD-001 but uses root+fifth+octave voicing (no third) — maximally open and modal. Same 4-bar break rule applies.
+    - PAD-003 Pulsed 2-bar (8%): one chord attack every 2 bars, duration 30 steps. Very sparse — lets the harmonic bed breathe.
+    - PAD-005 Arpeggio (18%): 8th-note cycling through chord tones (8 events per bar). Direction chosen once per song: ascending, descending, or bounce (up then down). Most Motorik-characteristic pad style.
+    - PAD-006 Chord stabs (10%): chord hit on beat 1 (duration 4 steps), with 50% chance of a secondary hit on beat 3 at slightly lower velocity.
+    - PAD-007 Charleston / 3+3+2 (12%): three hits per bar at steps 0, 6, 12 — durations 5, 5, 4 steps. Derived from Silly Love Songs verse rhythm guitar analysis.
+    - PAD-008 8th-note chop (8%): near-every-8th-note staccato hits (steps 0,2,4,6,8,10,12,14, duration 2 each). Low-intensity sections randomly skip some hits. Derived from Hallogallo guitar density analysis.
+    - PAD-009 Quarter pump (10%): locked quarter-note chord hits all four beats. Velocity accented on beats 1 and 3, softer on 2 and 4. Derived from SLS intro rhythm guitar.
+    - PAD-010 Half-bar breathe (8%): chord on beat 1 (duration 7 steps), silence on second half of bar. Creates maximum air and space.
+    - PAD-011 Backbeat stabs (4%): chord hits on beats 2 and 4 only (steps 4 and 12, duration 3). Off-beat emphasis — contrasts all beat-1-anchored patterns. Derived from LA Woman guitar 2 syncopated fill analysis.
+  - PAD-004 Sparse intro/outro always applies on top of the primary style: controls intro/outro skip behavior per bar (see intro style rules).
+  - All chord voicings use 4-note open spread in register MIDI 48-84. No thirds below MIDI 60.
   - Writing rules:
-    - Sustained harmonic bed with slower motion than Lead 1/Lead 2/Rhythm
     - Chord-change ceiling: 1-2 functional changes per 16 bars
-    - Progression shape: loop-first, linear/modal movement, avoid circle-of-fifths behavior
-    - Pads must follow the section chord plan (no independent progression path).
-    - Chord complexity policy (Motorik-first):
-      - Triads (major/minor): 65%
-      - Sus/add colors (sus2/sus4/add9): 20%
-      - 7th chords: 10%
-      - 9th/11th colors: 5%
-      - Diminished/altered colors: <=2%, transition-only
-    - Substitution policy:
-      - Functional-jazz substitutions are off by default in Motorik mode.
-      - Only mild modal substitutions are allowed when tonal center remains stable.
-    - Voicing density:
-      - Use 2-4 note voicings by default.
-      - Re-voice less often than Lead 1 motif mutation cadence (target every 8-16 bars).
-    - Rhythm-shape policy:
-      - Limit continuous whole-note pad behavior to <=4 bars typical, <=8 bars maximum (rare). (Same as rule P-001.)
-      - After any 4-8 bar whole-note stretch, switch to a different pad rhythm template for at least 2-4 bars.
-      - Alternate pad rhythmic templates over time (hold, half-bar re-voice, add/sus pulse) to avoid static bed monotony.
-      - In busier sections, keep pad rhythm simple but not permanently static.
-    - If Lead 1 activity is high, reduce pad re-voicing and keep stable shell voicings.
-    - Intro behavior:
-      - Optional low-level pad bed only in full-band filtered intro type.
-    - Outro behavior:
-      - Hold final chord tone through layer drop, then release before texture tail.
+    - Progression shape: loop-first, linear/modal movement; no circle-of-fifths behavior
+    - Re-voice less often than Lead 1 motif mutation cadence (target every 8-16 bars)
+    - If Lead 1 activity is high, reduce pad re-voicing and keep stable shell voicings
+    - Intro behavior (PAD-004): Progressive Entry — pads skip until the final intro bar. Already Playing — 20% skip per bar throughout intro (low-velocity variation). Cold Start drumsOnly — pads suppress through entire intro. Cold Start bass+drums — 50% skip chance on bars after bar 0.
+    - Outro behavior (PAD-004): Fade — 15% skip per bar. Dissolve — pads never skip; they are the final sound. Cold Stop — pads cut on the final outro bar.
 - Texture
   - Event probabilities:
     - Event chance per 8 bars: 50%
@@ -1231,17 +1202,19 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
 
 ### Intro/Outro layer order rules
 
-- Intro layer add order (when active):
-  - Rhythm-section intros (`Drums-only`, `Drums + Bass`, `Drums + Bass + Texture`, `Full-band filtered`):
-    - Drums -> Bass -> Pads -> Rhythm -> Lead 1 -> Texture -> Lead 2
-  - Lead-centric intros (`Lead only melody`, `Lead + texture`):
-    - Lead 1 -> Texture -> Drums -> Bass -> Pads -> Rhythm -> Lead 2
-- Outro layer drop order (default): Lead 2 -> Lead 1 -> Rhythm -> Pads -> Bass -> Drums -> Texture
-- Entry/exit timing jitter:
-  - Per-track boundary jitter up to +/- 1 beat (40% chance) for less mechanical transitions.
+- Intro behavior by style:
+  - Already Playing: all tracks present from bar 1, including Bass and Pads. Velocities ramp up across the intro bars from ~55% to 100% of body level. The actual body pattern is used, not a simplified version.
+  - Progressive Entry: Bass plays the simplified intro riff throughout. Pads enter on the final intro bar only (or skip earlier bars). Lead 1, Lead 2, Rhythm, Texture all suppress until the body. Drums may play sparse pattern throughout.
+  - Cold Start — drums only: bar 0 is drum fill only (partial bar, mid-bar pickup). Bass is silent on bar 0. All other tracks silent through entire intro. Everyone arrives together on bar 1 of the body.
+  - Cold Start — bass+drums: bar 0 is drum fill plus bass simplified riff. All other tracks silent. Body entry on bar 1.
+- Outro behavior by style:
+  - Fade: all tracks play through the outro with gradual velocity/density reduction. Pads have a 15% per-bar skip chance.
+  - Dissolve: pads never skip — the harmonic bed is the last thing you hear. Other tracks may drop early.
+  - Cold Stop: pads cut on the final outro bar. A drum fill may play as the last event. Hard silence follows.
 - Variation lock:
-  - Intro and outro must still obey selected key and mood profile.
-  - No new progression family may be introduced only in outro.
+  - Intro and outro must obey the selected key and mood profile.
+  - No new progression family may be introduced in the outro.
+  - Spotlight and bass evolution processes stop at the first outro bar — no variation annotations are generated for outro bars.
 
 ### Song-inspired melodic variation rules
 
@@ -1325,7 +1298,7 @@ These are concrete sound targets derived from the Neu!/Harmonia/Kraftwerk refere
   - Pads: GM 90 (`Warm Pad`), GM 91 (`Polysynth`), GM 96 (`Sweep Pad`)
   - Rhythm: GM 29 (`Electric Muted Guitar`), GM 85 (`Charang`), GM 91 (`Polysynth`) with short gate
   - Texture: GM 94 (`Metallic Pad`), GM 93 (`Bowed Glass`), GM 95 (`Halo Pad`)
-  - Bass: GM 39 (`Synth Bass 1`), GM 40 (`Synth Bass 2`), GM 35 (`Electric Bass Pick`)
+  - Bass: GM 39 (`Synth Bass 1` / Moog Bass — **default**), GM 87 (`Lead Bass`), GM 38 (`Analog Bass`), GM 33 (`Electric Bass`)
 - Drums kits for v1: Electronic (24) + Power (16)
   - Mapping note: `Rock Kit` = GM/GS `Power` kit (16).
   - Default choice rule:
@@ -1661,16 +1634,36 @@ D-001 - Keep motorik-compatible pulse continuity; vary accents/hats/fills before
 D-002 - Use section-intensity drum variants (intro sparse, drive, lift, bridge sparse) for form signaling.
 
 ### Bass rules
-B-001 - Keep drum+bass lock as primary rhythmic anchor.
+B-001 - Keep drum+bass lock as primary rhythmic anchor; beat 1 always grounded.
 B-002 - Bass strong-beat note targets: root 60-75%, fifth 15-30%, other chord tones 5-15%.
 B-003 - Bass non-scale tones disallowed except explicit short pickup with rapid resolution.
-B-004 - Use layered bass model: layer A (intro/core), layer B (later variation), one active layer at a time.
-B-005 - Bass layer switches only at section or 4/8-bar boundaries (optionally with pickup).
+BAS-001 - Root Anchor: root beat 1 (long), chord tone beat 3.
+BAS-002 - Motorik Drive: 4 staccato quarter notes, velocity accented on beats 1+3.
+BAS-003 - Crawling Walk: 2-bar root/fifth/approach-note pattern.
+BAS-004 - Hallogallo Lock: root beat 1 (long), fifth beat 3, kick-locked.
+BAS-005 - McCartney Drive: 8th-note groove; bar 1 descends, bar 2 breathes; ~1/3 chance of all-drive 4-bar block.
+BAS-006 - LA Woman Sustain: root holds most of bar, chromatic neighbor shimmer at end.
+BAS-007 - Hook Ascent: melodic high-register riff; bar 1 hammers major third then descends, bar 2 falls to root.
+BAS-008 - Moroder Pulse: staccato 8th notes root-root-fifth-fifth-b7-b7-root-root, mechanical.
+BAS-009 - Vitamin Hook: bar 1 climbs root→fifth→octave, bar 2 descends and breathes.
+BAS-010 - Quo Arc: 2-bar boogie-woogie arc ascending then descending using boogie scale (1-3-5-6-b7).
+BAS-011 - Quo Drive: 1-bar compressed boogie arc; root-push variant on even bars.
 
 ### Pad rules
-P-001 - Limit continuous whole-note pad behavior to typical <=4 bars, rare max 8 bars.
+P-001 - Limit continuous whole-note pad behavior to <=4 bars; auto-inject PAD-007 Charleston bar to break monotony.
 P-002 - After long hold blocks, rotate to a different pad rhythm template for 2-4 bars.
 P-003 - Keep pads harmonically authoritative but rhythmically adaptive in busier sections.
+PAD-001 - Sustained whole-bar: one attack per bar, duration 14 steps. 4-bar break rule applies.
+PAD-002 - Power/drone voicing: root+fifth+octave whole-bar. Same 4-bar break rule applies.
+PAD-003 - Pulsed 2-bar: one attack every 2 bars, duration 30 steps.
+PAD-004 - Sparse intro/outro: controls skip behavior during intro and outro bars (always applied on top of primary style).
+PAD-005 - Arpeggio: 8th notes cycling chord tones. Direction (ascending/descending/bounce) fixed per song.
+PAD-006 - Chord stabs: beat 1 hit (dur 4), 50% chance beat 3 secondary hit at lower velocity.
+PAD-007 - Charleston / 3+3+2: hits at steps 0 (dur 5), 6 (dur 5), 12 (dur 4). From Silly Love Songs verse analysis.
+PAD-008 - 8th-note chop: near-every-8th staccato hits (dur 2 each). Low intensity sections skip some hits randomly.
+PAD-009 - Quarter pump: all 4 beats, velocity accented on 1+3, softer on 2+4. From SLS intro rhythm guitar analysis.
+PAD-010 - Half-bar breathe: chord on beat 1 (dur 7), silence second half. Maximum air.
+PAD-011 - Backbeat stabs: beats 2+4 only (steps 4 and 12, dur 3). Off-beat emphasis. From LA Woman guitar 2 analysis.
 
 ### Rhythm rules
 R-001 - Rhythm must stay sparser than drums in most sections.
@@ -1920,10 +1913,25 @@ struct SongSection {
                              // may differ for Moderate A/B B-section
 }
 
+// Intro and outro style (generation step 2 output)
+enum IntroStyle: Equatable {
+    case alreadyPlaying                   // full pattern at low velocity, ramps up
+    case progressiveEntry                 // simplified intro riff, other tracks hold
+    case coldStart(drumsOnly: Bool)       // drum fill pickup; drumsOnly=true: bass silent on bar 0
+}
+
+enum OutroStyle {
+    case fade          // all tracks thin out gradually
+    case dissolve      // pads are the final sound, never skipped
+    case coldStop      // hard cut on final bar, drums-only last event
+}
+
 // Generation step 2 output
 struct SongStructure {
     let sections: [SongSection]
     let chordPlan: [ChordWindow]
+    let introStyle: IntroStyle
+    let outroStyle: OutroStyle
 }
 
 // Tonal governance map (generation step 3 output)

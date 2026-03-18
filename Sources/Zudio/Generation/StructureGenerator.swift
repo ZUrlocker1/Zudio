@@ -4,9 +4,9 @@
 struct StructureGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> SongStructure {
         let form = pickForm(rng: &rng)
-        let sections = buildSections(form: form, totalBars: frame.totalBars, rng: &rng)
+        let (sections, introStyle, outroStyle) = buildSections(form: form, totalBars: frame.totalBars, rng: &rng)
         let chordPlan = buildChordPlan(frame: frame, sections: sections, rng: &rng)
-        return SongStructure(sections: sections, chordPlan: chordPlan)
+        return SongStructure(sections: sections, chordPlan: chordPlan, introStyle: introStyle, outroStyle: outroStyle)
     }
 
     // MARK: - Form selection
@@ -21,7 +21,7 @@ struct StructureGenerator {
 
     // MARK: - Section layout
 
-    private static func buildSections(form: SongForm, totalBars: Int, rng: inout SeededRNG) -> [SongSection] {
+    private static func buildSections(form: SongForm, totalBars: Int, rng: inout SeededRNG) -> (sections: [SongSection], introStyle: IntroStyle, outroStyle: OutroStyle) {
         // Motorik intro: 2 or 4 bars (50/50 — keep it tight); Outro: 4 or 8 bars
         let introBars = rng.nextDouble() < 0.5 ? 2 : 4
         let outroBars = rng.nextDouble() < 0.5 ? 4 : 8
@@ -42,7 +42,18 @@ struct StructureGenerator {
         // Outro
         sections.append(SongSection(startBar: cursor, lengthBars: outroBars, label: .outro, intensity: .low, mode: bodySections.last?.mode ?? .Dorian))
 
-        return sections
+        // Pick intro/outro styles — equal weight across all three options.
+        // coldStart gets a 50/50 sub-choice: drums-only bar 0, or bass+drums together.
+        let outroStyles: [OutroStyle] = [.fade, .dissolve, .coldStop]
+        let outroStyle = outroStyles[rng.nextInt(upperBound: 3)]
+        let introStyle: IntroStyle
+        switch rng.nextInt(upperBound: 3) {
+        case 0:  introStyle = .alreadyPlaying
+        case 1:  introStyle = .progressiveEntry
+        default: introStyle = .coldStart(drumsOnly: rng.nextDouble() < 0.5)
+        }
+
+        return (sections, introStyle, outroStyle)
     }
 
     private static func buildBodySections(
@@ -79,19 +90,22 @@ struct StructureGenerator {
         let aWeights: [Double] = [0.30, 0.40, 0.25, 0.05]
         let aBars = aLengths[rng.weightedPick(aWeights)]
 
-        // B section: remainder split roughly 40/60
-        let remaining = max(32, bodyBars - aBars)
-        let bBars = max(16, (remaining * 2) / 3)
-
+        // Decide reprise first so B can be sized to exactly fill the remainder.
         let hasReprise = rng.nextDouble() < 0.30 // A/B/A' reprise variant 30%
         let aIntensity: SectionIntensity = rng.nextDouble() < 0.10 ? .low : .medium
         let bMode = Mode.allCases[rng.nextInt(upperBound: Mode.allCases.count)]
+        // Always consume the reprise-length RNG draw so seed outputs stay stable.
+        let repriseLength = rng.nextDouble() < 0.5 ? 16 : 32
+        let repriseBars = hasReprise ? repriseLength : 0
+
+        // B fills whatever bodyBars remain after A (and reprise), ensuring no uncovered bars.
+        let bBars = max(16, bodyBars - aBars - repriseBars)
+
         var sections: [SongSection] = [
             SongSection(startBar: cursor, lengthBars: aBars, label: .A, intensity: aIntensity, mode: .Dorian),
             SongSection(startBar: cursor + aBars, lengthBars: bBars, label: .B, intensity: .high, mode: bMode)
         ]
         if hasReprise {
-            let repriseBars = rng.nextDouble() < 0.5 ? 16 : 32
             let repriseStart = cursor + aBars + bBars
             sections.append(SongSection(startBar: repriseStart, lengthBars: repriseBars, label: .A, intensity: .medium, mode: .Dorian))
         }
@@ -105,10 +119,36 @@ struct StructureGenerator {
     ) -> [ChordWindow] {
         var plan: [ChordWindow] = []
         for section in sections {
-            let windows = buildChordWindows(frame: frame, section: section, rng: &rng)
-            plan.append(contentsOf: windows)
+            plan.append(contentsOf: buildChordWindows(frame: frame, section: section, rng: &rng))
         }
-        return plan
+        return anchorIntroToBody(plan: plan, frame: frame, sections: sections)
+    }
+
+    /// Replaces the intro chord window's root+type with the first body chord's root+type.
+    /// This makes the intro bass/pads sit in the same harmonic world as the opening body bar,
+    /// eliminating the "different key" jump at the intro→body transition.
+    private static func anchorIntroToBody(
+        plan: [ChordWindow], frame: GlobalMusicalFrame, sections: [SongSection]
+    ) -> [ChordWindow] {
+        guard let introSection = sections.first(where: { $0.label == .intro }),
+              let firstBodyChord = plan.first(where: { $0.startBar >= introSection.endBar })
+        else { return plan }
+
+        let (tones, tensions, avoids) = NotePoolBuilder.build(
+            chordRootDegree: firstBodyChord.chordRoot,
+            chordType: firstBodyChord.chordType,
+            key: frame.key,
+            mode: introSection.mode
+        )
+        return plan.map { window in
+            guard window.startBar >= introSection.startBar,
+                  window.startBar < introSection.endBar else { return window }
+            return ChordWindow(
+                startBar: window.startBar, lengthBars: window.lengthBars,
+                chordRoot: firstBodyChord.chordRoot, chordType: firstBodyChord.chordType,
+                chordTones: tones, scaleTensions: tensions, avoidTones: avoids
+            )
+        }
     }
 
     /// One chord per section by default; body sections may get 2–3 chord windows.
@@ -127,7 +167,10 @@ struct StructureGenerator {
         var bar = section.startBar
         for i in 0..<chordCount {
             let length = (i == chordCount - 1) ? (section.endBar - bar) : barsEach
-            let root = pickChordRoot(mode: section.mode, rng: &rng)
+            // Consume the RNG call regardless, but anchor intro/outro to tonic so all
+            // instruments (bass, pads) are tonally grounded before and after the main body.
+            let rawRoot = pickChordRoot(mode: section.mode, rng: &rng)
+            let root = (section.label == .intro || section.label == .outro) ? "1" : rawRoot
             let type = pickChordType(mode: section.mode, rng: &rng)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,

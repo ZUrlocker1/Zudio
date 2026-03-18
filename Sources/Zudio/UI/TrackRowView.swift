@@ -48,8 +48,8 @@ struct TrackRowView: View {
                     .init(name:"Slow Strings",    program:49), .init(name:"Space Voice",     program:91),
                     .init(name:"FX Soundtrack",   program:97), .init(name:"Field Noise",     program:119)]
         case kTrackBass:
-            return [.init(name:"Lead Bass",      program:87), .init(name:"Analog Bass",     program:38),
-                    .init(name:"Moog Bass",       program:39), .init(name:"Electric Bass",   program:33)]
+            return [.init(name:"Moog Bass",       program:39), .init(name:"Lead Bass",      program:87),
+                    .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]
         case kTrackDrums:
             return [.init(name:"Rock Kit",       program:8),  .init(name:"808 Kit",         program:25),
                     .init(name:"Brush Kit",       program:40),

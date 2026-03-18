@@ -110,7 +110,7 @@ struct SongGenerator {
             rhythmRules: rhythmRules
         )
 
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame)
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules)
 
         return SongState(
             frame: frame,
@@ -224,16 +224,14 @@ struct SongGenerator {
 
         // Intro rule — immediately after form
         if let intro = structure.introSection {
-            let ruleID = intro.lengthBars <= 2 ? "INT-001" : "INT-002"
-            log.append(GenerationLogEntry(tag: ruleID,
-                description: "Intro: \(intro.lengthBars) bars, drums-only entry → sparse groove"))
+            log.append(GenerationLogEntry(tag: "Intro",
+                description: "\(intro.lengthBars) bar \(introStyleLabel(structure.introStyle))"))
         }
 
         // Outro rule — immediately after intro
         if let outro = structure.outroSection {
-            let ruleID = outro.lengthBars <= 8 ? "OUT-001" : "OUT-002"
-            log.append(GenerationLogEntry(tag: ruleID,
-                description: "Outro: \(outro.lengthBars) bars, sparse/low-intensity drop"))
+            log.append(GenerationLogEntry(tag: "Outro",
+                description: "\(outro.lengthBars) bar \(outroStyleLabel(structure.outroStyle))"))
         }
 
         // Chord progression — single combined line
@@ -338,6 +336,22 @@ struct SongGenerator {
         case .singleA:    return "Single-A"
         case .subtleAB:   return "Subtle A/B"
         case .moderateAB: return "Moderate A/B"
+        }
+    }
+
+    private static func introStyleLabel(_ style: IntroStyle) -> String {
+        switch style {
+        case .alreadyPlaying:   return "fade in"
+        case .progressiveEntry: return "lock in"
+        case .coldStart(let drumsOnly): return drumsOnly ? "cold start — drums only" : "cold start"
+        }
+    }
+
+    private static func outroStyleLabel(_ style: OutroStyle) -> String {
+        switch style {
+        case .fade:     return "fade"
+        case .dissolve: return "dissolve"
+        case .coldStop: return "cold stop — drum fill ending"
         }
     }
 
@@ -460,7 +474,8 @@ struct SongGenerator {
     static func buildStepAnnotations(
         structure: SongStructure,
         trackEvents: [[MIDIEvent]],
-        frame: GlobalMusicalFrame
+        frame: GlobalMusicalFrame,
+        drumRules: Set<String> = []
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -627,7 +642,10 @@ struct SongGenerator {
             let bar = section.startBar
             switch section.label {
             case .intro:
-                fireBar(bar, tag: "Intro", desc: sectionInstruments(section))
+                let introInstr = sectionInstruments(section)
+                let introDesc = "\(section.lengthBars) bar \(introStyleLabel(structure.introStyle))"
+                    + (introInstr.isEmpty ? "" : " — \(introInstr)")
+                fireBar(bar, tag: "Intro", desc: introDesc)
             case .A:
                 let chords = chordsLabel(for: section)
                 if seenLabels.contains(.A) {
@@ -643,16 +661,20 @@ struct SongGenerator {
                     fireBar(bar, tag: "Section B", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
                 }
             case .outro:
-                fireBar(bar, tag: "Outro", desc: "winding down — \(section.lengthBars) bars")
+                fireBar(bar, tag: "Outro", desc: "\(section.lengthBars) bar \(outroStyleLabel(structure.outroStyle))")
             }
             seenLabels.insert(section.label)
         }
+
+        // Once the outro begins the song is winding down — suppress all instrument
+        // annotations (fills, cymbals, spotlight, bass evolution, pattern changes).
+        let outroStartBar = structure.outroSection?.startBar ?? totalBars
 
         // 2. Drum fills — fire 2 beats (8 steps) before the fill region begins, so the
         //    text appears just ahead of the hit rather than a full bar early.
         //    Fill region offsets: 1-beat → step 12, 2-beat → step 8, 3-beat → step 4.
         //    Fire steps:          1-beat → step 4,  2-beat → step 0,  3-beat → step 0.
-        for fillBar in allFillBars.sorted() {
+        for fillBar in allFillBars.sorted() where fillBar < outroStartBar {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
             let beats  = fillBeats(bar: fillBar)
@@ -665,18 +687,18 @@ struct SongGenerator {
         }
 
         // 3. Drum cymbal variations — announce only on transitions, not every bar.
-        // Track the cymbal "mode" of the previous bar and fire only when it changes.
+        // DRM-003 (Ride Groove) uses ride as its baseline — skip ride annotations for it
+        // since the generation log already documents this. For all other drum rules, track
+        // the cymbal mode across the whole song (no reset between sections) so a transition
+        // back to ride after a non-body section doesn't re-trigger.
+        let isRideGroove = drumRules.contains("DRM-003")
         if kTrackDrums < trackEvents.count {
             let drumEvs = trackEvents[kTrackDrums]
-            // Cymbal mode: nil = no body bars seen yet, "" = normal hi-hat, or a desc string
             var prevCymbalMode: String? = nil
             for bar in 0..<totalBars {
                 guard !allFillBars.contains(bar),
                       let sec = structure.section(atBar: bar),
-                      sec.label == .A || sec.label == .B else {
-                    prevCymbalMode = nil   // reset across non-body sections
-                    continue
-                }
+                      sec.label == .A || sec.label == .B else { continue }
                 let bs = bar * 16
                 let barEvs = drumEvs.filter { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
                 let hasRide       = barEvs.contains { $0.note == GMDrum.ride.rawValue }
@@ -697,7 +719,10 @@ struct SongGenerator {
                 if mode != prevCymbalMode {
                     switch mode {
                     case "ride":
-                        fireBar(bar, tag: "Drums", desc: "playing ride instead of hi-hat")
+                        // Don't announce ride when ride IS the normal pattern for this song
+                        if !isRideGroove {
+                            fireBar(bar, tag: "Drums", desc: "playing ride instead of hi-hat")
+                        }
                     case "crash":
                         fireBar(bar, tag: "Drums", desc: "crash on beat 1, open hat colour")
                     case "openHat":
@@ -716,14 +741,14 @@ struct SongGenerator {
 
         // 4. Track spotlight entrances — fire at bar start when a track re-enters after 4+ silent bars.
         // Announced at most once per section to avoid repetition.
-        let spotlightTracks: [(Int, String)] = [
-            (kTrackLead1,   "Lead 1"),
-            (kTrackLead2,   "Lead 2"),
-            (kTrackPads,    "Pads"),
-            (kTrackRhythm,  "Rhythm"),
-            (kTrackTexture, "Texture")
+        let spotlightTracks: [(Int, String, String)] = [
+            (kTrackLead1,   "Lead 1",  "steps into the spotlight"),
+            (kTrackLead2,   "Lead 2",  "steps into the spotlight"),
+            (kTrackPads,    "Pads",    "is back on stage"),
+            (kTrackRhythm,  "Rhythm",  "is back on stage"),
+            (kTrackTexture, "Texture", "steps into the spotlight")
         ]
-        for (trackIdx, trackName) in spotlightTracks {
+        for (trackIdx, trackName, entranceDesc) in spotlightTracks {
             guard trackIdx < trackEvents.count else { continue }
             var barHasNotes = [Bool](repeating: false, count: totalBars)
             for ev in trackEvents[trackIdx] {
@@ -732,10 +757,10 @@ struct SongGenerator {
             }
             var silentStreak = 0
             var lastAnnouncedBar: Int = -8   // cooldown: don't re-announce within 8 bars
-            for bar in 0..<totalBars {
+            for bar in 0..<outroStartBar {
                 if barHasNotes[bar] {
                     if silentStreak >= 3 && (bar - lastAnnouncedBar) >= 8 {
-                        fireBar(bar, tag: trackName, desc: "steps into the spotlight")
+                        fireBar(bar, tag: trackName, desc: entranceDesc)
                         lastAnnouncedBar = bar
                     }
                     silentStreak = 0
@@ -766,7 +791,7 @@ struct SongGenerator {
             var prevFP: Set<UInt8>? = nil
             var prevCount: Int = 0
             var lastEvolvedBar: Int = -8
-            for bar in stride(from: 0, to: totalBars, by: 4) {
+            for bar in stride(from: 0, to: outroStartBar, by: 4) {
                 guard let sec = structure.section(atBar: bar),
                       sec.label == .A || sec.label == .B else { continue }
                 let fp = bassFP(fromBar: bar)
@@ -776,16 +801,21 @@ struct SongGenerator {
                     let union = fp.union(prev).count
                     let common = fp.intersection(prev).count
                     let jaccard = union > 0 ? Double(common) / Double(union) : 1.0
-                    // For simple locked patterns (≤2 pitch classes), any new pitch class is
-                    // significant — adding a third note to a two-note riff is a real change.
-                    // For richer patterns, use the standard 0.65 Jaccard threshold.
+                    // Adaptive threshold: for a fingerprint of N pitch classes, adding or
+                    // removing 1 class gives Jaccard of N/(N+1) or (N-1)/N. Set the threshold
+                    // just above N/(N+1) so any single-class change is detected regardless of
+                    // how rich the pattern is. Cap at 0.88 to avoid hypersensitivity on very
+                    // large fingerprints. Simple patterns (≤2 classes) use the newClasses check.
+                    let n = Double(prev.count)
+                    let adaptiveThreshold = prev.count <= 2 ? 0.99 :
+                        min(0.88, n / (n + 1.0) + 0.03)
                     let newClasses = fp.subtracting(prev)
-                    let pitchChanged = jaccard < 0.65 || (prev.count <= 2 && !newClasses.isEmpty)
+                    let pitchChanged = jaccard < adaptiveThreshold || (prev.count <= 2 && !newClasses.isEmpty)
                     // Density change: note count shifts by more than 50%
                     let densityChanged = prevCount > 0 &&
                         abs(count - prevCount) > max(1, prevCount / 2)
                     if pitchChanged || densityChanged {
-                        fireBar(bar, tag: "Bass", desc: "pattern evolving — new motif")
+                        fireBar(bar, tag: "Bass", desc: "pattern evolving")
                         lastEvolvedBar = bar
                     }
                 }

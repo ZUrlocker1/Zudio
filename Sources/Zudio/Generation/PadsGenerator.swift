@@ -49,12 +49,38 @@ struct PadsGenerator {
             guard let section = structure.section(atBar: bar) else { continue }
             guard let cw = structure.chordWindow(atBar: bar) else { continue }
 
-            let isIntroOutro = section.label == .intro || section.label == .outro
-
-            // Intro/outro: 50% skip (PAD-004)
-            if isIntroOutro && rng.nextDouble() < 0.5 {
-                sustainRunBars = 0
-                continue
+            // Intro/outro: skip probability varies by style
+            if section.label == .intro {
+                let isFirstBar = bar == (structure.introSection?.startBar ?? bar)
+                switch structure.introStyle {
+                case .alreadyPlaying:
+                    // Pads present from bar 1 at low velocity (20% skip for variation)
+                    if rng.nextDouble() < 0.20 { sustainRunBars = 0; continue }
+                case .progressiveEntry:
+                    // Pads only in the final intro bar — build up saved for the body entrance
+                    let isLastBar = bar == (structure.introSection?.endBar ?? bar + 1) - 1
+                    if !isLastBar { sustainRunBars = 0; continue }
+                case .coldStart(let drumsOnly):
+                    // Bar 0 is always silent (drums-only pickup or bass+drums pickup).
+                    // drumsOnly: keep pads out for the full intro so the first-beat arrival is dramatic.
+                    // Not drumsOnly: 50% skip on bars 1+ for some air.
+                    if isFirstBar { sustainRunBars = 0; continue }
+                    if drumsOnly { sustainRunBars = 0; continue }
+                    if rng.nextDouble() < 0.50 { sustainRunBars = 0; continue }
+                }
+            } else if section.label == .outro {
+                let isLastBar = bar == (structure.outroSection?.endBar ?? bar + 1) - 1
+                switch structure.outroStyle {
+                case .fade:
+                    // Pads throughout, rarely skipped — they fade with everything else
+                    if rng.nextDouble() < 0.15 { sustainRunBars = 0; continue }
+                case .dissolve:
+                    break  // Pads never skip in dissolve — they are the final sound
+                case .coldStop:
+                    // Pads cut on the final bar (drum fill plays alone)
+                    if isLastBar { sustainRunBars = 0; continue }
+                    if rng.nextDouble() < 0.20 { sustainRunBars = 0; continue }
+                }
             }
 
             let stepIdx = bar * 16

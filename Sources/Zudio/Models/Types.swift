@@ -116,6 +116,28 @@ enum SongForm: String, Sendable {
     case moderateAB
 }
 
+/// How the song enters from silence.
+enum IntroStyle: Equatable, Sendable {
+    /// Neu!/Harmonia style — full groove present from bar 1 at ~55% velocity, ramping to full.
+    /// Bass plays its actual pattern. Pads present throughout. "Already in motion."
+    case alreadyPlaying
+    /// Can style — full Motorik groove from bar 0, actual bass rule at reduced velocity, pads enter last bar.
+    case progressiveEntry
+    /// Cold start — pickup fill launches the song, then full groove enters on the next downbeat.
+    /// drumsOnly: true = bar 0 is drums alone (bass and pads silent); false = bass grounds the pickup.
+    case coldStart(drumsOnly: Bool)
+}
+
+/// How the song exits to silence.
+enum OutroStyle: Equatable, Sendable {
+    /// Full groove with velocity fading to near-silence over all outro bars.
+    case fade
+    /// Drums strip back progressively; pads/texture hold all the way to the final bar.
+    case dissolve
+    /// Full groove until the final bar, which is a big closing fill → complete silence.
+    case coldStop
+}
+
 // MARK: - Key semitone table
 
 /// Maps a key name string to its semitone offset from C (0–11).
@@ -217,6 +239,6 @@ let kDefaultGMPrograms: [Int: UInt8] = [
     kTrackPads:    89,  // Warm Pad
     kTrackRhythm:  28,  // Guitar Pulse
     kTrackTexture: 95,  // Swell
-    kTrackBass:    87,  // Lead Bass
+    kTrackBass:    39,  // Moog Bass
     kTrackDrums:   8,   // Rock Kit
 ]

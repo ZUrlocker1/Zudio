@@ -56,45 +56,264 @@ struct BassGenerator {
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar),
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
-
-            let isIntroOutro = section.label == .intro || section.label == .outro
             let barStart = bar * 16
 
-            if isIntroOutro {
-                // Intro/outro: sparse root-only anchor locked to kick
-                let rootNote = chordRootNote(entry: entry, frame: frame)
-                let vel: UInt8 = section.label == .intro ? 72 : 65
-                events.append(MIDIEvent(stepIndex: barStart, note: rootNote, velocity: vel, durationSteps: 7))
+            if let introSec = structure.introSection, introSec.contains(bar: bar) {
+                events += introBar(bar: bar, introSection: introSec, ruleID: ruleID,
+                                   barStart: barStart, entry: entry, frame: frame, rng: &rng,
+                                   mccartney4BarDrive: mccartney4BarDrive, style: structure.introStyle)
+            } else if let outroSec = structure.outroSection, outroSec.contains(bar: bar) {
+                events += outroBar(bar: bar, outroSection: outroSec, ruleID: ruleID,
+                                   barStart: barStart, entry: entry, frame: frame, rng: &rng,
+                                   mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
             } else {
-                switch ruleID {
-                case "BAS-002":
-                    events += motorikDriveBar(barStart: barStart, entry: entry, frame: frame)
-                case "BAS-003":
-                    events += crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-                case "BAS-004":
-                    events += hallogalloLockBar(barStart: barStart, entry: entry, frame: frame)
-                case "BAS-005":
-                    let allDrive = mccartney4BarDrive[min(bar / 4, mccartney4BarDrive.count - 1)]
-                    events += mccartneyDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame, allDrive: allDrive)
-                case "BAS-006":
-                    events += laWomanSustainBar(barStart: barStart, entry: entry, frame: frame)
-                case "BAS-007":
-                    events += hookAscentBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-                case "BAS-008":
-                    events += motoroderPulseBar(barStart: barStart, entry: entry, frame: frame)
-                case "BAS-009":
-                    events += vitaminHookBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-                case "BAS-010":
-                    events += quoArcBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-                case "BAS-011":
-                    events += quoDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-                default:
-                    events += rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
-                }
+                events += bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                                  frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
             }
         }
 
         return events
+    }
+
+    // MARK: - Body bar dispatcher
+
+    private static func bodyBar(
+        ruleID: String, barStart: Int, bar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        rng: inout SeededRNG, mccartney4BarDrive: [Bool]
+    ) -> [MIDIEvent] {
+        switch ruleID {
+        case "BAS-002": return motorikDriveBar(barStart: barStart, entry: entry, frame: frame)
+        case "BAS-003": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "BAS-004": return hallogalloLockBar(barStart: barStart, entry: entry, frame: frame)
+        case "BAS-005":
+            let allDrive = mccartney4BarDrive[min(bar / 4, mccartney4BarDrive.count - 1)]
+            return mccartneyDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame, allDrive: allDrive)
+        case "BAS-006": return laWomanSustainBar(barStart: barStart, entry: entry, frame: frame)
+        case "BAS-007": return hookAscentBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "BAS-008": return motoroderPulseBar(barStart: barStart, entry: entry, frame: frame)
+        case "BAS-009": return vitaminHookBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "BAS-010": return quoArcBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "BAS-011": return quoDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
+        }
+    }
+
+    // MARK: - Intro bass
+
+    private static func introBar(
+        bar: Int, introSection: SongSection, ruleID: String,
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: IntroStyle
+    ) -> [MIDIEvent] {
+        let offsetBar = bar - introSection.startBar
+        let totalBars = introSection.lengthBars
+
+        switch style {
+        case .alreadyPlaying:
+            // Play the actual bass pattern at reduced velocity, ramping up bar by bar.
+            let factor = totalBars <= 1 ? 1.0 :
+                0.55 + 0.45 * Double(offsetBar) / Double(totalBars - 1)
+            let base = bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                               frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+            return scaleVelocity(base, factor: factor)
+
+        case .progressiveEntry:
+            // Simplified riff derived from the song's bass rule — signals "something is coming"
+            // without playing the actual groove. Ramps 65%→82% so the body arrival is still felt.
+            let factor = totalBars <= 1 ? 0.75 :
+                0.65 + 0.17 * Double(offsetBar) / Double(totalBars - 1)
+            return scaleVelocity(simplifiedIntroBar(ruleID: ruleID, barStart: barStart,
+                                                    entry: entry, frame: frame), factor: factor)
+
+        case .coldStart(let drumsOnly):
+            // drumsOnly bar 0: drums alone, bass silent — full impact lands on bar 1.
+            // All other bars: simplified riff at near-full velocity (the groove arrives at body).
+            if drumsOnly && offsetBar == 0 { return [] }
+            let factor: Double
+            if !drumsOnly && offsetBar == 0 {
+                factor = 0.72   // ground the drum pickup without dominating
+            } else {
+                // Bars 1+ ramp 82%→95% — just below body level so the body still "arrives".
+                let playedOffset = drumsOnly ? (offsetBar - 1) : offsetBar
+                let playedTotal  = drumsOnly ? max(1, totalBars - 1) : totalBars
+                factor = playedTotal <= 1 ? 0.92 :
+                    0.82 + 0.13 * Double(playedOffset) / Double(playedTotal - 1)
+            }
+            return scaleVelocity(simplifiedIntroBar(ruleID: ruleID, barStart: barStart,
+                                                    entry: entry, frame: frame), factor: factor)
+        }
+    }
+
+    // MARK: - Simplified intro riff (derived-from-rule, not the full pattern)
+    //
+    // For COMPLEX rules: strip back to a recognisable skeleton that signals the groove.
+    // For SIMPLE rules (BAS-001/003/004): go in the OPPOSITE direction — add interest
+    // with an ascending scale/arpeggio figure so the intro isn't more boring than the body.
+    //
+    //   BAS-001  Root Anchor       → quarter-note arpeggio: root→3rd→5th→root (hints at chord)
+    //   BAS-002  Motorik Drive     → root only, half-time (beats 1+3, long sustain)
+    //   BAS-003  Crawling Walk     → ascending quarter notes: root→2nd→3rd→5th
+    //   BAS-004  Hallogallo Lock   → 8th-note scale walk root→2nd→3rd then lands on 5th (held)
+    //   BAS-005  McCartney Drive   → breathe-bar pattern (bar 2): root sustain + low fifth + approach
+    //   BAS-006  LA Woman          → root whole-bar sustain, no chromatic shimmer
+    //   BAS-007  Hook Ascent       → root 8th notes (rhythmic signal, melody withheld)
+    //   BAS-008  Moroder Pulse     → root only staccato 8ths (omit fifth and b7)
+    //   BAS-009  Vitamin Hook      → root on 1, fifth on 3 (omit arpeggio movement)
+    //   BAS-010  Quo Arc           → alternating root–third 8th notes (omit fifth, sixth, b7)
+    //   BAS-011  Quo Drive         → alternating root–third 8th notes (same stripped feel)
+
+    private static func simplifiedIntroBar(
+        ruleID: String, barStart: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = chordRootNote(entry: entry, frame: frame)
+        let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
+
+        switch ruleID {
+
+        case "BAS-002":   // Motorik Drive → root only, half-time beats 1+3
+            return [
+                MIDIEvent(stepIndex: barStart,     note: root, velocity: 82, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8, note: root, velocity: 74, durationSteps: 7),
+            ]
+
+        case "BAS-003":   // Crawling Walk (simple) → ascending quarter notes root→2nd→3rd→5th
+            // Body has root/fifth/approach; intro hints at more by climbing the scale.
+            let second3 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 28, high: 56))
+            let third3  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,    velocity: 82, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: second3, velocity: 80, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: third3,  velocity: 84, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: fifth,   velocity: 88, durationSteps: 4),
+            ]
+
+        case "BAS-004":   // Hallogallo Lock (simple) → 8th-note scale walk root→2nd→3rd, lands on 5th
+            // Body is just root+fifth; intro builds anticipation by walking up to that fifth.
+            let second4 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 28, high: 56))
+            let third4  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,    velocity: 84, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 2,  note: second4, velocity: 80, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: third4,  velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: fifth,   velocity: 88, durationSteps: 10),
+            ]
+
+        case "BAS-005":   // McCartney Drive → breathe bar: root sustain + low fifth + approach
+            let lowerFifth = UInt8(clamped(Int(root) - 5, low: 28, high: 52))
+            let approach   = UInt8(clamped(Int(root) - 2, low: 28, high: 52))
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,       velocity: 84, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8,  note: lowerFifth, velocity: 74, durationSteps: 5),
+                MIDIEvent(stepIndex: barStart + 14, note: approach,   velocity: 60, durationSteps: 2),
+            ]
+
+        case "BAS-006":   // LA Woman → root whole-bar, no shimmer
+            return [MIDIEvent(stepIndex: barStart, note: root, velocity: 86, durationSteps: 14)]
+
+        case "BAS-007":   // Hook Ascent → root 8th notes (rhythm signal, melody withheld)
+            var evs7: [MIDIEvent] = []
+            let vels7: [UInt8] = [86, 72, 78, 68, 82, 68, 76, 66]
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evs7.append(MIDIEvent(stepIndex: barStart + step, note: root,
+                                      velocity: vels7[i], durationSteps: 2))
+            }
+            return evs7
+
+        case "BAS-008":   // Moroder Pulse → root only staccato 8ths (omit fifth and b7)
+            var evs8: [MIDIEvent] = []
+            let vels8: [UInt8] = [90, 74, 80, 70, 84, 70, 80, 72]
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evs8.append(MIDIEvent(stepIndex: barStart + step, note: root,
+                                      velocity: vels8[i], durationSteps: 1))
+            }
+            return evs8
+
+        case "BAS-009":   // Vitamin Hook → root on 1, fifth on 3 (omit arpeggio movement)
+            return [
+                MIDIEvent(stepIndex: barStart,     note: root,  velocity: 86, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 76, durationSteps: 7),
+            ]
+
+        case "BAS-010", "BAS-011":   // Quo Arc / Quo Drive → root–third alternating 8ths
+            let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 62))
+            let quoNotes: [UInt8] = [root, third, root, third, root, third, root, third]
+            let quoVels:  [UInt8] = [90,   76,    86,   72,    88,   74,    84,   70  ]
+            var evsQuo: [MIDIEvent] = []
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evsQuo.append(MIDIEvent(stepIndex: barStart + step, note: quoNotes[i],
+                                        velocity: quoVels[i], durationSteps: 2))
+            }
+            return evsQuo
+
+        default:   // BAS-001 Root Anchor (simple) → quarter-note chord arpeggio: root→3rd→5th→root
+            // Body alternates just two notes; intro hints at the full chord with a short arpeggio.
+            let third1 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,   velocity: 86, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: third1, velocity: 80, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: fifth,  velocity: 86, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: root,   velocity: 78, durationSteps: 4),
+            ]
+        }
+    }
+
+    // MARK: - Outro bass
+
+    private static func outroBar(
+        bar: Int, outroSection: SongSection, ruleID: String,
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: OutroStyle
+    ) -> [MIDIEvent] {
+        let offsetBar = bar - outroSection.startBar
+        let totalBars = outroSection.lengthBars
+
+        switch style {
+        case .fade:
+            // Actual bass pattern with velocity fading to ~25% by the final bar.
+            let factor = totalBars <= 1 ? 0.25 :
+                max(0.25, 1.0 - 0.75 * Double(offsetBar) / Double(totalBars - 1))
+            let base = bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                               frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+            return scaleVelocity(base, factor: factor)
+
+        case .dissolve:
+            // Bass plays a simplified anchor in the first half, then drops out — pads hold alone.
+            if offsetBar < totalBars / 2 {
+                return simplifiedBassBar(barStart: barStart, entry: entry, frame: frame)
+            }
+            return []  // silent — pads carry the final bars
+
+        case .coldStop:
+            // Bass plays body pattern until the final bar; cuts one bar before the drum fill.
+            if offsetBar >= totalBars - 1 { return [] }
+            return bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+        }
+    }
+
+    // MARK: - Simplified bass (root on 1, fifth on 3) — intro/outro anchor
+
+    private static func simplifiedBassBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = chordRootNote(entry: entry, frame: frame)
+        let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
+        return [
+            MIDIEvent(stepIndex: barStart,     note: root,  velocity: 78, durationSteps: 7),
+            MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 70, durationSteps: 7),
+        ]
+    }
+
+    // MARK: - Velocity scaling utility
+
+    private static func scaleVelocity(_ events: [MIDIEvent], factor: Double) -> [MIDIEvent] {
+        events.map { ev in
+            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                      velocity: UInt8(max(1, min(127, Int(Double(ev.velocity) * factor)))),
+                      durationSteps: ev.durationSteps)
+        }
     }
 
     // MARK: - BAS-001: Root Anchor — clean, locked to beat 1 and 3

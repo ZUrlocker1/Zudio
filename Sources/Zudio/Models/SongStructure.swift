@@ -52,6 +52,8 @@ struct SongSection: Equatable, Sendable {
 struct SongStructure: Equatable, Sendable {
     let sections: [SongSection]
     let chordPlan: [ChordWindow]
+    let introStyle: IntroStyle
+    let outroStyle: OutroStyle
 
     func section(atBar bar: Int) -> SongSection? {
         sections.first { $0.contains(bar: bar) }

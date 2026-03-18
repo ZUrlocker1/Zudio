@@ -40,9 +40,11 @@ struct DrumGenerator {
             let isFirstBarOfBodySection = section.startBar == bar && section.label != .intro && section.label != .outro
 
             if let intro = structure.introSection, intro.contains(bar: bar) {
-                events += introPattern(bar: bar, introSection: intro, ruleID: ruleID, barStart: barStart, rng: &rng)
+                events += introPattern(bar: bar, introSection: intro, ruleID: ruleID,
+                                       style: structure.introStyle, barStart: barStart, rng: &rng)
             } else if let outro = structure.outroSection, outro.contains(bar: bar) {
-                events += outroPattern(bar: bar, outroSection: outro, barStart: barStart)
+                events += outroPattern(bar: bar, outroSection: outro, ruleID: ruleID,
+                                       style: structure.outroStyle, barStart: barStart, rng: &rng)
             } else {
                 let intensity = section.subPhaseIntensity(atBar: bar)
                 // Crash on first bar of each new body section
@@ -223,74 +225,154 @@ struct DrumGenerator {
         return events
     }
 
-    // MARK: - Intro pattern (progressive build — Hallogallo style)
-    // Bar 0: kick only | Bar 1: kick + sparse hat | Bar 2-3: kick + 8th hats |
-    // Bar 4+: full sparse groove | Last bar: full groove + fill
+    // MARK: - Intro patterns
 
     private static func introPattern(
-        bar: Int, introSection: SongSection, ruleID: String, barStart: Int, rng: inout SeededRNG
+        bar: Int, introSection: SongSection, ruleID: String,
+        style: IntroStyle, barStart: Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        var events: [MIDIEvent] = []
-        let offsetBar = bar - introSection.startBar
-        let isLastBar = bar == introSection.endBar - 1
+        let offsetBar  = bar - introSection.startBar
+        let totalBars  = introSection.lengthBars
+        let isLastBar  = bar == introSection.endBar - 1
 
-        switch offsetBar {
-        case 0:
-            // Bar 0: just the kick on 1+3 — pure pulse start
-            events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
-            events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue, velocity: 95,  durationSteps: 1))
-        case 1:
-            // Bar 1: kick 1+3 + hat on beats 1+3
-            events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue,      velocity: 100, durationSteps: 1))
-            events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,      velocity: 95,  durationSteps: 1))
-            events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.closedHat.rawValue, velocity: 60,  durationSteps: 1))
-            events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.closedHat.rawValue, velocity: 55,  durationSteps: 1))
-        case 2, 3:
-            // Bars 2-3: kick 1+3 + 8th hats (no snare yet)
-            for step in Swift.stride(from: 0, to: 16, by: 2) {
-                let vel: UInt8 = (step % 8 == 0) ? 65 : 52
-                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue, velocity: vel, durationSteps: 1))
-            }
-            events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
-            events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue, velocity: 95,  durationSteps: 1))
-        default:
-            // Remaining intro bars: sparse groove (snare enters here)
-            events += motorikSparseBar(barStart: barStart)
-        }
-
-        // Last intro bar: fill into body (snare run on last 2 steps)
-        if isLastBar {
-            events += [
+        // All styles add a 2-step snare pickup on the last intro bar to launch the body
+        func withPickup(_ evs: [MIDIEvent]) -> [MIDIEvent] {
+            guard isLastBar else { return evs }
+            return evs + [
                 MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: 82, durationSteps: 1),
                 MIDIEvent(stepIndex: barStart + 15, note: GMDrum.snare.rawValue, velocity: 96, durationSteps: 1)
             ]
         }
 
-        return events
+        switch style {
+
+        case .alreadyPlaying:
+            // Full groove from bar 0 at reduced velocity, ramping up to 100% by the last bar.
+            // Sounds as if the music has been running and the listener is fading in.
+            let factor = totalBars <= 1 ? 1.0 :
+                0.55 + 0.45 * Double(offsetBar) / Double(totalBars - 1)
+            let base = bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng)
+            return withPickup(scaleVelocity(base, factor: factor))
+
+        case .progressiveEntry:
+            // Full Motorik sparse groove from bar 0 (kick+snare+hat all present).
+            // Bass will play a simplified root+fifth pattern; pads enter on last bar.
+            return withPickup(motorikSparseBar(barStart: barStart))
+
+        case .coldStart(let drumsOnly):
+            // Bar 0: kick/tom pickup fill that starts mid-bar so the groove launches on bar 1 beat 1.
+            // drumsOnly = true → 2-3 beat fill only (nothing else plays bar 0).
+            // drumsOnly = false → random 1-4 beat fill with bass grounding it.
+            // Bar 1+: full sparse Motorik groove.
+            if offsetBar == 0 {
+                let pickupStarts = drumsOnly ? [4, 8] : [0, 4, 8, 12]
+                let fromStep = pickupStarts[rng.nextInt(upperBound: pickupStarts.count)]
+                return coldStartPickup(fromStep: fromStep, barStart: barStart)
+            }
+            return withPickup(motorikSparseBar(barStart: barStart))
+        }
     }
 
-    // MARK: - Outro pattern (subtractive fade — reverses the intro build)
+    /// Cold start drum pickup: silence before `fromStep`, then a descending kick/tom cascade
+    /// running to the end of the bar. `fromStep` 0 = full bar, 4 = 3-beat, 8 = 2-beat, 12 = 1-beat.
+    private static func coldStartPickup(fromStep: Int, barStart: Int) -> [MIDIEvent] {
+        let pattern: [(Int, UInt8, UInt8)] = [
+            (0,  GMDrum.kick.rawValue,          100),
+            (4,  GMDrum.kick.rawValue,          95),
+            // Descending tom + snare cascade — fills remaining beats
+            (8,  GMDrum.hiTom.rawValue,         80),
+            (9,  GMDrum.snare.rawValue,         70),
+            (10, GMDrum.hiMidTom.rawValue,      82),
+            (11, GMDrum.snare.rawValue,         76),
+            (12, GMDrum.lowMidTom.rawValue,     85),
+            (13, GMDrum.snare.rawValue,         82),
+            (14, GMDrum.highFloorTom.rawValue,  88),
+            (15, GMDrum.snare.rawValue,         96),
+        ]
+        return pattern.compactMap { (offset, note, velocity) in
+            guard offset >= fromStep else { return nil }
+            return MIDIEvent(stepIndex: barStart + offset, note: note,
+                             velocity: velocity, durationSteps: 1)
+        }
+    }
 
-    private static func outroPattern(bar: Int, outroSection: SongSection, barStart: Int) -> [MIDIEvent] {
-        let offsetBar = bar - outroSection.startBar
+    // MARK: - Outro patterns
+
+    private static func outroPattern(
+        bar: Int, outroSection: SongSection, ruleID: String,
+        style: OutroStyle, barStart: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let offsetBar     = bar - outroSection.startBar
         let totalOutroBars = outroSection.lengthBars
+        let isLastBar     = offsetBar == totalOutroBars - 1
 
-        if offsetBar < totalOutroBars / 2 {
-            return motorikSparseBar(barStart: barStart)
-        } else if offsetBar < totalOutroBars - 2 {
-            // Just kick 1+3 and sparse hat
-            return [
-                MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue,      velocity: 85, durationSteps: 1),
-                MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,      velocity: 80, durationSteps: 1),
-                MIDIEvent(stepIndex: barStart + 0, note: GMDrum.closedHat.rawValue, velocity: 55, durationSteps: 1),
-                MIDIEvent(stepIndex: barStart + 8, note: GMDrum.closedHat.rawValue, velocity: 50, durationSteps: 1),
-            ]
-        } else {
-            // Final 2 bars: kick only
-            return [
-                MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue, velocity: 75, durationSteps: 1),
-                MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue, velocity: 70, durationSteps: 1),
-            ]
+        switch style {
+
+        case .fade:
+            // Full groove with velocity decaying from 100% to ~30% across all outro bars.
+            let factor = totalOutroBars <= 1 ? 0.30 :
+                max(0.30, 1.0 - 0.70 * Double(offsetBar) / Double(totalOutroBars - 1))
+            let base = bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng)
+            return scaleVelocity(base, factor: factor)
+
+        case .dissolve:
+            // Drums strip back progressively; pads hold to the final bar.
+            if offsetBar < totalOutroBars / 2 {
+                return motorikSparseBar(barStart: barStart)
+            } else if offsetBar < totalOutroBars - 2 {
+                return [
+                    MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue,      velocity: 85, durationSteps: 1),
+                    MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,      velocity: 80, durationSteps: 1),
+                    MIDIEvent(stepIndex: barStart + 0, note: GMDrum.closedHat.rawValue, velocity: 55, durationSteps: 1),
+                    MIDIEvent(stepIndex: barStart + 8, note: GMDrum.closedHat.rawValue, velocity: 50, durationSteps: 1),
+                ]
+            } else {
+                return [
+                    MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue, velocity: 75, durationSteps: 1),
+                    MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue, velocity: 70, durationSteps: 1),
+                ]
+            }
+
+        case .coldStop:
+            // Full body groove until the final bar, which is a dramatic 4-beat closing fill.
+            if isLastBar {
+                return coldStopFill(barStart: barStart)
+            }
+            return bodyBar(bar: bar, ruleID: ruleID, intensity: .medium, barStart: barStart, rng: &rng)
+        }
+    }
+
+    /// Dramatic 4-beat closing fill: crash launch → descending tom cascade → final crash+kick.
+    private static func coldStopFill(barStart: Int) -> [MIDIEvent] {
+        return [
+            MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.crash1.rawValue,       velocity: 110, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue,          velocity: 110, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 1,  note: GMDrum.hiTom.rawValue,         velocity: 90,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 2,  note: GMDrum.snare.rawValue,         velocity: 95,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 3,  note: GMDrum.hiTom.rawValue,         velocity: 85,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue,          velocity: 100, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 5,  note: GMDrum.hiMidTom.rawValue,      velocity: 88,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.snare.rawValue,         velocity: 92,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 7,  note: GMDrum.hiMidTom.rawValue,      velocity: 83,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue,          velocity: 105, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 9,  note: GMDrum.lowMidTom.rawValue,     velocity: 90,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue,         velocity: 96,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 11, note: GMDrum.lowMidTom.rawValue,     velocity: 86,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 12, note: GMDrum.highFloorTom.rawValue,  velocity: 92,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 13, note: GMDrum.snare.rawValue,         velocity: 100, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 14, note: GMDrum.lowFloorTom.rawValue,   velocity: 95,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 15, note: GMDrum.crash1.rawValue,        velocity: 115, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 15, note: GMDrum.kick.rawValue,          velocity: 115, durationSteps: 1),
+        ]
+    }
+
+    // MARK: - Velocity scaling utility
+
+    private static func scaleVelocity(_ events: [MIDIEvent], factor: Double) -> [MIDIEvent] {
+        events.map { ev in
+            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                      velocity: UInt8(max(1, min(127, Int(Double(ev.velocity) * factor)))),
+                      durationSteps: ev.durationSteps)
         }
     }
 }
