@@ -132,18 +132,17 @@ struct PadsGenerator {
                     }
                 }
 
-            // MARK: 16th-note chop (Hallogallo guitar density)
-            // Staccato hits on every 16th except beat's final subdivision: skip steps 3,7,15
+            // MARK: 8th-note chop (Hallogallo guitar density — minimum 8th note per pad rule)
+            // Hits on every 8th note (steps 0,2,4,6,8,10,12,14), duration 2 (8th note minimum)
             case "PAD-008":
-                let chopSteps = [0,1,2,4,5,6,8,9,10,11,12,13,14]
-                for offset in chopSteps {
-                    // Thin out slightly based on intensity
+                for i in 0..<8 {
+                    let offset = i * 2
                     let skipChance: Double = section.intensity == .low ? 0.25 : 0.0
                     guard rng.nextDouble() >= skipChance else { continue }
                     let vel8 = UInt8(max(40, Int(velocity) - rng.nextInt(upperBound: 20)))
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: stepIdx + offset, note: note,
-                                                velocity: vel8, durationSteps: 1))
+                                                velocity: vel8, durationSteps: 2))
                     }
                 }
 

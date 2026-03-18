@@ -193,7 +193,12 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func gmDLSSoundBankURL() -> URL {
-        URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
+        // Prefer bundled GeneralUser GS SF2 for higher quality.
+        // To roll back: delete the SF2 from Resources — this fallback restores the Apple DLS bank.
+        if let sf2 = Bundle.main.url(forResource: "GeneralUser_GS_v1.471", withExtension: "sf2") {
+            return sf2
+        }
+        return URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
     }
 
     /// Spec: MIDI channel assignment — drums must use channel 9 (GM drums).

@@ -26,28 +26,34 @@ struct TrackRowView: View {
     private var instruments: [Instrument] {
         switch trackIndex {
         case kTrackLead1:
-            return [.init(name:"Synth Lead",     program:82), .init(name:"Electric Lead", program:26),
-                    .init(name:"Brass Lead",      program:56), .init(name:"Piano",         program:0),
-                    .init(name:"Rhodes",          program:4)]
+            return [.init(name:"Synth Brass",      program:63), .init(name:"Synth Brass 2",  program:62),
+                    .init(name:"Sawtooth Lead",    program:81), .init(name:"Fifths Lead",    program:86),
+                    .init(name:"Moog Lead",        program:39), .init(name:"Overdrive Gtr",  program:29),
+                    .init(name:"Flute",            program:82), .init(name:"Ocarina",        program:79)]
         case kTrackLead2:
-            return [.init(name:"Square Lead",    program:80), .init(name:"Guitar Counter", program:24),
-                    .init(name:"Bell/Pluck",      program:14), .init(name:"Soft Brass",     program:56),
-                    .init(name:"Synth Brass",     program:63)]
+            return [.init(name:"Square Lead",    program:80), .init(name:"Brightness",      program:100),
+                    .init(name:"Vibraphone",      program:11), .init(name:"Marimba",         program:12),
+                    .init(name:"Bell/Pluck",      program:14), .init(name:"Soft Brass",      program:56)]
         case kTrackPads:
-            return [.init(name:"Warm Pad",       program:89), .init(name:"Glass Pad",      program:98),
-                    .init(name:"String Pad",      program:48), .init(name:"Choir Pad",      program:53),
-                    .init(name:"Organ Drone",     program:16)]
+            return [.init(name:"Warm Pad",       program:89), .init(name:"Halo Pad",        program:94),
+                    .init(name:"New Age Pad",     program:88), .init(name:"Sweep Pad",       program:95),
+                    .init(name:"Bowed Glass",     program:92), .init(name:"Synth Strings",   program:50),
+                    .init(name:"String Pad",      program:48), .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
-            return [.init(name:"Guitar Pulse",   program:28), .init(name:"Mono Synth",     program:80),
-                    .init(name:"Arp Synth",       program:37), .init(name:"E-Piano",         program:4)]
+            return [.init(name:"Guitar Pulse",     program:28), .init(name:"Wurlitzer",         program:5),
+                    .init(name:"Rock Organ",        program:18), .init(name:"Tremolo Strings",   program:44),
+                    .init(name:"Pizzicato Strings", program:45), .init(name:"Mono Synth",        program:80)]
         case kTrackTexture:
-            return [.init(name:"Noise/Swell",    program:95), .init(name:"Field Noise",    program:119),
-                    .init(name:"Metallic FX",     program:98), .init(name:"Tape Texture",   program:93)]
+            return [.init(name:"Swell",          program:95), .init(name:"Tape Texture",    program:93),
+                    .init(name:"Slow Strings",    program:49), .init(name:"Space Voice",     program:91),
+                    .init(name:"FX Soundtrack",   program:97), .init(name:"Field Noise",     program:119)]
         case kTrackBass:
-            return [.init(name:"Analog Bass",    program:38), .init(name:"FM Bass",         program:37),
-                    .init(name:"Electric Bass",   program:33), .init(name:"Upright Bass",   program:32)]
+            return [.init(name:"Lead Bass",      program:87), .init(name:"Analog Bass",     program:38),
+                    .init(name:"Moog Bass",       program:39), .init(name:"Electric Bass",   program:33)]
         case kTrackDrums:
-            return [.init(name:"Electronic Kit", program:0),  .init(name:"Rock Kit",        program:8)]
+            return [.init(name:"Rock Kit",       program:8),  .init(name:"808 Kit",         program:25),
+                    .init(name:"Brush Kit",       program:40),
+                    .init(name:"Rock Kit",        program:8)]
         default:
             return [.init(name:"Synth",          program:0)]
         }

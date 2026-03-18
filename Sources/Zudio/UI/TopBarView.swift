@@ -332,12 +332,12 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.5 (alpha)").font(.callout)
-                Text("Built by analyzing Motorik and related songs and developing a set of rules to keep instruments in sync and playing together. Sometimes it sounds like music!").font(.callout)
+                Text("Version: 0.6 (alpha)").font(.callout)
+                Text("Built by analyzing Motorik and related songs and developing a set of rules to keep instruments in sync and playing together. Sometimes it even sounds like music!").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1: Motorik style only. Instruments using built-in MIDI. Effects not implemented.").font(.callout)
+                Text("V1: Motorik style only. Instruments using GS MIDI. Effects not implemented.").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2: Improve musicality, upgrade MIDI instruments, add effects, attempt additional styles (Electronic, Ambient, etc.).").font(.callout)
+                Text("V2: Improve musicality, add effects, attempt additional styles (Electronic, Ambient, etc.).").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
