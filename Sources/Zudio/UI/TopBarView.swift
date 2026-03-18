@@ -18,20 +18,20 @@ struct TopBarView: View {
             // Main controls block
             HStack(alignment: .center, spacing: 10) {
 
-                // Logo — 700×350 landscape asset, height matched to controls height (60px → 120px wide)
+                // Logo — 700×350 landscape asset, 40% bigger than controls height (84px)
                 Group {
                     if let nsImg = loadLogoImage() {
                         Image(nsImage: nsImg)
                             .resizable()
                             .scaledToFit()
-                            .frame(height: 60)
+                            .frame(height: 84)
                     } else {
                         Text("Zudio")
-                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .font(.system(size: 42, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
                     }
                 }
-                .frame(width: 200, alignment: .leading)
+                .frame(width: 200, alignment: .center)
                 .padding(.leading, 8)
 
                 Divider()
@@ -87,7 +87,7 @@ struct TopBarView: View {
                     // Row 2: Generate | Style | Mood | Key | BPM
                     HStack(spacing: 14) {
                         Button(action: { appState.generateNew() }) {
-                            Label("Generate", systemImage: "wand.and.stars")
+                            Label("Generate", systemImage: "bolt.fill")
                                 .fontWeight(.semibold)
                         }
                         .disabled(appState.isGenerating)
@@ -117,13 +117,13 @@ struct TopBarView: View {
                         HStack(spacing: 4) {
                             Text("BPM").foregroundStyle(.secondary)
                             TextField("", value: Binding(
-                                get: { appState.tempoOverride ?? 0 },
+                                get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 0 },
                                 set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
                             ), format: .number)
                             .frame(width: 44)
                             .textFieldStyle(.roundedBorder)
                             Stepper("", value: Binding(
-                                get: { appState.tempoOverride ?? 138 },
+                                get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 138 },
                                 set: { appState.tempoOverride = max(20, min(200, $0)) }
                             ), in: 20...200)
                             .labelsHidden()

@@ -24,8 +24,9 @@ struct RhythmGenerator {
             // Rhythm is silent in intro/outro
             guard section.label != .intro && section.label != .outro else { continue }
 
-            // Pick pattern type once per section
-            let patternType = rng.nextInt(upperBound: 3) // 0=8th, 1=quarter, 2=syncopated
+            // Pick pattern type once per section — weight 8th pulse highest (most Motorik)
+            let patternWeights: [Double] = [0.50, 0.25, 0.25]
+            let patternType = rng.weightedPick(patternWeights)
             switch patternType {
             case 0:  usedRuleIDs.insert("RHY-001")
             case 1:  usedRuleIDs.insert("RHY-002")
@@ -39,8 +40,8 @@ struct RhythmGenerator {
                 let intensity = section.subPhaseIntensity(atBar: bar)
                 let density: Double
                 switch intensity {
-                case .low:    density = 0.55
-                case .medium: density = 0.80
+                case .low:    density = 0.72   // was 0.55 — Motorik ostinato never drops below ~70%
+                case .medium: density = 0.88
                 case .high:   density = 1.00
                 }
 

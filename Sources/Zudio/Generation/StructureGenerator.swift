@@ -22,9 +22,9 @@ struct StructureGenerator {
     // MARK: - Section layout
 
     private static func buildSections(form: SongForm, totalBars: Int, rng: inout SeededRNG) -> [SongSection] {
-        // Intro: 8 or 16 bars (50/50); Outro: 8 or 16 bars (50/50)
-        let introBars = rng.nextDouble() < 0.5 ? 8 : 16
-        let outroBars = rng.nextDouble() < 0.5 ? 8 : 16
+        // Motorik intro: 2 or 4 bars (50/50 — keep it tight); Outro: 4 or 8 bars
+        let introBars = rng.nextDouble() < 0.5 ? 2 : 4
+        let outroBars = rng.nextDouble() < 0.5 ? 4 : 8
         let bodyBars  = max(16, totalBars - introBars - outroBars)
 
         var sections: [SongSection] = []

@@ -79,6 +79,12 @@ struct SongGenerator {
         // Step 10 — Collision / density simplification pass
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
 
+        // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
+        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, seed: seed)
+
+        // Step 11 — Harmonic filter: clash guard, register separation, velocity arc
+        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+
         // Title generation
         let title = TitleGenerator.generate(frame: frame, rng: &rng)
 
@@ -170,9 +176,9 @@ struct SongGenerator {
 
         // Intro rule — immediately after form
         if let intro = structure.introSection {
-            let ruleID = intro.lengthBars <= 8 ? "INT-001" : "INT-002"
+            let ruleID = intro.lengthBars <= 2 ? "INT-001" : "INT-002"
             log.append(GenerationLogEntry(tag: ruleID,
-                description: "Intro: \(intro.lengthBars) bars, drums-only entry → sparse from bar 2"))
+                description: "Intro: \(intro.lengthBars) bars, drums-only entry → sparse groove"))
         }
 
         // Outro rule — immediately after intro
@@ -324,18 +330,22 @@ struct SongGenerator {
 
     private static func drumRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "DRM-001": return "4-on-the-floor kick, closed-hat 16ths, snare beat 3"
-        case "DRM-002": return "Open pocket — closed-hat 8ths, open hat beat 1, ghost snares"
-        case "DRM-003": return "Ride groove — ride 8ths, snare beat 3, pedal hi-hat beats 2+4"
+        case "DRM-001": return "Classic Motorik — kick 1+3, snare 2+4, 16th-hat gradient"
+        case "DRM-002": return "Open pocket — kick 1+3, snare 2+4, 8th hats, open hat beat 1, ghost snares"
+        case "DRM-003": return "Ride groove — kick 1+3, snare 2+4, ride 8ths, pedal hi-hat 2+4"
+        case "DRM-004": return "Almost Motorik — 4-on-the-floor kick, snare 2+4, 16th-hat gradient"
         default:        return ruleID
         }
     }
 
     private static func bassRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "BAS-001": return "Root anchor beat 1, chord tones beat 3, syncopation"
-        case "BAS-002": return "Motorik Drive — steady quarter-note root pulse, staccato"
+        case "BAS-001": return "Root anchor — root beat 1 long, fifth beat 3, locked to kick"
+        case "BAS-002": return "Motorik Drive — steady quarter-note root pulse, accents 1+3"
         case "BAS-003": return "Crawling Walk — 2-bar root/fifth/approach note pattern"
+        case "BAS-004": return "Hallogallo Lock — root beat 1 long, fifth beat 3, locked to kick 1+3"
+        case "BAS-005": return "McCartney Drive — 8th-note pump, root/fifth descent (SLS verse groove)"
+        case "BAS-006": return "LA Woman Sustain — root holds bar, chromatic shimmer at bar end"
         default:        return ruleID
         }
     }
@@ -345,6 +355,8 @@ struct SongGenerator {
         case "LD1-001": return "Motif-first, chord tones 80%, scale tensions 20%"
         case "LD1-002": return "Pentatonic Cell — short driving notes from pentatonic scale"
         case "LD1-003": return "Long Breath — sparse, sustained notes with rests"
+        case "LD1-004": return "Stepwise Sequence — descending sequence development (5→4→2→1 / b7→5→4→2)"
+        case "LD1-005": return "Statement-Answer — ascending statement bar, silent response bar (from Hallogallo phrase analysis)"
         default:        return ruleID
         }
     }
@@ -354,6 +366,8 @@ struct SongGenerator {
         case "LD2-001": return "Counter-response, density ≤55% of Lead 1"
         case "LD2-002": return "Sustained Drone — sparse long holds on root or 5th"
         case "LD2-003": return "Rhythmic Counter — short bursts offset from Lead 1"
+        case "LD2-004": return "Hallogallo Counter — quick 16th pairs (Guitar 2 motif, 75% fire probability)"
+        case "LD2-005": return "Descending Line — 2-bar diatonic descent from Hallogallo counter-melody analysis"
         default:        return ruleID
         }
     }
@@ -368,6 +382,9 @@ struct SongGenerator {
         case "PAD-006": return "Stabs — short chord attacks on beat 1, sometimes beat 3"
         case "PAD-007": return "Charleston (3+3+2) — dotted-quarter rhythm from Silly Love Songs"
         case "PAD-008": return "16th-note chop — dense staccato from Hallogallo guitar"
+        case "PAD-009": return "Quarter pump — locked chord hits all 4 beats (SLS intro rhythm guitar)"
+        case "PAD-010": return "Half-bar breathe — chord beat 1 only, silence second half"
+        case "PAD-011": return "Backbeat stabs — chords on beats 2+4 only (LA Woman syncopated feel)"
         default:        return ruleID
         }
     }

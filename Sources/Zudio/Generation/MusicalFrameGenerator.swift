@@ -68,12 +68,16 @@ struct MusicalFrameGenerator {
         }
     }
 
+    /// Motorik harmonic palette — two-chord and minor-loop patterns dominate the corpus.
+    /// static_tonic (Cluster-style drone), two_chord_I_bVII (classic Neu!/Harmonia),
+    /// minor_loop patterns (modal Motorik), modal_cadence (rarer, more dramatic).
     private static func pickProgressionFamily(rng: inout SeededRNG) -> ProgressionFamily {
-        let all: [ProgressionFamily] = [
+        let families: [ProgressionFamily] = [
             .static_tonic, .two_chord_I_bVII, .minor_loop_i_VII,
             .minor_loop_i_VI, .modal_cadence_bVI_bVII_I
         ]
-        return all[rng.nextInt(upperBound: all.count)]
+        let weights: [Double] = [0.20, 0.30, 0.25, 0.15, 0.10]
+        return families[rng.weightedPick(weights)]
     }
 
     /// Triangular distribution: min=210s, peak=285s, max=390s (spec §totalBars).

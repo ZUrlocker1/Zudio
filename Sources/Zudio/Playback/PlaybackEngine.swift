@@ -119,6 +119,23 @@ final class PlaybackEngine: ObservableObject {
         }
     }
 
+    // MARK: - Real-time tempo change
+
+    /// Updates the step-timer interval to match a new BPM without restarting the song.
+    /// If playing, the current scheduler is swapped out from the current playhead position.
+    func setTempo(_ bpm: Int) {
+        guard let state = songState else { return }
+        let newFrame = state.frame.withTempo(bpm)
+        songState = state.withFrame(newFrame)
+        guard isPlaying else { return }
+        scheduler?.stop()
+        scheduler = nil
+        allNotesOff()
+        let sched = StepScheduler(engine: self, songState: songState!, startStep: currentStep)
+        scheduler = sched
+        sched.start()
+    }
+
     // MARK: - Instrument program change (called from TrackRowView via AppState)
 
     func setProgram(_ program: UInt8, forTrack trackIndex: Int) {

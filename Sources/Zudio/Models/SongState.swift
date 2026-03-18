@@ -32,6 +32,14 @@ struct SongState: Sendable {
         return trackEvents[trackIndex]
     }
 
+    /// Returns a copy of this state with the frame replaced (used for real-time tempo changes).
+    func withFrame(_ newFrame: GlobalMusicalFrame) -> SongState {
+        SongState(frame: newFrame, structure: structure, tonalMap: tonalMap,
+                  trackEvents: trackEvents, globalSeed: globalSeed,
+                  trackOverrides: trackOverrides, title: title, form: form,
+                  generationLog: generationLog)
+    }
+
     /// Returns a copy of this state with one track's events replaced.
     /// The generation log is carried through unchanged (reflects the full generation).
     func replacingEvents(_ events: [MIDIEvent], forTrack trackIndex: Int) -> SongState {

@@ -61,6 +61,19 @@ final class AppState: ObservableObject {
             return nil   // consume event so no other handler sees it
         }
 
+        // Real-time tempo scrubbing: update live playback when BPM changes on a loaded song
+        $tempoOverride
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] bpm in
+                guard let self, let current = self.songState,
+                      bpm != current.frame.tempo else { return }
+                self.playback.setTempo(bpm)
+                self.songState = self.playback.songState
+            }
+            .store(in: &cancellables)
+
         // DAW-style scrolling: advance visible window when playhead hits 85%
         playback.$currentStep
             .dropFirst()
@@ -102,9 +115,10 @@ final class AppState: ObservableObject {
                 self.generationHistory.append(state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
-                // Reflect actual generated values back into the picker fields
+                // Reflect key/mood back so the user can see what was picked.
+                // BPM resets to Auto so the next generation is free to pick a fresh tempo.
                 self.keyOverride   = state.frame.key
-                self.tempoOverride = state.frame.tempo
+                self.tempoOverride = nil
                 self.moodOverride  = state.frame.mood
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
@@ -136,7 +150,11 @@ final class AppState: ObservableObject {
         if songState == nil {
             generateNew(thenPlay: true)
         } else {
-            playback.play()  // resumes from current playhead position
+            // If the playhead is at or past the end, rewind to bar 1 before playing
+            if let song = songState, playback.currentStep >= song.frame.totalBars * 16 - 1 {
+                playback.seek(toStep: 0)
+            }
+            playback.play()
         }
     }
 

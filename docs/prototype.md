@@ -111,8 +111,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - Visual cues for motif repeats and variation points
   - Visualization only: no note editing, note drawing, drag, erase, or velocity editing
 - Right effects column:
-  - Per-track effect character controls (`Space`, `Echo`, `Width`, `Grit`, `Tone`) shown but disabled in v1
-  - Quick presets per track (for example `Dry`, `Wide`, `Hazy`, `Punchy`) shown but disabled in v1
+  - Per-track effect character controls (`Space`, `Echo`, `Delay`) shown but disabled in v1
   - No functional effect editing in v1
 - Interaction principles:
   - One-click generation always produces a complete song state.

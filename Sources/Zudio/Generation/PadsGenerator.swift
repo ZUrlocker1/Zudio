@@ -14,6 +14,11 @@
 //            3+3+2 feel — hits at steps 0, 6, 12 with durations 5, 5, 4
 //   PAD-008: 16th-note chop (from Hallogallo Guitar analysis):
 //            Near-every-16th staccato: steps 0-2, 4-6, 8-14 (duration 1 each)
+//   PAD-009: Quarter pump (from SLS intro rhythm guitar):
+//            Locked quarter-note chord hits, all 4 beats, vel-accented on 1+3
+//   PAD-010: Half-bar breathe — chord on beat 1 (dur 7), silence second half; creates air
+//   PAD-011: Backbeat stabs (from LA Woman guitar 2 syncopated fills):
+//            Chord hits on beats 2+4 only (steps 4, 12 dur 3); off-beat emphasis
 
 struct PadsGenerator {
     static func generate(
@@ -25,19 +30,12 @@ struct PadsGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
-        // Select one primary style per song (0–7 → 8 styles)
-        let styleIndex = rng.nextInt(upperBound: 8)
-        let primaryRule: String
-        switch styleIndex {
-        case 0: primaryRule = "PAD-001"
-        case 1: primaryRule = "PAD-002"
-        case 2: primaryRule = "PAD-003"
-        case 3: primaryRule = "PAD-005"
-        case 4: primaryRule = "PAD-005"    // arp style chosen per-song below
-        case 5: primaryRule = "PAD-006"
-        case 6: primaryRule = "PAD-007"
-        default: primaryRule = "PAD-008"
-        }
+        // Weighted style selection — arpeggio and Charleston weighted highest (most Motorik)
+        let padRules:    [String] = ["PAD-001","PAD-002","PAD-003","PAD-005","PAD-006",
+                                     "PAD-007","PAD-008","PAD-009","PAD-010","PAD-011"]
+        let padWeights:  [Double] = [0.12,     0.10,     0.08,     0.18,     0.10,
+                                     0.12,     0.08,     0.10,     0.08,     0.04]
+        let primaryRule = padRules[rng.weightedPick(padWeights)]
         usedRuleIDs.insert(primaryRule)
         usedRuleIDs.insert("PAD-004")  // sparse intro/outro always applies
 
@@ -146,6 +144,35 @@ struct PadsGenerator {
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: stepIdx + offset, note: note,
                                                 velocity: vel8, durationSteps: 1))
+                    }
+                }
+
+            // MARK: Quarter pump (SLS intro rhythm guitar — locked quarters, all 4 beats)
+            case "PAD-009":
+                let qtVels: [UInt8] = [88, 70, 82, 66]   // accented on 1+3, softer 2+4
+                for (i, beat) in [0, 4, 8, 12].enumerated() {
+                    let v = UInt8(clamped(Int(qtVels[i]) + (Int(velocity) - 72), low: 40, high: 110))
+                    for note in voicing {
+                        events.append(MIDIEvent(stepIndex: stepIdx + beat, note: note,
+                                                velocity: v, durationSteps: 3))
+                    }
+                }
+
+            // MARK: Half-bar breathe — chord on beat 1, long sustain, silence second half
+            case "PAD-010":
+                for note in voicing {
+                    events.append(MIDIEvent(stepIndex: stepIdx, note: note,
+                                            velocity: velocity, durationSteps: 7))
+                }
+
+            // MARK: Backbeat stabs (LA Woman guitar 2 syncopated fill pattern)
+            // Off-beat emphasis: beats 2+4 only — contrasts all beat-1-anchored patterns
+            case "PAD-011":
+                let bbVel = UInt8(clamped(Int(velocity) - 8, low: 40, high: 110))
+                for step in [4, 12] {
+                    for note in voicing {
+                        events.append(MIDIEvent(stepIndex: stepIdx + step, note: note,
+                                                velocity: bbVel, durationSteps: 3))
                     }
                 }
 

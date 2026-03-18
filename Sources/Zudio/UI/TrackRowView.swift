@@ -54,6 +54,7 @@ struct TrackRowView: View {
     }
 
     @State private var instrumentIndex: Int = 0
+    @State private var activeEffects: Set<String> = []
 
     // MARK: - Body
 
@@ -71,7 +72,7 @@ struct TrackRowView: View {
                         .frame(width: 22)
                     Text(label)
                         .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(isMuted ? .tertiary : .primary)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
@@ -133,18 +134,18 @@ struct TrackRowView: View {
                 showPlayheadHandle: showPlayheadHandle
             )
             .frame(height: 63)
-            .opacity(isMuted ? 0.35 : 1.0)
+            .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
 
             // Right effects column
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 2) {
-                    ForEach(["Dry", "Wide", "Hazy", "Punchy"], id: \.self) { effectChip($0) }
-                }
-                HStack(spacing: 2) {
-                    ForEach(["Space", "Echo", "Width", "Grit", "Tone"], id: \.self) { effectChip($0) }
+            HStack(spacing: 4) {
+                ForEach(trackEffects, id: \.self) { name in
+                    Button { activeEffects.formSymmetricDifference([name]) } label: {
+                        effectChip(name, active: activeEffects.contains(name))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .frame(width: 136)
+            .frame(width: 110)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .opacity(0.75)
@@ -153,24 +154,39 @@ struct TrackRowView: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .padding(.horizontal, 8)
         .padding(.vertical, 1)
-        .opacity(isEffectivelyMuted ? 0.22 : 1.0)
     }
 
     // MARK: - Helpers
+
+    private var trackEffects: [String] {
+        switch trackIndex {
+        case kTrackLead1, kTrackLead2:          return ["Fuzz",   "Echo", "Delay"]
+        case kTrackPads, kTrackRhythm,
+             kTrackTexture:                     return ["Space",  "Echo", "Delay"]
+        case kTrackBass:                        return ["Punch",  "Echo", "Delay"]
+        case kTrackDrums:                       return ["Reverb", "Echo", "Delay"]
+        default:                                return ["Space",  "Echo", "Delay"]
+        }
+    }
 
     private func cycleInstrument(by delta: Int) {
         instrumentIndex = (instrumentIndex + delta + instruments.count) % instruments.count
         appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
     }
 
-    private func effectChip(_ name: String) -> some View {
+    private func effectChip(_ name: String, active: Bool) -> some View {
         Text(name)
-            .font(.system(size: 9))
+            .font(.system(size: 9, weight: active ? .semibold : .regular))
+            .lineLimit(1)
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
-            .background(.quaternary)
+            .background(active ? Color(white: 0.45) : Color(white: 0.22))
             .clipShape(RoundedRectangle(cornerRadius: 3))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(active ? Color.white : Color(white: 0.55))
+            .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                    .strokeBorder(active ? Color(white: 0.65) : Color.clear, lineWidth: 1)
+            )
     }
 
     private var trackIcon: String {

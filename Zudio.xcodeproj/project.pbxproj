@@ -21,6 +21,8 @@
 		AA00000000000000000000C /* DrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000C /* DrumGenerator.swift */; };
 		AA00000000000000000000D /* PadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000D /* PadsGenerator.swift */; };
 		AA00000000000000000000E /* DensitySimplifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000E /* DensitySimplifier.swift */; };
+		AA000000000000000000022 /* ArrangementFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000024 /* ArrangementFilter.swift */; };
+		AA000000000000000000023 /* HarmonicFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000025 /* HarmonicFilter.swift */; };
 		AA00000000000000000000F /* StructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000F /* StructureGenerator.swift */; };
 		AA000000000000000000010 /* TitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010 /* TitleGenerator.swift */; };
 		AA000000000000000000011 /* MusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000011 /* MusicalFrameGenerator.swift */; };
@@ -57,6 +59,8 @@
 		BB00000000000000000000C /* DrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumGenerator.swift; sourceTree = "<group>"; };
 		BB00000000000000000000D /* PadsGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PadsGenerator.swift; sourceTree = "<group>"; };
 		BB00000000000000000000E /* DensitySimplifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DensitySimplifier.swift; sourceTree = "<group>"; };
+		BB000000000000000000024 /* ArrangementFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrangementFilter.swift; sourceTree = "<group>"; };
+		BB000000000000000000025 /* HarmonicFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarmonicFilter.swift; sourceTree = "<group>"; };
 		BB00000000000000000000F /* StructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000010 /* TitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitleGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000011 /* MusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicalFrameGenerator.swift; sourceTree = "<group>"; };
@@ -130,6 +134,8 @@
 				BB00000000000000000000C /* DrumGenerator.swift */,
 				BB00000000000000000000D /* PadsGenerator.swift */,
 				BB00000000000000000000E /* DensitySimplifier.swift */,
+				BB000000000000000000024 /* ArrangementFilter.swift */,
+				BB000000000000000000025 /* HarmonicFilter.swift */,
 				BB00000000000000000000F /* StructureGenerator.swift */,
 				BB000000000000000000010 /* TitleGenerator.swift */,
 				BB000000000000000000011 /* MusicalFrameGenerator.swift */,
@@ -288,6 +294,8 @@
 				AA00000000000000000000C /* DrumGenerator.swift in Sources */,
 				AA00000000000000000000D /* PadsGenerator.swift in Sources */,
 				AA00000000000000000000E /* DensitySimplifier.swift in Sources */,
+				AA000000000000000000022 /* ArrangementFilter.swift in Sources */,
+				AA000000000000000000023 /* HarmonicFilter.swift in Sources */,
 				AA00000000000000000000F /* StructureGenerator.swift in Sources */,
 				AA000000000000000000010 /* TitleGenerator.swift in Sources */,
 				AA000000000000000000011 /* MusicalFrameGenerator.swift in Sources */,

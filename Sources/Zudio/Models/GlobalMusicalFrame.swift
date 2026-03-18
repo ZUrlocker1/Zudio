@@ -24,6 +24,12 @@ struct GlobalMusicalFrame: Equatable, Sendable {
     /// Total song duration in seconds.
     var totalDurationSeconds: Double { Double(totalBars) * secondsPerBar }
 
+    /// Returns a copy with only the tempo changed (used for real-time BPM scrubbing).
+    func withTempo(_ newTempo: Int) -> GlobalMusicalFrame {
+        GlobalMusicalFrame(key: key, mode: mode, tempo: newTempo, mood: mood,
+                           progressionFamily: progressionFamily, totalBars: totalBars)
+    }
+
     /// Absolute MIDI note for a given degree string and octave offset, clamped to a track's register.
     func midiNote(degree: String, oct: Int, trackIndex: Int) -> UInt8 {
         let raw = 60 + keySemitoneValue + degreeSemitone(degree) + (oct * 12)
