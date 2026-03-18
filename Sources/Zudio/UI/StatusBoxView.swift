@@ -70,7 +70,7 @@ struct StatusBoxView: View {
                 .scrollIndicators(.visible)
                 .frame(minHeight: 60, idealHeight: 200, maxHeight: 280)
                 .background(Color(white: 0.10))
-                .onChange(of: appState.generationHistory.count) { _ in
+                .onChange(of: appState.generationHistory.reduce(0) { $0 + $1.generationLog.count }) { _ in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                     }

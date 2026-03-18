@@ -85,15 +85,16 @@ final class PlaybackEngine: ObservableObject {
         }
     }
 
-    // Called by StepScheduler when song ends — reset playhead to beginning
+    // Called by StepScheduler when song ends — leave playhead at end position so
+    // atLimit closures in HoldRepeater see the final bar and stop correctly.
+    // AppState.play() detects the end position and rewinds to bar 1 before playing.
     nonisolated func onSongEnd() {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.scheduler?.stop()
             self.scheduler = nil
-            self.isPlaying   = false
-            self.currentStep = 0
-            self.currentBar  = 0
+            self.isPlaying = false
+            // Keep currentStep / currentBar at their last-set values (end of song)
             self.allNotesOff()
         }
     }

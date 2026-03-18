@@ -31,6 +31,19 @@ enum Mode: String, CaseIterable, Codable, Sendable {
         case .MajorPentatonic: return [0, 2, 4, 7, 9]
         }
     }
+
+    /// Snaps `semitones` to the nearest interval present in this mode's scale.
+    /// Use for diatonic scale degrees (3rd, 6th, 7th) that differ between modes.
+    /// Purely chromatic passing tones (tritone, neighbour notes) should not use this.
+    ///
+    /// Examples:
+    ///   Ionian.nearestInterval(4)  → 4  (major 3rd stays major)
+    ///   Aeolian.nearestInterval(4) → 3  (snaps to minor 3rd)
+    ///   Aeolian.nearestInterval(9) → 8  (major 6th snaps to minor 6th)
+    ///   Ionian.nearestInterval(10) → 9  (b7 snaps to major 6th — closest scale tone)
+    func nearestInterval(_ semitones: Int) -> Int {
+        intervals.min(by: { abs($0 - semitones) < abs($1 - semitones) }) ?? semitones
+    }
 }
 
 enum Mood: String, CaseIterable, Codable, Sendable {

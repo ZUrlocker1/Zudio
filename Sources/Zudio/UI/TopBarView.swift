@@ -4,11 +4,70 @@
 import SwiftUI
 import AppKit
 
+// Styled to match macOS bordered Button appearance with a press-state highlight.
+private extension View {
+    func transportButtonStyle(isDown: Bool) -> some View {
+        self
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isDown ? Color(NSColor.selectedControlColor) : Color(NSColor.controlColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5)
+                    )
+            )
+            .contentShape(Rectangle())
+    }
+}
+
+// Reference-type repeater so gesture closures always see the live timer reference,
+// avoiding the SwiftUI stale-closure problem that caused post-release drift.
+private final class HoldRepeater: ObservableObject {
+    private var timer: Timer?
+    private var holding = false
+
+    /// Call on press. Fires `initial` immediately, then after `delay` seconds starts
+    /// repeating `step` every `interval` seconds. Stops automatically when `atLimit` returns true.
+    func start(initial: @escaping () -> Void,
+               step: @escaping () -> Void,
+               atLimit: @escaping () -> Bool,
+               delay: Double = 0.45,
+               interval: Double = 0.25) {
+        guard !holding else { return }
+        holding = true
+        initial()
+        guard !atLimit() else { holding = false; return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.holding else { return }
+            self.timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] t in
+                guard let self, self.holding else { t.invalidate(); return }
+                if atLimit() { self.stop(); return }
+                step()
+            }
+        }
+    }
+
+    func stop() {
+        holding = false
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
 struct TopBarView: View {
     @EnvironmentObject var appState: AppState
     @State private var showHelp  = false
     @State private var showAbout = false
     @State private var stopFlash = false
+
+    @StateObject private var reverseRepeater = HoldRepeater()
+    @StateObject private var forwardRepeater = HoldRepeater()
+
+    // @GestureState auto-resets to false when the gesture ends — used for press highlight
+    @GestureState private var reverseIsDown = false
+    @GestureState private var forwardIsDown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,8 +95,9 @@ struct TopBarView: View {
 
                 Divider()
 
-                // Transport — ⏮ ▶ ■ ⏭
+                // Transport — ⏮ ◀ ▶ ■ ▶ ⏭
                 HStack(spacing: 10) {
+                    // Jump to start
                     Button(action: { appState.seekToStart() }) {
                         Image(systemName: "backward.end.fill")
                             .foregroundStyle(.primary)
@@ -45,6 +105,25 @@ struct TopBarView: View {
                     .disabled(appState.songState == nil)
                     .help("Go to start (rewind to bar 1)")
 
+                    // Reverse: tap = -1 bar, hold = -2 bars per tick, stops at bar 0
+                    Image(systemName: "backward.fill")
+                        .transportButtonStyle(isDown: reverseIsDown)
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .updating($reverseIsDown) { _, state, _ in state = true }
+                                .onChanged { _ in
+                                    guard appState.songState != nil else { return }
+                                    reverseRepeater.start(
+                                        initial:  { appState.seekBackOneBar() },
+                                        step:     { appState.seekBackTwoBars() },
+                                        atLimit:  { appState.playback.currentBar <= 0 }
+                                    )
+                                }
+                                .onEnded { _ in reverseRepeater.stop() }
+                        )
+                        .help("Back 1 bar (hold: back 2 bars repeatedly)")
+
+                    // Play
                     Button(action: { appState.play() }) {
                         Image(systemName: appState.isGenerating ? "hourglass" : "play.fill")
                             .foregroundStyle(.green)
@@ -52,6 +131,7 @@ struct TopBarView: View {
                     .disabled(appState.playback.isPlaying || appState.isGenerating)
                     .help("Play (auto-generates if no song)")
 
+                    // Stop
                     Button(action: {
                         appState.stop()
                         withAnimation(.easeOut(duration: 0.1)) { stopFlash = true }
@@ -66,6 +146,25 @@ struct TopBarView: View {
                     .disabled(!appState.playback.isPlaying)
                     .help("Stop")
 
+                    // Fast forward: tap = +1 bar, hold = +2 bars per tick, stops at last bar
+                    Image(systemName: "forward.fill")
+                        .transportButtonStyle(isDown: forwardIsDown)
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .updating($forwardIsDown) { _, state, _ in state = true }
+                                .onChanged { _ in
+                                    guard let song = appState.songState else { return }
+                                    forwardRepeater.start(
+                                        initial:  { appState.seekForwardOneBar() },
+                                        step:     { appState.seekForwardTwoBars() },
+                                        atLimit:  { appState.playback.currentBar >= song.frame.totalBars - 1 }
+                                    )
+                                }
+                                .onEnded { _ in forwardRepeater.stop() }
+                        )
+                        .help("Forward 1 bar (hold: forward 2 bars repeatedly)")
+
+                    // Jump to end
                     Button(action: { appState.seekToEnd() }) {
                         Image(systemName: "forward.end.fill")
                             .foregroundStyle(.primary)
@@ -194,26 +293,23 @@ struct HelpView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Zudio Help").font(.title2.bold())
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    helpLine("Generate (⌘G)", "Creates a full Motorik song — structure, chords, and all 7 tracks.")
-                    helpLine("Play / Stop (Space)", "Space bar toggles play/stop. Play auto-generates if no song exists.")
-                    helpLine("⏮ Go to Start", "Moves the playhead to bar 1. Keeps playing if currently playing.")
-                    helpLine("⏭ Go to End", "Moves the playhead to the last bar and stops playback.")
-                    helpLine("Save MIDI", "Exports a Type-1 multi-track MIDI file to ~/Downloads/.")
-                    helpLine("◀ Name ▶", "Cycle through GM instruments for that track. Change takes effect immediately.")
-                    helpLine("⚡ Lightning", "Regenerates only that track's MIDI notes (structure and key stay the same).")
-                    helpLine("M / S", "Mute (blue) or Solo (yellow) a track. Second click toggles off.")
-                    helpLine("Key / Mood / BPM", "Override parameters for the next Generate. Set to Auto for random.")
-                    helpLine("Status log", "Shows the generation rules applied to the current song.")
-                }
-                .padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Zudio generates Motorik-inspired music using MIDI tracks.")
+                    .font(.callout).fixedSize(horizontal: false, vertical: true)
+                Divider()
+                helpLine("Generate (⌘G)", "Creates a new song. Use Mood, Key, and BPM to shape the result, or leave them on Auto.")
+                helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
+                helpLine("Save MIDI", "Exports a multi-track MIDI file to ~/Downloads/. Open in any DAW to edit further.")
+                helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
+                helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")
+                helpLine("M / S", "Mute or Solo a track. Click again to toggle off.")
+                helpLine("Status log", "Shows the generation rules applied to the current song.")
             }
             Spacer()
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 480, height: 420)
+        .frame(width: 600, height: 430)
     }
 
     private func helpLine(_ title: String, _ desc: String) -> some View {
@@ -232,21 +328,22 @@ struct AboutView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Zudio").font(.title.bold())
-            Text("Personal generative music research prototype for native macOS.")
+            Text("Generative music application vibe coded with Claude!")
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.1 (prototype)").font(.callout)
-                Text("Audio engine: Apple AVAudioEngine with Apple DLS/GM playback.").font(.callout)
-                Text("MIDI export: Type-1 multi-track, saved to ~/Downloads/.").font(.callout)
-                Text("V1 scope: Motorik style — 7 tracks: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.").font(.callout)
+                Text("Version: 0.5 (alpha)").font(.callout)
+                Text("Built by analyzing Motorik and related songs and developing a set of rules to keep instruments in sync and playing together. Sometimes it sounds like music!").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Generation is seeded and deterministic.").font(.callout)
+                Text("V1: Motorik style only. Instruments using built-in MIDI. Effects not implemented.").font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("V2: Improve musicality, upgrade MIDI instruments, add effects, attempt additional styles (Electronic, Ambient, etc.).").font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 420, height: 320)
+        .frame(width: 440, height: 298)
     }
 }

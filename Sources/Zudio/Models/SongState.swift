@@ -43,13 +43,18 @@ struct SongState: Sendable {
     /// Returns a copy of this state with one track's events replaced.
     /// The generation log is carried through unchanged (reflects the full generation).
     func replacingEvents(_ events: [MIDIEvent], forTrack trackIndex: Int) -> SongState {
+        replacingEvents(events, forTrack: trackIndex, appendingLog: [])
+    }
+
+    /// Returns a copy of this state with one track's events replaced and extra log entries appended.
+    func replacingEvents(_ events: [MIDIEvent], forTrack trackIndex: Int, appendingLog extra: [GenerationLogEntry]) -> SongState {
         var updated = trackEvents
         if trackIndex < updated.count { updated[trackIndex] = events }
         return SongState(
             frame: frame, structure: structure, tonalMap: tonalMap,
             trackEvents: updated, globalSeed: globalSeed,
             trackOverrides: trackOverrides, title: title, form: form,
-            generationLog: generationLog
+            generationLog: generationLog + extra
         )
     }
 }

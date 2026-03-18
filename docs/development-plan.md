@@ -11,10 +11,11 @@ In scope for this first version:
 
 - one-click song generation
 - track-level regenerate
-- transport controls
+- transport controls (play, stop, seek, reverse, fast forward)
 - per-track mute/solo
 - per-track instrument cycling
 - piano-roll style lane visualization (display only; no note editing in v1)
+- MIDI export (Type-1 multi-track file to ~/Downloads/)
 
 Out of scope for first version:
 
@@ -23,7 +24,7 @@ Out of scope for first version:
 
 ## Stage plan
 
-- [ ] **0.1 Drums foundation**
+- [x] **0.1 Drums foundation**
   - Build:
     - Drums generation engine and playback.
     - Drum lane visualization.
@@ -31,7 +32,7 @@ Out of scope for first version:
   - Test gate:
     - playback stable; lane updates correctly on generate/play.
 
-- [ ] **0.2 Add Bass**
+- [x] **0.2 Add Bass**
   - Build:
     - Bass generation and playback.
     - Bass lane visualization.
@@ -39,7 +40,7 @@ Out of scope for first version:
   - Test gate:
     - bass aligns with drum timing and remains stable under regenerate.
 
-- [ ] **0.3 Add Pads**
+- [x] **0.3 Add Pads**
   - Build:
     - Pad/chord generation and playback.
     - Pad lane visualization.
@@ -47,7 +48,7 @@ Out of scope for first version:
   - Test gate:
     - harmonic alignment across sections remains stable.
 
-- [ ] **0.4 Add Lead 1**
+- [x] **0.4 Add Lead 1**
   - Build:
     - Lead 1 generation and playback.
     - Lead 1 lane visualization.
@@ -55,7 +56,7 @@ Out of scope for first version:
   - Test gate:
     - Lead 1 regenerates cleanly without destabilizing existing tracks.
 
-- [ ] **0.5 Add Lead 2**
+- [x] **0.5 Add Lead 2**
   - Build:
     - Lead 2 generation and playback.
     - Lead 2 lane visualization.
@@ -63,7 +64,7 @@ Out of scope for first version:
   - Test gate:
     - Lead 2 integration stable with mute/solo and regenerate flows.
 
-- [ ] **0.6 Add Rhythm**
+- [x] **0.6 Add Rhythm**
   - Build:
     - Rhythm track generation and playback.
     - Rhythm lane visualization.
@@ -71,7 +72,7 @@ Out of scope for first version:
   - Test gate:
     - rhythm integrates without timing glitches and UI remains responsive.
 
-- [ ] **0.7 Add Texture**
+- [x] **0.7 Add Texture**
   - Build:
     - Texture event generation and playback.
     - Texture lane visualization.
@@ -79,28 +80,41 @@ Out of scope for first version:
   - Test gate:
     - texture layer stable and regenerates without audio artifacts.
 
-- [ ] **0.75 Sound engine decision gate**
+- [x] **0.75 Sound engine decision gate**
   - Build:
     - A/B pass between Apple DLS baseline and higher-quality GM soundfont path.
   - Test gate:
-    - confirm whether Apple DLS remains acceptable or GM-soundfont upgrade is required for quality.
+    - confirmed Apple DLS acceptable for v1; GM-soundfont upgrade deferred to post-v1.
 
-- [ ] **0.76 Upgraded GM bank pass**
+- [ ] **0.76 Upgraded GM bank pass** *(deferred post-v1)*
   - Build:
     - optional higher-quality GM bank integration while preserving MIDI mappings and generation logic.
   - Test gate:
     - audible improvement with no control/regression breakage.
 
-- [ ] **0.8 Full app workflow integration**
+- [x] **0.8 Full app workflow integration**
   - Build:
-    - full-track generation flow, UI wiring, and transport integration (per `prototype.md` UX/status spec).
+    - full-track generation flow, UI wiring, and transport integration.
     - track regenerate + mute/solo behavior finalized.
+    - arrangement filter (intro/outro layer entry/exit).
+    - harmonic filter (chord-window pitch enforcement across melodic tracks).
+    - pattern evolver for bass (gradual mutation across evolution windows).
+    - drum variation engine (fills at transitions, cymbal variation on runs).
+    - song title generation.
+    - MIDI export (Type-1 multi-track to ~/Downloads/).
+    - full transport: play, stop, go-to-start, go-to-end, reverse (tap/hold), fast forward (tap/hold).
+    - DAW-style auto-scroll during playback; edge-sensitive scroll during manual seek.
+    - space bar global play/stop toggle.
+    - per-track regenerate wired to post-processors (drums → variation engine; bass → pattern evolver).
+    - key/mood/BPM reflected back to UI after each generate; BPM resets to Auto for next generate.
   - Test gate:
     - complete workflow stable with expected visual updates and no critical timing failures.
 
 - [ ] **0.9 Stabilization and hardening**
   - Build:
     - determinism checks, performance tuning, regression coverage, preset polish.
+    - Help and About dialog content review and final copy.
+    - status log accuracy pass (rule IDs match generated output).
   - Test gate:
     - repeatability in internal test mode, CPU/audio reliability, and no critical regressions.
 
@@ -113,5 +127,8 @@ Out of scope for first version:
 
 ## Post-1.0 placeholder
 
-- [ ] **1.1 Evolution mode**
+- [ ] **1.1 Upgraded GM bank**
+  - Higher-quality GM soundfont integration (deferred from 0.76).
+
+- [ ] **1.2 Evolution mode**
   - Continuous morphing playback between related song states.

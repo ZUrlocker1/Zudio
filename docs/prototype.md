@@ -31,13 +31,14 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
 - Global controls always visible: Style (locked to Motorik in v1), Mood, Tempo, Key.
 - Primary action: `Generate` creates a full song state across all tracks using current global controls.
 - Global transport includes:
-  - `Previous` (left arrow)
+  - `Go to Start` (skip-to-beginning)
+  - `Reverse` (back 1 bar; hold to repeat at 2 bars per tick)
   - `Play` (green arrow)
   - `Stop` (red square)
-  - `Next` (right arrow)
-- One-click regenerate options:
-  - Regenerate single track
-  - Regenerate all tracks while preserving style/mood/tempo/key
+  - `Fast Forward` (forward 1 bar; hold to repeat at 2 bars per tick)
+  - `Go to End` (skip-to-end)
+- Export action: `Save MIDI` exports the current song as a Type-1 multi-track MIDI file.
+- One-click regenerate option: Regenerate single track (preserves structure, key, and all other tracks)
 
 ## Design (v1 layout and UX structure)
 
@@ -53,18 +54,17 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
     - fit height target ~56 px on standard desktop window
     - allow responsive range ~44-72 px based on window size
     - center the logo within the left header column width
-  - Transport: `Previous` (left arrow), `Play` (green arrow), `Stop` (red square), `Next` (right arrow)
-  - Primary action: `Generate`
-  - Title section (top-center):
-    - Generated song title
-    - Tempo
-    - Key
-    - Mood
-    - Style
-  - Global selectors: `Style`, `Mood`, `Tempo`, `Key`
-  - Secondary actions: `Regenerate Track`, `Regenerate All`
+  - Transport buttons (left to right): `Go to Start`, `Reverse`, `Play`, `Stop`, `Fast Forward`, `Go to End`
+    - `Go to Start`: moves playhead to bar 1; does not stop playback if playing
+    - `Reverse`: tap = back 1 bar; hold = back 2 bars repeatedly until bar 1 or release
+    - `Play`: starts playback from current playhead position; if no song exists, auto-generates first; icon shows hourglass while generating
+    - `Stop`: stops playback immediately; playhead stays at current position
+    - `Fast Forward`: tap = forward 1 bar; hold = forward 2 bars repeatedly until last bar or release
+    - `Go to End`: moves playhead to the last bar and stops playback
+  - Primary action: `Generate` (keyboard shortcut: ⌘G) — creates a full song; icon shows hourglass while generating; Space bar toggles Play/Stop globally
+  - Export action: `Save MIDI` — exports a Type-1 multi-track MIDI file to `~/Downloads/`
+  - Global selectors: `Style` (fixed Motorik label in v1), `Mood` picker (Auto or specific mood), `Key` picker (Auto or specific key), `BPM` field with stepper (Auto clears after generate; shows 0 when unset)
   - Utility actions: `Help`, `About`
-  - Global display/readouts: song length (derived from `totalBars` and `tempo`: `totalBars * 4 * 60 / tempo` seconds, displayed as m:ss)
 
 ### Key selector behavior
 
@@ -192,10 +192,10 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - Includes a close action and optional "do not show again" hint flag.
   - Default Help text:
     - `Zudio generates Motorik-inspired music using MIDI tracks.`
-    - `Use Generate New to create a full song, then Play/Stop to audition it.`
-    - `Use M and S on each track to isolate parts, and the lightning bolt to regenerate one track.`
-    - `Use instrument cycle controls to audition alternate MIDI sounds.`
-    - `The center grid shows generated MIDI notes and scrolls during playback.`
+    - `Use Generate to create a new song, then Play/Stop to audition it.`
+    - `Use M and S on each track to Mute or Solo parts, and the lightning bolt to regenerate the track.`
+    - `You can cyle through different instruments for each track by clicking on the arrows.`
+    -`You can save to a MIDI file and edit further in any DAW.`
 - `About` button behavior:
   - Opens a modal dialog with app identity and attribution basics:
     - Zudio name and purpose (personal generative music research app)
@@ -204,10 +204,12 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - Includes close action and link target placeholder for full credits/licenses doc.
   - Default About text:
     - `Zudio`
-    - `Personal generative music research prototype for native macOS.`
-    - `Version: 0.1 (prototype)`
-    - `Audio engine: Apple AVAudioEngine with Apple DLS/General MIDI playback.`
-    - `V1 scope: Motorik style only.`
+    - `Generative music Application vibe coded with Claude!`
+    - `Version: 0.5 (alpha)`
+    - `This was built by analyzing Motorik and related songs and developing a set of rules to keep the instruments in sync and playing together. Sometimes it sounds like music!`
+    - `V1: Motorik style only. Instruments using built in MIDI. Effects not implemented.`
+    - `V2: improve musicality, upgrade MIDI instruments, add effects, attempt additional musical styles such as Electronic, Ambient, etc.`
+    
 
 ## Track instrument options (v1)
 
@@ -279,11 +281,17 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - The playback engine always reads from `trackEvents[trackIndex]` at render time. Swapping one track's array while others remain unchanged is the complete implementation of per-track regenerate — no re-running of other tracks, no re-deriving of the global frame.
   - If playback is running when per-track regenerate is triggered, the new events for that track take effect at the next bar boundary (do not interrupt mid-bar).
 - Playback behavior (v1 authoritative):
-  - Pressing `Play` starts playback from the beginning of the generated song.
+  - Pressing `Play` starts playback from the current playhead position. If no song exists, generate is triggered first and playback begins when generation completes.
+  - If the playhead is at or past the final bar when Play is pressed, it rewinds to bar 1 before playing.
   - The song plays once through to the end (intro → main sections → outro) and then stops. There is no looping.
-  - When playback reaches the final bar, the audio engine stops and the playhead returns to bar 1.
-  - Pressing `Stop` stops playback immediately (hard stop, no fade). The playhead returns to bar 1.
-  - `Previous` and `Next` are disabled placeholders in v1 and perform no action.
+  - When playback reaches the final bar, the audio engine stops and the playhead stays at the end position.
+  - Pressing `Stop` stops playback immediately (hard stop, no fade). The playhead stays at the current position.
+  - `Go to Start` moves the playhead to bar 1 without stopping playback.
+  - `Go to End` moves the playhead to the last bar and stops playback.
+  - `Reverse`: tap moves back 1 bar; holding initiates a repeat mode that steps back 2 bars per tick after a short delay. Stops at bar 1.
+  - `Fast Forward`: tap moves forward 1 bar; holding initiates a repeat mode that steps forward 2 bars per tick after a short delay. Stops at the last bar.
+  - The MIDI grid scrolls automatically during playback (DAW-style: scrolls when the playhead reaches 85% of the visible window). Manual seek via Reverse/Fast Forward scrolls only when the playhead reaches the outer 10% of the visible window.
+  - Space bar globally toggles Play/Stop regardless of keyboard focus.
   - All tracks share one timeline length. There is no per-track independent length or polymeter in v1; all tracks are the same number of bars.
 
 ## Track effects approach (post-v1 placeholder)
@@ -325,7 +333,11 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - 7. Lead layer plan (Lead 1 motif + Lead 2 counter-response)
   - 8. Rhythm ostinato plan (pulse embellishment)
   - 9. Texture-event plan (sparse atmosphere embellishment)
-  - 10. Collision/density simplification pass
+  - 10. Arrangement filter (intro/outro layer entry/exit — silences tracks by section to create buildup and taper)
+  - 11. Harmonic filter (removes notes outside the active chord window per bar for all melodic tracks)
+  - 12. Pattern evolver — bass only (applies gradual mutation across 8/16/32-bar evolution windows using thin/fill/substitute/rotate operators; creates forward momentum without full regeneration)
+  - 13. Drum variation engine (adds fills at section transitions and instrument entrances; applies cymbal variations after 16+ identical bars; fill weight: 60% 1-beat subtle, 30% 2-beat, 10% 3-beat)
+  - 14. Song title generation (deterministic title derived from key, mood, and seed)
   - Internal dependency build still starts from drums+bass+rhythm, then applies pads/lead layers.
 - All tracks inherit one shared harmonic map and timeline length:
   - Chord movement complexity depends on style (ambient = slower changes, motorik = tighter loop)

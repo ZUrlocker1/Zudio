@@ -85,6 +85,13 @@ struct SongGenerator {
         // Step 11 — Harmonic filter: clash guard, register separation, velocity arc
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
+        // Step 12 — Pattern evolver: gradual bass mutation across evolution windows
+        trackEvents = PatternEvolver.apply(trackEvents: trackEvents, frame: frame, structure: structure, tonalMap: tonalMap, seed: seed)
+
+        // Step 13 — Drum variation engine: fills at section transitions and instrument entrances,
+        //            plus cymbal variations on 16+-bar identical runs
+        trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed)
+
         // Title generation
         let title = TitleGenerator.generate(frame: frame, rng: &rng)
 
@@ -119,35 +126,73 @@ struct SongGenerator {
     // MARK: - Per-track regenerate
 
     /// Regenerates a single track without touching any other track or the global seed.
-    /// The generation log is carried through unchanged (reflects the full generation).
+    /// Appends regen log entries so the status box reflects the new rules used.
     static func regenerateTrack(_ trackIndex: Int, songState: SongState) -> SongState {
         let newTrackSeed = UInt64.random(in: .min ... .max)
         var rng = SeededRNG(seed: newTrackSeed)
-        var discardedRules: Set<String> = []
+        var usedRules: Set<String> = []
 
         let events: [MIDIEvent]
         switch trackIndex {
         case kTrackDrums:
-            events = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &discardedRules)
+            let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules)
+            // Apply variation engine using the current track context (other tracks drive entrance detection)
+            var scratch = songState.trackEvents
+            scratch[kTrackDrums] = rawDrum
+            events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed)[kTrackDrums]
         case kTrackBass:
-            events = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &discardedRules)
+            let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            var scratch = songState.trackEvents
+            scratch[kTrackBass] = rawBass
+            // Pattern evolver: gradual bass mutation
+            scratch = PatternEvolver.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, seed: newTrackSeed)
+            // Lock bass to the existing drum fills (uses globalSeed to reproduce the same fill types)
+            scratch = DrumVariationEngine.lockBassToExistingFills(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: songState.globalSeed)
+            events = scratch[kTrackBass]
         case kTrackPads:
-            events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &discardedRules)
+            events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
         case kTrackLead1:
-            events = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &discardedRules)
+            events = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
         case kTrackLead2:
-            events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &discardedRules)
+            events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
         case kTrackRhythm:
-            events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &discardedRules)
+            events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
         case kTrackTexture:
             events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng)
         default:
             return songState
         }
 
-        var updated = songState.replacingEvents(events, forTrack: trackIndex)
+        // Build regen log entries for the status box
+        let trackName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
+        var regenLog: [GenerationLogEntry] = [
+            GenerationLogEntry(tag: "⚡ REGEN", description: trackName, isTitle: true)
+        ]
+        if usedRules.isEmpty {
+            regenLog.append(GenerationLogEntry(tag: "—", description: "no rules captured"))
+        } else {
+            for ruleID in usedRules.sorted() {
+                let desc = ruleDescription(ruleID, trackIndex: trackIndex)
+                regenLog.append(GenerationLogEntry(tag: ruleID, description: desc))
+            }
+        }
+
+        var updated = songState.replacingEvents(events, forTrack: trackIndex, appendingLog: regenLog)
         updated.trackOverrides[trackIndex] = newTrackSeed
         return updated
+    }
+
+    /// Route a ruleID to the correct description function by trackIndex.
+    private static func ruleDescription(_ ruleID: String, trackIndex: Int) -> String {
+        switch trackIndex {
+        case kTrackDrums:   return drumRuleDescription(ruleID)
+        case kTrackBass:    return bassRuleDescription(ruleID)
+        case kTrackPads:    return padRuleDescription(ruleID)
+        case kTrackLead1:   return lead1RuleDescription(ruleID)
+        case kTrackLead2:   return lead2RuleDescription(ruleID)
+        case kTrackRhythm:  return rhythmRuleDescription(ruleID)
+        default:            return ruleID
+        }
     }
 
     // MARK: - Generation log builder
@@ -346,6 +391,11 @@ struct SongGenerator {
         case "BAS-004": return "Hallogallo Lock — root beat 1 long, fifth beat 3, locked to kick 1+3"
         case "BAS-005": return "McCartney Drive — 8th-note pump, root/fifth descent (SLS verse groove)"
         case "BAS-006": return "LA Woman Sustain — root holds bar, chromatic shimmer at bar end"
+        case "BAS-007": return "Hook Ascent — Joy Division: mode-3rd riff, 8th-note drive, mode-6th colour descent"
+        case "BAS-008": return "Moroder Pulse — staccato 8th-note sequence root/fifth/b7 (I Feel Love ostinato)"
+        case "BAS-009": return "Vitamin Hook — CAN: 2-bar ascending arpeggio root→fifth→octave, chromatic passing"
+        case "BAS-010": return "Quo Arc — Status Quo Down Down: 2-bar boogie arc 1-1-3-3-5-5-6-b7 ascent, b7-6-5-3-1 descent"
+        case "BAS-011": return "Quo Drive — Status Quo Caroline/Paper Plane: 1-bar compressed boogie arc (root-push + full up-back variants)"
         default:        return ruleID
         }
     }

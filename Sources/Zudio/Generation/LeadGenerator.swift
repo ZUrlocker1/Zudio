@@ -192,8 +192,9 @@ struct LeadGenerator {
         let bounds = kRegisterBounds[kTrackLead1]!
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
 
-        // Bar A (even): descend 5-4-2-1; Bar B (odd): repeat lower — b7-5-4-2
-        let offsets: [Int] = (bar % 2 == 0) ? [7, 5, 2, 0] : [10, 7, 5, 2]
+        // Bar A (even): descend 5-4-2-1; Bar B (odd): repeat lower — mode7-5-4-2
+        // mode7 snaps b7(10) to the mode's actual 7th (11 in Ionian, 10 in Aeolian/Dorian/Mixolydian)
+        let offsets: [Int] = (bar % 2 == 0) ? [7, 5, 2, 0] : [frame.mode.nearestInterval(10), 7, 5, 2]
         let durs:    [Int] = [3, 2, 3, 4]   // longer on structurally strong positions
         let velAdj:  [Int] = [11, 5, 7, 3]  // velocity arc over the bar
 
@@ -225,8 +226,8 @@ struct LeadGenerator {
         let baseVel = Int(velocityForIntensity(intensity, rng: &rng))
 
         if bar % 2 == 0 {
-            // Statement: ascending 1→2→b3→5 at quarter-note grid
-            let offsets = [0, 2, 3, 7]
+            // Statement: ascending 1→2→mode3→5 at quarter-note grid (minor 3rd in minor, major 3rd in major)
+            let offsets = [0, 2, frame.mode.nearestInterval(3), 7]
             let durs    = [4, 3, 3, 5]
             let velBump = [0, -6, -3, +2]
             for (i, step) in [0, 4, 8, 12].enumerated() {
@@ -244,7 +245,7 @@ struct LeadGenerator {
                 let note = midiNoteForPC(pc, bounds: bounds, rng: &rng)
                 events.append(MIDIEvent(stepIndex: barStart + 6, note: note, velocity: 65, durationSteps: 2))
             }
-            let answerOffsets = [5, 3]   // 4th, b3 — descending answer to the statement's ascent
+            let answerOffsets = [5, frame.mode.nearestInterval(3)]   // 4th, mode3 — descending answer
             let answerDurs    = [4, 5]
             for (i, step) in [8, 12].enumerated() {
                 let pc   = (rootPC + answerOffsets[i]) % 12
@@ -356,9 +357,12 @@ struct LeadGenerator {
         let bounds = kRegisterBounds[kTrackLead2]!
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
 
-        // Bar A (even): 6th at step 5, 5th at step 13
-        // Bar B (odd):  b3 at step 5, 2nd at step 13 — continuation of the descent
-        let (off1, off2): (Int, Int) = (bar % 2 == 0) ? (9, 7) : (3, 2)
+        // Bar A (even): mode6 at step 5, 5th at step 13
+        // Bar B (odd):  mode3 at step 5, 2nd at step 13 — continuation of the descent
+        // Both snap to the song's actual mode (minor 6th in Aeolian, major 6th in Dorian/Ionian, etc.)
+        let (off1, off2): (Int, Int) = (bar % 2 == 0)
+            ? (frame.mode.nearestInterval(9), 7)
+            : (frame.mode.nearestInterval(3), 2)
         let (vel1, vel2): (UInt8, UInt8) = (bar % 2 == 0) ? (70, 72) : (68, 66)
 
         for (pcOffset, step, vel) in [(off1, 5, vel1), (off2, 13, vel2)] {

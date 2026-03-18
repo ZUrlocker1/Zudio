@@ -115,14 +115,24 @@ final class AppState: ObservableObject {
                 self.generationHistory.append(state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
+                // Reset mute/solo so every new song starts with all parts audible
+                self.muteState = Array(repeating: false, count: 7)
+                self.soloState = Array(repeating: false, count: 7)
+                self.playback.muteState = self.muteState
+                self.playback.soloState = self.soloState
                 // Reflect key/mood back so the user can see what was picked.
                 // BPM resets to Auto so the next generation is free to pick a fresh tempo.
                 self.keyOverride   = state.frame.key
                 self.tempoOverride = nil
                 self.moodOverride  = state.frame.mood
+                // Stop any in-progress playback cleanly before swapping in the new song.
+                // This prevents the old scheduler from firing events against the new song state
+                // during the brief window between load() and seek(), which caused desync.
+                let wasPlaying = self.playback.isPlaying
+                self.playback.stop()
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
-                if thenPlay { self.playback.play() }
+                if thenPlay || wasPlaying { self.playback.play() }
                 // Resign first responder so BPM TextField doesn't hold focus
                 NSApp.keyWindow?.makeFirstResponder(nil)
             }
@@ -139,6 +149,10 @@ final class AppState: ObservableObject {
                 self.songState    = updated
                 self.isGenerating = false
                 if self.playback.isPlaying { self.playback.load(updated) }
+                // Keep generationHistory in sync so StatusBoxView shows the regen log
+                if !self.generationHistory.isEmpty {
+                    self.generationHistory[self.generationHistory.count - 1] = updated
+                }
             }
         }
     }
@@ -150,9 +164,10 @@ final class AppState: ObservableObject {
         if songState == nil {
             generateNew(thenPlay: true)
         } else {
-            // If the playhead is at or past the end, rewind to bar 1 before playing
-            if let song = songState, playback.currentStep >= song.frame.totalBars * 16 - 1 {
+            // Rewind if the playhead is anywhere in the last bar or beyond
+            if let song = songState, playback.currentStep >= (song.frame.totalBars - 1) * 16 {
                 playback.seek(toStep: 0)
+                visibleBarOffset = 0
             }
             playback.play()
         }
@@ -189,6 +204,55 @@ final class AppState: ObservableObject {
         // Show the final window of bars
         visibleBarOffset = max(0, totalBars - visibleBars)
         playback.seek(toStep: lastStep)
+    }
+
+    /// Step back one bar. Clamps at bar 0.
+    func seekBackOneBar() {
+        let targetBar = max(0, playback.currentBar - 1)
+        seekEdgeSensitive(toBar: targetBar)
+    }
+
+    /// Step back two bars. Clamps at bar 0.
+    func seekBackTwoBars() {
+        let targetBar = max(0, playback.currentBar - 2)
+        seekEdgeSensitive(toBar: targetBar)
+    }
+
+    /// Step forward one bar. Clamps at last bar.
+    func seekForwardOneBar() {
+        guard let song = songState else { return }
+        let targetBar = min(song.frame.totalBars - 1, playback.currentBar + 1)
+        seekEdgeSensitive(toBar: targetBar)
+    }
+
+    /// Step forward two bars. Clamps at last bar.
+    func seekForwardTwoBars() {
+        guard let song = songState else { return }
+        let targetBar = min(song.frame.totalBars - 1, playback.currentBar + 2)
+        seekEdgeSensitive(toBar: targetBar)
+    }
+
+    /// Moves the playhead to `targetBar` without scrolling the visible window, unless the
+    /// target is within the outer 10% of the window — in which case the window scrolls just
+    /// enough to keep the playhead visible with a small margin.
+    private func seekEdgeSensitive(toBar targetBar: Int) {
+        playback.seek(toStep: targetBar * 16)
+
+        let totalBars  = songState?.frame.totalBars ?? 32
+        let winStart   = visibleBarOffset
+        let winEnd     = visibleBarOffset + visibleBars
+        let lowEdge    = winStart + max(1, Int(Double(visibleBars) * 0.10))
+        let highEdge   = winEnd   - max(1, Int(Double(visibleBars) * 0.10))
+
+        if targetBar < lowEdge {
+            // Approaching left edge — scroll so target sits ~20% from the left
+            visibleBarOffset = max(0, targetBar - Int(Double(visibleBars) * 0.20))
+        } else if targetBar >= highEdge {
+            // Approaching right edge — scroll so target sits ~80% from the left
+            let ideal = targetBar - Int(Double(visibleBars) * 0.80)
+            visibleBarOffset = max(0, min(ideal, totalBars - visibleBars))
+        }
+        // Target is safely within the middle 80% — no scroll needed
     }
 
     /// Space-bar toggle: play if stopped, stop if playing.
