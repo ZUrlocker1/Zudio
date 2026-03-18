@@ -2,6 +2,7 @@
 
 import SwiftUI
 import AppKit
+import Combine
 
 @MainActor
 final class AppState: ObservableObject {
@@ -9,6 +10,15 @@ final class AppState: ObservableObject {
 
     @Published var songState: SongState? = nil
     @Published var isGenerating: Bool = false
+
+    // MARK: - Generation history (status log accumulates across generations)
+
+    @Published var generationHistory: [SongState] = []
+
+    // MARK: - Visible window — zoom + DAW scroll
+
+    @Published var visibleBars: Int = 16
+    @Published var visibleBarOffset: Int = 0
 
     // MARK: - UI selectors (nil = Auto)
 
@@ -25,6 +35,56 @@ final class AppState: ObservableObject {
 
     let playback = PlaybackEngine()
 
+    private var cancellables = Set<AnyCancellable>()
+    private var spaceBarMonitor: Any?
+
+    init() {
+        // *** KEY FIX: forward PlaybackEngine changes through AppState ***
+        // Without this, @Published properties on PlaybackEngine (like currentStep)
+        // do not trigger redraws in views that observe AppState.
+        playback.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        // Global space-bar monitor — intercepts space regardless of keyboard focus.
+        // Bypasses the BPM TextField focus-stealing issue.
+        spaceBarMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 49,   // space bar
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty
+            else { return event }
+            // Always consume space — the only TextField in this app is numeric (BPM),
+            // which never needs space. Removing the NSText guard fixes the focus-steal bug.
+            Task { @MainActor [weak self] in
+                guard let self, !self.isGenerating else { return }
+                self.playOrStop()
+            }
+            return nil   // consume event so no other handler sees it
+        }
+
+        // DAW-style scrolling: advance visible window when playhead hits 85%
+        playback.$currentStep
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] step in
+                Task { @MainActor [weak self] in
+                    self?.updateDAWScroll(step: step)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - DAW Scroll
+
+    private func updateDAWScroll(step: Int) {
+        guard playback.isPlaying else { return }
+        let totalBars = songState?.frame.totalBars ?? 32
+        let triggerStep = (visibleBarOffset + Int(Double(visibleBars) * 0.85)) * 16
+        if step >= triggerStep {
+            let newOffset = max(0, step / 16 - Int(Double(visibleBars) * 0.15))
+            visibleBarOffset = min(newOffset, max(0, totalBars - visibleBars))
+        }
+    }
+
     // MARK: - Generate
 
     func generateNew(thenPlay: Bool = false) {
@@ -39,9 +99,18 @@ final class AppState: ObservableObject {
             )
             await MainActor.run {
                 self.songState    = state
+                self.generationHistory.append(state)
                 self.isGenerating = false
+                self.visibleBarOffset = 0
+                // Reflect actual generated values back into the picker fields
+                self.keyOverride   = state.frame.key
+                self.tempoOverride = state.frame.tempo
+                self.moodOverride  = state.frame.mood
                 self.playback.load(state)
+                self.playback.seek(toStep: 0)
                 if thenPlay { self.playback.play() }
+                // Resign first responder so BPM TextField doesn't hold focus
+                NSApp.keyWindow?.makeFirstResponder(nil)
             }
         }
     }
@@ -63,19 +132,54 @@ final class AppState: ObservableObject {
     // MARK: - Transport
 
     func play() {
-        // Ensure window is active so subsequent clicks always work
         NSApp.activate(ignoringOtherApps: true)
         if songState == nil {
-            // No song yet — generate then immediately play
             generateNew(thenPlay: true)
         } else {
-            playback.play()
+            playback.play()  // resumes from current playhead position
         }
     }
 
     func stop() {
         NSApp.activate(ignoringOtherApps: true)
         playback.stop()
+    }
+
+    // MARK: - Seek
+
+    func seekTo(step: Int) {
+        playback.seek(toStep: step)
+        // Recenter visible window on seek position
+        let totalBars = songState?.frame.totalBars ?? 32
+        let targetBar = step / 16
+        let newOffset = max(0, min(targetBar - Int(Double(visibleBars) * 0.15), totalBars - visibleBars))
+        visibleBarOffset = newOffset
+    }
+
+    /// Rewind to bar 1. Keeps current play state.
+    func seekToStart() {
+        seekTo(step: 0)
+        visibleBarOffset = 0
+    }
+
+    /// Jump to the last bar and stop playback.
+    func seekToEnd() {
+        guard let song = songState else { return }
+        stop()
+        let lastStep = song.frame.totalBars * 16 - 1
+        let totalBars = song.frame.totalBars
+        // Show the final window of bars
+        visibleBarOffset = max(0, totalBars - visibleBars)
+        playback.seek(toStep: lastStep)
+    }
+
+    /// Space-bar toggle: play if stopped, stop if playing.
+    func playOrStop() {
+        if playback.isPlaying {
+            stop()
+        } else {
+            play()
+        }
     }
 
     // MARK: - MIDI export
@@ -109,5 +213,13 @@ final class AppState: ObservableObject {
     func toggleSolo(_ trackIndex: Int) {
         soloState[trackIndex].toggle()
         playback.soloState = soloState
+    }
+
+    // MARK: - Solo visual helper
+
+    var isAnySolo: Bool { soloState.contains(true) }
+
+    func isEffectivelyMuted(_ trackIndex: Int) -> Bool {
+        isAnySolo && !soloState[trackIndex]
     }
 }

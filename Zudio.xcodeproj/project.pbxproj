@@ -37,6 +37,7 @@
 		AA00000000000000000001C /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001C /* TopBarView.swift */; };
 		AA00000000000000000001D /* AssetLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001D /* AssetLoader.swift */; };
 		AA000000000000000000020 /* MIDIFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000022 /* MIDIFileExporter.swift */; };
+		AA000000000000000000021 /* FirstMouseFix.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000023 /* FirstMouseFix.swift */; };
 		AA00000000000000000001E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
 		AA00000000000000000001F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001F /* assets */; };
 /* End PBXBuildFile section */
@@ -72,6 +73,7 @@
 		BB00000000000000000001C /* TopBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopBarView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001D /* AssetLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLoader.swift; sourceTree = "<group>"; };
 		BB000000000000000000022 /* MIDIFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIFileExporter.swift; sourceTree = "<group>"; };
+		BB000000000000000000023 /* FirstMouseFix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstMouseFix.swift; sourceTree = "<group>"; };
 		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		BB00000000000000000001F /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -156,6 +158,7 @@
 				BB00000000000000000001A /* MIDILaneView.swift */,
 				BB00000000000000000001B /* StatusBoxView.swift */,
 				BB00000000000000000001C /* TopBarView.swift */,
+				BB000000000000000000023 /* FirstMouseFix.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -301,6 +304,7 @@
 				AA00000000000000000001C /* TopBarView.swift in Sources */,
 				AA00000000000000000001D /* AssetLoader.swift in Sources */,
 				AA000000000000000000020 /* MIDIFileExporter.swift in Sources */,
+				AA000000000000000000021 /* FirstMouseFix.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

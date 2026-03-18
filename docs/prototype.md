@@ -144,8 +144,9 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
     - progression family selected (for example static tonic, I-bVII, i-VII)
     - per-section bar counts
     - per-section chord sequence shown as:
-      - chord names (for example Em-D-Em-D)
-      - Nashville notation (for example i-bVII-i-bVII)
+      - proper chord names using standard notation (for example Em  D  Em  D)
+      - chord names use root note + type suffix: major = root only (e.g. G), minor = m (e.g. Em), dominant 7th = 7 (e.g. D7), minor 7th = m7 (e.g. Am7), sus2 = sus2 (e.g. Asus2), power = 5 (e.g. E5)
+      - no Nashville/numeric notation (no i-bVII or 1-b7 notation) in user-facing status
   - Intro rule summary:
     - intro type selected and intro length
     - key intro layer-entry decision (for example drums-only start, lead+texture start)
@@ -155,12 +156,30 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - Track-generation rule summary in UI order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.
     - Include short plain-language rule notes per track (for example bass = root/fifth anchor with sparse passing tones; Lead 2 = delayed entry/call-response).
   - Per-track instrument assignment in UI order.
-- Example compact 3-5 line status output:
-  - `Form: Subtle A/B, 16+16 bars, progression I-bVII`
-  - `Intro: Drums + Bass, 4 bars, snare enters bar 3`
-  - `Bass rule: root/fifth anchor, 1 passing tone max per bar`
-  - `Lead rules: Lead 1 motif-first, Lead 2 enters at bar 16 as response`
-  - `Outro: Drums-only tail, 4 bars, gradual cymbal reduction`
+- Example status output:
+  - `SONG    My Song Title`
+  - `STR-002 Subtle A/B, intro: 16 bars, A section: 48 bars, B section: 32 bars, outro: 16 bars`
+  - `INT-002 Intro: 16 bars, drums-only entry → sparse from bar 2`
+  - `OUT-002 Outro: 16 bars, sparse/low-intensity drop`
+  - `Chords  Em  G  D  Bm`
+  - `GBL-001 E Dorian, 138 BPM, minor_loop_i_VII`
+  - `DRM-001 4-on-the-floor kick, closed-hat grid, snare beat 3`
+  - `BAS-001 Root anchor beat 1, chord tones beat 3, syncopation`
+  - `PAD-001 Open 4-note sustained voicing, chord-window duration`
+  - `PAD-003 Pulsed re-attack every 4–8 bars within chord window`
+  - `LD1-001 Motif-first, chord tones 80%, scale tensions 20%`
+  - `LD2-001 Counter-response, density ≤55% of Lead 1`
+  - `RHY-001 8th-note ostinato, alternating root/fifth per chord`
+  - `RHY-003 Syncopated Motorik (3+3+2 feel), root/fifth alternation`
+  - `TEX-001 Boundary-weighted sparse atmosphere, scale tensions`
+- Rule numbering convention:
+  - STR-001: Single-A, STR-002: Subtle A/B, STR-003: Moderate A/B, STR-004: Moderate A/B/A'
+  - INT-001: 8-bar intro, INT-002: 16-bar intro
+  - OUT-001: 8-bar outro, OUT-002: 16-bar outro
+  - GBL, DRM, BAS, LD1, LD2, TEX: single rule each in v1 (always 001)
+  - PAD: PAD-001 (sustained), PAD-002 (power voicing), PAD-003 (pulsed), PAD-004 (sparse intro/outro)
+  - RHY: RHY-001 (8th pulse), RHY-002 (quarter note), RHY-003 (syncopated Motorik)
+  - Multiple rules shown when more than one variant is used across chord windows/sections
 
 ## Help and About dialogs (v1)
 

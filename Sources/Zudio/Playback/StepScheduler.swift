@@ -10,10 +10,11 @@ final class StepScheduler {
     private var currentStep: Int = 0
     private let totalSteps: Int
 
-    init(engine: PlaybackEngine, songState: SongState) {
-        self.engine     = engine
-        self.songState  = songState
-        self.totalSteps = songState.frame.totalBars * 16
+    init(engine: PlaybackEngine, songState: SongState, startStep: Int = 0) {
+        self.engine       = engine
+        self.songState    = songState
+        self.totalSteps   = songState.frame.totalBars * 16
+        self.currentStep  = max(0, startStep)
     }
 
     func start() {

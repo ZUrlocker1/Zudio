@@ -46,22 +46,18 @@ final class PlaybackEngine: ObservableObject {
 
     func play() {
         guard !isPlaying, let state = songState else { return }
-        // Always play from beginning (spec §Playback behavior)
-        currentBar  = 0
-        currentStep = 0
-        isPlaying   = true
-        let sched = StepScheduler(engine: self, songState: state)
+        // Resume from current playhead position (currentStep already set correctly)
+        isPlaying = true
+        let sched = StepScheduler(engine: self, songState: state, startStep: currentStep)
         scheduler = sched
         sched.start()
     }
 
     func stop() {
         scheduler?.stop()
-        scheduler   = nil
-        isPlaying   = false
-        // Playhead returns to bar 1 (spec §Playback behavior)
-        currentBar  = 0
-        currentStep = 0
+        scheduler = nil
+        isPlaying = false
+        // Leave playhead in place — user can resume from here with Play
         allNotesOff()
     }
 
@@ -89,11 +85,37 @@ final class PlaybackEngine: ObservableObject {
         }
     }
 
-    // Called by StepScheduler when song ends
+    // Called by StepScheduler when song ends — reset playhead to beginning
     nonisolated func onSongEnd() {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            self.stop()
+            self.scheduler?.stop()
+            self.scheduler = nil
+            self.isPlaying   = false
+            self.currentStep = 0
+            self.currentBar  = 0
+            self.allNotesOff()
+        }
+    }
+
+    // MARK: - Seek (restart scheduler from a new position)
+
+    func seek(toStep newStep: Int) {
+        guard let state = songState else { return }
+        let totalSteps = state.frame.totalBars * 16
+        let clampedStep = max(0, min(newStep, totalSteps - 1))
+        if isPlaying {
+            scheduler?.stop()
+            scheduler = nil
+            allNotesOff()
+            currentStep = clampedStep
+            currentBar  = clampedStep / 16
+            let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep)
+            scheduler = sched
+            sched.start()
+        } else {
+            currentStep = clampedStep
+            currentBar  = clampedStep / 16
         }
     }
 

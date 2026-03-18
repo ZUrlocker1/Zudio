@@ -1,6 +1,6 @@
-// StatusBoxView.swift — 3-5 line scrollable generation log (spec §Status box)
-// Shows: form, progression, bar counts, chord sequence, per-track rule notes.
-// No seed values, no timestamps, no transport event logs.
+// StatusBoxView.swift — scrollable generation log.
+// Accumulates entries across all generations; newest at bottom.
+// Renders directly from SongState.generationLog — no ad-hoc formatting here.
 
 import SwiftUI
 
@@ -10,93 +10,94 @@ struct StatusBoxView: View {
     var body: some View {
         VStack(spacing: 0) {
             Divider()
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 3) {
-                    if let song = appState.songState {
-                        statusLines(song)
-                    } else {
-                        Text("Ready — press Generate to create a Motorik song.")
-                            .foregroundStyle(.secondary)
+
+            // Header bar: label + scroll-to-top / scroll-to-bottom
+            HStack(spacing: 4) {
+                Text("Generation Log")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                ScrollViewReader { proxy in
+                    HStack(spacing: 4) {
+                        Button {
+                            withAnimation { proxy.scrollTo("top", anchor: .top) }
+                        } label: {
+                            Image(systemName: "arrow.up.to.line")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10))
+                        .help("Scroll to first entry")
+
+                        Button {
+                            withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                        } label: {
+                            Image(systemName: "arrow.down.to.line")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10))
+                        .help("Scroll to latest entry")
                     }
                 }
-                .font(.system(size: 12, design: .monospaced))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 240)
-            .background(Color(white: 0.10))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 3)
+            .background(Color(white: 0.12))
+
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Color.clear.frame(height: 1).id("top")
+
+                        if appState.generationHistory.isEmpty {
+                            Text("Ready — press Generate to create a Motorik song.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(Array(appState.generationHistory.enumerated()), id: \.offset) { idx, song in
+                                if idx > 0 { Divider().padding(.vertical, 3) }
+                                generationSection(song)
+                            }
+                        }
+
+                        Color.clear.frame(height: 1).id("bottom")
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollIndicators(.visible)
+                .frame(minHeight: 60, idealHeight: 200, maxHeight: 280)
+                .background(Color(white: 0.10))
+                .onChange(of: appState.generationHistory.count) { _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    }
+                }
+            }
         }
     }
 
-    // MARK: - Build status lines from SongState
+    // MARK: - Render one generation block
 
     @ViewBuilder
-    private func statusLines(_ song: SongState) -> some View {
-        let structure = song.structure
-        let frame     = song.frame
-
-        // Line 1: form + progression + bar counts
-        let bodyBars = structure.bodySections.map { "\($0.label.rawValue)=\($0.lengthBars)b" }.joined(separator: " ")
-        let introBars = structure.introSection.map { "intro=\($0.lengthBars)b" } ?? ""
-        let outroBars = structure.outroSection.map { "outro=\($0.lengthBars)b" } ?? ""
-        statusLine("Form",  "\(formLabel(song.form)), \(introBars) \(bodyBars) \(outroBars)".trimmingCharacters(in: .whitespaces))
-
-        // Line 2: chord sequence (Nashville notation)
-        let chords = structure.chordPlan.map { cw in "\(cw.chordRoot)\(chordTypeShort(cw.chordType))" }.joined(separator: "–")
-        statusLine("Chords", chords.isEmpty ? "—" : chords)
-
-        // Line 3: key / mode / tempo / progression
-        statusLine("GBL-001", "\(frame.key) \(frame.mode.rawValue), \(frame.tempo) BPM, progression: \(frame.progressionFamily.rawValue)")
-
-        // Line 4: track rule summary (spec §Required generation messages)
-        statusLine("DRM-001", "Drums: 4-on-the-floor kick, closed-hat grid, sparse intro, sub-phase intensity arc")
-        statusLine("BAS-001", "Bass: chord-root anchor beat 1, passing tones on beat 3, syncopated off-beats \(Int(Double(frame.tempo)*0.7))%")
-        statusLine("PAD-001", "Pads: open 4-note voicing (root–fifth–oct–third), one chord per window, \(song.structure.chordPlan.count) windows")
-        statusLine("LD1-001", "Lead 1: motif-first, chord tones strong beats 80%, scale tensions 20%")
-        statusLine("LD2-001", "Lead 2: counter-response, density ≤55% of Lead 1, avoids simultaneous accents")
-        statusLine("RHY-001", "Rhythm: 2-bar repeating ostinato, chord-root pitch, 8th or quarter-note stride")
-        statusLine("TEX-001", "Texture: sparse, boundary-weighted, scale tensions preferred")
-
-        // Line 5: outro/intro notes
-        if let intro = structure.introSection {
-            statusLine("STR-INT", "Intro: \(intro.lengthBars) bars, drums-only start → sparse enter bar 2+")
-        }
-        if let outro = structure.outroSection {
-            statusLine("STR-OUT", "Outro: \(outro.lengthBars) bars, sparse/low intensity layer drop")
+    private func generationSection(_ song: SongState) -> some View {
+        ForEach(Array(song.generationLog.enumerated()), id: \.offset) { _, entry in
+            logLine(entry)
         }
     }
 
-    private func statusLine(_ ruleId: String, _ text: String) -> some View {
+    private func logLine(_ entry: GenerationLogEntry) -> some View {
         HStack(alignment: .top, spacing: 6) {
-            Text(ruleId)
-                .foregroundStyle(.green.opacity(0.8))
+            Text(entry.tag)
+                .foregroundStyle(entry.isTitle ? Color.white : Color.green.opacity(0.8))
+                .fontWeight(entry.isTitle ? .bold : .regular)
                 .frame(width: 72, alignment: .leading)
-            Text(text)
-                .foregroundStyle(.white.opacity(0.85))
+            Text(entry.description)
+                .foregroundStyle(entry.isTitle ? Color.yellow.opacity(0.95) : Color.white.opacity(0.85))
                 .lineLimit(2)
-        }
-    }
-
-    private func formLabel(_ form: SongForm) -> String {
-        switch form {
-        case .singleA:    return "Single-A"
-        case .subtleAB:   return "Subtle A/B"
-        case .moderateAB: return "Moderate A/B"
-        }
-    }
-
-    private func chordTypeShort(_ t: ChordType) -> String {
-        switch t {
-        case .major:   return ""
-        case .minor:   return "m"
-        case .sus2:    return "sus2"
-        case .sus4:    return "sus4"
-        case .dom7:    return "7"
-        case .min7:    return "m7"
-        case .add9:    return "add9"
-        case .quartal: return "qrt"
-        case .power:   return "5"
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -13,35 +13,43 @@ struct TrackRowView: View {
     let currentStep: Int
     let isMuted: Bool
     let isSolo: Bool
+    let isEffectivelyMuted: Bool
+    let visibleBars: Int
+    let barOffset: Int
+    var showPlayheadHandle: Bool = false
+    var onSeek: ((Int) -> Void)? = nil
 
-    // MARK: - Instrument definitions (name + GM program)
+    // MARK: - Instrument definitions (no "Auto" — always show real name)
 
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
         switch trackIndex {
         case kTrackLead1:
-            return [.init(name:"Auto", program:82), .init(name:"Synth Lead", program:82), .init(name:"Electric Lead", program:26),
-                    .init(name:"Brass Lead", program:56), .init(name:"Piano", program:0), .init(name:"Rhodes", program:4)]
+            return [.init(name:"Synth Lead",     program:82), .init(name:"Electric Lead", program:26),
+                    .init(name:"Brass Lead",      program:56), .init(name:"Piano",         program:0),
+                    .init(name:"Rhodes",          program:4)]
         case kTrackLead2:
-            return [.init(name:"Auto", program:63), .init(name:"Synth Lead 2", program:80), .init(name:"Guitar Counter", program:24),
-                    .init(name:"Bell/Pluck", program:14), .init(name:"Soft Brass", program:56)]
+            return [.init(name:"Square Lead",    program:80), .init(name:"Guitar Counter", program:24),
+                    .init(name:"Bell/Pluck",      program:14), .init(name:"Soft Brass",     program:56),
+                    .init(name:"Synth Brass",     program:63)]
         case kTrackPads:
-            return [.init(name:"Auto", program:89), .init(name:"Warm Pad", program:89), .init(name:"Glass Pad", program:98),
-                    .init(name:"String Pad", program:48), .init(name:"Choir Pad", program:53), .init(name:"Organ Drone", program:16)]
+            return [.init(name:"Warm Pad",       program:89), .init(name:"Glass Pad",      program:98),
+                    .init(name:"String Pad",      program:48), .init(name:"Choir Pad",      program:53),
+                    .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
-            return [.init(name:"Auto", program:28), .init(name:"Guitar Pulse", program:28), .init(name:"Mono Synth", program:80),
-                    .init(name:"Arp Synth", program:37), .init(name:"E-Piano", program:4)]
+            return [.init(name:"Guitar Pulse",   program:28), .init(name:"Mono Synth",     program:80),
+                    .init(name:"Arp Synth",       program:37), .init(name:"E-Piano",         program:4)]
         case kTrackTexture:
-            return [.init(name:"Auto", program:93), .init(name:"Noise/Swell", program:95), .init(name:"Field Noise", program:119),
-                    .init(name:"Metallic FX", program:98), .init(name:"Tape Texture", program:93)]
+            return [.init(name:"Noise/Swell",    program:95), .init(name:"Field Noise",    program:119),
+                    .init(name:"Metallic FX",     program:98), .init(name:"Tape Texture",   program:93)]
         case kTrackBass:
-            return [.init(name:"Auto", program:38), .init(name:"Analog Bass", program:38), .init(name:"FM Bass", program:37),
-                    .init(name:"Electric Bass", program:33), .init(name:"Upright Bass", program:32)]
+            return [.init(name:"Analog Bass",    program:38), .init(name:"FM Bass",         program:37),
+                    .init(name:"Electric Bass",   program:33), .init(name:"Upright Bass",   program:32)]
         case kTrackDrums:
-            return [.init(name:"Auto", program:0), .init(name:"Electronic Kit", program:0), .init(name:"Rock Kit", program:8)]
+            return [.init(name:"Electronic Kit", program:0),  .init(name:"Rock Kit",        program:8)]
         default:
-            return [.init(name:"Auto", program:0)]
+            return [.init(name:"Synth",          program:0)]
         }
     }
 
@@ -55,33 +63,19 @@ struct TrackRowView: View {
             // Left controls panel
             VStack(alignment: .leading, spacing: 3) {
 
-                // Icon + label row (50% larger: 11→17pt, bold)
-                HStack(spacing: 6) {
+                // Row 1: [icon] [label]  ···  [◀ Name ▶]
+                HStack(spacing: 5) {
                     Image(systemName: trackIcon)
                         .foregroundStyle(trackColor)
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 20)
+                        .font(.system(size: 19, weight: .semibold))
+                        .frame(width: 22)
                     Text(label)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(isMuted ? .tertiary : .primary)
                         .lineLimit(1)
-                }
 
-                // Single row: [M] [S] [◀ Name ▶] [⚡]
-                HStack(spacing: 3) {
-                    // M mute — explicit blue fill when active
-                    Button("M") { appState.toggleMute(trackIndex) }
-                        .buttonStyle(ToggleChipStyle(active: isMuted, activeColor: .blue))
-                        .controlSize(.mini)
-                        .help("Mute")
+                    Spacer(minLength: 4)
 
-                    // S solo — explicit yellow fill when active
-                    Button("S") { appState.toggleSolo(trackIndex) }
-                        .buttonStyle(ToggleChipStyle(active: isSolo, activeColor: .yellow))
-                        .controlSize(.mini)
-                        .help("Solo")
-
-                    // ◀ Name ▶ cycle
                     Button { cycleInstrument(by: -1) } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 10, weight: .medium))
@@ -90,10 +84,10 @@ struct TrackRowView: View {
                     .foregroundStyle(.secondary)
 
                     Text(instruments[instrumentIndex].name)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.8))
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(width: 82, alignment: .center)
 
                     Button { cycleInstrument(by: 1) } label: {
                         Image(systemName: "chevron.right")
@@ -101,35 +95,47 @@ struct TrackRowView: View {
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
+                }
 
-                    // ⚡ regenerate this track
+                // Row 2: [M] [S] [⚡]
+                HStack(spacing: 4) {
+                    Button("M") { appState.toggleMute(trackIndex) }
+                        .buttonStyle(ToggleChipStyle(active: isMuted, activeColor: .blue))
+                        .help("Mute")
+
+                    Button("S") { appState.toggleSolo(trackIndex) }
+                        .buttonStyle(ToggleChipStyle(active: isSolo, activeColor: .yellow))
+                        .help("Solo")
+
                     Button { appState.regenerateTrack(trackIndex) } label: {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 11))
-                            .foregroundStyle(.yellow)
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(IconChipStyle())
                     .disabled(appState.isGenerating || appState.songState == nil)
                     .help("Regenerate \(label)")
                 }
-                .frame(maxWidth: .infinity)
             }
-            .frame(width: 130)
+            .frame(width: 232)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
 
-            // MIDI lane (always visible, even empty)
+            // MIDI lane
             MIDILaneView(
                 events: events,
                 totalBars: max(totalBars, 1),
                 currentStep: currentStep,
                 isDrumTrack: trackIndex == kTrackDrums,
-                trackColor: trackColor
+                trackColor: trackColor,
+                visibleBars: visibleBars,
+                barOffset: barOffset,
+                onSeek: onSeek,
+                showPlayheadHandle: showPlayheadHandle
             )
             .frame(height: 63)
             .opacity(isMuted ? 0.35 : 1.0)
 
-            // Right effects column — compact chip layout (v1 placeholder)
+            // Right effects column
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 2) {
                     ForEach(["Dry", "Wide", "Hazy", "Punchy"], id: \.self) { effectChip($0) }
@@ -147,6 +153,7 @@ struct TrackRowView: View {
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .padding(.horizontal, 8)
         .padding(.vertical, 1)
+        .opacity(isEffectivelyMuted ? 0.22 : 1.0)
     }
 
     // MARK: - Helpers
@@ -166,7 +173,6 @@ struct TrackRowView: View {
             .foregroundStyle(.secondary)
     }
 
-    /// SF Symbol per track type
     private var trackIcon: String {
         switch trackIndex {
         case kTrackLead1:   return "music.note"
@@ -175,12 +181,11 @@ struct TrackRowView: View {
         case kTrackRhythm:  return "music.quarternote.3"
         case kTrackTexture: return "waveform"
         case kTrackBass:    return "waveform.path.ecg"
-        case kTrackDrums:   return "drum"
+        case kTrackDrums:   return "metronome.fill"
         default:            return "music.note"
         }
     }
 
-    /// Track family color mapping (spec §Track family color mapping)
     private var trackColor: Color {
         switch trackIndex {
         case kTrackLead1, kTrackLead2:                return .red
@@ -192,19 +197,32 @@ struct TrackRowView: View {
     }
 }
 
-// MARK: - Toggle chip button style (M=blue, S=yellow)
+// MARK: - Button styles
 
+/// Toggle button (M mute, S solo) — filled color when active
 struct ToggleChipStyle: ButtonStyle {
     let active: Bool
     let activeColor: Color
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .bold))
             .frame(width: 22, height: 18)
-            .background(active ? activeColor : Color(white: 0.30))
+            .background(active ? activeColor : Color(white: configuration.isPressed ? 0.45 : 0.30))
             .foregroundStyle(active ? .black : .white)
             .clipShape(RoundedRectangle(cornerRadius: 4))
-            .opacity(configuration.isPressed ? 0.75 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+    }
+}
+
+/// Icon chip (⚡) — same size as M/S, press feedback via flash
+struct IconChipStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .bold))
+            .frame(width: 22, height: 18)
+            .background(configuration.isPressed ? Color.yellow.opacity(0.40) : Color(white: 0.30))
+            .foregroundStyle(.yellow)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .scaleEffect(configuration.isPressed ? 0.88 : 1.0)
     }
 }
