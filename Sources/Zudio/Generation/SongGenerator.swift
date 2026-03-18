@@ -110,6 +110,8 @@ struct SongGenerator {
             rhythmRules: rhythmRules
         )
 
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame)
+
         return SongState(
             frame: frame,
             structure: structure,
@@ -119,7 +121,8 @@ struct SongGenerator {
             trackOverrides: [:],
             title: title,
             form: form,
-            generationLog: log
+            generationLog: log,
+            stepAnnotations: stepAnnotations
         )
     }
 
@@ -446,6 +449,377 @@ struct SongGenerator {
         case "RHY-003": return "Syncopated Motorik (3+3+2 feel), root/fifth alternation"
         default:        return ruleID
         }
+    }
+
+    // MARK: - Step annotations (live playback feed)
+
+    /// Builds a map of absolute step → [GenerationLogEntry] for live playback annotations.
+    /// Keys are absolute step indices so each entry fires at precisely the right moment:
+    /// section/spotlight/bass events fire at bar start (step 0 of bar);
+    /// drum fills fire 2 beats (8 steps) before the fill region begins.
+    static func buildStepAnnotations(
+        structure: SongStructure,
+        trackEvents: [[MIDIEvent]],
+        frame: GlobalMusicalFrame
+    ) -> [Int: [GenerationLogEntry]] {
+        var out: [Int: [GenerationLogEntry]] = [:]
+        let totalBars = frame.totalBars
+
+        // fire: fires at the given absolute step index
+        func fire(_ step: Int, tag: String, desc: String) {
+            out[max(0, step), default: []].append(GenerationLogEntry(tag: tag, description: desc))
+        }
+        // fireBar: convenience — fires at the start of a bar
+        func fireBar(_ bar: Int, tag: String, desc: String) {
+            fire(bar * 16, tag: tag, desc: desc)
+        }
+
+        // Helper: format chord name from degree string + type
+        func chordName(_ rootDegree: String, _ type: ChordType) -> String {
+            let keyST = keySemitone(frame.key)
+            let rootST = (keyST + degreeSemitone(rootDegree) + 12) % 12
+            let names = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
+            let root = names[rootST]
+            switch type {
+            case .major:   return root
+            case .minor:   return root + "m"
+            case .sus2:    return root + "sus2"
+            case .sus4:    return root + "sus4"
+            case .add9:    return root + "add9"
+            case .dom7:    return root + "7"
+            case .min7:    return root + "m7"
+            case .quartal: return root + "qrt"
+            case .power:   return root + "5"
+            }
+        }
+
+        // Helper: 2–3 chord names covering a section's bars
+        func chordsLabel(for section: SongSection) -> String {
+            let windows = structure.chordPlan.filter { $0.startBar >= section.startBar && $0.startBar < section.endBar }
+            let names = windows.prefix(3).map { chordName($0.chordRoot, $0.chordType) }
+            guard !names.isEmpty else { return "" }
+            let joined = names.joined(separator: " ")
+            return windows.count > 3 ? joined + " …" : joined
+        }
+
+        // Helper: describe which instruments are active in a section (for intro/outro labels)
+        func sectionInstruments(_ section: SongSection) -> String {
+            func active(_ t: Int) -> Bool {
+                guard t < trackEvents.count else { return false }
+                return trackEvents[t].contains { let b = $0.stepIndex / 16; return b >= section.startBar && b < section.endBar }
+            }
+            let hasDrums   = active(kTrackDrums)
+            let hasBass    = active(kTrackBass)
+            let hasRhythm  = active(kTrackRhythm)
+            let hasPads    = active(kTrackPads)
+            let hasTexture = active(kTrackTexture)
+            let hasLead    = active(kTrackLead1) || active(kTrackLead2)
+            var parts: [String] = []
+            if hasDrums   { parts.append("drums") }
+            if hasBass    { parts.append("bass") }
+            if hasRhythm  { parts.append("rhythm") }
+            if hasPads    { parts.append("pads") }
+            if hasTexture { parts.append("texture") }
+            if hasLead    { parts.append("lead") }
+            let instruments: String
+            if parts.isEmpty        { instruments = "drums only" }
+            else if parts.count == 2 { instruments = parts.joined(separator: " & ") }
+            else                    { instruments = parts.joined(separator: ", ") }
+            return "\(section.lengthBars) bars — \(instruments)"
+        }
+
+        // Helper: hat-event count in a step range within a bar
+        func hatCount(bar: Int, fromStep: Int, toStep: Int) -> Int {
+            guard kTrackDrums < trackEvents.count else { return 0 }
+            let bs = bar * 16
+            let hatNotes: Set<UInt8> = [GMDrum.closedHat.rawValue, GMDrum.pedalHat.rawValue, GMDrum.openHat.rawValue]
+            return trackEvents[kTrackDrums].filter {
+                $0.stepIndex >= bs + fromStep && $0.stepIndex < bs + toStep && hatNotes.contains($0.note)
+            }.count
+        }
+
+        // Helper: infer fill length in beats from hat-stripping signature
+        func fillBeats(bar: Int) -> Int {
+            if hatCount(bar: bar, fromStep: 4, toStep: 16) == 0 { return 3 }
+            if hatCount(bar: bar, fromStep: 8, toStep: 16) == 0 { return 2 }
+            return 1
+        }
+
+        // Helper: bass locked = ≤1 note in back 12 steps of bar
+        func bassLocked(bar: Int) -> Bool {
+            guard kTrackBass < trackEvents.count else { return false }
+            let bs = bar * 16
+            return trackEvents[kTrackBass].filter { $0.stepIndex >= bs + 4 && $0.stepIndex < bs + 16 }.count <= 1
+        }
+
+        // Helper: identify fill name by examining drum notes in the fill region
+        func fillName(bar: Int, beats: Int) -> String {
+            guard kTrackDrums < trackEvents.count else { return "drum fill" }
+            let bs = bar * 16
+            let regionStart = bs + (beats == 3 ? 4 : beats == 2 ? 8 : 12)
+            let evs = trackEvents[kTrackDrums].filter { $0.stepIndex >= regionStart && $0.stepIndex < bs + 16 }
+            let notes = Set(evs.map { $0.note })
+            switch beats {
+            case 1:
+                if notes.contains(GMDrum.sidestick.rawValue)    { return "sidestick flam" }
+                if notes.contains(GMDrum.highFloorTom.rawValue) { return "floor tap" }
+                let snareCount = evs.filter { $0.note == GMDrum.snare.rawValue }.count
+                if snareCount >= 4                               { return "snare roll" }
+                // Hat triplet cue: closed hat on step 13 (odd position flags the triplet push)
+                if evs.contains(where: { $0.stepIndex == bs + 13 && $0.note == GMDrum.closedHat.rawValue }) {
+                    return "hat triplet cue"
+                }
+                // Ghost whisper: hat still rolls on step 14 (no stripping)
+                if evs.contains(where: { $0.stepIndex == bs + 14 && ($0.note == GMDrum.closedHat.rawValue || $0.note == GMDrum.pedalHat.rawValue) }) {
+                    return "ghost whisper"
+                }
+                return "double snap"
+            case 2:
+                if notes.contains(GMDrum.hiTom.rawValue)  { return "Bonham tom cascade" }
+                if notes.contains(GMDrum.kick.rawValue)   { return "funk cross-pattern" }
+                if evs.allSatisfy({ $0.note == GMDrum.snare.rawValue }) { return "double-time roll" }
+                return "snare and toms"
+            default: // 3 beats
+                if evs.allSatisfy({ $0.note == GMDrum.snare.rawValue }) { return "crescendo roll" }
+                // Alternating toms: hiMidTom and lowFloorTom interleaved
+                let hiMidCount   = evs.filter { $0.note == GMDrum.hiMidTom.rawValue }.count
+                let floorLowCount = evs.filter { $0.note == GMDrum.lowFloorTom.rawValue }.count
+                if hiMidCount >= 3 && floorLowCount >= 3 { return "alternating toms" }
+                return "tom cascade"
+            }
+        }
+
+        // Compute all fill bars — replicates DrumVariationEngine.computeFillBars (deterministic part)
+        var allFillBars = Set<Int>()
+        // Section transition fills: bar before each new body section
+        var prevLabel: SectionLabel? = nil
+        for bar in 0..<totalBars {
+            guard let sec = structure.section(atBar: bar) else { continue }
+            if sec.label != prevLabel {
+                if bar > 0, sec.label != .intro && sec.label != .outro {
+                    let fillBar = bar - 1
+                    if let prevSec = structure.section(atBar: fillBar), prevSec.label != .intro {
+                        allFillBars.insert(fillBar)
+                    }
+                }
+            }
+            prevLabel = sec.label
+        }
+        // Entrance fills: non-drum track comes in after ≥2 silent bars
+        for trackIdx in 0..<kTrackDrums {
+            guard trackIdx < trackEvents.count else { continue }
+            let presence: [Bool] = (0..<totalBars).map { bar in
+                let bs = bar * 16
+                return trackEvents[trackIdx].contains { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
+            }
+            for bar in 2..<totalBars {
+                guard presence[bar] && !presence[bar - 1] && !presence[bar - 2] else { continue }
+                let fillBar = bar - 1
+                guard let sec = structure.section(atBar: fillBar),
+                      sec.label != .intro && sec.label != .outro else { continue }
+                allFillBars.insert(fillBar)
+            }
+        }
+
+        // 1. Section entries — fire at bar start (the change is heard immediately)
+        var seenLabels = Set<SectionLabel>()
+        for section in structure.sections {
+            let bar = section.startBar
+            switch section.label {
+            case .intro:
+                fireBar(bar, tag: "Intro", desc: sectionInstruments(section))
+            case .A:
+                let chords = chordsLabel(for: section)
+                if seenLabels.contains(.A) {
+                    fireBar(bar, tag: "Section A", desc: "returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                } else {
+                    fireBar(bar, tag: "Section A", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
+                }
+            case .B:
+                let chords = chordsLabel(for: section)
+                if seenLabels.contains(.B) {
+                    fireBar(bar, tag: "Section B", desc: "returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                } else {
+                    fireBar(bar, tag: "Section B", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
+                }
+            case .outro:
+                fireBar(bar, tag: "Outro", desc: "winding down — \(section.lengthBars) bars")
+            }
+            seenLabels.insert(section.label)
+        }
+
+        // 2. Drum fills — fire 2 beats (8 steps) before the fill region begins, so the
+        //    text appears just ahead of the hit rather than a full bar early.
+        //    Fill region offsets: 1-beat → step 12, 2-beat → step 8, 3-beat → step 4.
+        //    Fire steps:          1-beat → step 4,  2-beat → step 0,  3-beat → step 0.
+        for fillBar in allFillBars.sorted() {
+            guard let sec = structure.section(atBar: fillBar),
+                  sec.label != .intro && sec.label != .outro else { continue }
+            let beats  = fillBeats(bar: fillBar)
+            let name   = fillName(bar: fillBar, beats: beats)
+            let locked = beats > 1 && bassLocked(bar: fillBar)
+            let desc   = locked ? "\(beats) beat — \(name) — bass locked in" : "\(beats) beat — \(name)"
+            // fillRegionOffset: where in the bar the fill starts; fire 1/4 bar (4 steps) before that
+            let fillRegionOffset = beats == 1 ? 12 : beats == 2 ? 8 : 4
+            fire(fillBar * 16 + max(0, fillRegionOffset - 4), tag: "Drum fill", desc: desc)
+        }
+
+        // 3. Drum cymbal variations — announce only on transitions, not every bar.
+        // Track the cymbal "mode" of the previous bar and fire only when it changes.
+        if kTrackDrums < trackEvents.count {
+            let drumEvs = trackEvents[kTrackDrums]
+            // Cymbal mode: nil = no body bars seen yet, "" = normal hi-hat, or a desc string
+            var prevCymbalMode: String? = nil
+            for bar in 0..<totalBars {
+                guard !allFillBars.contains(bar),
+                      let sec = structure.section(atBar: bar),
+                      sec.label == .A || sec.label == .B else {
+                    prevCymbalMode = nil   // reset across non-body sections
+                    continue
+                }
+                let bs = bar * 16
+                let barEvs = drumEvs.filter { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
+                let hasRide       = barEvs.contains { $0.note == GMDrum.ride.rawValue }
+                let hasClosedHat  = barEvs.contains { $0.note == GMDrum.closedHat.rawValue }
+                let hasCrashBeat1 = barEvs.contains { $0.stepIndex == bs     && $0.note == GMDrum.crash1.rawValue }
+                let hasOpenHat6   = barEvs.contains { $0.stepIndex == bs + 6  && $0.note == GMDrum.openHat.rawValue }
+                let hasOpenHat14  = barEvs.contains { $0.stepIndex == bs + 14 && $0.note == GMDrum.openHat.rawValue }
+                let mode: String
+                if hasRide && !hasClosedHat {
+                    mode = "ride"
+                } else if hasCrashBeat1 && hasOpenHat6 {
+                    mode = "crash"
+                } else if hasOpenHat14 && !hasClosedHat {
+                    mode = "openHat"
+                } else {
+                    mode = "hat"
+                }
+                if mode != prevCymbalMode {
+                    switch mode {
+                    case "ride":
+                        fireBar(bar, tag: "Drums", desc: "playing ride instead of hi-hat")
+                    case "crash":
+                        fireBar(bar, tag: "Drums", desc: "crash on beat 1, open hat colour")
+                    case "openHat":
+                        fireBar(bar, tag: "Drums", desc: "open hat on the 'and of 4'")
+                    case "hat":
+                        // Only announce the switch back if we were in a named variation
+                        if prevCymbalMode != nil && prevCymbalMode != "hat" {
+                            fireBar(bar, tag: "Drums", desc: "back on hi-hat")
+                        }
+                    default: break
+                    }
+                    prevCymbalMode = mode
+                }
+            }
+        }
+
+        // 4. Track spotlight entrances — fire at bar start when a track re-enters after 4+ silent bars.
+        // Announced at most once per section to avoid repetition.
+        let spotlightTracks: [(Int, String)] = [
+            (kTrackLead1,   "Lead 1"),
+            (kTrackLead2,   "Lead 2"),
+            (kTrackPads,    "Pads"),
+            (kTrackRhythm,  "Rhythm"),
+            (kTrackTexture, "Texture")
+        ]
+        for (trackIdx, trackName) in spotlightTracks {
+            guard trackIdx < trackEvents.count else { continue }
+            var barHasNotes = [Bool](repeating: false, count: totalBars)
+            for ev in trackEvents[trackIdx] {
+                let b = ev.stepIndex / 16
+                if b < totalBars { barHasNotes[b] = true }
+            }
+            var silentStreak = 0
+            var lastAnnouncedBar: Int = -8   // cooldown: don't re-announce within 8 bars
+            for bar in 0..<totalBars {
+                if barHasNotes[bar] {
+                    if silentStreak >= 3 && (bar - lastAnnouncedBar) >= 8 {
+                        fireBar(bar, tag: trackName, desc: "steps into the spotlight")
+                        lastAnnouncedBar = bar
+                    }
+                    silentStreak = 0
+                } else {
+                    silentStreak += 1
+                }
+            }
+        }
+
+        // 5. Bass pattern evolving — fire at bar start of the evolving window.
+        // Checks every 4 bars using a 4-bar pitch-class window. An 8-bar cooldown
+        // prevents over-triggering while still catching mid-song evolution.
+        // Does NOT reset across section boundaries so A→B transitions are detected.
+        if kTrackBass < trackEvents.count {
+            let bassEvents = trackEvents[kTrackBass]
+            // Build pitch-class fingerprint over a 4-bar window starting at `fromBar`
+            func bassFP(fromBar: Int) -> Set<UInt8> {
+                let windowEnd = min(fromBar + 4, totalBars)
+                return Set(bassEvents
+                    .filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }
+                    .map { $0.note % 12 })
+            }
+            // Count distinct notes in a 4-bar window (density signal)
+            func bassCount(fromBar: Int) -> Int {
+                let windowEnd = min(fromBar + 4, totalBars)
+                return bassEvents.filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }.count
+            }
+            var prevFP: Set<UInt8>? = nil
+            var prevCount: Int = 0
+            var lastEvolvedBar: Int = -8
+            for bar in stride(from: 0, to: totalBars, by: 4) {
+                guard let sec = structure.section(atBar: bar),
+                      sec.label == .A || sec.label == .B else { continue }
+                let fp = bassFP(fromBar: bar)
+                let count = bassCount(fromBar: bar)
+                if let prev = prevFP, !fp.isEmpty, !prev.isEmpty,
+                   (bar - lastEvolvedBar) >= 8 {
+                    let union = fp.union(prev).count
+                    let common = fp.intersection(prev).count
+                    let jaccard = union > 0 ? Double(common) / Double(union) : 1.0
+                    // For simple locked patterns (≤2 pitch classes), any new pitch class is
+                    // significant — adding a third note to a two-note riff is a real change.
+                    // For richer patterns, use the standard 0.65 Jaccard threshold.
+                    let newClasses = fp.subtracting(prev)
+                    let pitchChanged = jaccard < 0.65 || (prev.count <= 2 && !newClasses.isEmpty)
+                    // Density change: note count shifts by more than 50%
+                    let densityChanged = prevCount > 0 &&
+                        abs(count - prevCount) > max(1, prevCount / 2)
+                    if pitchChanged || densityChanged {
+                        fireBar(bar, tag: "Bass", desc: "pattern evolving — new motif")
+                        lastEvolvedBar = bar
+                    }
+                }
+                if !fp.isEmpty {
+                    prevFP = fp
+                    prevCount = count
+                }
+            }
+        }
+
+        // 6. Pads and Rhythm pattern changes — compare step-position fingerprints between body sections.
+        // PAD-001 auto-breaks to PAD-007 after 4 bars; Rhythm picks a new rule per section;
+        // fingerprint comparison catches meaningful rhythmic shifts in both tracks.
+        for (patternTrack, patternTag) in [(kTrackPads, "Pads"), (kTrackRhythm, "Rhythm")] {
+            guard patternTrack < trackEvents.count else { continue }
+            let evs = trackEvents[patternTrack]
+            var prevStepFP: Set<Int>? = nil
+            for section in structure.sections {
+                guard section.label == .A || section.label == .B else { prevStepFP = nil; continue }
+                let steps = Set(evs
+                    .filter { let b = $0.stepIndex / 16; return b >= section.startBar && b < section.endBar }
+                    .map { $0.stepIndex % 16 })
+                if let prev = prevStepFP, !steps.isEmpty, !prev.isEmpty {
+                    let union  = steps.union(prev).count
+                    let common = steps.intersection(prev).count
+                    if union > 0 && Double(common) / Double(union) < 0.55 {
+                        fireBar(section.startBar, tag: patternTag, desc: "rhythm pattern changes")
+                    }
+                }
+                if !steps.isEmpty { prevStepFP = steps }
+            }
+        }
+
+        return out
     }
 }
 

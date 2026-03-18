@@ -58,6 +58,10 @@ struct StatusBoxView: View {
                                 if idx > 0 { Divider().padding(.vertical, 3) }
                                 generationSection(song)
                             }
+                            // Live playback annotations — appended during active playback
+                            ForEach(Array(appState.livePlaybackFeed.enumerated()), id: \.offset) { _, entry in
+                                logLine(entry)
+                            }
                         }
 
                         Color.clear.frame(height: 1).id("bottom")
@@ -72,6 +76,11 @@ struct StatusBoxView: View {
                 .background(Color(white: 0.10))
                 .onChange(of: appState.generationHistory.reduce(0) { $0 + $1.generationLog.count }) { _ in
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    }
+                }
+                .onChange(of: appState.livePlaybackFeed.count) { _ in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                     }
                 }
@@ -100,4 +109,5 @@ struct StatusBoxView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
+
 }

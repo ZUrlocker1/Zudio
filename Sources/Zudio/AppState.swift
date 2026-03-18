@@ -31,6 +31,11 @@ final class AppState: ObservableObject {
     @Published var muteState: [Bool] = Array(repeating: false, count: 7)
     @Published var soloState: [Bool] = Array(repeating: false, count: 7)
 
+    // MARK: - Live playback feed (Now Playing strip)
+
+    @Published var livePlaybackFeed: [GenerationLogEntry] = []
+    private var lastEmittedStep: Int = -1
+
     // MARK: - Playback engine
 
     let playback = PlaybackEngine()
@@ -72,18 +77,34 @@ final class AppState: ObservableObject {
                 self.playback.setTempo(bpm)
                 self.songState = self.playback.songState
             }
-            .store(in: &cancellables)
+             .store(in: &cancellables)
 
-        // DAW-style scrolling: advance visible window when playhead hits 85%
+        // DAW-style scrolling + live annotation feed
         playback.$currentStep
             .dropFirst()
-            .receive(on: DispatchQueue.main)
+             .receive(on: DispatchQueue.main)
             .sink { [weak self] step in
                 Task { @MainActor [weak self] in
                     self?.updateDAWScroll(step: step)
+                    self?.emitStepAnnotations(upTo: step)
                 }
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Live annotation feed
+
+    private func emitStepAnnotations(upTo step: Int) {
+        guard step > lastEmittedStep,
+              let annotations = songState?.stepAnnotations else { return }
+        for s in (lastEmittedStep + 1)...step {
+            if let entries = annotations[s] {
+                for entry in entries {
+                    livePlaybackFeed.append(entry)
+                }
+            }
+        }
+        lastEmittedStep = step
     }
 
     // MARK: - DAW Scroll
@@ -115,6 +136,8 @@ final class AppState: ObservableObject {
                 self.generationHistory.append(state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
+                self.livePlaybackFeed = []
+                self.lastEmittedStep  = -1
                 // Reset mute/solo so every new song starts with all parts audible
                 self.muteState = Array(repeating: false, count: 7)
                 self.soloState = Array(repeating: false, count: 7)
@@ -182,6 +205,8 @@ final class AppState: ObservableObject {
 
     func seekTo(step: Int) {
         playback.seek(toStep: step)
+        // Reset annotation pointer so seeks don't re-emit or skip annotations
+        lastEmittedStep = step - 1
         // Recenter visible window on seek position
         let totalBars = songState?.frame.totalBars ?? 32
         let targetBar = step / 16

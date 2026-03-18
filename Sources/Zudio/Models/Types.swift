@@ -212,14 +212,11 @@ let kRegisterBounds: [Int: RegisterBounds] = [
 // MARK: - GM program numbers per track (v1 defaults)
 
 let kDefaultGMPrograms: [Int: UInt8] = [
-    kTrackLead1:   82,  // Saw Wave
-    kTrackLead2:   63,  // Synth Brass 1
-    kTrackPads:    90,  // Warm Pad
-    kTrackRhythm:  29,  // Electric Muted Guitar
-    kTrackTexture: 94,  // Metallic Pad
-    kTrackBass:    39,  // Synth Bass 1
-    kTrackDrums:   0,   // drum kit — bank selected separately
+    kTrackLead1:   63,  // Synth Brass
+    kTrackLead2:   80,  // Square Lead
+    kTrackPads:    89,  // Warm Pad
+    kTrackRhythm:  28,  // Guitar Pulse
+    kTrackTexture: 95,  // Swell
+    kTrackBass:    87,  // Lead Bass
+    kTrackDrums:   8,   // Rock Kit
 ]
-
-// Drum kit bank: Power kit (bank 16) is default for Motorik
-let kDefaultDrumKitBank: UInt8 = 16

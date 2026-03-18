@@ -24,6 +24,9 @@ struct SongState: Sendable {
     let form: SongForm
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
+    /// Live playback annotations keyed by absolute step index. Each entry fires when playback
+    /// reaches that step, giving precise timing (e.g. fills fire 2 beats before the hit).
+    let stepAnnotations: [Int: [GenerationLogEntry]]
 
     // MARK: - Convenience
 
@@ -37,7 +40,7 @@ struct SongState: Sendable {
         SongState(frame: newFrame, structure: structure, tonalMap: tonalMap,
                   trackEvents: trackEvents, globalSeed: globalSeed,
                   trackOverrides: trackOverrides, title: title, form: form,
-                  generationLog: generationLog)
+                  generationLog: generationLog, stepAnnotations: stepAnnotations)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -54,7 +57,7 @@ struct SongState: Sendable {
             frame: frame, structure: structure, tonalMap: tonalMap,
             trackEvents: updated, globalSeed: globalSeed,
             trackOverrides: trackOverrides, title: title, form: form,
-            generationLog: generationLog + extra
+            generationLog: generationLog + extra, stepAnnotations: stepAnnotations
         )
     }
 }
