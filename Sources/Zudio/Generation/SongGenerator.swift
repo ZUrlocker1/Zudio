@@ -10,10 +10,11 @@ struct SongGenerator {
     static func generate(
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil
+        moodOverride: Mood? = nil,
+        testMode: Bool = false
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
-        return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+        return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride, testMode: testMode)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
@@ -21,7 +22,8 @@ struct SongGenerator {
         seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil
+        moodOverride: Mood? = nil,
+        testMode: Bool = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -30,7 +32,8 @@ struct SongGenerator {
             rng: &rng,
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,
-            moodOverride: moodOverride
+            moodOverride: moodOverride,
+            testMode: testMode
         )
 
         // Step 2 — Song structure + chord plan

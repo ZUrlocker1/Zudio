@@ -90,8 +90,27 @@ struct TopBarView: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .overlay(alignment: .bottomTrailing) {
+                    if appState.testModeEnabled {
+                        Text("TEST")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.orange)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                            .padding(4)
+                    }
+                }
+                .onTapGesture { appState.toggleTestMode() }
                 .frame(width: 200, alignment: .center)
                 .padding(.leading, 8)
+                .background {
+                    // Hidden Cmd-T keyboard shortcut for test mode
+                    Button("") { appState.toggleTestMode() }
+                        .keyboardShortcut("t", modifiers: .command)
+                        .hidden()
+                }
 
                 Divider()
 
@@ -252,6 +271,10 @@ struct TopBarView: View {
                 VStack(alignment: .trailing, spacing: 6) {
                     Button("Help")  { showHelp  = true }
                     Button("About") { showAbout = true }
+                    Text("Copyright © 2026 Zack Urlocker")
+                        .font(.callout)
+                        .foregroundStyle(.white)
+                        .padding(.top, 6)
                 }
                 .font(.callout)
                 .padding(.top, 5)      // match controls VStack .padding(.vertical, 5)

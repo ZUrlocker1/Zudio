@@ -44,6 +44,7 @@
 		AA000000000000000000021 /* FirstMouseFix.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000023 /* FirstMouseFix.swift */; };
 		AA00000000000000000001E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
 		AA00000000000000000001F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001F /* assets */; };
+		AA000000000000000000028 /* zudio-icon.icns in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000028 /* zudio-icon.icns */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +85,7 @@
 		BB000000000000000000023 /* FirstMouseFix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstMouseFix.swift; sourceTree = "<group>"; };
 		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		BB00000000000000000001F /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
+		BB000000000000000000028 /* zudio-icon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = "assets/zudio-icon.icns"; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000000000000000000021 /* Zudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -276,6 +278,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA00000000000000000001F /* assets in Resources */,
+				AA000000000000000000028 /* zudio-icon.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

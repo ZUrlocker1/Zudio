@@ -26,6 +26,12 @@ final class AppState: ObservableObject {
     @Published var tempoOverride: Int?    = nil
     @Published var moodOverride:  Mood?   = nil
 
+    // MARK: - Test mode (shorter songs for rapid audition)
+
+    @Published var testModeEnabled: Bool = false
+
+    func toggleTestMode() { testModeEnabled.toggle() }
+
     // MARK: - Per-track UI state
 
     @Published var muteState: [Bool] = Array(repeating: false, count: 7)
@@ -129,7 +135,8 @@ final class AppState: ObservableObject {
             let state = SongGenerator.generate(
                 keyOverride:   await self.keyOverride,
                 tempoOverride: await self.tempoOverride,
-                moodOverride:  await self.moodOverride
+                moodOverride:  await self.moodOverride,
+                testMode:      await self.testModeEnabled
             )
             await MainActor.run {
                 self.songState    = state
