@@ -364,9 +364,16 @@ struct AboutView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
+            HStack(spacing: 4) {
+                Text("Source code available:")
+                    .foregroundStyle(.white)
+                Link("https://github.com/ZUrlocker1/Zudio",
+                     destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
+            }
+            .font(.callout)
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 440, height: 298)
+        .frame(width: 440, height: 316)
     }
 }
