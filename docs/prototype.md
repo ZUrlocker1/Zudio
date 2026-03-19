@@ -175,9 +175,12 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - STR-001: Single-A, STR-002: Subtle A/B, STR-003: Moderate A/B, STR-004: Moderate A/B/A'
   - INT-001: 8-bar intro, INT-002: 16-bar intro
   - OUT-001: 8-bar outro, OUT-002: 16-bar outro
-  - GBL, DRM, BAS, LD1, LD2, TEX: single rule each in v1 (always 001)
-  - PAD: PAD-001 (sustained), PAD-002 (power voicing), PAD-003 (pulsed), PAD-004 (sparse intro/outro)
-  - RHY: RHY-001 (8th pulse), RHY-002 (quarter note), RHY-003 (syncopated Motorik)
+  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-011
+  - LD1: LD1-001 (phrase-first), LD1-002 (pentatonic cell), LD1-003 (long breath), LD1-004 (stepwise sequence), LD1-005 (statement-answer)
+  - LD2: LD2-001 (counter-response), LD2-002 (sustained drone), LD2-003 (rhythmic counter), LD2-004 (Hallogallo motif counter), LD2-005 (descending line)
+  - PAD: PAD-001 (sustained whole-bar), PAD-002 (power/drone voicing), PAD-003 (pulsed 2-bar), PAD-004 (sparse intro/outro), PAD-006 (chord stabs beat 1/3), PAD-007 (Charleston 3+3+2), PAD-010 (half-bar breathe), PAD-011 (backbeat stabs beats 2+4)
+  - RHY: RHY-001 (8th-note stride), RHY-002 (quarter-note stride), RHY-003 (syncopated Motorik 3+3+2), RHY-004 (2-bar melodic riff), RHY-005 (chord stab beats 2+4), RHY-006 (arpeggio — quarter-note legato, 5 direction variants: up, down, up-down bounce, down-up bounce, ping-pong)
+  - TEX: TEX-001 (sparse backbone, always active) + 1–2 supplementary per song: TEX-002 (transition swell), TEX-003 (drone anchor), TEX-004 (shimmer pair), TEX-005 (breath release), TEX-006 (high tension touch)
   - Multiple rules shown when more than one variant is used across chord windows/sections
 
 ## Help and About dialogs (v1)
@@ -205,10 +208,10 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - Default About text:
     - `Zudio`
     - `Generative music Application vibe coded with Claude!`
-    - `Version: 0.5 (alpha)`
-    - `This was built by analyzing Motorik and related songs and developing a set of rules to keep the instruments in sync and playing together. Sometimes it sounds like music!`
-    - `V1: Motorik style only. Instruments using built in MIDI. Effects not implemented.`
-    - `V2: improve musicality, upgrade MIDI instruments, add effects, attempt additional musical styles such as Electronic, Ambient, etc.`
+    - `Version: 0.7 (alpha)`
+    - `This was built by analyzing Motorik and related songs and developing a set of rules to keep the instruments in sync and playing together. Sometimes it even sounds like music!`
+    - `V1: Motorik style only. Instruments using GS MIDI. Effects not implemented.`
+    - `V2: improve musicality, add effects, attempt additional musical styles such as Electronic, Ambient, etc.`
     
 
 ## Track instrument options (v1)
@@ -1164,16 +1167,13 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - After a doubling window, require divergence (call/response or complementary contour) for at least 2 bars.
 - Pads
   - Pad style catalog (one primary style selected per song):
-    - PAD-001 Sustained whole-bar (12%): one chord attack per bar, duration 14 steps (leaves a 2-step visual/sonic gap). After 4 consecutive whole-bar sustained bars, automatically injects a PAD-007 Charleston bar to break monotony, then resets the run counter.
-    - PAD-002 Power/drone voicing (10%): same rhythm as PAD-001 but uses root+fifth+octave voicing (no third) — maximally open and modal. Same 4-bar break rule applies.
-    - PAD-003 Pulsed 2-bar (8%): one chord attack every 2 bars, duration 30 steps. Very sparse — lets the harmonic bed breathe.
-    - PAD-005 Arpeggio (18%): 8th-note cycling through chord tones (8 events per bar). Direction chosen once per song: ascending, descending, or bounce (up then down). Most Motorik-characteristic pad style.
-    - PAD-006 Chord stabs (10%): chord hit on beat 1 (duration 4 steps), with 50% chance of a secondary hit on beat 3 at slightly lower velocity.
-    - PAD-007 Charleston / 3+3+2 (12%): three hits per bar at steps 0, 6, 12 — durations 5, 5, 4 steps. Derived from Silly Love Songs verse rhythm guitar analysis.
-    - PAD-008 8th-note chop (8%): near-every-8th-note staccato hits (steps 0,2,4,6,8,10,12,14, duration 2 each). Low-intensity sections randomly skip some hits. Derived from Hallogallo guitar density analysis.
-    - PAD-009 Quarter pump (10%): locked quarter-note chord hits all four beats. Velocity accented on beats 1 and 3, softer on 2 and 4. Derived from SLS intro rhythm guitar.
-    - PAD-010 Half-bar breathe (8%): chord on beat 1 (duration 7 steps), silence on second half of bar. Creates maximum air and space.
-    - PAD-011 Backbeat stabs (4%): chord hits on beats 2 and 4 only (steps 4 and 12, duration 3). Off-beat emphasis — contrasts all beat-1-anchored patterns. Derived from LA Woman guitar 2 syncopated fill analysis.
+    - PAD-001 Sustained whole-bar (22%): one chord attack per bar, duration 14 steps (leaves a 2-step visual/sonic gap). After 4 consecutive whole-bar sustained bars, automatically injects a PAD-007 Charleston bar to break monotony, then resets the run counter.
+    - PAD-002 Power/drone voicing (17%): same rhythm as PAD-001 but uses root+fifth+octave voicing (no third) — maximally open and modal. Same 4-bar break rule applies.
+    - PAD-003 Pulsed 2-bar (15%): one chord attack every 2 bars, duration 30 steps. Very sparse — lets the harmonic bed breathe.
+    - PAD-006 Chord stabs (14%): chord hit on beat 1 (duration 4 steps), with 50% chance of a secondary hit on beat 3 at slightly lower velocity.
+    - PAD-007 Charleston / 3+3+2 (18%): three hits per bar at steps 0, 6, 12 — durations 5, 5, 4 steps. Derived from Silly Love Songs verse rhythm guitar analysis.
+    - PAD-010 Half-bar breathe (9%): chord on beat 1 (duration 7 steps), silence on second half of bar. Creates maximum air and space.
+    - PAD-011 Backbeat stabs (5%): chord hits on beats 2 and 4 only (steps 4 and 12, duration 3). Off-beat emphasis — contrasts all beat-1-anchored patterns. Derived from LA Woman guitar 2 syncopated fill analysis.
   - PAD-004 Sparse intro/outro always applies on top of the primary style: controls intro/outro skip behavior per bar (see intro style rules).
   - All chord voicings use 4-note open spread in register MIDI 48-84. No thirds below MIDI 60.
   - Writing rules:
@@ -1184,21 +1184,19 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Intro behavior (PAD-004): Progressive Entry — pads skip until the final intro bar. Already Playing — 20% skip per bar throughout intro (low-velocity variation). Cold Start drumsOnly — pads suppress through entire intro. Cold Start bass+drums — 50% skip chance on bars after bar 0.
     - Outro behavior (PAD-004): Fade — 15% skip per bar. Dissolve — pads never skip; they are the final sound. Cold Stop — pads cut on the final outro bar.
 - Texture
-  - Event probabilities:
-    - Event chance per 8 bars: 50%
-    - Event chance at boundary: 80%
+  - TEX-001 is always active as the backbone. 1–2 supplementary rules are selected per song.
+  - Rule catalog:
+    - TEX-001 Sparse (always active): single scale-tension notes weighted toward section boundaries (45% at start/end bars, 5% elsewhere). Register MIDI 72–108.
+    - TEX-002 Transition Swell: sustained root or fifth on beat 1 at section boundaries, duration 24–32 steps, warm mid register (MIDI 60–84). Fires at ~70% of boundary bars.
+    - TEX-003 Drone Anchor: 2-bar root or fifth hold, very low velocity (28–40), fires ~once per 24 bars in body sections only. Register MIDI 60–72.
+    - TEX-004 Shimmer Pair: two notes a major-7th or minor-9th apart, short (4–6 steps), off-beat (step 6 or 10), fires ~once per 10 bars. Evokes the Rother/Roedelius shimmer color.
+    - TEX-005 Breath Release: quiet note (velocity 25–35) on the last step of each section's final bar, 50% probability per section end. Acts as a whisper before the next section.
+    - TEX-006 High Tension Touch: single scale-tension note, off-beat, duration 8–10 steps, fires ~once per 20 bars in body sections only.
   - Writing rules:
-    - Sparse transitions only (swell/noise/tail)
-    - Mostly non-harmonic to avoid tonal clutter
-    - Cadence policy:
-      - Allow repeated texture accents across sections if separated by a short cooldown (typically >=2 bars).
-      - Do not place texture events in every bar; aim for selective punctuation behavior.
-    - Embellishment constraints:
-      - Texture must remain sparser than Rhythm and Lead 2.
-      - If arrangement feels busy, simplify/remove Texture before altering Lead 1.
-    - Intro/outro behavior:
-      - Intro: reserve for low-level swell or filtered noise only.
-      - Outro: highest probability track to remain after rhythmic parts stop.
+    - Texture must remain sparser than Rhythm and Lead 2.
+    - Do not place events in every bar — selective punctuation behavior.
+    - If arrangement feels busy, simplify Texture before altering Lead 1.
+    - Intro/outro: TEX-001 and TEX-005 still fire; TEX-003 and TEX-006 are body-only.
 
 ### Intro/Outro layer order rules
 
@@ -1657,13 +1655,31 @@ PAD-001 - Sustained whole-bar: one attack per bar, duration 14 steps. 4-bar brea
 PAD-002 - Power/drone voicing: root+fifth+octave whole-bar. Same 4-bar break rule applies.
 PAD-003 - Pulsed 2-bar: one attack every 2 bars, duration 30 steps.
 PAD-004 - Sparse intro/outro: controls skip behavior during intro and outro bars (always applied on top of primary style).
-PAD-005 - Arpeggio: 8th notes cycling chord tones. Direction (ascending/descending/bounce) fixed per song.
 PAD-006 - Chord stabs: beat 1 hit (dur 4), 50% chance beat 3 secondary hit at lower velocity.
 PAD-007 - Charleston / 3+3+2: hits at steps 0 (dur 5), 6 (dur 5), 12 (dur 4). From Silly Love Songs verse analysis.
-PAD-008 - 8th-note chop: near-every-8th staccato hits (dur 2 each). Low intensity sections skip some hits randomly.
-PAD-009 - Quarter pump: all 4 beats, velocity accented on 1+3, softer on 2+4. From SLS intro rhythm guitar analysis.
 PAD-010 - Half-bar breathe: chord on beat 1 (dur 7), silence second half. Maximum air.
 PAD-011 - Backbeat stabs: beats 2+4 only (steps 4 and 12, dur 3). Off-beat emphasis. From LA Woman guitar 2 analysis.
+
+### Lead 1 rules
+L1-001 - Use phrase arc: statement -> answer -> development -> cadence over section windows.
+L1-002 - Avoid dense opening lead blocks; first active lead phrase prioritizes space.
+L1-003 - Keep transformed hook identity across sections (rhythm/interval/cadence anchors).
+LD1-001 - Phrase-first: 4-bar v2 starter phrases cycling with slow mutation. Chord tones 80%, scale tensions 20%.
+LD1-002 - Pentatonic Cell: short driving cell from pentatonic scale, locked 16 bars then one-interval mutation.
+LD1-003 - Long Breath: sparse, long sustained notes with generous rests.
+LD1-004 - Stepwise Sequence: descending sequence development (5→4→2→1 bar A, b7→5→4→2 bar B).
+LD1-005 - Statement-Answer: bar A ascends 1→2→b3→5, bar B silent then answers 4→b3. From Hallogallo phrase analysis.
+
+### Lead 2 rules
+L2-001 - Default role is response/counterline at 30-55% of Lead 1 density.
+L2-002 - Lead 2 may temporarily assume Lead 1 role when Lead 1 is absent in a section.
+L2-003 - When Lead 1 returns, Lead 2 transitions back to response role within 1-2 bars.
+L2-004 - Lead 2 may use Hallogallo-derived motif variants as counterline vocabulary.
+LD2-001 - Counter-response: density ≤55% of Lead 1, avoids Lead 1 steps.
+LD2-002 - Sustained Drone: very sparse, long holds on root or 5th.
+LD2-003 - Rhythmic Counter: short bursts offset from Lead 1 rhythm.
+LD2-004 - Hallogallo Motif Counter: 16th-note pairs at steps 0,2,4,6,10,12,14,15. From guitar 2 analysis.
+LD2-005 - Descending Line: off-beat 2-bar arc 6→5→b3→2 with velocity diminuendo.
 
 ### Rhythm rules
 R-001 - Rhythm must stay sparser than drums in most sections.
@@ -1671,22 +1687,23 @@ R-002 - Do not keep identical subdivision density for more than 4 bars.
 R-003 - Maintain 20-45% silence in active rhythm bars.
 R-004 - Allow short local fill gestures near boundaries, then return to sparse pulse role.
 R-005 - Use fast guitar-chug variants (plain, fill, break) as selectable rhythmic vocabulary.
-
-### Lead 1 rules
-L1-001 - Use phrase arc: statement -> answer -> development -> cadence over section windows.
-L1-002 - Avoid dense opening lead blocks; first active lead phrase prioritizes space.
-L1-003 - Keep transformed hook identity across sections (rhythm/interval/cadence anchors).
-
-### Lead 2 rules
-L2-001 - Default role is response/counterline at 30-55% of Lead 1 density.
-L2-002 - Lead 2 may temporarily assume Lead 1 role when Lead 1 is absent in a section.
-L2-003 - When Lead 1 returns, Lead 2 transitions back to response role within 1-2 bars.
-L2-004 - Lead 2 may use Hallogallo-derived motif variants as counterline vocabulary.
+RHY-001 - 8th-note stride: alternating root/fifth/third cycle, active Motorik pulse.
+RHY-002 - Quarter-note stride: root-anchored open quarter notes, spacious feel.
+RHY-003 - Syncopated Motorik: hits at steps 0,3,6,8,11,14 (3+3+2+3+3+2 feel), root/fifth alternation.
+RHY-004 - 2-bar melodic riff: scale-tone riff cycling over 2 bars, quarter-note grid.
+RHY-005 - Chord stab: root+third short hits on beats 2 and 4.
+RHY-006 - Arpeggio: quarter-note legato through chord tones. Direction fixed per song: up, down, up-down bounce, down-up bounce, or ping-pong.
 
 ### Texture rules
 X-001 - Reuse texture accents across sections with cooldown (typically >=2 bars).
 X-002 - Do not place texture events in every bar; use selective punctuation behavior.
 X-003 - Keep texture sparse and boundary-weighted (intro swells, transition accents, tail).
+TEX-001 - Sparse backbone: single scale-tension notes, boundary-weighted (45% at section start/end, 5% mid-section). Always active.
+TEX-002 - Transition Swell: sustained root/fifth at section boundaries, warm register (MIDI 60–84), duration 24–32 steps.
+TEX-003 - Drone Anchor: 2-bar root/fifth hold, very low velocity, ~once per 24 bars, body sections only. Register MIDI 60–72.
+TEX-004 - Shimmer Pair: two notes a major-7th or minor-9th apart, off-beat, short, ~once per 10 bars.
+TEX-005 - Breath Release: quiet note on last step of each section's final bar, 50% probability.
+TEX-006 - High Tension Touch: single scale-tension note, off-beat, ~once per 20 bars, body sections only.
 
 ### Interplay rules for cross-track behavior
 I-001 - Bass-vs-Lead2 conflict priority: keep bass, remap Lead 2 to consonant target, else suppress.
@@ -2037,8 +2054,50 @@ struct SeededRNG {
   - `Evolution Rate`: Slow / Medium / Fast (controls mutation frequency/intensity).
   - `Lock Track`: prevent selected track from mutation across evolution events.
 
+## Audio Effects Research (post-v1 consideration)
+
+Researched 2026-03-18. Decision: use Apple built-in AudioUnits as a first step; evaluate AudioKit later if more exotic effects are needed.
+
+### Option A — Apple built-in AudioUnits (recommended first step)
+
+Available with zero additional dependencies via `AVAudioEngine`. Insert as nodes between the per-track sampler outputs and the main mixer.
+
+- Delay — `kAudioUnitSubType_Delay`
+- Reverb — `kAudioUnitSubType_MatrixReverb`
+- Distortion / crunch — `kAudioUnitSubType_Distortion`
+- Parametric EQ — `kAudioUnitSubType_ParametricEQ`
+
+**Gap**: no chorus, flanger, or phaser in Apple's standard AU set.
+**Integration difficulty**: low — `engine.attach(unit)` + `engine.connect(sampler → unit → mixer)`.
+**License**: Apple proprietary; no restrictions on shipping.
+
+The UI effect chips (Fuzz, Echo, Delay, Space, Reverb, Punch) are already rendered in TrackRowView but currently do nothing. Wiring them to real AU nodes is the planned implementation path.
+
+### Option B — AudioKit (Apache 2.0)
+
+Open-source, SPM-installable. Covers the full set: delay, reverb, echo, distortion, chorus, flanger, phaser.
+
+- Works directly with the existing `AVAudioEngine` graph.
+- Nodes slot between the track mixer and `mainMixerNode`.
+- Apache 2.0 licence — commercial-friendly, no open-source requirement.
+- Adds ~15–20 MB to the binary.
+- Integration difficulty: medium.
+
+Recommended if chorus/flanger/phaser are needed. Can be layered on top of Option A.
+
+### Option C — Soundpipe (MIT, C)
+
+A single-header C library (~20 KB). Covers delay, reverb, distortion, chorus, phaser. Requires a Swift bridging header. Smallest binary footprint but most manual work. Use only if binary size is a constraint and AudioKit is too heavy.
+
+### Not recommended
+
+- **JUCE**: GPL v3 — requires open-sourcing the app unless a commercial licence is purchased.
+- **STK (Stanford)**: BSD, but C++ interop overhead and academic-focus limited feature set.
+
+---
+
 ## Open questions
 
-- ~~Should style be a single selector (Motorik, Cosmic, Ambient) or a blend slider?~~ Resolved: single selector for v1, locked to Motorik. Blend sliders are post-v1.
-- ~~Should lead generation be optional by default for more sparse ambient output?~~ Resolved: Lead 1 and Lead 2 are always generated in v1. The user can mute individual tracks after generation if a sparser result is wanted. Making lead generation optional by default adds UI state complexity that is out of scope for v1.
-- ~~Should each track permit independent length/polymeter, or all parts share one loop length in v1?~~ Resolved: all tracks share one loop length in v1. No polymeter.
+- Resolved: single selector for v1, locked to Motorik. Blend sliders are post-v1. Later add Cosmic and Ambient
+- Resolved: Lead 1 and Lead 2 are always generated in v1. The user can mute individual tracks after generation if a sparser result is wanted. Making lead generation optional by default adds UI state complexity that is out of scope for v1.
+- Resolved: all tracks share one loop length in v1. No polymeter.

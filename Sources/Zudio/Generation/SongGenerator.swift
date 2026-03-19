@@ -74,7 +74,8 @@ struct SongGenerator {
         trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules)
 
         // Step 9 — Texture
-        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG)
+        var texRules: Set<String> = []
+        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules)
 
         // Step 10 — Collision / density simplification pass
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
@@ -107,7 +108,7 @@ struct SongGenerator {
             title: title, frame: frame, structure: structure, form: form,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules
+            rhythmRules: rhythmRules, texRules: texRules
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules)
@@ -161,7 +162,7 @@ struct SongGenerator {
         case kTrackRhythm:
             events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
         case kTrackTexture:
-            events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng)
+            events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
         default:
             return songState
         }
@@ -193,8 +194,9 @@ struct SongGenerator {
         case kTrackPads:    return padRuleDescription(ruleID)
         case kTrackLead1:   return lead1RuleDescription(ruleID)
         case kTrackLead2:   return lead2RuleDescription(ruleID)
-        case kTrackRhythm:  return rhythmRuleDescription(ruleID)
-        default:            return ruleID
+        case kTrackRhythm:   return rhythmRuleDescription(ruleID)
+        case kTrackTexture:  return textureRuleDescription(ruleID)
+        default:             return ruleID
         }
     }
 
@@ -210,7 +212,8 @@ struct SongGenerator {
         padRules: Set<String>,
         lead1Rules: Set<String>,
         lead2Rules: Set<String>,
-        rhythmRules: Set<String>
+        rhythmRules: Set<String>,
+        texRules: Set<String>
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -299,9 +302,14 @@ struct SongGenerator {
                 description: "8th-note ostinato, alternating root/fifth"))
         }
 
-        // Texture — single rule in v1
-        log.append(GenerationLogEntry(tag: "TEX-001",
-            description: "Boundary-weighted sparse atmosphere, scale tensions"))
+        // Texture
+        for ruleID in texRules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: textureRuleDescription(ruleID)))
+        }
+        if texRules.isEmpty {
+            log.append(GenerationLogEntry(tag: "TEX-001",
+                description: "Boundary-weighted sparse atmosphere, scale tensions"))
+        }
 
         return log
     }
@@ -458,9 +466,24 @@ struct SongGenerator {
 
     private static func rhythmRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "RHY-001": return "8th-note ostinato, alternating root/fifth per chord"
-        case "RHY-002": return "Quarter-note ostinato, root-anchored"
+        case "RHY-001": return "8th-note stride — root/fifth/third cycle, active Motorik pulse"
+        case "RHY-002": return "Quarter-note stride — root-anchored, open and spacious"
         case "RHY-003": return "Syncopated Motorik (3+3+2 feel), root/fifth alternation"
+        case "RHY-004": return "2-bar melodic riff — scale-tone riff cycling over 2 bars"
+        case "RHY-005": return "Chord stab — root+third short hits on beats 2 and 4"
+        case "RHY-006": return "Arpeggio — quarter-note legato, chord tones in chosen direction"
+        default:        return ruleID
+        }
+    }
+
+    private static func textureRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "TEX-001": return "Sparse — boundary-weighted scale-tension notes"
+        case "TEX-002": return "Transition Swell — sustained root/fifth at section boundaries"
+        case "TEX-003": return "Drone Anchor — 2-bar root/fifth hold, very quiet, body sections"
+        case "TEX-004": return "Shimmer Pair — maj-7/min-9 interval off-beat touch, ~once per 10 bars"
+        case "TEX-005": return "Breath Release — whisper note on last step of each section"
+        case "TEX-006": return "High Tension Touch — scale-tension note, off-beat, ~once per 20 bars"
         default:        return ruleID
         }
     }

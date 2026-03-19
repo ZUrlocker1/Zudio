@@ -7,18 +7,12 @@
 //   PAD-002: Power/drone voicing (root+fifth+octave) whole-bar, same break rule.
 //   PAD-003: Pulsed — one attack every 2 bars (durationSteps: 30)
 //   PAD-004: Sparse intro/outro (50% skip)
-//   PAD-005: Arpeggio — 8th notes cycling through chord tones
-//            Direction variant chosen per song: ascending, descending, or bounce (up-down)
 //   PAD-006: Chord stabs — beat 1 (dur 4), sometimes beat 3 (dur 4)
-//   PAD-007: Charleston rhythm (from Silly Love Songs verse analysis):
-//            3+3+2 feel — hits at steps 0, 6, 12 with durations 5, 5, 4
-//   PAD-008: 16th-note chop (from Hallogallo Guitar analysis):
-//            Near-every-16th staccato: steps 0-2, 4-6, 8-14 (duration 1 each)
-//   PAD-009: Quarter pump (from SLS intro rhythm guitar):
-//            Locked quarter-note chord hits, all 4 beats, vel-accented on 1+3
-//   PAD-010: Half-bar breathe — chord on beat 1 (dur 7), silence second half; creates air
-//   PAD-011: Backbeat stabs (from LA Woman guitar 2 syncopated fills):
-//            Chord hits on beats 2+4 only (steps 4, 12 dur 3); off-beat emphasis
+//   PAD-007: Charleston rhythm — 3+3+2 feel, hits at steps 0, 6, 12
+//   PAD-010: Half-bar breathe — chord on beat 1 (dur 7), silence second half
+//   PAD-011: Backbeat stabs — chord hits on beats 2+4 only (steps 4, 12 dur 3)
+//
+// Note: arpeggios moved to RhythmGenerator (RHY-006) — pads are purely atmospheric.
 
 struct PadsGenerator {
     static func generate(
@@ -30,20 +24,18 @@ struct PadsGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
-        // Weighted style selection — arpeggio and Charleston weighted highest (most Motorik)
-        let padRules:    [String] = ["PAD-001","PAD-002","PAD-003","PAD-005","PAD-006",
-                                     "PAD-007","PAD-008","PAD-009","PAD-010","PAD-011"]
-        let padWeights:  [Double] = [0.12,     0.10,     0.08,     0.18,     0.10,
-                                     0.12,     0.08,     0.10,     0.08,     0.04]
+        // Weighted style selection — all rules are atmospheric/harmonic
+        let padRules:   [String] = ["PAD-001","PAD-002","PAD-003","PAD-006",
+                                    "PAD-007","PAD-010","PAD-011"]
+        let padWeights: [Double] = [0.22,     0.17,     0.15,     0.14,
+                                    0.18,     0.09,     0.05]
         let primaryRule = padRules[rng.weightedPick(padWeights)]
         usedRuleIDs.insert(primaryRule)
         usedRuleIDs.insert("PAD-004")  // sparse intro/outro always applies
 
-        // Arpeggio direction: 0=up, 1=down, 2=bounce
-        let arpDirection = rng.nextInt(upperBound: 3)
-
         let totalBars = frame.totalBars
-        var sustainRunBars = 0  // tracks consecutive whole-note bars for 4-bar rule
+        var sustainRunBars = 0   // tracks consecutive whole-note bars for 4-bar break rule
+        var prevRootMIDI: Int? = nil  // voice-leading anchor across bar lines
 
         for bar in 0..<totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
@@ -54,16 +46,11 @@ struct PadsGenerator {
                 let isFirstBar = bar == (structure.introSection?.startBar ?? bar)
                 switch structure.introStyle {
                 case .alreadyPlaying:
-                    // Pads present from bar 1 at low velocity (20% skip for variation)
                     if rng.nextDouble() < 0.20 { sustainRunBars = 0; continue }
                 case .progressiveEntry:
-                    // Pads only in the final intro bar — build up saved for the body entrance
                     let isLastBar = bar == (structure.introSection?.endBar ?? bar + 1) - 1
                     if !isLastBar { sustainRunBars = 0; continue }
                 case .coldStart(let drumsOnly):
-                    // Bar 0 is always silent (drums-only pickup or bass+drums pickup).
-                    // drumsOnly: keep pads out for the full intro so the first-beat arrival is dramatic.
-                    // Not drumsOnly: 50% skip on bars 1+ for some air.
                     if isFirstBar { sustainRunBars = 0; continue }
                     if drumsOnly { sustainRunBars = 0; continue }
                     if rng.nextDouble() < 0.50 { sustainRunBars = 0; continue }
@@ -72,19 +59,20 @@ struct PadsGenerator {
                 let isLastBar = bar == (structure.outroSection?.endBar ?? bar + 1) - 1
                 switch structure.outroStyle {
                 case .fade:
-                    // Pads throughout, rarely skipped — they fade with everything else
                     if rng.nextDouble() < 0.15 { sustainRunBars = 0; continue }
                 case .dissolve:
-                    break  // Pads never skip in dissolve — they are the final sound
+                    break
                 case .coldStop:
-                    // Pads cut on the final bar (drum fill plays alone)
                     if isLastBar { sustainRunBars = 0; continue }
                     if rng.nextDouble() < 0.20 { sustainRunBars = 0; continue }
                 }
             }
 
             let stepIdx = bar * 16
-            let voicing = buildVoicing(chordWindow: cw, frame: frame, usePower: primaryRule == "PAD-002")
+            let voicing = buildVoicing(chordWindow: cw, frame: frame,
+                                       usePower: primaryRule == "PAD-002",
+                                       prevRootMIDI: prevRootMIDI)
+            if let first = voicing.first { prevRootMIDI = Int(first) }
 
             let velocity: UInt8
             switch section.intensity {
@@ -96,7 +84,7 @@ struct PadsGenerator {
             // 4-bar rule: after 4 consecutive sustained bars, inject a Charleston bar
             let activePrimary: String
             if (primaryRule == "PAD-001" || primaryRule == "PAD-002") && sustainRunBars >= 4 {
-                activePrimary = "PAD-007"  // break the monotony
+                activePrimary = "PAD-007"
                 usedRuleIDs.insert("PAD-007")
                 sustainRunBars = 0
             } else {
@@ -122,16 +110,6 @@ struct PadsGenerator {
                     }
                 }
 
-            // MARK: Arpeggio (up / down / bounce)
-            case "PAD-005":
-                let arpNotes = buildArpNotes(chordWindow: cw, frame: frame, direction: arpDirection)
-                guard !arpNotes.isEmpty else { break }
-                for i in 0..<8 {   // 8 eighth-notes per bar
-                    let note = arpNotes[i % arpNotes.count]
-                    events.append(MIDIEvent(stepIndex: stepIdx + i * 2, note: note,
-                                            velocity: velocity, durationSteps: 2))
-                }
-
             // MARK: Chord stabs (beat 1 + sometimes beat 3)
             case "PAD-006":
                 for note in voicing {
@@ -146,52 +124,25 @@ struct PadsGenerator {
                     }
                 }
 
-            // MARK: Charleston / 3+3+2 (Silly Love Songs verse pattern)
+            // MARK: Charleston / 3+3+2
             // Hits at steps 0, 6, 12 — dotted-quarter, dotted-quarter, quarter
             case "PAD-007":
                 sustainRunBars = 0
-                let charlstonHits: [(Int, Int)] = [(0, 5), (6, 5), (12, 4)]
-                for (offset, dur) in charlstonHits {
+                for (offset, dur) in [(0, 5), (6, 5), (12, 4)] {
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: stepIdx + offset, note: note,
                                                 velocity: velocity, durationSteps: dur))
                     }
                 }
 
-            // MARK: 8th-note chop (Hallogallo guitar density — minimum 8th note per pad rule)
-            // Hits on every 8th note (steps 0,2,4,6,8,10,12,14), duration 2 (8th note minimum)
-            case "PAD-008":
-                for i in 0..<8 {
-                    let offset = i * 2
-                    let skipChance: Double = section.intensity == .low ? 0.25 : 0.0
-                    guard rng.nextDouble() >= skipChance else { continue }
-                    let vel8 = UInt8(max(40, Int(velocity) - rng.nextInt(upperBound: 20)))
-                    for note in voicing {
-                        events.append(MIDIEvent(stepIndex: stepIdx + offset, note: note,
-                                                velocity: vel8, durationSteps: 2))
-                    }
-                }
-
-            // MARK: Quarter pump (SLS intro rhythm guitar — locked quarters, all 4 beats)
-            case "PAD-009":
-                let qtVels: [UInt8] = [88, 70, 82, 66]   // accented on 1+3, softer 2+4
-                for (i, beat) in [0, 4, 8, 12].enumerated() {
-                    let v = UInt8(clamped(Int(qtVels[i]) + (Int(velocity) - 72), low: 40, high: 110))
-                    for note in voicing {
-                        events.append(MIDIEvent(stepIndex: stepIdx + beat, note: note,
-                                                velocity: v, durationSteps: 3))
-                    }
-                }
-
-            // MARK: Half-bar breathe — chord on beat 1, long sustain, silence second half
+            // MARK: Half-bar breathe — chord on beat 1, silence second half
             case "PAD-010":
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
                                             velocity: velocity, durationSteps: 7))
                 }
 
-            // MARK: Backbeat stabs (LA Woman guitar 2 syncopated fill pattern)
-            // Off-beat emphasis: beats 2+4 only — contrasts all beat-1-anchored patterns
+            // MARK: Backbeat stabs — beats 2+4 only
             case "PAD-011":
                 let bbVel = UInt8(clamped(Int(velocity) - 8, low: 40, high: 110))
                 for step in [4, 12] {
@@ -212,10 +163,11 @@ struct PadsGenerator {
     // MARK: - Voicing builder
 
     private static func buildVoicing(
-        chordWindow: ChordWindow, frame: GlobalMusicalFrame, usePower: Bool
+        chordWindow: ChordWindow, frame: GlobalMusicalFrame, usePower: Bool,
+        prevRootMIDI: Int? = nil
     ) -> [UInt8] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(chordWindow.chordRoot)) % 12
-        let rootMIDI = nearestMIDI(pc: rootPC, target: 54)
+        let rootMIDI = nearestMIDI(pc: rootPC, target: prevRootMIDI ?? 54)
 
         if usePower {
             return [rootMIDI, rootMIDI + 7, rootMIDI + 12]
@@ -236,54 +188,6 @@ struct PadsGenerator {
         }
 
         return offsets.map { UInt8(clamped(rootMIDI + $0, low: 48, high: 84)) }
-    }
-
-    // MARK: - Arpeggio builder
-
-    /// Builds ordered MIDI note sequence from chord tones in range 48–84.
-    /// direction: 0=ascending, 1=descending, 2=bounce (up then down, alternating)
-    private static func buildArpNotes(
-        chordWindow: ChordWindow, frame: GlobalMusicalFrame, direction: Int
-    ) -> [UInt8] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(chordWindow.chordRoot)) % 12
-
-        let chordIntervals: [Int]
-        switch chordWindow.chordType {
-        case .major:   chordIntervals = [0, 4, 7]
-        case .minor:   chordIntervals = [0, 3, 7]
-        case .sus2:    chordIntervals = [0, 2, 7]
-        case .sus4:    chordIntervals = [0, 5, 7]
-        case .dom7:    chordIntervals = [0, 4, 7, 10]
-        case .min7:    chordIntervals = [0, 3, 7, 10]
-        case .add9:    chordIntervals = [0, 4, 7, 14]
-        case .quartal: chordIntervals = [0, 5, 10]
-        case .power:   chordIntervals = [0, 7, 12]
-        }
-
-        // Collect all MIDI notes in range from chord-tone PCs
-        var ascending: [UInt8] = []
-        for octave in 4...7 {
-            for interval in chordIntervals {
-                let pc = (rootPC + interval) % 12
-                let midi = octave * 12 + pc
-                if midi >= 48 && midi <= 84 { ascending.append(UInt8(midi)) }
-            }
-        }
-        ascending.sort()
-        guard !ascending.isEmpty else { return ascending }
-
-        switch direction {
-        case 0: return ascending
-        case 1: return ascending.reversed()
-        default:
-            // Bounce: ascending then descending (without repeating top/bottom)
-            var bounce = ascending
-            if ascending.count > 1 {
-                let inner = Array(ascending.dropFirst().dropLast().reversed())
-                bounce += inner
-            }
-            return bounce
-        }
     }
 
     // MARK: - Helpers

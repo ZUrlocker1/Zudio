@@ -9,12 +9,14 @@ final class StepScheduler {
     private var timer: DispatchSourceTimer?
     private var currentStep: Int = 0
     private let totalSteps: Int
+    private let schedulerID: Int
 
-    init(engine: PlaybackEngine, songState: SongState, startStep: Int = 0) {
+    init(engine: PlaybackEngine, songState: SongState, startStep: Int = 0, schedulerID: Int = 0) {
         self.engine       = engine
         self.songState    = songState
         self.totalSteps   = songState.frame.totalBars * 16
         self.currentStep  = max(0, startStep)
+        self.schedulerID  = schedulerID
     }
 
     func start() {
@@ -40,7 +42,7 @@ final class StepScheduler {
             engine.onSongEnd()
             return
         }
-        engine.onStep(step, bar: step / 16)
+        engine.onStep(step, bar: step / 16, schedulerID: schedulerID)
         currentStep += 1
     }
 }

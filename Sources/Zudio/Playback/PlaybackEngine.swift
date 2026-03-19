@@ -13,14 +13,21 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Audio graph
 
-    private let engine   = AVAudioEngine()
-    private var samplers = [AVAudioUnitSampler]()
-    private let mixer    = AVAudioMixerNode()
+    private let engine      = AVAudioEngine()
+    private var samplers    = [AVAudioUnitSampler]()
+    private var distortions = [AVAudioUnitDistortion]()
+    private var delays      = [AVAudioUnitDelay]()
+    private var reverbs     = [AVAudioUnitReverb]()
+    private let mixer       = AVAudioMixerNode()
     private var scheduler: StepScheduler?
 
     // MARK: - Song state
 
     private(set) var songState: SongState?
+
+    // Incremented each time a new scheduler starts. onStep tasks check this to
+    // reject stale callbacks queued before a stop/seek/generate.
+    private var currentSchedulerID: Int = 0
 
     // Mute/solo state indexed by trackIndex
     var muteState: [Bool] = Array(repeating: false, count: 7) {
@@ -48,7 +55,8 @@ final class PlaybackEngine: ObservableObject {
         guard !isPlaying, let state = songState else { return }
         // Resume from current playhead position (currentStep already set correctly)
         isPlaying = true
-        let sched = StepScheduler(engine: self, songState: state, startStep: currentStep)
+        currentSchedulerID += 1
+        let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
     }
@@ -63,9 +71,10 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
 
-    nonisolated func onStep(_ step: Int, bar: Int) {
+    nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
         Task { @MainActor [weak self] in
-            guard let self, let state = self.songState, self.isPlaying else { return }
+            guard let self, self.isPlaying, self.currentSchedulerID == schedulerID,
+                  let state = self.songState else { return }
             self.currentStep = step
             self.currentBar  = bar
 
@@ -111,7 +120,8 @@ final class PlaybackEngine: ObservableObject {
             allNotesOff()
             currentStep = clampedStep
             currentBar  = clampedStep / 16
-            let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep)
+            currentSchedulerID += 1
+            let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
             scheduler = sched
             sched.start()
         } else {
@@ -132,7 +142,8 @@ final class PlaybackEngine: ObservableObject {
         scheduler?.stop()
         scheduler = nil
         allNotesOff()
-        let sched = StepScheduler(engine: self, songState: songState!, startStep: currentStep)
+        currentSchedulerID += 1
+        let sched = StepScheduler(engine: self, songState: songState!, startStep: currentStep, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
     }
@@ -146,6 +157,20 @@ final class PlaybackEngine: ObservableObject {
         try? samplers[trackIndex].loadSoundBankInstrument(
             at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
         )
+    }
+
+    // MARK: - Per-track effect toggle
+
+    func setEffect(_ effect: TrackEffect, enabled: Bool, forTrack trackIndex: Int) {
+        guard trackIndex < samplers.count else { return }
+        switch effect {
+        case .boost:
+            distortions[trackIndex].wetDryMix = enabled ? 65 : 0
+        case .delay:
+            delays[trackIndex].wetDryMix = enabled ? 40 : 0
+        case .reverb:
+            reverbs[trackIndex].wetDryMix = enabled ? 50 : 0
+        }
     }
 
     // MARK: - All-notes-off (used by stop())
@@ -165,11 +190,42 @@ final class PlaybackEngine: ObservableObject {
         engine.attach(mixer)
         engine.connect(mixer, to: engine.mainMixerNode, format: nil)
 
-        for i in 0..<7 {
+        for _ in 0..<7 {
             let sampler = AVAudioUnitSampler()
+            let dist    = AVAudioUnitDistortion()
+            let delay   = AVAudioUnitDelay()
+            let reverb  = AVAudioUnitReverb()
+
+            // Boost: cubic waveshaping with positive preGain — clean boost + crunch
+            dist.loadFactoryPreset(.multiDistortedCubed)
+            dist.preGain    = 8   // drives signal into waveshaper for crunch and volume lift
+            dist.wetDryMix  = 0   // off by default
+
+            // Delay: 16th-note echo with moderate feedback
+            delay.delayTime     = 0.125  // 16th note at ~120 BPM
+            delay.feedback      = 40
+            delay.lowPassCutoff = 6000   // tame harsh distortion harmonics
+            delay.wetDryMix     = 0  // off by default
+
+            // Reverb: large chamber for obvious spaciousness
+            reverb.loadFactoryPreset(.largeChamber)
+            reverb.wetDryMix = 0  // off by default
+
             engine.attach(sampler)
-            engine.connect(sampler, to: mixer, format: nil)
+            engine.attach(dist)
+            engine.attach(delay)
+            engine.attach(reverb)
+
+            // Chain: sampler → boost → delay → reverb → mixer
+            engine.connect(sampler, to: dist,  format: nil)
+            engine.connect(dist,    to: delay, format: nil)
+            engine.connect(delay,   to: reverb, format: nil)
+            engine.connect(reverb,  to: mixer, format: nil)
+
             samplers.append(sampler)
+            distortions.append(dist)
+            delays.append(delay)
+            reverbs.append(reverb)
         }
         loadGMPrograms()
     }

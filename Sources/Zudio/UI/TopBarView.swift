@@ -332,7 +332,7 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.6 (alpha)").font(.callout)
+                Text("Version: 0.7 (alpha)").font(.callout)
                 Text("Built by analyzing classic Motorik songs as well as other works. Then a set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music!").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1: Motorik style only. Instruments using GS MIDI. Effects not implemented.").font(.callout)

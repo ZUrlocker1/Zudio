@@ -15,6 +15,14 @@ let kTrackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Dru
 // MIDI channel per track (Drums must be channel 9 for GM)
 let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9]
 
+// MARK: - Track effects
+
+enum TrackEffect: String, CaseIterable {
+    case boost = "Boost"
+    case delay      = "Delay"
+    case reverb     = "Reverb"
+}
+
 // MARK: - Musical enumerations
 
 enum Mode: String, CaseIterable, Codable, Sendable {
@@ -234,7 +242,7 @@ let kRegisterBounds: [Int: RegisterBounds] = [
 // MARK: - GM program numbers per track (v1 defaults)
 
 let kDefaultGMPrograms: [Int: UInt8] = [
-    kTrackLead1:   63,  // Synth Brass
+    kTrackLead1:   80,  // Square Lead
     kTrackLead2:   80,  // Square Lead
     kTrackPads:    89,  // Warm Pad
     kTrackRhythm:  28,  // Guitar Pulse

@@ -310,6 +310,10 @@ final class AppState: ObservableObject {
         playback.setProgram(program, forTrack: trackIndex)
     }
 
+    func setEffect(_ effect: TrackEffect, enabled: Bool, forTrack trackIndex: Int) {
+        playback.setEffect(effect, enabled: enabled, forTrack: trackIndex)
+    }
+
     // MARK: - Mute / Solo
 
     func toggleMute(_ trackIndex: Int) {
