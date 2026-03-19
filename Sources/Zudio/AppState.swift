@@ -77,7 +77,7 @@ final class AppState: ObservableObject {
                 self.playback.setTempo(bpm)
                 self.songState = self.playback.songState
             }
-             .store(in: &cancellables)
+                .store(in: &cancellables)
 
         // DAW-style scrolling + live annotation feed
         playback.$currentStep

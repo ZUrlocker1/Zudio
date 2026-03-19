@@ -26,10 +26,10 @@ struct TrackRowView: View {
     private var instruments: [Instrument] {
         switch trackIndex {
         case kTrackLead1:
-            return [.init(name:"Square Lead",      program:80), .init(name:"Synth Brass",    program:63),
-                    .init(name:"Synth Brass 2",    program:62), .init(name:"Sawtooth Lead",  program:81),
-                    .init(name:"Fifths Lead",      program:86), .init(name:"Moog Lead",      program:39),
-                    .init(name:"Overdrive Gtr",    program:29), .init(name:"Flute",          program:82)]
+            return [.init(name:"Square Lead",      program:80), .init(name:"Mono Synth",      program:81),
+                    .init(name:"Synth Brass",      program:63), .init(name:"Synth Brass 2",   program:62),
+                    .init(name:"Fifths Lead",      program:86), .init(name:"Moog Lead",        program:39),
+                    .init(name:"Overdrive Gtr",    program:29), .init(name:"Flute",            program:82)]
         case kTrackLead2:
             return [.init(name:"Brightness",     program:100), .init(name:"Vibraphone",      program:11),
                     .init(name:"Marimba",          program:12), .init(name:"Bell/Pluck",      program:14),
@@ -41,8 +41,9 @@ struct TrackRowView: View {
                     .init(name:"String Pad",      program:48), .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
             return [.init(name:"Guitar Pulse",     program:28), .init(name:"Wurlitzer",         program:5),
-                    .init(name:"Rock Organ",        program:18), .init(name:"Tremolo Strings",   program:44),
-                    .init(name:"Pizzicato Strings", program:45), .init(name:"Mono Synth",        program:80)]
+                    .init(name:"Rock Organ",        program:18), .init(name:"Clavinet",          program:7),
+                    .init(name:"Electric Piano",    program:4),  .init(name:"Muted Guitar",      program:29),
+                    .init(name:"Tremolo Strings",   program:44), .init(name:"Mono Synth",        program:80)]
         case kTrackTexture:
             return [.init(name:"Halo Pad",        program:94), .init(name:"Warm Pad",        program:89),
                     .init(name:"Space Voice",      program:91), .init(name:"Swell",           program:95),
@@ -67,7 +68,7 @@ struct TrackRowView: View {
     var body: some View {
         HStack(spacing: 0) {
 
-            // Left + MIDI — track-color tinted zone
+            // Left + MIDI zone
             HStack(spacing: 0) {
 
                 // Left controls panel
@@ -117,7 +118,11 @@ struct TrackRowView: View {
                             .buttonStyle(ToggleChipStyle(active: isSolo, activeColor: .yellow))
                             .help("Solo")
 
-                        Button { appState.regenerateTrack(trackIndex) } label: {
+                        Button {
+                            instrumentIndex = Int.random(in: 0..<instruments.count)
+                            appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
+                            appState.regenerateTrack(trackIndex)
+                        } label: {
                             Image(systemName: "bolt.fill")
                                 .font(.system(size: 11))
                         }
@@ -145,11 +150,9 @@ struct TrackRowView: View {
                 .frame(height: 63)
                 .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
             }
-            .background(trackColor.opacity(0.07))
-
-            // Right effects column — always grey, no track color
+            // Right effects column
             HStack(spacing: 4) {
-                ForEach(TrackEffect.allCases, id: \.self) { fx in
+                ForEach(trackEffects, id: \.self) { fx in
                     let isOn = activeEffects.contains(fx.rawValue)
                     Button {
                         let nowOn = !isOn
@@ -165,22 +168,38 @@ struct TrackRowView: View {
             .frame(width: 152)
             .frame(maxHeight: .infinity)
             .padding(.horizontal, 6)
-            .background(Color(white: 0.18))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .frame(height: 63)
         .padding(.horizontal, 8)
-        .padding(.vertical, 1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color(white: 0.28))
+                .frame(height: 1)
+        }
         .onAppear { applyDefaultEffects() }
     }
 
     // MARK: - Helpers
+
+    // Per-track effect subset — exactly 3 per track
+    private var trackEffects: [TrackEffect] {
+        switch trackIndex {
+        case kTrackLead1:              return [.boost, .delay, .tremolo]
+        case kTrackLead2:              return [.boost, .delay, .reverb]
+        case kTrackPads:               return [.sweep, .delay, .space]
+        case kTrackTexture:            return [.pan, .delay, .reverb]
+        case kTrackBass:               return [.lowShelf, .delay, .reverb]
+        case kTrackDrums:              return [.compression, .delay, .reverb]
+        default:                       return [.boost, .delay, .reverb]  // Rhythm
+        }
+    }
 
     private func cycleInstrument(by delta: Int) {
         instrumentIndex = (instrumentIndex + delta + instruments.count) % instruments.count
         appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
     }
 
-    private static let effectActiveColor = Color(red: 0.50, green: 0.78, blue: 1.0) // light blue
+    private static let effectActiveColor = Color(red: 0.18, green: 0.42, blue: 0.78) // dark blue
 
     private func effectChip(_ fx: TrackEffect, active: Bool) -> some View {
         Text(fx.rawValue)
@@ -188,7 +207,7 @@ struct TrackRowView: View {
             .frame(width: 44, height: 20)
             .background(active ? Self.effectActiveColor : Color(white: 0.28))
             .clipShape(RoundedRectangle(cornerRadius: 4))
-            .foregroundStyle(active ? Color.black : Color(white: 0.55))
+            .foregroundStyle(Color.white)
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(active ? Self.effectActiveColor.opacity(0.7) : Color(white: 0.36), lineWidth: 1)
@@ -197,10 +216,11 @@ struct TrackRowView: View {
 
     private func applyDefaultEffects() {
         let defaults: [TrackEffect] = switch trackIndex {
-        case kTrackPads:    [.reverb]
-        case kTrackTexture: [.reverb]
-        case kTrackRhythm:  [.delay]
         case kTrackLead1:   [.delay]
+        case kTrackRhythm:  [.delay]
+        case kTrackPads:    [.space]
+        case kTrackTexture: [.pan]
+        case kTrackDrums:   []
         default:            []
         }
         for fx in defaults {

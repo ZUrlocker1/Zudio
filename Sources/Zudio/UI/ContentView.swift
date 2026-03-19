@@ -84,6 +84,7 @@ struct ContentView: View {
                     )
                 }
             }
+            .background(Color(white: 0.18))   // single slab behind all rows — eliminates inter-row seams
             .padding(.top, 2)
             .layoutPriority(1)   // shrinks after status box, before top bar
             .overlay {

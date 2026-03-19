@@ -80,9 +80,9 @@ struct MusicalFrameGenerator {
         return families[rng.weightedPick(weights)]
     }
 
-    /// Triangular distribution: min=210s, peak=285s, max=390s (spec §totalBars).
+    /// Triangular distribution: min=150s, peak=210s, max=270s → mostly 3-4 min songs.
     private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
-        let minS: Double = 210, peakS: Double = 285, maxS: Double = 390
+        let minS: Double = 150, peakS: Double = 210, maxS: Double = 270
         let r = rng.nextDouble()
         let fc = (peakS - minS) / (maxS - minS)
         let secs: Double

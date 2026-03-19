@@ -18,9 +18,15 @@ let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9]
 // MARK: - Track effects
 
 enum TrackEffect: String, CaseIterable {
-    case boost = "Boost"
-    case delay      = "Delay"
-    case reverb     = "Reverb"
+    case boost       = "Boost"
+    case delay       = "Delay"
+    case reverb      = "Reverb"
+    case tremolo     = "Trem"
+    case compression = "Comp"
+    case lowShelf    = "Low"
+    case sweep       = "Sweep"   // LFO-driven low-pass filter sweep
+    case pan         = "Pan"     // LFO-driven auto-pan
+    case space       = "Space"   // Cathedral reverb (Pads-specific label)
 }
 
 // MARK: - Musical enumerations
