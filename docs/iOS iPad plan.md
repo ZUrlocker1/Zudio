@@ -279,22 +279,84 @@ On iOS, brief haptic feedback on Generate completion and Play/Stop would improve
 
 ---
 
-## Part 12: Implementation Order (When Work Begins)
+## Part 12: Implementation Strategy — Why iPad First
 
-The recommended sequence minimizes risk by getting a buildable iOS target first, then improving the UI progressively:
+### The Right Approach: iPad + iPhone Landscape Before Portrait
 
-1. **Add iOS target to Package.swift** — first step; establishes the build target
-2. **Fix AppKit imports** — wrap in `#if os(macOS)` so the app compiles on iOS at all
-3. **Add AVAudioSession setup** — without this, no sound on iOS
-4. **Fix file export path** — without this, Save MIDI crashes on iOS
-5. **Test on iPad first** — the regular-width layout is closest to Mac; validate audio + generation work
-6. **Compress regular-width layout** for iPad (reduce fixed pixel widths)
-7. **Build compact-width layout** — the iPhone track row redesign; most design work
-8. **Build compact top bar** for iPhone
-9. **Move StatusBox to sheet** on iPhone
-10. **Increase touch target sizes** for all small buttons
-11. **Add haptic feedback**
-12. **Test on iPhone SE (smallest screen)** — the hardest case
+This is the correct professional sequence, not just the easier one.
+
+**Music apps live on iPad.** GarageBand, Korg Gadget, AUM, Moog's apps, Drambo — virtually every serious iOS music app is designed iPad-first. The larger screen is the right form factor for a DAW-like track layout with MIDI lanes, effects columns, and a transport bar. iPhone portrait is a valuable addition but not the primary mobile use case for this type of app.
+
+**iPad and iPhone landscape share exactly one code path.** `horizontalSizeClass == .regular` covers both iPad (all orientations) and iPhone landscape. Implement the compressed regular-width layout once and both devices work. The only difference is screen height, which a `ScrollView` handles automatically.
+
+**AppKit removal is prerequisite work regardless.** Fixing the four AppKit-dependent files is required to get any iOS build. Once done, you have a compilable iOS target. The jump from "compiles" to "works well on iPad" is then a day of layout compression, not a redesign.
+
+**iPhone portrait is a separate project of equal size.** The compact track row redesign (two-zone card, effects sheet, condensed top bar, status log as pull-up sheet) is essentially building a second UI. Deferring it lets the iPad version ship while that work is planned and executed separately.
+
+**App Store supports iPad-only or "Designed for iPad" apps.** Shipping Phase 1+2 as an iPad app is a fully legitimate release. iPhone support can be added in a subsequent update.
+
+---
+
+### Phase 1: Get It Building on iOS (Est. 1–2 days)
+Goal: A compilable iOS target that runs on an iPad simulator with full audio and generation.
+
+1. Add `.iOS(.v16)` and `.iPadOS(.v16)` to `Package.swift` platforms array
+2. Add iOS deployment target to `Zudio.xcodeproj/project.pbxproj`
+3. Wrap `ZudioApp.swift` NSApp calls in `#if os(macOS)`
+4. Wrap `AppState.swift` NSEvent monitor and NSApp calls in `#if os(macOS)`
+5. Wrap `FirstMouseFix.swift` entirely in `#if os(macOS)`; remove its `.background()` usage in TopBarView on iOS
+6. Replace `NSColor` in `TopBarView.swift` with SwiftUI `Color` equivalents
+7. Replace `NSImage` logo loading with asset-catalog `Image` (cross-platform)
+8. Add `AVAudioSession` setup and interruption handling in `PlaybackEngine.swift` inside `#if os(iOS)`
+9. Fix `MIDIFileExporter.swift` to use `.documentDirectory` on iOS
+10. Add iOS app icon assets to asset catalog
+11. Add `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` to Info.plist
+12. **Verify:** `xcodebuild -scheme Zudio -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' build` passes with no errors
+
+---
+
+### Phase 2: iPad + iPhone Landscape — Working UI (Est. 2–3 days)
+Goal: The app looks good and is fully usable on iPad (all orientations) and iPhone landscape.
+
+Layout strategy: `horizontalSizeClass == .regular` covers all these cases.
+
+13. Remove `.frame(minWidth: 900, minHeight: 500)` from `ContentView.swift`; wrap track list in `ScrollView(.vertical)`
+14. Compress `TrackRowView` regular-width layout: left panel 232pt → 180pt, right effects panel 152pt → 120pt, row height 63pt → 52pt
+15. Compress `TopBarView` regular-width: logo height 84pt → 60pt; verify all pickers still fit
+16. Fix `HelpView` and `AboutView` fixed frame sizes — use `presentationDetents` instead of fixed pixel dimensions
+17. Increase touch target sizes for small buttons (mute/solo chips, instrument arrows) to meet 44×44pt Apple HIG minimum via `.contentShape` padding
+18. **Verify on iPad Pro 13" simulator:** generate, play, stop, save MIDI, mute/solo, effects all work
+19. **Verify on iPad mini simulator:** same checks at narrower width
+20. **Verify on iPhone 15 Pro Max in landscape:** `horizontalSizeClass` is `.regular` in landscape — same layout path, narrower height handled by scroll
+21. **Test on a real iPad device** if available — validates AVAudioSession and audio output
+
+At this point the app is shippable as an iPad app.
+
+---
+
+### Phase 3: Ship iPad Version (Optional milestone)
+- Submit to App Store as iPad-compatible app
+- Gather real-world feedback on the track layout, touch targets, and workflow before committing to the iPhone portrait design
+
+---
+
+### Phase 4: iPhone Portrait — Compact Layout (Est. 3–5 days, separate project)
+Goal: Full iPhone support including portrait mode.
+
+This phase is a separate design and implementation project. `horizontalSizeClass == .compact` is the branch point.
+
+22. Build `TrackRowView` compact layout — two-zone card:
+    - Top zone (full width, 38pt): icon + label + M + S + ⚡ + instrument name
+    - Bottom zone (full width, 44pt): MIDI lane at full width
+23. Build `TrackEffectsSheet.swift` — new view, effects panel as `.sheet` presented on track row tap
+24. Build compact `TopBarView` — single-row: logo (left) + play/stop (center) + generate (right); second row: style + mood + key + BPM
+25. Move Help/About to a settings sheet triggered by "..." button on iPhone
+26. Move `StatusBoxView` to a detent sheet (`.presentationDetents([.fraction(0.3), .large])`) on iPhone; add a "≡ log" trigger button in the top bar
+27. Handle iPhone landscape (compact height / regular width) — single-row top bar, scrollable track list
+28. **Verify on iPhone SE (3rd gen) simulator** — the hardest case: 375×667pt portrait
+29. **Verify on iPhone 15 Pro Max simulator** — largest iPhone portrait: 430×932pt
+30. Add haptic feedback (`UIImpactFeedbackGenerator`) for Generate complete, Play, Stop — iOS-only via `#if os(iOS)`
+31. **Test iPhone SE on a real device** if available
 
 ---
 

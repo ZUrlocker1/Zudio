@@ -11,14 +11,37 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
+        style: MusicStyle = .cosmic,
         testMode: Bool = false
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
-        return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride, testMode: testMode)
+        return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
+                        moodOverride: moodOverride, style: style, testMode: testMode)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
     static func generate(
+        seed: UInt64,
+        keyOverride: String? = nil,
+        tempoOverride: Int? = nil,
+        moodOverride: Mood? = nil,
+        style: MusicStyle = .cosmic,
+        testMode: Bool = false
+    ) -> SongState {
+        // Branch on style
+        switch style {
+        case .cosmic:
+            return generateCosmic(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
+                                  moodOverride: moodOverride, testMode: testMode)
+        case .motorik:
+            return generateMotorik(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
+                                   moodOverride: moodOverride, testMode: testMode)
+        }
+    }
+
+    // MARK: - Motorik generation (original path, unchanged)
+
+    private static func generateMotorik(
         seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
@@ -130,6 +153,149 @@ struct SongGenerator {
         )
     }
 
+    // MARK: - Cosmic generation path
+
+    private static func generateCosmic(
+        seed: UInt64,
+        keyOverride: String? = nil,
+        tempoOverride: Int? = nil,
+        moodOverride: Mood? = nil,
+        testMode: Bool = false
+    ) -> SongState {
+        var rng = SeededRNG(seed: seed)
+
+        // Step 1 — Cosmic musical frame
+        let (frame, percussionStyle, cosmicProgFamily) = CosmicMusicalFrameGenerator.generate(
+            rng: &rng,
+            keyOverride: keyOverride,
+            tempoOverride: tempoOverride,
+            moodOverride: moodOverride,
+            testMode: testMode
+        )
+
+        // Step 2 — Cosmic structure (longer sections, glacial pacing)
+        let cosmicForm: CosmicSongForm = {
+            let r = rng.nextDouble()
+            if r < 0.50 { return .single_evolving }
+            if r < 0.85 { return .two_world }
+            return .build_and_dissolve
+        }()
+        let structure = CosmicStructureGenerator.generate(
+            frame: frame,
+            cosmicForm: cosmicForm,
+            cosmicProgFamily: cosmicProgFamily,
+            rng: &rng
+        )
+
+        // Step 3 — Tonal governance map (reused as-is)
+        let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
+
+        // Steps 4–9 — Per-track MIDI event generation (Cosmic generators)
+        var trackEvents = [[MIDIEvent]](repeating: [], count: 7)
+
+        var drumRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackDrums))
+        var bassRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackBass))
+        var padsRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackPads))
+        var lead1RNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackLead1))
+        var lead2RNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackLead2))
+        var rhythmRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackRhythm))
+        var texRNG    = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackTexture))
+
+        // Arpeggio (rhythm slot) — the heartbeat of Cosmic
+        var rhythmRules: Set<String> = []
+        trackEvents[kTrackRhythm] = CosmicArpeggioGenerator.generate(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            rng: &rhythmRNG, usedRuleIDs: &rhythmRules
+        )
+
+        // Lead 1
+        var lead1Rules: Set<String> = []
+        trackEvents[kTrackLead1] = CosmicLeadGenerator.generateLead1(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            rng: &lead1RNG, usedRuleIDs: &lead1Rules
+        )
+
+        // Lead 2
+        var lead2Rules: Set<String> = []
+        trackEvents[kTrackLead2] = CosmicLeadGenerator.generateLead2(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            lead1Events: trackEvents[kTrackLead1],
+            rng: &lead2RNG, usedRuleIDs: &lead2Rules
+        )
+
+        // Pads
+        var padRules: Set<String> = []
+        trackEvents[kTrackPads] = CosmicPadsGenerator.generate(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            cosmicProgFamily: cosmicProgFamily,
+            rng: &padsRNG, usedRuleIDs: &padRules
+        )
+
+        // Texture (lower register arpeggio, orbital motives)
+        var texRules: Set<String> = []
+        trackEvents[kTrackTexture] = CosmicTextureGenerator.generate(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            rng: &texRNG, usedRuleIDs: &texRules
+        )
+
+        // Bass
+        var bassRules: Set<String> = []
+        trackEvents[kTrackBass] = CosmicBassGenerator.generate(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            rng: &bassRNG, usedRuleIDs: &bassRules
+        )
+
+        // Drums (absent / sparse / minimal per percussionStyle)
+        var drumRules: Set<String> = []
+        trackEvents[kTrackDrums] = CosmicDrumGenerator.generate(
+            frame: frame, structure: structure,
+            percussionStyle: percussionStyle,
+            rng: &drumRNG, usedRuleIDs: &drumRules
+        )
+
+        // Post-processing: apply arrangement and harmonic filters
+        // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Cosmic)
+        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, seed: seed)
+        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+
+        // Title generation — Cosmic uses its own space-themed generator
+        let title = CosmicTitleGenerator.generate(frame: frame, rng: &rng)
+
+        // Song form (use standard Motorik SongForm for compatibility with existing log/UI)
+        let form: SongForm = {
+            switch cosmicForm {
+            case .single_evolving:   return .singleA
+            case .two_world:         return .subtleAB
+            case .build_and_dissolve: return .moderateAB
+            }
+        }()
+
+        // Build Cosmic generation log
+        let log = buildCosmicLog(
+            title: title, frame: frame, structure: structure, form: form,
+            percussionStyle: percussionStyle, cosmicForm: cosmicForm,
+            cosmicProgFamily: cosmicProgFamily,
+            drumRules: drumRules, bassRules: bassRules,
+            padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
+            rhythmRules: rhythmRules, texRules: texRules
+        )
+
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame)
+
+        return SongState(
+            frame: frame,
+            structure: structure,
+            tonalMap: tonalMap,
+            trackEvents: trackEvents,
+            globalSeed: seed,
+            trackOverrides: [:],
+            title: title,
+            form: form,
+            generationLog: log,
+            stepAnnotations: stepAnnotations
+        )
+    }
+
     // MARK: - Per-track regenerate
 
     /// Regenerates a single track without touching any other track or the global seed.
@@ -180,7 +346,8 @@ struct SongGenerator {
         } else {
             for ruleID in usedRules.sorted() {
                 let desc = ruleDescription(ruleID, trackIndex: trackIndex)
-                regenLog.append(GenerationLogEntry(tag: ruleID, description: desc))
+                let tag  = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID
+                regenLog.append(GenerationLogEntry(tag: tag, description: desc))
             }
         }
 
@@ -258,15 +425,16 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: drumRuleDescription(ruleID)))
         }
         if drumRules.isEmpty {
-            log.append(GenerationLogEntry(tag: "DRM-001", description: drumRuleDescription("DRM-001")))
+            log.append(GenerationLogEntry(tag: "MOT-DRUM-001", description: drumRuleDescription("MOT-DRUM-001")))
         }
 
         // Bass
         for ruleID in bassRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: bassRuleDescription(ruleID)))
+            let tag = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID
+            log.append(GenerationLogEntry(tag: tag, description: bassRuleDescription(ruleID)))
         }
         if bassRules.isEmpty {
-            log.append(GenerationLogEntry(tag: "BAS-001", description: bassRuleDescription("BAS-001")))
+            log.append(GenerationLogEntry(tag: "MOT-BASS-001", description: bassRuleDescription("MOT-BASS-001")))
         }
 
         // Pads — may be multiple rules
@@ -275,8 +443,8 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: padRuleDescription(ruleID)))
         }
         if sortedPadRules.isEmpty {
-            log.append(GenerationLogEntry(tag: "PAD-001",
-                description: padRuleDescription("PAD-001")))
+            log.append(GenerationLogEntry(tag: "MOT-PADS-001",
+                description: padRuleDescription("MOT-PADS-001")))
         }
 
         // Lead 1
@@ -284,7 +452,7 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: lead1RuleDescription(ruleID)))
         }
         if lead1Rules.isEmpty {
-            log.append(GenerationLogEntry(tag: "LD1-001", description: lead1RuleDescription("LD1-001")))
+            log.append(GenerationLogEntry(tag: "MOT-LD1-001", description: lead1RuleDescription("MOT-LD1-001")))
         }
 
         // Lead 2
@@ -292,7 +460,7 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: lead2RuleDescription(ruleID)))
         }
         if lead2Rules.isEmpty {
-            log.append(GenerationLogEntry(tag: "LD2-001", description: lead2RuleDescription("LD2-001")))
+            log.append(GenerationLogEntry(tag: "MOT-LD2-001", description: lead2RuleDescription("MOT-LD2-001")))
         }
 
         // Rhythm — may be multiple rules
@@ -301,7 +469,7 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: rhythmRuleDescription(ruleID)))
         }
         if sortedRhythmRules.isEmpty {
-            log.append(GenerationLogEntry(tag: "RHY-001",
+            log.append(GenerationLogEntry(tag: "MOT-RHYT-001",
                 description: "8th-note ostinato, alternating root/fifth"))
         }
 
@@ -310,7 +478,7 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: textureRuleDescription(ruleID)))
         }
         if texRules.isEmpty {
-            log.append(GenerationLogEntry(tag: "TEX-001",
+            log.append(GenerationLogEntry(tag: "MOT-TEXR-001",
                 description: "Boundary-weighted sparse atmosphere, scale tensions"))
         }
 
@@ -403,92 +571,277 @@ struct SongGenerator {
 
     private static func drumRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "DRM-001": return "Classic Motorik — kick 1+3, snare 2+4, 16th-hat gradient"
-        case "DRM-002": return "Open pocket — kick 1+3, snare 2+4, 8th hats, open hat beat 1, ghost snares"
-        case "DRM-003": return "Ride groove — kick 1+3, snare 2+4, ride 8ths, pedal hi-hat 2+4"
-        case "DRM-004": return "Almost Motorik — 4-on-the-floor kick, snare 2+4, 16th-hat gradient"
-        default:        return ruleID
+        case "MOT-DRUM-001": return "Classic Motorik"
+        case "MOT-DRUM-002": return "Open Pocket"
+        case "MOT-DRUM-003": return "Ride Groove"
+        case "MOT-DRUM-004": return "Almost Motorik"
+        default:             return ruleID
         }
     }
 
     private static func bassRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "BAS-001": return "Root anchor — root beat 1 long, fifth beat 3, locked to kick"
-        case "BAS-002": return "Motorik Drive — steady quarter-note root pulse, accents 1+3"
-        case "BAS-003": return "Crawling Walk — 2-bar root/fifth/approach note pattern"
-        case "BAS-004": return "Hallogallo Lock — root beat 1 long, fifth beat 3, locked to kick 1+3"
-        case "BAS-005": return "McCartney Drive — 8th-note pump, root/fifth descent (SLS verse groove)"
-        case "BAS-006": return "LA Woman Sustain — root holds bar, chromatic shimmer at bar end"
-        case "BAS-007": return "Hook Ascent — Joy Division: mode-3rd riff, 8th-note drive, mode-6th colour descent"
-        case "BAS-008": return "Moroder Pulse — staccato 8th-note sequence root/fifth/b7 (I Feel Love ostinato)"
-        case "BAS-009": return "Vitamin Hook — CAN: 2-bar ascending arpeggio root→fifth→octave, chromatic passing"
-        case "BAS-010": return "Quo Arc — Status Quo Down Down: 2-bar boogie arc 1-1-3-3-5-5-6-b7 ascent, b7-6-5-3-1 descent"
-        case "BAS-011": return "Quo Drive — Status Quo Caroline/Paper Plane: 1-bar compressed boogie arc (root-push + full up-back variants)"
-        default:        return ruleID
+        case "MOT-BASS-001": return "Root Anchor"
+        case "MOT-BASS-002": return "Motorik Drive"
+        case "MOT-BASS-003": return "Crawling Walk"
+        case "MOT-BASS-004": return "Hallogallo Lock"
+        case "MOT-BASS-005": return "McCartney Drive"
+        case "MOT-BASS-006": return "LA Woman Sustain"
+        case "MOT-BASS-007": return "Hook Ascent"
+        case "MOT-BASS-008": return "Moroder Pulse"
+        case "MOT-BASS-009": return "Vitamin Hook"
+        case "MOT-BASS-010": return "Quo Arc"
+        case "MOT-BASS-011": return "Quo Drive"
+        case "BASS-EVOL":    return "Evolving pattern"
+        case "BASS-DEVOL":   return "Devolving pattern"
+        default:             return ruleID
         }
     }
 
     private static func lead1RuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "LD1-001": return "Motif-first, chord tones 80%, scale tensions 20%"
-        case "LD1-002": return "Pentatonic Cell — short driving notes from pentatonic scale"
-        case "LD1-003": return "Long Breath — sparse, sustained notes with rests"
-        case "LD1-004": return "Stepwise Sequence — descending sequence development (5→4→2→1 / b7→5→4→2)"
-        case "LD1-005": return "Statement-Answer — ascending statement bar, silent response bar (from Hallogallo phrase analysis)"
-        default:        return ruleID
+        case "MOT-LD1-001": return "Motif-first"
+        case "MOT-LD1-002": return "Pentatonic Cell"
+        case "MOT-LD1-003": return "Long Breath"
+        case "MOT-LD1-004": return "Stepwise Sequence"
+        case "MOT-LD1-005": return "Statement-Answer"
+        default:            return ruleID
         }
     }
 
     private static func lead2RuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "LD2-001": return "Counter-response, density ≤55% of Lead 1"
-        case "LD2-002": return "Sustained Drone — sparse long holds on root or 5th"
-        case "LD2-003": return "Rhythmic Counter — short bursts offset from Lead 1"
-        case "LD2-004": return "Hallogallo Counter — quick 16th pairs (Guitar 2 motif, 75% fire probability)"
-        case "LD2-005": return "Descending Line — 2-bar diatonic descent from Hallogallo counter-melody analysis"
-        default:        return ruleID
+        case "MOT-LD2-001": return "Counter-response"
+        case "MOT-LD2-002": return "Sustained Drone"
+        case "MOT-LD2-003": return "Rhythmic Counter"
+        case "MOT-LD2-004": return "Hallogallo Counter"
+        case "MOT-LD2-005": return "Descending Line"
+        default:            return ruleID
         }
     }
 
     private static func padRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "PAD-001": return "Sustained whole-bar (auto-breaks to Charleston after 4 bars)"
-        case "PAD-002": return "Power/drone voicing (root, fifth, octave), 4-bar break rule"
-        case "PAD-003": return "Pulsed — one attack every 2 bars with overlap"
-        case "PAD-004": return "Sparse intro/outro (50% skip probability)"
-        case "PAD-005": return "Arpeggio — 8th notes cycling through chord tones (up/down/bounce)"
-        case "PAD-006": return "Stabs — short chord attacks on beat 1, sometimes beat 3"
-        case "PAD-007": return "Charleston (3+3+2) — dotted-quarter rhythm from Silly Love Songs"
-        case "PAD-008": return "16th-note chop — dense staccato from Hallogallo guitar"
-        case "PAD-009": return "Quarter pump — locked chord hits all 4 beats (SLS intro rhythm guitar)"
-        case "PAD-010": return "Half-bar breathe — chord beat 1 only, silence second half"
-        case "PAD-011": return "Backbeat stabs — chords on beats 2+4 only (LA Woman syncopated feel)"
-        default:        return ruleID
+        case "MOT-PADS-001": return "Sustained"
+        case "MOT-PADS-002": return "Power Drone"
+        case "MOT-PADS-003": return "Pulsed"
+        case "MOT-PADS-004": return "Sparse"
+        case "MOT-PADS-005": return "Arpeggio"
+        case "MOT-PADS-006": return "Stabs"
+        case "MOT-PADS-007": return "Charleston"
+        case "MOT-PADS-008": return "16th Chop"
+        case "MOT-PADS-009": return "Quarter Pump"
+        case "MOT-PADS-010": return "Half-bar Breathe"
+        case "MOT-PADS-011": return "Backbeat Stabs"
+        default:             return ruleID
         }
     }
 
     private static func rhythmRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "RHY-001": return "8th-note stride — root/fifth/third cycle, active Motorik pulse"
-        case "RHY-002": return "Quarter-note stride — root-anchored, open and spacious"
-        case "RHY-003": return "Syncopated Motorik (3+3+2 feel), root/fifth alternation"
-        case "RHY-004": return "2-bar melodic riff — scale-tone riff cycling over 2 bars"
-        case "RHY-005": return "Chord stab — root+third short hits on beats 2 and 4"
-        case "RHY-006": return "Arpeggio — quarter-note legato, chord tones in chosen direction"
-        default:        return ruleID
+        case "MOT-RHYT-001": return "8th-note Stride"
+        case "MOT-RHYT-002": return "Quarter Stride"
+        case "MOT-RHYT-003": return "Syncopated Motorik"
+        case "MOT-RHYT-004": return "2-bar Melodic Riff"
+        case "MOT-RHYT-005": return "Chord Stab"
+        case "MOT-RHYT-006": return "Arpeggio"
+        default:             return ruleID
         }
     }
 
     private static func textureRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "TEX-001": return "Sparse — boundary-weighted scale-tension notes"
-        case "TEX-002": return "Transition Swell — sustained root/fifth at section boundaries"
-        case "TEX-003": return "Drone Anchor — 2-bar root/fifth hold, very quiet, body sections"
-        case "TEX-004": return "Shimmer Pair — maj-7/min-9 interval off-beat touch, ~once per 10 bars"
-        case "TEX-005": return "Breath Release — whisper note on last step of each section"
-        case "TEX-006": return "High Tension Touch — scale-tension note, off-beat, ~once per 20 bars"
-        default:        return ruleID
+        case "MOT-TEXR-001": return "Sparse"
+        case "MOT-TEXR-002": return "Transition Swell"
+        case "MOT-TEXR-003": return "Drone Anchor"
+        case "MOT-TEXR-004": return "Shimmer Pair"
+        case "MOT-TEXR-005": return "Breath Release"
+        case "MOT-TEXR-006": return "High Tension Touch"
+        // Cosmic texture rules
+        case "COS-TEXT-001": return "Orbital Motive"
+        case "COS-TEXT-002": return "Shimmer Hold"
+        case "COS-TEXT-003": return "Spatial Sweep"
+        default:             return ruleID
         }
+    }
+
+    // MARK: - Cosmic rule descriptions
+
+    private static func cosmicDrumRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "COS-DRUM-001": return "Minimal — JMJ Mini Pops style"
+        case "COS-DRUM-002": return "Sparse pitched percussion"
+        case "COS-DRUM-003": return "No percussion — Berlin School"
+        default:                 return ruleID
+        }
+    }
+
+    private static func cosmicBassRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "COS-BASS-001":  return "Drone Root — 2-bar hold, velocity 65"
+        case "COS-BASS-002":  return "Root-Fifth Slow Walk — 8-bar cycle"
+        case "COS-BASS-003":  return "Pedal Pulse — quarter-note root"
+        case "COS-BASS-004":  return "Moroder Drift — chromatic neighbor bar 4"
+        case "COS-BASS-005":  return "Bass absent in main section"
+        case "COS-BASS-006":  return "Additive dual bass — anchor + staccato hits"
+        case "COS-BASS-007":  return "Additive pulsating tremolo bass"
+        default:              return ruleID
+        }
+    }
+
+    private static func cosmicPadRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "COS-PADS-001":  return "Long Drone — whole notes held 2–4 bars"
+        case "COS-PADS-002":  return "Swell Chord — velocity ramp 20→80"
+        case "COS-PADS-003":  return "Unsync Layers — 8/10/12 bar loops"
+        case "COS-PADS-004":  return "Suspended Resolution — sus4→minor"
+        case "COS-PADS-005":  return "Quartal Stack — stacked fourths"
+        case "COS-PADS-006":  return "Cloud Shimmer — upper register fade"
+        default:              return ruleID
+        }
+    }
+
+    private static func cosmicLeadRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "COS-LEAD-001": return "Slow Arc — long rising/falling phrase"
+        case "COS-LEAD-002": return "Floating Tones — widely spaced notes"
+        case "COS-LEAD-003": return "Pentatonic Drift — slow 5-note move"
+        case "COS-LEAD-004": return "Echo Melody — phrase + answer"
+        case "COS-LEAD-005": return "Arpeggio Highlight — held note"
+        default:             return ruleID
+        }
+    }
+
+    private static func cosmicArpRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "COS-ARP-001": return "Tangerine Dream step-sequencer arpeggio rhythm"
+        case "COS-ARP-002": return "JMJ melodic hook — 8th/quarter, legato phrasing"
+        case "COS-ARP-003": return "JMJ Oxygène oscillation — ascending then descending"
+        case "COS-ARP-004": return "Electric Buddha groove — pentatonic syncopated drive"
+        default:            return ruleID
+        }
+    }
+
+    private static func cosmicTexRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "COS-TEXT-001": return "Orbital Motive — lower register loop"
+        case "COS-TEXT-002": return "Shimmer Hold — sustained note"
+        case "COS-TEXT-003": return "Spatial Sweep — chromatic passing"
+        default:             return ruleID
+        }
+    }
+
+    private static func cosmicProgressionFamilyLabel(_ family: CosmicProgressionFamily) -> String {
+        switch family {
+        case .static_drone:          return "Static Drone — single tonic hold"
+        case .two_chord_pendulum:    return "Two Chord Pendulum — Vangelis i→bVI"
+        case .modal_drift:           return "Modal Drift — i→bVII→bVI"
+        case .suspended_resolution:  return "Suspended Resolution — sus4→minor"
+        case .quartal_stack:         return "Quartal Stack — stacked fourths"
+        }
+    }
+
+    // MARK: - Cosmic generation log builder
+
+    private static func buildCosmicLog(
+        title: String,
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        form: SongForm,
+        percussionStyle: PercussionStyle,
+        cosmicForm: CosmicSongForm,
+        cosmicProgFamily: CosmicProgressionFamily,
+        drumRules: Set<String>,
+        bassRules: Set<String>,
+        padRules: Set<String>,
+        lead1Rules: Set<String>,
+        lead2Rules: Set<String>,
+        rhythmRules: Set<String>,
+        texRules: Set<String>
+    ) -> [GenerationLogEntry] {
+        var log: [GenerationLogEntry] = []
+
+        // Song title
+        log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
+
+        // Style identifier
+        log.append(GenerationLogEntry(tag: "STYLE", description: "Cosmic"))
+
+        // Cosmic form
+        let cosmicFormLabel: String
+        switch cosmicForm {
+        case .single_evolving:    cosmicFormLabel = "Single Evolving (Roach/TD)"
+        case .two_world:          cosmicFormLabel = "Two World (spacious + dense)"
+        case .build_and_dissolve: cosmicFormLabel = "Build and Dissolve"
+        }
+        log.append(GenerationLogEntry(tag: "FORM", description: cosmicFormLabel))
+
+        // Intro/outro
+        if let intro = structure.introSection {
+            log.append(GenerationLogEntry(tag: "Intro",
+                description: "\(intro.lengthBars) bar \(introStyleLabel(structure.introStyle))"))
+        }
+        if let outro = structure.outroSection {
+            log.append(GenerationLogEntry(tag: "Outro",
+                description: "\(outro.lengthBars) bar \(outroStyleLabel(structure.outroStyle))"))
+        }
+
+        // Global frame
+        let percLabel: String
+        switch percussionStyle {
+        case .absent:    percLabel = "absent"
+        case .sparse:    percLabel = "sparse pitched"
+        case .minimal:   percLabel = "minimal Mini Pops"
+        default:         percLabel = percussionStyle.rawValue
+        }
+        log.append(GenerationLogEntry(tag: "GBL-001",
+            description: "\(frame.key) \(frame.mode.rawValue), \(frame.tempo) BPM, percussion: \(percLabel)"))
+
+        // Chord progression — tag "Chords" for consistency with Motorik
+        let chordNames = structure.chordPlan
+            .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
+            .removingAdjacentDuplicates()
+            .joined(separator: ", ")
+        let progFamilyLabel = cosmicProgressionFamilyLabel(cosmicProgFamily)
+        let chordDesc = chordNames.isEmpty ? progFamilyLabel : "\(progFamilyLabel)  \(chordNames)"
+        log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
+
+        // Arpeggio (Rhythm track)
+        for ruleID in rhythmRules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicArpRuleDescription(ruleID)))
+        }
+
+        // Lead 1
+        for ruleID in lead1Rules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicLeadRuleDescription(ruleID)))
+        }
+
+        // Lead 2
+        for ruleID in lead2Rules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicLeadRuleDescription(ruleID)))
+        }
+
+        // Pads
+        for ruleID in padRules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicPadRuleDescription(ruleID)))
+        }
+
+        // Texture
+        for ruleID in texRules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicTexRuleDescription(ruleID)))
+        }
+
+        // Bass
+        for ruleID in bassRules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicBassRuleDescription(ruleID)))
+        }
+
+        // Drums
+        for ruleID in drumRules.sorted() {
+            log.append(GenerationLogEntry(tag: ruleID, description: cosmicDrumRuleDescription(ruleID)))
+        }
+
+        return log
     }
 
     // MARK: - Step annotations (live playback feed)
@@ -717,7 +1070,7 @@ struct SongGenerator {
         // since the generation log already documents this. For all other drum rules, track
         // the cymbal mode across the whole song (no reset between sections) so a transition
         // back to ride after a non-body section doesn't re-trigger.
-        let isRideGroove = drumRules.contains("DRM-003")
+        let isRideGroove = drumRules.contains("MOT-DRUM-003")
         if kTrackDrums < trackEvents.count {
             let drumEvs = trackEvents[kTrackDrums]
             var prevCymbalMode: String? = nil
@@ -783,7 +1136,7 @@ struct SongGenerator {
             }
             var silentStreak = 0
             var lastAnnouncedBar: Int = -8   // cooldown: don't re-announce within 8 bars
-            for bar in 0..<outroStartBar {
+            for bar in 0..<min(outroStartBar, totalBars) {
                 if barHasNotes[bar] {
                     if silentStreak >= 3 && (bar - lastAnnouncedBar) >= 8 {
                         fireBar(bar, tag: trackName, desc: entranceDesc)

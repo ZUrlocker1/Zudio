@@ -211,8 +211,12 @@ struct TopBarView: View {
                         .disabled(appState.isGenerating)
                         .keyboardShortcut("g", modifiers: .command)
 
-                        Text("Style: Motorik")
-                            .foregroundStyle(.secondary)
+                        Picker("", selection: $appState.selectedStyle) {
+                            Text("Motorik").tag(MusicStyle.motorik)
+                            Text("Cosmic").tag(MusicStyle.cosmic)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 140)
 
                         Picker("Mood", selection: $appState.moodOverride) {
                             Text("Auto").tag(Optional<Mood>.none)
@@ -355,12 +359,12 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.75 (alpha)").font(.callout)
-                Text("Built by analyzing classic Motorik songs as well as other works. Then a set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.callout)
+                Text("Version: 0.8 (alpha)").font(.callout)
+                Text("Built by analyzing classic Motorik and Cosmic songs as well as other works. Then a set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1: Motorik style only. Instruments using GS MIDI. Basic audio effects for boost, reverb, delay, etc.").font(.callout)
+                Text("V1.0: Motorik and Cosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2: Add new musical styles Cosmic and Ambient.").font(.callout)
+                Text("V2.0: Ambient style coming soon.").font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()

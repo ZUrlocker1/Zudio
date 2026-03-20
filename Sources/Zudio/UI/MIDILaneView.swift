@@ -74,17 +74,33 @@ struct MIDILaneView: View {
 
         // Notes — only those overlapping visible window
         let (lo, hi) = pitchRange
+        // Scale note height so adjacent semitones always have a 1px vertical gap.
+        // Without this, dense chords (e.g. 4-voice pad block) render as a solid rectangle.
+        let semitoneCount = max(1, hi - lo)
+        let pixelsPerSemitone = (h - noteH) / CGFloat(semitoneCount)
+        let drawH = max(2, min(noteH, pixelsPerSemitone - 1))
+
+        // Pre-compute next-onset per pitch so overlapping long notes are clipped
+        // at the start of the following note at the same pitch.
+        var onsetsByNote: [UInt8: [Int]] = [:]
+        for ev in events { onsetsByNote[ev.note, default: []].append(ev.stepIndex) }
+        for key in onsetsByNote.keys { onsetsByNote[key]?.sort() }
+
         for ev in events {
-            let evEnd = ev.stepIndex + ev.durationSteps
+            let rawEnd = ev.stepIndex + ev.durationSteps
+            // Clip to next same-pitch onset so held notes never overdraw a later note
+            let nextOnset = onsetsByNote[ev.note]?.first(where: { $0 > ev.stepIndex }) ?? rawEnd
+            let evEnd = min(rawEnd, nextOnset)
+
             guard evEnd > startStep && ev.stepIndex < startStep + visibleSteps else { continue }
 
             let clampedStart = max(ev.stepIndex, startStep)
             let clampedEnd   = min(evEnd, startStep + visibleSteps)
             let x   = CGFloat(clampedStart - startStep) / CGFloat(visibleSteps) * w
-            let nw  = max(2, CGFloat(clampedEnd - clampedStart) / CGFloat(visibleSteps) * w - 1.5)
+            let nw  = max(2, CGFloat(clampedEnd - clampedStart) / CGFloat(visibleSteps) * w - 2)
             let y   = rawNoteY(note: Int(ev.note), lo: lo, hi: hi, height: h)
             let col = noteColor(for: Int(ev.note))
-            ctx.fill(Path(CGRect(x: x, y: max(0, min(h - noteH, y)), width: nw, height: noteH)),
+            ctx.fill(Path(CGRect(x: x, y: max(0, min(h - drawH, y)), width: nw, height: drawH)),
                      with: .color(col))
         }
 

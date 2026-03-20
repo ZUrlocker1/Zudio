@@ -139,7 +139,7 @@ struct LeadGenerator {
 
             switch ruleID {
 
-            case "LD1-001":
+            case "MOT-LD1-001":
                 if isIntroOutro {
                     // Fallback: sparse random during intro/outro
                     barEvents = lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
@@ -186,7 +186,7 @@ struct LeadGenerator {
                     }
                 }
 
-            case "LD1-002":
+            case "MOT-LD1-002":
                 if !isIntroOutro {
                     // B: Build motif on first body bar; lock and mutate every 16 bars
                     if !motifBuilt {
@@ -204,15 +204,15 @@ struct LeadGenerator {
                         intensity: intensity, prevNote: prevNote)
                 }
 
-            case "LD1-003":
+            case "MOT-LD1-003":
                 barEvents = lead1LongBreath(barStart: barStart, entry: entry, frame: frame,
                     intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
 
-            case "LD1-004":
+            case "MOT-LD1-004":
                 barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
                     intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
 
-            case "LD1-005":
+            case "MOT-LD1-005":
                 barEvents = lead1StatementAnswer(barStart: barStart, bar: bar, entry: entry, frame: frame,
                     intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
 
@@ -242,7 +242,7 @@ struct LeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
-        let ld2Rules:   [String] = ["LD2-001", "LD2-002", "LD2-003", "LD2-004", "LD2-005", "LD2-006"]
+        let ld2Rules:   [String] = ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
         let ld2Weights: [Double] = [0.20,      0.15,      0.10,      0.20,      0.15,      0.20]
         let ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
         usedRuleIDs.insert(ruleID)
@@ -266,19 +266,19 @@ struct LeadGenerator {
             }
 
             switch ruleID {
-            case "LD2-002":
+            case "MOT-LD2-002":
                 events += lead2SustainedDrone(barStart: barStart, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, rng: &rng)
-            case "LD2-003":
+            case "MOT-LD2-003":
                 events += lead2RhythmicCounter(barStart: barStart, entry: entry, frame: frame,
                     intensity: intensity, isIntroOutro: isIntroOutro, lead1StepSet: lead1StepSet, rng: &rng)
-            case "LD2-004":
+            case "MOT-LD2-004":
                 events += lead2HallogalloCounter(barStart: barStart, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, rng: &rng)
-            case "LD2-005":
+            case "MOT-LD2-005":
                 events += lead2DescendingLine(barStart: barStart, bar: bar, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, rng: &rng)
-            case "LD2-006":
+            case "MOT-LD2-006":
                 events += lead2DiatonicShadow(barStart: barStart, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, lead1Events: lead1Events, rng: &rng)
             default:
@@ -559,7 +559,7 @@ struct LeadGenerator {
 
     /// Picks a new LD1 rule consuming one RNG draw (called twice in generateLead1 for determinism).
     private static func pickLd1Rule(rng: inout SeededRNG) -> String {
-        let rules:   [String] = ["LD1-001", "LD1-002", "LD1-003", "LD1-004", "LD1-005"]
+        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005"]
         let weights: [Double] = [0.25,      0.20,      0.15,      0.22,      0.18]
         return rules[rng.weightedPick(weights)]
     }

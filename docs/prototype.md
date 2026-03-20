@@ -134,9 +134,8 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - No seed values.
   - No transport event logs.
   - Auto-scroll to newest message by default, with manual scrollback allowed.
-  - Where practical, include relevant generation rule references in status output as:
-    - rule ID (for example `B-002`)
-    - brief plain-language explanation of how that rule was applied
+  - The status log is an append-only flat list. All entries — initial generation, live playback annotations, and per-track regeneration entries — are always written to the end in chronological order. Regenerating a track appends only the new entries for that track at the bottom; older entries are never reordered or removed. Multiple songs in a session are separated by a `─── new song` divider.
+  - Rule entries use the format: `RULE-ID | Rule Name`. Descriptions are short names only — no verbose explanations.
 - Required generation messages (on `Generate New`):
   - Song-structure rule summary:
     - section form selected (for example Single-A, subtle A/B)
@@ -153,7 +152,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
     - outro type selected and outro length
     - layer-drop behavior (for example subtractive fade or drums-only tail)
   - Track-generation rule summary in UI order: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums.
-    - Include short plain-language rule notes per track (for example bass = root/fifth anchor with sparse passing tones; Lead 2 = delayed entry/call-response).
+    - Each rule shown as: rule ID + short name only (no additional description).
   - Per-track instrument assignment in UI order.
 - Example status output:
   - `SONG    My Song Title`
@@ -162,20 +161,20 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - `OUT-002 Outro: 16 bars, sparse/low-intensity drop`
   - `Chords  Em  G  D  Bm`
   - `GBL-001 E Dorian, 138 BPM, minor_loop_i_VII`
-  - `DRM-001 4-on-the-floor kick, closed-hat grid, snare beat 3`
-  - `BAS-001 Root anchor beat 1, chord tones beat 3, syncopation`
-  - `PAD-001 Open 4-note sustained voicing, chord-window duration`
-  - `PAD-003 Pulsed re-attack every 4–8 bars within chord window`
-  - `LD1-001 Motif-first, chord tones 80%, scale tensions 20%`
-  - `LD2-001 Counter-response, density ≤55% of Lead 1`
-  - `RHY-001 8th-note ostinato, alternating root/fifth per chord`
-  - `RHY-003 Syncopated Motorik (3+3+2 feel), root/fifth alternation`
-  - `TEX-001 Boundary-weighted sparse atmosphere, scale tensions`
+  - `DRM-001 Classic Motorik`
+  - `BAS-002 Motorik Drive`
+  - `BAS-VAR Bass evolving`
+  - `PAD-001 Sustained`
+  - `LD1-001 Motif-first`
+  - `LD2-001 Counter-response`
+  - `RHY-001 8th-note Stride`
+  - `TEX-001 Sparse`
+  - (Live playback annotations also append here during play, e.g. spotlight changes and bass variation events)
 - Rule numbering convention:
   - STR-001: Single-A, STR-002: Subtle A/B, STR-003: Moderate A/B, STR-004: Moderate A/B/A'
   - INT-001: 8-bar intro, INT-002: 16-bar intro
   - OUT-001: 8-bar outro, OUT-002: 16-bar outro
-  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-011
+  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-011, BAS-VAR (bass variation active), BAS-VAR-R (bass reverted to original pattern)
   - LD1: LD1-001 (phrase-first), LD1-002 (pentatonic cell), LD1-003 (long breath), LD1-004 (stepwise sequence), LD1-005 (statement-answer)
   - LD2: LD2-001 (counter-response), LD2-002 (sustained drone), LD2-003 (rhythmic counter), LD2-004 (Hallogallo motif counter), LD2-005 (descending line)
   - PAD: PAD-001 (sustained whole-bar), PAD-002 (power/drone voicing), PAD-003 (pulsed 2-bar), PAD-004 (sparse intro/outro), PAD-006 (chord stabs beat 1/3), PAD-007 (Charleston 3+3+2), PAD-010 (half-bar breathe), PAD-011 (backbeat stabs beats 2+4)
@@ -339,7 +338,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - 10. Arrangement filter (intro/outro layer entry/exit — silences tracks by section to create buildup and taper)
   - 11. Harmonic filter (removes notes outside the active chord window per bar for all melodic tracks)
   - 12. Pattern evolver — bass only (applies gradual mutation across 8/16/32-bar evolution windows using thin/fill/substitute/rotate operators; creates forward momentum without full regeneration)
-  - 13. Drum variation engine (adds fills at section transitions and instrument entrances; applies cymbal variations after 16+ identical bars; fill weight: 60% 1-beat subtle, 30% 2-beat, 10% 3-beat)
+  - 13. Drum variation engine (adds fills from three sources: section transitions, instrument entrances after ≥2 silent bars, and a periodic cadence every 4 bars through body sections — bars 3/7/11/15 within each section, so the crash lands on the next 4-bar phrase downbeat; applies cymbal variations after 16+ identical bars; fill weight: 60% 1-beat subtle, 30% 2-beat, 10% 3-beat)
   - 14. Song title generation (deterministic title derived from key, mood, and seed)
   - Internal dependency build still starts from drums+bass+rhythm, then applies pads/lead layers.
 - All tracks inherit one shared harmonic map and timeline length:
@@ -991,11 +990,11 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Kick: syncopated motorik pattern (not plain 4-on-floor). Core A: steps 0, 2, 6, 8, 14. Core B: steps 0, 2, 6, 8, 10, 14.
     - Snare: beats 2 and 4 (steps 4 and 12) in all non-sparse patterns
     - Hat/cymbal: 8th-note positions (steps 2, 4, 6, 8, 10, 12, 14) with closed hat; open hat or ride for accent variants
-    - Fill limit: maximum 1 fill per 16 bars (any length)
-    - Fill placement weights (where within the 16-bar window the fill lands):
-      - section-boundary lead-in: 60%
-      - 8-bar phrase boundary: 30%
-      - other bars: 10%
+    - Fill sources (three independent triggers, processed by DrumVariationEngine after drum generation):
+      - Section transitions: bar immediately before each new body section
+      - Instrument entrances: bar immediately before a non-drum track that enters after ≥2 bars of silence
+      - Periodic body cadence: bars 3, 7, 11, 15 … within each body section (one bar before each 4-bar phrase boundary); the crash from the fill then lands on the phrase downbeat. This fires through the entire body, giving roughly one fill per 4 bars. Skip if bar is already tagged by another source.
+    - Most periodic fills are 1-beat (60% weight) and are very subtle (Ghost Whisper or Sidestick Flam variants) — the groove remains intact and the fills are barely perceptible except at section boundaries.
     - Fill length weights:
       - 1 beat (4 steps): 60%
       - 2 beats (8 steps): 30%
@@ -1037,6 +1036,14 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - BAS-009 Vitamin Hook (7%): bar 1 climbs root→fifth→octave with chromatic passing tone, bar 2 descends with a long root breathe. Inspired by Holger Czukay / CAN "Vitamin C".
     - BAS-010 Quo Arc (10%): 2-bar boogie-woogie arc in paired 8th notes; bar 1 ascends 1-1-3-3-5-5-6-b7, bar 2 descends b7-6-5-3-1-1-1-1 back to root. Always uses boogie-woogie scale (1-3-5-6-b7) regardless of chord type. Inspired by Status Quo "Down Down".
     - BAS-011 Quo Drive (8%): compressed 1-bar boogie arc root-third-fifth-sixth-b7-sixth-fifth-third, with a root-push variant (root-root-third-fifth-sixth-b7-sixth-fifth) applied on even bars. Inspired by Status Quo "Caroline" / "Paper Plane".
+  - Bass variation for simple rules (BAS-001, BAS-002, BAS-004):
+    - These three rules produce very repetitive 1–2 note patterns. In B sections and alternating A sections that start at or after bar 48, the generator substitutes a slightly more complex variant to maintain musical interest without abandoning the rule's identity:
+      - BAS-001 Root Anchor variation: quarter-note walk root → third → fifth → root (mode-correct third and perfect fifth)
+      - BAS-002 Motorik Drive variation: root–root–third–root quarter pulse (adds mode-correct third on beat 3)
+      - BAS-004 Hallogallo Lock variation: root (long) → third → fifth arc (mode-correct passing third between the two anchors)
+    - All interval choices are mode-correct: minor third (3 semitones) in Dorian/Aeolian, major third (4 semitones) in Ionian/Mixolydian. The fifth is always a perfect fifth (+7, mode-neutral).
+    - The variation runs through the qualifying section(s) and then reverts to the original pattern. It does not take over the rest of the song. Alternating A sections after bar 48 (every other one) receive the variation so the pattern alternates rather than staying permanently changed.
+    - Status log entries: `BAS-VAR | Bass evolving` when the first variation bar fires; `BAS-VAR-R | Bass devolving` when the first revert bar fires. Both appear in the generation log at song load time.
   - All patterns anchor beat 1 (step 0) as the primary attack, matching the kick drum. Syncopation is deliberately minimal — Motorik bass is locked and pulse-forward.
   - Writing rules:
     - Phrase length: 1-2 bars
@@ -1722,6 +1729,79 @@ Q-002 - Reject/regenerate windows with >2 unresolved strong-beat Bass/Lead2 clas
 Q-003 - Reject/regenerate windows exceeding mood-consistency major/minor coloration threshold.
 Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 
+## Cosmic Implementation Spec (v1.x)
+
+### Style philosophy
+
+Berlin School / Tangerine Dream / JMJ / Klaus Schulze aesthetic. Long-form, slowly evolving, atmospheric. Minimal or absent percussion. Bass drones that build from near-silence. Sequencer arpeggios that spin up gradually. Pad swells that fill harmonic space. Texture shimmer as a presence layer. Songs feel like they are arriving from a great distance and then receding back into it.
+
+### Track roles in Cosmic style
+
+- Bass — holds root or fifth as a drone; may have an additive layer for movement or pulse
+- Pads — slow-moving 2-bar held chord voicings; primary harmonic atmosphere
+- Texture — atmospheric shimmer; present but nearly subliminal
+- Arpeggio — sequencer pattern; the kinetic element; enters late in intro and exits early in outro
+- Lead — sparse melodic line over the arpeggio pulse
+- Drums — sparse or absent; never a driving backbeat
+
+### Intro and outro behavior
+
+The intro builds from near-silence across 4–8 bars:
+- Bass enters first as a barely audible drone, growing gradually louder
+- Pads swell across 2-bar held notes, velocity climbing from dim to present
+- Texture shimmer appears only in the second half of the intro
+- Arpeggio sequencer spins up only in the final 2 bars of the intro, at reduced velocity
+
+The outro mirrors this arc:
+- Arpeggio winds down after the first 2 bars of the outro
+- Pads decay across 2-bar holds, fading to near-silence
+- Bass drone decays gradually to the end
+- Texture shimmer present only in the first half of the outro
+
+### Percussion styles (COS-DRUM)
+
+- COS-DRUM-001 — Minimal: kick on beat 1 every other bar; hi-hat quarter-note pulse with ghost/accent alternation (JMJ Mini Pops style)
+- COS-DRUM-002 — Sparse: pitched floor tom hits every 4–8 beats, rooted on the root and fifth of the key
+- COS-DRUM-003 — Absent: no percussion at all (Berlin School orchestral mode)
+
+### Arpeggio patterns (COS-ARP)
+
+- COS-ARP-001 — TD Sequencer: repeating 8-step pattern over one octave, Tangerine Dream style
+- COS-ARP-002 — JMJ Hook: distinctive 6-step melodic hook, Jean-Michel Jarre style
+- COS-ARP-003 — Oxygène: three-voice layered ascending/descending figures
+- COS-ARP-004 — Electric Buddha: syncopated 16-step pattern with rhythmic displacement
+
+### Bass patterns (COS-BASS)
+
+Primary rules (one selected per song):
+- COS-BASS-001 — Root drone: single sustained root note per bar
+- COS-BASS-002 — Octave pulse: alternating root / root+octave pattern
+- COS-BASS-003 — Root–fifth movement: alternates between root and perfect fifth
+- COS-BASS-004 — Moroder Drift: slow chromatic drift between adjacent tones
+- COS-BASS-005 — Absent: no bass layer (sparse cosmic texture songs)
+
+Additive rules (layered on top of primary; at most one per song):
+- COS-BASS-006 — Additive dual bass: anchor note plus staccato hits on off-beats
+- COS-BASS-007 — Additive pulsating tremolo: rapid pulsing on the root; blocked when primary is COS-BASS-004
+
+### Pad voicings (COS-PADS)
+
+- COS-PADS-001 — Simple triad: root, third, fifth
+- COS-PADS-002 — Open fifth: root and fifth only, no third
+- COS-PADS-003 — Spread voicing: wide-interval chord across two octaves
+- COS-PADS-004 — Suspended chord: suspended second or fourth
+- COS-PADS-005 — Quartal Stack: chords built in fourths rather than thirds
+- COS-PADS-006 — Cloud Shimmer: high shimmer layer added above pad voicing
+
+### Texture patterns (COS-TEXT)
+
+- COS-TEXT-001 — Slow sweep: very slow filter-style ascending line
+- COS-TEXT-002 — Shimmer Hold: long sustained note in upper register
+- COS-TEXT-003 — Spatial Sweep: slow rising figure across 4 bars
+- COS-TEXT-004 — Micro-pulse: very quiet, rapidly repeated single note
+
+---
+
 ## Motorik Title Generator (v1)
 
 - Behavior
@@ -1792,6 +1872,37 @@ Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 - Bomb Pattern
 - Flur Motor
 - Panzinger Echo
+
+## Cosmic Title Generator
+
+Song titles for Cosmic-style songs draw from space and cosmos vocabulary in English, French, and faux-German. They follow four patterns:
+
+- Single JMJ-X word: a 3-syllable word containing X, either real French/Latin or invented in the JMJ style
+- JMJ-X word + Roman numeral: e.g. "Galaxie IV"
+- Two-word English cosmic: adjective + cosmic noun
+- Faux-German adjective + cosmic noun: in the Tangerine Dream tradition
+
+### Example generated titles
+
+- Vortexe
+- Proxima III
+- Dark Nebula
+- Silent Void
+- Ewig Kosmos
+- Tief Nebel
+- Dunkel Stern
+
+---
+
+## Style-specific song naming summary
+
+Motorik titles: short, pulse-oriented, slightly cryptic. English + Germanic mix. Hard consonants. Motion/place/texture vocabulary.
+- Examples: Mittelwerk Pulse, Neon Nordhausen, Rother Flux
+
+Cosmic titles: space and cosmos vocabulary. English, French, and faux-German. JMJ-style 3-syllable X words. Roman numerals for series naming.
+- Examples: Vortexe, Proxima III, Dunkel Stern, Dark Nebula
+
+---
 
 ## AVAudioEngine playback architecture (v1)
 

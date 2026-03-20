@@ -179,6 +179,59 @@ Concrete BPM data from specific tracks:
 
 ---
 
+## Part 2.5: Numbered Ambient Rules Catalog
+
+These rules are extracted from the artist analysis above and numbered for reference during implementation. Each rule maps directly to a generator behavior or a Types.swift constraint.
+
+**AMB-RULE-01: Incommensurable loop lengths**
+Loop lengths must have no common factors (co-prime). A ratio of ~1.08–1.15 between any two loop lengths is ideal. This prevents the loops from returning to phase alignment during any listening session.
+**Source:** Eno, Discreet Music (63s/68s loop ratio)
+
+**AMB-RULE-02: Silence ≥ 2× note duration**
+After any note event, generate at least 2× that note's duration as rest before the next event on the same track. This is Eno's foundational rule from Music for Airports.
+**Source:** Eno, Music for Airports
+
+**AMB-RULE-03: 3–7 loops per song, each with 1–4 notes**
+Each loop layer contains 1–4 notes followed by silence. The minimal content per layer is intentional — variation emerges from phase relationships, not from complex individual patterns.
+**Source:** Eno, Music for Airports
+
+**AMB-RULE-04: Tonic always anchored**
+At least one pad layer must hold the tonic note at all times. This is the harmonic anchor that prevents the piece from feeling atonal or random.
+
+**AMB-RULE-05: Reversed-attack bloom via velocity ramp**
+Simulate the reversed-attack effect by starting a note at near-zero velocity (0–15) and ramping to peak over the first 8–16 steps. The note "blooms" into existence rather than striking.
+**Source:** Eno, Apollo (backward-attack pads)
+
+**AMB-RULE-06: Beating drone via detuned voices**
+Two pad voices detuned by ±3–8 cents create a natural beating/chorus effect at 0.1–0.5 Hz — one gentle pulse every 2–10 seconds. This is achieved through pitch: no LFO needed.
+**Source:** Eno, On Land
+
+**AMB-RULE-07: Drone preferred over melody in long songs**
+For songs with `progressionFamily == .drone_single`, prefer whole-note chord drones over melodic loops. The harmonic content IS the structure.
+**Source:** Eno, Thursday Afternoon
+
+**AMB-RULE-08: Loscil drums = sparse stochastic texture**
+"Drums" in Loscil-style ambient: very short note durations (2–4 steps), low velocity (30–50), ~25% trigger probability per 16th-note step. Heavy reverb. Feels like texture, not rhythm.
+**Source:** Loscil, Stases/Submers/Plume
+
+**AMB-RULE-09: Bass as sub-presence only**
+Bass holds root note for 4–8 bars at a time. No bass runs. Velocity 55–65. Register MIDI 28–48.
+**Source:** Loscil
+
+**AMB-RULE-10: No drums = compositional silence, not a missing track**
+When `percussionStyle == .absent`, the drums track exists but generates zero MIDI events. The track appears blank in the UI. This preserves UI consistency and allows mute/solo.
+**Source:** Stars of the Lid, Eno beatless tracks
+
+**AMB-RULE-11: Gas-style = textural drums + quarter-note kick**
+A heartbeat-without-groove feel: kick on every quarter beat (steps 0, 4, 8, 12), hi-hat at 25% probability on 16th grid, velocity 15–30. No snare.
+**Source:** Gas (Wolfgang Voigt)
+
+**AMB-RULE-12: Dark ambient = allow dissonant intervals**
+When `progressionFamily == .dissonant_haze`, allow minor 2nds and tritones in pad voicings. This requires a flag `allowsDissonance: Bool` to gate — the HarmonicFilter normally rejects these.
+**Source:** Tim Hecker
+
+---
+
 ## Part 3: Universal Ambient Rules (What All Sources Share)
 
 These rules are non-negotiable for anything to sound Ambient:
@@ -190,7 +243,13 @@ These rules are non-negotiable for anything to sound Ambient:
 - **No metronomic pulse** — even when tempo exists (Loscil at 170 BPM), the feel is not "in time"
 - **Consonant harmony** (Eno/Loscil style) OR controlled dissonance (Hecker style), but not jazz function
 - **Reverb is compositional** — not an effect; it defines the spatial scale of the piece
-- **Velocity narrow range** — pads 40–70; leads 30–60; no accents, no dynamic arc
+- **Velocity hierarchy:**
+  - Pads: 40–70 (background; never prominent)
+  - Lead: 30–60 (even softer than pads — lead is background, not foreground)
+  - Bass: 55–65 (sub-presence only)
+  - Texture: 15–35 (barely audible; harmonic mass contributor)
+  - Drums (when present): 20–55 textural / 50–65 soft-pulse
+  - No track should exceed velocity 70; absence of dynamic peaks is genre-defining
 
 ---
 
@@ -209,10 +268,14 @@ These rules are non-negotiable for anything to sound Ambient:
 
 ### 5.1 AmbientMusicalFrameGenerator
 
-**Tempo:** Two operating modes:
+**Tempo:** Three operating modes:
 - **Beatless** (50% probability): Tempo stored as 60–80 BPM but used only as step clock — no perceived pulse
 - **Slow pulse** (35%): 70–95 BPM, soft kick-like events, Loscil/Gas feel (corrected from initial double-time estimate)
 - **Mid pulse** (15%): 95–110 BPM — still feels slow due to sparse events; Gas-style heartbeat kick
+
+**Cosmic/Ambient boundary at overlapping tempos:** At 95–110 BPM, the distinction from Cosmic is not tempo — it is the absence of the arpeggio generator. Ambient at these tempos has no sequencer pulse; Cosmic at the same tempo has a CosmicArpeggioGenerator as its primary voice.
+
+**PercussionStyle enum (canonical, for Types.swift):** `.absent` / `.textural` / `.softPulse`
 
 **Keys:** Weighted toward flat/minor keys:
 - A minor (18%), E minor (15%), D minor (15%), G minor (12%), F minor (10%), B minor (10%), C minor (8%), other (12%)
@@ -252,6 +315,17 @@ This is what makes Ambient different from Cosmic at an engine level.
 - 3-loop system: loop lengths 11, 13, 15 bars (LCM = 2145; use 48-bar song = first portion of the phase)
 - 4-loop system: loop lengths 7, 11, 13, 17 bars (LCM = 17017; use 64-bar song)
 - Loop lengths should be multiples of 2 for simpler MIDI alignment: 10, 14, 16, 22 bars (all even co-primes)
+
+**Track→loop assignment (Zudio 7-track model):**
+- Pads track: loop length A (longest prime, e.g. 17 bars)
+- Lead 1: loop length B (e.g. 13 bars)
+- Lead 2: loop length C (e.g. 11 bars)
+- Texture track: loop length D (e.g. 7 bars — shortest for most frequent texture cycling)
+- Bass track: loop length A or B (share with pads for harmonic consistency)
+- Rhythm/Arpeggio: loop length E (e.g. 5 bars if used; absent in 60% of songs)
+- Drums: no loop length (stochastic per-step probability; not a repeating loop)
+
+In a 3-loop system (Pads + Lead 1 + Texture), assign the remaining tracks (Lead 2, Bass, Rhythm) to the nearest matching loop length or generate their content from the same loop pattern with minor variation.
 
 ---
 

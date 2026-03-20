@@ -11,14 +11,24 @@ final class AppState: ObservableObject {
     @Published var songState: SongState? = nil
     @Published var isGenerating: Bool = false
 
-    // MARK: - Generation history (status log accumulates across generations)
+    // MARK: - Generation history (SongState tracking for regen/export/playback)
 
     @Published var generationHistory: [SongState] = []
+
+    // MARK: - Flat status log — single append-only source for StatusBoxView.
+    // Everything writes here in chronological order: initial generation entries,
+    // live bar annotations, and regen entries all go to the end.
+
+    @Published var statusLog: [GenerationLogEntry] = []
 
     // MARK: - Visible window — zoom + DAW scroll
 
     @Published var visibleBars: Int = 16
     @Published var visibleBarOffset: Int = 0
+
+    // MARK: - Style selector
+
+    @Published var selectedStyle: MusicStyle = .cosmic
 
     // MARK: - UI selectors (nil = Auto)
 
@@ -91,8 +101,15 @@ final class AppState: ObservableObject {
              .receive(on: DispatchQueue.main)
             .sink { [weak self] step in
                 Task { @MainActor [weak self] in
-                    self?.updateDAWScroll(step: step)
-                    self?.emitStepAnnotations(upTo: step)
+                    guard let self else { return }
+                    // Discard stale notifications from a previous song/playback session.
+                    // The double async (receive + Task) means old step values (e.g., step 800
+                    // from before generateNew reset currentStep to 0) can arrive AFTER the
+                    // new song is already playing. A stale step is hundreds of steps ahead of
+                    // currentStep=0 — far outside the normal 1–5 step delivery lag.
+                    guard step <= self.playback.currentStep + 32 else { return }
+                    self.updateDAWScroll(step: step)
+                    self.emitStepAnnotations(upTo: step)
                 }
             }
             .store(in: &cancellables)
@@ -106,7 +123,7 @@ final class AppState: ObservableObject {
         for s in (lastEmittedStep + 1)...step {
             if let entries = annotations[s] {
                 for entry in entries {
-                    livePlaybackFeed.append(entry)
+                    statusLog.append(entry)
                 }
             }
         }
@@ -136,6 +153,7 @@ final class AppState: ObservableObject {
                 keyOverride:   await self.keyOverride,
                 tempoOverride: await self.tempoOverride,
                 moodOverride:  await self.moodOverride,
+                style:         await self.selectedStyle,
                 testMode:      await self.testModeEnabled
             )
             await MainActor.run {
@@ -143,8 +161,12 @@ final class AppState: ObservableObject {
                 self.generationHistory.append(state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
-                self.livePlaybackFeed = []
                 self.lastEmittedStep  = -1
+                // Append generation log to the flat status log (with separator if not first)
+                if !self.statusLog.isEmpty {
+                    self.statusLog.append(GenerationLogEntry(tag: "───", description: "new song", isTitle: false))
+                }
+                self.statusLog.append(contentsOf: state.generationLog)
                 // Reset mute/solo so every new song starts with all parts audible
                 self.muteState = Array(repeating: false, count: 7)
                 self.soloState = Array(repeating: false, count: 7)
@@ -179,10 +201,13 @@ final class AppState: ObservableObject {
                 self.songState    = updated
                 self.isGenerating = false
                 if self.playback.isPlaying { self.playback.load(updated) }
-                // Keep generationHistory in sync so StatusBoxView shows the regen log
+                // Keep generationHistory in sync for SongState tracking
                 if !self.generationHistory.isEmpty {
                     self.generationHistory[self.generationHistory.count - 1] = updated
                 }
+                // Append only the NEW regen entries to the flat status log (at the very bottom)
+                let regenEntries = Array(updated.generationLog.dropFirst(current.generationLog.count))
+                self.statusLog.append(contentsOf: regenEntries)
             }
         }
     }

@@ -25,10 +25,10 @@ struct DrumGenerator {
         let ruleIndex = rng.weightedPick(ruleWeights)
         let ruleID: String
         switch ruleIndex {
-        case 1:  ruleID = "DRM-002"
-        case 2:  ruleID = "DRM-003"
-        case 3:  ruleID = "DRM-004"
-        default: ruleID = "DRM-001"
+        case 1:  ruleID = "MOT-DRUM-002"
+        case 2:  ruleID = "MOT-DRUM-003"
+        case 3:  ruleID = "MOT-DRUM-004"
+        default: ruleID = "MOT-DRUM-001"
         }
         usedRuleIDs.insert(ruleID)
 
@@ -64,10 +64,10 @@ struct DrumGenerator {
         bar: Int, ruleID: String, intensity: SectionIntensity, barStart: Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         switch ruleID {
-        case "DRM-002": return openPocketBar(intensity: intensity, barStart: barStart)
-        case "DRM-003": return rideGrooveBar(intensity: intensity, barStart: barStart)
-        case "DRM-004": return almostMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
-        default:        return classicMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-002": return openPocketBar(intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-003": return rideGrooveBar(intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-004": return almostMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
+        default:             return classicMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
         }
     }
 

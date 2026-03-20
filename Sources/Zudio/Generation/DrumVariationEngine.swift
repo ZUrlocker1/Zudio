@@ -210,6 +210,20 @@ struct DrumVariationEngine {
             }
         }
 
+        // Periodic body fills: fire on bars 3, 7, 11, 15 … within each body section
+        // (one bar before each 4-bar phrase boundary). Modelled on Vanishing Point (Electric
+        // Buddha Band) which maintains a secondary fills layer throughout the body regardless
+        // of section transitions. The crash from applyFill() then lands on the natural downbeat.
+        // Skip bars already tagged to avoid double-fills.
+        for bar in 0..<frame.totalBars {
+            guard let sec = structure.section(atBar: bar),
+                  sec.label != .intro && sec.label != .outro else { continue }
+            let barInSection = bar - sec.startBar
+            guard (barInSection + 1) % 4 == 0 else { continue }
+            guard !fillBars.contains(bar) else { continue }
+            fillBars.insert(bar)
+        }
+
         return fillBars
     }
 
@@ -543,33 +557,19 @@ struct DrumVariationEngine {
         fillBars: Set<Int>,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        func fingerprint(bar: Int) -> Set<UInt8> {
-            let bs = bar * 16
-            return Set(events.filter { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }.map { $0.note })
-        }
-
+        // Count body bars independently of fill bars, then fire a cymbal variation every 8
+        // body bars starting at bar 8 (skipping fill bars, which already have varied content).
+        // Previously used a run-length fingerprint approach that broke once fills started
+        // triggering every 4 bars — the counter never reached 16 so variations never fired.
         var result = events
-        var runLength = 0
-        var lastFP: Set<UInt8>? = nil
+        var bodyBarCount = 0
 
         for bar in 0..<frame.totalBars {
             guard let sec = structure.section(atBar: bar),
-                  sec.label != .intro && sec.label != .outro else {
-                runLength = 0; lastFP = nil; continue
-            }
-            guard !fillBars.contains(bar) else {
-                runLength = 0; lastFP = nil; continue
-            }
-
-            let fp = fingerprint(bar: bar)
-            if let last = lastFP, last == fp {
-                runLength += 1
-            } else {
-                runLength = 1
-                lastFP = fp
-            }
-
-            if runLength >= 16 && runLength % 8 == 0 {
+                  sec.label != .intro && sec.label != .outro else { continue }
+            bodyBarCount += 1
+            guard !fillBars.contains(bar) else { continue }
+            if bodyBarCount >= 8 && bodyBarCount % 8 == 0 {
                 let varType = rng.nextInt(upperBound: 3)
                 result = applyVariation(to: result, bar: bar, varType: varType)
             }

@@ -34,9 +34,9 @@ struct BassGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
-        let rules:   [String] = ["BAS-001","BAS-002","BAS-003","BAS-004",
-                                  "BAS-005","BAS-006","BAS-007","BAS-008","BAS-009",
-                                  "BAS-010","BAS-011"]
+        let rules:   [String] = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
+                                  "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
+                                  "MOT-BASS-010","MOT-BASS-011"]
         let weights: [Double] = [0.10,     0.10,     0.07,     0.10,
                                   0.12,     0.06,     0.11,     0.09,     0.07,
                                   0.10,     0.08]
@@ -46,12 +46,39 @@ struct BassGenerator {
         // BAS-005: pre-roll per-4-bar-group flags — ~1/3 chance the phrase is all-drive
         // (bass sits on the descent groove for 4 straight bars instead of alternating breathe bars).
         var mccartney4BarDrive: [Bool] = []
-        if ruleID == "BAS-005" {
+        if ruleID == "MOT-BASS-005" {
             let groups = frame.totalBars / 4 + 1
             mccartney4BarDrive = (0..<groups).map { _ in rng.nextDouble() < 0.33 }
         }
 
+        // Precompute variation windows for simple 1–2 note rules (BAS-001/002/004).
+        // Fires for: every B section; every other A section that starts at or after bar 48
+        // (alternating on/off so the variation doesn't take over the whole second half).
+        // This keeps the bass interesting at section boundaries without being relentless.
+        let simpleRules: Set<String> = ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004"]
+        var variationBars = Set<Int>()
+        if simpleRules.contains(ruleID) {
+            var aToggle = false
+            var seenSection: SectionLabel? = nil
+            for bar in 0..<frame.totalBars {
+                guard let sec = structure.section(atBar: bar),
+                      sec.label != .intro && sec.label != .outro else { continue }
+                guard sec.startBar == bar else { continue }   // process each section once at its start
+                if sec.label == .B {
+                    for b in sec.startBar..<sec.endBar { variationBars.insert(b) }
+                } else if sec.label == .A && sec.startBar >= 48 {
+                    aToggle.toggle()
+                    if aToggle { for b in sec.startBar..<sec.endBar { variationBars.insert(b) } }
+                }
+                seenSection = sec.label
+            }
+            _ = seenSection  // suppress unused warning
+        }
+
         var events: [MIDIEvent] = []
+        var variationLogged = false   // emit "BASS-EVOL" rule once when first variation bar fires
+        var devolveLogged   = false   // emit "BASS-DEVOL" rule once when first revert bar fires
+        var wasInVariation  = false   // tracks previous body bar's variation state
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar),
@@ -67,9 +94,26 @@ struct BassGenerator {
                                    barStart: barStart, entry: entry, frame: frame, rng: &rng,
                                    mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
             } else {
+                let useVariation = variationBars.contains(bar)
+                if useVariation && !variationLogged {
+                    usedRuleIDs.insert("BASS-EVOL")
+                    variationLogged = true
+                }
+                if !useVariation && wasInVariation && !devolveLogged {
+                    usedRuleIDs.insert("BASS-DEVOL")
+                    devolveLogged = true
+                }
+                wasInVariation = useVariation
                 events += bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                                  frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+                                  frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
+                                  useVariation: useVariation)
             }
+        }
+
+        // If the song ended still in variation (e.g. B section directly before outro),
+        // the outro plays the original non-variation pattern — emit the devolution marker.
+        if variationLogged && wasInVariation && !devolveLogged {
+            usedRuleIDs.insert("BASS-DEVOL")
         }
 
         return events
@@ -80,22 +124,75 @@ struct BassGenerator {
     private static func bodyBar(
         ruleID: String, barStart: Int, bar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        rng: inout SeededRNG, mccartney4BarDrive: [Bool]
+        rng: inout SeededRNG, mccartney4BarDrive: [Bool],
+        useVariation: Bool = false
     ) -> [MIDIEvent] {
+        // Simple 1–2 note rules get a more interesting variant in B sections and after bar 48
+        if useVariation, ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004"].contains(ruleID) {
+            return simpleRuleVariationBar(barStart: barStart, bar: bar, ruleID: ruleID, entry: entry, frame: frame)
+        }
         switch ruleID {
-        case "BAS-002": return motorikDriveBar(barStart: barStart, entry: entry, frame: frame)
-        case "BAS-003": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "BAS-004": return hallogalloLockBar(barStart: barStart, entry: entry, frame: frame)
-        case "BAS-005":
+        case "MOT-BASS-002": return motorikDriveBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-003": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-004": return hallogalloLockBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-005":
             let allDrive = mccartney4BarDrive[min(bar / 4, mccartney4BarDrive.count - 1)]
             return mccartneyDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame, allDrive: allDrive)
-        case "BAS-006": return laWomanSustainBar(barStart: barStart, entry: entry, frame: frame)
-        case "BAS-007": return hookAscentBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "BAS-008": return motoroderPulseBar(barStart: barStart, entry: entry, frame: frame)
-        case "BAS-009": return vitaminHookBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "BAS-010": return quoArcBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "BAS-011": return quoDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-006": return laWomanSustainBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-007": return hookAscentBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-008": return motoroderPulseBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-009": return vitaminHookBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-010": return quoArcBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-011": return quoDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
+        }
+    }
+
+    // MARK: - Variation for simple rules (BAS-001 / BAS-002 / BAS-004)
+    // Fires in B sections and at bars >= 48. Keeps the Motorik quarter-note pulse
+    // but adds a third or fifth to break the monotony.
+
+    private static func simpleRuleVariationBar(
+        barStart: Int, bar: Int, ruleID: String,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = chordRootNote(entry: entry, frame: frame)
+        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+        let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
+
+        switch ruleID {
+
+        case "MOT-BASS-002":
+            // Motorik Drive + third: root–root–third–root quarter pulse.
+            // Same velocity/duration feel as BAS-002; third on beat 3 is the only change.
+            let pitches: [UInt8] = [root, root,  third, root ]
+            let vels:    [UInt8] = [96,   70,    86,    68   ]
+            let durs:    [Int]   = [3,    2,     3,     2    ]
+            var evs: [MIDIEvent] = []
+            for beat in 0..<4 {
+                evs.append(MIDIEvent(stepIndex: barStart + beat * 4, note: pitches[beat],
+                                     velocity: vels[beat], durationSteps: durs[beat]))
+            }
+            return evs
+
+        case "MOT-BASS-004":
+            // Hallogallo + arc: root (long) → third → fifth instead of root → fifth.
+            // Adds a passing third between the two anchor notes.
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,  velocity: 96, durationSteps: 5),
+                MIDIEvent(stepIndex: barStart + 6,  note: third, velocity: 78, durationSteps: 3),
+                MIDIEvent(stepIndex: barStart + 10, note: fifth, velocity: 84, durationSteps: 5),
+            ]
+
+        default: // BAS-001
+            // Root Anchor walk: root → third → fifth → root (same arpeggio as the intro hint,
+            // now used in the body for variety). Still quarter-note locked.
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,  velocity: 92, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: third, velocity: 82, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: fifth, velocity: 88, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: root,  velocity: 78, durationSteps: 4),
+            ]
         }
     }
 
@@ -172,13 +269,13 @@ struct BassGenerator {
 
         switch ruleID {
 
-        case "BAS-002":   // Motorik Drive → root only, half-time beats 1+3
+        case "MOT-BASS-002":   // Motorik Drive → root only, half-time beats 1+3
             return [
                 MIDIEvent(stepIndex: barStart,     note: root, velocity: 82, durationSteps: 7),
                 MIDIEvent(stepIndex: barStart + 8, note: root, velocity: 74, durationSteps: 7),
             ]
 
-        case "BAS-003":   // Crawling Walk (simple) → ascending quarter notes root→2nd→3rd→5th
+        case "MOT-BASS-003":   // Crawling Walk (simple) → ascending quarter notes root→2nd→3rd→5th
             // Body has root/fifth/approach; intro hints at more by climbing the scale.
             let second3 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 28, high: 56))
             let third3  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
@@ -189,7 +286,7 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 12, note: fifth,   velocity: 88, durationSteps: 4),
             ]
 
-        case "BAS-004":   // Hallogallo Lock (simple) → 8th-note scale walk root→2nd→3rd, lands on 5th
+        case "MOT-BASS-004":   // Hallogallo Lock (simple) → 8th-note scale walk root→2nd→3rd, lands on 5th
             // Body is just root+fifth; intro builds anticipation by walking up to that fifth.
             let second4 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 28, high: 56))
             let third4  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
@@ -200,7 +297,7 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 6,  note: fifth,   velocity: 88, durationSteps: 10),
             ]
 
-        case "BAS-005":   // McCartney Drive → breathe bar: root sustain + low fifth + approach
+        case "MOT-BASS-005":   // McCartney Drive → breathe bar: root sustain + low fifth + approach
             let lowerFifth = UInt8(clamped(Int(root) - 5, low: 28, high: 52))
             let approach   = UInt8(clamped(Int(root) - 2, low: 28, high: 52))
             return [
@@ -209,10 +306,10 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 14, note: approach,   velocity: 60, durationSteps: 2),
             ]
 
-        case "BAS-006":   // LA Woman → root whole-bar, no shimmer
+        case "MOT-BASS-006":   // LA Woman → root whole-bar, no shimmer
             return [MIDIEvent(stepIndex: barStart, note: root, velocity: 86, durationSteps: 14)]
 
-        case "BAS-007":   // Hook Ascent → root 8th notes (rhythm signal, melody withheld)
+        case "MOT-BASS-007":   // Hook Ascent → root 8th notes (rhythm signal, melody withheld)
             var evs7: [MIDIEvent] = []
             let vels7: [UInt8] = [86, 72, 78, 68, 82, 68, 76, 66]
             for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
@@ -221,7 +318,7 @@ struct BassGenerator {
             }
             return evs7
 
-        case "BAS-008":   // Moroder Pulse → root only staccato 8ths (omit fifth and b7)
+        case "MOT-BASS-008":   // Moroder Pulse → root only staccato 8ths (omit fifth and b7)
             var evs8: [MIDIEvent] = []
             let vels8: [UInt8] = [90, 74, 80, 70, 84, 70, 80, 72]
             for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
@@ -230,13 +327,13 @@ struct BassGenerator {
             }
             return evs8
 
-        case "BAS-009":   // Vitamin Hook → root on 1, fifth on 3 (omit arpeggio movement)
+        case "MOT-BASS-009":   // Vitamin Hook → root on 1, fifth on 3 (omit arpeggio movement)
             return [
                 MIDIEvent(stepIndex: barStart,     note: root,  velocity: 86, durationSteps: 7),
                 MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 76, durationSteps: 7),
             ]
 
-        case "BAS-010", "BAS-011":   // Quo Arc / Quo Drive → root–third alternating 8ths
+        case "MOT-BASS-010", "MOT-BASS-011":   // Quo Arc / Quo Drive → root–third alternating 8ths
             let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 62))
             let quoNotes: [UInt8] = [root, third, root, third, root, third, root, third]
             let quoVels:  [UInt8] = [90,   76,    86,   72,    88,   74,    84,   70  ]

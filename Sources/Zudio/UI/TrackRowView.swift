@@ -24,34 +24,63 @@ struct TrackRowView: View {
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
+        let isCosmic = appState.selectedStyle == .cosmic
         switch trackIndex {
         case kTrackLead1:
+            if isCosmic {
+                return [.init(name:"Brightness",    program:100), .init(name:"Vibraphone",   program:11),
+                        .init(name:"Ocarina",        program:79),  .init(name:"Flute",        program:73),
+                        .init(name:"Whistle",        program:78)]
+            }
             return [.init(name:"Square Lead",      program:80), .init(name:"Mono Synth",      program:81),
                     .init(name:"Synth Brass",      program:63), .init(name:"Synth Brass 2",   program:62),
                     .init(name:"Fifths Lead",      program:86), .init(name:"Moog Lead",        program:39),
                     .init(name:"Overdrive Gtr",    program:29), .init(name:"Flute",            program:82)]
         case kTrackLead2:
+            if isCosmic {
+                return [.init(name:"Warm Pad",     program:89), .init(name:"Halo Pad",        program:94),
+                        .init(name:"New Age Pad",  program:88)]
+            }
             return [.init(name:"Brightness",     program:100), .init(name:"Vibraphone",      program:11),
                     .init(name:"Marimba",          program:12), .init(name:"Bell/Pluck",      program:14),
                     .init(name:"Soft Brass",        program:56), .init(name:"Ocarina",        program:79)]
         case kTrackPads:
+            if isCosmic {
+                return [.init(name:"Choir Aahs",   program:52), .init(name:"String Ensemble", program:48),
+                        .init(name:"Synth Strings", program:50), .init(name:"Warm Pad",       program:89),
+                        .init(name:"Space Voice",   program:91)]
+            }
             return [.init(name:"Warm Pad",       program:89), .init(name:"Halo Pad",        program:94),
                     .init(name:"New Age Pad",     program:88), .init(name:"Sweep Pad",       program:95),
                     .init(name:"Bowed Glass",     program:92), .init(name:"Synth Strings",   program:50),
                     .init(name:"String Pad",      program:48), .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
+            if isCosmic {
+                return [.init(name:"Square Lead",  program:80), .init(name:"Vibraphone",     program:11),
+                        .init(name:"Marimba",       program:12), .init(name:"Kalimba",        program:108)]
+            }
             return [.init(name:"Guitar Pulse",     program:28), .init(name:"Wurlitzer",         program:5),
                     .init(name:"Rock Organ",        program:18), .init(name:"Clavinet",          program:7),
                     .init(name:"Electric Piano",    program:4),  .init(name:"Muted Guitar",      program:29),
                     .init(name:"Tremolo Strings",   program:44), .init(name:"Mono Synth",        program:80)]
         case kTrackTexture:
+            if isCosmic {
+                return [.init(name:"Pad 3 Poly",   program:90), .init(name:"FX Atmosphere",  program:99),
+                        .init(name:"Sweep Pad",     program:95)]
+            }
             return [.init(name:"Halo Pad",        program:94), .init(name:"Warm Pad",        program:89),
                     .init(name:"Space Voice",      program:91), .init(name:"Swell",           program:95),
                     .init(name:"FX Atmosphere",    program:99), .init(name:"FX Echoes",       program:102)]
         case kTrackBass:
+            if isCosmic {
+                return [.init(name:"Moog Bass",    program:39), .init(name:"Synth Bass 1",   program:38)]
+            }
             return [.init(name:"Moog Bass",       program:39), .init(name:"Lead Bass",      program:87),
                     .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]
         case kTrackDrums:
+            if isCosmic {
+                return [.init(name:"Standard Kit", program:0),  .init(name:"Brush Kit",      program:40)]
+            }
             return [.init(name:"Rock Kit",       program:8),  .init(name:"808 Kit",         program:25),
                     .init(name:"Brush Kit",       program:40),
                     .init(name:"Rock Kit",        program:8)]
@@ -177,6 +206,10 @@ struct TrackRowView: View {
                 .frame(height: 1)
         }
         .onAppear { applyDefaultEffects() }
+        .onChange(of: appState.selectedStyle) { _ in
+            instrumentIndex = min(instrumentIndex, instruments.count - 1)
+            appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
+        }
     }
 
     // MARK: - Helpers

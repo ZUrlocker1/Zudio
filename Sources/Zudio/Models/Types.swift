@@ -124,6 +124,42 @@ enum ProgressionFamily: String, Codable, Sendable {
     case modal_cadence_bVI_bVII_I
 }
 
+// MARK: - Music style
+
+enum MusicStyle: String, CaseIterable, Codable, Sendable {
+    case motorik = "Motorik"
+    case cosmic  = "Cosmic"
+    // case ambient = "Ambient"  // future
+}
+
+// MARK: - Percussion style (Cosmic + future Ambient)
+
+enum PercussionStyle: String, Codable, Sendable {
+    case absent
+    case sparse
+    case minimal
+    case textural    // Ambient future use
+    case softPulse   // Ambient future use
+}
+
+// MARK: - Cosmic song forms
+
+enum CosmicSongForm: String, Codable, Sendable {
+    case single_evolving
+    case two_world
+    case build_and_dissolve
+}
+
+// MARK: - Cosmic progression families
+
+enum CosmicProgressionFamily: String, Codable, Sendable {
+    case static_drone
+    case two_chord_pendulum
+    case modal_drift
+    case suspended_resolution
+    case quartal_stack
+}
+
 enum SongForm: String, Sendable {
     case singleA
     case subtleAB

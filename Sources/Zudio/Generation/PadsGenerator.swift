@@ -25,13 +25,13 @@ struct PadsGenerator {
         var events: [MIDIEvent] = []
 
         // Weighted style selection — all rules are atmospheric/harmonic
-        let padRules:   [String] = ["PAD-001","PAD-002","PAD-003","PAD-006",
-                                    "PAD-007","PAD-010","PAD-011"]
+        let padRules:   [String] = ["MOT-PADS-001","MOT-PADS-002","MOT-PADS-003","MOT-PADS-006",
+                                    "MOT-PADS-007","MOT-PADS-010","MOT-PADS-011"]
         let padWeights: [Double] = [0.22,     0.17,     0.15,     0.14,
                                     0.18,     0.09,     0.05]
         let primaryRule = padRules[rng.weightedPick(padWeights)]
         usedRuleIDs.insert(primaryRule)
-        usedRuleIDs.insert("PAD-004")  // sparse intro/outro always applies
+        usedRuleIDs.insert("MOT-PADS-004")  // sparse intro/outro always applies
 
         let totalBars = frame.totalBars
         var sustainRunBars = 0   // tracks consecutive whole-note bars for 4-bar break rule
@@ -70,7 +70,7 @@ struct PadsGenerator {
 
             let stepIdx = bar * 16
             let voicing = buildVoicing(chordWindow: cw, frame: frame,
-                                       usePower: primaryRule == "PAD-002",
+                                       usePower: primaryRule == "MOT-PADS-002",
                                        prevRootMIDI: prevRootMIDI)
             if let first = voicing.first { prevRootMIDI = Int(first) }
 
@@ -83,9 +83,9 @@ struct PadsGenerator {
 
             // 4-bar rule: after 4 consecutive sustained bars, inject a Charleston bar
             let activePrimary: String
-            if (primaryRule == "PAD-001" || primaryRule == "PAD-002") && sustainRunBars >= 4 {
-                activePrimary = "PAD-007"
-                usedRuleIDs.insert("PAD-007")
+            if (primaryRule == "MOT-PADS-001" || primaryRule == "MOT-PADS-002") && sustainRunBars >= 4 {
+                activePrimary = "MOT-PADS-007"
+                usedRuleIDs.insert("MOT-PADS-007")
                 sustainRunBars = 0
             } else {
                 activePrimary = primaryRule
@@ -94,7 +94,7 @@ struct PadsGenerator {
             switch activePrimary {
 
             // MARK: Sustained whole-bar
-            case "PAD-001", "PAD-002":
+            case "MOT-PADS-001", "MOT-PADS-002":
                 sustainRunBars += 1
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
@@ -102,7 +102,7 @@ struct PadsGenerator {
                 }
 
             // MARK: Pulsed 2-bar
-            case "PAD-003":
+            case "MOT-PADS-003":
                 if bar % 2 == 0 {
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: stepIdx, note: note,
@@ -111,7 +111,7 @@ struct PadsGenerator {
                 }
 
             // MARK: Chord stabs (beat 1 + sometimes beat 3)
-            case "PAD-006":
+            case "MOT-PADS-006":
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
                                             velocity: velocity, durationSteps: 4))
@@ -126,7 +126,7 @@ struct PadsGenerator {
 
             // MARK: Charleston / 3+3+2
             // Hits at steps 0, 6, 12 — dotted-quarter, dotted-quarter, quarter
-            case "PAD-007":
+            case "MOT-PADS-007":
                 sustainRunBars = 0
                 for (offset, dur) in [(0, 5), (6, 5), (12, 4)] {
                     for note in voicing {
@@ -136,14 +136,14 @@ struct PadsGenerator {
                 }
 
             // MARK: Half-bar breathe — chord on beat 1, silence second half
-            case "PAD-010":
+            case "MOT-PADS-010":
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
                                             velocity: velocity, durationSteps: 7))
                 }
 
             // MARK: Backbeat stabs — beats 2+4 only
-            case "PAD-011":
+            case "MOT-PADS-011":
                 let bbVel = UInt8(clamped(Int(velocity) - 8, low: 40, high: 110))
                 for step in [4, 12] {
                     for note in voicing {
