@@ -60,11 +60,15 @@ final class AppState: ObservableObject {
     private var spaceBarMonitor: Any?
 
     init() {
-        // *** KEY FIX: forward PlaybackEngine changes through AppState ***
-        // Without this, @Published properties on PlaybackEngine (like currentStep)
-        // do not trigger redraws in views that observe AppState.
-        playback.objectWillChange
-            .sink { [weak self] in self?.objectWillChange.send() }
+        // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
+        // Removing the blanket objectWillChange cascade breaks the per-step chain:
+        // PlaybackEngine.currentStep → AppState → ContentView → 7 TrackRowViews → 7 Canvases.
+        // MIDILaneView now observes PlaybackEngine directly (injected as EnvironmentObject),
+        // so per-step redraws are scoped to the 7 Canvas views only.
+        playback.$isPlaying
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
         // Global space-bar monitor — intercepts space regardless of keyboard focus.
@@ -159,6 +163,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.songState    = state
                 self.generationHistory.append(state)
+                if self.generationHistory.count > 5 { self.generationHistory.removeFirst() }
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
@@ -182,6 +187,7 @@ final class AppState: ObservableObject {
                 // during the brief window between load() and seek(), which caused desync.
                 let wasPlaying = self.playback.isPlaying
                 self.playback.stop()
+                self.playback.cosmicStyle = self.selectedStyle == .cosmic
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 if thenPlay || wasPlaying { self.playback.play() }
@@ -224,6 +230,7 @@ final class AppState: ObservableObject {
                 playback.seek(toStep: 0)
                 visibleBarOffset = 0
             }
+            playback.cosmicStyle = selectedStyle == .cosmic
             playback.play()
         }
     }

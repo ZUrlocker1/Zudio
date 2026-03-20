@@ -38,17 +38,33 @@ struct CosmicPadsGenerator {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
 
-            // Intro: open root+fifth drone, velocity builds over 2-bar holds
+            // Intro: single continuous root+fifth note spanning entire section.
+            // Volume fade-in (0 → 1) handled by PlaybackEngine boost ramp.
             if section.label == .intro {
-                events += introCosmicPadBar(barStart: barStart, bar: bar,
-                                            section: section, entry: entry, frame: frame)
+                guard bar == section.startBar else { continue }
+                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 50, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 44, durationSteps: dur),
+                ]
                 continue
             }
 
-            // Outro: root+fifth drone, velocity decays over 2-bar holds
+            // Outro: single continuous root+fifth note spanning entire section.
+            // Volume fade-out (1 → 0) handled by PlaybackEngine boost ramp.
             if section.label == .outro {
-                events += outroCosmicPadBar(barStart: barStart, bar: bar,
-                                            section: section, entry: entry, frame: frame)
+                guard bar == section.startBar else { continue }
+                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 50, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 44, durationSteps: dur),
+                ]
                 continue
             }
 
@@ -270,47 +286,6 @@ struct CosmicPadsGenerator {
             }
         }
         return evs
-    }
-
-    // MARK: - Intro pad: open root+fifth, velocity builds, 2-bar holds
-
-    private static func introCosmicPadBar(
-        barStart: Int, bar: Int, section: SongSection,
-        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
-    ) -> [MIDIEvent] {
-        guard bar % 2 == 0 else { return [] }
-        let sectionLen = max(2, section.endBar - section.startBar)
-        let barInSec   = bar - section.startBar
-        let progress   = Double(barInSec) / Double(sectionLen)
-        let baseVel    = Int(22 + progress * 32.0)  // 22→54
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-        return [
-            MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: UInt8(baseVel),    durationSteps: 30),
-            MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: UInt8(max(14, baseVel - 6)), durationSteps: 30),
-        ]
-    }
-
-    // MARK: - Outro pad: open root+fifth, velocity decays, 2-bar holds
-
-    private static func outroCosmicPadBar(
-        barStart: Int, bar: Int, section: SongSection,
-        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
-    ) -> [MIDIEvent] {
-        guard bar % 2 == 0 else { return [] }
-        let sectionLen = max(2, section.endBar - section.startBar)
-        let barInSec   = bar - section.startBar
-        let progress   = Double(barInSec) / Double(sectionLen)
-        let baseVel    = Int(55 - progress * 26.0)  // 55→29
-        guard baseVel >= 18 else { return [] }
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-        return [
-            MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: UInt8(baseVel),    durationSteps: 30),
-            MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: UInt8(max(14, baseVel - 6)), durationSteps: 30),
-        ]
     }
 
     // MARK: - Register helper: put pitch class in pads register (MIDI 36–72)

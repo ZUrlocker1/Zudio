@@ -659,7 +659,7 @@ struct SongGenerator {
         case "MOT-TEXR-006": return "High Tension Touch"
         // Cosmic texture rules
         case "COS-TEXT-001": return "Orbital Motive"
-        case "COS-TEXT-002": return "Shimmer Hold"
+        case "COS-TEXT-002": return "EB Shimmer Hold"
         case "COS-TEXT-003": return "Spatial Sweep"
         default:             return ruleID
         }
@@ -672,6 +672,7 @@ struct SongGenerator {
         case "COS-DRUM-001": return "Minimal — JMJ Mini Pops style"
         case "COS-DRUM-002": return "Sparse pitched percussion"
         case "COS-DRUM-003": return "No percussion — Berlin School"
+        case "COS-DRUM-004": return "Electric Buddha motorik lock"
         default:                 return ruleID
         }
     }
@@ -684,7 +685,7 @@ struct SongGenerator {
         case "COS-BASS-004":  return "Moroder Drift — chromatic neighbor bar 4"
         case "COS-BASS-005":  return "Bass absent in main section"
         case "COS-BASS-006":  return "Additive dual bass — anchor + staccato hits"
-        case "COS-BASS-007":  return "Additive pulsating tremolo bass"
+        case "COS-BASS-007":  return "Electric Buddha additive pulsating tremolo"
         default:              return ruleID
         }
     }
@@ -725,7 +726,7 @@ struct SongGenerator {
     private static func cosmicTexRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         case "COS-TEXT-001": return "Orbital Motive — lower register loop"
-        case "COS-TEXT-002": return "Shimmer Hold — sustained note"
+        case "COS-TEXT-002": return "Electric Buddha shimmer hold"
         case "COS-TEXT-003": return "Spatial Sweep — chromatic passing"
         default:             return ruleID
         }
@@ -859,6 +860,19 @@ struct SongGenerator {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
 
+        // Precompute bar presence: trackBars[t][bar] = true if track t has any event in that bar.
+        // One pass per track (O(totalEvents) total), replaces O(totalEvents × totalBars) repeated
+        // .contains calls in sectionInstruments() and the entrance-fills loop.
+        let numTracks = min(trackEvents.count, 7)
+        let trackBars: [[Bool]] = (0..<numTracks).map { t in
+            var present = Array(repeating: false, count: totalBars)
+            for ev in trackEvents[t] {
+                let b = ev.stepIndex / 16
+                if b >= 0 && b < totalBars { present[b] = true }
+            }
+            return present
+        }
+
         // fire: fires at the given absolute step index
         func fire(_ step: Int, tag: String, desc: String) {
             out[max(0, step), default: []].append(GenerationLogEntry(tag: tag, description: desc))
@@ -898,9 +912,10 @@ struct SongGenerator {
 
         // Helper: describe which instruments are active in a section (for intro/outro labels)
         func sectionInstruments(_ section: SongSection) -> String {
+            // O(sectionLength) — sections are 2–8 bars; trackBars lookup is O(1) per bar
             func active(_ t: Int) -> Bool {
-                guard t < trackEvents.count else { return false }
-                return trackEvents[t].contains { let b = $0.stepIndex / 16; return b >= section.startBar && b < section.endBar }
+                guard t < trackBars.count else { return false }
+                return (section.startBar..<section.endBar).contains { trackBars[t][$0] }
             }
             let hasDrums   = active(kTrackDrums)
             let hasBass    = active(kTrackBass)
@@ -1002,10 +1017,8 @@ struct SongGenerator {
         // Entrance fills: non-drum track comes in after ≥2 silent bars
         for trackIdx in 0..<kTrackDrums {
             guard trackIdx < trackEvents.count else { continue }
-            let presence: [Bool] = (0..<totalBars).map { bar in
-                let bs = bar * 16
-                return trackEvents[trackIdx].contains { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
-            }
+            // O(1) per bar — uses the precomputed presence map instead of rescanning all events
+            let presence = trackIdx < trackBars.count ? trackBars[trackIdx] : Array(repeating: false, count: totalBars)
             for bar in 2..<totalBars {
                 guard presence[bar] && !presence[bar - 1] && !presence[bar - 2] else { continue }
                 let fillBar = bar - 1

@@ -2207,6 +2207,75 @@ A single-header C library (~20 KB). Covers delay, reverb, distortion, chorus, ph
 
 ---
 
+## Performance best practices
+
+This section records the architectural decisions that keep Zudio responsive at 120+ BPM with 7 simultaneous tracks. Apply these patterns when adding Ambient or any other style to avoid regression.
+
+### Rule 1: Keep the playback hot path off the main thread
+
+The step scheduler fires 16 times per bar on a background `DispatchSourceTimer`. The `onStep` callback dispatches a `Task { @MainActor }` only to perform MIDI note-on, because `AVAudioUnitSampler.startNote` requires the main actor context. Note-off (`stopNote`) does not need the main actor and runs on `DispatchQueue.global(qos: .userInteractive)`.
+
+**Do not** add any work to `onStep` that involves array iteration, string formatting, UI state reads, or property publishing. Every microsecond spent in `onStep` on the main actor competes directly with SwiftUI rendering and audio scheduling.
+
+### Rule 2: Index events at load time, not at play time
+
+`PlaybackEngine.buildStepEventMap(_:)` converts the flat `[[MIDIEvent]]` arrays into a `[Int: [(trackIndex, MIDIEvent)]]` dictionary keyed by step index when a song is loaded. `onStep` does a single O(1) dictionary lookup per step instead of scanning all 7 × N events.
+
+**Pattern to follow**: Any per-step lookup that can be precomputed from the song's static event data should be built into a dictionary at `load()` time. This is especially important as Ambient songs may have longer durations or denser event arrays.
+
+### Rule 3: Scope SwiftUI invalidations to the smallest possible subtree
+
+The full invalidation chain — `objectWillChange` on a root `@ObservedObject` → all child views re-evaluate their bodies → all Canvas views redraw — fires on every invalidation. At 16 steps/bar, a blanket cascade from `PlaybackEngine` through `AppState` was causing 7 × TrackRowView + 7 × MIDILaneView body evaluations per step, per bar.
+
+**Current architecture**: `PlaybackEngine` is injected as a separate `@EnvironmentObject` alongside `AppState`. `MIDILaneView` observes `PlaybackEngine` directly. The `AppState` → `objectWillChange` cascade is triggered only for `isPlaying` changes (play/stop events), not on every step tick. DAW scroll (`visibleBarOffset`) and status log appends trigger their own narrower invalidations via `@Published`.
+
+**Pattern to follow**: When a new style adds a live visual indicator (e.g. an Ambient breathing animation), wire it to observe `PlaybackEngine` directly rather than routing through `AppState`. Never subscribe to `objectWillChange` of a parent for the purpose of driving a per-step animation.
+
+### Rule 4: Cache derived-from-events data at the view level
+
+`MIDILaneView` redraws on every step tick (unavoidably — it must move the playhead). Two expensive derivations from `events` were formerly recomputed on every Canvas draw call:
+
+- `onsetsByNote: [UInt8: [Int]]` — sorted onset list per pitch for note-clipping logic
+- `pitchRange: (Int, Int)` — min/max note scan for vertical scaling
+
+Both are now cached in `@State` and recomputed only in `.onAppear` and `.onChange(of: events)`. Events only change on song load or per-track regeneration — never during playback.
+
+**Pattern to follow**: Any value derived from `events` that is constant during playback should be in `@State` with an `onChange(of: events)` invalidation guard. Do not compute it inside the Canvas closure.
+
+### Rule 5: Use lazy containers for append-only logs
+
+`StatusBoxView` previously called `buildLogText()` to rebuild a single `AttributedString` from all N log entries on every append. During playback, live step annotations fire frequently and each append triggered a full O(n) string reconstruction.
+
+The fix: `LazyVStack` with one `logRow(_:)` view per entry. SwiftUI only instantiates rows currently visible in the scroll viewport. New entries append without touching existing rows. `ForEach` over `statusLog.indices` is stable because the log is append-only.
+
+**Pattern to follow**: Any list that grows monotonically during playback (annotations, debug output, event history) should use `LazyVStack` or `List`. Never rebuild an `AttributedString` or `NSAttributedString` from the full dataset on each append.
+
+### Rule 6: LFO timers fire at modulation rate, not at display rate
+
+LFO effects (sweep filter, auto-pan, tremolo, drone fade) run on `DispatchSourceTimer` on `.global(qos: .userInteractive)`, dispatching a `Task { @MainActor }` on each tick to update audio parameters. Each Task adds scheduling overhead on the main actor.
+
+Timer rates:
+- **Tremolo (8 Hz)**: 16ms / 60fps — fast amplitude modulation; lower rates cause audible stepping
+- **Sweep filter (0.07 Hz), auto-pan (0.5 Hz)**: 50ms / 20fps — well above Nyquist for these rates, zero audible difference from 60fps, 3× fewer main-actor dispatches
+
+**Pattern to follow**: Choose the slowest timer interval that still satisfies the Nyquist criterion for the modulation frequency. For any LFO ≤ 2 Hz, 50ms (20fps) is the correct interval. Tremolo and other fast-rate effects stay at 16ms. Never default to 16ms/60fps for a new LFO without checking whether the modulation frequency actually requires it.
+
+### Rule 7: Cap historical state
+
+`AppState.generationHistory` is capped at 5 entries. Each `SongState` holds the full event arrays for all 7 tracks for the entire song. An uncapped history grows linearly with the number of generations in a session, increasing memory pressure and GC pause frequency.
+
+**Pattern to follow**: Any `@Published` array that accumulates `SongState` objects or other large value types across multiple generation cycles should have an explicit cap. A cap of 5 is sufficient for undo/history UI while bounding memory.
+
+### Rule 8: Precompute generation-time lookups rather than scanning at annotation time
+
+`buildStepAnnotations` runs once per generation (not during playback), but as song density grows it was performing O(totalEvents × totalBars) repeated `.contains` scans to determine which tracks were active in which bars.
+
+The fix: build `trackBars: [[Bool]]` — a per-track, per-bar boolean presence map — in one O(totalEvents) pass at the top of `buildStepAnnotations`. All subsequent bar-range queries are O(sectionLength) at most, never O(totalEvents).
+
+**Pattern to follow**: When a generation-time function needs to repeatedly ask "does track T have any event in bar B?", build the presence map once and query it. As Ambient songs may have longer timelines and more events than Cosmic, this pattern prevents generation time from scaling quadratically.
+
+---
+
 ## Open questions
 
 - Resolved: single selector for v1, locked to Motorik. Blend sliders are post-v1. Later add Cosmic and Ambient

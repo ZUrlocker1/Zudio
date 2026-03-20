@@ -138,7 +138,8 @@ enum PercussionStyle: String, Codable, Sendable {
     case absent
     case sparse
     case minimal
-    case textural    // Ambient future use
+    case motorikGrid  // Full 16th-note grid (Electric Buddha Band Cosmic style)
+    case textural     // Ambient future use
     case softPulse   // Ambient future use
 }
 

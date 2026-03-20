@@ -48,27 +48,23 @@ struct CosmicBassGenerator {
             // COS-BASS-005: truly absent in body — no notes at all
             if bassAbsent && section.label != .intro && section.label != .outro { continue }
 
-            // Intro: bass drone builds from silence, 2-bar holds, velocity ramps up
+            // Intro: single continuous bass note spanning the entire section.
+            // Volume fade-in (0 → 1) handled by PlaybackEngine boost ramp — no velocity ramp needed.
             if section.label == .intro {
-                guard bar % 2 == 0 else { continue }
-                let sectionLen = max(2, section.endBar - section.startBar)
-                let barInSec   = bar - section.startBar
-                let progress   = Double(barInSec) / Double(sectionLen)
-                let vel        = UInt8(28 + Int(progress * 30.0))  // 28→58
-                let root       = bassRoot(entry: entry, frame: frame)
-                events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: vel, durationSteps: 30))
+                guard bar == section.startBar else { continue }
+                let root = bassRoot(entry: entry, frame: frame)
+                let dur  = max(1, (section.endBar - section.startBar) * 16 - 1)
+                events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: 60, durationSteps: dur))
                 continue
             }
 
-            // Outro: bass drone decays to silence, 2-bar holds
+            // Outro: single continuous bass note spanning the entire section.
+            // Volume fade-out (1 → 0) handled by PlaybackEngine boost ramp.
             if section.label == .outro {
-                guard bar % 2 == 0 else { continue }
-                let sectionLen = max(2, section.endBar - section.startBar)
-                let barInSec   = bar - section.startBar
-                let progress   = Double(barInSec) / Double(sectionLen)
-                let vel        = UInt8(55 - Int(progress * 23.0))  // 55→32
-                let root       = bassRoot(entry: entry, frame: frame)
-                events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: vel, durationSteps: 30))
+                guard bar == section.startBar else { continue }
+                let root = bassRoot(entry: entry, frame: frame)
+                let dur  = max(1, (section.endBar - section.startBar) * 16 - 1)
+                events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: 60, durationSteps: dur))
                 continue
             }
 

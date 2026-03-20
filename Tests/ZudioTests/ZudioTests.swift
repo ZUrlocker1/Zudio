@@ -102,3 +102,96 @@ struct RegenerateTests {
         #expect(original.frame.tempo == updated.frame.tempo)
     }
 }
+
+// MARK: - Phase 1a: stepEventMap correctness
+// PlaybackEngine is @MainActor + requires AVAudioEngine, so we test the map-building
+// algorithm directly: the map must be a lossless, non-duplicating index of all events.
+
+private func buildStepEventMap(state: SongState) -> [Int: [(Int, MIDIEvent)]] {
+    var map: [Int: [(Int, MIDIEvent)]] = [:]
+    for trackIndex in 0..<7 {
+        for ev in state.events(forTrack: trackIndex) {
+            map[ev.stepIndex, default: []].append((trackIndex, ev))
+        }
+    }
+    return map
+}
+
+struct StepEventMapTests {
+    @Test func mapContainsEveryEvent() {
+        let song = SongGenerator.generate(seed: 42)
+        let map  = buildStepEventMap(state: song)
+        // Count events via O(n) scan (ground truth)
+        var directCount = 0
+        for t in 0..<7 { directCount += song.events(forTrack: t).count }
+        // Count events via map (what onStep now uses)
+        let mapCount = map.values.reduce(0) { $0 + $1.count }
+        #expect(mapCount == directCount)
+    }
+
+    @Test func mapLookupMatchesDirectScan() {
+        let song = SongGenerator.generate(seed: 99)
+        let map  = buildStepEventMap(state: song)
+        let totalSteps = song.frame.totalBars * 16
+        for step in 0..<totalSteps {
+            // Direct scan (old approach)
+            var direct: [(Int, MIDIEvent)] = []
+            for t in 0..<7 {
+                for ev in song.events(forTrack: t) where ev.stepIndex == step {
+                    direct.append((t, ev))
+                }
+            }
+            // Map lookup (new approach)
+            let fromMap = map[step] ?? []
+            // Same total count per step
+            #expect(fromMap.count == direct.count, "Step \(step): map has \(fromMap.count), direct has \(direct.count)")
+        }
+    }
+
+    @Test func mapHasNoStepsOutsideSongRange() {
+        let song = SongGenerator.generate(seed: 7)
+        let map  = buildStepEventMap(state: song)
+        let maxStep = song.frame.totalBars * 16
+        for step in map.keys {
+            #expect(step >= 0 && step < maxStep, "Event at step \(step) outside song range 0..<\(maxStep)")
+        }
+    }
+
+    @Test func mapTrackIndicesAreValid() {
+        let song = SongGenerator.generate(seed: 55)
+        let map  = buildStepEventMap(state: song)
+        for entries in map.values {
+            for (trackIndex, _) in entries {
+                #expect(trackIndex >= 0 && trackIndex < 7)
+            }
+        }
+    }
+}
+
+// MARK: - Phase 3a: generationHistory cap
+// Tests the pure array-capping logic in isolation.
+
+struct GenerationHistoryCapTests {
+    @Test func capAt5() {
+        var history: [Int] = []
+        for i in 0..<10 {
+            history.append(i)
+            if history.count > 5 { history.removeFirst() }
+        }
+        #expect(history.count == 5)
+        #expect(history == [5, 6, 7, 8, 9])
+    }
+
+    @Test func capRetainsMostRecent() {
+        var history: [SongState] = []
+        for seed: UInt64 in 0..<8 {
+            let s = SongGenerator.generate(seed: seed)
+            history.append(s)
+            if history.count > 5 { history.removeFirst() }
+        }
+        #expect(history.count == 5)
+        // Oldest seed kept should be 3 (seeds 0–2 evicted)
+        #expect(history.first?.globalSeed == 3)
+        #expect(history.last?.globalSeed  == 7)
+    }
+}

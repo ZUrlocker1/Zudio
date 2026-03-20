@@ -73,7 +73,6 @@ struct ContentView: View {
                         label: trackLabels[trackIndex],
                         events: appState.songState?.events(forTrack: trackIndex) ?? [],
                         totalBars: appState.songState?.frame.totalBars ?? 32,
-                        currentStep: appState.playback.currentStep,
                         isMuted: appState.muteState[trackIndex],
                         isSolo:  appState.soloState[trackIndex],
                         isEffectivelyMuted: appState.isEffectivelyMuted(trackIndex),

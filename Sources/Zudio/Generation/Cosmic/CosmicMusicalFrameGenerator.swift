@@ -26,7 +26,7 @@ struct CosmicMusicalFrameGenerator {
         let mode   = pickMode(rng: &rng)
         let family = pickProgressionFamilyMotarik(rng: &rng)  // standard ProgressionFamily for StructureGenerator
         let total  = pickTotalBars(tempo: tempo, rng: &rng, testMode: testMode)
-        let percStyle = pickPercussionStyle(rng: &rng)
+        let percStyle = pickPercussionStyle(tempo: tempo, rng: &rng)
         let cosmicFamily = pickCosmicProgressionFamily(rng: &rng)
 
         let frame = GlobalMusicalFrame(
@@ -106,11 +106,20 @@ struct CosmicMusicalFrameGenerator {
         return families[rng.weightedPick(weights)]
     }
 
-    /// PercussionStyle: absent 40%, sparse 35%, minimal 25%
-    private static func pickPercussionStyle(rng: inout SeededRNG) -> PercussionStyle {
-        let styles:  [PercussionStyle] = [.absent, .sparse, .minimal]
-        let weights: [Double]          = [0.40,    0.35,    0.25]
-        return styles[rng.weightedPick(weights)]
+    /// PercussionStyle: absent 35%, sparse 25%, minimal 25%, motorikGrid 15%
+    /// motorikGrid only available when tempo >= 112 (driving Mode A range).
+    /// A 16th-note grid at contemplative tempos (88–105 BPM) is too slow and plodding.
+    private static func pickPercussionStyle(tempo: Int, rng: inout SeededRNG) -> PercussionStyle {
+        if tempo >= 112 {
+            let styles:  [PercussionStyle] = [.absent, .sparse, .minimal, .motorikGrid]
+            let weights: [Double]          = [0.35,    0.25,    0.25,     0.15]
+            return styles[rng.weightedPick(weights)]
+        } else {
+            // Contemplative tempo: redistribute motorikGrid weight to absent/sparse
+            let styles:  [PercussionStyle] = [.absent, .sparse, .minimal]
+            let weights: [Double]          = [0.42,    0.33,    0.25]
+            return styles[rng.weightedPick(weights)]
+        }
     }
 
     /// Song length: triangular min=180s, peak=300s, max=420s (longer than Motorik)

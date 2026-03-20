@@ -39,6 +39,19 @@ final class PlaybackEngine: ObservableObject {
     private var panPhase    = Array(repeating: Double(0), count: 7)
     private var panTimers   = [DispatchSourceTimer?](repeating: nil, count: 7)
 
+    // Cosmic drone fade (intro 0→1, outro 1→0 on boosts[bass] and boosts[pads])
+    var cosmicStyle: Bool = false
+    private var droneFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
+
+    // Step-event map: built once at load time for O(1) lookup in onStep
+    private var stepEventMap: [Int: [(Int, MIDIEvent)]] = [:]
+
+    // Hidden intro/outro modulation: pads sweep LFO + bass slow pan (no UI change)
+    private var cosmicIntroSweepPhase:   Double = 0.0
+    private var cosmicIntroSweepTimer:   DispatchSourceTimer? = nil
+    private var cosmicIntroBassPanPhase: Double = 0.0
+    private var cosmicIntroBassPanTimer: DispatchSourceTimer? = nil
+
     private static let compDesc = AudioComponentDescription(
         componentType: kAudioUnitType_Effect,
         componentSubType: kAudioUnitSubType_DynamicsProcessor,
@@ -80,7 +93,18 @@ final class PlaybackEngine: ObservableObject {
 
     func load(_ state: SongState) {
         songState = state
+        buildStepEventMap(state: state)
         // Don't reset playhead here; only reset on play/stop
+    }
+
+    private func buildStepEventMap(state: SongState) {
+        var map: [Int: [(Int, MIDIEvent)]] = [:]
+        for trackIndex in 0..<7 {
+            for ev in state.events(forTrack: trackIndex) {
+                map[ev.stepIndex, default: []].append((trackIndex, ev))
+            }
+        }
+        stepEventMap = map
     }
 
     func play() {
@@ -91,6 +115,7 @@ final class PlaybackEngine: ObservableObject {
         let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
+        if cosmicStyle { startCosmicDroneFades(state: state) }
     }
 
     func stop() {
@@ -99,6 +124,7 @@ final class PlaybackEngine: ObservableObject {
         isPlaying = false
         // Leave playhead in place — user can resume from here with Play
         allNotesOff()
+        stopCosmicDroneFades()
     }
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
@@ -111,16 +137,13 @@ final class PlaybackEngine: ObservableObject {
             self.currentBar  = bar
 
             // Always dispatch all events (mute is handled by sampler volume, not skipping)
-            for trackIndex in 0..<7 {
-                let events = state.events(forTrack: trackIndex)
-                for ev in events where ev.stepIndex == step {
-                    let channel = gmChannel(trackIndex)
-                    self.samplers[trackIndex].startNote(ev.note, withVelocity: ev.velocity, onChannel: channel)
-                    let delay = Double(ev.durationSteps) * state.frame.secondsPerStep
-                    let sampler = self.samplers[trackIndex]
-                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                        sampler.stopNote(ev.note, onChannel: channel)
-                    }
+            for (trackIndex, ev) in self.stepEventMap[step] ?? [] {
+                let channel = gmChannel(trackIndex)
+                self.samplers[trackIndex].startNote(ev.note, withVelocity: ev.velocity, onChannel: channel)
+                let delay = Double(ev.durationSteps) * state.frame.secondsPerStep
+                let sampler = self.samplers[trackIndex]
+                DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delay) {
+                    sampler.stopNote(ev.note, onChannel: channel)
                 }
             }
         }
@@ -137,6 +160,7 @@ final class PlaybackEngine: ObservableObject {
             self.isPlaying = false
             // Keep currentStep / currentBar at their last-set values (end of song)
             self.allNotesOff()
+            self.stopCosmicDroneFades()
         }
     }
 
@@ -150,12 +174,14 @@ final class PlaybackEngine: ObservableObject {
             scheduler?.stop()
             scheduler = nil
             allNotesOff()
+            stopCosmicDroneFades()
             currentStep = clampedStep
             currentBar  = clampedStep / 16
             currentSchedulerID += 1
             let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
             scheduler = sched
             sched.start()
+            if cosmicStyle { startCosmicDroneFades(state: state) }
         } else {
             currentStep = clampedStep
             currentBar  = clampedStep / 16
@@ -223,8 +249,10 @@ final class PlaybackEngine: ObservableObject {
             comps[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .lowShelf:
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-        case .reverb, .space:
+        case .reverb:
             reverbs[trackIndex].wetDryMix = enabled ? 50 : 0
+        case .space:
+            reverbs[trackIndex].wetDryMix = enabled ? 70 : 0
         }
     }
 
@@ -271,11 +299,12 @@ final class PlaybackEngine: ObservableObject {
         sweepPhase[i]   = 0.0
         sweepFilters[i].auAudioUnit.shouldBypassEffect = false
         let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
-        src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
+        // 50ms / 20fps — at 0.07 Hz the audible difference from 60fps is zero
+        src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
         src.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.sweepEnabled[i] else { return }
-                self.sweepPhase[i] += 0.00733   // 2π × 0.07 Hz / 60 fps
+                self.sweepPhase[i] += 0.02199   // 2π × 0.07 Hz / 20 fps
                 let cutoff = Float(300 + 1600 * (1 + sin(self.sweepPhase[i])))  // 300–3500 Hz
                 AudioUnitSetParameter(self.sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
             }
@@ -299,11 +328,12 @@ final class PlaybackEngine: ObservableObject {
         panEnabled[i] = true
         panPhase[i]   = 0.0
         let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
-        src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
+        // 50ms / 20fps — at 0.5 Hz the audible difference from 60fps is zero
+        src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
         src.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self, self.panEnabled[i] else { return }
-                self.panPhase[i] += 0.05236   // 2π × 0.5 Hz / 60 fps — ~1 sweep per bar
+                self.panPhase[i] += 0.15708   // 2π × 0.5 Hz / 20 fps — ~1 sweep per bar
                 self.boosts[i].pan = Float(sin(self.panPhase[i]))
             }
         }
@@ -317,6 +347,188 @@ final class PlaybackEngine: ObservableObject {
         panTimers[i] = nil
         panPhase[i]  = 0.0
         boosts[i].pan = 0.0
+    }
+
+    // MARK: - Cosmic Drone Fade (intro/outro continuous note with boost volume ramp)
+    // Uses boosts[kTrackBass/kTrackPads].outputVolume (separate from sampler mute volume).
+    // Intro: 0 → 1 over the intro section duration.
+    // Outro: 1 → 0 over the outro section duration.
+
+    private func startCosmicDroneFades(state: SongState) {
+        stopCosmicDroneFades()
+        let sps = state.frame.secondsPerStep
+        let schedulerID = currentSchedulerID
+
+        if let intro = state.structure.introSection {
+            let introStartStep = intro.startBar * 16
+            let introEndStep   = intro.endBar   * 16
+            let totalSteps     = introEndStep - introStartStep
+            guard totalSteps > 0 else {
+                startOutroDroneFade(state: state, schedulerID: schedulerID)
+                return
+            }
+            if currentStep >= introEndStep {
+                boosts[kTrackBass].outputVolume = 1.0
+                boosts[kTrackPads].outputVolume = 1.0
+                startOutroDroneFade(state: state, schedulerID: schedulerID)
+                return
+            }
+            let elapsedSteps  = max(0, currentStep - introStartStep)
+            let startProgress = Double(elapsedSteps) / Double(totalSteps)
+            // Extend 2 bars into body so the volume ramp crosses the section boundary —
+            // this eliminates the abrupt jump where full-velocity body notes suddenly appear.
+            let bodyRampSteps = 32
+            let remainingSecs = Double(totalSteps - elapsedSteps + bodyRampSteps) * sps
+            let startNanos    = DispatchTime.now().uptimeNanoseconds
+
+            boosts[kTrackBass].outputVolume = Float(startProgress)
+            boosts[kTrackPads].outputVolume = Float(startProgress)
+            startCosmicIntroEffects()
+
+            let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            src.setEventHandler { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                    let vol = Float(min(1.0, startProgress + (1.0 - startProgress) * elapsed / max(0.001, remainingSecs)))
+                    self.boosts[kTrackBass].outputVolume = vol
+                    self.boosts[kTrackPads].outputVolume = vol
+                    if vol >= 1.0 {
+                        self.droneFadeTimers[0]?.cancel()
+                        self.droneFadeTimers[0] = nil
+                        self.stopCosmicIntroEffects()
+                        self.startOutroDroneFade(state: state, schedulerID: schedulerID)
+                    }
+                }
+            }
+            src.resume()
+            droneFadeTimers[0] = src
+        } else {
+            startOutroDroneFade(state: state, schedulerID: schedulerID)
+        }
+    }
+
+    private func startOutroDroneFade(state: SongState, schedulerID: Int) {
+        guard let outro = state.structure.outroSection else { return }
+        let outroStartStep = outro.startBar * 16
+        let outroEndStep   = outro.endBar   * 16
+        let totalSteps     = outroEndStep - outroStartStep
+        guard totalSteps > 0, currentStep < outroEndStep else { return }
+
+        let sps             = state.frame.secondsPerStep
+        let stepsUntilStart = max(0, outroStartStep - currentStep)
+        let delaySeconds    = Double(stepsUntilStart) * sps
+
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delaySeconds) { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
+                guard self.droneFadeTimers[1] == nil else { return }
+
+                let elapsedInOutro = max(0, self.currentStep - outroStartStep)
+                let startProgress  = 1.0 - Double(elapsedInOutro) / Double(totalSteps)
+                let remainingSecs  = Double(totalSteps - elapsedInOutro) * sps
+                let startNanos     = DispatchTime.now().uptimeNanoseconds
+
+                self.boosts[kTrackBass].outputVolume = Float(startProgress)
+                self.boosts[kTrackPads].outputVolume = Float(startProgress)
+                self.startCosmicIntroEffects()
+
+                let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+                src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+                src.setEventHandler { [weak self] in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.currentSchedulerID == schedulerID else { return }
+                        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                        let vol = Float(max(0.0, startProgress * (1.0 - elapsed / max(0.001, remainingSecs))))
+                        self.boosts[kTrackBass].outputVolume = vol
+                        self.boosts[kTrackPads].outputVolume = vol
+                        if vol <= 0.0 {
+                            self.droneFadeTimers[1]?.cancel()
+                            self.droneFadeTimers[1] = nil
+                            self.stopCosmicIntroEffects()
+                        }
+                    }
+                }
+                src.resume()
+                self.droneFadeTimers[1] = src
+            }
+        }
+    }
+
+    private func stopCosmicDroneFades() {
+        droneFadeTimers[0]?.cancel()
+        droneFadeTimers[0] = nil
+        droneFadeTimers[1]?.cancel()
+        droneFadeTimers[1] = nil
+        stopCosmicIntroEffects()
+        boosts[kTrackBass].outputVolume = 1.0
+        boosts[kTrackPads].outputVolume = 1.0
+    }
+
+    // MARK: - Cosmic hidden intro/outro effects (pads sweep + bass slow pan)
+    // Activated during intro/outro drone sections only — no UI state change.
+
+    private func startCosmicIntroEffects() {
+        // Cancel any already-running intro effect timers (safe to restart)
+        cosmicIntroSweepTimer?.cancel()
+        cosmicIntroSweepTimer = nil
+        cosmicIntroBassPanTimer?.cancel()
+        cosmicIntroBassPanTimer = nil
+
+        // Pads: sweep LFO (0.07 Hz, cutoff 400–3200 Hz) — same rate as user sweep chip
+        // Only activate if the user hasn't already enabled sweep on pads (avoid double-timer)
+        if !sweepEnabled[kTrackPads] {
+            cosmicIntroSweepPhase = 0.0
+            sweepFilters[kTrackPads].auAudioUnit.shouldBypassEffect = false
+            let sweepSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            sweepSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            sweepSrc.setEventHandler { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.cosmicIntroSweepPhase += 0.02199  // 2π × 0.07 Hz / 20 fps
+                    let cutoff = Float(400 + 1400 * (1 + sin(self.cosmicIntroSweepPhase)))  // 400–3200 Hz
+                    AudioUnitSetParameter(self.sweepFilters[kTrackPads].audioUnit,
+                                         0, kAudioUnitScope_Global, 0, cutoff, 0)
+                }
+            }
+            sweepSrc.resume()
+            cosmicIntroSweepTimer = sweepSrc
+        }
+
+        // Bass: very slow pan (0.05 Hz, ±0.5) — gentle spatial drift, one sweep per 20 sec
+        if !panEnabled[kTrackBass] {
+            cosmicIntroBassPanPhase = 0.0
+            let panSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            panSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            panSrc.setEventHandler { [weak self] in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.cosmicIntroBassPanPhase += 0.01571  // 2π × 0.05 Hz / 20 fps
+                    self.boosts[kTrackBass].pan = Float(0.5 * sin(self.cosmicIntroBassPanPhase))
+                }
+            }
+            panSrc.resume()
+            cosmicIntroBassPanTimer = panSrc
+        }
+    }
+
+    private func stopCosmicIntroEffects() {
+        cosmicIntroSweepTimer?.cancel()
+        cosmicIntroSweepTimer = nil
+        cosmicIntroSweepPhase = 0.0
+        if !sweepEnabled[kTrackPads] {
+            sweepFilters[kTrackPads].auAudioUnit.shouldBypassEffect = true
+            AudioUnitSetParameter(sweepFilters[kTrackPads].audioUnit,
+                                  0, kAudioUnitScope_Global, 0, 6000, 0)
+        }
+
+        cosmicIntroBassPanTimer?.cancel()
+        cosmicIntroBassPanTimer = nil
+        cosmicIntroBassPanPhase = 0.0
+        if !panEnabled[kTrackBass] {
+            boosts[kTrackBass].pan = 0.0
+        }
     }
 
     // MARK: - All-notes-off (used by stop())
@@ -376,8 +588,10 @@ final class PlaybackEngine: ObservableObject {
             lowEQ.bands[0].bypass     = false
             lowEQ.auAudioUnit.shouldBypassEffect = true
 
-            // Reverb: cathedral for Pads, large chamber for all others
-            reverb.loadFactoryPreset(i == kTrackPads ? .cathedral : .largeChamber)
+            // Reverb: cathedral for atmospheric tracks (Lead1, Lead2, Pads, Texture);
+            // large chamber for rhythmic tracks (Rhythm, Bass, Drums)
+            let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture]
+            reverb.loadFactoryPreset(atmosphericTracks.contains(i) ? .cathedral : .largeChamber)
             reverb.wetDryMix = 0
 
             engine.attach(sampler)

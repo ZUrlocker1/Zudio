@@ -23,6 +23,7 @@ struct ZudioApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(appState.playback)  // MIDILaneView observes directly — no AppState cascade on each step
         }
         .windowStyle(.titleBar)
         .commands {

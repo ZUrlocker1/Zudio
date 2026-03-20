@@ -4,9 +4,10 @@
 import SwiftUI
 
 struct MIDILaneView: View {
+    @EnvironmentObject var playback: PlaybackEngine
+
     let events: [MIDIEvent]
     let totalBars: Int
-    let currentStep: Int
     let isDrumTrack: Bool
     var trackColor: Color = .white
     var visibleBars: Int = 16
@@ -16,10 +17,22 @@ struct MIDILaneView: View {
 
     private let noteH: CGFloat = 7
 
+    // Cached per-events data: recomputed only when events change (song load / track regen),
+    // not on every Canvas redraw (which fires on each playhead step tick).
+    @State private var onsetsByNote: [UInt8: [Int]] = [:]
+    @State private var cachedPitchRange: (Int, Int) = (48, 84)
+
     var body: some View {
+        // Capture stable locals so the Canvas closure holds their current values
+        // without going through @State property wrappers inside the draw call.
+        let onsets    = onsetsByNote
+        let pitchRng  = cachedPitchRange
+        let curStep   = playback.currentStep
+
         ZStack {
             Canvas { ctx, size in
-                drawLane(ctx: ctx, size: size)
+                drawLane(ctx: ctx, size: size, onsets: onsets,
+                         pitchRange: pitchRng, currentStep: curStep)
             }
 
             // Drag-to-seek overlay — invisible, covers full lane
@@ -41,11 +54,32 @@ struct MIDILaneView: View {
         }
         .background(Color(white: 0.09))
         .clipShape(RoundedRectangle(cornerRadius: 3))
+        .onAppear { buildCache() }
+        .onChange(of: events) { _, _ in buildCache() }
+    }
+
+    // MARK: - Cache
+
+    private func buildCache() {
+        var map: [UInt8: [Int]] = [:]
+        for ev in events { map[ev.note, default: []].append(ev.stepIndex) }
+        for key in map.keys { map[key]?.sort() }
+        onsetsByNote = map
+
+        let notes = events.map { Int($0.note) }
+        if notes.isEmpty {
+            cachedPitchRange = (48, 84)
+        } else {
+            let lo = max(notes.min()! - 3, 0)
+            let hi = min(notes.max()! + 3, 127)
+            cachedPitchRange = hi - lo < 12 ? (lo, lo + 12) : (lo, hi)
+        }
     }
 
     // MARK: - Main draw
 
-    private func drawLane(ctx: GraphicsContext, size: CGSize) {
+    private func drawLane(ctx: GraphicsContext, size: CGSize,
+                          onsets: [UInt8: [Int]], pitchRange: (Int, Int), currentStep: Int) {
         let w = size.width
         let h = size.height
 
@@ -80,16 +114,10 @@ struct MIDILaneView: View {
         let pixelsPerSemitone = (h - noteH) / CGFloat(semitoneCount)
         let drawH = max(2, min(noteH, pixelsPerSemitone - 1))
 
-        // Pre-compute next-onset per pitch so overlapping long notes are clipped
-        // at the start of the following note at the same pitch.
-        var onsetsByNote: [UInt8: [Int]] = [:]
-        for ev in events { onsetsByNote[ev.note, default: []].append(ev.stepIndex) }
-        for key in onsetsByNote.keys { onsetsByNote[key]?.sort() }
-
         for ev in events {
             let rawEnd = ev.stepIndex + ev.durationSteps
             // Clip to next same-pitch onset so held notes never overdraw a later note
-            let nextOnset = onsetsByNote[ev.note]?.first(where: { $0 > ev.stepIndex }) ?? rawEnd
+            let nextOnset = onsets[ev.note]?.first(where: { $0 > ev.stepIndex }) ?? rawEnd
             let evEnd = min(rawEnd, nextOnset)
 
             guard evEnd > startStep && ev.stepIndex < startStep + visibleSteps else { continue }
@@ -147,14 +175,6 @@ struct MIDILaneView: View {
     }
 
     private let drumLaneNorms: [CGFloat] = [0.04, 0.15, 0.26, 0.36, 0.48, 0.58, 0.67, 0.77, 0.90]
-
-    private var pitchRange: (Int, Int) {
-        let notes = events.map { Int($0.note) }
-        guard !notes.isEmpty else { return (48, 84) }
-        let lo = max(notes.min()! - 3, 0)
-        let hi = min(notes.max()! + 3, 127)
-        return hi - lo < 12 ? (lo, lo + 12) : (lo, hi)
-    }
 
     // MARK: - Colors
 

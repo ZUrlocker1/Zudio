@@ -135,9 +135,14 @@ struct CosmicArpeggioGenerator {
                              offset: 0, legato: true, bar: bar, rng: &rng, events: &events)
                 // No harmony voice during intro/outro — keep it minimal
                 if addHarmony && !isIntroOutro {
-                    let mode  = frame.mode
-                    let third = mode.nearestInterval(3)
-                    let harmNotes = notes.map { Swift.min($0 + third, 84) }
+                    let keyPC     = keySemitone(frame.key)
+                    let harmNotes = notes.map { note -> Int in
+                        // Diatonic third: scale degree +2 above each melody note.
+                        // Using a fixed chromatic interval (e.g. +3) causes out-of-scale
+                        // clashes whenever the melody note is not the root (e.g. C → Eb
+                        // in A Aeolian, which is a semitone outside the scale).
+                        Swift.min(diatonicThirdAbove(note, keyPC: keyPC, mode: frame.mode), 84)
+                    }
                     emitJMJVoice(notes: harmNotes, barStart: barStart, stepDur: stepDur,
                                  offset: stepDur, legato: true, bar: bar, rng: &rng, events: &events)
                 }
@@ -426,7 +431,20 @@ struct CosmicArpeggioGenerator {
         }
     }
 
-    // MARK: - COS-ARP-002 helper: emit JMJ voice
+    // MARK: - COS-ARP-002 helpers
+
+    /// Returns the MIDI note a diatonic third (scale degree +2) above `note`.
+    /// Correctly handles all scale positions — never produces out-of-scale pitches.
+    private static func diatonicThirdAbove(_ note: Int, keyPC: Int, mode: Mode) -> Int {
+        let scale      = mode.intervals  // e.g. Aeolian: [0,2,3,5,7,8,10]
+        let relPC      = (note % 12 - keyPC + 12) % 12
+        // Find which scale degree this pitch class best matches
+        let degIdx     = scale.enumerated().min(by: { abs($0.element - relPC) < abs($1.element - relPC) })?.offset ?? 0
+        let thirdIdx   = (degIdx + 2) % scale.count
+        var semitones  = scale[thirdIdx] - scale[degIdx]
+        if semitones <= 0 { semitones += 12 }  // wrap up if third crosses the octave
+        return note + semitones
+    }
 
     private static func emitJMJVoice(
         notes: [Int], barStart: Int, stepDur: Int, offset: Int,
