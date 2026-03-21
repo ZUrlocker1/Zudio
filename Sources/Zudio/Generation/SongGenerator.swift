@@ -572,7 +572,7 @@ struct SongGenerator {
         switch style {
         case .alreadyPlaying:   return "fade in"
         case .progressiveEntry: return "lock in"
-        case .coldStart(let drumsOnly): return drumsOnly ? "cold start — drums only" : "cold start"
+        case .coldStart(_): return "cold start"
         }
     }
 
@@ -642,8 +642,8 @@ struct SongGenerator {
         case "MOT-BASS-009": return "Vitamin Hook"
         case "MOT-BASS-010": return "Quo Arc"
         case "MOT-BASS-011": return "Quo Drive"
-        case "MOT-BASS-012": return "Moroder Chase — delay-echo 16th-note ostinato"
-        case "MOT-BASS-013": return "Kraftwerk Roboter — octave-jump 3-note cell"
+        case "MOT-BASS-012": return "Moroder Chase"
+        case "MOT-BASS-013": return "Kraftwerk Roboter"
         case "MOT-BASS-014": return "McCartney melodic drive"
         case "BASS-EVOL":    return "Evolving pattern"
         case "BASS-DEVOL":   return "Devolving pattern"
@@ -733,17 +733,17 @@ struct SongGenerator {
 
     private static func cosmicBassRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "COS-BASS-001":  return "Drone Root — 2-bar hold, velocity 65"
-        case "COS-BASS-002":  return "Root-Fifth Slow Walk — 8-bar cycle"
-        case "COS-BASS-003":  return "Pedal Pulse — quarter-note root"
-        case "COS-BASS-004":  return "Moroder Drift — chromatic neighbor bar 4"
-        case "COS-BASS-005":  return "Bass absent in main section"
-        case "COS-BASS-006":  return "Additive dual bass — anchor + staccato hits"
-        case "COS-BASS-007":  return "Electric Buddha additive pulsating tremolo"
-        case "COS-BASS-008":  return "Hallogallo Lock — root + fifth, two notes per bar"
-        case "COS-BASS-009":  return "Crawling Walk — 2-bar root/fifth with approach note"
-        case "COS-BASS-010":  return "Moroder Pulse — 8th-note root/fifth/b7 sequence"
-        case "COS-BASS-011":  return "Kraftwerk Roboter — octave-jump 3-note cell"
+        case "COS-BASS-001":  return "Drone Root"
+        case "COS-BASS-002":  return "Root-Fifth Slow Walk"
+        case "COS-BASS-003":  return "Pedal Pulse"
+        case "COS-BASS-004":  return "Moroder Drift"
+        case "COS-BASS-005":  return "Bass absent"
+        case "COS-BASS-006":  return "Additive dual bass"
+        case "COS-BASS-007":  return "Pulsating tremolo"
+        case "COS-BASS-008":  return "Hallogallo Lock"
+        case "COS-BASS-009":  return "Crawling Walk"
+        case "COS-BASS-010":  return "Moroder Pulse"
+        case "COS-BASS-011":  return "Kraftwerk Roboter"
         case "COS-BASS-012":  return "McCartney melodic drive"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
@@ -1095,9 +1095,7 @@ struct SongGenerator {
             let bar = section.startBar
             switch section.label {
             case .intro:
-                let introInstr = sectionInstruments(section)
                 let introDesc = "\(section.lengthBars) bar \(introStyleLabel(structure.introStyle))"
-                    + (introInstr.isEmpty ? "" : " — \(introInstr)")
                 fireBar(bar, tag: "Intro", desc: introDesc)
             case .A:
                 let chords = chordsLabel(for: section)

@@ -1,7 +1,8 @@
 // StatusBoxView.swift — scrollable generation log.
 // Accumulates entries across all generations; newest at bottom.
-// Uses LazyVStack so SwiftUI renders only visible rows — appending one entry
-// no longer rebuilds the entire AttributedString from scratch.
+// Renders as a single Text view so selection spans the entire log
+// exactly like a word processor — drag to select across any lines,
+// then copy with ⌘C.
 
 import SwiftUI
 
@@ -11,7 +12,7 @@ struct StatusBoxView: View {
     // Tag column fixed width in monospaced chars (must exceed longest rule ID + space)
     private let tagWidth = 15
 
-    var body: some View {   
+    var body: some View {
         VStack(spacing: 0) {
             Divider()
 
@@ -51,22 +52,25 @@ struct StatusBoxView: View {
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Color.clear.frame(height: 1).id("top")
 
                         if appState.statusLog.isEmpty {
                             Text("Ready — press Generate to create a song.")
                                 .foregroundStyle(.secondary)
                                 .font(.system(size: 12, design: .monospaced))
+                                .textSelection(.enabled)
                         } else {
-                            ForEach(appState.statusLog.indices, id: \.self) { i in
-                                logRow(appState.statusLog[i])
-                            }
+                            // Single Text view built from all entries so drag-selection
+                            // spans the entire log (multiple Text views create isolated
+                            // selection islands that cannot be bridged).
+                            buildLogText()
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         Color.clear.frame(height: 1).id("bottom")
                     }
-                    .textSelection(.enabled)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,16 +87,26 @@ struct StatusBoxView: View {
         }
     }
 
-    // Single log row — rendered independently; LazyVStack only instantiates visible rows.
-    private func logRow(_ entry: GenerationLogEntry) -> some View {
-        HStack(spacing: 0) {
-            Text(entry.tag.padding(toLength: tagWidth, withPad: " ", startingAt: 0))
-                .font(.system(size: 12, weight: entry.isTitle ? .bold : .regular, design: .monospaced))
+    // Build the entire log as one Text value by concatenating styled segments.
+    // A single Text supports contiguous selection across all lines.
+    private func buildLogText() -> Text {
+        let entries = appState.statusLog
+        var result = Text("")
+        for (i, entry) in entries.enumerated() {
+            let tag = entry.tag.padding(toLength: tagWidth, withPad: " ", startingAt: 0)
+            let weight: Font.Weight = entry.isTitle ? .bold : .regular
+            let font = Font.system(size: 12, weight: weight, design: .monospaced)
+
+            let tagText  = Text(tag)
+                .font(font)
                 .foregroundStyle(entry.isTitle ? Color.white : Color.green.opacity(0.85))
-            Text(entry.description)
-                .font(.system(size: 12, weight: entry.isTitle ? .bold : .regular, design: .monospaced))
+            let descText = Text(entry.description)
+                .font(font)
                 .foregroundStyle(entry.isTitle ? Color.yellow.opacity(0.95) : Color.white.opacity(0.85))
-            Spacer(minLength: 0)
+
+            let line = tagText + descText
+            result = i == 0 ? line : result + Text("\n").font(font) + line
         }
+        return result
     }
 }

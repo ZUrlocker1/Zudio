@@ -238,7 +238,6 @@ struct TopBarView: View {
                         .pickerStyle(.menu)
                         .frame(width: 90)
 
-                        Spacer(minLength: 8)
                         HStack(spacing: 6) {
                             Text("BPM")
                                 .foregroundStyle(.secondary)
