@@ -163,7 +163,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - `GBL-001 E Dorian, 138 BPM, minor_loop_i_VII`
   - `DRM-001 Classic Motorik`
   - `BAS-002 Motorik Drive`
-  - `BAS-VAR Bass evolving`
+  - `BASS    Evolving pattern`
   - `PAD-001 Sustained`
   - `LD1-001 Motif-first`
   - `LD2-001 Counter-response`
@@ -174,7 +174,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - STR-001: Single-A, STR-002: Subtle A/B, STR-003: Moderate A/B, STR-004: Moderate A/B/A'
   - INT-001: 8-bar intro, INT-002: 16-bar intro
   - OUT-001: 8-bar outro, OUT-002: 16-bar outro
-  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-011, BAS-VAR (bass variation active), BAS-VAR-R (bass reverted to original pattern)
+  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-014; BASS-EVOL (evolving pattern — fires when variation starts, or always for rules 012/013/014 and COS-BASS-011/012), BASS-DEVOL (devolving pattern — fires when simple-rule variation reverts)
   - LD1: LD1-001 (phrase-first), LD1-002 (pentatonic cell), LD1-003 (long breath), LD1-004 (stepwise sequence), LD1-005 (statement-answer)
   - LD2: LD2-001 (counter-response), LD2-002 (sustained drone), LD2-003 (rhythmic counter), LD2-004 (Hallogallo motif counter), LD2-005 (descending line)
   - PAD: PAD-001 (sustained whole-bar), PAD-002 (power/drone voicing), PAD-003 (pulsed 2-bar), PAD-004 (sparse intro/outro), PAD-006 (chord stabs beat 1/3), PAD-007 (Charleston 3+3+2), PAD-010 (half-bar breathe), PAD-011 (backbeat stabs beats 2+4)
@@ -1036,6 +1036,9 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - BAS-009 Vitamin Hook (7%): bar 1 climbs root→fifth→octave with chromatic passing tone, bar 2 descends with a long root breathe. Inspired by Holger Czukay / CAN "Vitamin C".
     - BAS-010 Quo Arc (10%): 2-bar boogie-woogie arc in paired 8th notes; bar 1 ascends 1-1-3-3-5-5-6-b7, bar 2 descends b7-6-5-3-1-1-1-1 back to root. Always uses boogie-woogie scale (1-3-5-6-b7) regardless of chord type. Inspired by Status Quo "Down Down".
     - BAS-011 Quo Drive (8%): compressed 1-bar boogie arc root-third-fifth-sixth-b7-sixth-fifth-third, with a root-push variant (root-root-third-fifth-sixth-b7-sixth-fifth) applied on even bars. Inspired by Status Quo "Caroline" / "Paper Plane".
+    - BAS-012 Moroder Chase (7%): delay-echo 16th-note ostinato inspired by Giorgio Moroder "Chase" (Midnight Express, 1978). Primary 8th notes cycle root–mode3rd–fifth; a quieter echo note fills each intermediate 16th step, simulating the AMS digital delay Moroder used to double his Minimoog into 16ths. Even bars use full three-note cycling; odd bars simplify to root–root–fifth–root for breathing room.
+    - BAS-013 Kraftwerk Roboter (7%): octave-jump 3-note cell inspired by "The Robots" (1978). Each cell: root (8th) — root+octave (8th) — mode3rd (quarter), repeated twice per bar. Bars 0–1 of each 4-bar group land on the mode third; bars 2–3 land on the fifth for harmonic lift. Every 8th bar is a root-only quarter-note lock bar. The instant synthesizer octave jump is the signature of this pattern.
+    - BAS-014 McCartney melodic drive (8%): Mixolydian 8-note riff inspired by "Paperback Writer" (1966). Full riff on even bars (root–fifth–root–b7–fifth–root–mode3rd–root in 8th notes); odd bars breathe with root hold plus a root–fifth–root walkup approach. The flat-seventh gives a blues/Mixolydian edge; in pure major contexts the b7 falls back to fifth.
   - Bass variation for simple rules (BAS-001, BAS-002, BAS-004):
     - These three rules produce very repetitive 1–2 note patterns. In B sections and alternating A sections that start at or after bar 48, the generator substitutes a slightly more complex variant to maintain musical interest without abandoning the rule's identity:
       - BAS-001 Root Anchor variation: quarter-note walk root → third → fifth → root (mode-correct third and perfect fifth)
@@ -1043,7 +1046,7 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
       - BAS-004 Hallogallo Lock variation: root (long) → third → fifth arc (mode-correct passing third between the two anchors)
     - All interval choices are mode-correct: minor third (3 semitones) in Dorian/Aeolian, major third (4 semitones) in Ionian/Mixolydian. The fifth is always a perfect fifth (+7, mode-neutral).
     - The variation runs through the qualifying section(s) and then reverts to the original pattern. It does not take over the rest of the song. Alternating A sections after bar 48 (every other one) receive the variation so the pattern alternates rather than staying permanently changed.
-    - Status log entries: `BAS-VAR | Bass evolving` when the first variation bar fires; `BAS-VAR-R | Bass devolving` when the first revert bar fires. Both appear in the generation log at song load time.
+    - Status log entries: `BASS-EVOL | Evolving pattern` when the first variation bar fires; `BASS-DEVOL | Devolving pattern` when the first revert bar fires. Both appear in the generation log at song load time. The status box displays these with tag `BASS` (not the rule ID) for brevity.
   - All patterns anchor beat 1 (step 0) as the primary attack, matching the kick drum. Syncopation is deliberately minimal — Motorik bass is locked and pulse-forward.
   - Writing rules:
     - Phrase length: 1-2 bars
@@ -1653,6 +1656,11 @@ BAS-008 - Moroder Pulse: staccato 8th notes root-root-fifth-fifth-b7-b7-root-roo
 BAS-009 - Vitamin Hook: bar 1 climbs root→fifth→octave, bar 2 descends and breathes.
 BAS-010 - Quo Arc: 2-bar boogie-woogie arc ascending then descending using boogie scale (1-3-5-6-b7).
 BAS-011 - Quo Drive: 1-bar compressed boogie arc; root-push variant on even bars.
+BAS-012 - Moroder Chase: delay-echo 16th-note ostinato; primary 8th notes cycle root–mode3rd–fifth; quieter echo fills intermediate 16th steps. Even bars: full three-note cycling; odd bars: root–root–fifth–root breathing room. Always emits BASS-EVOL.
+BAS-013 - Kraftwerk Roboter: octave-jump 3-note cell root(8th)–root+octave(8th)–mode3rd(quarter), twice per bar. Bars 0–1 of 4-bar group: mode3rd landing; bars 2–3: fifth for harmonic lift. Every 8th bar is root-only lock. Always emits BASS-EVOL.
+BAS-014 - McCartney melodic drive: 8-note Mixolydian riff root–fifth–root–b7–fifth–root–mode3rd–root in 8th notes on even bars; odd bars breathe with root hold + root–fifth–root walkup. Flat-seventh gives blues/Mixolydian edge. Always emits BASS-EVOL.
+BASS-EVOL - Evolving pattern: fires when bass variation begins (simple rules BAS-001/002/004 in B sections or bar ≥48) or always for always-evolving rules (BAS-012/013/014, COS-BASS-011/012).
+BASS-DEVOL - Devolving pattern: fires when simple-rule bass variation reverts to original pattern at end of qualifying section window.
 
 ### Pad rules
 P-001 - Limit continuous whole-note pad behavior to <=4 bars; auto-inject PAD-007 Charleston bar to break monotony.
@@ -1712,6 +1720,27 @@ TEX-004 - Shimmer Pair: two notes a major-7th or minor-9th apart, off-beat, shor
 TEX-005 - Breath Release: quiet note on last step of each section's final bar, 50% probability.
 TEX-006 - High Tension Touch: single scale-tension note, off-beat, ~once per 20 bars, body sections only.
 
+### Cosmic bass rules (COS-BASS)
+COS-BASS-001 - Root drone: single sustained root note per bar.
+COS-BASS-002 - Octave pulse: alternating root / root+octave pattern.
+COS-BASS-003 - Pedal Pulse: alternates between root and perfect fifth.
+COS-BASS-004 - Moroder Drift: slow chromatic drift between adjacent tones.
+COS-BASS-005 - Bass absent: no bass layer.
+COS-BASS-006 - Additive dual bass: anchor note plus staccato off-beat layer. Required for COS-BASS-008; blocked with COS-BASS-004/010/012.
+COS-BASS-007 - Pulsating tremolo: rapid root pulsing layer; blocked with COS-BASS-004/010/012.
+COS-BASS-008 - Hallogallo Lock (Cosmic): root beat 1, fifth beat 3, two long notes per bar. Always uses COS-BASS-006 layer.
+COS-BASS-009 - Crawling Walk (Cosmic): 2-bar root/fifth/approach-note pattern, lower velocities than Motorik version.
+COS-BASS-010 - Moroder Pulse (Cosmic): 8th-note ostinato root–root–fifth–fifth–b7–b7–root–root.
+COS-BASS-011 - Kraftwerk Roboter (Cosmic): octave-jump 3-note cell at slower Cosmic tempo. Always emits BASS-EVOL.
+COS-BASS-012 - McCartney melodic drive (Cosmic): 8-note Mixolydian riff cycling each bar. Always emits BASS-EVOL.
+
+### Cosmic drum rules (COS-DRUM)
+COS-DRUM-001 - Minimal: kick beat 1 every other bar; quarter-note hi-hat with ghost/accent alternation.
+COS-DRUM-002 - Sparse: floor tom hits every 4–8 beats on root and fifth.
+COS-DRUM-003 - Absent: no percussion.
+COS-DRUM-004 - Electric Buddha Groove: 8th-note hi-hat, 5 kick/snare pattern variants rotating every 4 bars. Tempo ≥ 100 BPM only.
+COS-DRUM-005 - Electric Buddha Pulse: quarter-note hi-hat, half-time snare default, mid-weight feel. Tempo ≥ 100 BPM only.
+
 ### Interplay rules for cross-track behavior
 I-001 - Bass-vs-Lead2 conflict priority: keep bass, remap Lead 2 to consonant target, else suppress.
 I-002 - Allow controlled doubling windows (Lead2+Rhythm or keyboard+guitar) in unison/octave.
@@ -1763,6 +1792,15 @@ The outro mirrors this arc:
 - COS-DRUM-001 — Minimal: kick on beat 1 every other bar; hi-hat quarter-note pulse with ghost/accent alternation (JMJ Mini Pops style)
 - COS-DRUM-002 — Sparse: pitched floor tom hits every 4–8 beats, rooted on the root and fifth of the key
 - COS-DRUM-003 — Absent: no percussion at all (Berlin School orchestral mode)
+- COS-DRUM-004 — Electric Buddha Groove: 8th-note hi-hat pulse (not 16th — half-density Motorik), 5 kick/snare pattern variants rotating every 4 bars for groove without monotony. Inspired by Electric Buddha Band (Time Loops, Dark Sun, Mister Mosca). Used with cold start (drums-only pickup) 60% of the time. Only fires at tempo ≥ 100 BPM.
+- COS-DRUM-005 — Electric Buddha Pulse: mid-weight half-time feel between Minimal and the full groove. Quarter-note hi-hat (not 8th); kick on beat 1 every bar, beat 3 added ~45% of bars; snare half-time (beat 3 only) 65% of time, full rock (beats 2+4) 35%. Only fires at tempo ≥ 100 BPM.
+
+Cold start drum fill (Cosmic — 3 variants, selected randomly):
+- All variants: no kick anywhere in the fill (avoids double-bass-drum collision with bar 1 beat 1), no notes on step 15 (1-step gap ensures bar 1 downbeat arrives clean)
+- v0 Hat Crescendo: 16th-note closed hat run steps 4–13 building in velocity, single snare on step 14
+- v1 Bonham Launch: hat prefix on beat 2 (steps 4–7), tom cascade hi→floor on beat 3 (steps 8–13), snare on step 14. Inspired by John Bonham's 2-beat fills.
+- v2 Crescendo Roll: ghost snare roll steps 4–14 with exponential velocity curve (18→105), peaks at step 14
+- drumsOnly variant starts pickup at step 8 (2-beat fill); bass+drums variant starts at step 4 (3-beat fill)
 
 ### Arpeggio patterns (COS-ARP)
 
@@ -1780,9 +1818,16 @@ Primary rules (one selected per song):
 - COS-BASS-004 — Moroder Drift: slow chromatic drift between adjacent tones
 - COS-BASS-005 — Absent: no bass layer (sparse cosmic texture songs)
 
+Expanded primary rules (added alongside originals; one selected per song):
+- COS-BASS-008 — Hallogallo Lock (Cosmic): root on beat 1 (7 steps), fifth on beat 3 (6 steps). Two long notes per bar — more active than Drone Root but still very spacious. Adapted from Neu! "Hallogallo" bass character. Always paired with COS-BASS-006 dual layer (sounds thin without it).
+- COS-BASS-009 — Crawling Walk (Cosmic): 2-bar pattern: bar 1 root hold → fifth on beat 2.75 → semitone approach at bar end; bar 2 arrives on fifth with chromatic pickup. Adapted from Motorik BAS-003 with lower velocities and Cosmic pitch range (MIDI 40–55).
+- COS-BASS-010 — Moroder Pulse (Cosmic): sequential 8th-note ostinato root–root–fifth–fifth–b7–b7–root–root. Mechanical, relentless. Adapted from Giorgio Moroder "I Feel Love" feel. Blocks dual-layer and pulsating-layer (already fills the off-beats).
+- COS-BASS-011 — Kraftwerk Roboter (Cosmic): octave-jump 3-note cell root(8th)–root+octave(8th)–mode3rd(quarter), repeated twice per bar. The synthesizer octave jump creates mechanical, robot-like feel. Bar-based evolution baked in — always emits BASS-EVOL.
+- COS-BASS-012 — McCartney melodic drive (Cosmic): 8-note riff root–fifth–root–b7–fifth–root–mode3rd–root in 8th notes, cycling identically each bar. Flat-seventh gives Mixolydian/blues quality; falls back to fifth in pure major contexts. Blocks dual-layer and pulsating-layer (already dense). Bar-based cycling always emits BASS-EVOL.
+
 Additive rules (layered on top of primary; at most one per song):
-- COS-BASS-006 — Additive dual bass: anchor note plus staccato hits on off-beats
-- COS-BASS-007 — Additive pulsating tremolo: rapid pulsing on the root; blocked when primary is COS-BASS-004
+- COS-BASS-006 — Additive dual bass: anchor note plus staccato hits on off-beats. Blocked with COS-BASS-004 (chromatic clash), COS-BASS-010 (already fills off-beats), COS-BASS-012 (melodic riff would be cluttered). Required for COS-BASS-008.
+- COS-BASS-007 — Additive pulsating tremolo: rapid pulsing on the root; blocked when primary is COS-BASS-004, COS-BASS-010, or COS-BASS-012
 
 ### Pad voicings (COS-PADS)
 
