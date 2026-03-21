@@ -22,6 +22,16 @@
 //   BAS-011: Quo Drive — Status Quo "Caroline" 1-bar compressed boogie arc;
 //            full up-and-back arc in one bar: 1-3-5-6-b7-6-5-3.
 //            Root-push variant (Paper Plane): 1-1-3-5-6-b7-6-5 — applied on even bars.
+//   BAS-012: Moroder Chase — Giorgio Moroder "Chase" (Midnight Express, 1978) delay-echo 16th-note ostinato;
+//            primary 8th notes cycle root–mode3rd–fifth, with a mirrored quieter echo on each odd 16th step
+//            simulating the AMS digital delay Moroder used to double his Minimoog 8th notes into 16ths.
+//   BAS-013: Kraftwerk Roboter — "The Robots" (1978) 3-note octave-jump cell;
+//            root(low, 8th)–root+octave(high, 8th)–mode3rd(quarter), repeated twice per bar.
+//            The instant synthesizer octave jump is the signature; creates a mechanical robot feel.
+//            Works in both Motorik and Cosmic ranges.
+//   BAS-014: McCartney PBW — "Paperback Writer" (1966) Mixolydian riff;
+//            root–fifth–root–b7–fifth–root–mode3rd–root in 8 8th-notes.
+//            The flat-seventh gives a blues/Mixolydian edge. b7 falls back to fifth in pure major contexts.
 //
 // All patterns hit beat 1 (step 0) as the primary anchor, matching the kick drum.
 // Syncopation is deliberately minimized — Motorik bass is locked and pulse-forward.
@@ -36,10 +46,12 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         let rules:   [String] = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
                                   "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
-                                  "MOT-BASS-010","MOT-BASS-011"]
-        let weights: [Double] = [0.10,     0.10,     0.07,     0.10,
-                                  0.12,     0.06,     0.11,     0.09,     0.07,
-                                  0.10,     0.08]
+                                  "MOT-BASS-010","MOT-BASS-011",
+                                  "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014"]
+        let weights: [Double] = [0.08,     0.08,     0.05,     0.08,
+                                  0.09,     0.05,     0.09,     0.07,     0.06,
+                                  0.07,     0.06,
+                                  0.07,     0.07,     0.08]
         let ruleID = rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
 
@@ -116,6 +128,12 @@ struct BassGenerator {
             usedRuleIDs.insert("BASS-DEVOL")
         }
 
+        // Rules 012/013/014 have bar-based evolution baked in (no section gate needed).
+        // Always emit BASS-EVOL so the status log reflects the ongoing variation.
+        if ruleID == "MOT-BASS-012" || ruleID == "MOT-BASS-013" || ruleID == "MOT-BASS-014" {
+            usedRuleIDs.insert("BASS-EVOL")
+        }
+
         return events
     }
 
@@ -144,6 +162,9 @@ struct BassGenerator {
         case "MOT-BASS-009": return vitaminHookBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-010": return quoArcBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-011": return quoDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-012": return moroderChaseBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-013": return kraftwerkRoboterBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-014": return mccartneyPBWBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
         }
     }
@@ -331,6 +352,32 @@ struct BassGenerator {
             return [
                 MIDIEvent(stepIndex: barStart,     note: root,  velocity: 86, durationSteps: 7),
                 MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 76, durationSteps: 7),
+            ]
+
+        case "MOT-BASS-012":   // Moroder Chase → root only staccato 16ths (omit b3 and fifth)
+            // Intro strips back to pure-root machine pulse — saves the minor-pentatonic
+            // cycling (b3/fifth) for the body arrival.
+            var evs12: [MIDIEvent] = []
+            let vels12: [UInt8] = [90, 68, 78, 58, 86, 64, 74, 56, 88, 66, 76, 58, 84, 62, 72, 54]
+            for step in 0..<16 {
+                evs12.append(MIDIEvent(stepIndex: barStart + step, note: root,
+                                       velocity: vels12[step], durationSteps: 1))
+            }
+            return evs12
+
+        case "MOT-BASS-013":   // Kraftwerk Roboter → root only, quarter notes (no octave jump intro)
+            // Holds back the octave jump for the body; quarter-note root pulse signals "something big"
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root, velocity: 90, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: root, velocity: 78, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: root, velocity: 86, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: root, velocity: 74, durationSteps: 4),
+            ]
+
+        case "MOT-BASS-014":   // McCartney PBW → root only, half-time beats 1+3 (withholds the Mixolydian melody)
+            return [
+                MIDIEvent(stepIndex: barStart,     note: root, velocity: 86, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8, note: root, velocity: 76, durationSteps: 7),
             ]
 
         case "MOT-BASS-010", "MOT-BASS-011":   // Quo Arc / Quo Drive → root–third alternating 8ths
@@ -708,6 +755,147 @@ struct BassGenerator {
                                     velocity: vels[i], durationSteps: 2))
         }
         return events
+    }
+
+    // MARK: - BAS-012: Moroder Chase — Midnight Express (1978) delay-echo 16th-note ostinato
+    // The original bass was 8th notes on a Minimoog; an AMS digital delay set to exact
+    // 16th-note time created a mirrored echo on every odd step, producing continuous 16ths.
+    // Simulated here by writing alternating primary (even steps, 8th-note positions) and
+    // quieter echo notes (odd steps, 16th-note off-positions) at ~70% of primary velocity.
+    // Primary pattern (even steps): root–mode3rd–fifth–root cycling (4 pairs = 8 positions).
+    // The minor-pentatonic cycling (1–b3–5) is what distinguishes Chase from BAS-008 (1–5–b7).
+    // In major chord contexts the mode-third becomes a major third — stays diatonic either way.
+    //
+    // 2-bar evolution: bar 1 (even) plays the full root–b3–fifth cycling;
+    // bar 2 (odd) releases tension by dropping to root–root–fifth–root (omits b3),
+    // simulating the natural "breath" a real bassist would take between drive bars.
+
+    private static func moroderChaseBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = chordRootNote(entry: entry, frame: frame)
+        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 52))
+        let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 52))
+
+        // Even bars: full chase (root–third–fifth–root); odd bars: simplified (root–root–fifth–root)
+        let primaryNotes: [UInt8]
+        let primaryVels:  [UInt8]
+        if bar % 2 == 0 {
+            primaryNotes = [root, third, fifth, root, root, third, fifth, root]
+            primaryVels  = [92,   86,    88,   84,   90,   84,    86,   82  ]
+        } else {
+            primaryNotes = [root, root,  fifth, root, root, fifth, root, root]
+            primaryVels  = [90,   82,    86,   80,   88,   84,    82,   78  ]
+        }
+
+        var events: [MIDIEvent] = []
+        for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+            let pVel = primaryVels[i]
+            let eVel = UInt8(max(18, Int(pVel) * 70 / 100))  // echo at ~70% of primary
+            events.append(MIDIEvent(stepIndex: barStart + step,     note: primaryNotes[i],
+                                    velocity: pVel, durationSteps: 1))
+            events.append(MIDIEvent(stepIndex: barStart + step + 1, note: primaryNotes[i],
+                                    velocity: eVel, durationSteps: 1))
+        }
+        return events
+    }
+
+    // MARK: - BAS-013: Kraftwerk Roboter — "The Robots" (1978) octave-jump 3-note cell
+    // A 3-note cell repeating twice per bar: root(low, 8th) – root+octave(high, 8th) – mode-3rd(quarter).
+    // The instant octave jump (impossible on acoustic bass; native to synthesizer) is the signature.
+    // 3-note cell in 8-step half-bar groups: steps 0-7 = cell 1, steps 8-15 = cell 2.
+    // The cell is exactly 2 beats long (8 steps), fitting twice in a 4/4 bar.
+    // In the original Dm, the 3rd is F (minor); in major keys, it's the major third.
+    // Range extended to 28-64 to allow the octave note to sit above the normal bass floor.
+    // Best at Cosmic tempos (100-125 BPM) and low Motorik (128-135 BPM).
+    //
+    // 4-bar evolution: bars 1-2 (standard): root–octave–third / root–octave–third
+    //                 bars 3-4 (inverted):  root–octave–fifth / root–octave–fifth
+    // The fifth swap on bars 3-4 adds harmonic lift before returning to the third on bar 1.
+    // Also: every 8 bars a "lock" bar plays root-only quarter notes (root–root–root–root)
+    // — strips back the octave jump for one bar so the return of the jump on the next bar
+    // feels like a re-arrival. Inspired by how Kraftwerk's sequencers occasionally held a note.
+
+    private static func kraftwerkRoboterBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root   = chordRootNote(entry: entry, frame: frame)
+        let octave = UInt8(clamped(Int(root) + 12, low: 28, high: 64))
+        let third  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+        let fifth  = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
+
+        // Every 8 bars: one "lock" bar — root-only quarter notes, no octave jump
+        if bar % 8 == 7 {
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root, velocity: 92, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: root, velocity: 80, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: root, velocity: 88, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: root, velocity: 78, durationSteps: 4),
+            ]
+        }
+
+        // Bars 0-1 of each 4-bar group: third on the landing note
+        // Bars 2-3 of each 4-bar group: fifth on the landing note (harmonic lift)
+        let landing = (bar % 4 < 2) ? third : fifth
+        let landingVel: UInt8 = (bar % 4 < 2) ? 76 : 80
+
+        var events: [MIDIEvent] = []
+        for cell in 0..<2 {
+            let offset = cell * 8
+            events.append(MIDIEvent(stepIndex: barStart + offset,     note: root,    velocity: 92, durationSteps: 2))
+            events.append(MIDIEvent(stepIndex: barStart + offset + 2, note: octave,  velocity: 80, durationSteps: 2))
+            events.append(MIDIEvent(stepIndex: barStart + offset + 4, note: landing, velocity: landingVel, durationSteps: 4))
+        }
+        return events
+    }
+
+    // MARK: - BAS-014: McCartney PBW — "Paperback Writer" (1966) Mixolydian riff
+    // One of McCartney's most analyzed bass lines. In G major/Mixolydian:
+    //   G–D–G–F–D–G–B–G = root–fifth–root–b7–fifth–root–mode3rd–root in 8 8th-notes.
+    // The flat-seventh (b7 = F in G major) gives it a blues/Mixolydian edge.
+    // In minor/Dorian/Mixolydian contexts b7 is naturally diatonic (stays on b7).
+    // In pure major (Ionian) contexts b7 is chromatic — replaced with fifth to stay diatonic.
+    // The mode-third at position 7 adapts: major third in Ionian/Mixolydian, minor third in Dorian/Aeolian.
+    //
+    // 2-bar evolution: McCartney alternates the full riff (even bars) with a "breathe" bar (odd bars)
+    // that holds root for two beats then walks root–fifth–root–pickup — giving the riff room to land
+    // before repeating. This is faithful to how Beatles arrangements actually work: the bass riff
+    // doesn't repeat mechanically for 32 bars; it breathes every other bar.
+
+    private static func mccartneyPBWBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = chordRootNote(entry: entry, frame: frame)
+        let fifth = UInt8(clamped(Int(root) + 7,  low: 28, high: 52))
+        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 52))
+
+        let isMajorContext: Bool
+        switch entry.chordWindow.chordType {
+        case .major, .sus2, .sus4, .add9: isMajorContext = true
+        default:                          isMajorContext = false
+        }
+        let flatSeven = isMajorContext ? fifth : UInt8(clamped(Int(root) + 10, low: 28, high: 52))
+
+        if bar % 2 == 0 {
+            // Drive bar: full riff — root–fifth–root–b7–fifth–root–mode3rd–root
+            let pitches: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]
+            let vels:    [UInt8] = [94,   84,    88,   80,        82,    78,   84,    74  ]
+            var events: [MIDIEvent] = []
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: pitches[i],
+                                        velocity: vels[i], durationSteps: 2))
+            }
+            return events
+        } else {
+            // Breathe bar: root hold (beats 1–2), then root–fifth–root walkup (beats 3–4)
+            // Simulates McCartney sustaining under the chord while the riff "resets"
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,  velocity: 90, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8,  note: root,  velocity: 82, durationSteps: 3),
+                MIDIEvent(stepIndex: barStart + 12, note: fifth, velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 14, note: root,  velocity: 70, durationSteps: 2),
+            ]
+        }
     }
 
     // MARK: - Note helpers

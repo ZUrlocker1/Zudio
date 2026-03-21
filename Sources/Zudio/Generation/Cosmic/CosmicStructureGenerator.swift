@@ -6,11 +6,13 @@ struct CosmicStructureGenerator {
         frame: GlobalMusicalFrame,
         cosmicForm: CosmicSongForm,
         cosmicProgFamily: CosmicProgressionFamily,
+        percussionStyle: PercussionStyle,
         rng: inout SeededRNG
     ) -> SongStructure {
         let (sections, introStyle, outroStyle) = buildSections(
             form: cosmicForm,
             totalBars: frame.totalBars,
+            percussionStyle: percussionStyle,
             rng: &rng
         )
         let chordPlan = buildChordPlan(
@@ -28,11 +30,14 @@ struct CosmicStructureGenerator {
     private static func buildSections(
         form: CosmicSongForm,
         totalBars: Int,
+        percussionStyle: PercussionStyle,
         rng: inout SeededRNG
     ) -> (sections: [SongSection], introStyle: IntroStyle, outroStyle: OutroStyle) {
 
-        // Cosmic intro: 4 or 8 bars (longer than Motorik's 2-4)
-        let introBars = rng.nextDouble() < 0.5 ? 4 : 8
+        // Cosmic intro: 2 bars (25%), 4 bars (50%), 8 bars (25%)
+        let introLengths: [Int]    = [2,    4,    8   ]
+        let introWeights: [Double] = [0.25, 0.50, 0.25]
+        let introBars = introLengths[rng.weightedPick(introWeights)]
         // Cosmic outro: 8 or 16 bars
         let outroBars = rng.nextDouble() < 0.5 ? 8 : 16
         let bodyBars  = Swift.max(4, totalBars - introBars - outroBars)
@@ -55,12 +60,24 @@ struct CosmicStructureGenerator {
         sections.append(SongSection(startBar: cursor, lengthBars: outroBars,
                                     label: .outro, intensity: .low, mode: lastMode))
 
-        // Cosmic intro styles
+        // Cosmic intro styles.
+        // Electric Buddha groove / minimal beat → cold start preferred (drums-alone pickup).
+        // Other percussion → equal three-way split as before.
         let introStyle: IntroStyle
-        switch rng.nextInt(upperBound: 3) {
-        case 0:  introStyle = .alreadyPlaying       // ambient_fade_in
-        case 1:  introStyle = .progressiveEntry     // texture_first
-        default: introStyle = .coldStart(drumsOnly: false)  // sequencer_launch
+        let usesRockGroove = (percussionStyle == .motorikGrid || percussionStyle == .electricBuddhaPulse)
+        if usesRockGroove {
+            // 60% cold start (always drumsOnly: true for the Electric Buddha feel),
+            // 20% progressive entry, 20% already playing
+            let r = rng.nextDouble()
+            if r < 0.60      { introStyle = .coldStart(drumsOnly: true) }
+            else if r < 0.80 { introStyle = .progressiveEntry }
+            else             { introStyle = .alreadyPlaying }
+        } else {
+            switch rng.nextInt(upperBound: 3) {
+            case 0:  introStyle = .alreadyPlaying
+            case 1:  introStyle = .progressiveEntry
+            default: introStyle = .coldStart(drumsOnly: false)
+            }
         }
 
         // Cosmic outro styles — mapped to existing OutroStyle cases

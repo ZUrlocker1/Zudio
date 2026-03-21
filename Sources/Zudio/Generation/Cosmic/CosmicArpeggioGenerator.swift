@@ -89,7 +89,7 @@ struct CosmicArpeggioGenerator {
                     for i in countBefore..<events.count {
                         let ev = events[i]
                         events[i] = MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                              velocity: UInt8(max(42, Int(ev.velocity) * 58 / 100)),
+                                              velocity: UInt8(max(55, Int(ev.velocity) * 80 / 100)),
                                               durationSteps: ev.durationSteps)
                     }
                 }
@@ -150,7 +150,7 @@ struct CosmicArpeggioGenerator {
                     for i in countBefore..<events.count {
                         let ev = events[i]
                         events[i] = MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                              velocity: UInt8(max(42, Int(ev.velocity) * 60 / 100)),
+                                              velocity: UInt8(max(55, Int(ev.velocity) * 82 / 100)),
                                               durationSteps: ev.durationSteps)
                     }
                 }
@@ -202,7 +202,7 @@ struct CosmicArpeggioGenerator {
                     for i in countBefore..<events.count {
                         let ev = events[i]
                         events[i] = MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                              velocity: UInt8(max(42, Int(ev.velocity) * 60 / 100)),
+                                              velocity: UInt8(max(55, Int(ev.velocity) * 82 / 100)),
                                               durationSteps: ev.durationSteps)
                     }
                 }
@@ -266,7 +266,7 @@ struct CosmicArpeggioGenerator {
                     for i in countBefore..<events.count {
                         let ev = events[i]
                         events[i] = MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                              velocity: UInt8(max(42, Int(ev.velocity) * 60 / 100)),
+                                              velocity: UInt8(max(55, Int(ev.velocity) * 82 / 100)),
                                               durationSteps: ev.durationSteps)
                     }
                 }

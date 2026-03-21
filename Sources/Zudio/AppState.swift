@@ -30,6 +30,12 @@ final class AppState: ObservableObject {
 
     @Published var selectedStyle: MusicStyle = .cosmic
 
+    // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
+    // Fired on generateNew() and on the manual Reset button.
+    @Published var defaultsResetToken: Int = 0
+
+    func resetTrackDefaults() { defaultsResetToken += 1 }
+
     // MARK: - UI selectors (nil = Auto)
 
     @Published var keyOverride:   String? = nil
@@ -99,22 +105,16 @@ final class AppState: ObservableObject {
             }
                 .store(in: &cancellables)
 
-        // DAW-style scrolling + live annotation feed
+        // DAW-style scrolling + live annotation feed.
+        // .receive(on: DispatchQueue.main) guarantees main-thread delivery — no Task wrapper needed.
         playback.$currentStep
             .dropFirst()
-             .receive(on: DispatchQueue.main)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] step in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    // Discard stale notifications from a previous song/playback session.
-                    // The double async (receive + Task) means old step values (e.g., step 800
-                    // from before generateNew reset currentStep to 0) can arrive AFTER the
-                    // new song is already playing. A stale step is hundreds of steps ahead of
-                    // currentStep=0 — far outside the normal 1–5 step delivery lag.
-                    guard step <= self.playback.currentStep + 32 else { return }
-                    self.updateDAWScroll(step: step)
-                    self.emitStepAnnotations(upTo: step)
-                }
+                guard let self else { return }
+                guard step <= self.playback.currentStep + 32 else { return }
+                self.updateDAWScroll(step: step)
+                self.emitStepAnnotations(upTo: step)
             }
             .store(in: &cancellables)
     }
@@ -124,11 +124,16 @@ final class AppState: ObservableObject {
     private func emitStepAnnotations(upTo step: Int) {
         guard step > lastEmittedStep,
               let annotations = songState?.stepAnnotations else { return }
+        var newEntries: [GenerationLogEntry] = []
         for s in (lastEmittedStep + 1)...step {
             if let entries = annotations[s] {
-                for entry in entries {
-                    statusLog.append(entry)
-                }
+                newEntries.append(contentsOf: entries)
+            }
+        }
+        if !newEntries.isEmpty {
+            statusLog.append(contentsOf: newEntries)  // single objectWillChange for the whole batch
+            if statusLog.count > 500 {
+                statusLog.removeFirst(statusLog.count - 500)
             }
         }
         lastEmittedStep = step
@@ -190,6 +195,9 @@ final class AppState: ObservableObject {
                 self.playback.cosmicStyle = self.selectedStyle == .cosmic
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
+                // Reset instruments + effects BEFORE play so setProgram() doesn't race
+                // against the first note firing.
+                self.defaultsResetToken += 1
                 if thenPlay || wasPlaying { self.playback.play() }
                 // Resign first responder so BPM TextField doesn't hold focus
                 NSApp.keyWindow?.makeFirstResponder(nil)

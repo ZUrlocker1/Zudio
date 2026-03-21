@@ -138,7 +138,8 @@ enum PercussionStyle: String, Codable, Sendable {
     case absent
     case sparse
     case minimal
-    case motorikGrid  // Full 16th-note grid (Electric Buddha Band Cosmic style)
+    case motorikGrid          // Electric Buddha groove — 8th-note hi-hat + varied rock kick/snare (COS-DRUM-004)
+    case electricBuddhaPulse  // Electric Buddha pulse — quarter-note hi-hat + half-time kick/snare (COS-DRUM-005)
     case textural     // Ambient future use
     case softPulse   // Ambient future use
 }

@@ -23,7 +23,7 @@ struct TrackRowView: View {
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
-        let isCosmic = appState.selectedStyle == .cosmic
+        let isCosmic = activeStyle == .cosmic
         switch trackIndex {
         case kTrackLead1:
             if isCosmic {
@@ -92,6 +92,10 @@ struct TrackRowView: View {
 
     @State private var instrumentIndex: Int = 0
     @State private var activeEffects: Set<String> = []
+    // Snapshot of the style currently applied to this track's instruments + effects.
+    // Only updated when defaultsResetToken fires (generate or Reset button) — NOT on live
+    // selectedStyle changes — so switching the picker mid-song doesn't touch anything.
+    @State private var activeStyle: MusicStyle = .cosmic
 
     // MARK: - Body
 
@@ -205,9 +209,13 @@ struct TrackRowView: View {
                 .fill(Color(white: 0.28))
                 .frame(height: 1)
         }
-        .onAppear { applyDefaultEffects() }
-        .onChange(of: appState.selectedStyle) { _ in
-            instrumentIndex = 0   // reset to style default (first in list)
+        .onAppear {
+            activeStyle = appState.selectedStyle
+            applyDefaultEffects()
+        }
+        .onChange(of: appState.defaultsResetToken) { _ in
+            activeStyle = appState.selectedStyle  // snapshot style at reset/generate time
+            instrumentIndex = 0
             appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
             applyDefaultEffects()
         }
@@ -217,7 +225,7 @@ struct TrackRowView: View {
 
     // Per-track effect subset — exactly 3 per track (style-specific for Cosmic)
     private var trackEffects: [TrackEffect] {
-        let isCosmic = appState.selectedStyle == .cosmic
+        let isCosmic = activeStyle == .cosmic
         switch trackIndex {
         case kTrackLead1:   return isCosmic ? [.boost, .delay, .space]  : [.boost, .delay, .tremolo]
         case kTrackLead2:              return [.boost, .delay, .reverb]
@@ -256,7 +264,7 @@ struct TrackRowView: View {
             appState.setEffect(fx, enabled: false, forTrack: trackIndex)
         }
 
-        let isCosmic = appState.selectedStyle == .cosmic
+        let isCosmic = activeStyle == .cosmic
         let defaults: [TrackEffect]
         if isCosmic {
             defaults = switch trackIndex {

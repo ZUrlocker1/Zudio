@@ -2274,6 +2274,58 @@ The fix: build `trackBars: [[Bool]]` — a per-track, per-bar boolean presence m
 
 **Pattern to follow**: When a generation-time function needs to repeatedly ask "does track T have any event in bar B?", build the presence map once and query it. As Ambient songs may have longer timelines and more events than Cosmic, this pattern prevents generation time from scaling quadratically.
 
+### Rule 9: Background asyncAfter closures must carry a generation token
+
+Any `DispatchQueue.asyncAfter` closure that touches audio state must capture `currentSchedulerID` by value and guard against it at execution time. Without this, closures queued during song A fire during song B and can silence notes that just started.
+
+The symptom of a missing guard is irregular, choppy playback that worsens after each song transition — the orphaned closures accumulate and compete with the live scheduler. `allNotesOff()` (CC120) only clears notes at the moment it runs; it does not cancel pending closures.
+
+**Pattern to follow**: Every `asyncAfter` that calls `startNote`, `stopNote`, or any audio-node mutation must have the form:
+
+```swift
+let capturedID = self.currentSchedulerID
+DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delay) { [weak self] in
+    guard let self, self.currentSchedulerID == capturedID else { return }
+    // ... audio call
+}
+```
+
+`currentSchedulerID` is declared `nonisolated(unsafe)` so it can be read from a background closure without a main-actor bounce. It is incremented on every `stop()`, `seek()`, and `setTempo()` call, which covers all song-transition paths.
+
+### Rule 10: Do not double-dispatch Combine sinks with Task { @MainActor }
+
+`.receive(on: DispatchQueue.main)` on a Combine publisher delivers the sink closure on the main thread synchronously. Wrapping the body in `Task { @MainActor }` adds a second async hop that delays processing by one run-loop turn. At 32 steps/second this creates a backlog of queued Tasks.
+
+The symptom is DAW scroll and annotation timestamps that lag the playhead by one or more steps, and a growing queue of deferred Tasks that competes with audio scheduling on the main actor.
+
+**Pattern to follow**: If the publisher is already `.receive(on: DispatchQueue.main)`, execute work directly in the sink closure. Only use `Task { @MainActor }` when the work originates on a background thread with no `.receive` operator.
+
+### Rule 11: Batch @Published mutations to fire one objectWillChange per logical event
+
+Each individual `.append()` to a `@Published` array fires `objectWillChange` on its owning `ObservableObject`. Every view observing that object re-evaluates its body. If a single logical event (one step tick, one section transition) causes N sequential `.append()` calls, the view rebuilds N times in the same frame.
+
+The fix: accumulate new entries in a local array and write them in one `append(contentsOf:)` call — one `objectWillChange` for the whole batch.
+
+**Pattern to follow**: Anywhere a loop appends to a `@Published` array, collect into a local `var buffer: [T] = []` first and replace with a single `array.append(contentsOf: buffer)` after the loop. Apply this to status log emission, annotation feeds, and any future live-data arrays added for Ambient.
+
+### Rule 12: Cancel existing DispatchSourceTimers before creating replacements
+
+`startTremolo`, `startSweep`, and `startPan` each create a new `DispatchSourceTimer` and assign it to a slot in the timer array. If the same effect is re-enabled while already running (rapid toggle, state desync on song load), the old timer is overwritten without cancellation. Both timers then run simultaneously, writing to the same audio node at 20–60fps.
+
+The symptom is audible audio flutter on affected tracks, increasing CPU usage with each toggle, and eventual backpressure on `.userInteractive` queue as leaked timers accumulate.
+
+**Pattern to follow**: Always cancel and nil the existing timer slot before creating a new one:
+
+```swift
+private func startSweep(forTrack i: Int) {
+    sweepTimers[i]?.cancel()
+    sweepTimers[i] = nil
+    // ... create new timer
+}
+```
+
+Apply this pattern to every `start*` function that allocates a `DispatchSourceTimer` into an array or optional property.
+
 ---
 
 ## Open questions

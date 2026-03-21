@@ -11,7 +11,7 @@ struct StatusBoxView: View {
     // Tag column fixed width in monospaced chars (must exceed longest rule ID + space)
     private let tagWidth = 15
 
-    var body: some View {
+    var body: some View {   
         VStack(spacing: 0) {
             Divider()
 
@@ -66,6 +66,7 @@ struct StatusBoxView: View {
 
                         Color.clear.frame(height: 1).id("bottom")
                     }
+                    .textSelection(.enabled)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,6 +94,5 @@ struct StatusBoxView: View {
                 .foregroundStyle(entry.isTitle ? Color.yellow.opacity(0.95) : Color.white.opacity(0.85))
             Spacer(minLength: 0)
         }
-        .textSelection(.enabled)
     }
 }

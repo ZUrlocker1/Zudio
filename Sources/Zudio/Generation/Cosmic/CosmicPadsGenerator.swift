@@ -38,23 +38,45 @@ struct CosmicPadsGenerator {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
 
-            // Intro: single continuous root+fifth note spanning entire section.
-            // Volume fade-in (0 → 1) handled by PlaybackEngine boost ramp.
+            // Intro: growing drone with beat-3 chord colour.
+            // Beat-1 (every 2 bars): root + fifth, velocity ramp 20→65 / 15→58.
+            // Beat-3 (every bar): modal third (major or minor per current mode) — completes the
+            //   triad, adds colour and gentle motion. Different pitch from beat-1 notes so no
+            //   noteOff conflict. All noteOffs converge at intro end, no bleed into body.
             if section.label == .intro {
-                guard bar == section.startBar else { continue }
-                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let introLen   = section.endBar - section.startBar
+                let barInIntro = bar - section.startBar
+                let p = introLen <= 2 ? 1.0
+                                      : min(1.0, max(0.0, Double(barInIntro) / Double(introLen - 2)))
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-                events += [
-                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 50, durationSteps: dur),
-                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 44, durationSteps: dur),
-                ]
+
+                if bar % 2 == 0 {
+                    let rootVel  = UInt8(20 + Int(p * 45))  // 20 → 65
+                    let fifthVel = UInt8(15 + Int(p * 43))  // 15 → 58
+                    let dur = (section.endBar - bar) * 16 - 1
+                    events += [
+                        MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: rootVel,  durationSteps: dur),
+                        MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: fifthVel, durationSteps: dur),
+                    ]
+                }
+
+                // Beat-3: modal third every bar — major or minor depending on current mode
+                let thirdST   = entry.sectionMode.intervals[2]
+                let thirdPC   = (rootPC + thirdST) % 12
+                let third     = noteInPadsRegister(pc: thirdPC, targetOct: 2)
+                let beat3Vel  = UInt8(10 + Int(p * 35))   // 10 → 45, softer colour note
+                let beat3Step = barStart + 8
+                let beat3Dur  = section.endBar * 16 - beat3Step - 1
+                if beat3Dur > 0 {
+                    events.append(MIDIEvent(stepIndex: beat3Step, note: UInt8(third),
+                                            velocity: beat3Vel, durationSteps: beat3Dur))
+                }
                 continue
             }
 
-            // Outro: single continuous root+fifth note spanning entire section.
-            // Volume fade-out (1 → 0) handled by PlaybackEngine boost ramp.
+            // Outro: same principle — velocity matches body so the fade-out is perceptually linear.
             if section.label == .outro {
                 guard bar == section.startBar else { continue }
                 let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
@@ -62,8 +84,8 @@ struct CosmicPadsGenerator {
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
                 events += [
-                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 50, durationSteps: dur),
-                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 44, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 65, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 58, durationSteps: dur),
                 ]
                 continue
             }

@@ -53,12 +53,14 @@ struct CosmicMusicalFrameGenerator {
 
     /// Cosmic tempo: bimodal distribution per COS-RULE-20
     /// Mode A (70%): triangular min=115, peak=120, max=126 — driving Cosmic
-    /// Mode B (30%): triangular min=88, peak=95, max=105 — contemplative Cosmic
+    /// Mode B (30%): triangular min=108, peak=113, max=118 — contemplative Cosmic
+    /// Floor raised from 88 to 108: sub-108 BPM makes the 16th-note grid feel sluggish.
+    /// Reference artists (TD Phaedra/Rubycon, Craven Faults groove tracks) bottom out ~108.
     private static func pickTempo(rng: inout SeededRNG) -> Int {
         let useDriverMode = rng.nextDouble() < 0.70
-        let minT: Double  = useDriverMode ? 115.0 : 88.0
-        let peakT: Double = useDriverMode ? 120.0 : 95.0
-        let maxT: Double  = useDriverMode ? 126.0 : 105.0
+        let minT: Double  = useDriverMode ? 115.0 : 108.0
+        let peakT: Double = useDriverMode ? 120.0 : 113.0
+        let maxT: Double  = useDriverMode ? 126.0 : 118.0
         let r = rng.nextDouble()
         let fc = (peakT - minT) / (maxT - minT)
         let raw: Double
@@ -106,18 +108,19 @@ struct CosmicMusicalFrameGenerator {
         return families[rng.weightedPick(weights)]
     }
 
-    /// PercussionStyle: absent 35%, sparse 25%, minimal 25%, motorikGrid 15%
-    /// motorikGrid only available when tempo >= 112 (driving Mode A range).
-    /// A 16th-note grid at contemplative tempos (88–105 BPM) is too slow and plodding.
+    /// PercussionStyle weights (tempo >= 100):
+    ///   absent 25%, sparse 20%, minimal 15%,
+    ///   electricBuddhaGroove 30%, electricBuddhaPulse 10%
+    /// Below 100 BPM: Electric Buddha patterns redistributed to absent/sparse.
     private static func pickPercussionStyle(tempo: Int, rng: inout SeededRNG) -> PercussionStyle {
-        if tempo >= 112 {
-            let styles:  [PercussionStyle] = [.absent, .sparse, .minimal, .motorikGrid]
-            let weights: [Double]          = [0.35,    0.25,    0.25,     0.15]
+        if tempo >= 100 {
+            let styles:  [PercussionStyle] = [.absent, .sparse, .minimal, .motorikGrid, .electricBuddhaPulse]
+            let weights: [Double]          = [0.25,    0.20,    0.15,     0.30,          0.10]
             return styles[rng.weightedPick(weights)]
         } else {
-            // Contemplative tempo: redistribute motorikGrid weight to absent/sparse
+            // Very slow tempo: Electric Buddha patterns redistributed to absent/sparse
             let styles:  [PercussionStyle] = [.absent, .sparse, .minimal]
-            let weights: [Double]          = [0.42,    0.33,    0.25]
+            let weights: [Double]          = [0.45,    0.32,    0.23]
             return styles[rng.weightedPick(weights)]
         }
     }

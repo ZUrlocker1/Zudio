@@ -198,6 +198,7 @@ struct TopBarView: View {
                 Divider()
 
                 // Generate (row 2) and Save MIDI (row 3) in a VStack, plus selectors
+                // Fixed widths on all buttons/pickers ensure rows align without Grid's two-pass layout.
                 VStack(alignment: .leading, spacing: 6) {
                     // Blank row above first button row
                     Color.clear.frame(height: 22)
@@ -207,6 +208,7 @@ struct TopBarView: View {
                         Button(action: { appState.generateNew() }) {
                             Label("Generate", systemImage: "bolt.fill")
                                 .fontWeight(.semibold)
+                                .frame(width: 116, alignment: .center)
                         }
                         .disabled(appState.isGenerating)
                         .keyboardShortcut("g", modifiers: .command)
@@ -253,14 +255,23 @@ struct TopBarView: View {
                         }
                     }
 
-                    // Row 3: Save MIDI grouped below Generate
+                    // Row 3: Save MIDI | Reset
                     HStack(spacing: 14) {
                         Button(action: { appState.saveMIDI() }) {
                             Label("Save MIDI", systemImage: "square.and.arrow.down")
                                 .fontWeight(.semibold)
+                                .frame(width: 116, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
                         .help("Save multi-track MIDI to ~/Downloads/")
+
+                        Button(action: { appState.resetTrackDefaults() }) {
+                            Label("Reset", systemImage: "arrow.counterclockwise")
+                                .fontWeight(.semibold)
+                                .frame(width: 140, alignment: .center)
+                        }
+                        .disabled(appState.songState == nil)
+                        .help("Reset all instruments and effects to style defaults")
                     }
 
                     // Blank row below second button row
@@ -273,16 +284,16 @@ struct TopBarView: View {
 
                 // Help / About — rows align with Generate (row 2) and Save MIDI (row 3)
                 VStack(alignment: .trailing, spacing: 6) {
-                    Button("Help")  { showHelp  = true }
-                    Button("About") { showAbout = true }
+                    Button { showHelp  = true } label: { Text("Help").frame(width: 52) }
+                    Button { showAbout = true } label: { Text("About").frame(width: 52) }
                     Text("Copyright © 2026 Zack Urlocker")
                         .font(.callout)
                         .foregroundStyle(.white)
                         .padding(.top, 6)
                 }
                 .font(.callout)
-                .padding(.top, 5)      // match controls VStack .padding(.vertical, 5)
-                .padding(.trailing, 8)
+                .padding(.top, 5)
+                .padding(.trailing, 20)
             }
             .padding(.horizontal, 2)
             .background(Color(white: 0.15))

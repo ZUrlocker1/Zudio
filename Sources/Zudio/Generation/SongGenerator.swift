@@ -148,6 +148,9 @@ struct SongGenerator {
             trackOverrides: [:],
             title: title,
             form: form,
+            style: .motorik,
+            percussionStyle: .absent,
+            cosmicProgFamily: .static_drone,
             generationLog: log,
             stepAnnotations: stepAnnotations
         )
@@ -184,6 +187,7 @@ struct SongGenerator {
             frame: frame,
             cosmicForm: cosmicForm,
             cosmicProgFamily: cosmicProgFamily,
+            percussionStyle: percussionStyle,
             rng: &rng
         )
 
@@ -291,6 +295,9 @@ struct SongGenerator {
             trackOverrides: [:],
             title: title,
             form: form,
+            style: .cosmic,
+            percussionStyle: percussionStyle,
+            cosmicProgFamily: cosmicProgFamily,
             generationLog: log,
             stepAnnotations: stepAnnotations
         )
@@ -306,32 +313,75 @@ struct SongGenerator {
         var usedRules: Set<String> = []
 
         let events: [MIDIEvent]
+        let isCosmic = songState.style == .cosmic
         switch trackIndex {
         case kTrackDrums:
-            let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules)
-            // Apply variation engine using the current track context (other tracks drive entrance detection)
-            var scratch = songState.trackEvents
-            scratch[kTrackDrums] = rawDrum
-            events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed)[kTrackDrums]
+            if isCosmic {
+                events = CosmicDrumGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    percussionStyle: songState.percussionStyle,
+                    rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules)
+                var scratch = songState.trackEvents
+                scratch[kTrackDrums] = rawDrum
+                events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed)[kTrackDrums]
+            }
         case kTrackBass:
-            let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
-            var scratch = songState.trackEvents
-            scratch[kTrackBass] = rawBass
-            // Pattern evolver: gradual bass mutation
-            scratch = PatternEvolver.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, seed: newTrackSeed)
-            // Lock bass to the existing drum fills (uses globalSeed to reproduce the same fill types)
-            scratch = DrumVariationEngine.lockBassToExistingFills(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: songState.globalSeed)
-            events = scratch[kTrackBass]
+            if isCosmic {
+                events = CosmicBassGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+                var scratch = songState.trackEvents
+                scratch[kTrackBass] = rawBass
+                scratch = PatternEvolver.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, seed: newTrackSeed)
+                scratch = DrumVariationEngine.lockBassToExistingFills(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: songState.globalSeed)
+                events = scratch[kTrackBass]
+            }
         case kTrackPads:
-            events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            if isCosmic {
+                events = CosmicPadsGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    tonalMap: songState.tonalMap, cosmicProgFamily: songState.cosmicProgFamily,
+                    rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            }
         case kTrackLead1:
-            events = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            if isCosmic {
+                events = CosmicLeadGenerator.generateLead1(
+                    frame: songState.frame, structure: songState.structure,
+                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                events = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            }
         case kTrackLead2:
-            events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
+            if isCosmic {
+                events = CosmicLeadGenerator.generateLead2(
+                    frame: songState.frame, structure: songState.structure,
+                    tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1],
+                    rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
+            }
         case kTrackRhythm:
-            events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            if isCosmic {
+                events = CosmicArpeggioGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            }
         case kTrackTexture:
-            events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            if isCosmic {
+                events = CosmicTextureGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            } else {
+                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            }
         default:
             return songState
         }
@@ -592,6 +642,9 @@ struct SongGenerator {
         case "MOT-BASS-009": return "Vitamin Hook"
         case "MOT-BASS-010": return "Quo Arc"
         case "MOT-BASS-011": return "Quo Drive"
+        case "MOT-BASS-012": return "Moroder Chase — delay-echo 16th-note ostinato"
+        case "MOT-BASS-013": return "Kraftwerk Roboter — octave-jump 3-note cell"
+        case "MOT-BASS-014": return "McCartney PBW — Mixolydian root–5th–b7–3rd riff"
         case "BASS-EVOL":    return "Evolving pattern"
         case "BASS-DEVOL":   return "Devolving pattern"
         default:             return ruleID
@@ -672,7 +725,8 @@ struct SongGenerator {
         case "COS-DRUM-001": return "Minimal — JMJ Mini Pops style"
         case "COS-DRUM-002": return "Sparse pitched percussion"
         case "COS-DRUM-003": return "No percussion — Berlin School"
-        case "COS-DRUM-004": return "Electric Buddha motorik lock"
+        case "COS-DRUM-004": return "Electric Buddha groove"
+        case "COS-DRUM-005": return "Electric Buddha minimal beat"
         default:                 return ruleID
         }
     }
@@ -686,6 +740,13 @@ struct SongGenerator {
         case "COS-BASS-005":  return "Bass absent in main section"
         case "COS-BASS-006":  return "Additive dual bass — anchor + staccato hits"
         case "COS-BASS-007":  return "Electric Buddha additive pulsating tremolo"
+        case "COS-BASS-008":  return "Hallogallo Lock — root + fifth, two notes per bar"
+        case "COS-BASS-009":  return "Crawling Walk — 2-bar root/fifth with approach note"
+        case "COS-BASS-010":  return "Moroder Pulse — 8th-note root/fifth/b7 sequence"
+        case "COS-BASS-011":  return "Kraftwerk Roboter — octave-jump 3-note cell"
+        case "COS-BASS-012":  return "McCartney PBW — Mixolydian root–5th–b7–3rd riff"
+        case "BASS-EVOL":     return "Evolving pattern"
+        case "BASS-DEVOL":    return "Devolving pattern"
         default:              return ruleID
         }
     }
@@ -1125,7 +1186,7 @@ struct SongGenerator {
                             fireBar(bar, tag: "Drums", desc: "back on hi-hat")
                         }
                     default: break
-                    }
+                     }
                     prevCymbalMode = mode
                 }
             }

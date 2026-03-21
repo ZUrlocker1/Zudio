@@ -38,7 +38,7 @@ struct CosmicTextureGenerator {
                     let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                     let note   = texRegisterNote(pc: rootPC, targetOct: 2)
                     events.append(MIDIEvent(stepIndex: barStart, note: UInt8(note),
-                                            velocity: UInt8(35 + rng.nextInt(upperBound: 10)),
+                                            velocity: UInt8(50 + rng.nextInt(upperBound: 10)),
                                             durationSteps: 62))
                     continue
                 }

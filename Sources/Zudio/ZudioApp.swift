@@ -3,8 +3,14 @@
 import SwiftUI
 import AppKit
 
+// Quit the app when the last window closes (window-close = full exit, not just hide)
+private final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
 @main
 struct ZudioApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var appState = AppState()
 
     init() {

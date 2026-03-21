@@ -22,6 +22,11 @@ struct SongState: Sendable {
     var trackOverrides: [Int: UInt64]
     let title: String
     let form: SongForm
+    let style: MusicStyle
+    /// Cosmic-only: percussion pattern selected at generation time. `.absent` for Motorik.
+    let percussionStyle: PercussionStyle
+    /// Cosmic-only: chord family selected at generation time. `.static_drone` default for Motorik.
+    let cosmicProgFamily: CosmicProgressionFamily
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
@@ -39,7 +44,8 @@ struct SongState: Sendable {
     func withFrame(_ newFrame: GlobalMusicalFrame) -> SongState {
         SongState(frame: newFrame, structure: structure, tonalMap: tonalMap,
                   trackEvents: trackEvents, globalSeed: globalSeed,
-                  trackOverrides: trackOverrides, title: title, form: form,
+                  trackOverrides: trackOverrides, title: title, form: form, style: style,
+                  percussionStyle: percussionStyle, cosmicProgFamily: cosmicProgFamily,
                   generationLog: generationLog, stepAnnotations: stepAnnotations)
     }
 
@@ -56,7 +62,8 @@ struct SongState: Sendable {
         return SongState(
             frame: frame, structure: structure, tonalMap: tonalMap,
             trackEvents: updated, globalSeed: globalSeed,
-            trackOverrides: trackOverrides, title: title, form: form,
+            trackOverrides: trackOverrides, title: title, form: form, style: style,
+            percussionStyle: percussionStyle, cosmicProgFamily: cosmicProgFamily,
             generationLog: generationLog + extra, stepAnnotations: stepAnnotations
         )
     }
