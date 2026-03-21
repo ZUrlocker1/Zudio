@@ -43,10 +43,36 @@ final class AppState: ObservableObject {
     @Published var moodOverride:  Mood?   = nil
 
     // MARK: - Test mode (shorter songs for rapid audition)
+    // In test mode each new generation cycles through bass rules from newest → oldest,
+    // so you can hear every rule in sequence. Index resets when test mode is toggled.
 
     @Published var testModeEnabled: Bool = false
+    // Per-style index: each style counts down its own rule sequence independently.
+    // Toggling test mode resets all counters so each style starts fresh from its newest rule.
+    private var testModeBassRuleIndex: [MusicStyle: Int] = [:]
 
-    func toggleTestMode() { testModeEnabled.toggle() }
+    func toggleTestMode() {
+        testModeEnabled.toggle()
+        testModeBassRuleIndex = [:]
+    }
+
+    // Ordered newest-first so the first test generation plays the most recently added rule.
+    private static let testModeBassRules: [MusicStyle: [String]] = [
+        .motorik: ["MOT-BASS-014", "MOT-BASS-013", "MOT-BASS-012", "MOT-BASS-011", "MOT-BASS-010",
+                   "MOT-BASS-009", "MOT-BASS-008", "MOT-BASS-007", "MOT-BASS-006", "MOT-BASS-005",
+                   "MOT-BASS-004", "MOT-BASS-003", "MOT-BASS-002", "MOT-BASS-001"],
+        .cosmic:  ["COS-BASS-012", "COS-BASS-011", "COS-BASS-010", "COS-BASS-009", "COS-BASS-008",
+                   "COS-BASS-005", "COS-BASS-004",  "COS-BASS-003", "COS-BASS-002", "COS-BASS-001"]
+    ]
+
+    private func nextTestModeBassRuleID(forStyle style: MusicStyle) -> String? {
+        guard testModeEnabled,
+              let rules = Self.testModeBassRules[style], !rules.isEmpty else { return nil }
+        let index = testModeBassRuleIndex[style, default: 0]
+        let id = rules[index % rules.count]
+        testModeBassRuleIndex[style] = index + 1
+        return id
+    }
 
     // MARK: - Per-track UI state
 
@@ -156,14 +182,17 @@ final class AppState: ObservableObject {
     func generateNew(thenPlay: Bool = false) {
         guard !isGenerating else { return }
         isGenerating = true
+        let style = selectedStyle
+        let forcedBassRule = nextTestModeBassRuleID(forStyle: style)
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let state = SongGenerator.generate(
-                keyOverride:   await self.keyOverride,
-                tempoOverride: await self.tempoOverride,
-                moodOverride:  await self.moodOverride,
-                style:         await self.selectedStyle,
-                testMode:      await self.testModeEnabled
+                keyOverride:     await self.keyOverride,
+                tempoOverride:   await self.tempoOverride,
+                moodOverride:    await self.moodOverride,
+                style:           style,
+                testMode:        await self.testModeEnabled,
+                forceBassRuleID: forcedBassRule
             )
             await MainActor.run {
                 self.songState    = state

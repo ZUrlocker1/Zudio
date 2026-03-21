@@ -12,11 +12,13 @@ struct SongGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         style: MusicStyle = .cosmic,
-        testMode: Bool = false
+        testMode: Bool = false,
+        forceBassRuleID: String? = nil
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                        moodOverride: moodOverride, style: style, testMode: testMode)
+                        moodOverride: moodOverride, style: style, testMode: testMode,
+                        forceBassRuleID: forceBassRuleID)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
@@ -26,16 +28,19 @@ struct SongGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         style: MusicStyle = .cosmic,
-        testMode: Bool = false
+        testMode: Bool = false,
+        forceBassRuleID: String? = nil
     ) -> SongState {
         // Branch on style
         switch style {
         case .cosmic:
             return generateCosmic(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                                  moodOverride: moodOverride, testMode: testMode)
+                                  moodOverride: moodOverride, testMode: testMode,
+                                  forceBassRuleID: forceBassRuleID)
         case .motorik:
             return generateMotorik(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                                   moodOverride: moodOverride, testMode: testMode)
+                                   moodOverride: moodOverride, testMode: testMode,
+                                   forceBassRuleID: forceBassRuleID)
         }
     }
 
@@ -46,7 +51,8 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false
+        testMode: Bool = false,
+        forceBassRuleID: String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -83,7 +89,7 @@ struct SongGenerator {
 
         // Step 5 — Bass
         var bassRules: Set<String> = []
-        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules)
+        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID)
 
         // Step 6 — Pads
         var padRules: Set<String> = []
@@ -163,7 +169,8 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false
+        testMode: Bool = false,
+        forceBassRuleID: String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -246,7 +253,7 @@ struct SongGenerator {
         var bassRules: Set<String> = []
         trackEvents[kTrackBass] = CosmicBassGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
-            rng: &bassRNG, usedRuleIDs: &bassRules
+            rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID
         )
 
         // Drums (absent / sparse / minimal per percussionStyle)
@@ -1129,8 +1136,9 @@ struct SongGenerator {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
             let beats  = fillBeats(bar: fillBar)
+            guard beats > 1 else { continue }  // 1-beat fills are too brief to clutter the log with
             let name   = fillName(bar: fillBar, beats: beats)
-            let locked = beats > 1 && bassLocked(bar: fillBar)
+            let locked = bassLocked(bar: fillBar)
             let desc   = locked ? "\(beats) beat — \(name) — bass locked in" : "\(beats) beat — \(name)"
             // fillRegionOffset: where in the bar the fill starts; fire 1/4 bar (4 steps) before that
             let fillRegionOffset = beats == 1 ? 12 : beats == 2 ? 8 : 4

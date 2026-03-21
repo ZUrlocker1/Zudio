@@ -15,7 +15,9 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Audio graph
 
     private let engine   = AVAudioEngine()
-    private var samplers = [AVAudioUnitSampler]()
+    // nonisolated(unsafe): built once in setupEngine() (main actor, before playback).
+    // Read from background timer thread in onStep() — AVAudioUnitSampler is thread-safe.
+    nonisolated(unsafe) private var samplers = [AVAudioUnitSampler]()
     private var boosts      = [AVAudioMixerNode]()     // outputVolume > 1 = clean gain boost; also carries pan
     private var sweepFilters = [AVAudioUnitEffect]()   // LFO-driven low-pass for Sweep effect
     private var delays      = [AVAudioUnitDelay]()
@@ -45,8 +47,14 @@ final class PlaybackEngine: ObservableObject {
     // Body entrance fade: tracks with no intro notes fade in over 1 bar at the body downbeat
     private var bodyEntranceFadeTimer: DispatchSourceTimer? = nil
 
-    // Step-event map: built once at load time for O(1) lookup in onStep
-    private var stepEventMap: [Int: [(Int, MIDIEvent)]] = [:]
+    // Step-event map: built once at load time for O(1) lookup in onStep.
+    // nonisolated(unsafe): written on main actor in load(), read from background timer thread.
+    // Writes always happen-before reads (load() runs before play() which starts the timer).
+    nonisolated(unsafe) private var stepEventMap: [Int: [(Int, MIDIEvent)]] = [:]
+
+    // Cached seconds-per-step from the loaded song frame — avoids accessing songState on the
+    // background timer thread. Set in load() alongside stepEventMap.
+    nonisolated(unsafe) private var cachedSecondsPerStep: Double = 0
 
     // Hidden intro/outro modulation: pads sweep LFO + bass slow pan (no UI change)
     private var cosmicIntroSweepPhase:   Double = 0.0
@@ -97,6 +105,7 @@ final class PlaybackEngine: ObservableObject {
 
     func load(_ state: SongState) {
         songState = state
+        cachedSecondsPerStep = state.frame.secondsPerStep
         buildStepEventMap(state: state)
         // Always restore bass+pads to full volume. Cosmic intro fade is now handled
         // purely by velocity ramp in CosmicBassGenerator / CosmicPadsGenerator —
@@ -141,24 +150,25 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Step callback (called by StepScheduler on a background queue)
 
     nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
-        Task { @MainActor [weak self] in
-            guard let self, self.isPlaying, self.currentSchedulerID == schedulerID,
-                  let state = self.songState else { return }
+        guard currentSchedulerID == schedulerID else { return }
+        // Fire note-ons directly from the timer thread — AVAudioUnitSampler.startNote()
+        // is thread-safe (lock-free MIDI ring buffer consumed by the audio render thread).
+        let sps = cachedSecondsPerStep
+        for (trackIndex, ev) in stepEventMap[step] ?? [] {
+            let channel = gmChannel(trackIndex)
+            samplers[trackIndex].startNote(ev.note, withVelocity: ev.velocity, onChannel: channel)
+            let sampler = samplers[trackIndex]
+            let noteOffDelay = Double(ev.durationSteps) * sps
+            DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + noteOffDelay) {
+                guard self.currentSchedulerID == schedulerID else { return }
+                sampler.stopNote(ev.note, onChannel: channel)
+            }
+        }
+        // Minimal main-actor hop: only update @Published playhead position
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             self.currentBar  = bar
-
-            // Always dispatch all events (mute is handled by sampler volume, not skipping)
-            for (trackIndex, ev) in self.stepEventMap[step] ?? [] {
-                let channel = gmChannel(trackIndex)
-                self.samplers[trackIndex].startNote(ev.note, withVelocity: ev.velocity, onChannel: channel)
-                let delay = Double(ev.durationSteps) * state.frame.secondsPerStep
-                let sampler = self.samplers[trackIndex]
-                let capturedSchedulerID = self.currentSchedulerID
-                DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self, self.currentSchedulerID == capturedSchedulerID else { return }
-                    sampler.stopNote(ev.note, onChannel: channel)
-                }
-            }
         }
     }
 
@@ -221,10 +231,20 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Instrument program change (called from TrackRowView via AppState)
 
+    // Cache the currently-loaded program per sampler to skip redundant loadSoundBankInstrument
+    // calls. loadSoundBankInstrument is expensive (SF2 parse + audio buffer alloc), and
+    // TrackRowView always resets to program index 0 on generate — the same program every time.
+    private var currentProgram: [UInt8] = Array(repeating: 255, count: 7)   // 255 = "not yet loaded"
+    private var currentBankMSB: [UInt8] = Array(repeating: 0,   count: 7)
+
     func setProgram(_ program: UInt8, forTrack trackIndex: Int) {
         guard trackIndex < samplers.count else { return }
         let isDrum = (trackIndex == kTrackDrums)
         let bankMSB: UInt8 = isDrum ? 0x78 : 0x79
+        // Skip if the sampler already has this exact program loaded
+        if program == currentProgram[trackIndex] && bankMSB == currentBankMSB[trackIndex] { return }
+        currentProgram[trackIndex] = program
+        currentBankMSB[trackIndex] = bankMSB
         try? samplers[trackIndex].loadSoundBankInstrument(
             at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
         )
@@ -248,6 +268,7 @@ final class PlaybackEngine: ObservableObject {
         case .boost:
             boosts[trackIndex].outputVolume = enabled ? 1.7 : 1.0  // 1.7 ≈ +4.6 dB
         case .delay:
+            delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             delays[trackIndex].wetDryMix = enabled ? 40 : 0
         case .sweep:
             if enabled { startSweep(forTrack: trackIndex) }
@@ -263,8 +284,10 @@ final class PlaybackEngine: ObservableObject {
         case .lowShelf:
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb:
+            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             reverbs[trackIndex].wetDryMix = enabled ? 50 : 0
         case .space:
+            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             reverbs[trackIndex].wetDryMix = enabled ? 70 : 0
         }
     }
@@ -280,7 +303,7 @@ final class PlaybackEngine: ObservableObject {
         // ~60 fps ticks for smooth modulation
         src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
         src.setEventHandler { [weak self] in
-            Task { @MainActor [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.tremEnabled[i] else { return }
                 self.tremPhase[i] += 0.8378  // 2π × 8 Hz / 60 fps
                 // Respect mute/solo state — don't overwrite a muted track's 0 volume
@@ -319,7 +342,7 @@ final class PlaybackEngine: ObservableObject {
         // 50ms / 20fps — at 0.07 Hz the audible difference from 60fps is zero
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
         src.setEventHandler { [weak self] in
-            Task { @MainActor [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.sweepEnabled[i] else { return }
                 self.sweepPhase[i] += 0.02199   // 2π × 0.07 Hz / 20 fps
                 let cutoff = Float(300 + 1600 * (1 + sin(self.sweepPhase[i])))  // 300–3500 Hz
@@ -350,7 +373,7 @@ final class PlaybackEngine: ObservableObject {
         // 50ms / 20fps — at 0.5 Hz the audible difference from 60fps is zero
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
         src.setEventHandler { [weak self] in
-            Task { @MainActor [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.panEnabled[i] else { return }
                 self.panPhase[i] += 0.15708   // 2π × 0.5 Hz / 20 fps — ~1 sweep per bar
                 self.boosts[i].pan = Float(sin(self.panPhase[i]))
@@ -386,7 +409,7 @@ final class PlaybackEngine: ObservableObject {
             let stepsUntilBody  = max(0, introEndStep - currentStep)
             let delayToBody     = Double(stepsUntilBody) * state.frame.secondsPerStep
             DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delayToBody) {
-                Task { @MainActor [weak self] in
+                DispatchQueue.main.async { [weak self] in
                     guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
                     self.stopCosmicIntroEffects()
                     self.startBodyEntranceFade(state: state, schedulerID: schedulerID)
@@ -409,7 +432,7 @@ final class PlaybackEngine: ObservableObject {
         let delaySeconds    = Double(stepsUntilStart) * sps
 
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delaySeconds) { [weak self] in
-            Task { @MainActor [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
                 guard self.droneFadeTimers[1] == nil else { return }
 
@@ -425,7 +448,7 @@ final class PlaybackEngine: ObservableObject {
                 let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
                 src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
                 src.setEventHandler { [weak self] in
-                    Task { @MainActor [weak self] in
+                    DispatchQueue.main.async { [weak self] in
                         guard let self, self.currentSchedulerID == schedulerID else { return }
                         let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
                         let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
@@ -487,7 +510,7 @@ final class PlaybackEngine: ObservableObject {
         let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
         src.setEventHandler { [weak self] in
-            Task { @MainActor [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 guard let self, self.currentSchedulerID == schedulerID else { return }
                 let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
                 let progress = min(1.0, elapsed / max(0.001, fadeSecs))
@@ -526,7 +549,7 @@ final class PlaybackEngine: ObservableObject {
             let sweepSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
             sweepSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
             sweepSrc.setEventHandler { [weak self] in
-                Task { @MainActor [weak self] in
+                DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     self.cosmicIntroSweepPhase += 0.02199  // 2π × 0.07 Hz / 20 fps
                     let cutoff = Float(400 + 1400 * (1 + sin(self.cosmicIntroSweepPhase)))  // 400–3200 Hz
@@ -544,7 +567,7 @@ final class PlaybackEngine: ObservableObject {
             let panSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
             panSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
             panSrc.setEventHandler { [weak self] in
-                Task { @MainActor [weak self] in
+                DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     self.cosmicIntroBassPanPhase += 0.01571  // 2π × 0.05 Hz / 20 fps
                     self.boosts[kTrackBass].pan = Float(0.5 * sin(self.cosmicIntroBassPanPhase))
@@ -613,6 +636,7 @@ final class PlaybackEngine: ObservableObject {
             delay.feedback      = 40
             delay.lowPassCutoff = 6000
             delay.wetDryMix     = 0
+            delay.auAudioUnit.shouldBypassEffect = true
 
             // Comp: threshold -15 dB, fast attack (2 ms), moderate release (80 ms), +4 dB makeup
             AudioUnitSetParameter(comp.audioUnit, 0, kAudioUnitScope_Global, 0, -15.0, 0)
@@ -635,6 +659,7 @@ final class PlaybackEngine: ObservableObject {
             let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture]
             reverb.loadFactoryPreset(atmosphericTracks.contains(i) ? .cathedral : .largeChamber)
             reverb.wetDryMix = 0
+            reverb.auAudioUnit.shouldBypassEffect = true
 
             engine.attach(sampler)
             engine.attach(boost)
@@ -681,6 +706,9 @@ final class PlaybackEngine: ObservableObject {
             try? samplers[i].loadSoundBankInstrument(
                 at: bankURL, program: program, bankMSB: bankMSB, bankLSB: 0
             )
+            // Seed the cache so setProgram() skips redundant reloads of the startup defaults
+            currentProgram[i] = program
+            currentBankMSB[i] = bankMSB
         }
     }
 
@@ -694,7 +722,7 @@ final class PlaybackEngine: ObservableObject {
     }
 
     /// Spec: MIDI channel assignment — drums must use channel 9 (GM drums).
-    private func gmChannel(_ trackIndex: Int) -> UInt8 {
+    nonisolated private func gmChannel(_ trackIndex: Int) -> UInt8 {
         trackIndex == kTrackDrums ? 9 : UInt8(trackIndex)
     }
 

@@ -12,6 +12,10 @@ struct StatusBoxView: View {
     // Tag column fixed width in monospaced chars (must exceed longest rule ID + space)
     private let tagWidth = 15
 
+    // Cached Text built from the log — rebuilt only when entry count changes,
+    // not on every body evaluation (which fires on nearly every step tick).
+    @State private var builtText: Text = Text("")
+
     var body: some View {
         VStack(spacing: 0) {
             Divider()
@@ -64,7 +68,7 @@ struct StatusBoxView: View {
                             // Single Text view built from all entries so drag-selection
                             // spans the entire log (multiple Text views create isolated
                             // selection islands that cannot be bridged).
-                            buildLogText()
+                            builtText
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -78,7 +82,9 @@ struct StatusBoxView: View {
                 .scrollIndicators(.visible)
                 .frame(minHeight: 60, idealHeight: 200, maxHeight: 280)
                 .background(Color(white: 0.10))
+                .onAppear { builtText = buildLogText() }
                 .onChange(of: appState.statusLog.count) { _ in
+                    builtText = buildLogText()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                     }

@@ -2371,6 +2371,50 @@ private func startSweep(forTrack i: Int) {
 
 Apply this pattern to every `start*` function that allocates a `DispatchSourceTimer` into an array or optional property.
 
+### Rule 13: Use `shouldBypassEffect` to fully remove disabled AU effects from the render graph
+
+Setting `wetDryMix = 0` on an `AVAudioUnitReverb` or `AVAudioUnitDelay` does **not** bypass the effect's DSP kernel — the AudioUnit render callback still runs for every audio buffer, consuming CPU on the real-time audio thread. The correct approach is `auAudioUnit.shouldBypassEffect = true`, which removes the node from the render graph entirely at the HAL level.
+
+At 14 disabled effect nodes (7 reverbs + 7 delays, all off by default), the `wetDryMix = 0` pattern was wasting measurable CPU on the audio thread even during silence.
+
+**Pattern to follow**: Whenever toggling an effect off, set both `wetDryMix = 0` (for clean silent output if bypass is ignored) and `auAudioUnit.shouldBypassEffect = true`. When toggling on, set `shouldBypassEffect = false` before adjusting `wetDryMix`. Apply to all `AVAudioUnitReverb`, `AVAudioUnitDelay`, `AVAudioUnitEffect`, and `AVAudioUnitEQ` nodes.
+
+### Rule 14: Eliminate `Task { @MainActor }` in the step callback hot path
+
+The `onStep` callback fires 16 times per bar from a background `DispatchSourceTimer`. If all work — including note-ons — is wrapped in `Task { @MainActor }`, each tick allocates a Swift concurrency Task (~80-200 bytes), performs an actor hop, and serialises all MIDI work onto the main actor. At 120 BPM this is ~32 Tasks/second competing with SwiftUI rendering.
+
+`AVAudioUnitSampler.startNote()` and `stopNote()` are thread-safe (lock-free MIDI ring buffer consumed by the audio render thread). They do not need the main actor. Only `@Published` property assignments require it.
+
+**Pattern to follow**: Declare immutable-during-playback data as `nonisolated(unsafe)` (same pattern as `currentSchedulerID`). Fire note-ons directly from the timer thread. Dispatch only the `@Published` playhead position update to the main actor via `DispatchQueue.main.async`. Properties are safe to mark `nonisolated(unsafe)` when they are written exclusively before playback starts (in `load()` or `init()`) and only read during playback.
+
+### Rule 15: Split SwiftUI Canvas into an Equatable note layer and a tiny playhead layer
+
+A single Canvas that captures `currentStep` redraws on every step tick (9+ Hz). If the Canvas also iterates all N events to draw note rectangles, the result is O(N) `Path` allocations and `ctx.fill()` calls per tick across 7 tracks. Notes never change between ticks — only the playhead position changes.
+
+**Fix**: Extract the note-drawing Canvas into a private `struct NoteLayerView: View, Equatable`. Implement `==` to compare only the note-layout inputs (`onsets`, `pitchRange`, `barOffset`, `visibleBars`). Apply `.equatable()` so SwiftUI calls `==` before deciding whether to re-run `body`. Because `NoteLayerView` does not capture `currentStep`, SwiftUI skips its `body` whenever only the playhead moves. A second tiny Canvas draws only the playhead (1 rect + optional triangle) on every tick.
+
+**Pattern to follow**: Any Canvas that mixes static content (derived from events, layout) with per-tick content (playhead, beat indicator) should be split. Static content goes in an `Equatable` subview. Per-tick content gets its own minimal Canvas. The cost of an equality check on ~20 dictionary keys per tick is negligible compared to 200+ `Path` allocations.
+
+### Rule 16: Cache per-sampler program to skip redundant `loadSoundBankInstrument` calls
+
+`AVAudioUnitSampler.loadSoundBankInstrument(at:program:bankMSB:bankLSB:)` parses the soundfont file and allocates audio buffers. Calling it 7 times in rapid succession on the main actor (triggered by `defaultsResetToken` firing across 7 `TrackRowView` instances) produces a noticeable CPU spike when a song finishes generating.
+
+Because `defaultsResetToken` always resets every track to index 0 (the same program each time), the second and subsequent generations would reload the identical program that is already loaded.
+
+**Pattern to follow**: Track `currentProgram[trackIndex]` and `currentBankMSB[trackIndex]` alongside the samplers. In `setProgram()`, return early if the requested program and bank already match. Seed the cache in `loadGMPrograms()` so the startup load is also reflected. This eliminates all redundant calls after the first generation.
+
+---
+
+## Test Mode (developer feature)
+
+Test Mode is a hidden developer feature that changes how new songs are generated, for the purpose of systematically auditioning bass rules.
+
+When Test Mode is enabled, each successive "Generate New" uses the next bass rule in a fixed descending sequence (newest rule first) rather than picking randomly. Each style — Motorik and Cosmic — has its own independent position in its sequence, so switching styles mid-session does not disturb the other style's counter. Toggling Test Mode off and on resets all counters so each style restarts from its most recently added rule.
+
+Test Mode also shortens song length (to roughly 60–90 seconds) so each rule can be evaluated quickly.
+
+Test Mode has no visible UI indicator by design — it is accessed only via a keyboard shortcut or hidden button intended for development sessions, not end-user exposure.
+
 ---
 
 ## Open questions

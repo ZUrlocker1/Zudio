@@ -42,7 +42,8 @@ struct BassGenerator {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
         let rules:   [String] = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
                                   "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
@@ -52,7 +53,7 @@ struct BassGenerator {
                                   0.09,     0.05,     0.09,     0.07,     0.06,
                                   0.07,     0.06,
                                   0.07,     0.07,     0.08]
-        let ruleID = rules[rng.weightedPick(weights)]
+        let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
 
         // BAS-005: pre-roll per-4-bar-group flags — ~1/3 chance the phrase is all-drive
@@ -107,14 +108,8 @@ struct BassGenerator {
                                    mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
             } else {
                 let useVariation = variationBars.contains(bar)
-                if useVariation && !variationLogged {
-                    usedRuleIDs.insert("BASS-EVOL")
-                    variationLogged = true
-                }
-                if !useVariation && wasInVariation && !devolveLogged {
-                    usedRuleIDs.insert("BASS-DEVOL")
-                    devolveLogged = true
-                }
+                if useVariation { variationLogged = true }
+                if !useVariation && wasInVariation { devolveLogged = true }
                 wasInVariation = useVariation
                 events += bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
                                   frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
@@ -122,17 +117,12 @@ struct BassGenerator {
             }
         }
 
-        // If the song ended still in variation (e.g. B section directly before outro),
-        // the outro plays the original non-variation pattern — emit the devolution marker.
-        if variationLogged && wasInVariation && !devolveLogged {
-            usedRuleIDs.insert("BASS-DEVOL")
-        }
-
-        // Rules 012/013/014 have bar-based evolution baked in (no section gate needed).
-        // Always emit BASS-EVOL so the status log reflects the ongoing variation.
-        if ruleID == "MOT-BASS-012" || ruleID == "MOT-BASS-013" || ruleID == "MOT-BASS-014" {
-            usedRuleIDs.insert("BASS-EVOL")
-        }
+        // variationLogged / devolveLogged are retained for potential future use
+        // but BASS-EVOL / BASS-DEVOL are intentionally NOT inserted into usedRuleIDs.
+        // "Evolving pattern" is a live playback annotation (step annotations) — it should
+        // not appear in the static generation log shown at song-load time.
+        _ = variationLogged
+        _ = devolveLogged
 
         return events
     }

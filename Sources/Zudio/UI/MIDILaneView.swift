@@ -1,5 +1,10 @@
 // MIDILaneView.swift — Canvas-based piano-roll with DAW visible window + drag-to-seek.
 // Drag anywhere in the lane to reposition the playhead.
+//
+// Performance split: note drawing is isolated in NoteLayerView (Equatable).
+// NoteLayerView.body is skipped by SwiftUI when only currentStep changes (every tick),
+// so O(N) note iteration is eliminated from the per-tick hot path.
+// Only the tiny playhead Canvas re-draws on each step tick.
 
 import SwiftUI
 
@@ -23,16 +28,31 @@ struct MIDILaneView: View {
     @State private var cachedPitchRange: (Int, Int) = (48, 84)
 
     var body: some View {
-        // Capture stable locals so the Canvas closure holds their current values
-        // without going through @State property wrappers inside the draw call.
+        // Capture stable locals so closures hold their current values
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
         let curStep   = playback.currentStep
 
         ZStack {
+            // Note layer — does not capture currentStep, so SwiftUI skips its body
+            // whenever only the playhead moves. O(N) note draw runs only on song
+            // load, track regen, or DAW scroll — not on every 9 Hz step tick.
+            NoteLayerView(
+                events: events,
+                onsets: onsets,
+                pitchRange: pitchRng,
+                visibleBars: visibleBars,
+                barOffset: barOffset,
+                totalBars: totalBars,
+                isDrumTrack: isDrumTrack,
+                trackColor: trackColor,
+                noteH: noteH
+            )
+            .equatable()
+
+            // Playhead layer — O(1): one rect + optional triangle per tick
             Canvas { ctx, size in
-                drawLane(ctx: ctx, size: size, onsets: onsets,
-                         pitchRange: pitchRng, currentStep: curStep)
+                drawPlayhead(ctx: ctx, size: size, currentStep: curStep)
             }
 
             // Drag-to-seek overlay — invisible, covers full lane
@@ -76,10 +96,70 @@ struct MIDILaneView: View {
         }
     }
 
-    // MARK: - Main draw
+    // MARK: - Playhead draw (O(1): only called by the playhead Canvas)
 
-    private func drawLane(ctx: GraphicsContext, size: CGSize,
-                          onsets: [UInt8: [Int]], pitchRange: (Int, Int), currentStep: Int) {
+    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Int) {
+        let w = size.width
+        let h = size.height
+        let clampedVisible = max(1, min(visibleBars, totalBars))
+        let clampedOffset  = max(0, min(barOffset, totalBars - clampedVisible))
+        let visibleSteps   = clampedVisible * 16
+        let startStep      = clampedOffset * 16
+
+        guard currentStep >= startStep && currentStep < startStep + visibleSteps else { return }
+        let px = CGFloat(currentStep - startStep) / CGFloat(visibleSteps) * w
+        ctx.fill(Path(CGRect(x: px, y: 0, width: 2, height: h)),
+                 with: .color(.white.opacity(0.9)))
+        if showPlayheadHandle {
+            let cx = px + 1.0
+            var tri = Path()
+            tri.move(to: CGPoint(x: cx - 6, y: 0))
+            tri.addLine(to: CGPoint(x: cx + 6, y: 0))
+            tri.addLine(to: CGPoint(x: cx,     y: 10))
+            tri.closeSubpath()
+            ctx.fill(tri, with: .color(.white))
+        }
+    }
+}
+
+// MARK: - NoteLayerView
+
+// Equatable: SwiftUI calls == before deciding whether to re-run body.
+// When only currentStep changes (every tick), inputs are equal → body skipped.
+// Body re-runs only on song load, track regen, or DAW scroll.
+private struct NoteLayerView: View, Equatable {
+    let events: [MIDIEvent]
+    let onsets: [UInt8: [Int]]
+    let pitchRange: (Int, Int)
+    let visibleBars: Int
+    let barOffset: Int
+    let totalBars: Int
+    let isDrumTrack: Bool
+    let trackColor: Color
+    let noteH: CGFloat
+
+    static func == (lhs: NoteLayerView, rhs: NoteLayerView) -> Bool {
+        // onsets is derived from events in buildCache(), so it's a faithful
+        // proxy for event equality without requiring MIDIEvent: Equatable.
+        lhs.onsets == rhs.onsets &&
+        lhs.pitchRange.0 == rhs.pitchRange.0 &&
+        lhs.pitchRange.1 == rhs.pitchRange.1 &&
+        lhs.visibleBars == rhs.visibleBars &&
+        lhs.barOffset == rhs.barOffset &&
+        lhs.totalBars == rhs.totalBars &&
+        lhs.isDrumTrack == rhs.isDrumTrack &&
+        lhs.trackColor == rhs.trackColor
+    }
+
+    var body: some View {
+        Canvas { ctx, size in
+            drawNotes(ctx: ctx, size: size)
+        }
+    }
+
+    // MARK: - Note draw (bar lines + drum separators + note rects — no playhead)
+
+    private func drawNotes(ctx: GraphicsContext, size: CGSize) {
         let w = size.width
         let h = size.height
 
@@ -108,8 +188,6 @@ struct MIDILaneView: View {
 
         // Notes — only those overlapping visible window
         let (lo, hi) = pitchRange
-        // Scale note height so adjacent semitones always have a 1px vertical gap.
-        // Without this, dense chords (e.g. 4-voice pad block) render as a solid rectangle.
         let semitoneCount = max(1, hi - lo)
         let pixelsPerSemitone = (h - noteH) / CGFloat(semitoneCount)
         let drawH = max(2, min(noteH, pixelsPerSemitone - 1))
@@ -130,24 +208,6 @@ struct MIDILaneView: View {
             let col = noteColor(for: Int(ev.note))
             ctx.fill(Path(CGRect(x: x, y: max(0, min(h - drawH, y)), width: nw, height: drawH)),
                      with: .color(col))
-        }
-
-        // Playhead — only if in visible window
-        if currentStep >= startStep && currentStep < startStep + visibleSteps {
-            let px = CGFloat(currentStep - startStep) / CGFloat(visibleSteps) * w
-            // Playhead line
-            ctx.fill(Path(CGRect(x: px, y: 0, width: 2, height: h)),
-                     with: .color(.white.opacity(0.9)))
-            // Drag-handle triangle (▼) — only on the top lane
-            if showPlayheadHandle {
-                let cx = px + 1.0
-                var tri = Path()
-                tri.move(to: CGPoint(x: cx - 6, y: 0))
-                tri.addLine(to: CGPoint(x: cx + 6, y: 0))
-                tri.addLine(to: CGPoint(x: cx,     y: 10))
-                tri.closeSubpath()
-                ctx.fill(tri, with: .color(.white))
-            }
         }
     }
 

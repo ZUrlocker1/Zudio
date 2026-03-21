@@ -12,7 +12,8 @@ struct CosmicBassGenerator {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
         // Pick primary bass rule
@@ -22,7 +23,7 @@ struct CosmicBassGenerator {
         let weights: [Double] = [0.18,           0.15,          0.13,           0.10,           0.07,
                                   0.09,           0.07,           0.05,
                                   0.09,           0.07]
-        let ruleID = rules[rng.weightedPick(weights)]
+        let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
 
         // COS-BASS-005 = truly absent bass in body sections (intro/outro still get a root note).
         // Always logged so the status shows "Bass absent in main section".
@@ -110,10 +111,8 @@ struct CosmicBassGenerator {
             }
         }
 
-        // COS-BASS-011/012 have bar-based evolution baked in — always log EVOL marker.
-        if ruleID == "COS-BASS-011" || ruleID == "COS-BASS-012" {
-            usedRuleIDs.insert("BASS-EVOL")
-        }
+        // "Evolving pattern" is a live playback step annotation — not a static generation log entry.
+        // BASS-EVOL is intentionally NOT inserted into usedRuleIDs here.
 
         return events
     }

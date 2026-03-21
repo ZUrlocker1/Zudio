@@ -125,11 +125,11 @@ struct CosmicMusicalFrameGenerator {
         }
     }
 
-    /// Song length: triangular min=180s, peak=300s, max=420s (longer than Motorik)
+    /// Song length: triangular min=225s (3:45), peak=250s, max=270s (4:30) — slightly longer than Motorik
     private static func pickTotalBars(tempo: Int, rng: inout SeededRNG, testMode: Bool = false) -> Int {
-        let minS: Double  = testMode ? 60.0  : 180.0
-        let peakS: Double = testMode ? 75.0  : 300.0
-        let maxS: Double  = testMode ? 90.0  : 420.0
+        let minS: Double  = testMode ? 60.0  : 225.0
+        let peakS: Double = testMode ? 75.0  : 250.0
+        let maxS: Double  = testMode ? 90.0  : 270.0
         let r = rng.nextDouble()
         let fc = (peakS - minS) / (maxS - minS)
         let secs: Double
