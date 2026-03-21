@@ -358,8 +358,14 @@ struct CosmicDrumGenerator {
 
     /// Generates a drum fill in the last intro bar that leads into the body downbeat.
     /// drumsOnly = true → starts at step 8 (last 2 beats); false → starts at step 4 (last 3 beats).
-    /// Pattern: escalating hi-hat run + kick + snare flam → crash on step 15 to launch bar 1.
-    /// Inspired by Time Loops (bar 0 beat 0.8 Neo Soul fill), Caligari Drop (bar 0 beat 2.7 fill).
+    ///
+    /// Three variants selected randomly:
+    ///   v0  Hat Crescendo  — 16th-note closed hat run, single snare on step 14, silence step 15.
+    ///   v1  Bonham Launch  — tom cascade hi→floor from beat 3, snare step 14, silence step 15.
+    ///   v2  Crescendo Roll — ghost snare roll building exponentially, peaks step 14, silence step 15.
+    ///
+    /// All variants: no kick (avoids double-bass-drum on bar 1), no notes on step 15
+    /// (1-step gap so bar 1 beat 1 kick+crash arrives clean and uncontested).
     private static func cosmicColdStartPickup(
         introStyle: IntroStyle,
         barStart: Int,
@@ -370,30 +376,57 @@ struct CosmicDrumGenerator {
 
         // drumsOnly: start at step 8 (2-beat pickup); bass also present: step 4 (3-beat)
         let fromStep = drumsOnly ? 8 : 4
+        let variant = rng.nextInt(upperBound: 3)
 
-        // Pattern: kick anchors beat 3, then hats build continuously through beat 4
-        // with NO kick on beat 4 (that was the stutter — two kicks in quick succession
-        // made beat 4 sound like a false landing). Snare accent on "and of 4" and
-        // "ah of 4" launch into the crash on bar 1 beat 1.
-        let pattern: [(step: Int, note: UInt8, vel: Int)] = [
-            (4,  GMDrum.closedHat.rawValue, 50),
-            (6,  GMDrum.closedHat.rawValue, 56),
-            (8,  GMDrum.kick.rawValue,      72),   // beat 3 kick — groove anchor
-            (8,  GMDrum.closedHat.rawValue, 62),
-            (10, GMDrum.closedHat.rawValue, 70),
-            (12, GMDrum.closedHat.rawValue, 80),   // beat 4 — hat continues, no kick
-            (13, GMDrum.closedHat.rawValue, 88),   // e of 4 — building
-            (14, GMDrum.snare.rawValue,     88),   // and of 4 — main accent
-            (14, GMDrum.openHat.rawValue,   72),
-            (15, GMDrum.snare.rawValue,     100),  // ah of 4 — launch
-            (15, GMDrum.crash1.rawValue,    105),
-        ]
+        let pattern: [(step: Int, note: UInt8, vel: Int)]
+
+        switch variant {
+
+        case 0: // Hat Crescendo — 16th-note closed hats building from beat 2 or 3, snare climax
+            let hatSteps: [(step: Int, vel: Int)] = [
+                (4,  45), (5,  50), (6,  55), (7,  60),
+                (8,  58), (9,  63), (10, 68), (11, 73),
+                (12, 78), (13, 85),
+            ]
+            pattern = hatSteps.map { ($0.step, GMDrum.closedHat.rawValue, $0.vel) }
+                    + [(14, GMDrum.snare.rawValue, 100)]
+
+        case 1: // Bonham Launch — tom cascade from beat 3 into snare, inspired by 2-beat Bonham fill.
+            // 3-beat variant (fromStep=4): precede with hats on beats 2–2.5 to fill the space.
+            let hatPrefix: [(step: Int, note: UInt8, vel: Int)] = [
+                (4, GMDrum.closedHat.rawValue, 45),
+                (5, GMDrum.closedHat.rawValue, 52),
+                (6, GMDrum.closedHat.rawValue, 58),
+                (7, GMDrum.closedHat.rawValue, 64),
+            ]
+            let tomCascade: [(step: Int, note: UInt8, vel: Int)] = [
+                (8,  GMDrum.hiTom.rawValue,        72),
+                (9,  GMDrum.hiTom.rawValue,        76),
+                (10, GMDrum.hiMidTom.rawValue,     80),
+                (11, GMDrum.lowMidTom.rawValue,    84),
+                (12, GMDrum.lowFloorTom.rawValue,  88),
+                (13, GMDrum.highFloorTom.rawValue, 94),
+                (14, GMDrum.snare.rawValue,        105),
+            ]
+            pattern = hatPrefix + tomCascade
+
+        default: // Crescendo Roll — ghost snare roll building exponentially to full accent.
+            // Steps 4–14 (or 8–14 for 2-beat), velocity curve 18→105, silence on 15.
+            let rollStart = 4
+            let rollEnd   = 14   // inclusive; step 15 stays silent
+            let count = rollEnd - rollStart + 1
+            pattern = (rollStart...rollEnd).map { s in
+                let i = s - rollStart
+                let t = Double(i) / Double(count - 1)
+                let vel = Int(18 + t * t * 87)  // exponential 18→105
+                return (s, GMDrum.snare.rawValue, vel)
+            }
+        }
 
         var events: [MIDIEvent] = []
         for (step, note, vel) in pattern {
             guard step >= fromStep else { continue }
-            // Slight velocity randomisation (±8)
-            let finalVel = UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 17) - 8)))
+            let finalVel = UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 11) - 5)))
             events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                     velocity: finalVel, durationSteps: 1))
         }

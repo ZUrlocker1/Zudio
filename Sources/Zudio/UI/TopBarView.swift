@@ -238,20 +238,22 @@ struct TopBarView: View {
                         .pickerStyle(.menu)
                         .frame(width: 90)
 
-                        HStack(spacing: 4) {
-                            Text("BPM").foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        HStack(spacing: 6) {
+                            Text("BPM")
+                                .foregroundStyle(.secondary)
+                                .fixedSize()
                             TextField("", value: Binding(
                                 get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 0 },
                                 set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
                             ), format: .number)
-                            .frame(width: 44)
+                            .frame(width: 48)
                             .textFieldStyle(.roundedBorder)
                             Stepper("", value: Binding(
                                 get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 138 },
                                 set: { appState.tempoOverride = max(20, min(200, $0)) }
                             ), in: 20...200)
                             .labelsHidden()
-                            .frame(width: 24)
                         }
                     }
 

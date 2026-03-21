@@ -644,7 +644,7 @@ struct SongGenerator {
         case "MOT-BASS-011": return "Quo Drive"
         case "MOT-BASS-012": return "Moroder Chase — delay-echo 16th-note ostinato"
         case "MOT-BASS-013": return "Kraftwerk Roboter — octave-jump 3-note cell"
-        case "MOT-BASS-014": return "McCartney PBW — Mixolydian root–5th–b7–3rd riff"
+        case "MOT-BASS-014": return "McCartney melodic drive"
         case "BASS-EVOL":    return "Evolving pattern"
         case "BASS-DEVOL":   return "Devolving pattern"
         default:             return ruleID
@@ -744,7 +744,7 @@ struct SongGenerator {
         case "COS-BASS-009":  return "Crawling Walk — 2-bar root/fifth with approach note"
         case "COS-BASS-010":  return "Moroder Pulse — 8th-note root/fifth/b7 sequence"
         case "COS-BASS-011":  return "Kraftwerk Roboter — octave-jump 3-note cell"
-        case "COS-BASS-012":  return "McCartney PBW — Mixolydian root–5th–b7–3rd riff"
+        case "COS-BASS-012":  return "McCartney melodic drive"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
         default:              return ruleID
