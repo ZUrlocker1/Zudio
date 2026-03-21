@@ -1,5 +1,8 @@
 // CosmicLeadGenerator.swift — Cosmic lead melody generation
-// Implements COS-LD-001 through COS-LD-005
+// Implements COS-LEAD-001 through COS-LEAD-006
+// COS-LEAD-006  JMJ Phrase Loop: 4–6 note melodic phrase generated once per body section,
+//              repeated identically for 4 bars, then one note shifts a scale step on bar 5,
+//              another shifts on bar 7. JMJ keyboard-solo-over-sequencer feel.
 // Register: MIDI 60–96 (celestial, higher than arpeggio's 55–72)
 // Velocity: 45–72 (softer than Motorik — cosmic is never aggressive)
 // COS-RULE-19: harmonic tier, full 20–87 range with phrase phrasing
@@ -15,29 +18,32 @@ struct CosmicLeadGenerator {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
-        // Pick rule for A sections
-        let aRule = pickLeadRule(rng: &rng)
+        let aRule = forceRuleID ?? pickLeadRule(rng: &rng)
         usedRuleIDs.insert(aRule)
 
+        // COS-LEAD-006 uses section-level phrase generation — bypass per-bar dispatch
+        if aRule == "COS-LEAD-006" {
+            return generateJMJPhraseLoop(frame: frame, structure: structure,
+                                         tonalMap: tonalMap, rng: &rng)
+        }
+
         // COS-RULE-24: commit to interval style
-        let useWideInterval = rng.nextDouble() < 0.40  // 40% wide/impressionistic
+        let useWideInterval = rng.nextDouble() < 0.40
 
         var events: [MIDIEvent] = []
 
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
-
-            let rule = aRule
-
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
                 let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
                                                       low: 60, high: 96)
-                events += emitLeadBar(rule: rule, barStart: barStart, bar: bar,
+                events += emitLeadBar(rule: aRule, barStart: barStart, bar: bar,
                                       scaleNotes: scaleNotes, entry: entry, frame: frame,
                                       useWideInterval: useWideInterval, rng: &rng)
             }
@@ -56,15 +62,18 @@ struct CosmicLeadGenerator {
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
 
-        // Lead 2 uses a different rule or offset variant of Lead 1
         let rule = pickLeadRule2(rng: &rng)
         usedRuleIDs.insert(rule)
+
+        if rule == "COS-LEAD-006" {
+            return generateJMJPhraseLoop(frame: frame, structure: structure,
+                                         tonalMap: tonalMap, rng: &rng)
+        }
 
         var events: [MIDIEvent] = []
 
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
-
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
@@ -81,15 +90,15 @@ struct CosmicLeadGenerator {
     // MARK: - Rule selection
 
     private static func pickLeadRule(rng: inout SeededRNG) -> String {
-        let rules:   [String] = ["COS-LEAD-001", "COS-LEAD-002", "COS-LEAD-003", "COS-LEAD-004", "COS-LEAD-005"]
-        let weights: [Double] = [0.30,          0.25,          0.20,          0.15,          0.10]
+        let rules:   [String] = ["COS-LEAD-001", "COS-LEAD-002", "COS-LEAD-003", "COS-LEAD-004", "COS-LEAD-005", "COS-LEAD-006"]
+        let weights: [Double] = [0.22,           0.18,           0.15,           0.12,           0.08,           0.25]
         return rules[rng.weightedPick(weights)]
     }
 
     private static func pickLeadRule2(rng: inout SeededRNG) -> String {
         // Lead 2 prefers floating tones and pentatonic drift (sparser / softer)
-        let rules:   [String] = ["COS-LEAD-002", "COS-LEAD-003", "COS-LEAD-005", "COS-LEAD-001", "COS-LEAD-004"]
-        let weights: [Double] = [0.35,          0.30,          0.15,          0.12,          0.08]
+        let rules:   [String] = ["COS-LEAD-002", "COS-LEAD-003", "COS-LEAD-005", "COS-LEAD-001", "COS-LEAD-004", "COS-LEAD-006"]
+        let weights: [Double] = [0.28,           0.22,           0.12,           0.10,           0.07,           0.21]
         return rules[rng.weightedPick(weights)]
     }
 
@@ -239,7 +248,82 @@ struct CosmicLeadGenerator {
         return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 14)]
     }
 
+    // MARK: - COS-LEAD-006: JMJ Phrase Loop
+
+    private static func generateJMJPhraseLoop(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        for section in structure.sections {
+            guard section.label != .intro && section.label != .outro else { continue }
+            guard let firstEntry = tonalMap.entry(atBar: section.startBar) else { continue }
+
+            let scaleNotes = jmjPhraseScaleNotes(entry: firstEntry, frame: frame)
+            guard scaleNotes.count >= 4 else { continue }
+
+            // Build the phrase once per section: 4–6 notes with quarter/8th-note durations
+            let phraseLen = 4 + rng.nextInt(upperBound: 3)
+            var phraseNotes: [Int] = []
+            var phraseDurs:  [Int] = []
+            var stepAccum = 0
+            for _ in 0..<phraseLen {
+                guard stepAccum < 16 else { break }
+                phraseNotes.append(scaleNotes[rng.nextInt(upperBound: scaleNotes.count)])
+                let dur = 4 + rng.nextInt(upperBound: 5)  // 4–8 steps (1–2 beats)
+                phraseDurs.append(dur)
+                stepAccum += dur
+            }
+            guard !phraseNotes.isEmpty else { continue }
+
+            // Which note index shifts and in which direction for each variation
+            let var1Idx   = rng.nextInt(upperBound: phraseNotes.count)
+            let var2Idx   = (var1Idx + 1 + rng.nextInt(upperBound: max(1, phraseNotes.count - 1))) % phraseNotes.count
+            let shift1    = rng.nextDouble() < 0.5 ? 1 : -1
+            let shift2    = rng.nextDouble() < 0.5 ? 1 : -1
+
+            func shiftedNote(_ note: Int, by delta: Int) -> Int {
+                let baseIdx = scaleNotes.firstIndex(of: note) ?? (scaleNotes.count / 2)
+                return scaleNotes[max(0, min(scaleNotes.count - 1, baseIdx + delta))]
+            }
+
+            for bar in section.startBar..<section.endBar {
+                let posInSection = bar - section.startBar
+                let posInBlock   = posInSection % 8  // 8-bar phrase block
+
+                // Bars 0–3: base phrase. Bars 4–5: shift note 1. Bars 6–7: shift note 2.
+                var activeNotes = phraseNotes
+                if posInBlock >= 4 {
+                    activeNotes[var1Idx] = shiftedNote(phraseNotes[var1Idx], by: shift1)
+                }
+                if posInBlock >= 6 {
+                    activeNotes[var2Idx] = shiftedNote(phraseNotes[var2Idx], by: shift2)
+                }
+
+                let barStart = bar * 16
+                var stepPos  = 0
+                for (i, note) in activeNotes.enumerated() {
+                    guard stepPos < 16 else { break }
+                    let dur = phraseDurs[i]
+                    let vel = UInt8(58 + rng.nextInt(upperBound: 15))  // 58–72
+                    events.append(MIDIEvent(stepIndex: barStart + stepPos,
+                                            note: UInt8(note), velocity: vel,
+                                            durationSteps: min(dur, 16 - stepPos)))
+                    stepPos += dur
+                }
+            }
+        }
+        return events
+    }
+
     // MARK: - Helpers
+
+    /// Scale notes for COS-LEAD-006 phrase loop: MIDI 65–84 (upper-mid solo register)
+    private static func jmjPhraseScaleNotes(entry: TonalGovernanceEntry,
+                                             frame: GlobalMusicalFrame) -> [Int] {
+        return scaleNotesInRegister(entry: entry, frame: frame, low: 65, high: 84)
+    }
 
     private static func scaleNotesInRegister(
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, low: Int, high: Int

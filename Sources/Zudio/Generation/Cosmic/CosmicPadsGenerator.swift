@@ -1,5 +1,5 @@
 // CosmicPadsGenerator.swift — Cosmic pads generation
-// Implements COS-PAD-001 through COS-PAD-005 and COS-RULE-07 (Wurlitzer), COS-RULE-16 (shimmer)
+// Implements COS-PADS-001 through COS-PADS-005, COS-PADS-007, COS-RULE-07 (Wurlitzer), COS-RULE-16 (shimmer)
 // Register: MIDI 36–72 (lower than Motorik pads at 48–84 — creates depth below arpeggio)
 
 import Foundation
@@ -12,16 +12,19 @@ struct CosmicPadsGenerator {
         tonalMap: TonalGovernanceMap,
         cosmicProgFamily: CosmicProgressionFamily,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
         // Pick primary pad rule
-        let padRules:   [String] = ["COS-PADS-001", "COS-PADS-002", "COS-PADS-003", "COS-PADS-004", "COS-PADS-005"]
-        let padWeights: [Double] = [0.30,           0.20,          0.20,           0.15,           0.15]
+        let padRules:   [String] = ["COS-PADS-001", "COS-PADS-002", "COS-PADS-003", "COS-PADS-004", "COS-PADS-005", "COS-PADS-007"]
+        let padWeights: [Double] = [0.26,           0.18,           0.18,           0.13,           0.13,            0.12]
 
-        // quartal_stack forces COS-PAD-005
+        // forceRuleID > quartal_stack/suspended_resolution constraints > weighted pick
         let primaryRule: String
-        if cosmicProgFamily == .quartal_stack {
+        if let forced = forceRuleID {
+            primaryRule = forced
+        } else if cosmicProgFamily == .quartal_stack {
             primaryRule = "COS-PADS-005"
         } else if cosmicProgFamily == .suspended_resolution {
             primaryRule = "COS-PADS-004"
@@ -101,6 +104,8 @@ struct CosmicPadsGenerator {
                 events += suspendedResolutionBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             case "COS-PADS-005":
                 events += quartalStackBar(barStart: barStart, entry: entry, frame: frame)
+            case "COS-PADS-007":
+                events += gatedChordPulseBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             default:
                 events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             }
@@ -258,6 +263,33 @@ struct CosmicPadsGenerator {
             MIDIEvent(stepIndex: barStart, note: UInt8(fourth), velocity: 60, durationSteps: 14),
             MIDIEvent(stepIndex: barStart, note: UInt8(flat7),  velocity: 57, durationSteps: 14),
         ]
+    }
+
+    // MARK: - COS-PADS-007: Gated Chord Pulse
+    // Root+fifth re-attacked each quarter beat with independent per-beat gate probability.
+    // Beats 1 and 3 weighted higher; creates a rhythmically active pad in the JMJ/TD style
+    // (Équinoxe, Stratosfear) rather than a static drone.
+
+    private static func gatedChordPulseBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+        let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+
+        // Downbeats (1, 3) fire more reliably than upbeats (2, 4)
+        let beatProbs: [Double] = [0.95, 0.72, 0.82, 0.65]
+        let beatSteps            = [0, 4, 8, 12]
+        var evs: [MIDIEvent] = []
+        for (i, step) in beatSteps.enumerated() {
+            guard rng.nextDouble() < beatProbs[i] else { continue }
+            let vel = UInt8(52 + rng.nextInt(upperBound: 18))  // 52–69
+            evs += [
+                MIDIEvent(stepIndex: barStart + step, note: UInt8(root),  velocity: vel,     durationSteps: 3),
+                MIDIEvent(stepIndex: barStart + step, note: UInt8(fifth), velocity: vel - 6, durationSteps: 3),
+            ]
+        }
+        return evs
     }
 
     // MARK: - COS-RULE-07: Wurlitzer chord track (bIII voicing, velocity ramp)

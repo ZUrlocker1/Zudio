@@ -49,7 +49,8 @@ struct CosmicBassGenerator {
         // Precompute variation windows for static Cosmic rules (same logic as Motorik BassGenerator).
         // Fires for: every B section; every other A section that starts at or after bar 48.
         // COS-BASS-008 uses middle-third body detection instead (computed below).
-        let cosmicVariableRules: Set<String> = ["COS-BASS-010", "COS-BASS-011", "COS-BASS-012"]
+        // COS-BASS-010 omitted: gating IS its variation; no discrete evolution events needed.
+        let cosmicVariableRules: Set<String> = ["COS-BASS-011", "COS-BASS-012"]
         var variationBars = Set<Int>()
         if cosmicVariableRules.contains(ruleID) {
             var aToggle = false
@@ -222,7 +223,7 @@ struct CosmicBassGenerator {
                                                        frame: frame, useVariation: useVariation)
         case "COS-BASS-009": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "COS-BASS-010": return moroderPulseBar(barStart: barStart, entry: entry, frame: frame,
-                                                     useVariation: useVariation)
+                                                     useVariation: useVariation, rng: &rng)
         case "COS-BASS-011": return kraftwerkRoboterBar(barStart: barStart, bar: bar, entry: entry,
                                                          frame: frame, useVariation: useVariation)
         case "COS-BASS-012": return mccartneyPBWBar(barStart: barStart, entry: entry, frame: frame,
@@ -497,7 +498,7 @@ struct CosmicBassGenerator {
 
     private static func moroderPulseBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        useVariation: Bool = false
+        useVariation: Bool = false, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let fifthPC = (rootPC + 7) % 12
@@ -522,8 +523,12 @@ struct CosmicBassGenerator {
         let sequence: [UInt8] = useVariation
             ? [root, root, fifth, fifth, m6, b7, root, root]
             : [root, root, fifth, fifth, b7,  b7, root, root]
-        return sequence.enumerated().map { i, note in
-            MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: 100, durationSteps: 2)
+        // Per-step gate probability: anchors at index 0 and 7 most reliable;
+        // mid-sequence positions drop freely, producing the gated analog-sequencer feel.
+        let gateProbs: [Double] = [0.94, 0.82, 0.82, 0.65, 0.65, 0.70, 0.70, 0.94]
+        return sequence.enumerated().compactMap { i, note in
+            guard rng.nextDouble() < gateProbs[i] else { return nil }
+            return MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: 100, durationSteps: 2)
         }
     }
 

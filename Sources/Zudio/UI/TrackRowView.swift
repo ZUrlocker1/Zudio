@@ -215,7 +215,8 @@ struct TrackRowView: View {
         }
         .onChange(of: appState.defaultsResetToken) { _ in
             activeStyle = appState.selectedStyle  // snapshot style at reset/generate time
-            instrumentIndex = 0
+            let override = appState.instrumentOverrides[trackIndex]
+            instrumentIndex = override.map { min($0, instruments.count - 1) } ?? 0
             appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
             applyDefaultEffects()
         }

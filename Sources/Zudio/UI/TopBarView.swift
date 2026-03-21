@@ -106,10 +106,19 @@ struct TopBarView: View {
                 .frame(width: 200, alignment: .center)
                 .padding(.leading, 8)
                 .background {
-                    // Hidden Cmd-T keyboard shortcut for test mode
-                    Button("") { appState.toggleTestMode() }
-                        .keyboardShortcut("t", modifiers: .command)
-                        .hidden()
+                    Group {
+                        // Hidden keyboard shortcuts
+                        Button("") { appState.toggleTestMode() }
+                            .keyboardShortcut("t", modifiers: .command)
+                        Button("") { appState.selectedStyle = .motorik }
+                            .keyboardShortcut("m", modifiers: .command)
+                        Button("") { appState.selectedStyle = .cosmic }
+                            .keyboardShortcut("k", modifiers: .command)
+                        Button("") { appState.seekToStart() }
+                            .keyboardShortcut("b", modifiers: .command)
+                            .disabled(appState.songState == nil)
+                    }
+                    .hidden()
                 }
 
                 Divider()
@@ -264,7 +273,8 @@ struct TopBarView: View {
                                 .frame(width: 116, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
-                        .help("Save multi-track MIDI to ~/Downloads/")
+                        .keyboardShortcut("s", modifiers: .command)
+                        .help("Save multi-track MIDI to ~/Downloads/ (⌘S)")
 
                         Button(action: { appState.resetTrackDefaults() }) {
                             Label("Reset", systemImage: "arrow.counterclockwise")
@@ -272,7 +282,8 @@ struct TopBarView: View {
                                 .frame(width: 140, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
-                        .help("Reset all instruments and effects to style defaults")
+                        .keyboardShortcut("r", modifiers: .command)
+                        .help("Reset all instruments and effects to style defaults (⌘R)")
                     }
 
                     // Blank row below second button row
@@ -336,9 +347,14 @@ struct HelpView: View {
                 Text("Zudio generates Motorik-inspired music using MIDI tracks.")
                     .font(.callout).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G)", "Creates a new song. Use Mood, Key, and BPM to shape the result, or leave them on Auto.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result, or leave them on Auto.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
-                helpLine("Save MIDI", "Exports a multi-track MIDI file to ~/Downloads/. Open in any DAW to edit further.")
+                helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
+                helpLine("⌘← / ⌘B", "Go to beginning of track.")
+                helpLine("⌘→", "Go to end of track.")
+                helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to ~/Downloads/. Open in any DAW to edit further.")
+                helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
+                helpLine("⌘M / ⌘K", "Switch to Motorik or Kosmic style.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")
                 helpLine("M / S", "Mute or Solo a track. Click again to toggle off.")

@@ -34,7 +34,7 @@ final class AppState: ObservableObject {
     // Fired on generateNew() and on the manual Reset button.
     @Published var defaultsResetToken: Int = 0
 
-    func resetTrackDefaults() { defaultsResetToken += 1 }
+    func resetTrackDefaults() { instrumentOverrides = [:]; defaultsResetToken += 1 }
 
     // MARK: - UI selectors (nil = Auto)
 
@@ -42,36 +42,77 @@ final class AppState: ObservableObject {
     @Published var tempoOverride: Int?    = nil
     @Published var moodOverride:  Mood?   = nil
 
-    // MARK: - Test mode (shorter songs for rapid audition)
-    // In test mode each new generation cycles through bass rules from newest → oldest,
-    // so you can hear every rule in sequence. Index resets when test mode is toggled.
+    // MARK: - Test mode (shorter songs cycling through recently-introduced rules)
+    // Each generation advances to the next slot in testCycle.
+    // Slot 0: ARP-005*, BASS-010*, PADS-007*   (all three new rules together)
+    // Slot 1: ARP-001*, free BASS, free PADS    (ARP retrofit, everything else random)
+    // Slot 2: ARP-002*, BASS-010*, PADS-007*    (second ARP retrofit + BASS/PADS repeat)
+
+    struct TestModeConfig {
+        var forceArpRuleID:  String?
+        var forceBassRuleID: String?
+        var forcePadsRuleID: String?
+        var forceLeadRuleID: String?
+    }
 
     @Published var testModeEnabled: Bool = false
-    // Per-style index: each style counts down its own rule sequence independently.
-    // Toggling test mode resets all counters so each style starts fresh from its newest rule.
-    private var testModeBassRuleIndex: [MusicStyle: Int] = [:]
+    private var testCycleIndex: Int = 0
 
     func toggleTestMode() {
         testModeEnabled.toggle()
-        testModeBassRuleIndex = [:]
+        testCycleIndex = 0
     }
 
-    // Ordered newest-first so the first test generation plays the most recently added rule.
-    private static let testModeBassRules: [MusicStyle: [String]] = [
-        .motorik: ["MOT-BASS-014", "MOT-BASS-013", "MOT-BASS-012", "MOT-BASS-011", "MOT-BASS-010",
-                   "MOT-BASS-009", "MOT-BASS-008", "MOT-BASS-007", "MOT-BASS-006", "MOT-BASS-005",
-                   "MOT-BASS-004", "MOT-BASS-003", "MOT-BASS-002", "MOT-BASS-001"],
-        .cosmic:  ["COS-BASS-012", "COS-BASS-011", "COS-BASS-010", "COS-BASS-009", "COS-BASS-008",
-                   "COS-BASS-005", "COS-BASS-004",  "COS-BASS-003", "COS-BASS-002", "COS-BASS-001"]
+    // 4-slot cycle covering the 6 newest rules.
+    // RTHM cycles all 4 new rules. PADS-007 and LEAD-006 appear in even slots (Option B).
+    private static let testCycle: [TestModeConfig] = [
+        TestModeConfig(forceArpRuleID: "COS-RTHM-006", forceBassRuleID: nil, forcePadsRuleID: "COS-PADS-007", forceLeadRuleID: "COS-LEAD-006"),
+        TestModeConfig(forceArpRuleID: "COS-RTHM-007", forceBassRuleID: nil, forcePadsRuleID: nil,            forceLeadRuleID: nil),
+        TestModeConfig(forceArpRuleID: "COS-RTHM-008", forceBassRuleID: nil, forcePadsRuleID: "COS-PADS-007", forceLeadRuleID: "COS-LEAD-006"),
+        TestModeConfig(forceArpRuleID: "COS-RTHM-005", forceBassRuleID: nil, forcePadsRuleID: nil,            forceLeadRuleID: nil),
     ]
 
-    private func nextTestModeBassRuleID(forStyle style: MusicStyle) -> String? {
-        guard testModeEnabled,
-              let rules = Self.testModeBassRules[style], !rules.isEmpty else { return nil }
-        let index = testModeBassRuleIndex[style, default: 0]
-        let id = rules[index % rules.count]
-        testModeBassRuleIndex[style] = index + 1
-        return id
+    private func nextTestConfig() -> TestModeConfig? {
+        guard testModeEnabled else { return nil }
+        let config = Self.testCycle[testCycleIndex % Self.testCycle.count]
+        testCycleIndex += 1
+        return config
+    }
+
+    // MARK: - Instrument randomization
+    // After the first generation (all-defaults), each new song picks 2 random non-drums tracks
+    // and assigns each a random non-default instrument from that track's pool.
+    // instrumentOverrides maps trackIndex → instrumentIndex; TrackRowView reads this on defaultsResetToken.
+
+    private var songGenerationCount = 0
+    var instrumentOverrides: [Int: Int] = [:]
+
+    private static let randomizableTrackIndices = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass, kTrackDrums]
+
+    private static let trackDisplayName: [Int: String] = [
+        kTrackLead1: "Lead 1", kTrackLead2: "Lead 2", kTrackPads: "Pads",
+        kTrackRhythm: "Rhythm", kTrackTexture: "Texture", kTrackBass: "Bass", kTrackDrums: "Drums"
+    ]
+
+    static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
+        let c = style == .cosmic
+        switch trackIndex {
+        case kTrackLead1:   return c ? ["Ocarina","Flute","Whistle","Calliope Lead","Fifths Lead"]
+                                     : ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr","Flute"]
+        case kTrackLead2:   return c ? ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
+                                     : ["Brightness","Vibraphone","Marimba","Bell/Pluck","Soft Brass","Ocarina"]
+        case kTrackPads:    return c ? ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
+                                     : ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]
+        case kTrackRhythm:  return c ? ["FX Crystal","Square Lead","Vibraphone","Elec Piano 2","Church Organ"]
+                                     : ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Electric Piano","Muted Guitar","Tremolo Strings","Mono Synth"]
+        case kTrackTexture: return c ? ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
+                                     : ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
+        case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass"]
+                                     : ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
+        case kTrackDrums:   return c ? ["Standard Kit","Brush Kit"]
+                                     : ["Rock Kit","808 Kit","Brush Kit"]
+        default:            return []
+        }
     }
 
     // MARK: - Per-track UI state
@@ -89,7 +130,7 @@ final class AppState: ObservableObject {
     let playback = PlaybackEngine()
 
     private var cancellables = Set<AnyCancellable>()
-    private var spaceBarMonitor: Any?
+    private var keyEventMonitor: Any?
 
     init() {
         // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
@@ -103,19 +144,77 @@ final class AppState: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
-        // Global space-bar monitor — intercepts space regardless of keyboard focus.
-        // Bypasses the BPM TextField focus-stealing issue.
-        spaceBarMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 49,   // space bar
-                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty
-            else { return event }
-            // Always consume space — the only TextField in this app is numeric (BPM),
-            // which never needs space. Removing the NSText guard fixes the focus-steal bug.
-            Task { @MainActor [weak self] in
-                guard let self, !self.isGenerating else { return }
-                self.playOrStop()
+        // Global key monitor — intercepts transport/generation shortcuts regardless of focus.
+        // NSEvent monitor callbacks always run on the main thread.
+        // Arrow keys and Return guard against text field focus (BPM field uses these for editing).
+        // Return also guards against open sheets (Help/About use .defaultAction = Return on Close).
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            // Strip modifier keys irrelevant to our shortcuts (.numericPad/.function are set on arrows)
+            let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+
+            switch event.keyCode {
+
+            case 49: // Space — play/stop (BPM field never needs space, no guard required)
+                guard mods.isEmpty else { return event }
+                Task { @MainActor [weak self] in
+                    guard let self, !self.isGenerating else { return }
+                    self.playOrStop()
+                }
+                return nil
+
+            case 36: // Return/Enter — generate new song
+                guard mods.isEmpty else { return event }
+                // Pass through if a text field is focused (Enter commits the value)
+                // or if a sheet is open (Return = Close on Help/About)
+                let isTextField = NSApp.keyWindow?.firstResponder is NSTextView
+                let sheetOpen   = !(NSApp.keyWindow?.sheets.isEmpty ?? true)
+                guard !isTextField, !sheetOpen else { return event }
+                Task { @MainActor [weak self] in
+                    guard let self, !self.isGenerating else { return }
+                    self.generateNew()
+                }
+                return nil
+
+            case 123: // Left arrow — seek back 1 bar (plain) or to start (Cmd)
+                let isTextField = NSApp.keyWindow?.firstResponder is NSTextView
+                guard !isTextField else { return event }
+                if mods.isEmpty {
+                    Task { @MainActor [weak self] in
+                        guard let self, self.songState != nil else { return }
+                        self.seekBackOneBar()
+                    }
+                    return nil
+                } else if mods == .command {
+                    Task { @MainActor [weak self] in
+                        guard let self, self.songState != nil else { return }
+                        self.seekToStart()
+                    }
+                    return nil
+                }
+
+            case 124: // Right arrow — seek forward 1 bar (plain) or to end (Cmd)
+                let isTextField = NSApp.keyWindow?.firstResponder is NSTextView
+                guard !isTextField else { return event }
+                if mods.isEmpty {
+                    Task { @MainActor [weak self] in
+                        guard let self, self.songState != nil else { return }
+                        self.seekForwardOneBar()
+                    }
+                    return nil
+                } else if mods == .command {
+                    Task { @MainActor [weak self] in
+                        guard let self, self.songState != nil else { return }
+                        self.seekToEnd()
+                    }
+                    return nil
+                }
+
+            default:
+                break
             }
-            return nil   // consume event so no other handler sees it
+
+            return event
         }
 
         // Real-time tempo scrubbing: update live playback when BPM changes on a loaded song
@@ -183,7 +282,7 @@ final class AppState: ObservableObject {
         guard !isGenerating else { return }
         isGenerating = true
         let style = selectedStyle
-        let forcedBassRule = nextTestModeBassRuleID(forStyle: style)
+        let testConfig = nextTestConfig()
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let state = SongGenerator.generate(
@@ -192,7 +291,10 @@ final class AppState: ObservableObject {
                 moodOverride:    await self.moodOverride,
                 style:           style,
                 testMode:        await self.testModeEnabled,
-                forceBassRuleID: forcedBassRule
+                forceBassRuleID: testConfig?.forceBassRuleID,
+                forceArpRuleID:  testConfig?.forceArpRuleID,
+                forcePadsRuleID: testConfig?.forcePadsRuleID,
+                forceLeadRuleID: testConfig?.forceLeadRuleID
             )
             await MainActor.run {
                 self.songState    = state
@@ -201,11 +303,52 @@ final class AppState: ObservableObject {
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
+
+                // Instrument randomization: first song uses all defaults (index 0).
+                // From the second song onwards, pick 2 random non-drums tracks and assign
+                // each a random non-default instrument, so users hear the instrument variety.
+                var instrumentLogDesc: String? = nil
+                if self.songGenerationCount > 0 {
+                    var eligible = Self.randomizableTrackIndices
+                    var picks: [(trackIndex: Int, instIndex: Int, name: String)] = []
+                    var rng = SystemRandomNumberGenerator()
+                    while picks.count < 2, !eligible.isEmpty {
+                        let pos = eligible.indices.randomElement(using: &rng)!
+                        let trackIdx = eligible.remove(at: pos)
+                        let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style)
+                        if pool.count > 1 {
+                            let instIdx = Int.random(in: 1..<pool.count, using: &rng)
+                            picks.append((trackIdx, instIdx, pool[instIdx]))
+                        }
+                    }
+                    if !picks.isEmpty {
+                        self.instrumentOverrides = Dictionary(uniqueKeysWithValues: picks.map { ($0.trackIndex, $0.instIndex) })
+                        let parts = picks.map { "\(Self.trackDisplayName[$0.trackIndex] ?? "Track"): \($0.name)" }
+                        instrumentLogDesc = parts.joined(separator: ",  ")
+                    }
+                } else {
+                    self.instrumentOverrides = [:]
+                }
+                self.songGenerationCount += 1
+
                 // Append generation log to the flat status log (with separator if not first)
                 if !self.statusLog.isEmpty {
                     self.statusLog.append(GenerationLogEntry(tag: "───", description: "new song", isTitle: false))
                 }
+                let logInsertBase = self.statusLog.count
                 self.statusLog.append(contentsOf: state.generationLog)
+                // Insert INSTRUMENTS entry between FORM and Intro/Outro entries
+                if let desc = instrumentLogDesc {
+                    let entry = GenerationLogEntry(tag: "Instruments", description: desc, isTitle: false)
+                    let searchRange = logInsertBase..<self.statusLog.count
+                    if let firstIdx = searchRange.first(where: {
+                        self.statusLog[$0].tag == "Intro" || self.statusLog[$0].tag == "Outro"
+                    }) {
+                        self.statusLog.insert(entry, at: firstIdx)
+                    } else {
+                        self.statusLog.append(entry)
+                    }
+                }
                 // Reset mute/solo so every new song starts with all parts audible
                 self.muteState = Array(repeating: false, count: 7)
                 self.soloState = Array(repeating: false, count: 7)

@@ -39,6 +39,13 @@ struct ZudioApp: App {
                 }
                 .keyboardShortcut("g", modifiers: .command)
             }
+            CommandGroup(replacing: .saveItem) {
+                Button("Save MIDI") {
+                    appState.saveMIDI()
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(appState.songState == nil)
+            }
         }
     }
 }
