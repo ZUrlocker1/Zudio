@@ -251,9 +251,11 @@ struct SongGenerator {
 
         // Bass
         var bassRules: Set<String> = []
+        var bassEvolutionBars: [Int] = []
         trackEvents[kTrackBass] = CosmicBassGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
-            rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID
+            rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID,
+            bassEvolutionBars: &bassEvolutionBars
         )
 
         // Drums (absent / sparse / minimal per percussionStyle)
@@ -291,7 +293,8 @@ struct SongGenerator {
             rhythmRules: rhythmRules, texRules: texRules
         )
 
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame)
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
+                                                    frame: frame, bassEvolutionBars: bassEvolutionBars)
 
         return SongState(
             frame: frame,
@@ -336,9 +339,11 @@ struct SongGenerator {
             }
         case kTrackBass:
             if isCosmic {
+                var ignored: [Int] = []
                 events = CosmicBassGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
+                    bassEvolutionBars: &ignored)
             } else {
                 let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
                 var scratch = songState.trackEvents
@@ -923,7 +928,8 @@ struct SongGenerator {
         structure: SongStructure,
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
-        drumRules: Set<String> = []
+        drumRules: Set<String> = [],
+        bassEvolutionBars: [Int] = []
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -1026,7 +1032,7 @@ struct SongGenerator {
         func bassLocked(bar: Int) -> Bool {
             guard kTrackBass < trackEvents.count else { return false }
             let bs = bar * 16
-            return trackEvents[kTrackBass].filter { $0.stepIndex >= bs + 4 && $0.stepIndex < bs + 16 }.count <= 1
+            return trackEvents[kTrackBass].filter { $0.stepIndex >= bs + 4 && $0.stepIndex < bs + 16 }.isEmpty
         }
 
         // Helper: identify fill name by examining drum notes in the fill region
@@ -1229,58 +1235,67 @@ struct SongGenerator {
             }
         }
 
-        // 5. Bass pattern evolving — fire at bar start of the evolving window.
-        // Checks every 4 bars using a 4-bar pitch-class window. An 8-bar cooldown
-        // prevents over-triggering while still catching mid-song evolution.
-        // Does NOT reset across section boundaries so A→B transitions are detected.
+        // 5. Bass pattern evolving — fire when the bass pattern changes character.
+        //
+        // Two detection paths:
+        // A) Explicit: generators pass bassEvolutionBars with the exact bars where the
+        //    pattern variant starts/ends. Used for Cosmic patterns where the dual layer
+        //    (COS-BASS-006/007) masks fingerprint changes. Applied with 4-bar cooldown.
+        // B) Fingerprint: 4-bar pitch-class window comparison + density check. Fallback
+        //    for patterns not covered by explicit tracking. 8-bar cooldown.
         if kTrackBass < trackEvents.count {
-            let bassEvents = trackEvents[kTrackBass]
-            // Build pitch-class fingerprint over a 4-bar window starting at `fromBar`
-            func bassFP(fromBar: Int) -> Set<UInt8> {
-                let windowEnd = min(fromBar + 4, totalBars)
-                return Set(bassEvents
-                    .filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }
-                    .map { $0.note % 12 })
-            }
-            // Count distinct notes in a 4-bar window (density signal)
-            func bassCount(fromBar: Int) -> Int {
-                let windowEnd = min(fromBar + 4, totalBars)
-                return bassEvents.filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }.count
-            }
-            var prevFP: Set<UInt8>? = nil
-            var prevCount: Int = 0
             var lastEvolvedBar: Int = -8
-            for bar in stride(from: 0, to: outroStartBar, by: 4) {
-                guard let sec = structure.section(atBar: bar),
-                      sec.label == .A || sec.label == .B else { continue }
-                let fp = bassFP(fromBar: bar)
-                let count = bassCount(fromBar: bar)
-                if let prev = prevFP, !fp.isEmpty, !prev.isEmpty,
-                   (bar - lastEvolvedBar) >= 8 {
-                    let union = fp.union(prev).count
-                    let common = fp.intersection(prev).count
-                    let jaccard = union > 0 ? Double(common) / Double(union) : 1.0
-                    // Adaptive threshold: for a fingerprint of N pitch classes, adding or
-                    // removing 1 class gives Jaccard of N/(N+1) or (N-1)/N. Set the threshold
-                    // just above N/(N+1) so any single-class change is detected regardless of
-                    // how rich the pattern is. Cap at 0.88 to avoid hypersensitivity on very
-                    // large fingerprints. Simple patterns (≤2 classes) use the newClasses check.
-                    let n = Double(prev.count)
-                    let adaptiveThreshold = prev.count <= 2 ? 0.99 :
-                        min(0.88, n / (n + 1.0) + 0.03)
-                    let newClasses = fp.subtracting(prev)
-                    let pitchChanged = jaccard < adaptiveThreshold || (prev.count <= 2 && !newClasses.isEmpty)
-                    // Density change: note count shifts by more than 50%
-                    let densityChanged = prevCount > 0 &&
-                        abs(count - prevCount) > max(1, prevCount / 2)
-                    if pitchChanged || densityChanged {
-                        fireBar(bar, tag: "Bass", desc: "pattern evolving")
-                        lastEvolvedBar = bar
-                    }
+
+            if !bassEvolutionBars.isEmpty {
+                // Path A: explicit bars from generator
+                for bar in bassEvolutionBars.sorted() where bar < outroStartBar {
+                    guard let sec = structure.section(atBar: bar),
+                          sec.label == .A || sec.label == .B else { continue }
+                    guard (bar - lastEvolvedBar) >= 4 else { continue }
+                    fireBar(bar, tag: "Bass", desc: "pattern evolving")
+                    lastEvolvedBar = bar
                 }
-                if !fp.isEmpty {
-                    prevFP = fp
-                    prevCount = count
+            } else {
+                // Path B: fingerprint inference (Motorik and patterns without explicit tracking)
+                let bassEvents = trackEvents[kTrackBass]
+                func bassFP(fromBar: Int) -> Set<UInt8> {
+                    let windowEnd = min(fromBar + 4, totalBars)
+                    return Set(bassEvents
+                        .filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }
+                        .map { $0.note % 12 })
+                }
+                func bassCount(fromBar: Int) -> Int {
+                    let windowEnd = min(fromBar + 4, totalBars)
+                    return bassEvents.filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }.count
+                }
+                var prevFP: Set<UInt8>? = nil
+                var prevCount: Int = 0
+                for bar in stride(from: 0, to: outroStartBar, by: 4) {
+                    guard let sec = structure.section(atBar: bar),
+                          sec.label == .A || sec.label == .B else { continue }
+                    let fp = bassFP(fromBar: bar)
+                    let count = bassCount(fromBar: bar)
+                    if let prev = prevFP, !fp.isEmpty, !prev.isEmpty,
+                       (bar - lastEvolvedBar) >= 8 {
+                        let union = fp.union(prev).count
+                        let common = fp.intersection(prev).count
+                        let jaccard = union > 0 ? Double(common) / Double(union) : 1.0
+                        let n = Double(prev.count)
+                        let adaptiveThreshold = prev.count <= 2 ? 0.99 :
+                            min(0.88, n / (n + 1.0) + 0.03)
+                        let newClasses = fp.subtracting(prev)
+                        let pitchChanged = jaccard < adaptiveThreshold || (prev.count <= 2 && !newClasses.isEmpty)
+                        let densityChanged = prevCount > 0 &&
+                            abs(count - prevCount) > max(1, prevCount / 2)
+                        if pitchChanged || densityChanged {
+                            fireBar(bar, tag: "Bass", desc: "pattern evolving")
+                            lastEvolvedBar = bar
+                        }
+                    }
+                    if !fp.isEmpty {
+                        prevFP = fp
+                        prevCount = count
+                    }
                 }
             }
         }

@@ -68,7 +68,8 @@ struct BassGenerator {
         // Fires for: every B section; every other A section that starts at or after bar 48
         // (alternating on/off so the variation doesn't take over the whole second half).
         // This keeps the bass interesting at section boundaries without being relentless.
-        let simpleRules: Set<String> = ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004"]
+        let simpleRules: Set<String> = ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
+                                         "MOT-BASS-013", "MOT-BASS-014"]
         var variationBars = Set<Int>()
         if simpleRules.contains(ruleID) {
             var aToggle = false
@@ -136,7 +137,8 @@ struct BassGenerator {
         useVariation: Bool = false
     ) -> [MIDIEvent] {
         // Simple 1–2 note rules get a more interesting variant in B sections and after bar 48
-        if useVariation, ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004"].contains(ruleID) {
+        if useVariation, ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
+                          "MOT-BASS-013", "MOT-BASS-014"].contains(ruleID) {
             return simpleRuleVariationBar(barStart: barStart, bar: bar, ruleID: ruleID, entry: entry, frame: frame)
         }
         switch ruleID {
@@ -194,6 +196,39 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 6,  note: third, velocity: 78, durationSteps: 3),
                 MIDIEvent(stepIndex: barStart + 10, note: fifth, velocity: 84, durationSteps: 5),
             ]
+
+        case "MOT-BASS-013":
+            // Kraftwerk Roboter B-section: lock to root–octave–third only (drop fifth cycling).
+            // Base bars alternate third (bars 0–1) and fifth (bars 2–3) → fingerprint {root,3rd,5th}.
+            // This variation uses only third every bar → fingerprint {root,3rd} — detector fires.
+            let octave13 = UInt8(clamped(Int(root) + 12, low: 28, high: 64))
+            var evs13: [MIDIEvent] = []
+            for cell in 0..<2 {
+                let off = cell * 8
+                evs13.append(MIDIEvent(stepIndex: barStart + off,     note: root,    velocity: 92, durationSteps: 2))
+                evs13.append(MIDIEvent(stepIndex: barStart + off + 2, note: octave13, velocity: 80, durationSteps: 2))
+                evs13.append(MIDIEvent(stepIndex: barStart + off + 4, note: third,   velocity: 86, durationSteps: 4))
+            }
+            return evs13
+
+        case "MOT-BASS-014":
+            // McCartney PBW B-section: all-drive, no breathe bar.
+            // Base alternates drive (8 notes) / breathe (3 notes) → density ~22 per 4 bars.
+            // This plays the full riff every bar → density 32 per 4 bars — density detector fires.
+            let isMajorCtx: Bool
+            switch entry.chordWindow.chordType {
+            case .major, .sus2, .sus4, .add9: isMajorCtx = true
+            default:                          isMajorCtx = false
+            }
+            let flatSeven = isMajorCtx ? fifth : UInt8(clamped(Int(root) + 10, low: 28, high: 52))
+            let pitches14: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]
+            let vels14:    [UInt8] = [94,   84,    88,   80,        82,    78,   84,    74  ]
+            var evs14: [MIDIEvent] = []
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evs14.append(MIDIEvent(stepIndex: barStart + step, note: pitches14[i],
+                                       velocity: vels14[i], durationSteps: 2))
+            }
+            return evs14
 
         default: // BAS-001
             // Root Anchor walk: root → third → fifth → root (same arpeggio as the intro hint,
