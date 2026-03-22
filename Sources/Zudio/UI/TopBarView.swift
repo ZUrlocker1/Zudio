@@ -425,8 +425,8 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.82 (alpha)").font(.system(size: 14))
-                Text("Built by analyzing classic Motorik and Kosmic songs as well as other works. Then a set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
+                Text("Version: 0.83 (alpha)").font(.system(size: 14))
+                Text("Built by analyzing classic Motorik and Kosmic artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0: Motorik and Kosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)

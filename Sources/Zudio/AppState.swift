@@ -74,32 +74,28 @@ final class AppState: ObservableObject {
         testCycleIndex = 0
     }
 
-    // 8-slot cycle. New rules always appear in the first two slots so they're heard immediately.
-    // Slot 0: KOS-DRUM-006 + KOS-BASS-011 (both new rules together, with RTHM-006)  [Kosmic]
-    // Slot 1: KOS-DRUM-006 + RTHM-007 (second hearing of new drums, different arp)  [Kosmic]
-    // Slot 2: KOS-BASS-011 + RTHM-008 + PADS-007 (new bass with other new rules)    [Kosmic]
-    // Slot 3: KOS-RTHM-006 + KOS-PADS-007 + KOS-LEAD-006 + KOS-TEXT-001            [Kosmic]
-    // Slot 4: KOS-RTHM-007 + KOS-TEXT-002                                            [Kosmic]
-    // Slot 5: KOS-RTHM-008 + KOS-PADS-007 + KOS-LEAD-006 + KOS-TEXT-003            [Kosmic]
-    // Slot 6: motorikGrid — exercises cold start fill variants; all else random      [Motorik]
-    // Slot 7:  MOT-BASS-015 * — Kraftwerk driving bass in Motorik style               [Motorik]
-    // Slot 8:  MOT-BASS-013 * — Kraftwerk Roboter in Motorik style                    [Motorik]
-    // Slot 9:  Bridge * — escalating drum bridge (EB Mister Mosca A-1 style)           [Kosmic]
-    // Slot 10: Bridge * — call+response drum bridge (EB Caligari Drop A-2 style)       [Kosmic]
-    // Slot 11: Bridge * — melody bridge with pre/post ramps (EB Dark Sun style)        [Kosmic]
+    // 10-slot cycle focused on new Loscil/Craven Faults rules + bridges (90% bridge coverage).
+    // Slot 0:  RTHM-009 * + BASS-013 * — call+response bridge                       [Kosmic]
+    // Slot 1:  RTHM-010 * + BASS-013 * — escalating drum bridge                     [Kosmic]
+    // Slot 2:  RTHM-009 * + TEXT-004 * — melody bridge                               [Kosmic]
+    // Slot 3:  RTHM-010 * + TEXT-004 * — call+response bridge                        [Kosmic]
+    // Slot 4:  RTHM-009 * + BASS-013 * + TEXT-004 * — escalating drum bridge         [Kosmic]
+    // Slot 5:  RTHM-010 * + BASS-013 * — melody bridge                               [Kosmic]
+    // Slot 6:  RTHM-009 * + TEXT-004 * — call+response bridge                        [Kosmic]
+    // Slot 7:  RTHM-010 * + BASS-013 * + TEXT-004 * — melody bridge                  [Kosmic]
+    // Slot 8:  RTHM-009 * + BASS-013 * — random bridge archetype                     [Kosmic]
+    // Slot 9:  RTHM-010 * + TEXT-004 * — no forced bridge (free)                     [Kosmic]
     private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-006", forceBassRuleID: "KOS-BASS-011", forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-007", forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: .electricBuddhaRestrained),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-008", forceBassRuleID: "KOS-BASS-011", forcePadsRuleID: "KOS-PADS-007", forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: "KOS-TEXT-003", forcePercussionStyle: nil),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-006", forceBassRuleID: nil,            forcePadsRuleID: "KOS-PADS-007", forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: "KOS-TEXT-001", forcePercussionStyle: nil),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-007", forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-008", forceBassRuleID: nil,            forcePadsRuleID: "KOS-PADS-007", forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: "KOS-TEXT-003", forcePercussionStyle: nil),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .motorikGrid),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: "MOT-BASS-015", forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .motorikGrid),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: "MOT-BASS-013", forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .motorikGrid),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true, forceBridgeArchetype: "drum"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true, forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true, forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drum"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drum"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "drum"),
     ]
 
     private func nextTestConfig() -> TestModeConfig? {

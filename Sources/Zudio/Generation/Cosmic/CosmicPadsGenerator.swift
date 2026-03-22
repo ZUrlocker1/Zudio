@@ -93,48 +93,122 @@ struct KosmicPadsGenerator {
                 continue
             }
 
-            // Bridge A-1 (.bridge): single tonic chord on bar 1 only, held for full bridge.
-            // Pads provide harmonic context under the escalating drums — quiet, not re-attacked.
+            // Bridge A-1 (.bridge): re-attack every bar, ascending or descending voicing per phase.
+            // Direction: ascending 67% (startBar % 3 != 2), descending 33% — matches bass/arpeggio.
+            // Ascending: root+fifth → +octave → +third → full chord (louder each phase).
+            // Descending: full chord → -third → -octave → root+fifth (strips back to root).
+            // Short hold (12 steps = 3 beats) leaves a crisp gap between attacks.
             if section.label == .bridge {
-                guard bar == section.startBar else { continue }
-                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let bridgeLen   = max(1, section.endBar - section.startBar)
+                let barInBridge = bar - section.startBar
+                let phase       = min(3, barInBridge * 4 / bridgeLen)
+                let ascending   = section.startBar % 3 != 2
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let mode   = entry.sectionMode
+                let root   = noteInPadsRegister(pc: rootPC,                                   targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12,                        targetOct: 2)
+                let octave = noteInPadsRegister(pc: rootPC,                                   targetOct: 3)
+                let third  = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
+                let dur = 12
+                // Ascending phases add voices; descending phases remove them
+                let ascPhase = ascending ? phase : (3 - phase)
+                let velBase = ascending ? [44, 50, 55, 62][phase] : [62, 55, 50, 44][phase]
                 events += [
-                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 60, durationSteps: dur),
-                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 54, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: UInt8(velBase),     durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: UInt8(velBase - 6), durationSteps: dur),
                 ]
+                if ascPhase >= 1 {
+                    events.append(MIDIEvent(stepIndex: barStart, note: UInt8(octave), velocity: UInt8(velBase - 10), durationSteps: dur))
+                }
+                if ascPhase >= 2 {
+                    events.append(MIDIEvent(stepIndex: barStart, note: UInt8(third),  velocity: UInt8(velBase - 8),  durationSteps: dur))
+                }
                 continue
             }
 
-            // Bridge A-2 (.bridgeAlt): staccato hit on hit bars (even), silent on response bars.
-            // The pulsating pad texture is muted — the hit+silence contrast is the musical point.
+            // Bridge A-2 (.bridgeAlt): light rhythmic chords throughout.
+            // Even bars (call): strong beat-1 hit + softer beat-3 echo (root + third + fifth).
+            // Odd bars (response): sustained half-note chord at lower velocity to support the lead melody.
             if section.label == .bridgeAlt {
                 let bridgeBar = bar - section.startBar
-                guard bridgeBar % 2 == 0 else { continue }  // response bars: silent
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-                events += [
-                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 100, durationSteps: 2),
-                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 94,  durationSteps: 2),
-                ]
+                let rootPC    = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode      = entry.sectionMode
+                let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let third     = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
+                let fifth     = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                if bridgeBar % 2 == 0 {
+                    // Call bar: sharp hit beat 1, quieter echo beat 3
+                    events += [
+                        MIDIEvent(stepIndex: barStart,     note: UInt8(root),  velocity: 88, durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart,     note: UInt8(third), velocity: 80, durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart,     note: UInt8(fifth), velocity: 82, durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart + 8, note: UInt8(root),  velocity: 58, durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart + 8, note: UInt8(fifth), velocity: 52, durationSteps: 4),
+                    ]
+                } else {
+                    // Response bar: always plays — root+fifth sustained under the melodic response
+                    let vel = UInt8(38 + rng.nextInt(upperBound: 14))
+                    events += [
+                        MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: vel,     durationSteps: 11),
+                        MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: vel - 6, durationSteps: 11),
+                    ]
+                }
                 continue
             }
 
-            // Bridge B (.bridgeMelody): single tonic chord on bar 1 held for full bridge.
-            // Harmonic foundation only — does not move or re-attack. Lead drives this section.
+            // Bridge B (.bridgeMelody): evolving pad voicing across the bridge.
+            // Short bridges (≤ 4 bars): single long hold (no room to evolve).
+            // Longer bridges: re-attack every 4 bars with three phases —
+            //   first half: open root+fifth (spacious, lets melody breathe)
+            //   second half: root+third+fifth (warmer, supports the raised-peak variant)
+            //   final 4 bars: root+fourth+fifth sus4 (harmonic tension before B section)
             if section.label == .bridgeMelody {
-                guard bar == section.startBar else { continue }
-                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let bridgeLen   = section.endBar - section.startBar
+                let barInBridge = bar - section.startBar
+                let halfLen     = max(1, bridgeLen / 2)
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode   = entry.sectionMode
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-                events += [
-                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 60, durationSteps: dur),
-                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 54, durationSteps: dur),
-                ]
+                let third  = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
+                let fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
+
+                if bridgeLen <= 4 {
+                    // Short bridge: one long hold for the full duration
+                    guard barInBridge == 0 else { continue }
+                    let dur = max(1, bridgeLen * 16 - 1)
+                    events += [
+                        MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 60, durationSteps: dur),
+                        MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 54, durationSteps: dur),
+                    ]
+                } else {
+                    // Longer bridge: re-attack every 4 bars with evolving voicing
+                    guard barInBridge % 4 == 0 else { continue }
+                    let holdDur     = min(62, (section.endBar - bar) * 16 - 2)
+                    let isNearEnd   = barInBridge >= bridgeLen - 4
+                    let isSecondHalf = barInBridge >= halfLen
+                    if isNearEnd {
+                        // Sus4 tension — harmonic unrest before B section arrives
+                        events += [
+                            MIDIEvent(stepIndex: barStart, note: UInt8(root),   velocity: 52, durationSteps: holdDur),
+                            MIDIEvent(stepIndex: barStart, note: UInt8(fourth), velocity: 46, durationSteps: holdDur),
+                            MIDIEvent(stepIndex: barStart, note: UInt8(fifth),  velocity: 48, durationSteps: holdDur),
+                        ]
+                    } else if isSecondHalf {
+                        // Warmer triad: supports the raised-peak phrase variant
+                        events += [
+                            MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 62, durationSteps: holdDur),
+                            MIDIEvent(stepIndex: barStart, note: UInt8(third), velocity: 54, durationSteps: holdDur),
+                            MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 56, durationSteps: holdDur),
+                        ]
+                    } else {
+                        // Open fifth: spacious, melody has room to speak
+                        events += [
+                            MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 58, durationSteps: holdDur),
+                            MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 52, durationSteps: holdDur),
+                        ]
+                    }
+                }
                 continue
             }
 

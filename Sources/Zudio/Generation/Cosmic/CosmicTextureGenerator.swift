@@ -1,10 +1,12 @@
 // KosmicTextureGenerator.swift — Kosmic texture generation
-// Implements KOS-TEXT-001 through KOS-TEXT-003
+// Implements KOS-TEXT-001 through KOS-TEXT-004
 // KOS-RULE-11: Bluebird/secondary arpeggio in MIDI 33–59, quarter-note durations
 // Register separation from main arpeggio (55–72) is CRITICAL
 //
 // KOS-TEXT-001 variation: every 24 body bars (from bar 24 onward), motif lifts one octave
 // for 8 bars then returns. Same pitches, same loop phase, purely a register shift.
+// KOS-TEXT-004: Loscil aquatic shimmer — 3 closely-voiced scale tones, staggered 1-step,
+// attacks, bluebird register, every 4 bars, very quiet (vel 16–30), long hold (dur 62).
 
 import Foundation
 
@@ -19,8 +21,8 @@ struct KosmicTextureGenerator {
         forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
-        let texRules:   [String] = ["KOS-TEXT-001", "KOS-TEXT-002", "KOS-TEXT-003"]
-        let texWeights: [Double] = [0.50,           0.30,           0.20]
+        let texRules:   [String] = ["KOS-TEXT-001", "KOS-TEXT-002", "KOS-TEXT-003", "KOS-TEXT-004"]
+        let texWeights: [Double] = [0.45,           0.27,           0.18,           0.10]
         let primaryRule = forceRuleID ?? texRules[rng.weightedPick(texWeights)]
         usedRuleIDs.insert(primaryRule)
 
@@ -33,8 +35,75 @@ struct KosmicTextureGenerator {
 
         var events: [MIDIEvent] = []
 
+        // Bridge A-1 (.bridge): sparse single note every 2 bars climbing or descending.
+        // Plays in the bluebird register (MIDI 33–59), direction matching bass/arpeggio/pads.
+        for section in structure.sections where section.label == .bridge {
+            let bridgeLen = max(1, section.endBar - section.startBar)
+            let ascending = section.startBar % 3 != 2
+            for bar in section.startBar..<section.endBar {
+                guard bar % 2 == 0 else { continue }  // every 2 bars — sparse
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let barInBridge = bar - section.startBar
+                let phase       = min(3, barInBridge * 4 / bridgeLen)
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode   = entry.sectionMode
+                let third  = mode.nearestInterval(3)
+                // Step through chord tones in the bluebird register
+                let ascPCs  = [0, third, 7, 12]
+                let descPCs = [12, 7, third, 0]
+                let pc  = (ascending ? ascPCs : descPCs)[phase]
+                var note = rootPC + pc + 36
+                while note < 33 { note += 12 }
+                while note > 59 { note -= 12 }
+                let vel  = UInt8(max(14, min(60, 28 + phase * 6 + rng.nextInt(upperBound: 8) - 4)))
+                events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 20))
+            }
+        }
+
+        // Bridge B (.bridgeMelody): sparse atmospheric texture, only for longer bridges (> 4 bars).
+        // Single note in bluebird register, very quiet — supports without competing with lead.
+        // First half: root (harmonically stable); second half: fifth (slightly brighter, mild tension).
+        for section in structure.sections where section.label == .bridgeMelody {
+            let bridgeLen = section.endBar - section.startBar
+            guard bridgeLen > 4 else { continue }
+            let halfLen = max(1, bridgeLen / 2)
+            for bar in section.startBar..<section.endBar {
+                let barInBridge = bar - section.startBar
+                guard barInBridge % 4 == 0 else { continue }
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC       = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let isSecondHalf = barInBridge >= halfLen
+                // Root in first half (stable); fifth in second half (brightens as melody climbs)
+                let pc = isSecondHalf ? 7 : 0
+                var note = rootPC + pc + 36
+                while note < 33 { note += 12 }
+                while note > 59 { note -= 12 }
+                let vel = UInt8(isSecondHalf ? 22 : 16)
+                events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 10))
+            }
+        }
+
+        // Bridge A-2 (.bridgeAlt): sparse optional texture on response bars only (~30% chance).
+        // Root or fifth in bluebird register — harmonic support without competing with arpeggio melody.
+        for section in structure.sections where section.label == .bridgeAlt {
+            for bar in section.startBar..<section.endBar {
+                let bridgeBar = bar - section.startBar
+                guard bridgeBar % 2 == 1 else { continue }  // response bars only (odd bars)
+                guard rng.nextDouble() < 0.30 else { continue }
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                // root or fifth only — avoid thirds that conflict with arpeggio phrase
+                let pc = rng.nextDouble() < 0.6 ? 0 : 7
+                var note = rootPC + pc + 36
+                while note < 33 { note += 12 }
+                while note > 59 { note -= 12 }
+                let vel = UInt8(max(14, min(35, 20 + rng.nextInt(upperBound: 12) - 4)))
+                events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 10))
+            }
+        }
+
         for section in structure.sections {
-            // Texture is silent during all bridge sections (density rule)
+            // Texture is silent during all bridge sections except .bridge (handled above)
             guard !section.label.isBridge else { continue }
             // preRamp uses TEXT-002 shimmer; postRamp uses TEXT-003 sweep (fall through to switch below)
             for bar in section.startBar..<section.endBar {
@@ -91,6 +160,8 @@ struct KosmicTextureGenerator {
                     events += shimmerHoldBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
                 case "KOS-TEXT-003":
                     events += spatialSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
+                case "KOS-TEXT-004":
+                    events += loscilShimmerBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
                 default:
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
                                                firstBodyBar: firstBodyBar,
@@ -201,6 +272,48 @@ struct KosmicTextureGenerator {
             MIDIEvent(stepIndex: barStart,     note: UInt8(fromMIDI), velocity: 89, durationSteps: 4),
             MIDIEvent(stepIndex: barStart + 4, note: UInt8(chromPass), velocity: 89, durationSteps: 4),
             MIDIEvent(stepIndex: barStart + 8, note: UInt8(toMIDI),    velocity: 89, durationSteps: 4),
+        ]
+    }
+
+    // MARK: - KOS-TEX-004: Loscil Aquatic Shimmer
+    // 3 closely-voiced scale tones with staggered 1-step attacks — dissolving into each other.
+    // Fires every 4 bars. Long hold (62 steps) creates the blurred, underwater quality.
+    // Very quiet (vel 16–30) so it sits beneath everything else as pure atmosphere.
+
+    private static func loscilShimmerBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        guard bar % 4 == 0 else { return [] }
+
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let mode   = entry.sectionMode
+        let second = mode.nearestInterval(2)
+        let third  = mode.nearestInterval(3)
+
+        // 3 closely-voiced tones: root, 2nd, 3rd — one octave below bluebird (MIDI 21–47)
+        var n0 = 36 + rootPC
+        var n1 = 36 + rootPC + second
+        var n2 = 36 + rootPC + third
+        while n0 < 21 { n0 += 12 }; while n0 > 47 { n0 -= 12 }
+        while n1 < 21 { n1 += 12 }; while n1 > 47 { n1 -= 12 }
+        while n2 < 21 { n2 += 12 }; while n2 > 47 { n2 -= 12 }
+
+        // 16-bar volume cycle: 8 bars ascending (40%→100%), 8 bars descending (100%→40%).
+        // Rule fires every 4 bars, so the audible steps in the cycle are at positions 0, 4, 8, 12.
+        let cyclePos = bar % 16
+        let t: Double = cyclePos < 8
+            ? Double(cyclePos) / 7.0          // 0.0 → 1.0 over bars 0–7
+            : Double(15 - cyclePos) / 7.0     // 1.0 → 0.0 over bars 8–15
+        let envelopeScale = 0.40 + 0.60 * t   // 40% at trough, 100% at peak
+
+        // Stagger attacks by 1 step each — creates slow-motion cluster dissolve
+        let peakVel = 110 + rng.nextInt(upperBound: 15)  // 110–124
+        let baseVel = max(1, min(127, Int(Double(peakVel) * envelopeScale)))
+        return [
+            MIDIEvent(stepIndex: barStart,     note: UInt8(n0), velocity: UInt8(baseVel),      durationSteps: 62),
+            MIDIEvent(stepIndex: barStart + 1, note: UInt8(n1), velocity: UInt8(max(1, baseVel - 10)), durationSteps: 62),
+            MIDIEvent(stepIndex: barStart + 2, note: UInt8(n2), velocity: UInt8(max(1, baseVel - 20)), durationSteps: 62),
         ]
     }
 

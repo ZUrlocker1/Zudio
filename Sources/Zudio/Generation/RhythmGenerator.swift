@@ -36,12 +36,12 @@ struct RhythmGenerator {
             let patternWeights: [Double] = [0.30, 0.17, 0.17, 0.13, 0.08, 0.15]
             let patternType = rng.weightedPick(patternWeights)
             switch patternType {
-            case 0:  usedRuleIDs.insert("MOT-RHYT-001")
-            case 1:  usedRuleIDs.insert("MOT-RHYT-002")
-            case 2:  usedRuleIDs.insert("MOT-RHYT-003")
-            case 3:  usedRuleIDs.insert("MOT-RHYT-004")
-            case 4:  usedRuleIDs.insert("MOT-RHYT-005")
-            default: usedRuleIDs.insert("MOT-RHYT-006")
+            case 0:  usedRuleIDs.insert("MOT-RTHM-001")
+            case 1:  usedRuleIDs.insert("MOT-RTHM-002")
+            case 2:  usedRuleIDs.insert("MOT-RTHM-003")
+            case 3:  usedRuleIDs.insert("MOT-RTHM-004")
+            case 4:  usedRuleIDs.insert("MOT-RTHM-005")
+            default: usedRuleIDs.insert("MOT-RTHM-006")
             }
 
             // prevNote for smooth octave transitions across bar lines

@@ -102,9 +102,12 @@ struct MIDIFileExporter {
         nameMeta += nameUTF8
         raw.append(RE(tick: 0, bytes: nameMeta, isNoteOff: false))
 
-        // Program change at tick 0
         let ch = channel & 0x0F
-        raw.append(RE(tick: 0, bytes: [0xC0 | ch, program], isNoteOff: false))
+
+        // Program change + channel initialisation at tick 0
+        raw.append(RE(tick: 0, bytes: [0xC0 | ch, program],       isNoteOff: false))  // program
+        raw.append(RE(tick: 0, bytes: [0xB0 | ch, 7,  100],       isNoteOff: false))  // CC7  volume
+        raw.append(RE(tick: 0, bytes: [0xB0 | ch, 11, 127],       isNoteOff: false))  // CC11 expression
 
         // Note on / off pairs
         for ev in events {

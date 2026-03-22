@@ -24,6 +24,7 @@ struct ArrangementFilter {
     static func apply(
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
+        structure: SongStructure,
         seed: UInt64
     ) -> [[MIDIEvent]] {
         var events = trackEvents
@@ -34,6 +35,12 @@ struct ArrangementFilter {
         let blockSize = rng.nextDouble() < 0.5 ? 8 : 16
         let totalBlocks = (frame.totalBars + blockSize - 1) / blockSize
 
+        // Pre-compute bridge bars — blocks containing ANY bridge bar are skipped entirely
+        // so the arrangement filter never silences bridge-specific events (X-Files whistle, etc.)
+        let bridgeBars: Set<Int> = Set(structure.sections
+            .filter { $0.label.isBridge }
+            .flatMap { $0.startBar..<$0.endBar })
+
         var lastSpotlight: Set<Int> = []
 
         for b in 0..<totalBlocks {
@@ -41,6 +48,9 @@ struct ArrangementFilter {
             let endBar    = min(startBar + blockSize, frame.totalBars)
             let startStep = startBar * 16
             let endStep   = endBar   * 16
+
+            // Skip blocks that overlap a bridge section — generators already handle those
+            guard !bridgeBars.contains(where: { $0 >= startBar && $0 < endBar }) else { continue }
 
             // Measure density as unique steps with notes (normalises pad chords vs single-note leads)
             let densities = subjectTracks.map { track -> (track: Int, density: Double) in

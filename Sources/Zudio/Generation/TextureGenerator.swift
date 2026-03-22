@@ -23,11 +23,11 @@ struct TextureGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
-        // MOT-TEXR-001 is always the backbone
-        usedRuleIDs.insert("MOT-TEXR-001")
+        // MOT-TEXT-001 is always the backbone
+        usedRuleIDs.insert("MOT-TEXT-001")
 
         // Select 1–2 supplementary rules per song
-        let suppCandidates = ["MOT-TEXR-002", "MOT-TEXR-003", "MOT-TEXR-004", "MOT-TEXR-005", "MOT-TEXR-006"]
+        let suppCandidates = ["MOT-TEXT-002", "MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005", "MOT-TEXT-006"]
         let suppWeights:   [Double]  = [0.25,      0.20,      0.25,      0.15,      0.15]
         let primaryIdx = rng.weightedPick(suppWeights)
         var activeSupp: Set<String> = [suppCandidates[primaryIdx]]
@@ -69,7 +69,7 @@ struct TextureGenerator {
             }
 
             // --- TEX-002: Transition Swell — section boundaries, warm mid register ---
-            if activeSupp.contains("MOT-TEXR-002") && (isSectionStart || isSectionEnd) {
+            if activeSupp.contains("MOT-TEXT-002") && (isSectionStart || isSectionEnd) {
                 if rng.nextDouble() < 0.70 {
                     let pc       = rng.nextDouble() < 0.60 ? rootPC : fifthPC
                     let note     = noteInRange(pc: pc, low: 60, high: 84)
@@ -81,7 +81,7 @@ struct TextureGenerator {
             }
 
             // --- TEX-003: Drone Anchor — ~once per 24 bars, body sections only ---
-            if activeSupp.contains("MOT-TEXR-003") && isBodySection && !isSectionEnd {
+            if activeSupp.contains("MOT-TEXT-003") && isBodySection && !isSectionEnd {
                 if rng.nextDouble() < (1.0 / 24.0) {
                     let pc       = rng.nextDouble() < 0.65 ? rootPC : fifthPC
                     let note     = noteInRange(pc: pc, low: 60, high: 72)
@@ -92,7 +92,7 @@ struct TextureGenerator {
             }
 
             // --- TEX-004: Shimmer Pair — ~once per 10 bars ---
-            if activeSupp.contains("MOT-TEXR-004") && rng.nextDouble() < (1.0 / 10.0) {
+            if activeSupp.contains("MOT-TEXT-004") && rng.nextDouble() < (1.0 / 10.0) {
                 let interval = rng.nextDouble() < 0.50 ? 11 : 14  // maj-7 or min-9
                 let hiPC     = (rootPC + interval) % 12
                 let loNote   = noteInRange(pc: rootPC, low: 72, high: 96)
@@ -107,7 +107,7 @@ struct TextureGenerator {
             }
 
             // --- TEX-005: Breath Release — last step of a section's final bar ---
-            if activeSupp.contains("MOT-TEXR-005") && isSectionEnd && rng.nextDouble() < 0.50 {
+            if activeSupp.contains("MOT-TEXT-005") && isSectionEnd && rng.nextDouble() < 0.50 {
                 let note     = noteInRange(pc: rootPC, low: 72, high: 96)
                 let velocity = UInt8(25 + rng.nextInt(upperBound: 11))
                 events.append(MIDIEvent(stepIndex: barStart + 15, note: note,
@@ -115,7 +115,7 @@ struct TextureGenerator {
             }
 
             // --- TEX-006: High Tension Touch — ~once per 20 bars, body sections only ---
-            if activeSupp.contains("MOT-TEXR-006") && isBodySection && rng.nextDouble() < (1.0 / 20.0) {
+            if activeSupp.contains("MOT-TEXT-006") && isBodySection && rng.nextDouble() < (1.0 / 20.0) {
                 let pool = entry.chordWindow.scaleTensions.sorted()
                 if !pool.isEmpty {
                     let pc       = pool[rng.nextInt(upperBound: pool.count)]

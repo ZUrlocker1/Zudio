@@ -19,10 +19,13 @@ struct KosmicLeadGenerator {
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        lead1BaseRule: inout String,
+        xFilesBars: inout [Int]
     ) -> [MIDIEvent] {
 
         let aRule = forceRuleID ?? pickLeadRule(rng: &rng)
+        lead1BaseRule = aRule
         usedRuleIDs.insert(aRule)
 
         // Technique D: 60% chance to use a different lead rule in B sections
@@ -40,7 +43,8 @@ struct KosmicLeadGenerator {
         // KOS-LEAD-006 uses section-level phrase generation — bypass per-bar dispatch
         if aRule == "KOS-LEAD-006" {
             return generateJMJPhraseLoop(frame: frame, structure: structure,
-                                         tonalMap: tonalMap, bRule: bRule, rng: &rng)
+                                         tonalMap: tonalMap, bRule: bRule, rng: &rng,
+                                         xFilesBars: &xFilesBars)
         }
 
         // KOS-RULE-24: commit to interval style
@@ -48,15 +52,50 @@ struct KosmicLeadGenerator {
 
         var events: [MIDIEvent] = []
 
+        // Bridge A-1: sustained 5th for the full bridge duration
+        events += generateDrumBridgeLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+        // Bridge A-2: short descending melodic response on odd (non-hit) bars
+        events += generateBridgeAltLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
-            // Drum bridges (A-1, A-2): Lead is silent — density rule
+            // Drum bridges handled above — skip in main loop
             guard section.label != .bridge && section.label != .bridgeAlt else { continue }
-            // Melody bridge (B): distinct lead melody repeated twice
+            // Melody bridge (B): X-Files whistle 25% of the time; otherwise generated melody
             if section.label == .bridgeMelody {
-                events += generateBridgeMelodySection(section: section, frame: frame,
-                                                      tonalMap: tonalMap, bridgeRule: bridgeMelodyRule,
-                                                      rng: &rng)
+                var melodyEvents = generateBridgeMelodySection(section: section, frame: frame,
+                                                               tonalMap: tonalMap, bridgeRule: bridgeMelodyRule,
+                                                               rng: &rng)
+                if rng.nextDouble() < 0.25 {
+                    // X-Files appears symmetrically: bookend (first+last) or middle-pair (two bars with a gap).
+                    let bridgeLen = section.endBar - section.startBar
+                    let xBars: [Int]
+                    if rng.nextDouble() < 0.50 {
+                        // Bookend: opening bar and closing bar mirror each other
+                        xBars = bridgeLen >= 2
+                            ? [section.startBar, section.endBar - 1]
+                            : [section.startBar]
+                    } else {
+                        // Middle pair: spaced ~1/3 and ~2/3 through the bridge
+                        let a = section.startBar + max(1, bridgeLen / 3)
+                        let b = section.startBar + max(2, (bridgeLen * 2) / 3)
+                        xBars = (b > a) ? [a, b] : [a]
+                    }
+                    for xBar in xBars {
+                        let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
+                        guard !barEvs.isEmpty else { continue }
+                        xFilesBars.append(xBar)
+                        let xStart = xBar * 16; let xEnd = xStart + 16
+                        // 6-beat (24-step) silence pad before and after so the whistle stands out
+                        let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
+                        let postPadEnd  = xBar < section.endBar - 1   ? xEnd + 24   : xEnd
+                        melodyEvents = melodyEvents.filter {
+                            $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
+                        }
+                        melodyEvents += barEvs
+                    }
+                }
+                events += melodyEvents
                 continue
             }
             // B sections: use Technique D rule if selected
@@ -82,29 +121,45 @@ struct KosmicLeadGenerator {
         tonalMap: TonalGovernanceMap,
         lead1Events: [MIDIEvent],
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        lead1BaseRuleID: String? = nil
     ) -> [MIDIEvent] {
 
         let rule = pickLeadRule2(rng: &rng)
         usedRuleIDs.insert(rule)
 
+        // If both leads share the same JMJ rule, generate sparse version for Lead 2
         if rule == "KOS-LEAD-006" {
+            let sparseMode = (lead1BaseRuleID == "KOS-LEAD-006")
+            var discard: [Int] = []
             return generateJMJPhraseLoop(frame: frame, structure: structure,
-                                         tonalMap: tonalMap, rng: &rng)
+                                         tonalMap: tonalMap, sparseMode: sparseMode, rng: &rng,
+                                         xFilesBars: &discard)
         }
+
+        // When Lead 2 draws the same rule as Lead 1, shift bar index by 1 so Lead 2
+        // always fires at least one bar after Lead 1, and skip the first bar of each section.
+        let sameRule = (lead1BaseRuleID != nil && rule == lead1BaseRuleID)
 
         var events: [MIDIEvent] = []
 
+        // Bridge A-2: Lead 2 plays a complementary ascending figure on response bars
+        events += generateBridgeAltLead2(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
-            // Lead 2 is always silent during all bridge sections
-            guard !section.label.isBridge else { continue }
+            // Lead 2 silent in A-1 and melody bridges; bridgeAlt handled above
+            guard section.label != .bridge && section.label != .bridgeMelody else { continue }
+            guard section.label != .bridgeAlt else { continue }
             for bar in section.startBar..<section.endBar {
+                // Same-rule fixup: skip section's first bar (Lead 1 fires there), lag by 1 bar
+                if sameRule && bar == section.startBar { continue }
+                let virtualBar = sameRule ? bar - 1 : bar
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
                 let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
                                                       low: 60, high: 88)
-                events += emitLeadBar(rule: rule, barStart: barStart, bar: bar,
+                events += emitLeadBar(rule: rule, barStart: barStart, bar: virtualBar,
                                       scaleNotes: scaleNotes, entry: entry, frame: frame,
                                       useWideInterval: false, rng: &rng)
             }
@@ -214,15 +269,73 @@ struct KosmicLeadGenerator {
             phrase.append(PhraseNote(bar01: bar01, step: step, note: note, vel: vel, dur: dur))
         }
 
-        // === Emit: 2-bar phrase repeats for every bar in first half; second half = first half ===
-        let halfLen = max(1, bridgeLen / 2)
+        // === Build evolved phrase for second half (bridges > 4 bars only) ===
+        // Raises the melodic peak +1 scale step and nudges the note before it too — the second
+        // half feels like it reaches higher, a classic TD/JMJ variation technique.
+        var phraseVariant = phrase
+        if bridgeLen > 4 && peakAt < phraseVariant.count {
+            // Raise the peak note
+            let oldIdx = pitchIdxs[peakAt]
+            if oldIdx + 1 < scale.count {
+                let p = phraseVariant[peakAt]
+                phraseVariant[peakAt] = PhraseNote(bar01: p.bar01, step: p.step,
+                                                    note: UInt8(scale[oldIdx + 1]),
+                                                    vel: UInt8(min(127, Int(p.vel) + 6)),
+                                                    dur: p.dur)
+            }
+            // Also nudge the note immediately before the peak (+1 step if possible)
+            let preIdx = max(0, peakAt - 1)
+            if preIdx != peakAt && preIdx < phraseVariant.count {
+                let oldPre = pitchIdxs[preIdx]
+                if oldPre + 1 < scale.count {
+                    let p = phraseVariant[preIdx]
+                    phraseVariant[preIdx] = PhraseNote(bar01: p.bar01, step: p.step,
+                                                        note: UInt8(scale[oldPre + 1]),
+                                                        vel: p.vel, dur: p.dur)
+                }
+            }
+        }
+
+        // === Build middle-repetition variant: shifts note at ~2/3 position by ±1 scale step ===
+        // Middle repetitions within each half use this to avoid sounding identical to the outer reps.
+        // The shift is subtle — one note moves one step — so the phrase is still recognisable.
+        let midShiftIdx = max(0, min(n - 1, n * 2 / 3))
+        let midOldIdx   = pitchIdxs[midShiftIdx]
+        var phraseMid = phrase
+        if midOldIdx + 1 < scale.count {
+            let p = phraseMid[midShiftIdx]
+            phraseMid[midShiftIdx] = PhraseNote(bar01: p.bar01, step: p.step,
+                                                note: UInt8(scale[midOldIdx + 1]),
+                                                vel: p.vel, dur: p.dur)
+        }
+        var phraseMidVariant = phraseVariant
+        if midOldIdx + 1 < scale.count && midShiftIdx < phraseMidVariant.count {
+            let p = phraseMidVariant[midShiftIdx]
+            phraseMidVariant[midShiftIdx] = PhraseNote(bar01: p.bar01, step: p.step,
+                                                       note: UInt8(scale[midOldIdx + 1]),
+                                                       vel: p.vel, dur: p.dur)
+        }
+
+        // === Emit: first and last reps per half are exact; middle reps use the evolved variant ===
+        let halfLen          = max(1, bridgeLen / 2)
+        let totalRepsInHalf  = max(1, halfLen / 2)
         var evs: [MIDIEvent] = []
         for bar in section.startBar..<section.endBar {
-            let bridgeBar  = bar - section.startBar
-            let phraseBar  = bridgeBar % halfLen        // reset at second half
-            let barIn2     = phraseBar % 2              // position in the 2-bar phrase (0 or 1)
-            let barStart   = bar * 16
-            for pn in phrase where pn.bar01 == barIn2 {
+            let bridgeBar    = bar - section.startBar
+            let phraseBar    = bridgeBar % halfLen
+            let barIn2       = phraseBar % 2
+            let barStart     = bar * 16
+            let repInHalf    = phraseBar / 2
+            let isFirstOrLast = repInHalf == 0 || repInHalf == totalRepsInHalf - 1
+            let inSecondHalf  = bridgeLen > 4 && bridgeBar >= halfLen
+            let useMid        = !isFirstOrLast && totalRepsInHalf > 2
+            let activePhrase: [PhraseNote]
+            if inSecondHalf {
+                activePhrase = useMid ? phraseMidVariant : phraseVariant
+            } else {
+                activePhrase = useMid ? phraseMid : phrase
+            }
+            for pn in activePhrase where pn.bar01 == barIn2 {
                 evs.append(MIDIEvent(stepIndex: barStart + pn.step, note: pn.note,
                                      velocity: pn.vel, durationSteps: pn.dur))
             }
@@ -380,14 +493,57 @@ struct KosmicLeadGenerator {
 
     private static func generateJMJPhraseLoop(
         frame: GlobalMusicalFrame, structure: SongStructure,
-        tonalMap: TonalGovernanceMap, bRule: String = "KOS-LEAD-006", rng: inout SeededRNG
+        tonalMap: TonalGovernanceMap, bRule: String = "KOS-LEAD-006",
+        sparseMode: Bool = false, rng: inout SeededRNG,
+        xFilesBars: inout [Int]
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
+        // Bridge A-1 and A-2: same bridge lead as regular rules
+        events += generateDrumBridgeLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+        events += generateBridgeAltLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+
+        // Bridge melody rule: pick once, different from JMJ
+        let jmjBridgeMelodyRule = pickLeadRuleDifferentFrom("KOS-LEAD-006", rng: &rng)
+
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
-            // Silent during drum bridges; melody bridge uses its own path
-            guard !section.label.isBridge else { continue }
+            // Drum bridges handled above
+            guard section.label != .bridge && section.label != .bridgeAlt else { continue }
+            // Melody bridge: same path as generateLead1
+            if section.label == .bridgeMelody {
+                var melodyEvents = generateBridgeMelodySection(section: section, frame: frame,
+                                                               tonalMap: tonalMap, bridgeRule: jmjBridgeMelodyRule,
+                                                               rng: &rng)
+                if rng.nextDouble() < 0.25 {
+                    let bridgeLen = section.endBar - section.startBar
+                    let xBars: [Int]
+                    if rng.nextDouble() < 0.50 {
+                        xBars = bridgeLen >= 2
+                            ? [section.startBar, section.endBar - 1]
+                            : [section.startBar]
+                    } else {
+                        let a = section.startBar + max(1, bridgeLen / 3)
+                        let b = section.startBar + max(2, (bridgeLen * 2) / 3)
+                        xBars = (b > a) ? [a, b] : [a]
+                    }
+                    for xBar in xBars {
+                        let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
+                        guard !barEvs.isEmpty else { continue }
+                        xFilesBars.append(xBar)
+                        let xStart = xBar * 16; let xEnd = xStart + 16
+                        // 6-beat (24-step) silence pad before and after so the whistle stands out
+                        let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
+                        let postPadEnd  = xBar < section.endBar - 1   ? xEnd + 24   : xEnd
+                        melodyEvents = melodyEvents.filter {
+                            $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
+                        }
+                        melodyEvents += barEvs
+                    }
+                }
+                events += melodyEvents
+                continue
+            }
             guard let firstEntry = tonalMap.entry(atBar: section.startBar) else { continue }
 
             let scaleNotes = jmjPhraseScaleNotes(entry: firstEntry, frame: frame)
@@ -413,30 +569,40 @@ struct KosmicLeadGenerator {
             let shift1    = rng.nextDouble() < 0.5 ? 1 : -1
             let shift2    = rng.nextDouble() < 0.5 ? 1 : -1
 
-            func shiftedNote(_ note: Int, by delta: Int) -> Int {
-                let baseIdx = scaleNotes.firstIndex(of: note) ?? (scaleNotes.count / 2)
-                return scaleNotes[max(0, min(scaleNotes.count - 1, baseIdx + delta))]
-            }
+            // Precompute the shifted notes once — inputs are constant across all bars in this section.
+            // Avoids O(scaleNotes) firstIndex scans on every bar tick.
+            let shiftedNote1: Int = {
+                let idx = scaleNotes.firstIndex(of: phraseNotes[var1Idx]) ?? (scaleNotes.count / 2)
+                return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift1))]
+            }()
+            let shiftedNote2: Int = {
+                let idx = scaleNotes.firstIndex(of: phraseNotes[var2Idx]) ?? (scaleNotes.count / 2)
+                return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift2))]
+            }()
 
             for bar in section.startBar..<section.endBar {
                 let posInSection = bar - section.startBar
+                // Sparse mode (Lead 2 doubling JMJ): skip first bar of section; 40% gate elsewhere
+                if sparseMode && posInSection == 0 { continue }
+                if sparseMode && rng.nextDouble() > 0.40 { continue }
+
                 let posInBlock   = posInSection % 8  // 8-bar phrase block
 
                 // Bars 0–3: base phrase. Bars 4–5: shift note 1. Bars 6–7: shift note 2.
                 var activeNotes = phraseNotes
-                if posInBlock >= 4 {
-                    activeNotes[var1Idx] = shiftedNote(phraseNotes[var1Idx], by: shift1)
-                }
-                if posInBlock >= 6 {
-                    activeNotes[var2Idx] = shiftedNote(phraseNotes[var2Idx], by: shift2)
-                }
+                if posInBlock >= 4 { activeNotes[var1Idx] = shiftedNote1 }
+                if posInBlock >= 6 { activeNotes[var2Idx] = shiftedNote2 }
 
                 let barStart = bar * 16
                 var stepPos  = 0
-                for (i, note) in activeNotes.enumerated() {
+                // Sparse mode: use only the first 1–2 notes per bar (subtle punctuation)
+                let noteLimit = sparseMode ? min(2, activeNotes.count) : activeNotes.count
+                for (i, note) in activeNotes.prefix(noteLimit).enumerated() {
                     guard stepPos < 16 else { break }
                     let dur = phraseDurs[i]
-                    let vel = UInt8(58 + rng.nextInt(upperBound: 15))  // 58–72
+                    // Sparse mode: softer velocity (43–57) so Lead 1 stays prominent
+                    let vel = UInt8(sparseMode ? 43 + rng.nextInt(upperBound: 15)
+                                               : 58 + rng.nextInt(upperBound: 15))
                     events.append(MIDIEvent(stepIndex: barStart + stepPos,
                                             note: UInt8(note), velocity: vel,
                                             durationSteps: min(dur, 16 - stepPos)))
@@ -485,6 +651,221 @@ struct KosmicLeadGenerator {
             }
         }
         return notes.sorted().removingDuplicates()
+    }
+
+    // MARK: - Bridge A-2 Lead 2 (call+response bridge)
+    // Plays on odd bars alongside Lead 1, ascending 3rd→5th in mid register (MIDI 64–76).
+    // Dotted-quarter durations contrast with Lead 1's quarter-note pulse; different register
+    // (64–76 vs 72–84) so they weave together rather than doubling.
+
+    static func generateBridgeAltLead2(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for section in structure.sections {
+            guard section.label == .bridgeAlt else { continue }
+            for bar in section.startBar..<section.endBar {
+                let bridgeBar = bar - section.startBar
+                guard bridgeBar % 2 == 1 else { continue }   // odd bars = response bars
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode   = entry.sectionMode
+                let third  = mode.nearestInterval(3)
+                let fifth  = 7
+
+                func place(_ pc: Int) -> Int {
+                    var m = 64 + rootPC + pc
+                    while m > 76 { m -= 12 }
+                    while m < 64 { m += 12 }
+                    return m
+                }
+
+                // 2-note ascending complement: 3rd → 5th (dotted quarters = 6 steps each)
+                let barStart = bar * 16
+                let vel1 = UInt8(60 + rng.nextInt(upperBound: 14))   // 60–73
+                let vel2 = UInt8(55 + rng.nextInt(upperBound: 14))   // 55–68
+                events.append(MIDIEvent(stepIndex: barStart,     note: UInt8(place(third)), velocity: vel1, durationSteps: 6))
+                events.append(MIDIEvent(stepIndex: barStart + 6, note: UInt8(place(fifth)), velocity: vel2, durationSteps: 6))
+            }
+        }
+        return events
+    }
+
+    // MARK: - Bridge A-1 lead (escalating drums bridge)
+    // Default: single sustained 5th held quietly for the full bridge.
+    // 25% chance: X-Files whistle repeats on every bar instead — more dramatic.
+
+    static func generateDrumBridgeLead(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        xFilesBars: inout [Int]
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for section in structure.sections {
+            guard section.label == .bridge else { continue }
+            guard let entry = tonalMap.entry(atBar: section.startBar) else { continue }
+            let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let useXFiles = rng.nextDouble() < 0.25
+
+            if useXFiles {
+                // X-Files whistle on 1–2 bars only — the theme lands harder as a brief appearance
+                let candidates = Array(section.startBar..<section.endBar)
+                let xBars = pickXFilesBars(from: candidates, minGap: 2, rng: &rng)
+                for bar in xBars {
+                    let barEvs = xFilesWhistleBar(bar: bar, frame: frame, tonalMap: tonalMap, rng: &rng)
+                    guard !barEvs.isEmpty else { continue }
+                    xFilesBars.append(bar)
+                    events += barEvs
+                }
+            } else {
+                // Default: single sustained 5th for the full bridge
+                var note = 72 + rootPC + 7
+                while note > 84 { note -= 12 }
+                while note < 72 { note += 12 }
+                let vel = UInt8(58 + rng.nextInt(upperBound: 12))
+                let durationSteps = section.lengthBars * 16
+                events.append(MIDIEvent(stepIndex: section.startBar * 16,
+                                        note: UInt8(note), velocity: vel, durationSteps: durationSteps))
+            }
+        }
+        return events
+    }
+
+    // MARK: - X-Files whistle — single bar helper
+    // Emits the whistle phrase (5th→b7→root→2nd→5th→4th) for one bar.
+    // Used by drum bridge (every bar) and melody bridge (middle bar only).
+
+    private static func xFilesWhistleBar(
+        bar: Int, frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        guard let entry = tonalMap.entry(atBar: bar) else { return [] }
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let mode   = entry.sectionMode
+        let fifth  = 7; let flat7 = mode.nearestInterval(10)
+        let second = mode.nearestInterval(2); let fourth = mode.nearestInterval(5)
+
+        func place(_ pc: Int) -> Int {
+            var m = 72 + rootPC + pc
+            while m > 84 { m -= 12 }
+            while m < 72 { m += 12 }
+            return m
+        }
+
+        let xPhrase: [(Int, Int, Int)] = [
+            (place(fifth),   0,  4),
+            (place(flat7),   4,  2),
+            (place(0),       6,  2),
+            (place(second),  8,  4),
+            (place(fifth),  12,  2),
+            (place(fourth), 14,  4),
+        ]
+        let barStart = bar * 16
+        return xPhrase.map { (note, step, dur) in
+            MIDIEvent(stepIndex: barStart + step,
+                      note: UInt8(note),
+                      velocity: UInt8(72 + rng.nextInt(upperBound: 16)),
+                      durationSteps: dur)
+        }
+    }
+
+    // MARK: - X-Files bar picker
+    // Returns 1–2 absolute bar numbers from `candidates` to play the X-Files theme.
+    // With ≥4 candidates, 50% chance of picking two bars; guarantees a minimum gap
+    // between them so repetition feels spaced out. Falls back to one bar if no valid
+    // pair is found after several attempts.
+    private static func pickXFilesBars(from candidates: [Int], minGap: Int, rng: inout SeededRNG) -> [Int] {
+        guard !candidates.isEmpty else { return [] }
+        let tryDouble = candidates.count >= 4 && rng.nextDouble() < 0.50
+        if !tryDouble { return [candidates[rng.nextInt(upperBound: candidates.count)]] }
+        for _ in 0..<15 {
+            let i = rng.nextInt(upperBound: candidates.count)
+            let j = rng.nextInt(upperBound: candidates.count)
+            guard i != j else { continue }
+            let (a, b) = candidates[i] < candidates[j]
+                ? (candidates[i], candidates[j]) : (candidates[j], candidates[i])
+            if b - a >= minGap { return [a, b] }
+        }
+        return [candidates[rng.nextInt(upperBound: candidates.count)]]
+    }
+
+    // MARK: - Bridge A-2 lead (call+response bridge)
+    // The "call" is the drum+pads+bass hit on even bars.
+    // Lead 1 provides the melodic "response" on odd bars — a short descending
+    // 3-note phrase (5th→3rd→root) in the upper register, opposite direction to
+    // the arpeggio's ascending figure, making the response clearly audible.
+
+    static func generateBridgeAltLead(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        xFilesBars: inout [Int]
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for section in structure.sections {
+            guard section.label == .bridgeAlt else { continue }
+            // ~30% chance: X-Files whistle on 1–2 response bars (spaced ≥4 bars apart)
+            let useXFiles = rng.nextDouble() < 0.30
+            let responseCandidates = (section.startBar..<section.endBar).filter { ($0 - section.startBar) % 2 == 1 }
+            let xFilesSelected = useXFiles ? pickXFilesBars(from: responseCandidates, minGap: 4, rng: &rng) : []
+            // Note: xFilesBars is populated per-bar below, only when events are confirmed generated
+            let xFilesResponseBars: Set<Int> = Set(xFilesSelected)
+            for bar in section.startBar..<section.endBar {
+                let bridgeBar = bar - section.startBar
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode   = entry.sectionMode
+                let third  = mode.nearestInterval(3)
+                let fifth  = 7
+                let flat7  = mode.nearestInterval(10)
+                let second = mode.nearestInterval(2)
+                let fourth = mode.nearestInterval(5)
+
+                func place(_ pc: Int) -> Int {
+                    var m = 72 + rootPC + pc
+                    while m > 84 { m -= 12 }
+                    while m < 72 { m += 12 }
+                    return m
+                }
+
+                let barStart = bar * 16
+
+                if bridgeBar % 2 == 0 {
+                    // Call bar: sustained background note from beat 2
+                    let note = useXFiles ? place(fourth) : place(fifth)
+                    let vel  = UInt8(60 + rng.nextInt(upperBound: 14))   // 60–73, softer
+                    events.append(MIDIEvent(stepIndex: barStart + 4, note: UInt8(note),
+                                            velocity: vel, durationSteps: 11))
+                } else if xFilesResponseBars.contains(bar) {
+                    // X-Files whistle: 5th → b7 → root → 2nd → 5th → 4th
+                    // Transposed from E–G–A–B–E–D in A minor to any key.
+                    // Timing: quarter, eighth, eighth, quarter, eighth, eighth
+                    let xPhrase: [(Int, Int, Int)] = [
+                        (place(fifth),   0,  4),   // 5th — quarter
+                        (place(flat7),   4,  2),   // b7  — eighth
+                        (place(0),       6,  2),   // root — eighth
+                        (place(second),  8,  4),   // 2nd — quarter
+                        (place(fifth),  12,  2),   // 5th — eighth
+                        (place(fourth), 14,  4),   // 4th — eighth (spills slightly)
+                    ]
+                    xFilesBars.append(bar)  // confirmed: entry valid, events will be generated
+                    for (note, step, dur) in xPhrase {
+                        let vel = UInt8(74 + rng.nextInt(upperBound: 16))   // 74–89
+                        events.append(MIDIEvent(stepIndex: barStart + step,
+                                                note: UInt8(note), velocity: vel, durationSteps: dur))
+                    }
+                } else {
+                    // Standard descending response: 5th → 3rd → root (quarter notes)
+                    let phrase = [place(fifth), place(third), place(0)]
+                    for (i, note) in phrase.enumerated() {
+                        let vel = UInt8(72 + rng.nextInt(upperBound: 18))   // 72–89
+                        events.append(MIDIEvent(stepIndex: barStart + i * 4,
+                                                note: UInt8(note), velocity: vel, durationSteps: 4))
+                    }
+                }
+            }
+        }
+        return events
     }
 }
 

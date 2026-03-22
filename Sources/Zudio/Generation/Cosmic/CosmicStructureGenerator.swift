@@ -200,11 +200,12 @@ struct KosmicStructureGenerator {
             archetype = rng.nextDouble() < 0.50 ? "drumBridge" : "melodyBridge"
         }
 
+        let minARemain = forceBridge ? 12 : 24
+
         if archetype == "drumBridge" {
             // A-1 or A-2: 4 bars (70%) or 8 bars (30%)
             let bridgeBars = rng.nextDouble() < 0.70 ? 4 : 8
-            // A section must retain at least 24 bars
-            guard aSection.lengthBars - bridgeBars >= 24 else { return sections }
+            guard aSection.lengthBars - bridgeBars >= minARemain else { return sections }
 
             let subVariant: SectionLabel
             if forceBridgeArchetype == "drumAlt" {
@@ -226,14 +227,17 @@ struct KosmicStructureGenerator {
             return reassignStartBars(result)
 
         } else {
-            // Archetype B (melody bridge): 16 bars (60%) or 24 bars (40%)
-            let bridgeBars = rng.nextDouble() < 0.60 ? 16 : 24
-            // Ramps: normally 6-8 bars each; shorten to 4 if A section too small
+            // Archetype B (melody bridge): 8 bars (40%), 12 bars (35%), 16 bars (18%), 24 bars (7%)
+            let bridgeLengths: [Int]    = [8,    12,   16,   24  ]
+            let bridgeWeights: [Double] = [0.40, 0.35, 0.18, 0.07]
+            let bridgeBars = bridgeLengths[rng.weightedPick(bridgeWeights)]
+            // Ramps: normally 6-8 bars each; shorten aggressively if A section is tight
             var rampLen = rng.nextInt(upperBound: 3) + 6  // 6-8
             let totalExtra = bridgeBars + rampLen * 2
             if aSection.lengthBars - totalExtra < 24 { rampLen = 4 }
+            if aSection.lengthBars - (bridgeBars + rampLen * 2) < minARemain { rampLen = 0 }
             let totalExtrafinal = bridgeBars + rampLen * 2
-            guard aSection.lengthBars - totalExtrafinal >= 24 else { return sections }
+            guard aSection.lengthBars - totalExtrafinal >= minARemain else { return sections }
 
             let newALen    = aSection.lengthBars - totalExtrafinal
             var pos        = aSection.startBar + newALen

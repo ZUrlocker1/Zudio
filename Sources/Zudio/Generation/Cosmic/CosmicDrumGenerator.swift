@@ -165,15 +165,14 @@ struct KosmicDrumGenerator {
             let barStart = bar * 16
 
             if section.label == .bridge {
-                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
-            }
-            if section.label == .bridgeAlt {
-                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section); continue
-            }
-            if section.label == .bridgeMelody {
+                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng)
+                // no continue — main groove runs underneath the fills
+            } else if section.label == .bridgeAlt {
+                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
+            } else if section.label == .bridgeMelody {
                 events += bridgeBBar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
             }
-            if transitionBars.contains(bar) && section.label != .outro {
+            if transitionBars.contains(bar) && section.label != .outro && !section.label.isBridge {
                 events += kosmicTransitionFill(barStart: barStart, variant: 0, rng: &rng)  // minimal: v0 only
                 continue
             }
@@ -263,17 +262,16 @@ struct KosmicDrumGenerator {
                 nextChange    = bar + 8
             }
 
-            // Bridge and transition fill handling (replaces normal bar)
+            // Bridge and transition fill handling
             if section.label == .bridge {
-                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
-            }
-            if section.label == .bridgeAlt {
-                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section); continue
-            }
-            if section.label == .bridgeMelody {
+                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng)
+                // no continue — main groove runs underneath the fills
+            } else if section.label == .bridgeAlt {
+                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
+            } else if section.label == .bridgeMelody {
                 events += bridgeBBar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
             }
-            if transitionBars.contains(bar) && section.label != .outro {
+            if transitionBars.contains(bar) && section.label != .outro && !section.label.isBridge {
                 events += kosmicTransitionFill(barStart: barStart, variant: rng.nextInt(upperBound: 3), rng: &rng)
                 continue
             }
@@ -387,17 +385,16 @@ struct KosmicDrumGenerator {
                 nextChange = bar + 4
             }
 
-            // Bridge and transition fill handling (replaces normal bar)
+            // Bridge and transition fill handling
             if section.label == .bridge {
-                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
-            }
-            if section.label == .bridgeAlt {
-                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section); continue
-            }
-            if section.label == .bridgeMelody {
+                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng)
+                // no continue — main groove runs underneath the fills
+            } else if section.label == .bridgeAlt {
+                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
+            } else if section.label == .bridgeMelody {
                 events += bridgeBBar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
             }
-            if transitionBars.contains(bar) && section.label != .outro {
+            if transitionBars.contains(bar) && section.label != .outro && !section.label.isBridge {
                 events += kosmicTransitionFill(barStart: barStart, variant: rng.nextInt(upperBound: 3), rng: &rng)
                 continue
             }
@@ -573,10 +570,15 @@ struct KosmicDrumGenerator {
             let barStart     = bar * 16
             let barInSection = bar - section.startBar
 
-            if section.label.isBridge {
-                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
+            if section.label == .bridge {
+                events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng)
+                // no continue — main groove runs underneath the fills
+            } else if section.label == .bridgeAlt {
+                events += bridgeA2Bar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
+            } else if section.label == .bridgeMelody {
+                events += bridgeBBar(barStart: barStart, bar: bar, section: section, rng: &rng); continue
             }
-            if transitionBars.contains(bar) && section.label != .outro {
+            if transitionBars.contains(bar) && section.label != .outro && !section.label.isBridge {
                 events += kosmicTransitionFill(barStart: barStart, variant: 0, rng: &rng); continue
             }
 
@@ -706,8 +708,12 @@ struct KosmicDrumGenerator {
         }
     }
 
-    // MARK: - Bridge A-1 escalation (Mister Mosca archetype)
-    // 4 phases mapped across bridge length. Phase 3 = full 5-drum climax.
+    // MARK: - Bridge A-1 escalation fills (Mister Mosca archetype)
+    // Fill-only overlay — the main groove generator runs underneath; this adds layered tension fills.
+    // Phase 0: silence (no fills — let the groove breathe in the opening bars).
+    // Phase 1: ghost snares on "and of 2" and "and of 4" — whisper tension.
+    // Phase 2: ascending snare build — steps 8, 10, 12 (crescendo into beat 4).
+    // Phase 3: tom cascade + crash climax — signals the B section launch.
 
     private static func bridgeA1Bar(
         barStart: Int, bar: Int, section: SongSection, rng: inout SeededRNG
@@ -716,36 +722,54 @@ struct KosmicDrumGenerator {
         let barInBridge = bar - section.startBar
         let phase       = min(3, barInBridge * 4 / bridgeLen)
         func j(_ vel: Int) -> UInt8 { UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 7) - 3))) }
-        func ev(_ step: Int, _ note: GMDrum, _ vel: Int) -> MIDIEvent {
-            MIDIEvent(stepIndex: barStart + step, note: note.rawValue, velocity: j(vel), durationSteps: 1)
-        }
-        // Beat-1 synchronized kick (all phases)
-        var evs: [MIDIEvent] = [ev(0, .kick, 82)]
+        var evs: [MIDIEvent] = []
         switch phase {
         case 0:
-            evs.append(ev(8, .kick, 76))
+            break  // no fills — main groove alone
         case 1:
-            evs += [ev(8, .kick, 78), ev(8, .snare, 68), ev(12, .lowFloorTom, 74)]
+            // Ghost snares on "and of 2" (step 6) and "and of 4" (step 14)
+            evs.append(MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.snare.rawValue, velocity: j(44), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: j(48), durationSteps: 1))
         case 2:
-            evs += [ev(8, .snare, 80), ev(12, .hiMidTom, 82), ev(13, .lowFloorTom, 86)]
-        default: // phase 3: snare 2+4, open hat 3, 5-drum climax
-            evs.append(ev(4, .snare, 88))
-            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.openHat.rawValue, velocity: 82, durationSteps: 2))
-            evs += [ev(12, .kick, 100), ev(12, .snare, 100), ev(12, .lowFloorTom, 95), ev(12, .hiMidTom, 90)]
-            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.crash1.rawValue, velocity: 100, durationSteps: 4))
+            // Snare roll build: steps 8, 10, 12 — ascending velocity
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: j(58), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: j(66), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: j(74), durationSteps: 1))
+        default:  // phase 3: tom cascade + full crash climax
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.hiMidTom.rawValue,    velocity: j(82), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.lowFloorTom.rawValue,  velocity: j(88), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue,        velocity: j(96), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue,         velocity: j(100), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.crash1.rawValue,       velocity: 100,   durationSteps: 4))
         }
         return evs
     }
 
-    // MARK: - Bridge A-2 (Caligari Drop archetype)
-    // Kick-only hit on beat 1 of even bridge bars; non-hit bars completely silent.
+    // MARK: - Bridge A-2 call-and-response (Caligari Drop archetype)
+    // Call bars (even): heavy kick beat 1 + hats beats 2,3,4 + snare beat 3 — bold punctuation.
+    // Response bars (odd): snare pickup roll on beats 3+4 — foreshadows next call, bridges the silence.
 
     private static func bridgeA2Bar(
-        barStart: Int, bar: Int, section: SongSection
+        barStart: Int, bar: Int, section: SongSection, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let barInBridge = bar - section.startBar
-        guard barInBridge % 2 == 0 else { return [] }
-        return [MIDIEvent(stepIndex: barStart, note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1)]
+        func j(_ vel: Int) -> UInt8 { UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 7) - 3))) }
+        var evs: [MIDIEvent] = []
+        if barInBridge % 2 == 0 {
+            // Call bar: synchronized hit (kick), hats on off-beats, snare beat 3
+            evs.append(MIDIEvent(stepIndex: barStart,      note: GMDrum.kick.rawValue,      velocity: j(100), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.closedHat.rawValue, velocity: j(60),  durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue,     velocity: j(82),  durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.closedHat.rawValue, velocity: j(64),  durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.closedHat.rawValue, velocity: j(58),  durationSteps: 1))
+        } else {
+            // Response bar: ascending snare pickup roll building back to the next call
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: j(46), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: j(56), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: j(66), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: j(76), durationSteps: 1))
+        }
+        return evs
     }
 
     // MARK: - Bridge B (Dark Sun archetype)

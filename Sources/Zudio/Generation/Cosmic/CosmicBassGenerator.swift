@@ -20,10 +20,10 @@ struct KosmicBassGenerator {
         // Pick primary bass rule
         let rules:   [String] = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-005",
                                   "KOS-BASS-008", "KOS-BASS-009", "KOS-BASS-010",
-                                  "KOS-BASS-011", "KOS-BASS-012"]
-        let weights: [Double] = [0.18,           0.15,          0.13,           0.10,           0.07,
-                                  0.09,           0.07,           0.05,
-                                  0.09,           0.07]
+                                  "KOS-BASS-011", "KOS-BASS-012", "KOS-BASS-013"]
+        let weights: [Double] = [0.16,           0.13,          0.12,           0.09,           0.06,
+                                  0.08,           0.07,           0.05,
+                                  0.08,           0.06,           0.10]
         // Only honour forceRuleID if it belongs to the Kosmic bass pool.
         // Test slots that force Motorik rules (e.g. MOT-BASS-015) must not bleed into Kosmic songs.
         let validForce = forceRuleID.flatMap { rules.contains($0) ? $0 : nil }
@@ -39,21 +39,21 @@ struct KosmicBassGenerator {
         // clashes with staccato root) and KOS-BASS-010 (Moroder Pulse already fills off-beats).
         // KOS-BASS-008 (Hallogallo Lock) REQUIRES the dual layer — sounds thin without it.
         // PBW (012) is already an 8-note melodic riff — dual staccato layer would clutter it.
-        let canUseDualLayer = !bassAbsent && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012"
+        let canUseDualLayer = !bassAbsent && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
         let useDualLayer    = canUseDualLayer && (ruleID == "KOS-BASS-008" || rng.nextDouble() < 0.55)
         if useDualLayer { usedRuleIDs.insert("KOS-BASS-006") }
 
         // KOS-BASS-007: pulsating tremolo — mutually exclusive with 006, blocked when absent,
         // blocked with KOS-BASS-004 (Moroder Drift long hold clashes), and
         // blocked with KOS-BASS-010 (Moroder Pulse is already a dense 8th-note sequence).
-        let usePulsatingLayer = !bassAbsent && !useDualLayer && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && rng.nextDouble() < 0.45
+        let usePulsatingLayer = !bassAbsent && !useDualLayer && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013" && rng.nextDouble() < 0.45
         if usePulsatingLayer { usedRuleIDs.insert("KOS-BASS-007") }
 
         // Precompute variation windows for static Kosmic rules (same logic as Motorik BassGenerator).
         // Fires for: every B section; every other A section that starts at or after bar 48.
         // KOS-BASS-008 uses middle-third body detection instead (computed below).
         // KOS-BASS-010 omitted: gating IS its variation; no discrete evolution events needed.
-        let kosmicVariableRules: Set<String> = ["KOS-BASS-011", "KOS-BASS-012"]
+        let kosmicVariableRules: Set<String> = ["KOS-BASS-011", "KOS-BASS-012", "KOS-BASS-013"]
         var variationBars = Set<Int>()
         if kosmicVariableRules.contains(ruleID) {
             var aToggle = false
@@ -93,6 +93,18 @@ struct KosmicBassGenerator {
         var kos011LastSwitch = -16
 
         var events: [MIDIEvent] = []
+
+        // For melody bridges, pick a bass rule that always produces an active pattern.
+        // Excluded rules and reasons:
+        //   001 (drone root — single whole note per bar, worst case)
+        //   002 (root-fifth slow walk — 30-step hold across 2 bars = whole note × 2)
+        //   003 (unevolved = 4 boring quarter-note root hits per bar)
+        //   004 (Moroder drift — 14–30 step holds = whole notes)
+        //   013 (sub-bass doublet — too sparse for a bridge part)
+        // All included rules have max note duration ≤ 7 steps — no whole notes, no half-note ties.
+        let bridgeMelodyBassRules = ["KOS-BASS-009", "KOS-BASS-010",
+                                     "KOS-BASS-011", "KOS-BASS-012"]
+        let bridgeMelodyBassRule = bridgeMelodyBassRules[rng.nextInt(upperBound: bridgeMelodyBassRules.count)]
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
@@ -140,11 +152,74 @@ struct KosmicBassGenerator {
                 continue
             }
 
-            // Bridge A-1 (.bridge): root-only on beat 1, doubles the drum's kick.
-            // Short 8th-note duration (staccato hit) — most instruments are silent here.
+            // Bridge A-1 (.bridge): ascending or descending walk across phases.
+            // Direction: ascending 67% (startBar % 3 != 2), descending 33% — matches arpeggio/pads.
+            // Phase pitch offsets — ascending: root→3rd→5th→oct; descending: oct→5th→3rd→root.
+            // Pattern variant is chosen once per bridge (deterministic from startBar):
+            //   V0 Root anchor   — phase note beat 1, root beat 3 (pedal-point feel)
+            //   V1 Approach+land — chromatic approach → phase note → root (walking bass)
+            //   V2 Synco push    — phase beat 1, syncopated push beat 2, root beat 3 (Kraftwerk)
+            //   V3 Three-note    — root → passing → phase → root (most active figure)
+            //   V4 Held + tail   — phase note held 6 steps, root staccato step 10 (spacious)
             if section.label == .bridge {
-                let root = bassRoot(entry: entry, frame: frame)
-                events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: 95, durationSteps: 2))
+                let bridgeLen    = max(1, section.endBar - section.startBar)
+                let barInBridge  = bar - section.startBar
+                let phase        = min(3, barInBridge * 4 / bridgeLen)
+                let ascending    = section.startBar % 3 != 2
+                let root         = bassRoot(entry: entry, frame: frame)
+                let rootInt      = Int(root)
+                let offsets      = ascending ? [0, 3, 7, 12] : [12, 7, 3, 0]
+                let phaseNote    = UInt8(max(28, min(80, rootInt + offsets[phase])))
+                let velBases     = ascending ? [75, 83, 91, 99] : [99, 91, 83, 75]
+                let baseVel      = velBases[phase]
+                let bassVariant  = (section.startBar / 2) % 5
+
+                func v(_ base: Int, _ jitter: Int = 7) -> UInt8 {
+                    UInt8(max(20, min(127, base + rng.nextInt(upperBound: jitter) - (jitter / 2))))
+                }
+
+                switch bassVariant {
+
+                case 0:
+                    // Root anchor: phase note on beat 1, root returns on beat 3.
+                    // Pedal-point feel — the climbing note contrasts with the stable anchor.
+                    events.append(MIDIEvent(stepIndex: barStart,     note: phaseNote, velocity: v(baseVel),      durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: root,      velocity: v(baseVel - 14), durationSteps: 3))
+
+                case 1:
+                    // Approach + land: chromatic approach note (1 semitone toward phase) → land.
+                    // Ascending approaches from below; descending from above.
+                    let appOffset  = ascending ? -1 : 1
+                    let approach   = UInt8(max(28, min(80, rootInt + offsets[phase] + appOffset)))
+                    events.append(MIDIEvent(stepIndex: barStart,      note: approach,  velocity: v(baseVel - 10, 5), durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: barStart + 2,  note: phaseNote, velocity: v(baseVel),         durationSteps: 4))
+                    events.append(MIDIEvent(stepIndex: barStart + 8,  note: root,      velocity: v(baseVel - 12, 5), durationSteps: 3))
+
+                case 2:
+                    // Syncopated push: phase note beat 1, repeat on beat 2 (push), root beat 3.
+                    // The repeated hit before beat 3 gives a mechanical Kraftwerk groove.
+                    events.append(MIDIEvent(stepIndex: barStart,     note: phaseNote, velocity: v(baseVel),          durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 4, note: phaseNote, velocity: v(baseVel - 6, 5),   durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: root,      velocity: v(baseVel - 14),     durationSteps: 3))
+
+                case 3:
+                    // Three-note pickup figure: root → passing → phase note → root echo.
+                    // Passing tone is the semitone midpoint (min 1 step from root to avoid unison).
+                    let rawMid   = offsets[phase] / 2
+                    let midOff   = rawMid == 0 ? 1 : rawMid
+                    let passing  = UInt8(max(28, min(80, rootInt + midOff)))
+                    events.append(MIDIEvent(stepIndex: barStart,      note: root,      velocity: v(baseVel - 10, 5), durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: barStart + 2,  note: passing,   velocity: v(baseVel - 5, 5),  durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: barStart + 4,  note: phaseNote, velocity: v(baseVel),         durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 8,  note: phaseNote, velocity: v(baseVel - 6, 5),  durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 12, note: root,      velocity: v(baseVel - 16, 5), durationSteps: 2))
+
+                default:
+                    // Held + tail: phase note held 6 steps, brief root staccato at step 10.
+                    // Spacious and atmospheric — lets the escalating drums breathe.
+                    events.append(MIDIEvent(stepIndex: barStart,      note: phaseNote, velocity: v(baseVel),     durationSteps: 6))
+                    events.append(MIDIEvent(stepIndex: barStart + 10, note: root,      velocity: v(baseVel - 18, 5), durationSteps: 2))
+                }
                 continue
             }
 
@@ -159,24 +234,25 @@ struct KosmicBassGenerator {
                     // Double the synchronized hit — staccato, same step as drums
                     events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: 95, durationSteps: 2))
                 } else {
-                    // 2-note scale walk from root: root → 2nd degree, starting beat 3
+                    // 2-note scale walk from root: root → 2nd degree, starting beat 1
                     let intervals = frame.mode.intervals
                     let step2Int  = intervals.count > 1 ? intervals[1] : 2
                     var step2Midi = 36 + (rootPC + step2Int) % 12
                     while step2Midi < 40 { step2Midi += 12 }
                     while step2Midi > 55 { step2Midi -= 12 }
-                    events.append(MIDIEvent(stepIndex: barStart + 8,  note: root,              velocity: 85, durationSteps: 3))
-                    events.append(MIDIEvent(stepIndex: barStart + 12, note: UInt8(step2Midi),  velocity: 78, durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart,     note: root,              velocity: 85, durationSteps: 6))
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: UInt8(step2Midi),  velocity: 78, durationSteps: 5))
                 }
                 continue
             }
 
-            // Bridge B (.bridgeMelody): quarter-note pulse on beats 1 and 3 at lower velocity.
-            // Lead melody drives this section; bass provides harmonic ground without competing.
+            // Bridge B (.bridgeMelody): use a proper bass rule (picked once per song) rather than
+            // a hardcoded root pulse. Adds variety and keeps the bridge musically interesting.
             if section.label == .bridgeMelody {
-                let root = bassRoot(entry: entry, frame: frame)
-                events.append(MIDIEvent(stepIndex: barStart,     note: root, velocity: 85, durationSteps: 3))
-                events.append(MIDIEvent(stepIndex: barStart + 8, note: root, velocity: 78, durationSteps: 3))
+                events += primaryBassBar(ruleID: bridgeMelodyBassRule, barStart: barStart, bar: bar,
+                                         entry: entry, frame: frame, rng: &rng,
+                                         totalBars: frame.totalBars, isBody: true,
+                                         structure: structure)
                 continue
             }
 
@@ -289,6 +365,9 @@ struct KosmicBassGenerator {
                                                           subVariant: kos011Variant)
         case "KOS-BASS-012": return mccartneyPBWBar(barStart: barStart, entry: entry, frame: frame,
                                                      useVariation: useVariation)
+        case "KOS-BASS-013": return loscilSubBassPulseBar(barStart: barStart, bar: bar, entry: entry,
+                                                           frame: frame, useVariation: useVariation,
+                                                           rng: &rng)
         default:             return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: isBody)
         }
@@ -764,6 +843,45 @@ struct KosmicBassGenerator {
     }
 
     // MARK: - Note helpers
+
+    // MARK: - KOS-BASS-013: Loscil Sub-Bass Pulse
+    // Sub-bass register MIDI 28–43 — below KOS-RULE-06's normal 40–55 floor.
+    // Doublet pulse on beat 1: primary hit + slightly quieter repeat 2 steps later.
+    // Optional beat-3 note (50% chance) — creates gentle, underwater pumping feel.
+    // Every 4 bars (useVariation): octave-up hit replaces beat-3 note for momentary brightness.
+
+    private static func loscilSubBassPulseBar(
+        barStart: Int, bar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        useVariation: Bool, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        // Sub-bass register: MIDI 28–43
+        var subRoot = 24 + rootPC
+        while subRoot < 28 { subRoot += 12 }
+        while subRoot > 43 { subRoot -= 12 }
+        let upOct = Swift.min(55, subRoot + 12)
+
+        var evs: [MIDIEvent] = []
+
+        // Doublet pulse: beat 1 primary hit
+        let vel1 = UInt8(48 + rng.nextInt(upperBound: 15))  // 48–62
+        evs.append(MIDIEvent(stepIndex: barStart, note: UInt8(subRoot), velocity: vel1, durationSteps: 3))
+        // Secondary repeat 2 steps later — quieter, gives the "pulse" feel
+        let vel2 = UInt8(max(20, Int(vel1) - 12 - rng.nextInt(upperBound: 8)))
+        evs.append(MIDIEvent(stepIndex: barStart + 2, note: UInt8(subRoot), velocity: vel2, durationSteps: 2))
+
+        if useVariation {
+            // Octave-up note on beat 3 — momentary brightness every variation window
+            evs.append(MIDIEvent(stepIndex: barStart + 8, note: UInt8(upOct),
+                                 velocity: UInt8(38 + rng.nextInt(upperBound: 12)), durationSteps: 2))
+        } else if rng.nextDouble() < 0.50 {
+            // Optional beat-3 sub-bass note (50% chance) — maintains pulse without being rigid
+            evs.append(MIDIEvent(stepIndex: barStart + 8, note: UInt8(subRoot),
+                                 velocity: UInt8(32 + rng.nextInt(upperBound: 14)), durationSteps: 2))
+        }
+        return evs
+    }
 
     static func bassRoot(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> UInt8 {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
