@@ -1,24 +1,34 @@
-// CosmicStructureGenerator.swift — Cosmic generation step 2
-// Produces a SongStructure for Cosmic style with long sections and glacial pacing.
+// KosmicStructureGenerator.swift — Kosmic generation step 2
+// Produces a SongStructure for Kosmic style with long sections and glacial pacing.
+//
+// Supported song forms: single_evolving, ab, aba, abab, abba
+// Bridge archetypes (35% of ab/aba songs):
+//   .bridge       — A-1 escalating drum bridge (Mister Mosca style, 4-8 bars)
+//   .bridgeAlt    — A-2 sparse hit + call-and-response (Caligari Drop style, 4-8 bars)
+//   .bridgeMelody — Archetype B melody bridge (Dark Sun style, 16-24 bars + pre/post ramps)
 
-struct CosmicStructureGenerator {
+struct KosmicStructureGenerator {
     static func generate(
         frame: GlobalMusicalFrame,
-        cosmicForm: CosmicSongForm,
-        cosmicProgFamily: CosmicProgressionFamily,
+        kosmicForm: KosmicSongForm,
+        kosmicProgFamily: KosmicProgressionFamily,
         percussionStyle: PercussionStyle,
-        rng: inout SeededRNG
+        rng: inout SeededRNG,
+        forceBridge: Bool = false,
+        forceBridgeArchetype: String? = nil
     ) -> SongStructure {
         let (sections, introStyle, outroStyle) = buildSections(
-            form: cosmicForm,
+            form: kosmicForm,
             totalBars: frame.totalBars,
             percussionStyle: percussionStyle,
-            rng: &rng
+            rng: &rng,
+            forceBridge: forceBridge,
+            forceBridgeArchetype: forceBridgeArchetype
         )
         let chordPlan = buildChordPlan(
             frame: frame,
             sections: sections,
-            cosmicProgFamily: cosmicProgFamily,
+            kosmicProgFamily: kosmicProgFamily,
             rng: &rng
         )
         return SongStructure(sections: sections, chordPlan: chordPlan,
@@ -28,17 +38,19 @@ struct CosmicStructureGenerator {
     // MARK: - Section layout
 
     private static func buildSections(
-        form: CosmicSongForm,
+        form: KosmicSongForm,
         totalBars: Int,
         percussionStyle: PercussionStyle,
-        rng: inout SeededRNG
+        rng: inout SeededRNG,
+        forceBridge: Bool = false,
+        forceBridgeArchetype: String? = nil
     ) -> (sections: [SongSection], introStyle: IntroStyle, outroStyle: OutroStyle) {
 
-        // Cosmic intro: 2 bars (25%), 4 bars (50%), 8 bars (25%)
-        let introLengths: [Int]    = [2,    4,    8   ]
-        let introWeights: [Double] = [0.25, 0.50, 0.25]
+        // Kosmic intro: 2 bars (25%), 4 bars (62.5%), 8 bars (12.5%)
+        let introLengths: [Int]    = [2,    4,     8    ]
+        let introWeights: [Double] = [0.25, 0.625, 0.125]
         let introBars = introLengths[rng.weightedPick(introWeights)]
-        // Cosmic outro: 8 or 16 bars
+        // Kosmic outro: 8 or 16 bars
         let outroBars = rng.nextDouble() < 0.5 ? 8 : 16
         let bodyBars  = Swift.max(4, totalBars - introBars - outroBars)
 
@@ -50,8 +62,10 @@ struct CosmicStructureGenerator {
                                     label: .intro, intensity: .low, mode: .Dorian))
         cursor += introBars
 
-        // Body
-        let bodySections = buildBodySections(form: form, bodyBars: bodyBars, cursor: cursor, rng: &rng)
+        // Body — build raw sections then optionally insert bridge
+        var bodySections = buildBodySections(form: form, bodyBars: bodyBars, cursor: cursor, rng: &rng)
+        bodySections = insertBridgeIfNeeded(form: form, sections: bodySections, rng: &rng,
+                                            forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
         sections.append(contentsOf: bodySections)
         cursor += bodyBars
 
@@ -60,14 +74,10 @@ struct CosmicStructureGenerator {
         sections.append(SongSection(startBar: cursor, lengthBars: outroBars,
                                     label: .outro, intensity: .low, mode: lastMode))
 
-        // Cosmic intro styles.
-        // Electric Buddha groove / minimal beat → cold start preferred (drums-alone pickup).
-        // Other percussion → equal three-way split as before.
+        // Intro style
         let introStyle: IntroStyle
         let usesRockGroove = (percussionStyle == .motorikGrid || percussionStyle == .electricBuddhaPulse)
         if usesRockGroove {
-            // 60% cold start (always drumsOnly: true for the Electric Buddha feel),
-            // 20% progressive entry, 20% already playing
             let r = rng.nextDouble()
             if r < 0.60      { introStyle = .coldStart(drumsOnly: true) }
             else if r < 0.80 { introStyle = .progressiveEntry }
@@ -80,7 +90,7 @@ struct CosmicStructureGenerator {
             }
         }
 
-        // Cosmic outro styles — mapped to existing OutroStyle cases
+        // Outro style
         let outroStyles: [OutroStyle] = [.dissolve, .fade, .coldStop]
         let outroWeights: [Double]    = [0.50,      0.40, 0.10]
         let outroStyle = outroStyles[rng.weightedPick(outroWeights)]
@@ -88,45 +98,184 @@ struct CosmicStructureGenerator {
         return (sections, introStyle, outroStyle)
     }
 
+    // MARK: - Body section builders
+
+    private static func bMode(_ rng: inout SeededRNG) -> Mode {
+        // Aeolian 45%, Mixolydian 35%, Aeolian (Phrygian flavour) 20% → Aeolian 65%, Mixolydian 35%
+        let modes:   [Mode]   = [.Aeolian, .Mixolydian, .Aeolian]
+        let weights: [Double] = [0.45,     0.35,         0.20]
+        return modes[rng.weightedPick(weights)]
+    }
+
     private static func buildBodySections(
-        form: CosmicSongForm, bodyBars: Int, cursor: Int, rng: inout SeededRNG
+        form: KosmicSongForm, bodyBars: Int, cursor: Int, rng: inout SeededRNG
     ) -> [SongSection] {
         switch form {
+
         case .single_evolving:
-            // One very long section — Roach/TD model
             return [SongSection(startBar: cursor, lengthBars: bodyBars,
                                 label: .A, intensity: .medium, mode: .Dorian)]
 
-        case .two_world:
-            // A section (spacious) → B section (denser) — ABA optional reprise
-            let aLen = Swift.max(32, Int(Double(bodyBars) * 0.55) / 4 * 4)
-            let bLen = Swift.max(32, bodyBars - aLen)
-            let bMode = rng.nextDouble() < 0.5 ? Mode.Aeolian : Mode.Mixolydian
+        case .ab, .two_world:
+            // A (60%) → B (40%), each at least 16 bars
+            let aLen = Swift.max(24, (Int(Double(bodyBars) * 0.60) / 4) * 4)
+            let bLen = Swift.max(16, bodyBars - aLen)
             return [
                 SongSection(startBar: cursor,        lengthBars: aLen, label: .A, intensity: .low,    mode: .Dorian),
-                SongSection(startBar: cursor + aLen,  lengthBars: bLen, label: .B, intensity: .medium, mode: bMode)
+                SongSection(startBar: cursor + aLen, lengthBars: bLen, label: .B, intensity: .medium, mode: bMode(&rng))
             ]
 
-        case .build_and_dissolve:
-            // Builds from nothing, reaches peak density, dissolves
-            // Use A/B/A structure with intensity arc
-            let aLen1 = Swift.max(32, Int(Double(bodyBars) * 0.35) / 4 * 4)
-            let bLen  = Swift.max(32, Int(Double(bodyBars) * 0.40) / 4 * 4)
+        case .aba, .build_and_dissolve:
+            // A1 (35%) → B (30%) → A2 (35%), each at least 16 bars (A) / 16 bars (B)
+            let aLen1 = Swift.max(24, (Int(Double(bodyBars) * 0.35) / 4) * 4)
+            let bLen  = Swift.max(16, (Int(Double(bodyBars) * 0.30) / 4) * 4)
             let aLen2 = Swift.max(16, bodyBars - aLen1 - bLen)
+            let bm = bMode(&rng)
             return [
-                SongSection(startBar: cursor,              lengthBars: aLen1, label: .A, intensity: .low,    mode: .Dorian),
-                SongSection(startBar: cursor + aLen1,      lengthBars: bLen,  label: .B, intensity: .high,   mode: .Dorian),
-                SongSection(startBar: cursor + aLen1 + bLen, lengthBars: aLen2, label: .A, intensity: .medium, mode: .Dorian)
+                SongSection(startBar: cursor,                    lengthBars: aLen1, label: .A, intensity: .low,    mode: .Dorian),
+                SongSection(startBar: cursor + aLen1,            lengthBars: bLen,  label: .B, intensity: .high,   mode: bm),
+                SongSection(startBar: cursor + aLen1 + bLen,     lengthBars: aLen2, label: .A, intensity: .medium, mode: .Dorian)
             ]
+
+        case .abab:
+            // A1 (25%) → B1 (25%) → A2 (25%) → B2 (25%), each at least 16 bars
+            let quarter = Swift.max(16, (bodyBars / 4 / 4) * 4)
+            let leftover = bodyBars - quarter * 3
+            let a1Len = quarter; let b1Len = quarter; let a2Len = quarter
+            let b2Len = Swift.max(16, leftover)
+            let bm1 = bMode(&rng)
+            let bm2 = bMode(&rng)
+            var pos = cursor
+            var secs: [SongSection] = []
+            secs.append(SongSection(startBar: pos, lengthBars: a1Len, label: .A, intensity: .low,    mode: .Dorian)); pos += a1Len
+            secs.append(SongSection(startBar: pos, lengthBars: b1Len, label: .B, intensity: .medium, mode: bm1));    pos += b1Len
+            secs.append(SongSection(startBar: pos, lengthBars: a2Len, label: .A, intensity: .medium, mode: .Dorian)); pos += a2Len
+            secs.append(SongSection(startBar: pos, lengthBars: b2Len, label: .B, intensity: .high,   mode: bm2))
+            return secs
+
+        case .abba:
+            // A1 (25%) → B1 (25%) → B2 (25%) → A2 (25%), B2 same mode as B1
+            let quarter = Swift.max(16, (bodyBars / 4 / 4) * 4)
+            let leftover = bodyBars - quarter * 3
+            let a1Len = quarter; let b1Len = quarter; let b2Len = quarter
+            let a2Len = Swift.max(16, leftover)
+            let bm = bMode(&rng)
+            var pos = cursor
+            var secs: [SongSection] = []
+            secs.append(SongSection(startBar: pos, lengthBars: a1Len, label: .A, intensity: .low,    mode: .Dorian)); pos += a1Len
+            secs.append(SongSection(startBar: pos, lengthBars: b1Len, label: .B, intensity: .medium, mode: bm));     pos += b1Len
+            secs.append(SongSection(startBar: pos, lengthBars: b2Len, label: .B, intensity: .high,   mode: bm));     pos += b2Len
+            secs.append(SongSection(startBar: pos, lengthBars: a2Len, label: .A, intensity: .medium, mode: .Dorian))
+            return secs
         }
     }
 
-    // MARK: - Chord plan (Cosmic: very slow harmonic changes)
+    // MARK: - Bridge insertion
+
+    /// Probabilistically inserts a bridge between the first A and first B section.
+    /// Only for ab/aba forms. 35% chance. Bars are taken from the preceding A section.
+    private static func insertBridgeIfNeeded(
+        form: KosmicSongForm, sections: [SongSection], rng: inout SeededRNG,
+        forceBridge: Bool = false, forceBridgeArchetype: String? = nil
+    ) -> [SongSection] {
+        // Only ab/aba forms get bridges
+        guard form == .ab || form == .two_world || form == .aba || form == .build_and_dissolve else {
+            return sections
+        }
+        // In normal generation: 35% chance. When forced (test mode): always insert.
+        guard forceBridge || rng.nextDouble() < 0.35 else { return sections }
+
+        // Find the index of the first A→B boundary
+        guard let aIdx = sections.firstIndex(where: { $0.label == .A }),
+              aIdx + 1 < sections.count,
+              sections[aIdx + 1].label == .B else { return sections }
+
+        let aSection = sections[aIdx]
+
+        // Choose archetype — honour forceBridgeArchetype when set
+        let archetype: String
+        if let forced = forceBridgeArchetype {
+            archetype = (forced == "melody") ? "melodyBridge" : "drumBridge"
+        } else {
+            archetype = rng.nextDouble() < 0.50 ? "drumBridge" : "melodyBridge"
+        }
+
+        if archetype == "drumBridge" {
+            // A-1 or A-2: 4 bars (70%) or 8 bars (30%)
+            let bridgeBars = rng.nextDouble() < 0.70 ? 4 : 8
+            // A section must retain at least 24 bars
+            guard aSection.lengthBars - bridgeBars >= 24 else { return sections }
+
+            let subVariant: SectionLabel
+            if forceBridgeArchetype == "drumAlt" {
+                subVariant = .bridgeAlt
+            } else if forceBridgeArchetype == "drum" {
+                subVariant = .bridge
+            } else {
+                subVariant = rng.nextDouble() < 0.50 ? .bridge : .bridgeAlt
+            }
+            let newALen  = aSection.lengthBars - bridgeBars
+            let bridgeStart = aSection.startBar + newALen
+
+            var result = sections
+            result[aIdx] = SongSection(startBar: aSection.startBar, lengthBars: newALen,
+                                       label: .A, intensity: aSection.intensity, mode: aSection.mode)
+            result.insert(SongSection(startBar: bridgeStart, lengthBars: bridgeBars,
+                                      label: subVariant, intensity: .high, mode: aSection.mode),
+                          at: aIdx + 1)
+            return reassignStartBars(result)
+
+        } else {
+            // Archetype B (melody bridge): 16 bars (60%) or 24 bars (40%)
+            let bridgeBars = rng.nextDouble() < 0.60 ? 16 : 24
+            // Ramps: normally 6-8 bars each; shorten to 4 if A section too small
+            var rampLen = rng.nextInt(upperBound: 3) + 6  // 6-8
+            let totalExtra = bridgeBars + rampLen * 2
+            if aSection.lengthBars - totalExtra < 24 { rampLen = 4 }
+            let totalExtrafinal = bridgeBars + rampLen * 2
+            guard aSection.lengthBars - totalExtrafinal >= 24 else { return sections }
+
+            let newALen    = aSection.lengthBars - totalExtrafinal
+            var pos        = aSection.startBar + newALen
+
+            var result = sections
+            result[aIdx] = SongSection(startBar: aSection.startBar, lengthBars: newALen,
+                                       label: .A, intensity: aSection.intensity, mode: aSection.mode)
+            let preRamp = SongSection(startBar: pos, lengthBars: rampLen,
+                                      label: .preRamp, intensity: .medium, mode: aSection.mode)
+            pos += rampLen
+            let bridgeSec = SongSection(startBar: pos, lengthBars: bridgeBars,
+                                        label: .bridgeMelody, intensity: .high, mode: aSection.mode)
+            pos += bridgeBars
+            let postRamp = SongSection(startBar: pos, lengthBars: rampLen,
+                                       label: .postRamp, intensity: .medium, mode: aSection.mode)
+
+            result.insert(contentsOf: [preRamp, bridgeSec, postRamp], at: aIdx + 1)
+            return reassignStartBars(result)
+        }
+    }
+
+    /// Reassigns startBars sequentially after insertion/modification.
+    /// Preserves the offset of the first section so body sections remain correctly
+    /// positioned after the intro (cursor is already baked into sections[0].startBar).
+    private static func reassignStartBars(_ sections: [SongSection]) -> [SongSection] {
+        guard !sections.isEmpty else { return sections }
+        var result: [SongSection] = []
+        var pos = sections[0].startBar
+        for sec in sections {
+            result.append(SongSection(startBar: pos, lengthBars: sec.lengthBars,
+                                      label: sec.label, intensity: sec.intensity, mode: sec.mode))
+            pos += sec.lengthBars
+        }
+        return result
+    }
+
+    // MARK: - Chord plan (Kosmic: very slow harmonic changes)
 
     private static func buildChordPlan(
         frame: GlobalMusicalFrame,
         sections: [SongSection],
-        cosmicProgFamily: CosmicProgressionFamily,
+        kosmicProgFamily: KosmicProgressionFamily,
         rng: inout SeededRNG
     ) -> [ChordWindow] {
         var plan: [ChordWindow] = []
@@ -134,7 +283,7 @@ struct CosmicStructureGenerator {
             plan.append(contentsOf: buildChordWindows(
                 frame: frame,
                 section: section,
-                cosmicProgFamily: cosmicProgFamily,
+                kosmicProgFamily: kosmicProgFamily,
                 rng: &rng
             ))
         }
@@ -165,21 +314,21 @@ struct CosmicStructureGenerator {
         }
     }
 
-    /// Cosmic chord windows — fewer chords per section, longer holds (8–32 bars)
+    /// Kosmic chord windows — fewer chords per section, longer holds (8–32 bars)
     private static func buildChordWindows(
         frame: GlobalMusicalFrame,
         section: SongSection,
-        cosmicProgFamily: CosmicProgressionFamily,
+        kosmicProgFamily: KosmicProgressionFamily,
         rng: inout SeededRNG
     ) -> [ChordWindow] {
-        // Cosmic: chord changes every 8–32 bars (not 4–8 like Motorik)
-        // For most sections: 1 chord per section; B sections may get 2
         let chordCount: Int
         switch section.label {
-        case .intro, .outro: chordCount = 1
+        case .intro, .outro,
+             .bridge, .bridgeAlt, .bridgeMelody,
+             .preRamp, .postRamp:
+            chordCount = 1  // bridge/ramp sections always tonic, single chord
         case .A:
-            // static_drone and quartal_stack prefer single chord per section
-            switch cosmicProgFamily {
+            switch kosmicProgFamily {
             case .static_drone, .quartal_stack:
                 chordCount = 1
             default:
@@ -189,14 +338,20 @@ struct CosmicStructureGenerator {
             chordCount = rng.nextDouble() < 0.50 ? 2 : 1
         }
 
+        // Bridge/ramp sections always use root-position tonic
+        let forceTonic = (section.label == .bridge || section.label == .bridgeAlt ||
+                          section.label == .bridgeMelody ||
+                          section.label == .preRamp || section.label == .postRamp)
+
         let barsEach = Swift.max(8, section.lengthBars / chordCount)
         var windows: [ChordWindow] = []
         var bar = section.startBar
         for i in 0..<chordCount {
             let length = (i == chordCount - 1) ? (section.endBar - bar) : barsEach
-            let rawRoot = pickCosmicChordRoot(section: section, progFamily: cosmicProgFamily, rng: &rng)
-            let root = (section.label == .intro || section.label == .outro) ? "1" : rawRoot
-            let type = pickCosmicChordType(progFamily: cosmicProgFamily, mode: section.mode, rng: &rng)
+            let rawRoot = pickKosmicChordRoot(section: section, progFamily: kosmicProgFamily, rng: &rng)
+            let root = (section.label == .intro || section.label == .outro || forceTonic) ? "1" : rawRoot
+            let type = forceTonic ? .minor :
+                pickKosmicChordType(progFamily: kosmicProgFamily, mode: section.mode, rng: &rng)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
@@ -213,31 +368,29 @@ struct CosmicStructureGenerator {
         return windows
     }
 
-    private static func pickCosmicChordRoot(
+    private static func pickKosmicChordRoot(
         section: SongSection,
-        progFamily: CosmicProgressionFamily,
+        progFamily: KosmicProgressionFamily,
         rng: inout SeededRNG
     ) -> String {
         switch progFamily {
         case .static_drone:
-            return "1"  // always tonic
+            return "1"
         case .two_chord_pendulum:
-            // Alternate between root and bVI (Vangelis i → bVI = F#m → D)
             return rng.nextDouble() < 0.6 ? "1" : "b6"
         case .modal_drift:
-            // i → bVII → bVI → bVII → i movement
             let degrees = ["1", "b7", "b6", "b7"]
             return degrees[rng.nextInt(upperBound: degrees.count)]
         case .suspended_resolution:
-            return "1"  // sus stays on tonic
+            return "1"
         case .quartal_stack:
             let degrees = ["1", "4", "b7"]
             return degrees[rng.nextInt(upperBound: degrees.count)]
         }
     }
 
-    private static func pickCosmicChordType(
-        progFamily: CosmicProgressionFamily,
+    private static func pickKosmicChordType(
+        progFamily: KosmicProgressionFamily,
         mode: Mode,
         rng: inout SeededRNG
     ) -> ChordType {
@@ -255,7 +408,6 @@ struct CosmicStructureGenerator {
             let weights: [Double]    = [0.40,   0.30,   0.20,  0.10]
             return types[rng.weightedPick(weights)]
         case .suspended_resolution:
-            // Alternate sus4 and minor
             return rng.nextDouble() < 0.60 ? .sus4 : .minor
         case .quartal_stack:
             return rng.nextDouble() < 0.70 ? .quartal : .sus4

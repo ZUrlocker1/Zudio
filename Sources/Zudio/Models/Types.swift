@@ -75,6 +75,16 @@ enum Mood: String, CaseIterable, Codable, Sendable {
 
 enum SectionLabel: String, Codable, Sendable {
     case intro, A, B, outro
+    case bridge        // Archetype A-1: escalating drum bridge (Mister Mosca style)
+    case bridgeAlt     // Archetype A-2: sparse hit + call-and-response (Caligari Drop style)
+    case bridgeMelody  // Archetype B: melody-driven long bridge (Dark Sun style)
+    case preRamp       // 4-8 bar transition INTO bridgeMelody
+    case postRamp      // 4-8 bar transition OUT OF bridgeMelody back to A
+
+    /// True for any bridge variant (all three archetypes). Rhythm/Texture/Lead2 are silent here.
+    var isBridge: Bool {
+        self == .bridge || self == .bridgeAlt || self == .bridgeMelody
+    }
 }
 
 enum SectionIntensity: String, Codable, Sendable, Comparable {
@@ -128,33 +138,39 @@ enum ProgressionFamily: String, Codable, Sendable {
 
 enum MusicStyle: String, CaseIterable, Codable, Sendable {
     case motorik = "Motorik"
-    case cosmic  = "Cosmic"
+    case kosmic  = "Kosmic"
     // case ambient = "Ambient"  // future
 }
 
-// MARK: - Percussion style (Cosmic + future Ambient)
+// MARK: - Percussion style (Kosmic + future Ambient)
 
 enum PercussionStyle: String, Codable, Sendable {
     case absent
     case sparse
     case minimal
-    case motorikGrid          // Electric Buddha groove — 8th-note hi-hat + varied rock kick/snare (COS-DRUM-004)
-    case electricBuddhaPulse  // Electric Buddha pulse — quarter-note hi-hat + half-time kick/snare (COS-DRUM-005)
+    case motorikGrid               // Electric Buddha groove — 8th-note hi-hat + varied rock kick/snare (KOS-DRUM-004)
+    case electricBuddhaPulse       // Electric Buddha pulse — quarter-note hi-hat + half-time kick/snare (KOS-DRUM-005)
+    case electricBuddhaRestrained  // Electric Buddha restrained — ride+clap+4-on-floor kick, periodic dropouts (KOS-DRUM-006)
     case textural     // Ambient future use
     case softPulse   // Ambient future use
 }
 
-// MARK: - Cosmic song forms
+// MARK: - Kosmic song forms
 
-enum CosmicSongForm: String, Codable, Sendable {
-    case single_evolving
-    case two_world
-    case build_and_dissolve
+enum KosmicSongForm: String, Codable, Sendable {
+    case single_evolving    // A only — one long evolving section
+    case ab                 // A → B
+    case aba                // A → B → A
+    case abab               // A → B → A → B (two full cycles)
+    case abba               // A → B → B → A (double B, TD-like)
+    // Legacy names kept for any persisted state
+    case two_world          // alias for ab
+    case build_and_dissolve // alias for aba
 }
 
-// MARK: - Cosmic progression families
+// MARK: - Kosmic progression families
 
-enum CosmicProgressionFamily: String, Codable, Sendable {
+enum KosmicProgressionFamily: String, Codable, Sendable {
     case static_drone
     case two_chord_pendulum
     case modal_drift

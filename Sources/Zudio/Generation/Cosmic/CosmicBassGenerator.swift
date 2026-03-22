@@ -1,11 +1,11 @@
-// CosmicBassGenerator.swift — Cosmic bass generation
-// Implements COS-BAS-001 through COS-BAS-005 and COS-RULE-17 (dual bass layers)
-// COS-RULE-06: bass range MIDI 40–55
-// COS-RULE-05: synth-bass patterns use velocity = 100 flat
+// KosmicBassGenerator.swift — Kosmic bass generation
+// Implements KOS-BAS-001 through KOS-BAS-005 and KOS-RULE-17 (dual bass layers)
+// KOS-RULE-06: bass range MIDI 40–55
+// KOS-RULE-05: synth-bass patterns use velocity = 100 flat
 
 import Foundation
 
-struct CosmicBassGenerator {
+struct KosmicBassGenerator {
 
     static func generate(
         frame: GlobalMusicalFrame,
@@ -18,41 +18,44 @@ struct CosmicBassGenerator {
     ) -> [MIDIEvent] {
 
         // Pick primary bass rule
-        let rules:   [String] = ["COS-BASS-001", "COS-BASS-002", "COS-BASS-003", "COS-BASS-004", "COS-BASS-005",
-                                  "COS-BASS-008", "COS-BASS-009", "COS-BASS-010",
-                                  "COS-BASS-011", "COS-BASS-012"]
+        let rules:   [String] = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-005",
+                                  "KOS-BASS-008", "KOS-BASS-009", "KOS-BASS-010",
+                                  "KOS-BASS-011", "KOS-BASS-012"]
         let weights: [Double] = [0.18,           0.15,          0.13,           0.10,           0.07,
                                   0.09,           0.07,           0.05,
                                   0.09,           0.07]
-        let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
+        // Only honour forceRuleID if it belongs to the Kosmic bass pool.
+        // Test slots that force Motorik rules (e.g. MOT-BASS-015) must not bleed into Kosmic songs.
+        let validForce = forceRuleID.flatMap { rules.contains($0) ? $0 : nil }
+        let ruleID = validForce ?? rules[rng.weightedPick(weights)]
 
-        // COS-BASS-005 = truly absent bass in body sections (intro/outro still get a root note).
+        // KOS-BASS-005 = truly absent bass in body sections (intro/outro still get a root note).
         // Always logged so the status shows "Bass absent in main section".
         // Blocks 006 and 007: no point layering over silence.
-        let bassAbsent = ruleID == "COS-BASS-005"
+        let bassAbsent = ruleID == "KOS-BASS-005"
         usedRuleIDs.insert(ruleID)
 
-        // COS-BASS-006: staccato dual layer — blocked with COS-BASS-004 (chromatic neighbour
-        // clashes with staccato root) and COS-BASS-010 (Moroder Pulse already fills off-beats).
-        // COS-BASS-008 (Hallogallo Lock) REQUIRES the dual layer — sounds thin without it.
+        // KOS-BASS-006: staccato dual layer — blocked with KOS-BASS-004 (chromatic neighbour
+        // clashes with staccato root) and KOS-BASS-010 (Moroder Pulse already fills off-beats).
+        // KOS-BASS-008 (Hallogallo Lock) REQUIRES the dual layer — sounds thin without it.
         // PBW (012) is already an 8-note melodic riff — dual staccato layer would clutter it.
-        let canUseDualLayer = !bassAbsent && ruleID != "COS-BASS-004" && ruleID != "COS-BASS-010" && ruleID != "COS-BASS-012"
-        let useDualLayer    = canUseDualLayer && (ruleID == "COS-BASS-008" || rng.nextDouble() < 0.55)
-        if useDualLayer { usedRuleIDs.insert("COS-BASS-006") }
+        let canUseDualLayer = !bassAbsent && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012"
+        let useDualLayer    = canUseDualLayer && (ruleID == "KOS-BASS-008" || rng.nextDouble() < 0.55)
+        if useDualLayer { usedRuleIDs.insert("KOS-BASS-006") }
 
-        // COS-BASS-007: pulsating tremolo — mutually exclusive with 006, blocked when absent,
-        // blocked with COS-BASS-004 (Moroder Drift long hold clashes), and
-        // blocked with COS-BASS-010 (Moroder Pulse is already a dense 8th-note sequence).
-        let usePulsatingLayer = !bassAbsent && !useDualLayer && ruleID != "COS-BASS-004" && ruleID != "COS-BASS-010" && ruleID != "COS-BASS-012" && rng.nextDouble() < 0.45
-        if usePulsatingLayer { usedRuleIDs.insert("COS-BASS-007") }
+        // KOS-BASS-007: pulsating tremolo — mutually exclusive with 006, blocked when absent,
+        // blocked with KOS-BASS-004 (Moroder Drift long hold clashes), and
+        // blocked with KOS-BASS-010 (Moroder Pulse is already a dense 8th-note sequence).
+        let usePulsatingLayer = !bassAbsent && !useDualLayer && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && rng.nextDouble() < 0.45
+        if usePulsatingLayer { usedRuleIDs.insert("KOS-BASS-007") }
 
-        // Precompute variation windows for static Cosmic rules (same logic as Motorik BassGenerator).
+        // Precompute variation windows for static Kosmic rules (same logic as Motorik BassGenerator).
         // Fires for: every B section; every other A section that starts at or after bar 48.
-        // COS-BASS-008 uses middle-third body detection instead (computed below).
-        // COS-BASS-010 omitted: gating IS its variation; no discrete evolution events needed.
-        let cosmicVariableRules: Set<String> = ["COS-BASS-011", "COS-BASS-012"]
+        // KOS-BASS-008 uses middle-third body detection instead (computed below).
+        // KOS-BASS-010 omitted: gating IS its variation; no discrete evolution events needed.
+        let kosmicVariableRules: Set<String> = ["KOS-BASS-011", "KOS-BASS-012"]
         var variationBars = Set<Int>()
-        if cosmicVariableRules.contains(ruleID) {
+        if kosmicVariableRules.contains(ruleID) {
             var aToggle = false
             for bar in 0..<frame.totalBars {
                 guard let sec = structure.section(atBar: bar),
@@ -67,11 +70,11 @@ struct CosmicBassGenerator {
             }
         }
 
-        // COS-BASS-008: middle-third body evolution (same approach as COS-BASS-003 pedalPulseBar).
+        // KOS-BASS-008: middle-third body evolution (same approach as KOS-BASS-003 pedalPulseBar).
         // Reliable even in songs with no B sections or short A sections.
         var cos008EvoStart = Int.max
         var cos008EvoEnd   = Int.max
-        if ruleID == "COS-BASS-008", let introSec = structure.introSection {
+        if ruleID == "KOS-BASS-008", let introSec = structure.introSection {
             let bodyStart  = introSec.endBar
             let outroStart = structure.outroSection?.startBar ?? frame.totalBars
             let bodyLen    = max(1, outroStart - bodyStart)
@@ -83,6 +86,12 @@ struct CosmicBassGenerator {
 
         var wasInVariation = false
 
+        // KOS-BASS-011: pre-select Autobahn sub-pattern per section / every 16 bars.
+        // 0=Pattern D (sparse skeleton), 1=Pattern E (canonical full hook), 2=Pattern A (octave bounce), 3=Pattern F (sparse pairs)
+        // Selection uses rng so it varies per song; switches fire at body-section boundaries and every 16 bars.
+        var kos011Variant    = 0
+        var kos011LastSwitch = -16
+
         var events: [MIDIEvent] = []
 
         for bar in 0..<frame.totalBars {
@@ -90,7 +99,7 @@ struct CosmicBassGenerator {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
 
-            // COS-BASS-005: truly absent in body — no notes at all
+            // KOS-BASS-005: truly absent in body — no notes at all
             if bassAbsent && section.label != .intro && section.label != .outro { continue }
 
             // Intro: growing drone with beat-3 motion.
@@ -131,10 +140,50 @@ struct CosmicBassGenerator {
                 continue
             }
 
-            // Sub-layer A: long harmonic anchor (COS-RULE-17)
+            // Bridge A-1 (.bridge): root-only on beat 1, doubles the drum's kick.
+            // Short 8th-note duration (staccato hit) — most instruments are silent here.
+            if section.label == .bridge {
+                let root = bassRoot(entry: entry, frame: frame)
+                events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: 95, durationSteps: 2))
+                continue
+            }
+
+            // Bridge A-2 (.bridgeAlt): staccato double on hit bars (even), walking response on odd bars.
+            // Hit bars (even): bass doubles the drum+pads hit — beat 1 staccato, then silent.
+            // Response bars (odd): 2-note walking figure starting beat 3 — call-and-response texture.
+            if section.label == .bridgeAlt {
+                let bridgeBar = bar - section.startBar
+                let root      = bassRoot(entry: entry, frame: frame)
+                let rootPC    = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                if bridgeBar % 2 == 0 {
+                    // Double the synchronized hit — staccato, same step as drums
+                    events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: 95, durationSteps: 2))
+                } else {
+                    // 2-note scale walk from root: root → 2nd degree, starting beat 3
+                    let intervals = frame.mode.intervals
+                    let step2Int  = intervals.count > 1 ? intervals[1] : 2
+                    var step2Midi = 36 + (rootPC + step2Int) % 12
+                    while step2Midi < 40 { step2Midi += 12 }
+                    while step2Midi > 55 { step2Midi -= 12 }
+                    events.append(MIDIEvent(stepIndex: barStart + 8,  note: root,              velocity: 85, durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 12, note: UInt8(step2Midi),  velocity: 78, durationSteps: 3))
+                }
+                continue
+            }
+
+            // Bridge B (.bridgeMelody): quarter-note pulse on beats 1 and 3 at lower velocity.
+            // Lead melody drives this section; bass provides harmonic ground without competing.
+            if section.label == .bridgeMelody {
+                let root = bassRoot(entry: entry, frame: frame)
+                events.append(MIDIEvent(stepIndex: barStart,     note: root, velocity: 85, durationSteps: 3))
+                events.append(MIDIEvent(stepIndex: barStart + 8, note: root, velocity: 78, durationSteps: 3))
+                continue
+            }
+
+            // Sub-layer A: long harmonic anchor (KOS-RULE-17)
             let isBody = section.label != .intro && section.label != .outro
             let useVariation: Bool
-            if ruleID == "COS-BASS-008" {
+            if ruleID == "KOS-BASS-008" {
                 useVariation = bar >= cos008EvoStart && bar < cos008EvoEnd
             } else {
                 useVariation = variationBars.contains(bar)
@@ -144,27 +193,39 @@ struct CosmicBassGenerator {
                 if wasInVariation  && !useVariation { bassEvolutionBars.append(bar) }
                 wasInVariation = useVariation
             }
+            // KOS-BASS-011: rotate sub-pattern at body section boundaries and every 16 bars
+            if ruleID == "KOS-BASS-011" && isBody {
+                let isNewBodySection = section.startBar == bar && !section.label.isBridge
+                let bars16Elapsed    = (bar - kos011LastSwitch) >= 16
+                if isNewBodySection || bars16Elapsed {
+                    let r = rng.nextDouble()
+                    kos011Variant    = r < 0.25 ? 0 : r < 0.60 ? 1 : 2
+                    kos011LastSwitch = bar
+                }
+            }
+
             events += primaryBassBar(ruleID: ruleID, barStart: barStart, bar: bar,
                                      entry: entry, frame: frame, rng: &rng,
                                      totalBars: frame.totalBars, isBody: isBody,
-                                     structure: structure, useVariation: useVariation)
+                                     structure: structure, useVariation: useVariation,
+                                     kos011Variant: kos011Variant)
 
-            // Sub-layer B: rhythmic staccato movement (COS-RULE-17)
+            // Sub-layer B: rhythmic staccato movement (KOS-RULE-17)
             if useDualLayer {
                 events += rhythmicBassLayer(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             }
 
-            // Pulsating tremolo layer (COS-RULE-23)
+            // Pulsating tremolo layer (KOS-RULE-23)
             if usePulsatingLayer && bar % 4 == 0 {
                 events += pulsatingTremoloLayer(barStart: barStart, entry: entry, frame: frame)
             }
         }
 
-        // COS-BASS-001 fifth-breath detection: the dual layer always provides root+fifth pitch
+        // KOS-BASS-001 fifth-breath detection: the dual layer always provides root+fifth pitch
         // classes so the fingerprint detector in buildStepAnnotations can't see the transition.
         // Post-pass: compare the beat-1 note against the expected chord root; when the primary
         // drone switches to fifth (or back), record that bar explicitly.
-        if ruleID == "COS-BASS-001" {
+        if ruleID == "KOS-BASS-001" {
             var prevEvenBarIsRoot: Bool? = nil
             for bar in stride(from: 0, to: frame.totalBars, by: 2) {
                 guard let sec = structure.section(atBar: bar),
@@ -181,21 +242,19 @@ struct CosmicBassGenerator {
             }
         }
 
-        // COS-BASS-011 cycle detection: the 4-bar cycle (bars 0–1 = third, bars 2–3 = fifth)
-        // always produces {root, third, fifth} in every 4-bar fingerprint window, so the
-        // aggregate fingerprint never changes. Fire explicitly at cycle phase transitions
-        // (every bar%4==0 and bar%4==2) with an 8-bar cooldown to avoid spamming the log.
-        if ruleID == "COS-BASS-011" {
-            var lastCycleFireBar = -8
+        // KOS-BASS-011 Autobahn: fire evolution at every B-section entry and every 16 body bars.
+        // The pattern is the same every bar, so the variationBars mechanism handles B-section
+        // transitions; add extra fires every 16 bars so the log shows a sense of progression.
+        if ruleID == "KOS-BASS-011" {
+            var lastFireBar = -16
             for bar in 0..<frame.totalBars {
                 guard let sec = structure.section(atBar: bar),
                       sec.label != .intro && sec.label != .outro else { continue }
-                guard bar % 8 != 7 else { continue }   // skip lock bars
-                let isTransition = (bar % 4 == 0 || bar % 4 == 2)
-                guard isTransition else { continue }
-                guard (bar - lastCycleFireBar) >= 8 else { continue }
+                let isBEntry = sec.label == .B && sec.startBar == bar
+                let is16Cycle = (bar - lastFireBar) >= 16
+                guard isBEntry || (is16Cycle && bar % 16 == 0) else { continue }
                 bassEvolutionBars.append(bar)
-                lastCycleFireBar = bar
+                lastFireBar = bar
             }
         }
 
@@ -208,32 +267,34 @@ struct CosmicBassGenerator {
         ruleID: String, barStart: Int, bar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG, totalBars: Int, isBody: Bool,
-        structure: SongStructure, useVariation: Bool = false
+        structure: SongStructure, useVariation: Bool = false,
+        kos011Variant: Int = 0
     ) -> [MIDIEvent] {
         switch ruleID {
-        case "COS-BASS-001": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
+        case "KOS-BASS-001": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: isBody)
-        case "COS-BASS-002": return rootFifthWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "COS-BASS-003": return pedalPulseBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
+        case "KOS-BASS-002": return rootFifthWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "KOS-BASS-003": return pedalPulseBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                    structure: structure, totalBars: totalBars)
-        case "COS-BASS-004": return moroderDriftBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "COS-BASS-005": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
+        case "KOS-BASS-004": return moroderDriftBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "KOS-BASS-005": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: false)
-        case "COS-BASS-008": return hallogalloLockBar(barStart: barStart, bar: bar, entry: entry,
+        case "KOS-BASS-008": return hallogalloLockBar(barStart: barStart, bar: bar, entry: entry,
                                                        frame: frame, useVariation: useVariation)
-        case "COS-BASS-009": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "COS-BASS-010": return moroderPulseBar(barStart: barStart, entry: entry, frame: frame,
+        case "KOS-BASS-009": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "KOS-BASS-010": return moroderPulseBar(barStart: barStart, entry: entry, frame: frame,
                                                      useVariation: useVariation, rng: &rng)
-        case "COS-BASS-011": return kraftwerkRoboterBar(barStart: barStart, bar: bar, entry: entry,
-                                                         frame: frame, useVariation: useVariation)
-        case "COS-BASS-012": return mccartneyPBWBar(barStart: barStart, entry: entry, frame: frame,
+        case "KOS-BASS-011": return kraftwerkAutobahnBar(barStart: barStart, bar: bar, entry: entry,
+                                                          frame: frame, useVariation: useVariation,
+                                                          subVariant: kos011Variant)
+        case "KOS-BASS-012": return mccartneyPBWBar(barStart: barStart, entry: entry, frame: frame,
                                                      useVariation: useVariation)
         default:             return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: isBody)
         }
     }
 
-    // MARK: - COS-BAS-001: Drone Root
+    // MARK: - KOS-BAS-001: Drone Root
     // Root held 2 bars (32 steps), re-attacks every 2 bars.
     // Minor evolution: in body sections after bar 8, ~1-in-6 two-bar windows briefly
     // breathe to the fifth then return — authentic TD behaviour for shorter pieces.
@@ -270,7 +331,7 @@ struct CosmicBassGenerator {
         return [MIDIEvent(stepIndex: barStart, note: root, velocity: 65, durationSteps: 30)]
     }
 
-    // MARK: - COS-BAS-002: Root-Fifth Slow Walk
+    // MARK: - KOS-BAS-002: Root-Fifth Slow Walk
     // Root 2 bars, fifth 2 bars, root; 8-bar cycle
 
     private static func rootFifthWalkBar(
@@ -291,14 +352,14 @@ struct CosmicBassGenerator {
         }
     }
 
-    // MARK: - COS-BAS-003: Pedal Pulse with Mid-Song Evolution
+    // MARK: - KOS-BAS-003: Pedal Pulse with Mid-Song Evolution
     //
     // Evolution window: bars within the middle third of body sections.
     //   Intro + body_start … body_start + bodyLen/3  → plain pedal pulse
     //   body_start + bodyLen/3 … body_start + 2*bodyLen/3 → evolved pattern
     //   body_start + 2*bodyLen/3 … outro → devolve back (plain pulse)
     //
-    // Evolved pattern (COS-BASS-003-EVO):
+    // Evolved pattern (KOS-BASS-003-EVO):
     //   Beat 1  → root,  vel 100, dur 3 (anchor)
     //   Beat 1+ → fifth, vel 78,  dur 2 (syncopated off-beat push, step 2)
     //   Beat 2  → root,  vel 88,  dur 3
@@ -306,7 +367,7 @@ struct CosmicBassGenerator {
     //   Beat 3+ → third, vel 72,  dur 2 (passing tone, step 10)
     //   Beat 4  → root,  vel 88,  dur 3 (return)
     //
-    // The fifth and third are derived via pitch-class to respect COS-RULE-06 range.
+    // The fifth and third are derived via pitch-class to respect KOS-RULE-06 range.
 
     private static func pedalPulseBar(
         barStart: Int, bar: Int,
@@ -327,8 +388,13 @@ struct CosmicBassGenerator {
         let third1  = bodyLen / 3
         let third2  = (bodyLen * 2) / 3
 
-        // Only evolve in the middle third; also require at least 12 body bars for evolution to feel earned
-        let shouldEvolve = bodyLen >= 12 && barInBody >= third1 && barInBody < third2
+        // When a B section exists, enrich throughout B; otherwise use middle-third fallback
+        let shouldEvolve: Bool
+        if structure.hasBSection {
+            shouldEvolve = structure.inBSection(atBar: bar)
+        } else {
+            shouldEvolve = bodyLen >= 12 && barInBody >= third1 && barInBody < third2
+        }
 
         if shouldEvolve {
             return pedalPulseEvolved(barStart: barStart, entry: entry, frame: frame, root: root)
@@ -350,7 +416,7 @@ struct CosmicBassGenerator {
     private static func pedalPulseEvolved(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, root: UInt8
     ) -> [MIDIEvent] {
-        // Compute fifth and minor third via pitch-class (COS-RULE-06: MIDI 40–55)
+        // Compute fifth and minor third via pitch-class (KOS-RULE-06: MIDI 40–55)
         let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let fifthPC = (rootPC + 7) % 12
         let thirdPC = (rootPC + 3) % 12  // minor third (fits Aeolian/Dorian modes)
@@ -382,7 +448,7 @@ struct CosmicBassGenerator {
         ]
     }
 
-    // MARK: - COS-BAS-004: Moroder Drift
+    // MARK: - KOS-BAS-004: Moroder Drift
     // Root 3 bars, chromatic neighbor bar 4, return.
     // Cycle:  0=root(30 steps)  1=silent  2=root(14 steps)  3=neighbor(14 steps)
     // Bar 2 MUST use 14 steps, not 30: a 30-step hold from bar 2 bleeds into bar 3
@@ -413,7 +479,7 @@ struct CosmicBassGenerator {
         }
     }
 
-    // MARK: - COS-BASS-008: Hallogallo Lock (Cosmic)
+    // MARK: - KOS-BASS-008: Hallogallo Lock (Kosmic)
     // Root beat 1 (7 steps), fifth beat 3 (6 steps) — two long notes per bar.
     // Adapted from Neu! "Hallogallo" bass character; extremely minimal and locked.
     // More active than Drone Root (every bar vs every 2 bars) but still very spacious.
@@ -450,9 +516,9 @@ struct CosmicBassGenerator {
         ]
     }
 
-    // MARK: - COS-BASS-009: Crawling Walk (Cosmic)
+    // MARK: - KOS-BASS-009: Crawling Walk (Kosmic)
     // 2-bar pattern with approach note chromaticism. Adapted from Motorik BAS-003
-    // with Cosmic pitch range (MIDI 40–55) and lower velocities for the spacious feel.
+    // with Kosmic pitch range (MIDI 40–55) and lower velocities for the spacious feel.
     // Bar 1: root long → fifth at beat 2.75 → semitone approach at bar end (brief pickup)
     // Bar 2: root rearticulated short → root again → fifth holds the rest of bar
 
@@ -490,10 +556,10 @@ struct CosmicBassGenerator {
         }
     }
 
-    // MARK: - COS-BASS-010: Moroder Pulse (Cosmic)
+    // MARK: - KOS-BASS-010: Moroder Pulse (Kosmic)
     // Sequential 8th-note pattern: root-root-fifth-fifth-b7-b7-root-root.
     // Adapted from Giorgio Moroder sequencer feel (as in "I Feel Love").
-    // Velocity 100 flat (COS-RULE-05). Notes in Cosmic range MIDI 40–55.
+    // Velocity 100 flat (KOS-RULE-05). Notes in Kosmic range MIDI 40–55.
     // b7 is a natural scale tone in Dorian/Aeolian — no clash.
 
     private static func moroderPulseBar(
@@ -532,67 +598,82 @@ struct CosmicBassGenerator {
         }
     }
 
-    // MARK: - COS-BAS-011: Kraftwerk Roboter — "The Robots" (1978) octave-jump 3-note cell
-    // 3-note cell: root(low, 8th) – root+octave(high, 8th) – mode-3rd(quarter). Two cells per bar.
-    // The synthesizer octave jump creates mechanical, robot-like feel — well-suited to Cosmic's
-    // Berlin School synthetic palette. At Cosmic tempos (90–125 BPM) the quarter-note 3rd
-    // breathes more than it does at full Motorik speed.
-
-    // COS-BASS-011: Kraftwerk Roboter (Cosmic)
-    // 4-bar cycle matching Motorik version: bars 0–1 land on third, bars 2–3 land on fifth.
-    // bar%8==7: lock bar (root-only quarter notes) — jump re-arrives next bar.
-    // B-section variation: root–octave–fifth only (drops third) → fingerprint {root,5th} vs
-    // base {root,3rd,5th} — detector fires.
-    private static func kraftwerkRoboterBar(
+    // MARK: - KOS-BASS-011: Kraftwerk driving bass — rotates through 4 Autobahn patterns
+    //
+    // Sub-patterns (subVariant), all drawn from the Kraftwerk Autobahn MIDI file:
+    //   0 = Pattern D — sparse 4-note skeleton (bars 175-180):
+    //         step 0 root(q), step 4 octave(e), step 6 fourth(e), step 14 fifth(e)
+    //   1 = Pattern E — canonical full hook (bars 122-246, the main riff):
+    //         step 0 root(q), step 4 octave(e), step 6 fourth(e), step 8 fourth(dotq), step 14 fifth(e)
+    //         The long held fourth at step 8 is the defining sound — tension then release to the fifth.
+    //   2 = Pattern C — 8th-note octave trill (bars 21-27):
+    //         all 8 eighth-note steps alternating root/octave — dense, high-energy, motorik drive
+    //
+    // Bar%8==7 (lock bar): root + octave only across all variants — strips scale tones, motor feel.
+    // B-section variation (useVariation): in patterns D and E, b7th replaces the 4th.
+    private static func kraftwerkAutobahnBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        useVariation: Bool = false
+        useVariation: Bool = false, subVariant: Int = 0
     ) -> [MIDIEvent] {
         let root   = bassRoot(entry: entry, frame: frame)
-        let octave = UInt8(clamped(Int(root) + 12, low: 40, high: 67))
-        let thirdInterval = frame.mode.nearestInterval(4)
-        let third  = UInt8(clamped(Int(root) + thirdInterval, low: 40, high: 58))
-        let fifth  = UInt8(clamped(Int(root) + 7, low: 40, high: 55))
+        let octave = UInt8(clamped(Int(root) + 12, low: 48, high: 67))
+        let fourth = UInt8(clamped(Int(root) + 5,  low: 40, high: 55))
+        let fifth  = UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
+        let b7Interval = frame.mode.nearestInterval(10)
+        let b7     = UInt8(clamped(Int(root) + b7Interval, low: 40, high: 58))
 
-        // Lock bar: root-only quarter notes — strips the octave jump for one bar
+        // Lock bar: root + octave only — sparse, motor-like (all patterns)
         if bar % 8 == 7 {
             return [
-                MIDIEvent(stepIndex: barStart,      note: root, velocity: 92, durationSteps: 4),
-                MIDIEvent(stepIndex: barStart + 4,  note: root, velocity: 80, durationSteps: 4),
-                MIDIEvent(stepIndex: barStart + 8,  note: root, velocity: 88, durationSteps: 4),
-                MIDIEvent(stepIndex: barStart + 12, note: root, velocity: 78, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart,     note: root,   velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4, note: octave, velocity: 89, durationSteps: 2),
             ]
         }
 
-        // B-section: root–octave–fifth only (no third) → new fingerprint
-        if useVariation {
-            var evs: [MIDIEvent] = []
-            for cell in 0..<2 {
-                let off = cell * 8
-                evs.append(MIDIEvent(stepIndex: barStart + off,     note: root,   velocity: 100, durationSteps: 2))
-                evs.append(MIDIEvent(stepIndex: barStart + off + 2, note: octave, velocity: 88,  durationSteps: 2))
-                evs.append(MIDIEvent(stepIndex: barStart + off + 4, note: fifth,  velocity: 84,  durationSteps: 4))
-            }
-            return evs
-        }
+        switch subVariant {
 
-        // Base: 4-bar cycle — bars 0–1 use third, bars 2–3 use fifth
-        let landing = (bar % 4 < 2) ? third : fifth
-        let landingVel: UInt8 = (bar % 4 < 2) ? 82 : 86
-        var events: [MIDIEvent] = []
-        for cell in 0..<2 {
-            let offset = cell * 8
-            events.append(MIDIEvent(stepIndex: barStart + offset,     note: root,    velocity: 100, durationSteps: 2))
-            events.append(MIDIEvent(stepIndex: barStart + offset + 2, note: octave,  velocity: 88,  durationSteps: 2))
-            events.append(MIDIEvent(stepIndex: barStart + offset + 4, note: landing, velocity: landingVel, durationSteps: 4))
+        case 1:
+            // Pattern E: canonical Autobahn hook — the actual main riff.
+            // Held fourth at step 8 is the defining feature (dotted quarter = 6 steps holds into beat 3).
+            let midNote: UInt8 = useVariation ? b7 : fourth
+            let midVel:  UInt8 = useVariation ? 82 : 86
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,    velocity: 89, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: octave,  velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: midNote, velocity: midVel, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8,  note: midNote, velocity: 84, durationSteps: 6),  // long held note
+                MIDIEvent(stepIndex: barStart + 14, note: fifth,   velocity: 84, durationSteps: 2),
+            ]
+
+        case 2:
+            // Pattern C: 8th-note octave trill — all 8 subdivisions alternating root/octave.
+            // Dense and driving; high-energy contrast to the sparser patterns.
+            // Velocity alternates: on-beat slightly louder, off-beat softer for natural groove.
+            return stride(from: 0, to: 16, by: 2).map { step in
+                let onBeat = (step % 4 == 0)
+                let note   = (step % 4 == 0) ? root : octave
+                let vel    = UInt8(onBeat ? 89 : 80)
+                return MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 2)
+            }
+
+        default:
+            // Pattern D: sparse 4-note skeleton — the current implementation (most common)
+            let midNote: UInt8 = useVariation ? b7 : fourth
+            let midVel:  UInt8 = useVariation ? 82 : 86
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,    velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: octave,  velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: midNote, velocity: midVel, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 14, note: fifth,   velocity: 84, durationSteps: 2),
+            ]
         }
-        return events
     }
 
-    // MARK: - COS-BAS-012: McCartney PBW — "Paperback Writer" (1966) Mixolydian riff
+    // MARK: - KOS-BAS-012: McCartney PBW — "Paperback Writer" (1966) Mixolydian riff
     // root–fifth–root–b7–fifth–root–mode3rd–root in 8 8th-notes.
     // The flat-seventh (b7) gives a blues/Mixolydian quality — diatonic in Dorian and Mixolydian,
-    // which are common Cosmic modes. Falls back to fifth in pure major chord contexts.
-    // The riff cycles identically each bar — becomes hypnotic at slower Cosmic tempos.
+    // which are common Kosmic modes. Falls back to fifth in pure major chord contexts.
+    // The riff cycles identically each bar — becomes hypnotic at slower Kosmic tempos.
 
     private static func mccartneyPBWBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
@@ -626,12 +707,12 @@ struct CosmicBassGenerator {
         return evs
     }
 
-    // MARK: - COS-RULE-17: Rhythmic staccato bass layer (sub-layer B)
+    // MARK: - KOS-RULE-17: Rhythmic staccato bass layer (sub-layer B)
     // Velocity 80–88, short staccato hits on off-beats.
     // Step offsets avoid beat 1 (step 0) to prevent double-attack with sub-layer A,
     // and avoid step 14 which bleeds into the next bar's primary attack.
     //
-    // Only called when primary rule is NOT COS-BASS-004, because that rule plays
+    // Only called when primary rule is NOT KOS-BASS-004, because that rule plays
     // a chromatic neighbour (root+1) on every 4th bar — combining with the staccato
     // root produces a minor-2nd clash.
 
@@ -665,7 +746,7 @@ struct CosmicBassGenerator {
         return evs
     }
 
-    // MARK: - COS-RULE-23: Pulsating tremolo layer
+    // MARK: - KOS-RULE-23: Pulsating tremolo layer
 
     private static func pulsatingTremoloLayer(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
@@ -686,7 +767,7 @@ struct CosmicBassGenerator {
 
     static func bassRoot(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> UInt8 {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        // COS-RULE-06: bass in MIDI 40–55
+        // KOS-RULE-06: bass in MIDI 40–55
         var midi = 36 + rootPC  // start in octave 2
         while midi < 40 { midi += 12 }
         while midi > 55 { midi -= 12 }

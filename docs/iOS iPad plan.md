@@ -143,7 +143,7 @@ This gives each track 82pt height (up from 63pt) but removes the side panels ent
 
 **Top bar (iPhone portrait):** The current two-row header won't fit. Replace with:
 - Row 1: Logo (left, 40pt tall) + Play/Stop (center) + Generate (right)
-- Row 2: Style picker (Motorik/Cosmic/Ambient) + Mood + Key + BPM
+- Row 2: Style picker (Motorik/Kosmic/Ambient) + Mood + Key + BPM
 - Logo tap still toggles Test Mode
 - Help/About moved to a settings sheet (tap "..." or gear icon)
 

@@ -178,6 +178,9 @@ struct HarmonicFilter {
             }
             // Pre-outro taper: 1.07 → 0.95 over last 12%
             return 1.07 - ((ratio - 0.88) / 0.12) * 0.12
+        default:
+            // Bridge and ramp sections: neutral multiplier
+            return 1.0
         }
     }
 

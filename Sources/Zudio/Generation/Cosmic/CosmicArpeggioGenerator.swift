@@ -1,31 +1,31 @@
-// CosmicArpeggioGenerator.swift — Cosmic generation step 3 (Rhythm track slot)
-// The most important Cosmic generator — replaces RhythmGenerator for Cosmic style.
+// KosmicArpeggioGenerator.swift — Kosmic generation step 3 (Rhythm track slot)
+// The most important Kosmic generator — replaces RhythmGenerator for Kosmic style.
 //
 // Rules:
-//   COS-RTHM-001  Tangerine Dream step-sequencer: multi-voice modal grid, 16th notes,
+//   KOS-RTHM-001  Tangerine Dream step-sequencer: multi-voice modal grid, 16th notes,
 //                skip positions, parallel voices, glacial modulation. Phaedra/Rubycon era.
-//   COS-RTHM-002  JMJ Hook: single-voice 4-note ascending hook, 8th/quarter notes,
+//   KOS-RTHM-002  JMJ Hook: single-voice 4-note ascending hook, 8th/quarter notes,
 //                brighter register, occasional harmony voice a 3rd above. Oxygène/Équinoxe era.
-//   COS-RTHM-003  JMJ Oxygène Oscillation: one voice slowly ascending then descending,
+//   KOS-RTHM-003  JMJ Oxygène Oscillation: one voice slowly ascending then descending,
 //                quarter-note legato. Very spacious. Classic early JMJ feel.
-//   COS-RTHM-004  Electric Buddha Groove: pentatonic, 2 interlocking voices, syncopated
+//   KOS-RTHM-004  Electric Buddha Groove: pentatonic, 2 interlocking voices, syncopated
 //                16th-note grid with quarter-note anchor on beat 1. Driving and accessible.
-//   COS-RTHM-005  JMJ Dual-Rate: two voices sharing the same note pool cycling at 8th and
+//   KOS-RTHM-005  JMJ Dual-Rate: two voices sharing the same note pool cycling at 8th and
 //                quarter-note rates; each step independently gated. Interlocking, shifting feel.
-//   COS-RTHM-006  Kraftwerk Locked Pulse: rigid 3-note cell on 8th-note grid, pitches fixed
+//   KOS-RTHM-006  Kraftwerk Locked Pulse: rigid 3-note cell on 8th-note grid, pitches fixed
 //                for entire body. No gate probability — mechanical regularity is the sound.
 //                Every 32 body bars (from bar 32 onward), cell jumps one octave for 4 bars
 //                then snaps back. Deterministic — same displacement point every cycle.
-//   COS-RTHM-007  Pitch-Drifting Sequence: 4-step quarter-note pattern whose home pitch
+//   KOS-RTHM-007  Pitch-Drifting Sequence: 4-step quarter-note pattern whose home pitch
 //                transposes up one scale step every 4 bars through first body half, then
 //                back down. Phaedra/Schulze slow-modulation style. Probabilistic gate.
-//   COS-RTHM-008  Oxygène 8-bar Arc: 5–7 notes spread across an 8-bar window, each held
+//   KOS-RTHM-008  Oxygène 8-bar Arc: 5–7 notes spread across an 8-bar window, each held
 //                1.5–2 bars. Ascending arcs on even 8-bar blocks, descending on odd.
 //                Very sparse — wide interval arcs across multiple bars.
 
 import Foundation
 
-struct CosmicArpeggioGenerator {
+struct KosmicArpeggioGenerator {
 
     static func generate(
         frame: GlobalMusicalFrame,
@@ -36,26 +36,32 @@ struct CosmicArpeggioGenerator {
         forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
-        let rules:   [String] = ["COS-RTHM-001", "COS-RTHM-002", "COS-RTHM-003", "COS-RTHM-004",
-                                 "COS-RTHM-005", "COS-RTHM-006", "COS-RTHM-007", "COS-RTHM-008"]
+        let rules:   [String] = ["KOS-RTHM-001", "KOS-RTHM-002", "KOS-RTHM-003", "KOS-RTHM-004",
+                                 "KOS-RTHM-005", "KOS-RTHM-006", "KOS-RTHM-007", "KOS-RTHM-008"]
         let weights: [Double] = [0.16,           0.15,           0.13,           0.10,
                                  0.14,           0.14,           0.10,           0.08]
         let chosenRule = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(chosenRule)
 
+        var events: [MIDIEvent]
         switch chosenRule {
-        case "COS-RTHM-002": return generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        case "COS-RTHM-003": return generateJMJOxygene(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        case "COS-RTHM-004": return generateElectricBuddha(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        case "COS-RTHM-005": return generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        case "COS-RTHM-006": return generateKraftwerkLocked(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        case "COS-RTHM-007": return generatePitchDrifting(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        case "COS-RTHM-008": return generateOxygene8Bar(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        default:             return generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-002": events = generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-003": events = generateJMJOxygene(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-004": events = generateElectricBuddha(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-005": events = generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-006": events = generateKraftwerkLocked(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-007": events = generatePitchDrifting(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-008": events = generateOxygene8Bar(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        default:             events = generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         }
+        // Bridge A-1 (.bridge): arpeggio re-enters in final 2 bars with descending figure
+        events += generateBridgeA1Arp(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        // Bridge A-2 (.bridgeAlt call+response): melodic response phrase on non-hit bars
+        events += generateBridgeAltArp(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        return events
     }
 
-    // MARK: - COS-RTHM-001: Tangerine Dream multi-voice step-sequencer
+    // MARK: - KOS-RTHM-001: Tangerine Dream multi-voice step-sequencer
 
     private static func generateTD(
         frame: GlobalMusicalFrame,
@@ -78,6 +84,7 @@ struct CosmicArpeggioGenerator {
 
         var events: [MIDIEvent] = []
         for section in structure.sections {
+            guard !section.label.isBridge else { continue }  // bridges handled separately
             let isIntro = section.label == .intro
             let isOutro = section.label == .outro
             for bar in section.startBar..<section.endBar {
@@ -117,7 +124,7 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-002: JMJ Hook — single-voice melodic hook, 8th/quarter dominant
+    // MARK: - KOS-RTHM-002: JMJ Hook — single-voice melodic hook, 8th/quarter dominant
 
     private static func generateJMJHook(
         frame: GlobalMusicalFrame,
@@ -135,6 +142,7 @@ struct CosmicArpeggioGenerator {
 
         var events: [MIDIEvent] = []
         for section in structure.sections {
+            guard !section.label.isBridge else { continue }
             let isIntro = section.label == .intro
             let isOutro = section.label == .outro
             for bar in section.startBar..<section.endBar {
@@ -184,7 +192,7 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-003: JMJ Oxygène — single voice ascending then descending, quarter legato
+    // MARK: - KOS-RTHM-003: JMJ Oxygène — single voice ascending then descending, quarter legato
 
     private static func generateJMJOxygene(
         frame: GlobalMusicalFrame,
@@ -198,6 +206,7 @@ struct CosmicArpeggioGenerator {
 
         var events: [MIDIEvent] = []
         for section in structure.sections {
+            guard !section.label.isBridge else { continue }
             let isIntro = section.label == .intro
             let isOutro = section.label == .outro
             for bar in section.startBar..<section.endBar {
@@ -236,7 +245,7 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-004: Electric Buddha Groove — pentatonic interlocking voices, driving
+    // MARK: - KOS-RTHM-004: Electric Buddha Groove — pentatonic interlocking voices, driving
 
     private static func generateElectricBuddha(
         frame: GlobalMusicalFrame,
@@ -252,6 +261,7 @@ struct CosmicArpeggioGenerator {
 
         var events: [MIDIEvent] = []
         for section in structure.sections {
+            guard !section.label.isBridge else { continue }
             let isIntro = section.label == .intro
             let isOutro = section.label == .outro
             for bar in section.startBar..<section.endBar {
@@ -300,7 +310,7 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-005: JMJ Dual-Rate — two voices at different sequencer rates, gated
+    // MARK: - KOS-RTHM-005: JMJ Dual-Rate — two voices at different sequencer rates, gated
     // Voice A cycles the note pool at 8th-note rate (busier, higher velocity).
     // Voice B cycles the reversed pool at quarter-note rate (slower, quieter harmonic anchor).
     // Each step is independently gated so the two rates shift in and out of phase naturally.
@@ -317,6 +327,7 @@ struct CosmicArpeggioGenerator {
 
         var events: [MIDIEvent] = []
         for section in structure.sections {
+            guard !section.label.isBridge else { continue }
             let isIntro = section.label == .intro
             let isOutro = section.label == .outro
             for bar in section.startBar..<section.endBar {
@@ -377,7 +388,7 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-006: Kraftwerk Locked Pulse
+    // MARK: - KOS-RTHM-006: Kraftwerk Locked Pulse
 
     private static func generateKraftwerkLocked(
         frame: GlobalMusicalFrame, structure: SongStructure,
@@ -420,11 +431,17 @@ struct CosmicArpeggioGenerator {
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
             guard section.label != .intro && section.label != .outro else { continue }
+            guard !section.label.isBridge else { continue }
             let barStart   = bar * 16
             let barInBody  = bar - firstBodyBar
 
-            // Every 32 body bars (after the first block), displace up an octave for 4 bars.
-            let inOctaveWindow = barInBody >= 32 && barInBody % 32 < 4
+            // B section (or bar-count fallback for single_evolving) drives octave displacement.
+            let inOctaveWindow: Bool
+            if structure.hasBSection {
+                inOctaveWindow = structure.inBSection(atBar: bar)
+            } else {
+                inOctaveWindow = barInBody >= 32 && barInBody % 32 < 4
+            }
             let pattern = inOctaveWindow ? octavePattern : basePattern
 
             for i in 0..<8 {  // 8 eighth notes per bar (step duration = 2)
@@ -439,37 +456,35 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-007: Pitch-Drifting Sequence (TD/Schulze)
+    // MARK: - KOS-RTHM-007: Pitch-Drifting Sequence (TD/Schulze)
 
     private static func generatePitchDrifting(
         frame: GlobalMusicalFrame, structure: SongStructure,
         tonalMap: TonalGovernanceMap, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let bodyBars = structure.sections.filter { $0.label != .intro && $0.label != .outro }
-        guard !bodyBars.isEmpty else { return [] }
-        let bodyStart = bodyBars.first!.startBar
-        let bodyEnd   = bodyBars.last!.endBar
-        let bodyLen   = max(1, bodyEnd - bodyStart)
-        let halfLen   = bodyLen / 2
-
         var events: [MIDIEvent] = []
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
             guard section.label != .intro && section.label != .outro else { continue }
+            guard !section.label.isBridge else { continue }
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
-            let barInBody = bar - bodyStart
             let mode  = entry.sectionMode
-            let scale = mode.intervals  // e.g. [0,2,3,5,7,8,10] for aeolian
+            let scale = mode.intervals
 
-            // Arch: transpose up 1 scale step per 4-bar group in first half, back down in second
+            // Per-section pitch arch: each A and B section gets its own rise-and-fall arc.
+            // This way the A section returns and the B section's arch is independent.
+            let sectionLen = max(1, section.lengthBars)
+            let halfLen    = max(1, sectionLen / 2)
+            let barInSection = bar - section.startBar
+
             let peakDeg    = min(halfLen / 4, scale.count - 1)
             let transposeDeg: Int
-            if barInBody < halfLen {
-                transposeDeg = min(barInBody / 4, peakDeg)
+            if barInSection < halfLen {
+                transposeDeg = min(barInSection / 4, peakDeg)
             } else {
-                transposeDeg = max(0, peakDeg - (barInBody - halfLen) / 4)
+                transposeDeg = max(0, peakDeg - (barInSection - halfLen) / 4)
             }
             let transposeInterval = scale[transposeDeg % scale.count]
 
@@ -498,7 +513,7 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - COS-RTHM-008: Oxygène 8-bar Arc
+    // MARK: - KOS-RTHM-008: Oxygène 8-bar Arc
 
     private static func generateOxygene8Bar(
         frame: GlobalMusicalFrame, structure: SongStructure,
@@ -509,6 +524,7 @@ struct CosmicArpeggioGenerator {
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
             guard section.label != .intro && section.label != .outro else { continue }
+            guard !section.label.isBridge else { continue }
             guard bar % 8 == 0 else { continue }  // arc starts every 8 bars
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
@@ -552,9 +568,92 @@ struct CosmicArpeggioGenerator {
         return events
     }
 
+    // MARK: - Bridge A-1: descending figure in final 2 bars (re-entry signal before B section)
+    // Only fires for .bridge (Archetype A-1 escalating drum bridge) sections.
+    // Pattern: 5th → descend1 → 5th → descend2 → 5th → descend3, quarter-note durations.
+
+    private static func generateBridgeA1Arp(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for section in structure.sections {
+            guard section.label == .bridge else { continue }
+            guard section.lengthBars >= 2 else { continue }
+            // Only play in the final 2 bars of the bridge
+            let startBar = section.endBar - 2
+            for bar in startBar..<section.endBar {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode   = entry.sectionMode
+                let third  = mode.nearestInterval(3)
+                let fifth  = 7
+
+                func place(_ pc: Int) -> Int {
+                    var m = 60 + rootPC + pc
+                    while m > 72 { m -= 12 }
+                    while m < 60 { m += 12 }
+                    return m
+                }
+                // Descend from 5th: 5th, 3rd, root, alternating with 5th
+                let descend = [place(fifth), place(third), place(0), place(fifth),
+                               place(third), place(0), place(fifth), place(third)]
+                let barStart = bar * 16
+                for (i, note) in descend.prefix(4).enumerated() {
+                    let vel = UInt8(78 + rng.nextInt(upperBound: 14))
+                    events.append(MIDIEvent(stepIndex: barStart + i * 4,
+                                            note: UInt8(note), velocity: vel, durationSteps: 4))
+                }
+            }
+        }
+        return events
+    }
+
+    // MARK: - Bridge A-2 melodic response (call + response)
+    // The "call" is the synchronized drum+pads+bass hit on even bridge bars.
+    // The "response" fires here on the odd (non-hit) bars — a 3-note melodic phrase
+    // in the mid register that makes the silence between hits feel intentional, not empty.
+    // Pattern: root → 3rd → 5th over beats 1–3, quarter-note durations, medium velocity.
+
+    private static func generateBridgeAltArp(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for section in structure.sections {
+            guard section.label == .bridgeAlt else { continue }
+            for bar in section.startBar..<section.endBar {
+                let bridgeBar = bar - section.startBar
+                guard bridgeBar % 2 == 1 else { continue }   // odd bars = response bars only
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let mode   = entry.sectionMode
+                let third  = mode.nearestInterval(3)
+                let fifth  = 7
+
+                func place(_ pc: Int) -> Int {
+                    var m = 60 + rootPC + pc
+                    while m > 72 { m -= 12 }
+                    while m < 60 { m += 12 }
+                    return m
+                }
+
+                // 3-note ascending response: root → 3rd → 5th, one per beat
+                let phrase = [place(0), place(third), place(fifth)]
+                let barStart = bar * 16
+                for (i, note) in phrase.enumerated() {
+                    let vel = UInt8(68 + rng.nextInt(upperBound: 14))
+                    events.append(MIDIEvent(stepIndex: barStart + i * 4,
+                                            note: UInt8(note), velocity: vel, durationSteps: 4))
+                }
+            }
+        }
+        return events
+    }
+
     // MARK: - Note set builders
 
-    /// 5-note modal subset in MIDI 55–72 (used by COS-RTHM-001)
+    /// 5-note modal subset in MIDI 55–72 (used by KOS-RTHM-001)
     private static func fiveNoteSubset(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let mode   = entry.sectionMode
@@ -607,7 +706,7 @@ struct CosmicArpeggioGenerator {
         return [place(0), place(third), place(fifth), place(octave)]
     }
 
-    /// Pentatonic major/minor note set for COS-RTHM-004 in MIDI 58–76
+    /// Pentatonic major/minor note set for KOS-RTHM-004 in MIDI 58–76
     private static func pentatonicNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let mode   = entry.sectionMode
@@ -626,7 +725,7 @@ struct CosmicArpeggioGenerator {
         return [place(0), place(third), place(fourth), place(7), place(sixth)]
     }
 
-    /// COS-RTHM-005 note pool: root, modal 3rd, 5th, flat-7 in MIDI 60–80
+    /// KOS-RTHM-005 note pool: root, modal 3rd, 5th, flat-7 in MIDI 60–80
     private static func dualRateNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let mode   = entry.sectionMode
@@ -641,7 +740,7 @@ struct CosmicArpeggioGenerator {
         return [place(0), place(third), place(7), place(flat7)]
     }
 
-    // MARK: - COS-RTHM-001 helpers (TD style)
+    // MARK: - KOS-RTHM-001 helpers (TD style)
 
     private static func glacialModulate(notes: [Int], bar: Int, rng: inout SeededRNG) -> [Int] {
         guard bar > 0 && bar % 16 == 0 else { return notes }
@@ -727,7 +826,7 @@ struct CosmicArpeggioGenerator {
         }
     }
 
-    // MARK: - COS-RTHM-002 helpers
+    // MARK: - KOS-RTHM-002 helpers
 
     /// Returns the MIDI note a diatonic third (scale degree +2) above `note`.
     /// Correctly handles all scale positions — never produces out-of-scale pitches.

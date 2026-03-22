@@ -11,18 +11,24 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        style: MusicStyle = .cosmic,
+        style: MusicStyle = .kosmic,
         testMode: Bool = false,
-        forceBassRuleID: String? = nil,
-        forceArpRuleID:  String? = nil,
-        forcePadsRuleID: String? = nil,
-        forceLeadRuleID: String? = nil
+        forceBassRuleID:      String? = nil,
+        forceArpRuleID:       String? = nil,
+        forcePadsRuleID:      String? = nil,
+        forceLeadRuleID:      String? = nil,
+        forceTexRuleID:       String? = nil,
+        forcePercussionStyle: PercussionStyle? = nil,
+        forceBridge:          Bool    = false,
+        forceBridgeArchetype: String? = nil
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                         moodOverride: moodOverride, style: style, testMode: testMode,
                         forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
-                        forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID)
+                        forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
+                        forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
+                        forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
@@ -31,19 +37,25 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        style: MusicStyle = .cosmic,
+        style: MusicStyle = .kosmic,
         testMode: Bool = false,
-        forceBassRuleID: String? = nil,
-        forceArpRuleID:  String? = nil,
-        forcePadsRuleID: String? = nil,
-        forceLeadRuleID: String? = nil
+        forceBassRuleID:      String? = nil,
+        forceArpRuleID:       String? = nil,
+        forcePadsRuleID:      String? = nil,
+        forceLeadRuleID:      String? = nil,
+        forceTexRuleID:       String? = nil,
+        forcePercussionStyle: PercussionStyle? = nil,
+        forceBridge:          Bool    = false,
+        forceBridgeArchetype: String? = nil
     ) -> SongState {
         switch style {
-        case .cosmic:
-            return generateCosmic(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
+        case .kosmic:
+            return generateKosmic(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                   moodOverride: moodOverride, testMode: testMode,
                                   forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
-                                  forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID)
+                                  forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
+                                  forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
+                                  forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
         case .motorik:
             return generateMotorik(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                    moodOverride: moodOverride, testMode: testMode,
@@ -147,7 +159,7 @@ struct SongGenerator {
             title: title, frame: frame, structure: structure, form: form,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules, texRules: texRules
+            rhythmRules: rhythmRules, texRules: texRules, testMode: testMode
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules)
@@ -163,29 +175,33 @@ struct SongGenerator {
             form: form,
             style: .motorik,
             percussionStyle: .absent,
-            cosmicProgFamily: .static_drone,
+            kosmicProgFamily: .static_drone,
             generationLog: log,
             stepAnnotations: stepAnnotations
         )
     }
 
-    // MARK: - Cosmic generation path
+    // MARK: - Kosmic generation path
 
-    private static func generateCosmic(
+    private static func generateKosmic(
         seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         testMode: Bool = false,
-        forceBassRuleID: String? = nil,
-        forceArpRuleID:  String? = nil,
-        forcePadsRuleID: String? = nil,
-        forceLeadRuleID: String? = nil
+        forceBassRuleID:      String? = nil,
+        forceArpRuleID:       String? = nil,
+        forcePadsRuleID:      String? = nil,
+        forceLeadRuleID:      String? = nil,
+        forceTexRuleID:       String? = nil,
+        forcePercussionStyle: PercussionStyle? = nil,
+        forceBridge:          Bool    = false,
+        forceBridgeArchetype: String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
-        // Step 1 — Cosmic musical frame
-        let (frame, percussionStyle, cosmicProgFamily) = CosmicMusicalFrameGenerator.generate(
+        // Step 1 — Kosmic musical frame
+        let (frame, percussionStylePicked, kosmicProgFamily) = KosmicMusicalFrameGenerator.generate(
             rng: &rng,
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,
@@ -193,25 +209,32 @@ struct SongGenerator {
             testMode: testMode
         )
 
-        // Step 2 — Cosmic structure (longer sections, glacial pacing)
-        let cosmicForm: CosmicSongForm = {
-            let r = rng.nextDouble()
-            if r < 0.50 { return .single_evolving }
-            if r < 0.85 { return .two_world }
-            return .build_and_dissolve
+        let percussionStyle = forcePercussionStyle ?? percussionStylePicked
+
+        // Step 2 — Kosmic structure (longer sections, glacial pacing)
+        let kosmicForm: KosmicSongForm = {
+            if forceBridge {
+                // Bridge requires an A→B transition — force ab or aba (50/50)
+                return rng.nextDouble() < 0.50 ? .ab : .aba
+            }
+            let forms:   [KosmicSongForm] = [.single_evolving, .ab,  .aba, .abab, .abba]
+            let weights: [Double]         = [0.30,             0.20, 0.25, 0.15,  0.10 ]
+            return forms[rng.weightedPick(weights)]
         }()
-        let structure = CosmicStructureGenerator.generate(
+        let structure = KosmicStructureGenerator.generate(
             frame: frame,
-            cosmicForm: cosmicForm,
-            cosmicProgFamily: cosmicProgFamily,
+            kosmicForm: kosmicForm,
+            kosmicProgFamily: kosmicProgFamily,
             percussionStyle: percussionStyle,
-            rng: &rng
+            rng: &rng,
+            forceBridge: forceBridge,
+            forceBridgeArchetype: forceBridgeArchetype
         )
 
         // Step 3 — Tonal governance map (reused as-is)
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
 
-        // Steps 4–9 — Per-track MIDI event generation (Cosmic generators)
+        // Steps 4–9 — Per-track MIDI event generation (Kosmic generators)
         var trackEvents = [[MIDIEvent]](repeating: [], count: 7)
 
         var drumRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackDrums))
@@ -222,23 +245,23 @@ struct SongGenerator {
         var rhythmRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackRhythm))
         var texRNG    = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackTexture))
 
-        // Arpeggio (rhythm slot) — the heartbeat of Cosmic
+        // Arpeggio (rhythm slot) — the heartbeat of Kosmic
         var rhythmRules: Set<String> = []
-        trackEvents[kTrackRhythm] = CosmicArpeggioGenerator.generate(
+        trackEvents[kTrackRhythm] = KosmicArpeggioGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
             rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceArpRuleID
         )
 
         // Lead 1
         var lead1Rules: Set<String> = []
-        trackEvents[kTrackLead1] = CosmicLeadGenerator.generateLead1(
+        trackEvents[kTrackLead1] = KosmicLeadGenerator.generateLead1(
             frame: frame, structure: structure, tonalMap: tonalMap,
             rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceRuleID: forceLeadRuleID
         )
 
         // Lead 2
         var lead2Rules: Set<String> = []
-        trackEvents[kTrackLead2] = CosmicLeadGenerator.generateLead2(
+        trackEvents[kTrackLead2] = KosmicLeadGenerator.generateLead2(
             frame: frame, structure: structure, tonalMap: tonalMap,
             lead1Events: trackEvents[kTrackLead1],
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
@@ -246,23 +269,23 @@ struct SongGenerator {
 
         // Pads
         var padRules: Set<String> = []
-        trackEvents[kTrackPads] = CosmicPadsGenerator.generate(
+        trackEvents[kTrackPads] = KosmicPadsGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
-            cosmicProgFamily: cosmicProgFamily,
+            kosmicProgFamily: kosmicProgFamily,
             rng: &padsRNG, usedRuleIDs: &padRules, forceRuleID: forcePadsRuleID
         )
 
         // Texture (lower register arpeggio, orbital motives)
         var texRules: Set<String> = []
-        trackEvents[kTrackTexture] = CosmicTextureGenerator.generate(
+        trackEvents[kTrackTexture] = KosmicTextureGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
-            rng: &texRNG, usedRuleIDs: &texRules
+            rng: &texRNG, usedRuleIDs: &texRules, forceRuleID: forceTexRuleID
         )
 
         // Bass
         var bassRules: Set<String> = []
         var bassEvolutionBars: [Int] = []
-        trackEvents[kTrackBass] = CosmicBassGenerator.generate(
+        trackEvents[kTrackBass] = KosmicBassGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
             rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID,
             bassEvolutionBars: &bassEvolutionBars
@@ -270,34 +293,35 @@ struct SongGenerator {
 
         // Drums (absent / sparse / minimal per percussionStyle)
         var drumRules: Set<String> = []
-        trackEvents[kTrackDrums] = CosmicDrumGenerator.generate(
+        trackEvents[kTrackDrums] = KosmicDrumGenerator.generate(
             frame: frame, structure: structure,
             percussionStyle: percussionStyle,
             rng: &drumRNG, usedRuleIDs: &drumRules
         )
 
         // Post-processing: apply arrangement and harmonic filters
-        // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Cosmic)
+        // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Kosmic)
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, seed: seed)
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
-        // Title generation — Cosmic uses its own space-themed generator
-        let title = CosmicTitleGenerator.generate(frame: frame, rng: &rng)
+        // Title generation — Kosmic uses its own space-themed generator
+        let title = KosmicTitleGenerator.generate(frame: frame, rng: &rng)
 
         // Song form (use standard Motorik SongForm for compatibility with existing log/UI)
         let form: SongForm = {
-            switch cosmicForm {
-            case .single_evolving:   return .singleA
-            case .two_world:         return .subtleAB
-            case .build_and_dissolve: return .moderateAB
+            switch kosmicForm {
+            case .single_evolving:              return .singleA
+            case .ab, .two_world:               return .subtleAB
+            case .aba, .build_and_dissolve,
+                 .abab, .abba:                  return .moderateAB
             }
         }()
 
-        // Build Cosmic generation log
-        let log = buildCosmicLog(
+        // Build Kosmic generation log
+        let log = buildKosmicLog(
             title: title, frame: frame, structure: structure, form: form,
-            percussionStyle: percussionStyle, cosmicForm: cosmicForm,
-            cosmicProgFamily: cosmicProgFamily,
+            percussionStyle: percussionStyle, kosmicForm: kosmicForm,
+            kosmicProgFamily: kosmicProgFamily,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
             rhythmRules: rhythmRules, texRules: texRules,
@@ -305,7 +329,8 @@ struct SongGenerator {
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
-                                                    frame: frame, bassEvolutionBars: bassEvolutionBars)
+                                                    frame: frame, bassEvolutionBars: bassEvolutionBars,
+                                                    rhythmRules: rhythmRules, texRules: texRules)
 
         return SongState(
             frame: frame,
@@ -316,9 +341,9 @@ struct SongGenerator {
             trackOverrides: [:],
             title: title,
             form: form,
-            style: .cosmic,
+            style: .kosmic,
             percussionStyle: percussionStyle,
-            cosmicProgFamily: cosmicProgFamily,
+            kosmicProgFamily: kosmicProgFamily,
             generationLog: log,
             stepAnnotations: stepAnnotations
         )
@@ -334,11 +359,11 @@ struct SongGenerator {
         var usedRules: Set<String> = []
 
         let events: [MIDIEvent]
-        let isCosmic = songState.style == .cosmic
+        let isKosmic = songState.style == .kosmic
         switch trackIndex {
         case kTrackDrums:
-            if isCosmic {
-                events = CosmicDrumGenerator.generate(
+            if isKosmic {
+                events = KosmicDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     percussionStyle: songState.percussionStyle,
                     rng: &rng, usedRuleIDs: &usedRules)
@@ -349,9 +374,9 @@ struct SongGenerator {
                 events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed)[kTrackDrums]
             }
         case kTrackBass:
-            if isCosmic {
+            if isKosmic {
                 var ignored: [Int] = []
-                events = CosmicBassGenerator.generate(
+                events = KosmicBassGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     bassEvolutionBars: &ignored)
@@ -364,25 +389,25 @@ struct SongGenerator {
                 events = scratch[kTrackBass]
             }
         case kTrackPads:
-            if isCosmic {
-                events = CosmicPadsGenerator.generate(
+            if isKosmic {
+                events = KosmicPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    tonalMap: songState.tonalMap, cosmicProgFamily: songState.cosmicProgFamily,
+                    tonalMap: songState.tonalMap, kosmicProgFamily: songState.kosmicProgFamily,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackLead1:
-            if isCosmic {
-                events = CosmicLeadGenerator.generateLead1(
+            if isKosmic {
+                events = KosmicLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackLead2:
-            if isCosmic {
-                events = CosmicLeadGenerator.generateLead2(
+            if isKosmic {
+                events = KosmicLeadGenerator.generateLead2(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1],
                     rng: &rng, usedRuleIDs: &usedRules)
@@ -390,16 +415,16 @@ struct SongGenerator {
                 events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackRhythm:
-            if isCosmic {
-                events = CosmicArpeggioGenerator.generate(
+            if isKosmic {
+                events = KosmicArpeggioGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackTexture:
-            if isCosmic {
-                events = CosmicTextureGenerator.generate(
+            if isKosmic {
+                events = KosmicTextureGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             } else {
@@ -456,7 +481,8 @@ struct SongGenerator {
         lead1Rules: Set<String>,
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
-        texRules: Set<String>
+        texRules: Set<String>,
+        testMode: Bool = false
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -468,30 +494,14 @@ struct SongGenerator {
         let formDesc   = buildFormDescription(form: form, structure: structure)
         log.append(GenerationLogEntry(tag: formRuleID, description: formDesc))
 
-        // Intro rule — immediately after form
-        if let intro = structure.introSection {
-            log.append(GenerationLogEntry(tag: "Intro",
-                description: "\(intro.lengthBars) bar \(introStyleLabel(structure.introStyle))"))
-        }
-
-        // Outro rule — immediately after intro
-        if let outro = structure.outroSection {
-            log.append(GenerationLogEntry(tag: "Outro",
-                description: "\(outro.lengthBars) bar \(outroStyleLabel(structure.outroStyle))"))
-        }
-
-        // Chord progression — single combined line
+        // Chord progression — key/mode + progression family + chord names on one line
         let chordNames = structure.chordPlan
             .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
             .removingAdjacentDuplicates()
             .joined(separator: ", ")
         let progLabel = progressionFamilyLabel(frame.progressionFamily)
-        let chordDesc = chordNames.isEmpty ? progLabel : "\(progLabel)  (\(chordNames))"
+        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(progLabel)" + (chordNames.isEmpty ? "" : "  \(chordNames)")
         log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
-
-        // Global frame
-        log.append(GenerationLogEntry(tag: "GBL-001",
-            description: "\(frame.key) \(frame.mode.rawValue), \(frame.tempo) BPM, \(frame.progressionFamily.rawValue)"))
 
         // Drums
         for ruleID in drumRules.sorted() {
@@ -503,7 +513,8 @@ struct SongGenerator {
 
         // Bass
         for ruleID in bassRules.sorted() {
-            let tag = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID
+            let baseTag = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID
+            let tag = ruleTag(baseTag, testMode: testMode)
             log.append(GenerationLogEntry(tag: tag, description: bassRuleDescription(ruleID)))
         }
         if bassRules.isEmpty {
@@ -627,7 +638,7 @@ struct SongGenerator {
         case .dom7:    return "7"
         case .min7:    return "m7"
         case .add9:    return "add9"
-        case .quartal: return "qrt"
+        case .quartal: return "4th"
         case .power:   return "5"
         }
     }
@@ -635,10 +646,10 @@ struct SongGenerator {
     private static func progressionFamilyLabel(_ family: ProgressionFamily) -> String {
         switch family {
         case .static_tonic:             return "Static tonic: I"
-        case .two_chord_I_bVII:         return "Two chord: I — ♭VII"
-        case .minor_loop_i_VII:         return "Minor loop: i — VII"
-        case .minor_loop_i_VI:          return "Minor loop: i — VI"
-        case .modal_cadence_bVI_bVII_I: return "Modal rock: ♭VI — ♭VII — I"
+        case .two_chord_I_bVII:         return "Two chord: I - ♭VII"
+        case .minor_loop_i_VII:         return "Minor loop: i - VII"
+        case .minor_loop_i_VI:          return "Minor loop: i - VI"
+        case .modal_cadence_bVI_bVII_I: return "Modal rock: ♭VI - ♭VII - I"
         }
     }
 
@@ -648,6 +659,13 @@ struct SongGenerator {
         case "MOT-DRUM-002": return "Open Pocket"
         case "MOT-DRUM-003": return "Ride Groove"
         case "MOT-DRUM-004": return "Almost Motorik"
+        // Kosmic drum rules (shared lookup for regen log)
+        case "KOS-DRUM-001": return "Minimal JMJ Pop"
+        case "KOS-DRUM-002": return "Sparse pitched percussion"
+        case "KOS-DRUM-003": return "No percussion"
+        case "KOS-DRUM-004": return "Electric Buddha Groove"
+        case "KOS-DRUM-005": return "Electric Buddha Pulse"
+        case "KOS-DRUM-006": return "Electric Buddha Restrained"
         default:             return ruleID
         }
     }
@@ -668,8 +686,22 @@ struct SongGenerator {
         case "MOT-BASS-012": return "Moroder Chase"
         case "MOT-BASS-013": return "Kraftwerk Roboter"
         case "MOT-BASS-014": return "McCartney melodic drive"
+        case "MOT-BASS-015": return "Kraftwerk driving bass"
         case "BASS-EVOL":    return "Evolving pattern"
         case "BASS-DEVOL":   return "Devolving pattern"
+        // Kosmic bass rules (shared lookup for regen log)
+        case "KOS-BASS-001": return "Drone Root"
+        case "KOS-BASS-002": return "Root-Fifth Slow Walk"
+        case "KOS-BASS-003": return "Pedal Pulse"
+        case "KOS-BASS-004": return "Moroder Drift"
+        case "KOS-BASS-005": return "No bass"
+        case "KOS-BASS-006": return "Additive dual bass"
+        case "KOS-BASS-007": return "Pulsating tremolo"
+        case "KOS-BASS-008": return "Hallogallo Lock"
+        case "KOS-BASS-009": return "Crawling Walk"
+        case "KOS-BASS-010": return "Probabilistic Moroder Pulse"
+        case "KOS-BASS-011": return "Kraftwerk driving bass"
+        case "KOS-BASS-012": return "McCartney melodic drive"
         default:             return ruleID
         }
     }
@@ -733,127 +765,132 @@ struct SongGenerator {
         case "MOT-TEXR-004": return "Shimmer Pair"
         case "MOT-TEXR-005": return "Breath Release"
         case "MOT-TEXR-006": return "High Tension Touch"
-        // Cosmic texture rules
-        case "COS-TEXT-001": return "Orbital Motive"
-        case "COS-TEXT-002": return "EB Shimmer Hold"
-        case "COS-TEXT-003": return "Spatial Sweep"
+        // Kosmic texture rules
+        case "KOS-TEXT-001": return "Orbital Motive"
+        case "KOS-TEXT-002": return "EB Shimmer Hold"
+        case "KOS-TEXT-003": return "Spatial Sweep"
         default:             return ruleID
         }
     }
 
-    // MARK: - Cosmic rule descriptions
+    // MARK: - Kosmic rule descriptions
 
-    private static func cosmicDrumRuleDescription(_ ruleID: String) -> String {
+    private static func kosmicDrumRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "COS-DRUM-001": return "Minimal — JMJ Mini Pops style"
-        case "COS-DRUM-002": return "Sparse pitched percussion"
-        case "COS-DRUM-003": return "No percussion — Berlin School"
-        case "COS-DRUM-004": return "Electric Buddha groove"
-        case "COS-DRUM-005": return "Electric Buddha minimal beat"
+        case "KOS-DRUM-001": return "Minimal — JMJ Mini Pops style"
+        case "KOS-DRUM-002": return "Sparse pitched percussion"
+        case "KOS-DRUM-003": return "No percussion — Berlin School"
+        case "KOS-DRUM-004": return "Electric Buddha groove"
+        case "KOS-DRUM-005": return "Electric Buddha minimal beat"
+        case "KOS-DRUM-006": return "Electric Buddha restrained"
         default:                 return ruleID
         }
     }
 
-    private static func cosmicBassRuleDescription(_ ruleID: String) -> String {
+    private static func kosmicBassRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "COS-BASS-001":  return "Drone Root"
-        case "COS-BASS-002":  return "Root-Fifth Slow Walk"
-        case "COS-BASS-003":  return "Pedal Pulse"
-        case "COS-BASS-004":  return "Moroder Drift"
-        case "COS-BASS-005":  return "No bass"
-        case "COS-BASS-006":  return "Additive dual bass"
-        case "COS-BASS-007":  return "Pulsating tremolo"
-        case "COS-BASS-008":  return "Hallogallo Lock"
-        case "COS-BASS-009":  return "Crawling Walk"
-        case "COS-BASS-010":  return "Probabilistic Moroder Pulse"
-        case "COS-BASS-011":  return "Kraftwerk Roboter"
-        case "COS-BASS-012":  return "McCartney melodic drive"
+        case "KOS-BASS-001":  return "Drone Root"
+        case "KOS-BASS-002":  return "Root-Fifth Slow Walk"
+        case "KOS-BASS-003":  return "Pedal Pulse"
+        case "KOS-BASS-004":  return "Moroder Drift"
+        case "KOS-BASS-005":  return "No bass"
+        case "KOS-BASS-006":  return "Additive dual bass"
+        case "KOS-BASS-007":  return "Pulsating tremolo"
+        case "KOS-BASS-008":  return "Hallogallo Lock"
+        case "KOS-BASS-009":  return "Crawling Walk"
+        case "KOS-BASS-010":  return "Probabilistic Moroder Pulse"
+        case "KOS-BASS-011":  return "Kraftwerk driving bass"
+        case "KOS-BASS-012":  return "McCartney melodic drive"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
+        default:              return ruleID.hasPrefix("KOS-") ? ruleID : "Unknown bass rule"
+        }
+    }
+
+    private static func kosmicPadRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "KOS-PADS-001":  return "Long Drone — whole notes held 2–4 bars"
+        case "KOS-PADS-002":  return "Swell Chord — velocity ramp 20→80"
+        case "KOS-PADS-003":  return "Unsync Layers — 8/10/12 bar loops"
+        case "KOS-PADS-004":  return "Suspended Resolution — sus4→minor"
+        case "KOS-PADS-005":  return "Quartal Stack — stacked fourths"
+        case "KOS-PADS-006":  return "Cloud Shimmer — upper register fade"
+        case "KOS-PADS-007":  return "Probabilistic gated chord pulse"
         default:              return ruleID
         }
     }
 
-    private static func cosmicPadRuleDescription(_ ruleID: String) -> String {
+    private static func kosmicLeadRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "COS-PADS-001":  return "Long Drone — whole notes held 2–4 bars"
-        case "COS-PADS-002":  return "Swell Chord — velocity ramp 20→80"
-        case "COS-PADS-003":  return "Unsync Layers — 8/10/12 bar loops"
-        case "COS-PADS-004":  return "Suspended Resolution — sus4→minor"
-        case "COS-PADS-005":  return "Quartal Stack — stacked fourths"
-        case "COS-PADS-006":  return "Cloud Shimmer — upper register fade"
-        case "COS-PADS-007":  return "Probabilistic gated chord pulse"
-        default:              return ruleID
-        }
-    }
-
-    private static func cosmicLeadRuleDescription(_ ruleID: String) -> String {
-        switch ruleID {
-        case "COS-LEAD-001": return "Slow Arc — long rising/falling phrase"
-        case "COS-LEAD-002": return "Floating Tones — widely spaced notes"
-        case "COS-LEAD-003": return "Pentatonic Drift — slow 5-note move"
-        case "COS-LEAD-004": return "Echo Melody — phrase + answer"
-        case "COS-LEAD-005": return "Arpeggio Highlight — held note"
-        case "COS-LEAD-006": return "JMJ evolving phrase loop"
+        case "KOS-LEAD-001": return "Slow Arc — long rising/falling phrase"
+        case "KOS-LEAD-002": return "Floating Tones — widely spaced notes"
+        case "KOS-LEAD-003": return "Pentatonic Drift — slow 5-note move"
+        case "KOS-LEAD-004": return "Echo Melody — phrase + answer"
+        case "KOS-LEAD-005": return "Arpeggio Highlight — held note"
+        case "KOS-LEAD-006": return "JMJ evolving phrase loop"
         default:             return ruleID
         }
     }
 
-    private static func cosmicRthmRuleDescription(_ ruleID: String) -> String {
+    private static func kosmicRthmRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "COS-RTHM-001": return "Probabilistic Tangerine Dream sequencer"
-        case "COS-RTHM-002": return "Probabilistic JMJ melodic hook"
-        case "COS-RTHM-003": return "JMJ Oxygène oscillation — ascending then descending"
-        case "COS-RTHM-004": return "Probabilistic Electric Buddha pentatonic groove"
-        case "COS-RTHM-005": return "Probabilistic JMJ Dual-rate arpeggiator"
-        case "COS-RTHM-006": return "Kraftwerk locked pulse"
-        case "COS-RTHM-007": return "Probabilistic pitch-drifting sequence"
-        case "COS-RTHM-008": return "JMJ Oxygène 8-bar arc"
+        case "KOS-RTHM-001": return "Probabilistic Tangerine Dream sequencer"
+        case "KOS-RTHM-002": return "Probabilistic JMJ melodic hook"
+        case "KOS-RTHM-003": return "JMJ Oxygène oscillation — ascending then descending"
+        case "KOS-RTHM-004": return "Probabilistic Electric Buddha pentatonic groove"
+        case "KOS-RTHM-005": return "Probabilistic JMJ Dual-rate arpeggiator"
+        case "KOS-RTHM-006": return "Kraftwerk locked pulse"
+        case "KOS-RTHM-007": return "Probabilistic pitch-drifting sequence"
+        case "KOS-RTHM-008": return "JMJ Oxygène 8-bar arc"
         default:            return ruleID
         }
     }
 
-    private static func cosmicTexRuleDescription(_ ruleID: String) -> String {
+    private static func kosmicTexRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "COS-TEXT-001": return "Orbital Motive — lower register loop"
-        case "COS-TEXT-002": return "Electric Buddha shimmer hold"
-        case "COS-TEXT-003": return "Spatial Sweep — chromatic passing"
+        case "KOS-TEXT-001": return "Orbital Motive — lower register loop"
+        case "KOS-TEXT-002": return "Electric Buddha shimmer hold"
+        case "KOS-TEXT-003": return "Spatial Sweep — chromatic passing"
         default:             return ruleID
         }
     }
 
-    private static func cosmicProgressionFamilyLabel(_ family: CosmicProgressionFamily) -> String {
+    private static func kosmicProgressionFamilyLabel(_ family: KosmicProgressionFamily) -> String {
         switch family {
         case .static_drone:          return "Static Drone — single tonic hold"
-        case .two_chord_pendulum:    return "Two Chord Pendulum — Vangelis i→bVI"
-        case .modal_drift:           return "Modal Drift — i→bVII→bVI"
-        case .suspended_resolution:  return "Suspended Resolution — sus4→minor"
+        case .two_chord_pendulum:    return "Two Chord Pendulum — Vangelis i - bVI"
+        case .modal_drift:           return "Modal Drift — i - bVII - bVI"
+        case .suspended_resolution:  return "Suspended Resolution — sus4 - minor"
         case .quartal_stack:         return "Quartal Stack — stacked fourths"
         }
     }
 
-    // MARK: - Cosmic generation log builder
+    // MARK: - Kosmic generation log builder
 
     /// Rule IDs introduced recently — shown with a " *" suffix in the status log.
     /// Capped at 6; retire oldest when adding new ones.
     private static let newRuleIDs: Set<String> = [
-        "COS-RTHM-005", "COS-RTHM-006", "COS-RTHM-007", "COS-RTHM-008",
-        "COS-PADS-007",
-        "COS-LEAD-006"
+        "KOS-RTHM-006", "KOS-RTHM-007", "KOS-RTHM-008",
+        "KOS-PADS-007",
+        "KOS-LEAD-006",
+        "KOS-DRUM-006",
+        "KOS-BASS-011",
+        "MOT-BASS-013",
+        "MOT-BASS-015"
     ]
 
     private static func ruleTag(_ ruleID: String, testMode: Bool) -> String {
         testMode && newRuleIDs.contains(ruleID) ? "\(ruleID) *" : ruleID
     }
 
-    private static func buildCosmicLog(
+    private static func buildKosmicLog(
         title: String,
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         form: SongForm,
         percussionStyle: PercussionStyle,
-        cosmicForm: CosmicSongForm,
-        cosmicProgFamily: CosmicProgressionFamily,
+        kosmicForm: KosmicSongForm,
+        kosmicProgFamily: KosmicProgressionFamily,
         drumRules: Set<String>,
         bassRules: Set<String>,
         padRules: Set<String>,
@@ -869,80 +906,66 @@ struct SongGenerator {
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
 
         // Style identifier
-        log.append(GenerationLogEntry(tag: "Style", description: "Cosmic"))
+        log.append(GenerationLogEntry(tag: "Style", description: "Kosmic"))
 
-        // Cosmic form
-        let cosmicFormLabel: String
-        switch cosmicForm {
-        case .single_evolving:    cosmicFormLabel = "Single Evolving (Roach/TD)"
-        case .two_world:          cosmicFormLabel = "Two World (spacious + dense)"
-        case .build_and_dissolve: cosmicFormLabel = "Build and Dissolve"
+        // Kosmic form
+        let kosmicFormLabel: String
+        switch kosmicForm {
+        case .single_evolving:              kosmicFormLabel = "Single Evolving (Roach/TD)"
+        case .ab, .two_world:               kosmicFormLabel = "A - B"
+        case .aba, .build_and_dissolve:     kosmicFormLabel = "A - B - A"
+        case .abab:                         kosmicFormLabel = "A - B - A - B"
+        case .abba:                         kosmicFormLabel = "A - B - B - A"
         }
-        log.append(GenerationLogEntry(tag: "Form", description: cosmicFormLabel))
+        // Append bridge note if one was inserted
+        let hasBridge = structure.sections.contains { $0.label == .bridge || $0.label == .bridgeAlt || $0.label == .bridgeMelody }
+        let bridgeSuffix = hasBridge ? " + bridge" : ""
+        let formTag = (hasBridge && testMode) ? "Form *" : "Form"
+        log.append(GenerationLogEntry(tag: formTag, description: kosmicFormLabel + bridgeSuffix))
 
-        // Intro/outro
-        if let intro = structure.introSection {
-            log.append(GenerationLogEntry(tag: "Intro",
-                description: "\(intro.lengthBars) bar \(introStyleLabel(structure.introStyle))"))
-        }
-        if let outro = structure.outroSection {
-            log.append(GenerationLogEntry(tag: "Outro",
-                description: "\(outro.lengthBars) bar \(outroStyleLabel(structure.outroStyle))"))
-        }
 
-        // Global frame
-        let percLabel: String
-        switch percussionStyle {
-        case .absent:    percLabel = "absent"
-        case .sparse:    percLabel = "sparse pitched"
-        case .minimal:   percLabel = "minimal Mini Pops"
-        default:         percLabel = percussionStyle.rawValue
-        }
-        log.append(GenerationLogEntry(tag: "GBL-001",
-            description: "\(frame.key) \(frame.mode.rawValue), \(frame.tempo) BPM, percussion: \(percLabel)"))
-
-        // Chord progression — tag "Chords" for consistency with Motorik
+        // Chord progression — key/mode + progression family + chord names on one line
         let chordNames = structure.chordPlan
             .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
             .removingAdjacentDuplicates()
             .joined(separator: ", ")
-        let progFamilyLabel = cosmicProgressionFamilyLabel(cosmicProgFamily)
-        let chordDesc = chordNames.isEmpty ? progFamilyLabel : "\(progFamilyLabel)  \(chordNames)"
+        let progFamilyLabel = kosmicProgressionFamilyLabel(kosmicProgFamily)
+        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(progFamilyLabel)" + (chordNames.isEmpty ? "" : "  \(chordNames)")
         log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicRthmRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicRthmRuleDescription(ruleID)))
         }
 
         // Lead 1
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicLeadRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicLeadRuleDescription(ruleID)))
         }
 
         // Lead 2
         for ruleID in lead2Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicLeadRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicLeadRuleDescription(ruleID)))
         }
 
         // Pads
         for ruleID in padRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicPadRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicPadRuleDescription(ruleID)))
         }
 
         // Texture
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicTexRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicTexRuleDescription(ruleID)))
         }
 
         // Bass
         for ruleID in bassRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicBassRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicBassRuleDescription(ruleID)))
         }
 
         // Drums
         for ruleID in drumRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: cosmicDrumRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicDrumRuleDescription(ruleID)))
         }
 
         return log
@@ -959,7 +982,9 @@ struct SongGenerator {
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         drumRules: Set<String> = [],
-        bassEvolutionBars: [Int] = []
+        bassEvolutionBars: [Int] = [],
+        rhythmRules: Set<String> = [],
+        texRules: Set<String> = []
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -1000,7 +1025,7 @@ struct SongGenerator {
             case .add9:    return root + "add9"
             case .dom7:    return root + "7"
             case .min7:    return root + "m7"
-            case .quartal: return root + "qrt"
+            case .quartal: return root
             case .power:   return root + "5"
             }
         }
@@ -1063,6 +1088,32 @@ struct SongGenerator {
             guard kTrackBass < trackEvents.count else { return false }
             let bs = bar * 16
             return trackEvents[kTrackBass].filter { $0.stepIndex >= bs + 4 && $0.stepIndex < bs + 16 }.isEmpty
+        }
+
+        // Helper: identify cold start pickup fill name by examining drum notes in the last intro bar
+        func coldStartFillName(bar: Int) -> String {
+            guard kTrackDrums < trackEvents.count else { return "drum fill" }
+            let bs = bar * 16
+            let evs = trackEvents[kTrackDrums].filter { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
+            guard !evs.isEmpty else { return "drum fill" }
+            let notes = Set(evs.map { $0.note })
+            // Ride-based: Manchester atmospheric (Kosmic v3)
+            if notes.contains(GMDrum.ride.rawValue) { return "Buddha atmospheric fill" }
+            // All snare: crescendo roll (Kosmic v2)
+            if evs.allSatisfy({ $0.note == GMDrum.snare.rawValue }) { return "crescendo roll" }
+            // Has electric snare: funk snare build (Motorik v2)
+            if notes.contains(GMDrum.snare2.rawValue) { return "funky fill" }
+            let hasToms = notes.contains(GMDrum.hiTom.rawValue) || notes.contains(GMDrum.hiMidTom.rawValue)
+                       || notes.contains(GMDrum.lowMidTom.rawValue) || notes.contains(GMDrum.highFloorTom.rawValue)
+                       || notes.contains(GMDrum.lowFloorTom.rawValue)
+            let hasKick = notes.contains(GMDrum.kick.rawValue)
+            let hasHat  = notes.contains(GMDrum.closedHat.rawValue)
+            // Hat-only (no toms, no kick): hat crescendo (Kosmic v0)
+            if !hasToms && !hasKick { return "hat crescendo" }
+            // Toms with hat prefix: Bonham-style (Kosmic v1 3-beat / Motorik v1 3-beat)
+            if hasToms && hasHat { return "Bonham fill" }
+            // Toms, kick, no hat: rock cascade (Motorik v0, or 2-beat variants)
+            return "rock fill"
         }
 
         // Helper: identify fill name by examining drum notes in the fill region
@@ -1138,24 +1189,41 @@ struct SongGenerator {
             let bar = section.startBar
             switch section.label {
             case .intro:
-                let introDesc = "\(section.lengthBars) bar \(introStyleLabel(structure.introStyle))"
+                let introDesc: String
+                if case .coldStart(_) = structure.introStyle {
+                    let lastIntroBar = section.endBar - 1
+                    let fillLabel = coldStartFillName(bar: lastIntroBar)
+                    introDesc = "\(section.lengthBars) bar cold start — \(fillLabel)"
+                } else {
+                    introDesc = "\(section.lengthBars) bar \(introStyleLabel(structure.introStyle))"
+                }
                 fireBar(bar, tag: "Intro", desc: introDesc)
             case .A:
                 let chords = chordsLabel(for: section)
                 if seenLabels.contains(.A) {
-                    fireBar(bar, tag: "Section A", desc: "returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                    fireBar(bar, tag: "Form", desc: "Return to A section" + (chords.isEmpty ? "" : " — \(chords)"))
                 } else {
                     fireBar(bar, tag: "Section A", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
                 }
             case .B:
                 let chords = chordsLabel(for: section)
                 if seenLabels.contains(.B) {
-                    fireBar(bar, tag: "Section B", desc: "returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                    fireBar(bar, tag: "Form", desc: "Enter B section again" + (chords.isEmpty ? "" : " — \(chords)"))
                 } else {
-                    fireBar(bar, tag: "Section B", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
+                    fireBar(bar, tag: "Form", desc: "Enter B section" + (chords.isEmpty ? "" : " — \(chords)"))
                 }
             case .outro:
                 fireBar(bar, tag: "Outro", desc: "\(section.lengthBars) bar \(outroStyleLabel(structure.outroStyle))")
+            case .bridge:
+                fireBar(bar, tag: "Form", desc: "Bridge: escalating drums")
+            case .bridgeAlt:
+                fireBar(bar, tag: "Form", desc: "Bridge: call and response")
+            case .bridgeMelody:
+                fireBar(bar, tag: "Form", desc: "Bridge: melody")
+            case .preRamp:
+                fireBar(bar, tag: "Form", desc: "Transition")
+            case .postRamp:
+                fireBar(bar, tag: "Form", desc: "Returning to A section")
             }
             seenLabels.insert(section.label)
         }
@@ -1168,7 +1236,9 @@ struct SongGenerator {
         //    text appears just ahead of the hit rather than a full bar early.
         //    Fill region offsets: 1-beat → step 12, 2-beat → step 8, 3-beat → step 4.
         //    Fire steps:          1-beat → step 4,  2-beat → step 0,  3-beat → step 0.
-        for fillBar in allFillBars.sorted() where fillBar < outroStartBar {
+        //    Skip entirely when percussion is absent (drum track empty).
+        let hasDrums = kTrackDrums < trackEvents.count && !trackEvents[kTrackDrums].isEmpty
+        for fillBar in allFillBars.sorted() where fillBar < outroStartBar && hasDrums {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
             let beats  = fillBeats(bar: fillBar)
@@ -1216,7 +1286,7 @@ struct SongGenerator {
                     case "ride":
                         // Don't announce ride when ride IS the normal pattern for this song
                         if !isRideGroove {
-                            fireBar(bar, tag: "Drums", desc: "playing ride instead of hi-hat")
+                            fireBar(bar, tag: "Drums", desc: "switching to ride")
                         }
                     case "crash":
                         fireBar(bar, tag: "Drums", desc: "crash on beat 1, open hat colour")
@@ -1234,9 +1304,10 @@ struct SongGenerator {
             }
         }
 
-        // 4. Track spotlight entrances — fire at bar start when a track re-enters after 4+ silent bars.
-        // Announced at most once per section to avoid repetition.
-        let spotlightTracks: [(Int, String, String)] = [
+        // 4. Track spotlight entrances and departures.
+        // Departure: fire "stepping back" at the start of a 4+ bar silence (ArrangementFilter rest/reduce).
+        // Entrance: fire re-entry desc when a track returns after 3+ silent bars.
+        let spotlightTracks: [(trackIdx: Int, name: String, entranceDesc: String)] = [
             (kTrackLead1,   "Lead 1",  "steps into the spotlight"),
             (kTrackLead2,   "Lead 2",  "steps into the spotlight"),
             (kTrackPads,    "Pads",    "is back on stage"),
@@ -1250,17 +1321,30 @@ struct SongGenerator {
                 let b = ev.stepIndex / 16
                 if b < totalBars { barHasNotes[b] = true }
             }
-            var silentStreak = 0
-            var lastAnnouncedBar: Int = -8   // cooldown: don't re-announce within 8 bars
-            for bar in 0..<min(outroStartBar, totalBars) {
-                if barHasNotes[bar] {
-                    if silentStreak >= 3 && (bar - lastAnnouncedBar) >= 8 {
-                        fireBar(bar, tag: trackName, desc: entranceDesc)
-                        lastAnnouncedBar = bar
+            // Scan for silence blocks: find start and end of each contiguous silent run.
+            // Thresholds are intentionally high — only flag tracks that are genuinely absent,
+            // not sparse instruments with natural gaps between phrases.
+            var lastAnnouncedBar: Int = -16
+            let limit = min(outroStartBar, totalBars)
+            var i = 0
+            while i < limit {
+                if !barHasNotes[i] {
+                    let silenceStart = i
+                    while i < limit && !barHasNotes[i] { i += 1 }
+                    let silenceLen = i - silenceStart
+                    // Departure: 8+ bar silence that begins after the track was active
+                    if silenceLen >= 8 && silenceStart > 0 && barHasNotes[silenceStart - 1]
+                       && (silenceStart - lastAnnouncedBar) >= 16 {
+                        fireBar(silenceStart, tag: trackName, desc: "stepping back")
+                        lastAnnouncedBar = silenceStart
                     }
-                    silentStreak = 0
+                    // Entrance: track re-enters after 8+ bar silence
+                    if i < limit && silenceLen >= 8 && (i - lastAnnouncedBar) >= 16 {
+                        fireBar(i, tag: trackName, desc: entranceDesc)
+                        lastAnnouncedBar = i
+                    }
                 } else {
-                    silentStreak += 1
+                    i += 1
                 }
             }
         }
@@ -1269,8 +1353,8 @@ struct SongGenerator {
         //
         // Two detection paths:
         // A) Explicit: generators pass bassEvolutionBars with the exact bars where the
-        //    pattern variant starts/ends. Used for Cosmic patterns where the dual layer
-        //    (COS-BASS-006/007) masks fingerprint changes. Applied with 4-bar cooldown.
+        //    pattern variant starts/ends. Used for Kosmic patterns where the dual layer
+        //    (KOS-BASS-006/007) masks fingerprint changes. Applied with 4-bar cooldown.
         // B) Fingerprint: 4-bar pitch-class window comparison + density check. Fallback
         //    for patterns not covered by explicit tracking. 8-bar cooldown.
         if kTrackBass < trackEvents.count {
@@ -1350,6 +1434,50 @@ struct SongGenerator {
                     }
                 }
                 if !steps.isEmpty { prevStepFP = steps }
+            }
+        }
+
+        // Pattern evolution annotations — KOS-TEXT-001 and KOS-RTHM-006 shift register at B section
+        // boundaries when a B section exists; fall back to bar-count logic for single_evolving.
+        let firstBodyBar = structure.sections
+            .first(where: { $0.label != .intro && $0.label != .outro })?.startBar ?? 0
+        let bSections = structure.sections.filter { $0.label == .B }
+
+        if texRules.contains("KOS-TEXT-001") {
+            if structure.hasBSection {
+                for bSec in bSections {
+                    fireBar(bSec.startBar, tag: "Texture", desc: "octave lift")
+                    if bSec.endBar < outroStartBar {
+                        fireBar(bSec.endBar, tag: "Texture", desc: "back to original")
+                    }
+                }
+            } else {
+                var b = firstBodyBar + 24
+                while b < outroStartBar {
+                    fireBar(b, tag: "Texture", desc: "octave lift")
+                    let returnBar = b + 8
+                    if returnBar < outroStartBar { fireBar(returnBar, tag: "Texture", desc: "back to original") }
+                    b += 24
+                }
+            }
+        }
+
+        if rhythmRules.contains("KOS-RTHM-006") {
+            if structure.hasBSection {
+                for bSec in bSections {
+                    fireBar(bSec.startBar, tag: "Rhythm", desc: "octave shift")
+                    if bSec.endBar < outroStartBar {
+                        fireBar(bSec.endBar, tag: "Rhythm", desc: "back to original")
+                    }
+                }
+            } else {
+                var b = firstBodyBar + 32
+                while b < outroStartBar {
+                    fireBar(b, tag: "Rhythm", desc: "octave shift")
+                    let returnBar = b + 4
+                    if returnBar < outroStartBar { fireBar(returnBar, tag: "Rhythm", desc: "back to original") }
+                    b += 32
+                }
             }
         }
 

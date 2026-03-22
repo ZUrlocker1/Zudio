@@ -2,9 +2,9 @@
 
 ## Context
 
-Zudio currently has Motorik (krautrock) implemented and Cosmic (Berlin School) fully designed. This is the third style: **Ambient** — rooted in Brian Eno's tape-loop generative philosophy and Loscil's electronic drone aesthetic. The plan covers musical research, generator design, and architecture. No code is written here.
+Zudio currently has Motorik (krautrock) implemented and Kosmic (Berlin School) fully designed. This is the third style: **Ambient** — rooted in Brian Eno's tape-loop generative philosophy and Loscil's electronic drone aesthetic. The plan covers musical research, generator design, and architecture. No code is written here.
 
-The UI style dial will become: **Motorik → Cosmic → Ambient**.
+The UI style dial will become: **Motorik → Kosmic → Ambient**.
 
 The target is **electronic ambient** — slow, spacious, loop-phasing, modal. Not new-age piano. Available timbres: e-piano, Wurlitzer, organ, synth leads, pads, bass, drums (sparse/absent). No acoustic piano primacy.
 
@@ -14,9 +14,9 @@ The target is **electronic ambient** — slow, spacious, loop-phasing, modal. No
 
 **Brian Eno's definition (1978):** "Ambient music must be able to accommodate many levels of listening attention without enforcing one in particular; it must be as ignorable as it is interesting."
 
-**Key characteristics distinguishing Ambient from Cosmic:**
+**Key characteristics distinguishing Ambient from Kosmic:**
 - **Ambient:** No tempo anchor; loop phasing creates all variation; no rhythm; pure stasis with microscopic evolution
-- **Cosmic:** Has a sequencer pulse (arpeggios, rhythmic patterns); tempo is felt; Berlin School energy
+- **Kosmic:** Has a sequencer pulse (arpeggios, rhythmic patterns); tempo is felt; Berlin School energy
 - **Motorik:** Driving kick/snare groove; forward propulsion; rhythm is primary
 
 Ambient is the most static of the three styles. Changes happen over minutes, not bars. The listener cannot predict when anything will change — because nothing is scheduled to change; variation emerges from mathematical phase relationships between loops of incommensurable lengths.
@@ -320,14 +320,14 @@ These rules are non-negotiable for anything to sound Ambient:
 
 ---
 
-## Part 4: Ambient vs. Cosmic vs. Motorik — The Full Comparison
+## Part 4: Ambient vs. Kosmic vs. Motorik — The Full Comparison
 
-- **Tempo feel:** Ambient = no felt pulse / Cosmic = sequencer pulse / Motorik = driving groove
-- **Harmonic rhythm:** Ambient = drone (8–∞ bars) / Cosmic = slow (8–16 bars) / Motorik = moderate (4–8 bars)
-- **Drums:** Ambient = absent or textural-only / Cosmic = absent or sparse hi-hat / Motorik = full groove
-- **Leading element:** Ambient = pad/drone cloud / Cosmic = arpeggio sequence / Motorik = kick pattern
-- **Variation source:** Ambient = loop phase math / Cosmic = skip logic + layer mutation / Motorik = section arcs
-- **Listener experience:** Ambient = immersion (time dissolves) / Cosmic = trance (time slows) / Motorik = propulsion (time drives)
+- **Tempo feel:** Ambient = no felt pulse / Kosmic = sequencer pulse / Motorik = driving groove
+- **Harmonic rhythm:** Ambient = drone (8–∞ bars) / Kosmic = slow (8–16 bars) / Motorik = moderate (4–8 bars)
+- **Drums:** Ambient = absent or textural-only / Kosmic = absent or sparse hi-hat / Motorik = full groove
+- **Leading element:** Ambient = pad/drone cloud / Kosmic = arpeggio sequence / Motorik = kick pattern
+- **Variation source:** Ambient = loop phase math / Kosmic = skip logic + layer mutation / Motorik = section arcs
+- **Listener experience:** Ambient = immersion (time dissolves) / Kosmic = trance (time slows) / Motorik = propulsion (time drives)
 
 ---
 
@@ -340,7 +340,7 @@ These rules are non-negotiable for anything to sound Ambient:
 - **Slow pulse** (35%): 70–95 BPM, soft kick-like events, Loscil/Gas feel (corrected from initial double-time estimate)
 - **Mid pulse** (15%): 95–110 BPM — still feels slow due to sparse events; Gas-style heartbeat kick
 
-**Cosmic/Ambient boundary at overlapping tempos:** At 95–110 BPM, the distinction from Cosmic is not tempo — it is the absence of the arpeggio generator. Ambient at these tempos has no sequencer pulse; Cosmic at the same tempo has a CosmicArpeggioGenerator as its primary voice.
+**Kosmic/Ambient boundary at overlapping tempos:** At 95–110 BPM, the distinction from Kosmic is not tempo — it is the absence of the arpeggio generator. Ambient at these tempos has no sequencer pulse; Kosmic at the same tempo has a CosmicArpeggioGenerator as its primary voice.
 
 **PercussionStyle enum (canonical, for Types.swift):** `.absent` / `.textural` / `.softPulse`
 
@@ -374,7 +374,7 @@ The earlier plan (A minor 18%, E minor 15%, D minor 15%, minor-dominant) was der
 
 ### 5.2 AmbientLoopEngine — The Core Architecture
 
-This is what makes Ambient different from Cosmic at an engine level.
+This is what makes Ambient different from Kosmic at an engine level.
 
 **Loop concept:** Rather than a single song-length MIDI sequence, Ambient uses 3–7 independent loop layers, each with its own bar count (loop length), that play simultaneously and never resync.
 
@@ -528,7 +528,7 @@ The most constrained generator. Three settings:
 
 ### 5.7 AmbientRhythmGenerator (Arpeggio Track)
 
-In Cosmic, the rhythm/arpeggio track is the primary voice. In Ambient, it is nearly silent or absent.
+In Kosmic, the rhythm/arpeggio track is the primary voice. In Ambient, it is nearly silent or absent.
 
 **AMB-RHY-001: Absent** (60% probability) — Track empty; pad drones carry everything
 
@@ -647,7 +647,7 @@ Enforced in generator:
 
 - **Continuous Play interaction:** Ambient songs need different crossfade rules. A 6–8 bar crossfade (longer than Motorik's 4-bar) is appropriate. Bass and pads should always be "copied" (not regenerated fresh) across transitions — stable drones are even more critical in Ambient.
 
-- **All 7 tracks always generated:** Both Cosmic and Ambient use all 7 tracks (Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums). Tracks that are "absent" for a given style simply generate no MIDI events — their MIDI lane appears blank in the UI. This preserves UI consistency, allows users to mute/solo any track, and lets users swap instruments on sparse tracks. Drums being "absent" means the drums track exists but has zero events.
+- **All 7 tracks always generated:** Both Kosmic and Ambient use all 7 tracks (Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums). Tracks that are "absent" for a given style simply generate no MIDI events — their MIDI lane appears blank in the UI. This preserves UI consistency, allows users to mute/solo any track, and lets users swap instruments on sparse tracks. Drums being "absent" means the drums track exists but has zero events.
 
 - **Tempo-synced delay setup (AVAudioUnitDelay):** The PlaybackEngine already uses `AVAudioUnitDelay`. For Ambient style, when the playback engine initializes a song, it should configure the delay node with `delayTime = (60.0 / bpm) * 1.5` (dotted half note), `feedback = 0.65`, `wetDryMix = 60`. This would require either: (a) passing style info to PlaybackEngine so it can set delay parameters per-style, or (b) exporting delay parameters alongside MIDI events in the generated song data structure. Option (a) is simpler for the initial implementation.
 
@@ -683,7 +683,7 @@ Enforced in generator:
 - `Sources/Zudio/Models/Types.swift` — add `.ambient` to `MusicStyle`, add `PercussionStyle` enum, add Ambient progression families
 - `Sources/Zudio/UI/TopBarView.swift` — style picker gains third segment
 - `Sources/Zudio/UI/TrackRowView.swift` — Ambient instrument presets
-- `Sources/Zudio/AppState.swift` — `selectedStyle` already planned for Cosmic; Ambient slots in automatically
+- `Sources/Zudio/AppState.swift` — `selectedStyle` already planned for Kosmic; Ambient slots in automatically
 
 ---
 
@@ -709,7 +709,7 @@ Enforced in generator:
 6. No V7→I resolutions in any generated harmonic sequence
 7. Subjective test: does it sound like background music that can be ignored? (Eno's "as ignorable as it is interesting" criterion)
 8. Continuous Play crossfade: Ambient songs use 6-bar fade, not 4-bar
-9. Style picker shows Motorik | Cosmic | Ambient — all three generate correctly
+9. Style picker shows Motorik | Kosmic | Ambient — all three generate correctly
 10. Test Mode (Cmd-T): 1-minute Ambient songs generated for rapid audition
 
 ---
@@ -833,4 +833,4 @@ All 7 songs: 69–82 BPM. Percussion: absent or textural-only in all 7. Not one 
 - `.textural` 35% (unchanged)
 - `.softPulse` 5% (lowered from 15% — rare in practice)
 
-The 95–110 BPM "mid pulse" operating mode may be more characteristic of Cosmic-leaning ambient crossover than pure Ambient.
+The 95–110 BPM "mid pulse" operating mode may be more characteristic of Kosmic-leaning ambient crossover than pure Ambient.

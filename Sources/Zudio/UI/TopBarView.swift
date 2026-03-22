@@ -112,7 +112,7 @@ struct TopBarView: View {
                             .keyboardShortcut("t", modifiers: .command)
                         Button("") { appState.selectedStyle = .motorik }
                             .keyboardShortcut("m", modifiers: .command)
-                        Button("") { appState.selectedStyle = .cosmic }
+                        Button("") { appState.selectedStyle = .kosmic }
                             .keyboardShortcut("k", modifiers: .command)
                         Button("") { appState.seekToStart() }
                             .keyboardShortcut("b", modifiers: .command)
@@ -215,16 +215,18 @@ struct TopBarView: View {
                     // Row 2: Generate | Style | Mood | Key | BPM
                     HStack(spacing: 14) {
                         Button(action: { appState.generateNew() }) {
-                            Label("Generate", systemImage: "bolt.fill")
-                                .fontWeight(.semibold)
-                                .frame(width: 116, alignment: .center)
+                            Label {
+                                (Text("G").underline() + Text("enerate"))
+                                    .fontWeight(.semibold)
+                            } icon: { Image(systemName: "bolt.fill") }
+                            .frame(width: 116, alignment: .center)
                         }
                         .disabled(appState.isGenerating)
                         .keyboardShortcut("g", modifiers: .command)
 
                         Picker("", selection: $appState.selectedStyle) {
-                            Text("Motorik").tag(MusicStyle.motorik)
-                            Text("Cosmic").tag(MusicStyle.cosmic)
+                            (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
+                            (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
                         }
                         .pickerStyle(.segmented)
                         .frame(width: 140)
@@ -249,7 +251,7 @@ struct TopBarView: View {
 
                         HStack(spacing: 6) {
                             Text("BPM")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white)
                                 .fixedSize()
                             TextField("", value: Binding(
                                 get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 0 },
@@ -268,18 +270,22 @@ struct TopBarView: View {
                     // Row 3: Save MIDI | Reset
                     HStack(spacing: 14) {
                         Button(action: { appState.saveMIDI() }) {
-                            Label("Save MIDI", systemImage: "square.and.arrow.down")
-                                .fontWeight(.semibold)
-                                .frame(width: 116, alignment: .center)
+                            Label {
+                                (Text("S").underline() + Text("ave MIDI"))
+                                    .fontWeight(.semibold)
+                            } icon: { Image(systemName: "square.and.arrow.down") }
+                            .frame(width: 116, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
                         .keyboardShortcut("s", modifiers: .command)
                         .help("Save multi-track MIDI to ~/Downloads/ (⌘S)")
 
                         Button(action: { appState.resetTrackDefaults() }) {
-                            Label("Reset", systemImage: "arrow.counterclockwise")
-                                .fontWeight(.semibold)
-                                .frame(width: 140, alignment: .center)
+                            Label {
+                                (Text("R").underline() + Text("eset"))
+                                    .fontWeight(.semibold)
+                            } icon: { Image(systemName: "arrow.counterclockwise") }
+                            .frame(width: 140, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
                         .keyboardShortcut("r", modifiers: .command)
@@ -296,8 +302,8 @@ struct TopBarView: View {
 
                 // Help / About — rows align with Generate (row 2) and Save MIDI (row 3)
                 VStack(alignment: .trailing, spacing: 6) {
-                    Button { showHelp  = true } label: { Text("Help").frame(width: 52) }
-                    Button { showAbout = true } label: { Text("About").frame(width: 52) }
+                    Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: 52) }
+                    Button { showAbout = true } label: { (Text("A").underline() + Text("bout")).frame(width: 52) }
                     Text("Copyright © 2026 Zack Urlocker")
                         .font(.callout)
                         .foregroundStyle(.white)
@@ -309,11 +315,17 @@ struct TopBarView: View {
             }
             .padding(.horizontal, 2)
             .background(Color(white: 0.15))
+            .onAppear {
+                // Prevent BPM text field from stealing focus on launch so plain keyboard shortcuts work
+                DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
+            }
 
             Divider()
         }
         .sheet(isPresented: $showHelp)  { HelpView() }
         .sheet(isPresented: $showAbout) { AboutView() }
+        .onChange(of: appState.triggerShowHelp)  { _ in showHelp  = true }
+        .onChange(of: appState.triggerShowAbout) { _ in showAbout = true }
     }
 }
 
@@ -335,26 +347,44 @@ private func loadLogoImage() -> NSImage? {
     return nil
 }
 
+private func loadAppIcon() -> NSImage? {
+    let paths = ["assets/zudio-icon.icns", "Resources/assets/zudio-icon.icns"]
+    if let base = Bundle.main.resourceURL {
+        for path in paths {
+            let url = base.appendingPathComponent(path)
+            if let img = NSImage(contentsOf: url) { return img }
+        }
+    }
+    if let url = Bundle.main.url(forResource: "zudio-icon", withExtension: "icns"),
+       let img = NSImage(contentsOf: url) { return img }
+    return nil
+}
+
 // MARK: - Help
 
 struct HelpView: View {
     @Environment(\.dismiss) var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Zudio Help").font(.title2.bold())
+            HStack(spacing: 10) {
+                if let img = loadAppIcon() {
+                    Image(nsImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                }
+                Text("Zudio Help").font(.title2.bold())
+            }
             Divider()
             VStack(alignment: .leading, spacing: 8) {
-                Text("Zudio generates Motorik-inspired music using MIDI tracks.")
-                    .font(.callout).fixedSize(horizontal: false, vertical: true)
+                Text("Zudio generates Motorik, Kosmic and Ambient inspired music using MIDI.")
+                    .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
                 helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result, or leave them on Auto.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
-                helpLine("⌘← / ⌘B", "Go to beginning of track.")
-                helpLine("⌘→", "Go to end of track.")
                 helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to ~/Downloads/. Open in any DAW to edit further.")
                 helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
-                helpLine("⌘M / ⌘K", "Switch to Motorik or Kosmic style.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")
                 helpLine("M / S", "Mute or Solo a track. Click again to toggle off.")
@@ -364,13 +394,13 @@ struct HelpView: View {
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 600, height: 430)
+        .frame(width: 580, height: 600)
     }
 
     private func helpLine(_ title: String, _ desc: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(title).font(.callout.bold())
-            Text(desc).font(.callout).foregroundStyle(.secondary)
+            Text(title).font(.system(size: 14).bold())
+            Text(desc).font(.system(size: 14)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -382,17 +412,25 @@ struct AboutView: View {
     @Environment(\.dismiss) var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Zudio").font(.title.bold())
+            HStack(spacing: 10) {
+                if let img = loadAppIcon() {
+                    Image(nsImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 48, height: 48)
+                }
+                Text("Zudio").font(.title.bold())
+            }
             Text("Generative music application vibe coded with Claude!")
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.81 (alpha)").font(.callout)
-                Text("Built by analyzing classic Motorik and Cosmic songs as well as other works. Then a set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.callout)
+                Text("Version: 0.82 (alpha)").font(.system(size: 14))
+                Text("Built by analyzing classic Motorik and Kosmic songs as well as other works. Then a set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1.0: Motorik and Cosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.callout)
+                Text("V1.0: Motorik and Kosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2.0: Ambient style coming soon.").font(.callout)
+                Text("V2.0: Ambient style coming soon.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -402,10 +440,10 @@ struct AboutView: View {
                 Link("https://github.com/ZUrlocker1/Zudio",
                      destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
             }
-            .font(.callout)
+            .font(.system(size: 14))
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 440, height: 316)
+        .frame(width: 460, height: 420)
     }
 }

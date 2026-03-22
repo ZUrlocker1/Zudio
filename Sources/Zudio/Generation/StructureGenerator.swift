@@ -160,6 +160,7 @@ struct StructureGenerator {
         case .intro, .outro: chordCount = 1
         case .A: chordCount = rng.nextDouble() < 0.5 ? 1 : 2
         case .B: chordCount = rng.nextInt(upperBound: 2) + 2 // 2–3
+        default: chordCount = 1  // bridge / ramp sections: single chord
         }
 
         let barsEach = max(4, section.lengthBars / chordCount)

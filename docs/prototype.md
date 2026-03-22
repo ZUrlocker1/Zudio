@@ -174,7 +174,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - STR-001: Single-A, STR-002: Subtle A/B, STR-003: Moderate A/B, STR-004: Moderate A/B/A'
   - INT-001: 8-bar intro, INT-002: 16-bar intro
   - OUT-001: 8-bar outro, OUT-002: 16-bar outro
-  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-014; BASS-EVOL (evolving pattern — fires when variation starts, or always for rules 012/013/014 and COS-BASS-011/012), BASS-DEVOL (devolving pattern — fires when simple-rule variation reverts)
+  - GBL: single rule (GBL-001); DRM: DRM-001 through DRM-004; BAS: BAS-001 through BAS-014; BASS-EVOL (evolving pattern — fires when variation starts, or always for rules 012/013/014 and KOS-BASS-011/012), BASS-DEVOL (devolving pattern — fires when simple-rule variation reverts)
   - LD1: LD1-001 (phrase-first), LD1-002 (pentatonic cell), LD1-003 (long breath), LD1-004 (stepwise sequence), LD1-005 (statement-answer)
   - LD2: LD2-001 (counter-response), LD2-002 (sustained drone), LD2-003 (rhythmic counter), LD2-004 (Hallogallo motif counter), LD2-005 (descending line)
   - PAD: PAD-001 (sustained whole-bar), PAD-002 (power/drone voicing), PAD-003 (pulsed 2-bar), PAD-004 (sparse intro/outro), PAD-006 (chord stabs beat 1/3), PAD-007 (Charleston 3+3+2), PAD-010 (half-bar breathe), PAD-011 (backbeat stabs beats 2+4)
@@ -1659,7 +1659,7 @@ BAS-011 - Quo Drive: 1-bar compressed boogie arc; root-push variant on even bars
 BAS-012 - Moroder Chase: delay-echo 16th-note ostinato; primary 8th notes cycle root–mode3rd–fifth; quieter echo fills intermediate 16th steps. Even bars: full three-note cycling; odd bars: root–root–fifth–root breathing room. Always emits BASS-EVOL.
 BAS-013 - Kraftwerk Roboter: octave-jump 3-note cell root(8th)–root+octave(8th)–mode3rd(quarter), twice per bar. Bars 0–1 of 4-bar group: mode3rd landing; bars 2–3: fifth for harmonic lift. Every 8th bar is root-only lock. Always emits BASS-EVOL.
 BAS-014 - McCartney melodic drive: 8-note Mixolydian riff root–fifth–root–b7–fifth–root–mode3rd–root in 8th notes on even bars; odd bars breathe with root hold + root–fifth–root walkup. Flat-seventh gives blues/Mixolydian edge. Always emits BASS-EVOL.
-BASS-EVOL - Evolving pattern: fires when bass variation begins (simple rules BAS-001/002/004 in B sections or bar ≥48) or always for always-evolving rules (BAS-012/013/014, COS-BASS-011/012).
+BASS-EVOL - Evolving pattern: fires when bass variation begins (simple rules BAS-001/002/004 in B sections or bar ≥48) or always for always-evolving rules (BAS-012/013/014, KOS-BASS-011/012).
 BASS-DEVOL - Devolving pattern: fires when simple-rule bass variation reverts to original pattern at end of qualifying section window.
 
 ### Pad rules
@@ -1720,26 +1720,45 @@ TEX-004 - Shimmer Pair: two notes a major-7th or minor-9th apart, off-beat, shor
 TEX-005 - Breath Release: quiet note on last step of each section's final bar, 50% probability.
 TEX-006 - High Tension Touch: single scale-tension note, off-beat, ~once per 20 bars, body sections only.
 
-### Cosmic bass rules (COS-BASS)
-COS-BASS-001 - Root drone: single sustained root note per bar.
-COS-BASS-002 - Octave pulse: alternating root / root+octave pattern.
-COS-BASS-003 - Pedal Pulse: alternates between root and perfect fifth.
-COS-BASS-004 - Moroder Drift: slow chromatic drift between adjacent tones.
-COS-BASS-005 - Bass absent: no bass layer.
-COS-BASS-006 - Additive dual bass: anchor note plus staccato off-beat layer. Required for COS-BASS-008; blocked with COS-BASS-004/010/012.
-COS-BASS-007 - Pulsating tremolo: rapid root pulsing layer; blocked with COS-BASS-004/010/012.
-COS-BASS-008 - Hallogallo Lock (Cosmic): root beat 1, fifth beat 3, two long notes per bar. Always uses COS-BASS-006 layer.
-COS-BASS-009 - Crawling Walk (Cosmic): 2-bar root/fifth/approach-note pattern, lower velocities than Motorik version.
-COS-BASS-010 - Moroder Pulse (Cosmic): 8th-note ostinato root–root–fifth–fifth–b7–b7–root–root.
-COS-BASS-011 - Kraftwerk Roboter (Cosmic): octave-jump 3-note cell at slower Cosmic tempo. Always emits BASS-EVOL.
-COS-BASS-012 - McCartney melodic drive (Cosmic): 8-note Mixolydian riff cycling each bar. Always emits BASS-EVOL.
+### Kosmic bass rules (KOS-BASS)
+KOS-BASS-001 - Root drone: single sustained root note per bar.
+KOS-BASS-002 - Octave pulse: alternating root / root+octave pattern.
+KOS-BASS-003 - Pedal Pulse: alternates between root and perfect fifth.
+KOS-BASS-004 - Moroder Drift: slow chromatic drift between adjacent tones.
+KOS-BASS-005 - Bass absent: no bass layer.
+KOS-BASS-006 - Additive dual bass: anchor note plus staccato off-beat layer. Required for KOS-BASS-008; blocked with KOS-BASS-004/010/012.
+KOS-BASS-007 - Pulsating tremolo: rapid root pulsing layer; blocked with KOS-BASS-004/010/012.
+KOS-BASS-008 - Hallogallo Lock (Kosmic): root beat 1, fifth beat 3, two long notes per bar. Always uses KOS-BASS-006 layer.
+KOS-BASS-009 - Crawling Walk (Kosmic): 2-bar root/fifth/approach-note pattern, lower velocities than Motorik version.
+KOS-BASS-010 - Moroder Pulse (Kosmic): 8th-note ostinato root–root–fifth–fifth–b7–b7–root–root.
+KOS-BASS-011 - Kraftwerk Roboter (Kosmic): octave-jump 3-note cell at slower Kosmic tempo. Always emits BASS-EVOL.
+KOS-BASS-012 - McCartney melodic drive (Kosmic): 8-note Mixolydian riff cycling each bar. Always emits BASS-EVOL.
 
-### Cosmic drum rules (COS-DRUM)
-COS-DRUM-001 - Minimal: kick beat 1 every other bar; quarter-note hi-hat with ghost/accent alternation.
-COS-DRUM-002 - Sparse: floor tom hits every 4–8 beats on root and fifth.
-COS-DRUM-003 - Absent: no percussion.
-COS-DRUM-004 - Electric Buddha Groove: 8th-note hi-hat, 5 kick/snare pattern variants rotating every 4 bars. Tempo ≥ 100 BPM only.
-COS-DRUM-005 - Electric Buddha Pulse: quarter-note hi-hat, half-time snare default, mid-weight feel. Tempo ≥ 100 BPM only.
+### Kosmic drum rules (KOS-DRUM)
+KOS-DRUM-001 - Minimal: kick beat 1 every other bar; quarter-note hi-hat with ghost/accent alternation.
+KOS-DRUM-002 - Sparse: floor tom hits every 4–8 beats on root and fifth.
+KOS-DRUM-003 - Absent: no percussion.
+KOS-DRUM-004 - Electric Buddha Groove: 8th-note hi-hat, 5 kick/snare pattern variants rotating every 4 bars. Tempo ≥ 100 BPM only.
+KOS-DRUM-005 - Electric Buddha Pulse: quarter-note hi-hat, half-time snare default, mid-weight feel. Tempo ≥ 100 BPM only.
+KOS-DRUM-FILL - Transition fill: fires on the bar immediately before any body section label change. Three variants: hat strip, snare build, or tom cascade.
+
+### Kosmic arpeggio rules (KOS-RTHM)
+KOS-RTHM-001 - TD Sequencer: repeating 8-step pattern over one octave, Tangerine Dream style.
+KOS-RTHM-002 - JMJ Hook: distinctive 6-step melodic hook, Jean-Michel Jarre style.
+KOS-RTHM-003 - Oxygène: three-voice layered ascending/descending figures.
+KOS-RTHM-004 - Electric Buddha: syncopated 16-step pattern with rhythmic displacement.
+KOS-RTHM-006 - Kraftwerk Locked Pulse: octave-displaced version in B sections (or bar 32+ in single_evolving). B-section-driven.
+KOS-RTHM-007 - Pitch-Drifting Sequence: pitch arch scoped per section; each A and B section gets its own independent rise-and-fall.
+
+### Kosmic texture rules (KOS-TEXT)
+KOS-TEXT-001 - Orbital Motive: shimmer lift; active throughout B sections (or bar 24+ in single_evolving). B-section-driven.
+KOS-TEXT-002 - Shimmer Hold: long sustained note in upper register; used in preRamp before melody bridges.
+KOS-TEXT-003 - Spatial Sweep: slow rising figure across 4 bars; used in postRamp after melody bridges.
+KOS-TEXT-004 - Micro-pulse: very quiet, rapidly repeated single note.
+
+### Kosmic lead rules (KOS-LEAD)
+KOS-LEAD-TECH-D - Technique D: 60% chance the B section lead picks a rule not used in A (creates "instrument arriving" effect).
+KOS-LEAD-BRIDGE - Bridge melody: Archetype B bridge lead picks a rule not used in A or B; plays in upper register (MIDI 72–84); phrase repeats once.
 
 ### Interplay rules for cross-track behavior
 I-001 - Bass-vs-Lead2 conflict priority: keep bass, remap Lead 2 to consonant target, else suppress.
@@ -1758,13 +1777,13 @@ Q-002 - Reject/regenerate windows with >2 unresolved strong-beat Bass/Lead2 clas
 Q-003 - Reject/regenerate windows exceeding mood-consistency major/minor coloration threshold.
 Q-004 - Run final harmonic auto-repair pass before MIDI render commit.
 
-## Cosmic Implementation Spec (v1.x)
+## Kosmic Implementation Spec (v1.x)
 
 ### Style philosophy
 
 Berlin School / Tangerine Dream / JMJ / Klaus Schulze aesthetic. Long-form, slowly evolving, atmospheric. Minimal or absent percussion. Bass drones that build from near-silence. Sequencer arpeggios that spin up gradually. Pad swells that fill harmonic space. Texture shimmer as a presence layer. Songs feel like they are arriving from a great distance and then receding back into it.
 
-### Track roles in Cosmic style
+### Track roles in Kosmic style
 
 - Bass — holds root or fifth as a drone; may have an additive layer for movement or pulse
 - Pads — slow-moving 2-bar held chord voicings; primary harmonic atmosphere
@@ -1772,6 +1791,28 @@ Berlin School / Tangerine Dream / JMJ / Klaus Schulze aesthetic. Long-form, slow
 - Arpeggio — sequencer pattern; the kinetic element; enters late in intro and exits early in outro
 - Lead — sparse melodic line over the arpeggio pulse
 - Drums — sparse or absent; never a driving backbeat
+
+### Song forms (Kosmic)
+
+Five structural forms determine how sections are arranged:
+
+- `single_evolving` (30%) — A section only; no B section; evolution driven by bar-count thresholds
+- `ab` (20%) — A section followed by B section
+- `aba` (25%) — A section, B section, return to A
+- `abab` (15%) — two full A/B cycles
+- `abba` (10%) — A, double B in the middle, return to A (very TD-like; `abba` B2 uses the same mode as B1)
+
+A sections always use the song's primary mode (Dorian). B sections shift mode: Aeolian (45%), Mixolydian (35%), or Aeolian again (20%).
+
+Section lengths (as a proportion of total body bars):
+- `ab`: A = 60%, B = 40%
+- `aba`: A1 = 35%, B = 30%, A2 = 35%
+- `abab`: each of the four segments = 25%
+- `abba`: each of the four segments = 25%
+
+Minimum lengths: each B section at least 16 bars; each A section at least 24 bars.
+
+A bridge can be inserted between the last A and first B section in `ab` and `aba` forms only (35% of eligible songs). `abab` and `abba` are ineligible — the repeated B entry would make the dramatic effect feel formulaic. `single_evolving` has no B to bridge toward.
 
 ### Intro and outro behavior
 
@@ -1787,63 +1828,116 @@ The outro mirrors this arc:
 - Bass drone decays gradually to the end
 - Texture shimmer present only in the first half of the outro
 
-### Percussion styles (COS-DRUM)
+### B section behavior
 
-- COS-DRUM-001 — Minimal: kick on beat 1 every other bar; hi-hat quarter-note pulse with ghost/accent alternation (JMJ Mini Pops style)
-- COS-DRUM-002 — Sparse: pitched floor tom hits every 4–8 beats, rooted on the root and fifth of the key
-- COS-DRUM-003 — Absent: no percussion at all (Berlin School orchestral mode)
-- COS-DRUM-004 — Electric Buddha Groove: 8th-note hi-hat pulse (not 16th — half-density Motorik), 5 kick/snare pattern variants rotating every 4 bars for groove without monotony. Inspired by Electric Buddha Band (Time Loops, Dark Sun, Mister Mosca). Used with cold start (drums-only pickup) 60% of the time. Only fires at tempo ≥ 100 BPM.
-- COS-DRUM-005 — Electric Buddha Pulse: mid-weight half-time feel between Minimal and the full groove. Quarter-note hi-hat (not 8th); kick on beat 1 every bar, beat 3 added ~45% of bars; snare half-time (beat 3 only) 65% of time, full rock (beats 2+4) 35%. Only fires at tempo ≥ 100 BPM.
+When a B section exists, evolution rules shift from bar-count thresholds to section boundaries. For `single_evolving` songs, bar-count fallback logic still applies.
 
-Cold start drum fill (Cosmic — 3 variants, selected randomly):
+Section-driven evolution rules:
+- KOS-RTHM-006 (Kraftwerk Locked Pulse): octave-displaced arpeggio pattern active throughout the entire B section; base pattern in A sections. In `single_evolving`, octave version fires at bar 32+ on 32-bar windows.
+- KOS-TEXT-001 (Orbital Motive): shimmer lift active throughout the entire B section; inactive in A sections. In `single_evolving`, fires at bar 24+ on 24-bar windows.
+- KOS-BASS-003 (Pedal Pulse): harmonic enrichment active in B section; falls back to middle-third bar-count logic in `single_evolving`.
+
+B section entry techniques applied probabilistically at each B section start:
+- Technique C — Extended pad hold (50% chance): pads sustain a chord for 8–12 bars at slightly elevated velocity, creating a Dark Sun-style swell beneath the other instruments.
+- Technique D — New lead rule (60% chance): the lead picks a rule not used in the A section. Creates an "instrument arriving" effect.
+
+Arpeggio pitch arch: each A and each B section has its own independent rise-and-fall pitch arch, scoped to that section's bar range. This produces a satisfying arc within each section rather than one continuous arch across the whole song.
+
+Drum transition fills fire on the bar immediately before every body section label change (A→B, B→A, preRamp→bridge, bridge→postRamp, and similar). Three fill variants: hat strip (sparse downbeat hats + snare beat 4), snare build (ghost escalation to a crash), or tom cascade (floor→rack→snare).
+
+### Percussion styles (KOS-DRUM)
+
+- KOS-DRUM-001 — Minimal: kick on beat 1 every other bar; hi-hat quarter-note pulse with ghost/accent alternation (JMJ Mini Pops style)
+- KOS-DRUM-002 — Sparse: pitched floor tom hits every 4–8 beats, rooted on the root and fifth of the key
+- KOS-DRUM-003 — Absent: no percussion at all (Berlin School orchestral mode)
+- KOS-DRUM-004 — Electric Buddha Groove: 8th-note hi-hat pulse (not 16th — half-density Motorik), 5 kick/snare pattern variants rotating every 4 bars for groove without monotony. Inspired by Electric Buddha Band (Time Loops, Dark Sun, Mister Mosca). Used with cold start (drums-only pickup) 60% of the time. Only fires at tempo ≥ 100 BPM.
+- KOS-DRUM-005 — Electric Buddha Pulse: mid-weight half-time feel between Minimal and the full groove. Quarter-note hi-hat (not 8th); kick on beat 1 every bar, beat 3 added ~45% of bars; snare half-time (beat 3 only) 65% of time, full rock (beats 2+4) 35%. Only fires at tempo ≥ 100 BPM.
+
+Cold start drum fill (Kosmic — 3 variants, selected randomly):
 - All variants: no kick anywhere in the fill (avoids double-bass-drum collision with bar 1 beat 1), no notes on step 15 (1-step gap ensures bar 1 downbeat arrives clean)
 - v0 Hat Crescendo: 16th-note closed hat run steps 4–13 building in velocity, single snare on step 14
 - v1 Bonham Launch: hat prefix on beat 2 (steps 4–7), tom cascade hi→floor on beat 3 (steps 8–13), snare on step 14. Inspired by John Bonham's 2-beat fills.
 - v2 Crescendo Roll: ghost snare roll steps 4–14 with exponential velocity curve (18→105), peaks at step 14
 - drumsOnly variant starts pickup at step 8 (2-beat fill); bass+drums variant starts at step 4 (3-beat fill)
 
-### Arpeggio patterns (COS-ARP)
+### Arpeggio / rhythm patterns (KOS-RTHM)
 
-- COS-ARP-001 — TD Sequencer: repeating 8-step pattern over one octave, Tangerine Dream style
-- COS-ARP-002 — JMJ Hook: distinctive 6-step melodic hook, Jean-Michel Jarre style
-- COS-ARP-003 — Oxygène: three-voice layered ascending/descending figures
-- COS-ARP-004 — Electric Buddha: syncopated 16-step pattern with rhythmic displacement
+One base pattern is selected per song. The pattern evolves in B sections as described under B section behavior above.
 
-### Bass patterns (COS-BASS)
+- KOS-RTHM-001 — TD Sequencer: repeating 8-step pattern over one octave, Tangerine Dream style
+- KOS-RTHM-002 — JMJ Hook: distinctive 6-step melodic hook, Jean-Michel Jarre style
+- KOS-RTHM-003 — Oxygène: three-voice layered ascending/descending figures
+- KOS-RTHM-004 — Electric Buddha: syncopated 16-step pattern with rhythmic displacement
+- KOS-RTHM-006 — Kraftwerk Locked Pulse: locked staccato pulse; plays an octave-displaced version in B sections (section-driven) or at bar 32+ in `single_evolving` (bar-count fallback)
+- KOS-RTHM-007 — Pitch-Drifting Sequence: pitch arch scoped per section; each A and B section gets its own independent rise-and-fall
+
+### Bass patterns (KOS-BASS)
 
 Primary rules (one selected per song):
-- COS-BASS-001 — Root drone: single sustained root note per bar
-- COS-BASS-002 — Octave pulse: alternating root / root+octave pattern
-- COS-BASS-003 — Root–fifth movement: alternates between root and perfect fifth
-- COS-BASS-004 — Moroder Drift: slow chromatic drift between adjacent tones
-- COS-BASS-005 — Absent: no bass layer (sparse cosmic texture songs)
+- KOS-BASS-001 — Root drone: single sustained root note per bar
+- KOS-BASS-002 — Octave pulse: alternating root / root+octave pattern
+- KOS-BASS-003 — Root–fifth movement: alternates between root and perfect fifth
+- KOS-BASS-004 — Moroder Drift: slow chromatic drift between adjacent tones
+- KOS-BASS-005 — Absent: no bass layer (sparse kosmic texture songs)
 
 Expanded primary rules (added alongside originals; one selected per song):
-- COS-BASS-008 — Hallogallo Lock (Cosmic): root on beat 1 (7 steps), fifth on beat 3 (6 steps). Two long notes per bar — more active than Drone Root but still very spacious. Adapted from Neu! "Hallogallo" bass character. Always paired with COS-BASS-006 dual layer (sounds thin without it).
-- COS-BASS-009 — Crawling Walk (Cosmic): 2-bar pattern: bar 1 root hold → fifth on beat 2.75 → semitone approach at bar end; bar 2 arrives on fifth with chromatic pickup. Adapted from Motorik BAS-003 with lower velocities and Cosmic pitch range (MIDI 40–55).
-- COS-BASS-010 — Moroder Pulse (Cosmic): sequential 8th-note ostinato root–root–fifth–fifth–b7–b7–root–root. Mechanical, relentless. Adapted from Giorgio Moroder "I Feel Love" feel. Blocks dual-layer and pulsating-layer (already fills the off-beats).
-- COS-BASS-011 — Kraftwerk Roboter (Cosmic): octave-jump 3-note cell root(8th)–root+octave(8th)–mode3rd(quarter), repeated twice per bar. The synthesizer octave jump creates mechanical, robot-like feel. Bar-based evolution baked in — always emits BASS-EVOL.
-- COS-BASS-012 — McCartney melodic drive (Cosmic): 8-note riff root–fifth–root–b7–fifth–root–mode3rd–root in 8th notes, cycling identically each bar. Flat-seventh gives Mixolydian/blues quality; falls back to fifth in pure major contexts. Blocks dual-layer and pulsating-layer (already dense). Bar-based cycling always emits BASS-EVOL.
+- KOS-BASS-008 — Hallogallo Lock (Kosmic): root on beat 1 (7 steps), fifth on beat 3 (6 steps). Two long notes per bar — more active than Drone Root but still very spacious. Adapted from Neu! "Hallogallo" bass character. Always paired with KOS-BASS-006 dual layer (sounds thin without it).
+- KOS-BASS-009 — Crawling Walk (Kosmic): 2-bar pattern: bar 1 root hold → fifth on beat 2.75 → semitone approach at bar end; bar 2 arrives on fifth with chromatic pickup. Adapted from Motorik BAS-003 with lower velocities and Kosmic pitch range (MIDI 40–55).
+- KOS-BASS-010 — Moroder Pulse (Kosmic): sequential 8th-note ostinato root–root–fifth–fifth–b7–b7–root–root. Mechanical, relentless. Adapted from Giorgio Moroder "I Feel Love" feel. Blocks dual-layer and pulsating-layer (already fills the off-beats).
+- KOS-BASS-011 — Kraftwerk Roboter (Kosmic): octave-jump 3-note cell root(8th)–root+octave(8th)–mode3rd(quarter), repeated twice per bar. The synthesizer octave jump creates mechanical, robot-like feel. Bar-based evolution baked in — always emits BASS-EVOL.
+- KOS-BASS-012 — McCartney melodic drive (Kosmic): 8-note riff root–fifth–root–b7–fifth–root–mode3rd–root in 8th notes, cycling identically each bar. Flat-seventh gives Mixolydian/blues quality; falls back to fifth in pure major contexts. Blocks dual-layer and pulsating-layer (already dense). Bar-based cycling always emits BASS-EVOL.
 
 Additive rules (layered on top of primary; at most one per song):
-- COS-BASS-006 — Additive dual bass: anchor note plus staccato hits on off-beats. Blocked with COS-BASS-004 (chromatic clash), COS-BASS-010 (already fills off-beats), COS-BASS-012 (melodic riff would be cluttered). Required for COS-BASS-008.
-- COS-BASS-007 — Additive pulsating tremolo: rapid pulsing on the root; blocked when primary is COS-BASS-004, COS-BASS-010, or COS-BASS-012
+- KOS-BASS-006 — Additive dual bass: anchor note plus staccato hits on off-beats. Blocked with KOS-BASS-004 (chromatic clash), KOS-BASS-010 (already fills off-beats), KOS-BASS-012 (melodic riff would be cluttered). Required for KOS-BASS-008.
+- KOS-BASS-007 — Additive pulsating tremolo: rapid pulsing on the root; blocked when primary is KOS-BASS-004, KOS-BASS-010, or KOS-BASS-012
 
-### Pad voicings (COS-PADS)
+### Pad voicings (KOS-PADS)
 
-- COS-PADS-001 — Simple triad: root, third, fifth
-- COS-PADS-002 — Open fifth: root and fifth only, no third
-- COS-PADS-003 — Spread voicing: wide-interval chord across two octaves
-- COS-PADS-004 — Suspended chord: suspended second or fourth
-- COS-PADS-005 — Quartal Stack: chords built in fourths rather than thirds
-- COS-PADS-006 — Cloud Shimmer: high shimmer layer added above pad voicing
+- KOS-PADS-001 — Simple triad: root, third, fifth
+- KOS-PADS-002 — Open fifth: root and fifth only, no third
+- KOS-PADS-003 — Spread voicing: wide-interval chord across two octaves
+- KOS-PADS-004 — Suspended chord: suspended second or fourth
+- KOS-PADS-005 — Quartal Stack: chords built in fourths rather than thirds
+- KOS-PADS-006 — Cloud Shimmer: high shimmer layer added above pad voicing
 
-### Texture patterns (COS-TEXT)
+### Texture patterns (KOS-TEXT)
 
-- COS-TEXT-001 — Slow sweep: very slow filter-style ascending line
-- COS-TEXT-002 — Shimmer Hold: long sustained note in upper register
-- COS-TEXT-003 — Spatial Sweep: slow rising figure across 4 bars
-- COS-TEXT-004 — Micro-pulse: very quiet, rapidly repeated single note
+- KOS-TEXT-001 — Orbital Motive: shimmer lift; active throughout B sections in B-section-aware songs; bar-count fallback in `single_evolving`
+- KOS-TEXT-002 — Shimmer Hold: long sustained note in upper register; used in preRamp before melody bridges
+- KOS-TEXT-003 — Spatial Sweep: slow rising figure across 4 bars; used in postRamp after melody bridges
+- KOS-TEXT-004 — Micro-pulse: very quiet, rapidly repeated single note
+
+### Lead behavior (KOS-LEAD)
+
+A lead rule is selected for A sections. In B sections, Technique D (60% chance) picks a different rule — creating the "instrument arriving" effect heard in Dark Sun and Mister Mosca.
+
+In melody bridges (Archetype B), the bridge lead picks a rule not used in A or B, plays it in the upper register (MIDI 72–84), and the generated phrase repeats once to fill the bridge duration.
+
+### Bridge archetypes
+
+A bridge is a dramatic structural pivot inserted between the last A section and the first B section in eligible forms (35% of `ab` and `aba` songs). Two archetypes are chosen with equal probability.
+
+**Bridge density rule** — bridges must always be less dense than the surrounding A section:
+- Short bridges (Archetypes A-1 and A-2): maximum 3 instruments active at any moment
+- Melody bridge (Archetype B): maximum 4 instruments active
+- Rhythm/Arpeggio, Texture, and Lead2 are silent in all bridge sections
+- Doubling is preferred over layering: two instruments reinforce the same pitch/rhythm rather than competing melodically
+
+**Archetype A — Drum Bridge** (4 or 8 bars; 4 bars 70%, 8 bars 30%)
+
+Two sub-variants chosen with equal probability:
+
+A-1 — Escalating Drum Bridge (inspired by Mister Mosca): drums are the primary voice. Bass doubles the kick on beat 1 with root note only (staccato). Pads hold a single chord at low velocity for the full bridge. Drums escalate bar by bar through four phases: kick only → kick + snare + floor tom → kick + snare + tom cascade → full 5-drum climax hit (kick + snare + floor + rack + crash) launching into the B section.
+
+A-2 — Sparse Hit + Call-and-Response Bridge (inspired by Caligari Drop): synchronized drum + bass + pad hit fires on beat 1 of every 2nd bar; between hits, bass alone plays a 2–3 note walking figure while everything else is silent. The contrast between the 3-instrument hit and the 1-instrument response IS the bridge. Silence between hits is essential.
+
+**Archetype B — Melody Bridge** (16 or 24 bars; 16 bars 60%, 24 bars 40%)
+
+Lead melody drives the section. Bass doubles the lead melody's pitch class one octave lower (not root-only — it follows the lead's pitches). Pads hold a single tonic chord quietly for the full bridge duration. Drums: kick beat 1 + snare beats 2 and 4 only. The lead phrase is stated and then repeated exactly (the bridge is long enough to hear the complete phrase twice).
+
+Archetype B includes optional ramp sections flanking the bridge:
+- preRamp (6–8 bars before bridge): KOS-TEXT-002 shimmer hold applies; drums add a transition fill on the final ramp bar; all other generators continue normal A section behavior
+- postRamp (6–8 bars after bridge, before A returns): KOS-TEXT-003 spatial sweep applies; drums add fills on the final two ramp bars (consecutive fills signal urgency); all other generators return to A patterns
 
 ---
 
@@ -1918,14 +2012,14 @@ Additive rules (layered on top of primary; at most one per song):
 - Flur Motor
 - Panzinger Echo
 
-## Cosmic Title Generator
+## Kosmic Title Generator
 
-Song titles for Cosmic-style songs draw from space and cosmos vocabulary in English, French, and faux-German. They follow four patterns:
+Song titles for Kosmic-style songs draw from space and cosmos vocabulary in English, French, and faux-German. They follow four patterns:
 
 - Single JMJ-X word: a 3-syllable word containing X, either real French/Latin or invented in the JMJ style
 - JMJ-X word + Roman numeral: e.g. "Galaxie IV"
-- Two-word English cosmic: adjective + cosmic noun
-- Faux-German adjective + cosmic noun: in the Tangerine Dream tradition
+- Two-word English kosmic: adjective + kosmic noun
+- Faux-German adjective + kosmic noun: in the Tangerine Dream tradition
 
 ### Example generated titles
 
@@ -1944,7 +2038,7 @@ Song titles for Cosmic-style songs draw from space and cosmos vocabulary in Engl
 Motorik titles: short, pulse-oriented, slightly cryptic. English + Germanic mix. Hard consonants. Motion/place/texture vocabulary.
 - Examples: Mittelwerk Pulse, Neon Nordhausen, Rother Flux
 
-Cosmic titles: space and cosmos vocabulary. English, French, and faux-German. JMJ-style 3-syllable X words. Roman numerals for series naming.
+Kosmic titles: space and cosmos vocabulary. English, French, and faux-German. JMJ-style 3-syllable X words. Roman numerals for series naming.
 - Examples: Vortexe, Proxima III, Dunkel Stern, Dark Nebula
 
 ---
@@ -2287,13 +2381,13 @@ Both are now cached in `@State` and recomputed only in `.onAppear` and `.onChang
 
 **Pattern to follow**: Any value derived from `events` that is constant during playback should be in `@State` with an `onChange(of: events)` invalidation guard. Do not compute it inside the Canvas closure.
 
-### Rule 5: Use lazy containers for append-only logs
+### Rule 5: Use a single AttributedString for selectable multi-line log text
 
-`StatusBoxView` previously called `buildLogText()` to rebuild a single `AttributedString` from all N log entries on every append. During playback, live step annotations fire frequently and each append triggered a full O(n) string reconstruction.
+`StatusBoxView` requires cross-line drag selection across the entire log, which rules out `LazyVStack` (selection is isolated per `Text` view). Instead it uses a single `Text(AttributedString)` built from all entries.
 
-The fix: `LazyVStack` with one `logRow(_:)` view per entry. SwiftUI only instantiates rows currently visible in the scroll viewport. New entries append without touching existing rows. `ForEach` over `statusLog.indices` is stable because the log is append-only.
+`buildLogText()` builds one `AttributedString` by appending each entry's tag and description fragments in a loop, then wraps the result in a single `Text`. `AttributedString` appending is O(1) amortized per entry, O(n) total.
 
-**Pattern to follow**: Any list that grows monotonically during playback (annotations, debug output, event history) should use `LazyVStack` or `List`. Never rebuild an `AttributedString` or `NSAttributedString` from the full dataset on each append.
+**Pattern to follow**: When a view needs contiguous text selection across many lines, build a single `AttributedString` with per-range attributes and wrap it in one `Text`. Do not chain SwiftUI `Text` structs with `+` for large datasets (see Rule 17).
 
 ### Rule 6: LFO timers fire at modulation rate, not at display rate
 
@@ -2317,7 +2411,7 @@ Timer rates:
 
 The fix: build `trackBars: [[Bool]]` — a per-track, per-bar boolean presence map — in one O(totalEvents) pass at the top of `buildStepAnnotations`. All subsequent bar-range queries are O(sectionLength) at most, never O(totalEvents).
 
-**Pattern to follow**: When a generation-time function needs to repeatedly ask "does track T have any event in bar B?", build the presence map once and query it. As Ambient songs may have longer timelines and more events than Cosmic, this pattern prevents generation time from scaling quadratically.
+**Pattern to follow**: When a generation-time function needs to repeatedly ask "does track T have any event in bar B?", build the presence map once and query it. As Ambient songs may have longer timelines and more events than Kosmic, this pattern prevents generation time from scaling quadratically.
 
 ### Rule 9: Background asyncAfter closures must carry a generation token
 
@@ -2403,13 +2497,23 @@ Because `defaultsResetToken` always resets every track to index 0 (the same prog
 
 **Pattern to follow**: Track `currentProgram[trackIndex]` and `currentBankMSB[trackIndex]` alongside the samplers. In `setProgram()`, return early if the requested program and bank already match. Seed the cache in `loadGMPrograms()` so the startup load is also reflected. This eliminates all redundant calls after the first generation.
 
+### Rule 17: Never chain SwiftUI Text structs with `+` over large datasets
+
+SwiftUI `Text` is a value type (struct). Concatenating with `+` produces a new `Text` that wraps both operands as a tree. A loop of the form `result = result + newLine` copies the entire accumulated `result` at each iteration — total work O(1 + 2 + … + n) = **O(n²)**.
+
+In `StatusBoxView.buildLogText()`, `+`-chaining over the generation log produced a spike on every append, and the spike grew proportionally with the number of prior songs in the session (more songs → bigger log → more copying). After five songs the generation-time spike was measurably worse than after one.
+
+The fix: build one `AttributedString` by appending fragments in a loop (O(n) total), then wrap in `Text(attrStr)`. SwiftUI renders the result as a single text node.
+
+**Pattern to follow**: If you need a single selectable `Text` built from N dynamic segments, use `AttributedString`. If the segments are static or small (< ~20 items), `Text` `+` is fine. Never chain SwiftUI `Text` with `+` inside a loop over a list that grows at runtime.
+
 ---
 
 ## Test Mode (developer feature)
 
 Test Mode is a hidden developer feature that changes how new songs are generated, for the purpose of systematically auditioning bass rules.
 
-When Test Mode is enabled, each successive "Generate New" uses the next bass rule in a fixed descending sequence (newest rule first) rather than picking randomly. Each style — Motorik and Cosmic — has its own independent position in its sequence, so switching styles mid-session does not disturb the other style's counter. Toggling Test Mode off and on resets all counters so each style restarts from its most recently added rule.
+When Test Mode is enabled, each successive "Generate New" uses the next bass rule in a fixed descending sequence (newest rule first) rather than picking randomly. Each style — Motorik and Kosmic — has its own independent position in its sequence, so switching styles mid-session does not disturb the other style's counter. Toggling Test Mode off and on resets all counters so each style restarts from its most recently added rule.
 
 Test Mode also shortens song length (to roughly 60–90 seconds) so each rule can be evaluated quickly.
 
@@ -2419,6 +2523,6 @@ Test Mode has no visible UI indicator by design — it is accessed only via a ke
 
 ## Open questions
 
-- Resolved: single selector for v1, locked to Motorik. Blend sliders are post-v1. Later add Cosmic and Ambient
+- Resolved: single selector for v1, locked to Motorik. Blend sliders are post-v1. Later add Kosmic and Ambient
 - Resolved: Lead 1 and Lead 2 are always generated in v1. The user can mute individual tracks after generation if a sparser result is wanted. Making lead generation optional by default adds UI state complexity that is out of scope for v1.
 - Resolved: all tracks share one loop length in v1. No polymeter.

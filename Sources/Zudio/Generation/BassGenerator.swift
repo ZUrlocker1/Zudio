@@ -28,7 +28,7 @@
 //   BAS-013: Kraftwerk Roboter — "The Robots" (1978) 3-note octave-jump cell;
 //            root(low, 8th)–root+octave(high, 8th)–mode3rd(quarter), repeated twice per bar.
 //            The instant synthesizer octave jump is the signature; creates a mechanical robot feel.
-//            Works in both Motorik and Cosmic ranges.
+//            Works in both Motorik and Kosmic ranges.
 //   BAS-014: McCartney PBW — "Paperback Writer" (1966) Mixolydian riff;
 //            root–fifth–root–b7–fifth–root–mode3rd–root in 8 8th-notes.
 //            The flat-seventh gives a blues/Mixolydian edge. b7 falls back to fifth in pure major contexts.
@@ -48,11 +48,11 @@ struct BassGenerator {
         let rules:   [String] = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
                                   "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
                                   "MOT-BASS-010","MOT-BASS-011",
-                                  "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014"]
-        let weights: [Double] = [0.08,     0.08,     0.05,     0.08,
-                                  0.09,     0.05,     0.09,     0.07,     0.06,
-                                  0.07,     0.06,
-                                  0.07,     0.07,     0.08]
+                                  "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014","MOT-BASS-015"]
+        let weights: [Double] = [0.07,     0.07,     0.05,     0.07,
+                                  0.08,     0.05,     0.08,     0.06,     0.06,
+                                  0.07,     0.05,
+                                  0.07,     0.07,     0.07,     0.08]
         let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
 
@@ -69,7 +69,7 @@ struct BassGenerator {
         // (alternating on/off so the variation doesn't take over the whole second half).
         // This keeps the bass interesting at section boundaries without being relentless.
         let simpleRules: Set<String> = ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
-                                         "MOT-BASS-013", "MOT-BASS-014"]
+                                         "MOT-BASS-013", "MOT-BASS-014", "MOT-BASS-015"]
         var variationBars = Set<Int>()
         if simpleRules.contains(ruleID) {
             var aToggle = false
@@ -94,6 +94,10 @@ struct BassGenerator {
         var devolveLogged   = false   // emit "BASS-DEVOL" rule once when first revert bar fires
         var wasInVariation  = false   // tracks previous body bar's variation state
 
+        // MOT-BASS-015: sub-pattern rotation (same 3 variants as KOS-BASS-011)
+        var mot015Variant    = 0
+        var mot015LastSwitch = -16
+
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar),
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
@@ -112,9 +116,22 @@ struct BassGenerator {
                 if useVariation { variationLogged = true }
                 if !useVariation && wasInVariation { devolveLogged = true }
                 wasInVariation = useVariation
+
+                // MOT-BASS-015: rotate sub-pattern at section boundaries and every 16 bars
+                // Weights: D=15%, E=35%, C=50% — C (continuous trill) suits high-tempo Motorik best
+                if ruleID == "MOT-BASS-015" {
+                    let isNewSection  = section.startBar == bar
+                    let bars16Elapsed = (bar - mot015LastSwitch) >= 16
+                    if isNewSection || bars16Elapsed {
+                        let r = rng.nextDouble()
+                        mot015Variant    = r < 0.15 ? 0 : r < 0.50 ? 1 : 2
+                        mot015LastSwitch = bar
+                    }
+                }
+
                 events += bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
                                   frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
-                                  useVariation: useVariation)
+                                  useVariation: useVariation, mot015Variant: mot015Variant)
             }
         }
 
@@ -134,7 +151,7 @@ struct BassGenerator {
         ruleID: String, barStart: Int, bar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG, mccartney4BarDrive: [Bool],
-        useVariation: Bool = false
+        useVariation: Bool = false, mot015Variant: Int = 0
     ) -> [MIDIEvent] {
         // Simple 1–2 note rules get a more interesting variant in B sections and after bar 48
         if useVariation, ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
@@ -157,6 +174,9 @@ struct BassGenerator {
         case "MOT-BASS-012": return moroderChaseBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-013": return kraftwerkRoboterBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-014": return mccartneyPBWBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-015": return kraftwerkAutobahnMotBar(barStart: barStart, bar: bar, entry: entry,
+                                                             frame: frame, useVariation: useVariation,
+                                                             subVariant: mot015Variant)
         default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
         }
     }
@@ -832,7 +852,7 @@ struct BassGenerator {
     // The cell is exactly 2 beats long (8 steps), fitting twice in a 4/4 bar.
     // In the original Dm, the 3rd is F (minor); in major keys, it's the major third.
     // Range extended to 28-64 to allow the octave note to sit above the normal bass floor.
-    // Best at Cosmic tempos (100-125 BPM) and low Motorik (128-135 BPM).
+    // Best at Kosmic tempos (100-125 BPM) and low Motorik (128-135 BPM).
     //
     // 4-bar evolution: bars 1-2 (standard): root–octave–third / root–octave–third
     //                 bars 3-4 (inverted):  root–octave–fifth / root–octave–fifth
@@ -919,6 +939,58 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 8,  note: root,  velocity: 82, durationSteps: 3),
                 MIDIEvent(stepIndex: barStart + 12, note: fifth, velocity: 78, durationSteps: 2),
                 MIDIEvent(stepIndex: barStart + 14, note: root,  velocity: 70, durationSteps: 2),
+            ]
+        }
+    }
+
+    // MARK: - MOT-BASS-015: Kraftwerk Autobahn driving bass (Motorik range MIDI 28–52)
+    // Same 3-pattern rotation as KOS-BASS-011 but tuned for Motorik's unwavering pulse.
+    //   0 = Pattern D — 5-note grid: root(q), octave(e), 4th(e), root(e), 5th(e)
+    //       Beat 3 (step 8) is now covered with a root so the groove stays locked.
+    //   1 = Pattern E — canonical hook with held 4th: root(q), octave(e), 4th(e), 4th(dotq), 5th(e)
+    //   2 = Pattern C — 8th-note octave trill: all 8 subdivisions alternating root/octave
+    // B-section variation (useVariation): b7th replaces the 4th in patterns D and E.
+    // NO lock bar — Motorik must maintain the pulse every bar without interruption.
+    // Weights: D=15%, E=35%, C=50% — C dominates since trill suits high-tempo Motorik best.
+
+    private static func kraftwerkAutobahnMotBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        useVariation: Bool = false, subVariant: Int = 0
+    ) -> [MIDIEvent] {
+        let root   = chordRootNote(entry: entry, frame: frame)
+        let octave = UInt8(clamped(Int(root) + 12, low: 40, high: 64))
+        let fourth = UInt8(clamped(Int(root) + 5,  low: 28, high: 52))
+        let fifth  = UInt8(clamped(Int(root) + 7,  low: 28, high: 52))
+        let b7     = UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 28, high: 55))
+
+        switch subVariant {
+        case 1:
+            let midNote: UInt8 = useVariation ? b7 : fourth
+            let midVel:  UInt8 = useVariation ? 82 : 86
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,    velocity: 89, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: octave,  velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: midNote, velocity: midVel, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8,  note: midNote, velocity: 84, durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + 14, note: fifth,   velocity: 84, durationSteps: 2),
+            ]
+        case 2:
+            return stride(from: 0, to: 16, by: 2).map { step in
+                let onBeat = (step % 4 == 0)
+                let note   = onBeat ? root : octave
+                return MIDIEvent(stepIndex: barStart + step, note: note,
+                                 velocity: UInt8(onBeat ? 89 : 80), durationSteps: 2)
+            }
+        default:
+            // Pattern D: cover beat 3 with a root hit so there's no hole at high tempo
+            let midNote: UInt8 = useVariation ? b7 : fourth
+            let midVel:  UInt8 = useVariation ? 82 : 86
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,    velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: octave,  velocity: 89, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: midNote, velocity: midVel, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8,  note: root,    velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 14, note: fifth,   velocity: 84, durationSteps: 2),
             ]
         }
     }

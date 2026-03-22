@@ -21,6 +21,11 @@ final class AppState: ObservableObject {
 
     @Published var statusLog: [GenerationLogEntry] = []
 
+    // Incremented on every write to statusLog (append or remove). StatusBoxView
+    // observes this instead of statusLog.count so onChange fires even when the
+    // net count is unchanged (e.g. simultaneous append+trim).
+    @Published var statusLogVersion: Int = 0
+
     // MARK: - Visible window — zoom + DAW scroll
 
     @Published var visibleBars: Int = 16
@@ -28,13 +33,13 @@ final class AppState: ObservableObject {
 
     // MARK: - Style selector
 
-    @Published var selectedStyle: MusicStyle = .cosmic
+    @Published var selectedStyle: MusicStyle = .kosmic
 
     // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
     // Fired on generateNew() and on the manual Reset button.
     @Published var defaultsResetToken: Int = 0
 
-    func resetTrackDefaults() { instrumentOverrides = [:]; defaultsResetToken += 1 }
+    func resetTrackDefaults() { instrumentOverrides = [:]; songGenerationCount = 0; defaultsResetToken += 1 }
 
     // MARK: - UI selectors (nil = Auto)
 
@@ -49,10 +54,16 @@ final class AppState: ObservableObject {
     // Slot 2: ARP-002*, BASS-010*, PADS-007*    (second ARP retrofit + BASS/PADS repeat)
 
     struct TestModeConfig {
-        var forceArpRuleID:  String?
-        var forceBassRuleID: String?
-        var forcePadsRuleID: String?
-        var forceLeadRuleID: String?
+        var forceArpRuleID:        String?
+        var forceBassRuleID:       String?
+        var forcePadsRuleID:       String?
+        var forceLeadRuleID:       String?
+        var forceTexRuleID:        String?
+        var forcePercussionStyle:  PercussionStyle?
+        // Bridge testing: forceBridge=true guarantees a bridge fires (bypasses 35% gate).
+        // forceBridgeArchetype: nil=random, "drum"=A-1 escalating, "drumAlt"=A-2 call+response, "melody"=Archetype B
+        var forceBridge:           Bool    = false
+        var forceBridgeArchetype:  String? = nil
     }
 
     @Published var testModeEnabled: Bool = false
@@ -63,13 +74,32 @@ final class AppState: ObservableObject {
         testCycleIndex = 0
     }
 
-    // 4-slot cycle covering the 6 newest rules.
-    // RTHM cycles all 4 new rules. PADS-007 and LEAD-006 appear in even slots (Option B).
+    // 8-slot cycle. New rules always appear in the first two slots so they're heard immediately.
+    // Slot 0: KOS-DRUM-006 + KOS-BASS-011 (both new rules together, with RTHM-006)  [Kosmic]
+    // Slot 1: KOS-DRUM-006 + RTHM-007 (second hearing of new drums, different arp)  [Kosmic]
+    // Slot 2: KOS-BASS-011 + RTHM-008 + PADS-007 (new bass with other new rules)    [Kosmic]
+    // Slot 3: KOS-RTHM-006 + KOS-PADS-007 + KOS-LEAD-006 + KOS-TEXT-001            [Kosmic]
+    // Slot 4: KOS-RTHM-007 + KOS-TEXT-002                                            [Kosmic]
+    // Slot 5: KOS-RTHM-008 + KOS-PADS-007 + KOS-LEAD-006 + KOS-TEXT-003            [Kosmic]
+    // Slot 6: motorikGrid — exercises cold start fill variants; all else random      [Motorik]
+    // Slot 7:  MOT-BASS-015 * — Kraftwerk driving bass in Motorik style               [Motorik]
+    // Slot 8:  MOT-BASS-013 * — Kraftwerk Roboter in Motorik style                    [Motorik]
+    // Slot 9:  Bridge * — escalating drum bridge (EB Mister Mosca A-1 style)           [Kosmic]
+    // Slot 10: Bridge * — call+response drum bridge (EB Caligari Drop A-2 style)       [Kosmic]
+    // Slot 11: Bridge * — melody bridge with pre/post ramps (EB Dark Sun style)        [Kosmic]
     private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: "COS-RTHM-006", forceBassRuleID: nil, forcePadsRuleID: "COS-PADS-007", forceLeadRuleID: "COS-LEAD-006"),
-        TestModeConfig(forceArpRuleID: "COS-RTHM-007", forceBassRuleID: nil, forcePadsRuleID: nil,            forceLeadRuleID: nil),
-        TestModeConfig(forceArpRuleID: "COS-RTHM-008", forceBassRuleID: nil, forcePadsRuleID: "COS-PADS-007", forceLeadRuleID: "COS-LEAD-006"),
-        TestModeConfig(forceArpRuleID: "COS-RTHM-005", forceBassRuleID: nil, forcePadsRuleID: nil,            forceLeadRuleID: nil),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-006", forceBassRuleID: "KOS-BASS-011", forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-007", forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: .electricBuddhaRestrained),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-008", forceBassRuleID: "KOS-BASS-011", forcePadsRuleID: "KOS-PADS-007", forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: "KOS-TEXT-003", forcePercussionStyle: nil),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-006", forceBassRuleID: nil,            forcePadsRuleID: "KOS-PADS-007", forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: "KOS-TEXT-001", forcePercussionStyle: nil),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-007", forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil),
+        TestModeConfig(forceArpRuleID: "KOS-RTHM-008", forceBassRuleID: nil,            forcePadsRuleID: "KOS-PADS-007", forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: "KOS-TEXT-003", forcePercussionStyle: nil),
+        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .motorikGrid),
+        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: "MOT-BASS-015", forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .motorikGrid),
+        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: "MOT-BASS-013", forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .motorikGrid),
+        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true, forceBridgeArchetype: "drum"),
+        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true, forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil,            forceLeadRuleID: nil,            forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true, forceBridgeArchetype: "melody"),
     ]
 
     private func nextTestConfig() -> TestModeConfig? {
@@ -95,7 +125,7 @@ final class AppState: ObservableObject {
     ]
 
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
-        let c = style == .cosmic
+        let c = style == .kosmic
         switch trackIndex {
         case kTrackLead1:   return c ? ["Ocarina","Flute","Whistle","Calliope Lead","Fifths Lead"]
                                      : ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr","Flute"]
@@ -109,11 +139,15 @@ final class AppState: ObservableObject {
                                      : ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
         case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass"]
                                      : ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
-        case kTrackDrums:   return c ? ["Standard Kit","Brush Kit"]
+        case kTrackDrums:   return c ? ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
                                      : ["Rock Kit","808 Kit","Brush Kit"]
         default:            return []
         }
     }
+
+    // MARK: - Sheet triggers (set by key monitor, observed by TopBarView)
+    @Published var triggerShowHelp  = false
+    @Published var triggerShowAbout = false
 
     // MARK: - Per-track UI state
 
@@ -165,9 +199,10 @@ final class AppState: ObservableObject {
 
             case 36: // Return/Enter — generate new song
                 guard mods.isEmpty else { return event }
-                // Pass through if a text field is focused (Enter commits the value)
-                // or if a sheet is open (Return = Close on Help/About)
-                let isTextField = NSApp.keyWindow?.firstResponder is NSTextView
+                // Pass through only if an *editable* text field is focused (Enter commits the value)
+                // or if a sheet is open (Return = Close on Help/About).
+                // Read-only views like the status log must not block this.
+                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
                 let sheetOpen   = !(NSApp.keyWindow?.sheets.isEmpty ?? true)
                 guard !isTextField, !sheetOpen else { return event }
                 Task { @MainActor [weak self] in
@@ -177,7 +212,7 @@ final class AppState: ObservableObject {
                 return nil
 
             case 123: // Left arrow — seek back 1 bar (plain) or to start (Cmd)
-                let isTextField = NSApp.keyWindow?.firstResponder is NSTextView
+                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
                 guard !isTextField else { return event }
                 if mods.isEmpty {
                     Task { @MainActor [weak self] in
@@ -194,7 +229,7 @@ final class AppState: ObservableObject {
                 }
 
             case 124: // Right arrow — seek forward 1 bar (plain) or to end (Cmd)
-                let isTextField = NSApp.keyWindow?.firstResponder is NSTextView
+                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
                 guard !isTextField else { return event }
                 if mods.isEmpty {
                     Task { @MainActor [weak self] in
@@ -209,6 +244,42 @@ final class AppState: ObservableObject {
                     }
                     return nil
                 }
+
+            // Plain-letter shortcuts — all guard against text-field focus and open sheets
+            case 5, 1, 46, 15, 40, 4, 0, 11, 6:
+                guard mods.isEmpty else { return event }
+                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
+                let sheetOpen   = !(NSApp.keyWindow?.sheets.isEmpty ?? true)
+                guard !isTextField, !sheetOpen else { return event }
+                switch event.keyCode {
+                case 5:  // 'g' — generate
+                    Task { @MainActor [weak self] in
+                        guard let self, !self.isGenerating else { return }
+                        self.generateNew()
+                    }
+                case 1:  // 's' — save MIDI
+                    guard songState != nil else { return event }
+                    Task { @MainActor [weak self] in self?.saveMIDI() }
+                case 46: // 'm' — Motorik
+                    Task { @MainActor [weak self] in self?.selectedStyle = .motorik }
+                case 15: // 'r' — reset
+                    guard songState != nil else { return event }
+                    Task { @MainActor [weak self] in self?.resetTrackDefaults() }
+                case 40: // 'k' — Kosmic
+                    Task { @MainActor [weak self] in self?.selectedStyle = .kosmic }
+                case 4:  // 'h' — help
+                    Task { @MainActor [weak self] in self?.triggerShowHelp.toggle() }
+                case 0:  // 'a' — about
+                    Task { @MainActor [weak self] in self?.triggerShowAbout.toggle() }
+                case 11: // 'b' — beginning
+                    guard songState != nil else { return event }
+                    Task { @MainActor [weak self] in self?.seekToStart() }
+                case 6:  // 'z' — end
+                    guard songState != nil else { return event }
+                    Task { @MainActor [weak self] in self?.seekToEnd() }
+                default: break
+                }
+                return nil
 
             default:
                 break
@@ -244,6 +315,21 @@ final class AppState: ObservableObject {
             .store(in: &cancellables)
     }
 
+    // MARK: - Log append helper
+
+    // Single entry point for all statusLog mutations. Increments statusLogVersion
+    // so StatusBoxView.onChange fires even when the net count is unchanged.
+    // Trims front of log when it exceeds 600 entries (drops down to 400).
+    // Using a large drop (not a 1-entry trim) ensures the count changes noticeably.
+    private func appendToLog(_ entries: [GenerationLogEntry]) {
+        guard !entries.isEmpty else { return }
+        statusLog.append(contentsOf: entries)
+        if statusLog.count > 600 {
+            statusLog.removeFirst(statusLog.count - 400)
+        }
+        statusLogVersion += 1
+    }
+
     // MARK: - Live annotation feed
 
     private func emitStepAnnotations(upTo step: Int) {
@@ -256,10 +342,7 @@ final class AppState: ObservableObject {
             }
         }
         if !newEntries.isEmpty {
-            statusLog.append(contentsOf: newEntries)  // single objectWillChange for the whole batch
-            if statusLog.count > 500 {
-                statusLog.removeFirst(statusLog.count - 500)
-            }
+            appendToLog(newEntries)
         }
         lastEmittedStep = step
     }
@@ -291,10 +374,14 @@ final class AppState: ObservableObject {
                 moodOverride:    await self.moodOverride,
                 style:           style,
                 testMode:        await self.testModeEnabled,
-                forceBassRuleID: testConfig?.forceBassRuleID,
-                forceArpRuleID:  testConfig?.forceArpRuleID,
-                forcePadsRuleID: testConfig?.forcePadsRuleID,
-                forceLeadRuleID: testConfig?.forceLeadRuleID
+                forceBassRuleID:      testConfig?.forceBassRuleID,
+                forceArpRuleID:       testConfig?.forceArpRuleID,
+                forcePadsRuleID:      testConfig?.forcePadsRuleID,
+                forceLeadRuleID:      testConfig?.forceLeadRuleID,
+                forceTexRuleID:       testConfig?.forceTexRuleID,
+                forcePercussionStyle: testConfig?.forcePercussionStyle,
+                forceBridge:          testConfig?.forceBridge ?? false,
+                forceBridgeArchetype: testConfig?.forceBridgeArchetype
             )
             await MainActor.run {
                 self.songState    = state
@@ -331,24 +418,22 @@ final class AppState: ObservableObject {
                 }
                 self.songGenerationCount += 1
 
-                // Append generation log to the flat status log (with separator if not first)
+                // Build the batch to append: optional separator + generation log + instruments entry
+                var batch: [GenerationLogEntry] = []
                 if !self.statusLog.isEmpty {
-                    self.statusLog.append(GenerationLogEntry(tag: "───", description: "new song", isTitle: false))
+                    batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
                 }
-                let logInsertBase = self.statusLog.count
-                self.statusLog.append(contentsOf: state.generationLog)
-                // Insert INSTRUMENTS entry between FORM and Intro/Outro entries
+                var logEntries = state.generationLog
                 if let desc = instrumentLogDesc {
                     let entry = GenerationLogEntry(tag: "Instruments", description: desc, isTitle: false)
-                    let searchRange = logInsertBase..<self.statusLog.count
-                    if let firstIdx = searchRange.first(where: {
-                        self.statusLog[$0].tag == "Intro" || self.statusLog[$0].tag == "Outro"
-                    }) {
-                        self.statusLog.insert(entry, at: firstIdx)
+                    if let firstIdx = logEntries.firstIndex(where: { $0.tag == "Intro" || $0.tag == "Outro" }) {
+                        logEntries.insert(entry, at: firstIdx)
                     } else {
-                        self.statusLog.append(entry)
+                        logEntries.append(entry)
                     }
                 }
+                batch.append(contentsOf: logEntries)
+                self.appendToLog(batch)
                 // Reset mute/solo so every new song starts with all parts audible
                 self.muteState = Array(repeating: false, count: 7)
                 self.soloState = Array(repeating: false, count: 7)
@@ -364,7 +449,7 @@ final class AppState: ObservableObject {
                 // during the brief window between load() and seek(), which caused desync.
                 let wasPlaying = self.playback.isPlaying
                 self.playback.stop()
-                self.playback.cosmicStyle = self.selectedStyle == .cosmic
+                self.playback.kosmicStyle = self.selectedStyle == .kosmic
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 // Reset instruments + effects BEFORE play so setProgram() doesn't race
@@ -393,7 +478,7 @@ final class AppState: ObservableObject {
                 }
                 // Append only the NEW regen entries to the flat status log (at the very bottom)
                 let regenEntries = Array(updated.generationLog.dropFirst(current.generationLog.count))
-                self.statusLog.append(contentsOf: regenEntries)
+                self.appendToLog(regenEntries)
             }
         }
     }
@@ -410,7 +495,7 @@ final class AppState: ObservableObject {
                 playback.seek(toStep: 0)
                 visibleBarOffset = 0
             }
-            playback.cosmicStyle = selectedStyle == .cosmic
+            playback.kosmicStyle = selectedStyle == .kosmic
             playback.play()
         }
     }

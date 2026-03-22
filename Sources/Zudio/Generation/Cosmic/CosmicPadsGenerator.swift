@@ -1,38 +1,38 @@
-// CosmicPadsGenerator.swift — Cosmic pads generation
-// Implements COS-PADS-001 through COS-PADS-005, COS-PADS-007, COS-RULE-07 (Wurlitzer), COS-RULE-16 (shimmer)
+// KosmicPadsGenerator.swift — Kosmic pads generation
+// Implements KOS-PADS-001 through KOS-PADS-005, KOS-PADS-007, KOS-RULE-07 (Wurlitzer), KOS-RULE-16 (shimmer)
 // Register: MIDI 36–72 (lower than Motorik pads at 48–84 — creates depth below arpeggio)
 
 import Foundation
 
-struct CosmicPadsGenerator {
+struct KosmicPadsGenerator {
 
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
-        cosmicProgFamily: CosmicProgressionFamily,
+        kosmicProgFamily: KosmicProgressionFamily,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
         // Pick primary pad rule
-        let padRules:   [String] = ["COS-PADS-001", "COS-PADS-002", "COS-PADS-003", "COS-PADS-004", "COS-PADS-005", "COS-PADS-007"]
+        let padRules:   [String] = ["KOS-PADS-001", "KOS-PADS-002", "KOS-PADS-003", "KOS-PADS-004", "KOS-PADS-005", "KOS-PADS-007"]
         let padWeights: [Double] = [0.26,           0.18,           0.18,           0.13,           0.13,            0.12]
 
         // forceRuleID > quartal_stack/suspended_resolution constraints > weighted pick
         let primaryRule: String
         if let forced = forceRuleID {
             primaryRule = forced
-        } else if cosmicProgFamily == .quartal_stack {
-            primaryRule = "COS-PADS-005"
-        } else if cosmicProgFamily == .suspended_resolution {
-            primaryRule = "COS-PADS-004"
+        } else if kosmicProgFamily == .quartal_stack {
+            primaryRule = "KOS-PADS-005"
+        } else if kosmicProgFamily == .suspended_resolution {
+            primaryRule = "KOS-PADS-004"
         } else {
             primaryRule = padRules[rng.weightedPick(padWeights)]
         }
         usedRuleIDs.insert(primaryRule)
-        usedRuleIDs.insert("COS-PADS-006")  // shimmer always present
+        usedRuleIDs.insert("KOS-PADS-006")  // shimmer always present
 
         var events: [MIDIEvent] = []
 
@@ -93,30 +93,90 @@ struct CosmicPadsGenerator {
                 continue
             }
 
+            // Bridge A-1 (.bridge): single tonic chord on bar 1 only, held for full bridge.
+            // Pads provide harmonic context under the escalating drums — quiet, not re-attacked.
+            if section.label == .bridge {
+                guard bar == section.startBar else { continue }
+                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 60, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 54, durationSteps: dur),
+                ]
+                continue
+            }
+
+            // Bridge A-2 (.bridgeAlt): staccato hit on hit bars (even), silent on response bars.
+            // The pulsating pad texture is muted — the hit+silence contrast is the musical point.
+            if section.label == .bridgeAlt {
+                let bridgeBar = bar - section.startBar
+                guard bridgeBar % 2 == 0 else { continue }  // response bars: silent
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 100, durationSteps: 2),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 94,  durationSteps: 2),
+                ]
+                continue
+            }
+
+            // Bridge B (.bridgeMelody): single tonic chord on bar 1 held for full bridge.
+            // Harmonic foundation only — does not move or re-attack. Lead drives this section.
+            if section.label == .bridgeMelody {
+                guard bar == section.startBar else { continue }
+                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 60, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 54, durationSteps: dur),
+                ]
+                continue
+            }
+
+            // Technique C: Extended pad hold at B section entry (50% chance).
+            // Long chord wells up underneath the B section entry — Dark Sun swell feel.
+            if section.label == .B && bar == section.startBar && rng.nextDouble() < 0.50 {
+                let holdBars = 8 + rng.nextInt(upperBound: 5)  // 8–12 bars
+                let holdDur  = min(holdBars * 16 - 1, (section.endBar - bar) * 16 - 1)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root     = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth    = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 68, durationSteps: holdDur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 62, durationSteps: holdDur),
+                ]
+                // Fall through — normal pad rule also runs this bar (layered on top)
+            }
+
             switch primaryRule {
-            case "COS-PADS-001":
+            case "KOS-PADS-001":
                 events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-            case "COS-PADS-002":
+            case "KOS-PADS-002":
                 events += swellChordBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
-            case "COS-PADS-003":
+            case "KOS-PADS-003":
                 events += unsyncLayersBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-            case "COS-PADS-004":
+            case "KOS-PADS-004":
                 events += suspendedResolutionBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-            case "COS-PADS-005":
+            case "KOS-PADS-005":
                 events += quartalStackBar(barStart: barStart, entry: entry, frame: frame)
-            case "COS-PADS-007":
+            case "KOS-PADS-007":
                 events += gatedChordPulseBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             default:
                 events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             }
 
-            // COS-RULE-07: Wurlitzer chord track — bIII voicing, velocity ramp
-            if rng.nextDouble() < 0.55 {
+            // KOS-RULE-07: Wurlitzer chord track — bIII voicing, velocity ramp (not during bridges)
+            if !section.label.isBridge && rng.nextDouble() < 0.55 {
                 events += wurlitzerChordBar(barStart: barStart, entry: entry, frame: frame)
             }
 
-            // COS-RULE-16: Shimmer layer — high register, velocity ramp
-            if rng.nextDouble() < 0.45 {
+            // KOS-RULE-16: Shimmer layer — high register, velocity ramp (not during bridges)
+            if !section.label.isBridge && rng.nextDouble() < 0.45 {
                 events += shimmerLayerBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             }
         }
@@ -124,7 +184,7 @@ struct CosmicPadsGenerator {
         return events
     }
 
-    // MARK: - COS-PAD-001: Long Drone
+    // MARK: - KOS-PAD-001: Long Drone
     // Whole notes held 2–4 bars (but we emit per bar with overlap),
     // voicing: root+5th+octave+(3rd at octave up), velocity 40–55
 
@@ -154,7 +214,7 @@ struct CosmicPadsGenerator {
         ]
     }
 
-    // MARK: - COS-PAD-002: Swell Chord
+    // MARK: - KOS-PAD-002: Swell Chord
     // Velocity ramps 20→80 over the bar (Vangelis brass swell)
 
     private static func swellChordBar(
@@ -176,7 +236,7 @@ struct CosmicPadsGenerator {
         ]
     }
 
-    // MARK: - COS-PAD-003: Unsync Layers
+    // MARK: - KOS-PAD-003: Unsync Layers
     // Three voices at 8, 10, 12 bar loop lengths (Roach-style unsync)
 
     private static func unsyncLayersBar(
@@ -215,7 +275,7 @@ struct CosmicPadsGenerator {
         return evs
     }
 
-    // MARK: - COS-PAD-004: Suspended Resolution
+    // MARK: - KOS-PAD-004: Suspended Resolution
     // sus4 for 3 bars, minor for 1 bar (per 4-bar cycle)
 
     private static func suspendedResolutionBar(
@@ -247,7 +307,7 @@ struct CosmicPadsGenerator {
         }
     }
 
-    // MARK: - COS-PAD-005: Quartal Stack
+    // MARK: - KOS-PAD-005: Quartal Stack
     // Stacked fourths: 0, 5, 10 semitones (very spacious)
 
     private static func quartalStackBar(
@@ -265,7 +325,7 @@ struct CosmicPadsGenerator {
         ]
     }
 
-    // MARK: - COS-PADS-007: Gated Chord Pulse
+    // MARK: - KOS-PADS-007: Gated Chord Pulse
     // Root+fifth re-attacked each quarter beat with independent per-beat gate probability.
     // Beats 1 and 3 weighted higher; creates a rhythmically active pad in the JMJ/TD style
     // (Équinoxe, Stratosfear) rather than a static drone.
@@ -292,7 +352,7 @@ struct CosmicPadsGenerator {
         return evs
     }
 
-    // MARK: - COS-RULE-07: Wurlitzer chord track (bIII voicing, velocity ramp)
+    // MARK: - KOS-RULE-07: Wurlitzer chord track (bIII voicing, velocity ramp)
 
     private static func wurlitzerChordBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
@@ -312,7 +372,7 @@ struct CosmicPadsGenerator {
         ]
     }
 
-    // MARK: - COS-RULE-16: Shimmer layer (high register, velocity ramp 15→55)
+    // MARK: - KOS-RULE-16: Shimmer layer (high register, velocity ramp 15→55)
 
     private static func shimmerLayerBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG

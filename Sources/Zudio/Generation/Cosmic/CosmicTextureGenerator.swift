@@ -1,32 +1,42 @@
-// CosmicTextureGenerator.swift — Cosmic texture generation
-// Implements COS-TEXT-001 through COS-TEXT-003
-// COS-RULE-11: Bluebird/secondary arpeggio in MIDI 33–59, quarter-note durations
+// KosmicTextureGenerator.swift — Kosmic texture generation
+// Implements KOS-TEXT-001 through KOS-TEXT-003
+// KOS-RULE-11: Bluebird/secondary arpeggio in MIDI 33–59, quarter-note durations
 // Register separation from main arpeggio (55–72) is CRITICAL
+//
+// KOS-TEXT-001 variation: every 24 body bars (from bar 24 onward), motif lifts one octave
+// for 8 bars then returns. Same pitches, same loop phase, purely a register shift.
 
 import Foundation
 
-struct CosmicTextureGenerator {
+struct KosmicTextureGenerator {
 
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
-        let texRules:   [String] = ["COS-TEXT-001", "COS-TEXT-002", "COS-TEXT-003"]
+        let texRules:   [String] = ["KOS-TEXT-001", "KOS-TEXT-002", "KOS-TEXT-003"]
         let texWeights: [Double] = [0.50,           0.30,           0.20]
-        let primaryRule = texRules[rng.weightedPick(texWeights)]
+        let primaryRule = forceRuleID ?? texRules[rng.weightedPick(texWeights)]
         usedRuleIDs.insert(primaryRule)
 
         // Orbital motive loop length (different from arpeggio's pattern length)
         // Arpeggio uses 4 or 8 steps; texture uses 12 or 16 steps
         let texLoopLen = rng.nextDouble() < 0.5 ? 12 : 16
 
+        let firstBodyBar = structure.sections
+            .first(where: { $0.label != .intro && $0.label != .outro })?.startBar ?? 0
+
         var events: [MIDIEvent] = []
 
         for section in structure.sections {
+            // Texture is silent during all bridge sections (density rule)
+            guard !section.label.isBridge else { continue }
+            // preRamp uses TEXT-002 shimmer; postRamp uses TEXT-003 sweep (fall through to switch below)
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
@@ -38,8 +48,25 @@ struct CosmicTextureGenerator {
                     let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                     let note   = texRegisterNote(pc: rootPC, targetOct: 2)
                     events.append(MIDIEvent(stepIndex: barStart, note: UInt8(note),
-                                            velocity: UInt8(50 + rng.nextInt(upperBound: 10)),
+                                            velocity: UInt8(86 + rng.nextInt(upperBound: 10)),
                                             durationSteps: 62))
+                    continue
+                }
+
+                // PreRamp: shimmer hold signals change coming (TEXT-002 behavior)
+                if section.label == .preRamp {
+                    guard bar % 4 == 0 else { continue }
+                    let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                    let note   = texRegisterNote(pc: rootPC, targetOct: 2)
+                    events.append(MIDIEvent(stepIndex: barStart, note: UInt8(note),
+                                            velocity: UInt8(72 + rng.nextInt(upperBound: 10)),
+                                            durationSteps: 62))
+                    continue
+                }
+
+                // PostRamp: spatial sweep signals return (TEXT-003 behavior)
+                if section.label == .postRamp {
+                    events += spatialSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
                     continue
                 }
 
@@ -56,16 +83,18 @@ struct CosmicTextureGenerator {
                 }
 
                 switch primaryRule {
-                case "COS-TEXT-001":
+                case "KOS-TEXT-001":
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
-                                               entry: entry, frame: frame, rng: &rng)
-                case "COS-TEXT-002":
+                                               firstBodyBar: firstBodyBar,
+                                               entry: entry, frame: frame, structure: structure, rng: &rng)
+                case "KOS-TEXT-002":
                     events += shimmerHoldBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
-                case "COS-TEXT-003":
+                case "KOS-TEXT-003":
                     events += spatialSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
                 default:
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
-                                               entry: entry, frame: frame, rng: &rng)
+                                               firstBodyBar: firstBodyBar,
+                                               entry: entry, frame: frame, structure: structure, rng: &rng)
                 }
             }
         }
@@ -73,21 +102,33 @@ struct CosmicTextureGenerator {
         return events
     }
 
-    // MARK: - COS-TEX-001: Orbital Motive
+    // MARK: - KOS-TEX-001: Orbital Motive
     // 3-note figure (root, 5th, octave) at different length than arpeggio.
-    // Register: MIDI 33–59 (below arpeggio's 55–72) — COS-RULE-11
+    // Register: MIDI 33–59 (below arpeggio's 55–72) — KOS-RULE-11
 
     private static func orbitalMotiveBar(
         barStart: Int, bar: Int, loopLen: Int,
+        firstBodyBar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        structure: SongStructure,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
 
-        // Place in MIDI 33–55 register (COS-RULE-11: Bluebird register)
-        let root   = texRegisterNote(pc: rootPC,         targetOct: 2)
-        let fifth  = texRegisterNote(pc: (rootPC + 7) % 12, targetOct: 2)
-        let octave = texRegisterNote(pc: rootPC,         targetOct: 3)
+        // When a B section exists, lift the octave throughout B; otherwise use bar-count fallback.
+        let barInBody  = bar - firstBodyBar
+        let inLiftWindow: Bool
+        if structure.hasBSection {
+            inLiftWindow = structure.inBSection(atBar: bar)
+        } else {
+            inLiftWindow = barInBody >= 24 && barInBody % 24 < 8
+        }
+        let oct = inLiftWindow ? 3 : 2
+
+        // Place in MIDI 33–55 register (KOS-RULE-11: Bluebird register) or one octave up
+        let root   = texRegisterNote(pc: rootPC,              targetOct: oct)
+        let fifth  = texRegisterNote(pc: (rootPC + 7) % 12,  targetOct: oct)
+        let octave = texRegisterNote(pc: rootPC,              targetOct: oct + 1)
         let motif  = [root, fifth, octave]
 
         // Loop position based on bar and loopLen
@@ -95,11 +136,11 @@ struct CosmicTextureGenerator {
         let loopPosition = (bar * 16) % loopLen
         var evs: [MIDIEvent] = []
 
-        // Quarter-note durations (COS-RULE-11): emit on beats, cycling through motif
+        // Quarter-note durations (KOS-RULE-11): emit on beats, cycling through motif
         for beat in 0..<4 {
             let stepInLoop = (loopPosition + beat * 4) % motif.count
             let note = motif[stepInLoop % motif.count]
-            let vel  = UInt8(45 + rng.nextInt(upperBound: 21))  // 45–65
+            let vel  = UInt8(85 + rng.nextInt(upperBound: 21))  // 85–105
 
             evs.append(MIDIEvent(stepIndex: barStart + beat * 4, note: UInt8(note),
                                  velocity: vel, durationSteps: 3))
@@ -107,8 +148,8 @@ struct CosmicTextureGenerator {
         return evs
     }
 
-    // MARK: - COS-TEX-002: Shimmer Hold
-    // Single note held very quietly (velocity 25–35) for 4+ bars
+    // MARK: - KOS-TEX-002: Shimmer Hold
+    // Single note held quietly (velocity 72–84) for 4+ bars
 
     private static func shimmerHoldBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
@@ -119,14 +160,14 @@ struct CosmicTextureGenerator {
 
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let note   = texRegisterNote(pc: rootPC, targetOct: 2)
-        let vel    = UInt8(58 + rng.nextInt(upperBound: 13))  // 58–70
+        let vel    = UInt8(86 + rng.nextInt(upperBound: 13))  // 86–98
 
         // Hold for 4+ bars = 64+ steps; emit as a very long note
         return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 62)]
     }
 
-    // MARK: - COS-TEX-003: Spatial Sweep
-    // Chromatic passing notes (velocity 20) between scale tones, one per 4 bars
+    // MARK: - KOS-TEX-003: Spatial Sweep
+    // Chromatic passing notes (velocity 72) between scale tones, one per 4 bars
 
     private static func spatialSweepBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
@@ -157,9 +198,9 @@ struct CosmicTextureGenerator {
         while toMIDI > 59 { toMIDI -= 12 }
 
         return [
-            MIDIEvent(stepIndex: barStart,     note: UInt8(fromMIDI), velocity: 55, durationSteps: 4),
-            MIDIEvent(stepIndex: barStart + 4, note: UInt8(chromPass), velocity: 55, durationSteps: 4),
-            MIDIEvent(stepIndex: barStart + 8, note: UInt8(toMIDI),    velocity: 55, durationSteps: 4),
+            MIDIEvent(stepIndex: barStart,     note: UInt8(fromMIDI), velocity: 89, durationSteps: 4),
+            MIDIEvent(stepIndex: barStart + 4, note: UInt8(chromPass), velocity: 89, durationSteps: 4),
+            MIDIEvent(stepIndex: barStart + 8, note: UInt8(toMIDI),    velocity: 89, durationSteps: 4),
         ]
     }
 

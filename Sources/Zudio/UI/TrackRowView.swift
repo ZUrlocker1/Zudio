@@ -23,10 +23,10 @@ struct TrackRowView: View {
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
-        let isCosmic = activeStyle == .cosmic
+        let isKosmic = activeStyle == .kosmic
         switch trackIndex {
         case kTrackLead1:
-            if isCosmic {
+            if isKosmic {
                 return [.init(name:"Ocarina",        program:79),  .init(name:"Flute",        program:73),
                         .init(name:"Whistle",        program:78),  .init(name:"Calliope Lead", program:82),
                         .init(name:"Fifths Lead",    program:86)]
@@ -36,7 +36,7 @@ struct TrackRowView: View {
                     .init(name:"Fifths Lead",      program:86), .init(name:"Moog Lead",        program:39),
                     .init(name:"Overdrive Gtr",    program:29), .init(name:"Flute",            program:82)]
         case kTrackLead2:
-            if isCosmic {
+            if isKosmic {
                 return [.init(name:"Brightness",   program:100), .init(name:"Warm Pad",       program:89),
                         .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88)]
             }
@@ -44,7 +44,7 @@ struct TrackRowView: View {
                     .init(name:"Marimba",          program:12), .init(name:"Bell/Pluck",      program:14),
                     .init(name:"Soft Brass",        program:56), .init(name:"Ocarina",        program:79)]
         case kTrackPads:
-            if isCosmic {
+            if isKosmic {
                 return [.init(name:"Choir Aahs",   program:52), .init(name:"String Ensemble", program:48),
                         .init(name:"Synth Strings", program:50), .init(name:"Warm Pad",       program:89),
                         .init(name:"Space Voice",   program:91)]
@@ -54,7 +54,7 @@ struct TrackRowView: View {
                     .init(name:"Bowed Glass",     program:92), .init(name:"Synth Strings",   program:50),
                     .init(name:"String Pad",      program:48), .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
-            if isCosmic {
+            if isKosmic {
                 return [.init(name:"FX Crystal",   program:98), .init(name:"Square Lead",    program:80),
                         .init(name:"Vibraphone",   program:11), .init(name:"Elec Piano 2",   program:5),
                         .init(name:"Church Organ", program:19)]
@@ -64,7 +64,7 @@ struct TrackRowView: View {
                     .init(name:"Electric Piano",    program:4),  .init(name:"Muted Guitar",      program:29),
                     .init(name:"Tremolo Strings",   program:44), .init(name:"Mono Synth",        program:80)]
         case kTrackTexture:
-            if isCosmic {
+            if isKosmic {
                 return [.init(name:"FX Atmosphere", program:99), .init(name:"Pad 3 Poly",    program:90),
                         .init(name:"Sweep Pad",      program:95)]
             }
@@ -72,19 +72,19 @@ struct TrackRowView: View {
                     .init(name:"Space Voice",      program:91), .init(name:"Swell",           program:95),
                     .init(name:"FX Atmosphere",    program:99), .init(name:"FX Echoes",       program:102)]
         case kTrackBass:
-            if isCosmic {
+            if isKosmic {
                 return [.init(name:"Moog Bass",    program:39), .init(name:"Synth Bass 1",   program:38),
                         .init(name:"Lead Bass",    program:87), .init(name:"Fretless Bass",  program:35)]
             }
             return [.init(name:"Moog Bass",       program:39), .init(name:"Lead Bass",      program:87),
                     .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]
         case kTrackDrums:
-            if isCosmic {
-                return [.init(name:"Standard Kit", program:0),  .init(name:"Brush Kit",      program:40)]
+            if isKosmic {
+                return [.init(name:"Brush Kit",    program:40), .init(name:"808 Kit",      program:25),
+                        .init(name:"Machine Kit",  program:24), .init(name:"Standard Kit", program:0)]
             }
             return [.init(name:"Rock Kit",       program:8),  .init(name:"808 Kit",         program:25),
-                    .init(name:"Brush Kit",       program:40),
-                    .init(name:"Rock Kit",        program:8)]
+                    .init(name:"Brush Kit",       program:40)]
         default:
             return [.init(name:"Synth",          program:0)]
         }
@@ -95,7 +95,7 @@ struct TrackRowView: View {
     // Snapshot of the style currently applied to this track's instruments + effects.
     // Only updated when defaultsResetToken fires (generate or Reset button) — NOT on live
     // selectedStyle changes — so switching the picker mid-song doesn't touch anything.
-    @State private var activeStyle: MusicStyle = .cosmic
+    @State private var activeStyle: MusicStyle = .kosmic
 
     // MARK: - Body
 
@@ -224,14 +224,14 @@ struct TrackRowView: View {
 
     // MARK: - Helpers
 
-    // Per-track effect subset — exactly 3 per track (style-specific for Cosmic)
+    // Per-track effect subset — exactly 3 per track (style-specific for Kosmic)
     private var trackEffects: [TrackEffect] {
-        let isCosmic = activeStyle == .cosmic
+        let isKosmic = activeStyle == .kosmic
         switch trackIndex {
-        case kTrackLead1:   return isCosmic ? [.boost, .delay, .space]  : [.boost, .delay, .tremolo]
+        case kTrackLead1:   return isKosmic ? [.boost, .delay, .space]  : [.boost, .delay, .tremolo]
         case kTrackLead2:              return [.boost, .delay, .reverb]
         case kTrackPads:               return [.sweep, .delay, .space]
-        case kTrackTexture: return isCosmic ? [.pan, .delay, .space]    : [.pan, .delay, .reverb]
+        case kTrackTexture: return isKosmic ? [.pan, .delay, .space]    : [.pan, .delay, .reverb]
         case kTrackBass:               return [.lowShelf, .delay, .reverb]
         case kTrackDrums:              return [.compression, .delay, .reverb]
         default:                       return [.boost, .delay, .reverb]  // Rhythm
@@ -265,9 +265,9 @@ struct TrackRowView: View {
             appState.setEffect(fx, enabled: false, forTrack: trackIndex)
         }
 
-        let isCosmic = activeStyle == .cosmic
+        let isKosmic = activeStyle == .kosmic
         let defaults: [TrackEffect]
-        if isCosmic {
+        if isKosmic {
             defaults = switch trackIndex {
             case kTrackLead1:    [.delay, .space]
             case kTrackLead2:    [.space]

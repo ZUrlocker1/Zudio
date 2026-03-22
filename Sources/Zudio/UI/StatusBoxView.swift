@@ -83,7 +83,7 @@ struct StatusBoxView: View {
                 .frame(minHeight: 60, idealHeight: 200, maxHeight: 280)
                 .background(Color(white: 0.10))
                 .onAppear { builtText = buildLogText() }
-                .onChange(of: appState.statusLog.count) { _ in
+                .onChange(of: appState.statusLogVersion) { _ in
                     builtText = buildLogText()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
@@ -93,26 +93,44 @@ struct StatusBoxView: View {
         }
     }
 
-    // Build the entire log as one Text value by concatenating styled segments.
-    // A single Text supports contiguous selection across all lines.
+    // Build the entire log as a single AttributedString so text selection spans all lines.
+    // AttributedString appending is O(n) total — avoids the O(n²) cost of chaining
+    // SwiftUI Text structs via + (each + copies the entire accumulated value so far).
     private func buildLogText() -> Text {
         let entries = appState.statusLog
-        var result = Text("")
+        guard !entries.isEmpty else { return Text("") }
+
+        var attrStr = AttributedString()
+
+        let uiFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        let uiFontBold = NSFont.monospacedSystemFont(ofSize: 12, weight: .bold)
+
+        let tagColor      = NSColor(Color.green.opacity(0.85))
+        let tagTitleColor = NSColor.white
+        let descColor     = NSColor(Color.white.opacity(0.85))
+        let descTitleColor = NSColor(Color.yellow.opacity(0.95))
+
         for (i, entry) in entries.enumerated() {
             let tag = entry.tag.padding(toLength: tagWidth, withPad: " ", startingAt: 0)
-            let weight: Font.Weight = entry.isTitle ? .bold : .regular
-            let font = Font.system(size: 12, weight: weight, design: .monospaced)
+            let font = entry.isTitle ? uiFontBold : uiFont
 
-            let tagText  = Text(tag)
-                .font(font)
-                .foregroundStyle(entry.isTitle ? Color.white : Color.green.opacity(0.85))
-            let descText = Text(entry.description)
-                .font(font)
-                .foregroundStyle(entry.isTitle ? Color.yellow.opacity(0.95) : Color.white.opacity(0.85))
+            var tagAttr = AttributedString(tag)
+            tagAttr.font = font
+            tagAttr.foregroundColor = entry.isTitle ? tagTitleColor : tagColor
 
-            let line = tagText + descText
-            result = i == 0 ? line : result + Text("\n").font(font) + line
+            var descAttr = AttributedString(entry.description)
+            descAttr.font = font
+            descAttr.foregroundColor = entry.isTitle ? descTitleColor : descColor
+
+            if i > 0 {
+                var nl = AttributedString("\n")
+                nl.font = uiFont
+                attrStr += nl
+            }
+            attrStr += tagAttr
+            attrStr += descAttr
         }
-        return result
+
+        return Text(attrStr)
     }
 }

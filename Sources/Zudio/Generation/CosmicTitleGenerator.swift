@@ -1,12 +1,12 @@
-// CosmicTitleGenerator.swift — Cosmic / space-themed song title generator
+// KosmicTitleGenerator.swift — Kosmic / space-themed song title generator
 //
 // Four patterns:
 //   1. Single JMJ-X word          — Vortexe, Proxima, Fluxion
 //   2. JMJ-X word + Roman numeral — Galaxie II, Paradoxe IV
-//   5. Two-word English cosmic     — Dark Nebula, Solar Arc, Void Pulse
+//   5. Two-word English kosmic     — Dark Nebula, Solar Arc, Void Pulse
 //   6. Faux-German adj + noun      — Ewig Kosmos, Dunkel Stern, Tief Welle
 
-struct CosmicTitleGenerator {
+struct KosmicTitleGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
         let pattern = patterns[rng.nextInt(upperBound: patterns.count)]
         return pattern(frame, &rng)
@@ -25,13 +25,13 @@ struct CosmicTitleGenerator {
 
     private static let romanNumerals = ["II", "III", "IV", "V", "VI", "VII", "VIII"]
 
-    private static let cosmicAdjectives = [
+    private static let kosmicAdjectives = [
         "Solar", "Dark", "Deep", "Void", "Stellar", "Astral", "Polar",
         "Silent", "Orbital", "Distant", "Ancient", "Frozen", "Hollow",
         "Radiant", "Spectral", "Liminal", "Oblique", "Inert", "Ambient"
     ]
 
-    private static let cosmicNouns = [
+    private static let kosmicNouns = [
         "Arc", "Field", "Drift", "Pulse", "Nebula", "Void", "Ether",
         "Flux", "Prism", "Helix", "Vortex", "Horizon", "Signal",
         "Current", "Phase", "Lattice", "Aurora", "Apex", "Zenith",
@@ -43,7 +43,7 @@ struct CosmicTitleGenerator {
         "Schwarz", "Leer", "Uralt", "Groß", "Sanft", "Träge", "Fahl"
     ]
 
-    private static let germanCosmicNouns = [
+    private static let germanKosmicNouns = [
         "Kosmos", "Nebel", "Stern", "Raum", "Welle", "Licht", "Äther",
         "Ferne", "Himmel", "Strom", "Feld", "Leere", "Geist", "Tiefe",
         "Schwere", "Dunkel", "Stille", "Weite", "Schein", "Hauch"
@@ -66,22 +66,22 @@ struct CosmicTitleGenerator {
             return "\(word) \(num)"
         },
 
-        // 5. Two-word English cosmic
+        // 5. Two-word English kosmic
         { _, rng in
-            let adj  = cosmicAdjectives[rng.nextInt(upperBound: cosmicAdjectives.count)]
-            let noun = cosmicNouns[rng.nextInt(upperBound: cosmicNouns.count)]
+            let adj  = kosmicAdjectives[rng.nextInt(upperBound: kosmicAdjectives.count)]
+            let noun = kosmicNouns[rng.nextInt(upperBound: kosmicNouns.count)]
             return "\(adj) \(noun)"
         },
 
-        // 6. Faux-German adj + cosmic noun  (weight ×2 — TD flavour)
+        // 6. Faux-German adj + kosmic noun  (weight ×2 — TD flavour)
         { _, rng in
             let adj  = germanAdjectives[rng.nextInt(upperBound: germanAdjectives.count)]
-            let noun = germanCosmicNouns[rng.nextInt(upperBound: germanCosmicNouns.count)]
+            let noun = germanKosmicNouns[rng.nextInt(upperBound: germanKosmicNouns.count)]
             return "\(adj) \(noun)"
         },
         { _, rng in
             let adj  = germanAdjectives[rng.nextInt(upperBound: germanAdjectives.count)]
-            let noun = germanCosmicNouns[rng.nextInt(upperBound: germanCosmicNouns.count)]
+            let noun = germanKosmicNouns[rng.nextInt(upperBound: germanKosmicNouns.count)]
             return "\(adj) \(noun)"
         },
     ]

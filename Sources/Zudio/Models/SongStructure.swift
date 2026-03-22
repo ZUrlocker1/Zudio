@@ -66,4 +66,18 @@ struct SongStructure: Equatable, Sendable {
     var introSection: SongSection? { sections.first { $0.label == .intro } }
     var outroSection: SongSection? { sections.first { $0.label == .outro } }
     var bodySections: [SongSection] { sections.filter { $0.label == .A || $0.label == .B } }
+
+    /// True if this song has at least one B section (any form other than single_evolving).
+    var hasBSection: Bool { sections.contains { $0.label == .B } }
+
+    /// True if the bar falls within any B section.
+    func inBSection(atBar bar: Int) -> Bool {
+        section(atBar: bar)?.label == .B
+    }
+
+    /// True if the bar falls within any bridge section (any archetype).
+    func inBridge(atBar bar: Int) -> Bool {
+        guard let lbl = section(atBar: bar)?.label else { return false }
+        return lbl == .bridge || lbl == .bridgeAlt || lbl == .bridgeMelody
+    }
 }

@@ -1,18 +1,18 @@
-# Cosmic Style Generator — Research & Design Plan
+# Kosmic Style Generator — Research & Design Plan
 
 ## Context
 
-Zudio currently generates only Motorik-style (krautrock) music. The user wants to add a second style called "Cosmic" — inspired by Berlin School electronic music (Tangerine Dream, Jean-Michel Jarre, Steve Roach, Craven Faults, Vangelis). This document is a research plan only; no code will be written yet. It establishes the musical rules, generator design, and architecture for when implementation begins.
+Zudio currently generates only Motorik-style (krautrock) music. The user wants to add a second style called "Kosmic" — inspired by Berlin School electronic music (Tangerine Dream, Jean-Michel Jarre, Steve Roach, Craven Faults, Vangelis). This document is a research plan only; no code will be written yet. It establishes the musical rules, generator design, and architecture for when implementation begins.
 
-The UI will eventually offer a style dial: **Motorik → Cosmic → Ambient** (Ambient is a future third choice). For now this plan covers Cosmic only.
+The UI will eventually offer a style dial: **Motorik → Kosmic → Ambient** (Ambient is a future third choice). For now this plan covers Kosmic only.
 
 ---
 
-## Part 1: Genre Research — What Is "Cosmic"?
+## Part 1: Genre Research — What Is "Kosmic"?
 
 ### Definition
 
-**Kosmische Musik** (German: "cosmic music") is 1970s West German electronic music rooted in synthesizers and sequencers, emphasizing themes of space and otherworldliness. It emerged from the experimental Zodiak Free Arts Lab in West Berlin. The genre is characterized by:
+**Kosmische Musik** (German: "kosmic music") is 1970s West German electronic music rooted in synthesizers and sequencers, emphasizing themes of space and otherworldliness. It emerged from the experimental Zodiak Free Arts Lab in West Berlin. The genre is characterized by:
 
 - **Ostinato step-sequences** (repeating melodic/harmonic patterns)
 - **Modal improvisation** over static harmonic fields
@@ -20,7 +20,7 @@ The UI will eventually offer a style dial: **Motorik → Cosmic → Ambient** (A
 - **Hypnotic, trance-inducing listening**
 - **Timbre as primary narrative** — when harmony is static, synth tone color becomes the "melody"
 
-**Critical distinction from Motorik:** Motorik (Neu!, Can) uses a steady 4/4 kick-drum groove as the forward propulsive engine; rhythm is primary. Cosmic/Kosmische uses sequencer patterns and harmonic drones as the engine; **rhythm is secondary or absent**. The energy is inward and spatial, not outward and propulsive.
+**Critical distinction from Motorik:** Motorik (Neu!, Can) uses a steady 4/4 kick-drum groove as the forward propulsive engine; rhythm is primary. Kosmic/Kosmische uses sequencer patterns and harmonic drones as the engine; **rhythm is secondary or absent**. The energy is inward and spatial, not outward and propulsive.
 
 ---
 
@@ -104,7 +104,7 @@ The UI will eventually offer a style dial: **Motorik → Cosmic → Ambient** (A
 - Listener finds their own tempo within the static texture
 - Micro-evolution: what sounds static reveals slow harmonic drift over 20+ minutes
 
-**Generative Lesson:** For Cosmic in Zudio, a Roach-style section means nearly static harmony with multiple overlapping pad layers at different loop lengths (e.g., 16, 20, and 24 bars) producing constant variation from a minimal palette. No drum track needed.
+**Generative Lesson:** For Kosmic in Zudio, a Roach-style section means nearly static harmony with multiple overlapping pad layers at different loop lengths (e.g., 16, 20, and 24 bars) producing constant variation from a minimal palette. No drum track needed.
 
 ---
 
@@ -160,13 +160,13 @@ The UI will eventually offer a style dial: **Motorik → Cosmic → Ambient** (A
 - Slow, held, expressive — Yamaha CS-80 allows velocity, aftertouch, ribbon controller performance
 - Blend of jazz and classical sensibilities
 
-**Generative Lesson:** Vangelis shows that Cosmic doesn't have to be static. The "cinematic" variant uses two-chord simplicity (like Blade Runner's F#m/D) but makes those two chords sound vast through voicing, filter attack, and performance variation. For Zudio, the Vangelis approach means choosing 2-chord sections and varying how those chords are voiced/attacked per bar rather than changing chords frequently.
+**Generative Lesson:** Vangelis shows that Kosmic doesn't have to be static. The "cinematic" variant uses two-chord simplicity (like Blade Runner's F#m/D) but makes those two chords sound vast through voicing, filter attack, and performance variation. For Zudio, the Vangelis approach means choosing 2-chord sections and varying how those chords are voiced/attacked per bar rather than changing chords frequently.
 
 ---
 
-## Part 3: Universal Cosmic Rules (What All Five Share)
+## Part 3: Universal Kosmic Rules (What All Five Share)
 
-These rules are **non-negotiable** for anything to sound Cosmic:
+These rules are **non-negotiable** for anything to sound Kosmic:
 
 1. **Hypnotic repetition + scheduled variation**
    - A pattern repeats 3–5 times before any change (3 = hook, 5 = hypnotic, 8+ = needs timbral variation)
@@ -182,7 +182,7 @@ These rules are **non-negotiable** for anything to sound Cosmic:
    - Aeolian (natural minor, darkest) — most common in Berlin School
    - Dorian (minor with raised 6th, warmth + darkness) — JMJ, Vangelis
    - Phrygian (minor with flat 2nd, mysterious/Spanish) — rare but effective
-   - Mixolydian (major with flat 7th, open/suspended) — brighter cosmic sections
+   - Mixolydian (major with flat 7th, open/suspended) — brighter kosmic sections
    - Avoid functional harmony (no V7→I resolution = no classical narrative)
 
 4. **Timbre as primary narrative**
@@ -207,27 +207,27 @@ These rules are **non-negotiable** for anything to sound Cosmic:
 
 ---
 
-## Part 4: Cosmic vs. Motorik — The Generative Differences
+## Part 4: Kosmic vs. Motorik — The Generative Differences
 
-- **Tempo:** Motorik = 126–154 BPM / Cosmic = 95–126 BPM
-- **Rhythm anchor:** Motorik = kick drum 1+3, snare 2+4 / Cosmic = sequencer arpeggio or absent
-- **Harmonic rhythm:** Motorik = change every 4–8 bars / Cosmic = change every 8–32 bars
-- **Mode:** Motorik = Dorian, Aeolian, Mixolydian / Cosmic = Aeolian, Dorian, Phrygian, Mixolydian
-- **Song structure:** Motorik = Intro/A/B/Outro with clear arcs / Cosmic = long evolving sections, glacial pacing
-- **Lead melody:** Motorik = phrase-first, syncopated, rhythmic / Cosmic = long held notes, arpeggio-driven, sparse
-- **Pads:** Motorik = chord stabs, backbeats / Cosmic = whole-bar sustains, slow swells
-- **Bass:** Motorik = Motorik drive, 8th-note grooves / Cosmic = slow root movement, drone-like
-- **Drums:** Motorik = full Motorik groove / Cosmic = absent or sparse pulse only
-- **Energy model:** Motorik = propulsive, outward / Cosmic = immersive, inward
-- **Variation unit:** Motorik = per-section (A/B) / Cosmic = per-layer-cycle (staggered)
+- **Tempo:** Motorik = 126–154 BPM / Kosmic = 95–126 BPM
+- **Rhythm anchor:** Motorik = kick drum 1+3, snare 2+4 / Kosmic = sequencer arpeggio or absent
+- **Harmonic rhythm:** Motorik = change every 4–8 bars / Kosmic = change every 8–32 bars
+- **Mode:** Motorik = Dorian, Aeolian, Mixolydian / Kosmic = Aeolian, Dorian, Phrygian, Mixolydian
+- **Song structure:** Motorik = Intro/A/B/Outro with clear arcs / Kosmic = long evolving sections, glacial pacing
+- **Lead melody:** Motorik = phrase-first, syncopated, rhythmic / Kosmic = long held notes, arpeggio-driven, sparse
+- **Pads:** Motorik = chord stabs, backbeats / Kosmic = whole-bar sustains, slow swells
+- **Bass:** Motorik = Motorik drive, 8th-note grooves / Kosmic = slow root movement, drone-like
+- **Drums:** Motorik = full Motorik groove / Kosmic = absent or sparse pulse only
+- **Energy model:** Motorik = propulsive, outward / Kosmic = immersive, inward
+- **Variation unit:** Motorik = per-section (A/B) / Kosmic = per-layer-cycle (staggered)
 
 ---
 
-## Part 5: Proposed Cosmic Generator Design
+## Part 5: Proposed Kosmic Generator Design
 
 ### 5.1 CosmicMusicalFrameGenerator
 
-New `GlobalMusicalFrame` distributions for Cosmic:
+New `GlobalMusicalFrame` distributions for Kosmic:
 
 **Tempo:** Triangular distribution, min=95, peak=120, max=126 BPM
 - 120 BPM is the empirically confirmed peak (all four Electric Buddha Band reference songs run at 120). With 30% probability, apply a mid-song tempo lift of +4–8 BPM at a random bar in the range [totalBars × 0.45, totalBars × 0.65].
@@ -236,12 +236,12 @@ New `GlobalMusicalFrame` distributions for Cosmic:
 - Am/A (20%), Em/E (18%), Dm/D (15%), Gm/G (12%), Cm/C (10%), Fm/F (8%), Bm/B (7%), other (10%)
 
 **Modes:** Weighted differently from Motorik:
-- Aeolian 40% (darkest, most "cosmic")
+- Aeolian 40% (darkest, most "kosmic")
 - Dorian 30% (warm darkness — most JMJ-like)
 - Phrygian 15% (mysterious, Vangelis-adjacent)
 - Mixolydian 15% (brighter, open-sounding)
 
-**Progression Families** (new set for Cosmic):
+**Progression Families** (new set for Kosmic):
 - `static_drone` 30% — single tonic for 16–32 bars, slight voice movement
 - `two_chord_pendulum` 25% — two chords alternating every 8–16 bars (Vangelis F#m/D model)
 - `modal_drift` 20% — slow stepwise movement through modal scale tones (i → bVII → bVI → bVII → i)
@@ -263,23 +263,23 @@ New `GlobalMusicalFrame` distributions for Cosmic:
 
 **Section lengths:** 32–96 bars (much longer than Motorik's 16–48)
 
-**Intro styles (Cosmic-specific):**
+**Intro styles (Kosmic-specific):**
 - `ambient_fade_in` — song starts at near-zero volume, slow 4-bar linear ramp, no pickup fill
 - `texture_first` — pad/drone enters first (2 bars), then arpeggio joins on bar 3, bass on bar 5
 - `sequencer_launch` — arpeggio starts immediately (no intro), pads enter bar 4 (JMJ style)
 
-**Outro styles (Cosmic-specific):**
+**Outro styles (Kosmic-specific):**
 - `slow_dissolve` — layers drop out one at a time over 8 bars (opposite of build)
 - `drone_hold` — all melodic content stops, pad/drone holds for 4 bars then fades
 - `fade_to_silence` — master volume fade over 8–16 bars (ambient classic)
 
-**Intensity model:** Instead of Motorik's low/medium/high per section, Cosmic uses a **density curve** — a smooth sine or ramp function over the whole song that controls how many layers are active at each bar.
+**Intensity model:** Instead of Motorik's low/medium/high per section, Kosmic uses a **density curve** — a smooth sine or ramp function over the whole song that controls how many layers are active at each bar.
 
 ---
 
 ### 5.3 CosmicArpeggioGenerator (new — central to the style)
 
-This is the most important new generator. It replaces RhythmGenerator for Cosmic style.
+This is the most important new generator. It replaces RhythmGenerator for Kosmic style.
 
 **Arpeggio Construction Rules:**
 
@@ -313,27 +313,27 @@ If two arpeggio voices are used (Lead 1 + Rhythm track), offset the second voice
 
 ### 5.4 CosmicPadsGenerator
 
-**Extends/replaces PadsGenerator** for Cosmic style.
+**Extends/replaces PadsGenerator** for Kosmic style.
 
 **New pad rules:**
 
-**COS-PAD-001: Long Drone** — whole notes held 2–4 bars, full chord voicing, very low velocity (40–55), filter LFO implied by velocity variation
+**KOS-PAD-001: Long Drone** — whole notes held 2–4 bars, full chord voicing, very low velocity (40–55), filter LFO implied by velocity variation
 - Duration: 32 or 64 steps (2 or 4 bars)
 - Voicing: root + 5th + octave + (major or minor 3rd at octave up) = 4 voices
 
-**COS-PAD-002: Swell Chord** — starts silent, velocity ramps from 20→80 over the bar, then holds (Vangelis brass swell)
+**KOS-PAD-002: Swell Chord** — starts silent, velocity ramps from 20→80 over the bar, then holds (Vangelis brass swell)
 - Use multiple velocity-stepped events to simulate filter attack on MIDI sampler
 - Duration: 16 steps with ramped velocity across sub-events
 
-**COS-PAD-003: Unsync Layers** — three pad voices at different loop lengths (8, 10, 12 bars) creating slowly shifting harmony from a single chord
+**KOS-PAD-003: Unsync Layers** — three pad voices at different loop lengths (8, 10, 12 bars) creating slowly shifting harmony from a single chord
 - Voice 1: holds root chord for 8 bars
 - Voice 2: holds same chord but different voicing for 10 bars
 - Voice 3: holds inversion for 12 bars
 - Their phase relationships shift over time = Roach-style organic variation
 
-**COS-PAD-004: Suspended Resolution** — sus4 chord resolves to minor every 4 bars (sus4 for 3 bars, minor for 1 bar) — creates gentle periodicity
+**KOS-PAD-004: Suspended Resolution** — sus4 chord resolves to minor every 4 bars (sus4 for 3 bars, minor for 1 bar) — creates gentle periodicity
 
-**COS-PAD-005: Quartal Stack** — stacked fourths (0, 5, 10 semitones) for atonal/spacious sections
+**KOS-PAD-005: Quartal Stack** — stacked fourths (0, 5, 10 semitones) for atonal/spacious sections
 
 **Voicing register:** MIDI 36–72 (lower than Motorik pads at 48–84) — creates spatial depth below the arpeggio
 
@@ -341,40 +341,40 @@ If two arpeggio voices are used (Lead 1 + Rhythm track), offset the second voice
 
 ### 5.5 CosmicLeadGenerator
 
-Lead melody in Cosmic is sparse and long-note-oriented. Not absent, but not rhythmically busy.
+Lead melody in Kosmic is sparse and long-note-oriented. Not absent, but not rhythmically busy.
 
 **New lead rules:**
 
-**COS-LD-001: Slow Arc** — 2–4 note phrase, each note held 4–8 beats, rising or falling by scale steps. One phrase per 4–8 bars. Feels like a solo improvisation over the arpeggio bed.
+**KOS-LD-001: Slow Arc** — 2–4 note phrase, each note held 4–8 beats, rising or falling by scale steps. One phrase per 4–8 bars. Feels like a solo improvisation over the arpeggio bed.
 
-**COS-LD-002: Floating Tones** — single notes, widely spaced (one every 2–4 bars), held until the next attack. Creates sense of vast space between events. Notes always on scale tones (no chromatic passing).
+**KOS-LD-002: Floating Tones** — single notes, widely spaced (one every 2–4 bars), held until the next attack. Creates sense of vast space between events. Notes always on scale tones (no chromatic passing).
 
-**COS-LD-003: Pentatonic Drift** — slow movement through pentatonic scale (5 notes only), each step 2–4 bars. The pentatonic constraint prevents dissonance. Sounds like a Japanese koto or Mellotron flute.
+**KOS-LD-003: Pentatonic Drift** — slow movement through pentatonic scale (5 notes only), each step 2–4 bars. The pentatonic constraint prevents dissonance. Sounds like a Japanese koto or Mellotron flute.
 
-**COS-LD-004: Echo Melody** — a 4-note phrase (2 bars), followed by 2-bar silence, then the same phrase transposed up or down by a 3rd (question/answer). Repeats for the section. The classic Vangelis structural device.
+**KOS-LD-004: Echo Melody** — a 4-note phrase (2 bars), followed by 2-bar silence, then the same phrase transposed up or down by a 3rd (question/answer). Repeats for the section. The classic Vangelis structural device.
 
-**COS-LD-005: Arpeggio Highlight** — picks one note from the underlying arpeggio pattern and holds it for a full bar. Changes which note it highlights every 4 bars. Ties melody to arpeggio without duplicating it.
+**KOS-LD-005: Arpeggio Highlight** — picks one note from the underlying arpeggio pattern and holds it for a full bar. Changes which note it highlights every 4 bars. Ties melody to arpeggio without duplicating it.
 
 **Register:** MIDI 60–96 (higher than Motorik leads, more "celestial")
-**Velocity:** 45–72 (softer than Motorik — cosmic is never aggressive)
+**Velocity:** 45–72 (softer than Motorik — kosmic is never aggressive)
 
 ---
 
 ### 5.6 CosmicBassGenerator
 
-Bass in Cosmic is more drone-like than the driving Motorik bass patterns.
+Bass in Kosmic is more drone-like than the driving Motorik bass patterns.
 
 **New bass rules:**
 
-**COS-BAS-001: Drone Root** — root note held for 2 bars (32 steps), releases, re-attacks. Velocity 65. The simplest possible bass — just marks the harmonic root.
+**KOS-BAS-001: Drone Root** — root note held for 2 bars (32 steps), releases, re-attacks. Velocity 65. The simplest possible bass — just marks the harmonic root.
 
-**COS-BAS-002: Root-Fifth Slow Walk** — root for 2 bars, fifth for 2 bars, back to root. Creates slow harmonic movement underneath static pads. 8 bars per cycle.
+**KOS-BAS-002: Root-Fifth Slow Walk** — root for 2 bars, fifth for 2 bars, back to root. Creates slow harmonic movement underneath static pads. 8 bars per cycle.
 
-**COS-BAS-003: Pedal Pulse** — root on every quarter note beat, short duration (4 steps), creates a subtle pulse without Motorik drive energy. Like a slow heartbeat.
+**KOS-BAS-003: Pedal Pulse** — root on every quarter note beat, short duration (4 steps), creates a subtle pulse without Motorik drive energy. Like a slow heartbeat.
 
-**COS-BAS-004: Moroder Drift** — Giorgio Moroder-inspired: root held for 3 bars, then chromatic neighbor note (one semitone up) on bar 4 before returning to root. Creates harmonic tension without changing chord.
+**KOS-BAS-004: Moroder Drift** — Giorgio Moroder-inspired: root held for 3 bars, then chromatic neighbor note (one semitone up) on bar 4 before returning to root. Creates harmonic tension without changing chord.
 
-**COS-BAS-005: Absent Bass** (sparse sections only) — no bass events for 4–8 bar stretches, then COS-BAS-001 re-enters. This is the Roach approach: bass as punctuation, not foundation.
+**KOS-BAS-005: Absent Bass** (sparse sections only) — no bass events for 4–8 bar stretches, then KOS-BAS-001 re-enters. This is the Roach approach: bass as punctuation, not foundation.
 
 **Register:** MIDI 28–52 (same as Motorik — low register is the same regardless of style)
 
@@ -382,7 +382,7 @@ Bass in Cosmic is more drone-like than the driving Motorik bass patterns.
 
 ### 5.7 CosmicDrumGenerator (or: No Drums)
 
-The key design question: **does Cosmic have drums?**
+The key design question: **does Kosmic have drums?**
 
 Research finding: Pure Berlin School (TD Phaedra, Steve Roach) has **no drums**. JMJ uses a minimal rhythm machine (Korg Mini Pops). Craven Faults uses no conventional kit. Vangelis uses drums on some tracks (Heaven and Hell) but not on ambient pieces.
 
@@ -392,21 +392,21 @@ Research finding: Pure Berlin School (TD Phaedra, Steve Roach) has **no drums**.
 - `percussionStyle = .sparse` (35%): Single hi-hat pulse on every quarter beat (or every 2 beats), no kick or snare. Very quiet (velocity 35–50).
 - `percussionStyle = .minimal` (25%): Occasional kick (beat 1 only, every other bar) + hi-hat pulse. The "electronic rhythm machine" feel — JMJ Mini Pops style.
 
-No full Motorik groove in Cosmic mode.
+No full Motorik groove in Kosmic mode.
 
 ---
 
 ### 5.8 CosmicTextureGenerator
 
-Texture in Cosmic is more prominent than in Motorik (it becomes a primary voice, not a background shimmer).
+Texture in Kosmic is more prominent than in Motorik (it becomes a primary voice, not a background shimmer).
 
 **New texture rules:**
 
-**COS-TEX-001: Orbital Motive** — a 3-note figure (root, 5th, octave) looping at a different length than the arpeggio (e.g., arpeggio = 8 steps, texture loop = 12 steps). Their phase relationship creates ever-changing rhythmic combinations. The Steve Roach "unsynchronized loops" approach.
+**KOS-TEX-001: Orbital Motive** — a 3-note figure (root, 5th, octave) looping at a different length than the arpeggio (e.g., arpeggio = 8 steps, texture loop = 12 steps). Their phase relationship creates ever-changing rhythmic combinations. The Steve Roach "unsynchronized loops" approach.
 
-**COS-TEX-002: Shimmer Hold** — single note held very quietly (velocity 25–35) for 4+ bars. Contributes to harmonic fullness without drawing attention. Think: a sustained string note buried in reverb.
+**KOS-TEX-002: Shimmer Hold** — single note held very quietly (velocity 25–35) for 4+ bars. Contributes to harmonic fullness without drawing attention. Think: a sustained string note buried in reverb.
 
-**COS-TEX-003: Spatial Sweep** — slow glissando effect simulated by chromatic passing notes (velocity 20) between scale tones. One per 4 bars. Creates sense of filter sweep.
+**KOS-TEX-003: Spatial Sweep** — slow glissando effect simulated by chromatic passing notes (velocity 20) between scale tones. One per 4 bars. Creates sense of filter sweep.
 
 ---
 
@@ -419,14 +419,14 @@ The Zudio generator architecture is well-suited to extension. All of these work 
 - `midiNote(key:degree:oct:)` — fully reusable
 - `Mode.intervals` and `Mode.nearestInterval()` — reusable
 - `ChordType.intervals` — reusable (quartal, power, sus2 all exist)
-- `RegisterBounds` and `kRegisterBounds` — needs new entries for Cosmic tracks
+- `RegisterBounds` and `kRegisterBounds` — needs new entries for Kosmic tracks
 - `TonalGovernanceBuilder` — fully reusable (works with any chord/mode combination)
-- `DensitySimplifier` — reusable (density concept maps to Cosmic's layer counts)
+- `DensitySimplifier` — reusable (density concept maps to Kosmic's layer counts)
 - `ArrangementFilter` — reusable (post-processing is style-agnostic)
 - `HarmonicFilter` — reusable (diatonic constraint works in any mode)
 - `nearestMIDI(pc:bounds:prevNote:)` — fully reusable (voice leading is universal)
 - `diatonicBelow/Above` helpers in LeadGenerator — reusable
-- `buildArpNotes` in RhythmGenerator — reusable and extends to Cosmic arpeggio patterns
+- `buildArpNotes` in RhythmGenerator — reusable and extends to Kosmic arpeggio patterns
 - `weightedPick` — universal
 - `NotePoolBuilder` — reusable (pitch class sets work for any key/mode)
 
@@ -436,20 +436,20 @@ The Zudio generator architecture is well-suited to extension. All of these work 
 
 When implementation begins, create:
 
-- `Sources/Zudio/Generation/Cosmic/CosmicMusicalFrameGenerator.swift` — tempo/key/mode/progression distributions
-- `Sources/Zudio/Generation/Cosmic/CosmicStructureGenerator.swift` — song form, section lengths, intro/outro styles
-- `Sources/Zudio/Generation/Cosmic/CosmicArpeggioGenerator.swift` — the core of the style; 4–8 note patterns, skip logic, phasing
-- `Sources/Zudio/Generation/Cosmic/CosmicPadsGenerator.swift` — drone, swell, unsync-layer, sus/quartal rules
-- `Sources/Zudio/Generation/Cosmic/CosmicLeadGenerator.swift` — sparse slow-arc, floating tones, echo melody
-- `Sources/Zudio/Generation/Cosmic/CosmicBassGenerator.swift` — drone root, slow walk, pedal pulse
-- `Sources/Zudio/Generation/Cosmic/CosmicDrumGenerator.swift` — absent/sparse/minimal percussion logic
-- `Sources/Zudio/Generation/Cosmic/CosmicTextureGenerator.swift` — orbital motives, shimmer holds
+- `Sources/Zudio/Generation/Kosmic/CosmicMusicalFrameGenerator.swift` — tempo/key/mode/progression distributions
+- `Sources/Zudio/Generation/Kosmic/CosmicStructureGenerator.swift` — song form, section lengths, intro/outro styles
+- `Sources/Zudio/Generation/Kosmic/CosmicArpeggioGenerator.swift` — the core of the style; 4–8 note patterns, skip logic, phasing
+- `Sources/Zudio/Generation/Kosmic/CosmicPadsGenerator.swift` — drone, swell, unsync-layer, sus/quartal rules
+- `Sources/Zudio/Generation/Kosmic/CosmicLeadGenerator.swift` — sparse slow-arc, floating tones, echo melody
+- `Sources/Zudio/Generation/Kosmic/CosmicBassGenerator.swift` — drone root, slow walk, pedal pulse
+- `Sources/Zudio/Generation/Kosmic/CosmicDrumGenerator.swift` — absent/sparse/minimal percussion logic
+- `Sources/Zudio/Generation/Kosmic/CosmicTextureGenerator.swift` — orbital motives, shimmer holds
 
 **Modify:**
-- `Sources/Zudio/Generation/SongGenerator.swift` — add `style: MusicStyle` parameter, branch to Cosmic generators
+- `Sources/Zudio/Generation/SongGenerator.swift` — add `style: MusicStyle` parameter, branch to Kosmic generators
 - `Sources/Zudio/Models/Types.swift` — add `MusicStyle` enum, new `PercussionStyle` enum, new progression families
-- `Sources/Zudio/UI/TopBarView.swift` — add style dial (Motorik / Cosmic)
-- `Sources/Zudio/UI/TrackRowView.swift` — Cosmic instrument presets for each track
+- `Sources/Zudio/UI/TopBarView.swift` — add style dial (Motorik / Kosmic)
+- `Sources/Zudio/UI/TrackRowView.swift` — Kosmic instrument presets for each track
 - `Sources/Zudio/AppState.swift` — add `selectedStyle: MusicStyle` published property
 
 ---
@@ -463,7 +463,7 @@ Replace the `Text("Style: Motorik")` static label in TopBarView with an interact
 ```swift
 Picker("Style", selection: $appState.selectedStyle) {
     Text("Motorik").tag(MusicStyle.motorik)
-    Text("Cosmic").tag(MusicStyle.cosmic)
+    Text("Kosmic").tag(MusicStyle.kosmic)
 }
 .pickerStyle(.segmented)
 .frame(width: 140)
@@ -476,7 +476,7 @@ This is the cleanest macOS control for 2–3 choices. When Ambient is added, it 
 ```swift
 enum MusicStyle: String, CaseIterable, Codable {
     case motorik = "Motorik"
-    case cosmic  = "Cosmic"
+    case kosmic  = "Kosmic"
     // case ambient = "Ambient"  // future
 }
 ```
@@ -485,20 +485,20 @@ enum MusicStyle: String, CaseIterable, Codable {
 - Changing style takes effect on the next Generate (not the current song)
 - The Generate button triggers regeneration using the selected style's generators
 - Style selection persists across sessions (saved in AppState/UserDefaults)
-- Track instrument presets change per style (Cosmic gets new instrument lists in TrackRowView)
+- Track instrument presets change per style (Kosmic gets new instrument lists in TrackRowView)
 
 ---
 
-## Part 9: Cosmic Instrument Presets (TrackRowView)
+## Part 9: Kosmic Instrument Presets (TrackRowView)
 
-The existing GM program assignments will need a Cosmic variant per track:
+The existing GM program assignments will need a Kosmic variant per track:
 
-- **Lead 1 (Cosmic):** Square Lead → Brightness (100), Vibraphone (11), Ocarina (79), Flute (73), Whistle (78) — lighter, more celestial than Motorik leads
-- **Lead 2 (Cosmic):** Warm Pad (89), Halo Pad (94), New Age Pad (88) — pads acting as secondary melody
-- **Pads (Cosmic):** Choir Aahs (52), String Ensemble (48), Synth Strings (50), Warm Pad (89), Space Voice (91)
-- **Arpeggio/Rhythm (Cosmic):** Square Lead (80) for JMJ-style sequences, Vibraphone (11), Marimba (12), Kalimba (108)
-- **Bass (Cosmic):** Moog Bass (39), Synth Bass 1 (38), Pad (89) at low register for drone effect
-- **Drums (Cosmic):** Brush Kit (40) for sparse percussion, or absent
+- **Lead 1 (Kosmic):** Square Lead → Brightness (100), Vibraphone (11), Ocarina (79), Flute (73), Whistle (78) — lighter, more celestial than Motorik leads
+- **Lead 2 (Kosmic):** Warm Pad (89), Halo Pad (94), New Age Pad (88) — pads acting as secondary melody
+- **Pads (Kosmic):** Choir Aahs (52), String Ensemble (48), Synth Strings (50), Warm Pad (89), Space Voice (91)
+- **Arpeggio/Rhythm (Kosmic):** Square Lead (80) for JMJ-style sequences, Vibraphone (11), Marimba (12), Kalimba (108)
+- **Bass (Kosmic):** Moog Bass (39), Synth Bass 1 (38), Pad (89) at low register for drone effect
+- **Drums (Kosmic):** Brush Kit (40) for sparse percussion, or absent
 
 ---
 
@@ -506,7 +506,7 @@ The existing GM program assignments will need a Cosmic variant per track:
 
 1. **Tempo interaction with arpeggio speed:** At 90 BPM with 16th-note arpeggios, you get 6 notes/second — is that fast enough to feel "sequenced"? May need to allow tempo as low as 70 BPM for Roach-style sections.
 
-2. **Delay timing:** The existing delay effect is a time-based effect on the audio output. For Cosmic, delay time should be calculated from BPM (e.g., quarter-note delay = 60/BPM seconds). This needs a BPM-aware effect setting, not just "on/off."
+2. **Delay timing:** The existing delay effect is a time-based effect on the audio output. For Kosmic, delay time should be calculated from BPM (e.g., quarter-note delay = 60/BPM seconds). This needs a BPM-aware effect setting, not just "on/off."
 
 3. **Polyphonic arpeggio vs. monophonic:** JMJ arpeggios are monophonic (one note at a time). TD arpeggios are also monophonic. The existing arpeggio in RhythmGenerator is also monophonic. Good — no architecture change needed.
 
@@ -514,15 +514,15 @@ The existing GM program assignments will need a Cosmic variant per track:
 
 5. **Field recordings (Craven Faults):** Not feasible in MIDI. The "imperfection" principle can be approximated by adding ±5–10% velocity randomization and ±1 step timing jitter on some events.
 
-6. **Microtonality:** Not feasible in standard MIDI. Skip for V1 of Cosmic.
+6. **Microtonality:** Not feasible in standard MIDI. Skip for V1 of Kosmic.
 
-7. **Continuous Play interaction:** Cosmic songs may need different transition rules — longer crossfades (6 bars instead of 4), and bass/pads may need to be "always copied" (not freshly generated) since stable drones are even more important in Cosmic than in Motorik.
+7. **Continuous Play interaction:** Kosmic songs may need different transition rules — longer crossfades (6 bars instead of 4), and bass/pads may need to be "always copied" (not freshly generated) since stable drones are even more important in Kosmic than in Motorik.
 
 ---
 
 ## Part 11: Making It Sound Musical — The Core Rules
 
-Drawing on all research, the key rules that prevent Cosmic from being "noise":
+Drawing on all research, the key rules that prevent Kosmic from being "noise":
 
 1. **Every note must be diatonic** (in the mode) — no random chromatic pitches
 2. **The arpeggio pattern must be a recognizable shape** — not random note order; use one of the 5 interval vocabularies in §5.3
@@ -530,7 +530,7 @@ Drawing on all research, the key rules that prevent Cosmic from being "noise":
 4. **The bass must anticipate or confirm the chord** — bass moves to new root 1 step before or on the chord change bar
 5. **Layers must not compete in the same register** — arpeggio (MIDI 60–84), pads (MIDI 36–72), lead (MIDI 72–96), bass (MIDI 28–52) must not overlap more than 4 semitones
 6. **Velocity hierarchy:** Lead = 45–72, Arpeggio = 60–80, Pads = 35–60, Bass = 55–75, Texture = 20–45
-7. **Silence is valid** — notes should not fill every step; rests ARE music in Cosmic style
+7. **Silence is valid** — notes should not fill every step; rests ARE music in Kosmic style
 8. **Skip logic creates the groove** — 1–2 skipped steps in an 8-step arpeggio pattern creates syncopation without complexity
 
 ---
@@ -538,13 +538,13 @@ Drawing on all research, the key rules that prevent Cosmic from being "noise":
 ## Part 12: Verification Criteria (When Implementation Begins)
 
 1. Build: `xcodebuild -scheme Zudio -configuration Debug build`
-2. Generate 10 Cosmic songs — all should be in 95–126 BPM range
+2. Generate 10 Kosmic songs — all should be in 95–126 BPM range
 3. All songs should have no full drum groove (only absent/sparse/minimal percussion)
 4. Arpeggio track present in all songs, 4–8 note patterns diatonic to key
 5. Harmonic changes should occur no more than once per 8 bars
 6. Subjective test: does it sound like ambient/kosmische music? Would Tangerine Dream fan recognize the genre?
-7. Style selector switches between Motorik and Cosmic — both styles generate correctly from the same Generate button
-8. Test Mode (Cmd-T) works in Cosmic style — generates 1-minute songs for rapid audition
+7. Style selector switches between Motorik and Kosmic — both styles generate correctly from the same Generate button
+8. Test Mode (Cmd-T) works in Kosmic style — generates 1-minute songs for rapid audition
 
 ---
 
@@ -559,7 +559,7 @@ This section provides concrete BPM, key, chord, and arpeggio data measured from 
 **Oxygène Part 2**
 - Tempo: ~87 BPM (feels like 173–174 at half-time/3/4 feel)
 - Key: D Minor
-- Time signature: 3/4 (unusual — most Cosmic is 4/4; this is an exception)
+- Time signature: 3/4 (unusual — most Kosmic is 4/4; this is an exception)
 - Chord progression: Gm → Cm → Dm → F → Eb
 - Generator lesson: Gm→Cm→Dm uses mostly 2nds and 4ths in bass movement — very smooth voice leading. The F→Eb at the end is the only chromatic step (whole tone down) and acts as the "surprise." Apply this: 4 diatonic chord changes, then 1 modal/chromatic pivot.
 
@@ -572,7 +572,7 @@ This section provides concrete BPM, key, chord, and arpeggio data measured from 
 **Équinoxe Part 4**
 - Tempo: 115 BPM
 - Key: F Major (unusually bright for JMJ — Ionian mode)
-- Generator lesson: 115 BPM is the sweet spot for "fast Cosmic" — rhythmic but not propulsive. Confirms upper BPM bound at ~120 (above that it starts sounding Motorik).
+- Generator lesson: 115 BPM is the sweet spot for "fast Kosmic" — rhythmic but not propulsive. Confirms upper BPM bound at ~120 (above that it starts sounding Motorik).
 
 **Magnetic Fields Part 2**
 - Tempo: ~98 BPM (195 at double time)
@@ -594,12 +594,12 @@ This section provides concrete BPM, key, chord, and arpeggio data measured from 
 **Rubycon Part 1**
 - Tempo: (beatless — sequencer-driven)
 - Key: Modal ambiguity; chromatic neighbor notes used for tension
-- Generator lesson: The expansion from 4→12 notes/bar is the structural engine of the track. Implement as: `notesPerBar` starts at 4 in intro sections, increases by 2 every 16 bars in peak sections. This is the Cosmic equivalent of Motorik's intensity arc. Skip probability ≈ 25% (2 of 8 steps).
+- Generator lesson: The expansion from 4→12 notes/bar is the structural engine of the track. Implement as: `notesPerBar` starts at 4 in intro sections, increases by 2 every 16 bars in peak sections. This is the Kosmic equivalent of Motorik's intensity arc. Skip probability ≈ 25% (2 of 8 steps).
 
 **Ricochet Part 1**
 - Tempo: 146 BPM (faster than expected for Berlin School — confirms the upper range extends higher)
 - Key: C Minor
-- Generator lesson: At 146 BPM, Ricochet overlaps with Motorik entirely in tempo. The distinction is purely timbral and structural. Confirms tempo alone cannot distinguish Cosmic from Motorik — the absence of a kick-drum groove is the real marker.
+- Generator lesson: At 146 BPM, Ricochet overlaps with Motorik entirely in tempo. The distinction is purely timbral and structural. Confirms tempo alone cannot distinguish Kosmic from Motorik — the absence of a kick-drum groove is the real marker.
 
 **Berlin School Sequencer Pattern Example (Klaus Schulze-style):**
 ```
@@ -618,18 +618,18 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 **Blade Runner Main Titles**
 - Tempo: 115–117 BPM
 - Key: E Major (Ionian — surprisingly bright for noir sci-fi)
-- Generator lesson: The simplest possible harmonic structure — just IV→I. The complexity comes entirely from voicing and timbre. For Cosmic generator: `two_chord_pendulum` should default to I→IV or I→V (the most consonant relationships), not ii→V→I jazz logic.
+- Generator lesson: The simplest possible harmonic structure — just IV→I. The complexity comes entirely from voicing and timbre. For Kosmic generator: `two_chord_pendulum` should default to I→IV or I→V (the most consonant relationships), not ii→V→I jazz logic.
 
 **Tears in Rain (Blade Runner End Titles)**
 - Tempo: 111 BPM
 - Key: F# Minor
 - Chords: F#m → D (i → bVI)
-- Generator lesson: i → bVI is the definitive Vangelis two-chord. Also confirms extreme sparsity: a single note held for 4+ bars with silence around it is valid and intentional. For the lead generator, `COS-LD-002: Floating Tones` with 4-bar holds is confirmed by this track.
+- Generator lesson: i → bVI is the definitive Vangelis two-chord. Also confirms extreme sparsity: a single note held for 4+ bars with silence around it is valid and intentional. For the lead generator, `KOS-LD-002: Floating Tones` with 4-bar holds is confirmed by this track.
 
 **Pulstar (Albedo 0.39)**
 - Tempo: 123 BPM
 - Key: Db/Eb Major
-- Generator lesson: 4-note arpeggio at 123 BPM with 8th notes = one complete pattern per 2 beats = extremely hypnotic at this tempo. Confirms 4-note as the minimum viable arpeggio length and most hypnotic setting. The almost-zero variation is intentional — in Cosmic, variation is the exception, not the rule.
+- Generator lesson: 4-note arpeggio at 123 BPM with 8th notes = one complete pattern per 2 beats = extremely hypnotic at this tempo. Confirms 4-note as the minimum viable arpeggio length and most hypnotic setting. The almost-zero variation is intentional — in Kosmic, variation is the exception, not the rule.
 
 **Alpha (Heaven and Hell)**
 - Tempo: 83–84 BPM
@@ -637,10 +637,10 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 - Generator lesson: The intro build takes 32 bars to reach full density. This is 5× longer than a Motorik intro (typically 8 bars). Sets expectation for `texture_first` intro style: first instrument enters bar 1, second bar 4, third bar 8, fourth bar 16, fifth bar 32.
 
 **Chariots of Fire**
-- Tempo: 71 BPM (slowest confirmed tempo — sets the Cosmic floor)
+- Tempo: 71 BPM (slowest confirmed tempo — sets the Kosmic floor)
 - Key: Db Major
 - Progression: I → IV → V (Db → Gb → Ab)
-- Generator lesson: At 71 BPM, this is the slowest end of Cosmic. Confirms absolute minimum BPM = 70 (previously estimated, now confirmed). Four-bar chord holds at 71 BPM = ~13.5 seconds per chord — extremely spacious.
+- Generator lesson: At 71 BPM, this is the slowest end of Kosmic. Confirms absolute minimum BPM = 70 (previously estimated, now confirmed). Four-bar chord holds at 71 BPM = ~13.5 seconds per chord — extremely spacious.
 
 **Revised Vangelis BPM range for generator:** 71–123 BPM. The distribution is roughly: slow end (71–84, Alpha/Chariots), mid (111–117, Blade Runner), upper (123, Pulstar).
 
@@ -659,7 +659,7 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 
 **Generator lessons:**
 - The "imperfection" principle: ±8 velocity variation (not strict quantization) on melodic notes. Every note should have its velocity = base ± rand(0, 8).
-- The bass chromatic neighbor (Moroder Drift, `COS-BAS-004`) confirmed: bass holds root for 3 bars, moves ±1 semitone on bar 4, returns.
+- The bass chromatic neighbor (Moroder Drift, `KOS-BAS-004`) confirmed: bass holds root for 3 bars, moves ±1 semitone on bar 4, returns.
 - Loop length should favor 8 steps with some steps repeated rather than 8 unique pitches. Example: `[d, e, f, g, a, g, f, e]` — arch shape with repetition.
 
 ---
@@ -671,7 +671,7 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 - Most common slow range: 83–90 BPM (Alpha, JMJ-slow)
 - Most common mid range: 111–117 BPM (Blade Runner, Équinoxe Pt 4)
 - Most common fast range: 120–126 BPM (Oxygène Pt 4, upper Motorik overlap)
-- Absolute maximum: ~146 BPM for Cosmic (Ricochet — but this sounds like Motorik without the kick)
+- Absolute maximum: ~146 BPM for Kosmic (Ricochet — but this sounds like Motorik without the kick)
 - **Generator recommendation:** Triangular distribution min=95, peak=120, max=126. The corpus is clearly centred on 120.
 
 **Confirmed key preferences (from all sources combined):**
@@ -708,7 +708,7 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 
 ### Song Parameters (Confirmed)
 
-- **BPM: 120** — higher than the 70–110 range estimated from Berlin School research. Confirms that Cosmic can and does run at 120 BPM. Cosmic BPM ceiling revised from 120 → 126.
+- **BPM: 120** — higher than the 70–110 range estimated from Berlin School research. Confirms that Kosmic can and does run at 120 BPM. Kosmic BPM ceiling revised from 120 → 126.
 - **Key: G Dorian** — confirmed by B natural appearing in the bass line (B natural = major 6th of G = the defining Dorian characteristic). Core scale tones: G, A, Bb, C, D, F.
 - **Song length: ~105 bars at 4/4**
 
@@ -723,40 +723,40 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 
 ---
 
-**COS-RULE-01: BPM ceiling raised to 126**
-Mister Mosca runs at exactly 120 BPM and sounds definitively Cosmic, not Motorik. The Cosmic BPM upper bound should be raised from 110 to 126 BPM. This overlaps with the slowest Motorik tempos (Motorik min = 126), confirming the boundary is stylistic (presence/absence of kick groove), not purely tempo-based.
+**KOS-RULE-01: BPM ceiling raised to 126**
+Mister Mosca runs at exactly 120 BPM and sounds definitively Kosmic, not Motorik. The Kosmic BPM upper bound should be raised from 110 to 126 BPM. This overlaps with the slowest Motorik tempos (Motorik min = 126), confirming the boundary is stylistic (presence/absence of kick groove), not purely tempo-based.
 
-**COS-RULE-02: G Dorian confirmed as primary key center**
+**KOS-RULE-02: G Dorian confirmed as primary key center**
 The song is G Dorian. The bass line uses B natural (not Bb), confirming Dorian mode specifically over Aeolian. For the generator, Dorian should be the highest-weight mode: Dorian 40%, Aeolian 30%, Mixolydian 20%, Ionian 10% (revised upward for Dorian).
 
-**COS-RULE-03: Lead sequencer note durations**
+**KOS-RULE-03: Lead sequencer note durations**
 Average note duration = 108 ticks at 480 tpb = **exactly 16th note** (120 ticks) with some shorter. Maximum = 240 ticks = 8th note. The lead arpeggio fires at 16th note speed with occasional 8th note holds — confirming the Berlin School 16th-note sequencer model from Part 2. No notes shorter than a 32nd note (32 ticks).
 
-**COS-RULE-04: Low anchor note in sequencer**
+**KOS-RULE-04: Low anchor note in sequencer**
 The lead sequencer mixes a very low D2 (MIDI 38 — the fifth degree, 2+ octaves below the melodic range of G3–A4) as a punctuation note between melodic phrases. This appears roughly every 3–5 melodic notes. It acts like a bass guitar accent within the lead part — grounding the sequence without being the bass track. Generator rule: with 20% probability per 4-step window in the arpeggio, insert one note at `root - 5th - 2 octaves` at velocity ≤ 55.
 
-**COS-RULE-05: Squelchy bass uses velocity = 100 flat**
-The synth bass has zero velocity variation — every note is exactly 100. This contrasts with the electric bass (95–100, slightly variable). For COS-BAS rules: when `bassStyle == .droneRoot` or any synth bass, set velocity = 100 ± 0 (no random variation). This is intentional, not a MIDI default.
+**KOS-RULE-05: Squelchy bass uses velocity = 100 flat**
+The synth bass has zero velocity variation — every note is exactly 100. This contrasts with the electric bass (95–100, slightly variable). For KOS-BAS rules: when `bassStyle == .droneRoot` or any synth bass, set velocity = 100 ± 0 (no random variation). This is intentional, not a MIDI default.
 
-**COS-RULE-06: Bass pitch set is narrow — 5 notes over one octave**
-Bass uses only: G2, A2, B2, C3, D3 — a perfect one-octave Dorian scale fragment from root to fifth, plus the Dorian 6th (B natural) and minor 7th (F is absent from bass). Register is MIDI 43–50 — compressed into one octave. No octave jumps. Generator rule: Cosmic bass stays within a 7-semitone range (root to fifth only, plus scale tones within that span). No bass notes below MIDI 40 or above MIDI 55.
+**KOS-RULE-06: Bass pitch set is narrow — 5 notes over one octave**
+Bass uses only: G2, A2, B2, C3, D3 — a perfect one-octave Dorian scale fragment from root to fifth, plus the Dorian 6th (B natural) and minor 7th (F is absent from bass). Register is MIDI 43–50 — compressed into one octave. No octave jumps. Generator rule: Kosmic bass stays within a 7-semitone range (root to fifth only, plus scale tones within that span). No bass notes below MIDI 40 or above MIDI 55.
 
-**COS-RULE-07: Chord track uses bIII voicing held 3+ beats**
-Wurlitzer plays Bb major chord (bIII of G Dorian) sustained for 3.26 beats average. Voicing: C4–G4–A#4–F5 ascending spread (root of bIII → 5th → 3rd+octave → 5th+octave). Velocity starts at 7 (nearly inaudible) and rises through the chord's duration. Generator rule for COS-PAD / Wurlitzer chord track: hold bIII or bVII chord for 2–4 beats; use velocity ramp 15→65 over the duration; spread voicing across 2 octaves.
+**KOS-RULE-07: Chord track uses bIII voicing held 3+ beats**
+Wurlitzer plays Bb major chord (bIII of G Dorian) sustained for 3.26 beats average. Voicing: C4–G4–A#4–F5 ascending spread (root of bIII → 5th → 3rd+octave → 5th+octave). Velocity starts at 7 (nearly inaudible) and rises through the chord's duration. Generator rule for KOS-PAD / Wurlitzer chord track: hold bIII or bVII chord for 2–4 beats; use velocity ramp 15→65 over the duration; spread voicing across 2 octaves.
 
-**COS-RULE-08: Synth drums on root and fifth — not GM pitches**
-The drum pattern uses only two pitches: G (root) and D (fifth). These are on channel 0, not channel 9. This means Cosmic drums are better implemented as a **pitched percussion instrument** (marimba, vibraphone, or synth pluck) playing the tonic and dominant, not as a traditional GM drum kit. Generator rule: `CosmicDrumGenerator` should emit notes at `keySemitone + 0` (root) and `keySemitone + 7` (fifth) in octave 3, velocity 60–100, at sparse intervals (one event every 4–8 beats).
+**KOS-RULE-08: Synth drums on root and fifth — not GM pitches**
+The drum pattern uses only two pitches: G (root) and D (fifth). These are on channel 0, not channel 9. This means Kosmic drums are better implemented as a **pitched percussion instrument** (marimba, vibraphone, or synth pluck) playing the tonic and dominant, not as a traditional GM drum kit. Generator rule: `CosmicDrumGenerator` should emit notes at `keySemitone + 0` (root) and `keySemitone + 7` (fifth) in octave 3, velocity 60–100, at sparse intervals (one event every 4–8 beats).
 
-**COS-RULE-09: Timbre variation via duplicate MIDI data, not note variation**
-Liverpool Bass and Squelchy Bass carry identical pitch and rhythm data — only the instrument program differs. Same for the multiple "Smooth Lead Synth" tracks. This is the Electric Buddha approach to section variation: swap the instrument, keep the notes. In Zudio, this is already achievable by assigning the same `trackEvents` to two tracks with different GM programs. For Cosmic, when generating section structure, consider designating one section as "bass timbre A" and another as "bass timbre B" with identical note data.
+**KOS-RULE-09: Timbre variation via duplicate MIDI data, not note variation**
+Liverpool Bass and Squelchy Bass carry identical pitch and rhythm data — only the instrument program differs. Same for the multiple "Smooth Lead Synth" tracks. This is the Electric Buddha approach to section variation: swap the instrument, keep the notes. In Zudio, this is already achievable by assigning the same `trackEvents` to two tracks with different GM programs. For Kosmic, when generating section structure, consider designating one section as "bass timbre A" and another as "bass timbre B" with identical note data.
 
-**COS-RULE-10: Melodic range G3–A4 = 14 semitones**
-The lead sequencer's melodic content spans exactly G3 (MIDI 55) to A4 (MIDI 69) — one octave plus a major second. This is the **canonical Cosmic lead register**. Notes do not go below G3 (except the D2 anchor, which is a punctuation device, not part of the melodic stream). Generator rule: Cosmic lead register = MIDI 55–72 (G3–C5), which is tighter than the previously estimated 60–84.
+**KOS-RULE-10: Melodic range G3–A4 = 14 semitones**
+The lead sequencer's melodic content spans exactly G3 (MIDI 55) to A4 (MIDI 69) — one octave plus a major second. This is the **canonical Kosmic lead register**. Notes do not go below G3 (except the D2 anchor, which is a punctuation device, not part of the melodic stream). Generator rule: Kosmic lead register = MIDI 55–72 (G3–C5), which is tighter than the previously estimated 60–84.
 
-**COS-RULE-11: Bluebird arpeggiator — secondary layer in lower register**
+**KOS-RULE-11: Bluebird arpeggiator — secondary layer in lower register**
 A second arpeggiated voice runs in A1–B3 (MIDI 33–59), well below the lead sequencer. Quarter-note durations (not 16th notes), moderate velocity. This is the `CosmicTextureGenerator`'s orbital motive at work in practice: a lower-register arpeggio with a different rhythm than the main lead, creating the polyrhythmic phase effect. Register separation is critical — the texture arpeggio must stay below the lead arpeggio with no pitch overlap.
 
-**COS-RULE-12: Velocity hierarchy confirmed**
+**KOS-RULE-12: Velocity hierarchy confirmed**
 - Synth bass: 100 (highest — bass is the anchor)
 - Electric bass: 95–100
 - Lead/sequencer: 48–100, avg 59 (moderate)
@@ -770,13 +770,13 @@ Final hierarchy for generator: **Bass (100) > Lead (55–75) > Texture arpeggio 
 
 ## Part 15: MIDI Analysis — Time Loops & Dark Sun (Electric Buddha Band)
 
-Two additional Cosmic-style songs analyzed. Combined with Part 14, these three songs form a solid empirical foundation for the generator rules.
+Two additional Kosmic-style songs analyzed. Combined with Part 14, these three songs form a solid empirical foundation for the generator rules.
 
 ### Time Loops
 
 - **BPM:** 120, stable throughout
 - **Length:** ~61 bars, ~122 seconds
-- **Key / Harmony:** Bimodal — C and F# are nearly equal in note count. Tritone pairing creating "suspended cosmic" tension. D is the third most common pitch, suggesting D Dorian with both C (♭VII) and F# (major 3rd) as simultaneous poles.
+- **Key / Harmony:** Bimodal — C and F# are nearly equal in note count. Tritone pairing creating "suspended kosmic" tension. D is the third most common pitch, suggesting D Dorian with both C (♭VII) and F# (major 3rd) as simultaneous poles.
 
 Key musical findings:
 - 7 parallel "Luminous Tines" arpeggio layers all playing the same 5-note pitch set (D5/A5/A#5/C6/D6) at fixed velocity 100 with slightly different timing per layer — shimmering pad texture from 5 pitches
@@ -798,32 +798,32 @@ Key musical findings:
 
 ---
 
-**COS-RULE-13: 120 BPM is the Cosmic baseline; optional mid-song tempo lift**
-All three songs are at 120 BPM. Dark Sun demonstrates a 120→128 BPM lift (~6.7% increase) at approximately the halfway point. This lift energises the second half without disrupting the hypnotic feel. Generator rule: Cosmic BPM distribution should peak at 120 (triangular min=95, peak=120, max=126). With 30% probability, apply a tempo lift of 4–8 BPM at a random bar in the range [totalBars * 0.45, totalBars * 0.65]. The prior ceiling of 126 from Mister Mosca analysis stands.
+**KOS-RULE-13: 120 BPM is the Kosmic baseline; optional mid-song tempo lift**
+All three songs are at 120 BPM. Dark Sun demonstrates a 120→128 BPM lift (~6.7% increase) at approximately the halfway point. This lift energises the second half without disrupting the hypnotic feel. Generator rule: Kosmic BPM distribution should peak at 120 (triangular min=95, peak=120, max=126). With 30% probability, apply a tempo lift of 4–8 BPM at a random bar in the range [totalBars * 0.45, totalBars * 0.65]. The prior ceiling of 126 from Mister Mosca analysis stands.
 
-**COS-RULE-14: Tritone bimodal harmonic center**
-Both Time Loops (C + F#) and Dark Sun (D + F# + C, F#-C being a tritone) show two pitch classes a tritone apart as the most common notes. Mister Mosca is G Dorian where the bVII (F) and III (B) create similar tension. This tritone pairing is the Cosmic harmonic signature — it creates suspended, unresolved tension. Generator rule: after picking the key root, designate a "shadow root" at `root + 6 semitones` (tritone). Both the root and its tritone should each account for ~20–25% of all notes across all tracks. This creates the characteristic "cosmic float" with no strong tonal resolution.
+**KOS-RULE-14: Tritone bimodal harmonic center**
+Both Time Loops (C + F#) and Dark Sun (D + F# + C, F#-C being a tritone) show two pitch classes a tritone apart as the most common notes. Mister Mosca is G Dorian where the bVII (F) and III (B) create similar tension. This tritone pairing is the Kosmic harmonic signature — it creates suspended, unresolved tension. Generator rule: after picking the key root, designate a "shadow root" at `root + 6 semitones` (tritone). Both the root and its tritone should each account for ~20–25% of all notes across all tracks. This creates the characteristic "kosmic float" with no strong tonal resolution.
 
-**COS-RULE-15: Parallel arpeggio layers with identical pitch set**
+**KOS-RULE-15: Parallel arpeggio layers with identical pitch set**
 Time Loops uses 7 parallel "Luminous Tines" tracks all playing the same 5-note pitch set (D5/A5/A#5/C6/D6) at fixed velocity 100 with slightly different timing per layer. Dark Sun uses 10 "Classic Funk Boogie Bass Arp" tracks on the same pitch set. This parallel layering from a single constrained pitch set is the primary texture generation strategy. Generator rule: the `CosmicArpeggioGenerator` should output 3–7 parallel voices from the same 5-note modal subset of the key (root, 3rd, 5th, ♭7th, octave or equivalent pentatonic subset). Each voice gets a small timing offset (0–48 ticks = 0–1/10th of a beat jitter) and an independently randomised note ordering within the set. Fixed velocity 95–100 (no expression in arpeggio layers — expression lives in the lead only).
 
-**COS-RULE-16: Cloud shimmer — high-register sustained pad with fade-in envelope**
+**KOS-RULE-16: Cloud shimmer — high-register sustained pad with fade-in envelope**
 Dark Sun's "Cloud Shimmer" tracks hold notes for 7+ beats at velocity 21–69 in D3–D4 range. Time Loops has a similar upper-register sustained layer at D5–D6. The minimum velocity as low as 1 (Dark Sun synth chords) and 21 (shimmer) indicates these notes fade in via MIDI velocity ramp rather than having a full-on attack. Generator rule: `CosmicPadsGenerator` should include a shimmer layer — 1–3 notes from the key's upper register (root octave + 2 or +3), held for 4–8 beats, velocity ramped from 15 to 55 over the note's duration (simulate with a velocity curve: first few ticks at 15, later events at 55, or simply set note velocity to a mid-range value and mark it as a "shimmer note" for the playback engine to envelope). Duration avg target: 6 beats.
 
-**COS-RULE-17: Dual bass — drone sustain layer + rhythmic punch layer**
+**KOS-RULE-17: Dual bass — drone sustain layer + rhythmic punch layer**
 Confirmed across all three songs:
 - Sustained harmonic bass: D3–G3 range, 4–5 beat duration, velocity 60–67 (Dark Sun); D3–A#3, 1.3 beats, vel 92 (Time Loops); G2–D3, 1.2 beats, vel 100 (Mister Mosca)
 - Rhythmic staccato bass: C3–G#3, 0.6–1.6 beats, vel 92–93 (Dark Sun); C2–C3 sub-bass hits, 0.27–1.0 beats (Time Loops)
 
 Generator rule: `CosmicBassGenerator` outputs two sub-layers. Sub-layer A: long harmonic anchor notes on root and ♭VII, held 2–4 beats, velocity 60–70, note changes every 4 bars aligned to harmonic progression. Sub-layer B: staccato rhythmic movement within a one-octave span above the root, velocity 90–95, notes at 0.5–1.5 beat durations, providing rhythmic energy without leaving the root area.
 
-**COS-RULE-18: Two valid drum approaches — dense Motorik grid OR sparse pitched percussion**
-Time Loops and Dark Sun both use a full Motorik drum track (532 notes, 0.25-beat 16th-note grid, C2–E3 range, velocity avg 85). Mister Mosca uses sparse pitched percussion on root+fifth only (COS-RULE-08). Both are legitimate Cosmic drum strategies. Generator rule: `CosmicDrumGenerator` should randomly choose between two modes:
+**KOS-RULE-18: Two valid drum approaches — dense Motorik grid OR sparse pitched percussion**
+Time Loops and Dark Sun both use a full Motorik drum track (532 notes, 0.25-beat 16th-note grid, C2–E3 range, velocity avg 85). Mister Mosca uses sparse pitched percussion on root+fifth only (KOS-RULE-08). Both are legitimate Kosmic drum strategies. Generator rule: `CosmicDrumGenerator` should randomly choose between two modes:
 - **Motorik mode** (60% probability): emit a full 16th-note grid drum pattern similar to the Motorik generator, but lighter — use primarily hi-hat, a kick on beats 1 and 3, a snare on 2 and 4, velocity avg 85 ± 8. This gives the track rhythmic energy.
 - **Sparse pitched mode** (40% probability): emit root and fifth pitched hits at sparse intervals (one every 4–8 beats) as in Mister Mosca. This gives more open, drifting feel.
 The mood can guide which: Dream/Deep moods favour sparse pitched mode; Bright/Free moods favour Motorik mode.
 
-**COS-RULE-19: Velocity zone stratification — three tiers**
+**KOS-RULE-19: Velocity zone stratification — three tiers**
 Confirmed across all three songs, a consistent three-tier velocity structure:
 
 - **Rhythmic tier** (drums, staccato bass, electric piano hits): velocity 80–100, narrow range. These are the forward-driving elements; they must cut through.
@@ -838,7 +838,7 @@ These findings have been incorporated into the Part 5.1 parameter tables above.
 
 ## Part 16: MIDI Analysis — Cagliari Drop (Electric Buddha Band)
 
-Fourth Cosmic-style song analyzed. BPM: 93 (constant), Key: D Mixolydian, ~68 bars (~175 seconds).
+Fourth Kosmic-style song analyzed. BPM: 93 (constant), Key: D Mixolydian, ~68 bars (~175 seconds).
 
 ### Hi-Hat Velocity Swing Pattern
 
@@ -857,18 +857,18 @@ Pattern: ghost hits (velocity 19–48) alternate with accented hits (velocity 82
 
 ### Pulsating Tremolo Technique
 
-Track 11 ("Pulsating Pad bass"): 445 notes at velocity range 7–127, avg 87, duration avg 0.32 beats (rapid staccato). Velocities alternate between near-silent (7–20) and full (80–127) on rapid notes — a MIDI tremolo simulation encoding the LFO amplitude effect of a synthesizer tremolo as velocity changes. This is a classic Cosmic technique captured in MIDI.
+Track 11 ("Pulsating Pad bass"): 445 notes at velocity range 7–127, avg 87, duration avg 0.32 beats (rapid staccato). Velocities alternate between near-silent (7–20) and full (80–127) on rapid notes — a MIDI tremolo simulation encoding the LFO amplitude effect of a synthesizer tremolo as velocity changes. This is a classic Kosmic technique captured in MIDI.
 
 ---
 
-**COS-RULE-20: BPM distribution revised — 93 BPM is valid Cosmic territory**
+**KOS-RULE-20: BPM distribution revised — 93 BPM is valid Kosmic territory**
 With Cagliari Drop at 93 BPM alongside three songs at 120 BPM, the distribution must be bimodal or use a wider triangular spread. Revised generator rule: use two possible BPM modes selected randomly at generation time:
-- **Mode A (70% weight):** triangular min=115, peak=120, max=126 — the "driving" Cosmic feel (Time Loops, Dark Sun, Mister Mosca)
-- **Mode B (30% weight):** triangular min=88, peak=95, max=105 — the "contemplative" Cosmic feel (Cagliari Drop style)
+- **Mode A (70% weight):** triangular min=115, peak=120, max=126 — the "driving" Kosmic feel (Time Loops, Dark Sun, Mister Mosca)
+- **Mode B (30% weight):** triangular min=88, peak=95, max=105 — the "contemplative" Kosmic feel (Cagliari Drop style)
 
-Optional mid-song tempo lift (COS-RULE-13, +4–8 BPM) applies only to Mode A; Mode B stays constant.
+Optional mid-song tempo lift (KOS-RULE-13, +4–8 BPM) applies only to Mode A; Mode B stays constant.
 
-**COS-RULE-21: Decomposed drum tracks — separate voice streams**
+**KOS-RULE-21: Decomposed drum tracks — separate voice streams**
 Cagliari Drop demonstrates that drums can be decomposed into independent streams, each with its own velocity and density profile, rather than merged into one track. This is architecturally important for the generator: `CosmicDrumGenerator` should produce separate note streams per voice:
 - **Kick stream:** beat positions on 1 and 3 (with occasional syncopated early hit on "and-of-4"), velocity 95–105
 - **Hi-hat stream:** 16th-note grid, velocity alternating ghost (20–50) / accent (75–95) in pattern: ghost, accent, ghost, ghost repeating with ±15 velocity variation per hit
@@ -877,33 +877,33 @@ Cagliari Drop demonstrates that drums can be decomposed into independent streams
 
 These four streams can be merged into one track in the MIDI output or kept as separate tracks (Zudio currently uses 7 tracks — assign one to drums and pack all four streams into it).
 
-**COS-RULE-22: Hi-hat velocity swing — ghost/accent alternation**
+**KOS-RULE-22: Hi-hat velocity swing — ghost/accent alternation**
 The hi-hat runs a 16th-note grid but every other hit is a ghost note. Concrete pattern: `[accent, ghost, accent, ghost]` per beat, where accent = velocity 75–95 and ghost = velocity 20–50. Vary each value by ±8 randomly. This creates the subtle human feel of a hi-hat played with alternating wrist/finger strokes. Do not use equal velocity across all hi-hat hits — equal velocity sounds robotic in a way that other equal-velocity parts (arpeggios, bass) do not, because the ear is acutely sensitive to hi-hat patterns.
 
-**COS-RULE-23: Pulsating bass tremolo — extreme velocity oscillation on rapid notes**
-For a "pulsating" bass effect, generate staccato notes at 0.25–0.35 beat intervals and oscillate velocity between a low value (10–30) and a high value (80–120) on alternating notes. This MIDI-encodes the synthesizer tremolo/AM effect without requiring actual synthesis. The overall effect is a shimmering, rhythmically trembling bass. Apply this to one designated bass sub-layer in the Cosmic generator (the other sub-layers use normal dynamics per COS-RULE-17). Probability of including this pulsating layer: 50%.
+**KOS-RULE-23: Pulsating bass tremolo — extreme velocity oscillation on rapid notes**
+For a "pulsating" bass effect, generate staccato notes at 0.25–0.35 beat intervals and oscillate velocity between a low value (10–30) and a high value (80–120) on alternating notes. This MIDI-encodes the synthesizer tremolo/AM effect without requiring actual synthesis. The overall effect is a shimmering, rhythmically trembling bass. Apply this to one designated bass sub-layer in the Kosmic generator (the other sub-layers use normal dynamics per KOS-RULE-17). Probability of including this pulsating layer: 50%.
 
-**COS-RULE-24: Dual lead interval style — wide-impressionistic vs tight-melodic**
-Each generated Cosmic song should commit to one of two lead interval profiles at generation time:
+**KOS-RULE-24: Dual lead interval style — wide-impressionistic vs tight-melodic**
+Each generated Kosmic song should commit to one of two lead interval profiles at generation time:
 - **Wide / impressionistic** (40% probability): avg interval 10–14 semitones; pitch range spans 2–3 octaves; duration avg 0.8–1.2 beats; feels like a landscape painting — big shapes, few notes. Use with Dream or Deep mood.
 - **Tight / melodic** (60% probability): avg interval 2–5 semitones; pitch range 1–1.5 octaves; duration avg 0.5–0.8 beats; feels like a sung phrase. Use with Bright or Free mood.
 
 These map loosely to the interval profiles from Mister Mosca (16th-note tight sequencer = tight/melodic) and Cagliari Drop Track 1 (wide/impressionistic).
 
-**COS-RULE-25: Restraint principle — sparse high-velocity stabs at section boundaries**
+**KOS-RULE-25: Restraint principle — sparse high-velocity stabs at section boundaries**
 Cagliari Drop's bridge tracks (Tracks 47–57) use only 2–8 notes each over the entire song, placed at section transition points, with high velocity (70–100) and long duration (1–3 beats). These are **impact markers**: a single stab that signals a new section without any melodic content. Generator rule: at each major section boundary (defined as the chord progression reset point), 40% probability of emitting one impact stab note on the tonic or ♭VII, velocity 90–110, duration 1.5–2.5 beats, in the mid-low register (MIDI 40–55). This gives the song a sense of structural punctuation without adding a dedicated "stab" instrument.
 
 ---
 
 ### Updated Summary Across All Four Songs
 
-Four Electric Buddha Band Cosmic songs now analyzed. Combined picture:
+Four Electric Buddha Band Kosmic songs now analyzed. Combined picture:
 
 **BPM:** 93 (Cagliari Drop), 120 (Mister Mosca, Time Loops, Dark Sun, + Dark Sun lift to 128). Two BPM territories confirmed.
 
 **Keys used:** G Dorian (Mister Mosca), C + F# bimodal (Time Loops), D Mixolydian (Dark Sun, Cagliari Drop). The F#–C tritone pairing appears in three of four songs.
 
-**Drum styles:** Sparse pitched root+fifth (Mister Mosca) / Full Motorik 532-note unified track (Time Loops, Dark Sun) / Decomposed multi-track with velocity swing (Cagliari Drop). All three are valid. COS-RULE-18 updated: add "Decomposed" as a third mode (equal weight with Motorik and Sparse).
+**Drum styles:** Sparse pitched root+fifth (Mister Mosca) / Full Motorik 532-note unified track (Time Loops, Dark Sun) / Decomposed multi-track with velocity swing (Cagliari Drop). All three are valid. KOS-RULE-18 updated: add "Decomposed" as a third mode (equal weight with Motorik and Sparse).
 
 **Bass approaches:** Single-register squelchy flat velocity (Mister Mosca) / Dual mid+sub-bass (Time Loops) / Sustained drone + rhythmic Eighties Bass (Dark Sun) / Pulsating tremolo + layered disco bass (Cagliari Drop). Consistent theme: always at least two simultaneous bass layers with different density/velocity profiles.
 

@@ -267,28 +267,66 @@ struct DrumGenerator {
             if offsetBar == 0 {
                 let pickupStarts = drumsOnly ? [4, 8] : [0, 4, 8, 12]
                 let fromStep = pickupStarts[rng.nextInt(upperBound: pickupStarts.count)]
-                return coldStartPickup(fromStep: fromStep, barStart: barStart)
+                return coldStartPickup(fromStep: fromStep, barStart: barStart, rng: &rng)
             }
             return withPickup(motorikSparseBar(barStart: barStart))
         }
     }
 
-    /// Cold start drum pickup: silence before `fromStep`, then a descending kick/tom cascade
-    /// running to the end of the bar. `fromStep` 0 = full bar, 4 = 3-beat, 8 = 2-beat, 12 = 1-beat.
-    private static func coldStartPickup(fromStep: Int, barStart: Int) -> [MIDIEvent] {
-        let pattern: [(Int, UInt8, UInt8)] = [
-            (0,  GMDrum.kick.rawValue,          100),
-            (4,  GMDrum.kick.rawValue,          95),
-            // Descending tom + snare cascade — fills remaining beats
-            (8,  GMDrum.hiTom.rawValue,         80),
-            (9,  GMDrum.snare.rawValue,         70),
-            (10, GMDrum.hiMidTom.rawValue,      82),
-            (11, GMDrum.snare.rawValue,         76),
-            (12, GMDrum.lowMidTom.rawValue,     85),
-            (13, GMDrum.snare.rawValue,         82),
-            (14, GMDrum.highFloorTom.rawValue,  88),
-            (15, GMDrum.snare.rawValue,         96),
-        ]
+    /// Cold start drum pickup: silence before `fromStep`, then a fill leading to the body downbeat.
+    /// `fromStep` 0 = full bar, 4 = 3-beat, 8 = 2-beat, 12 = 1-beat.
+    /// Three variants picked randomly:
+    ///   v0  Tom cascade     — descending kick/tom/snare weave (original)
+    ///   v1  Retro Rock      — NEU!-style tom descend from beat 2, tom cascade beat 4
+    ///   v2  Funk snare build — snare accents building with kick, climaxes step 14
+    private static func coldStartPickup(fromStep: Int, barStart: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        let variant = rng.nextInt(upperBound: 3)
+        let pattern: [(Int, UInt8, UInt8)]
+
+        switch variant {
+
+        case 0: // Descending kick/tom cascade (original)
+            pattern = [
+                (0,  GMDrum.kick.rawValue,          100),
+                (4,  GMDrum.kick.rawValue,          95),
+                (8,  GMDrum.hiTom.rawValue,         80),
+                (9,  GMDrum.snare.rawValue,         70),
+                (10, GMDrum.hiMidTom.rawValue,      82),
+                (11, GMDrum.snare.rawValue,         76),
+                (12, GMDrum.lowMidTom.rawValue,     85),
+                (13, GMDrum.snare.rawValue,         82),
+                (14, GMDrum.highFloorTom.rawValue,  88),
+                (15, GMDrum.snare.rawValue,         96),
+            ]
+
+        case 1: // Retro Rock — snare+hat on beat 2, tom descend through beats 3–4, tom cascade climax
+            pattern = [
+                (4,  GMDrum.snare.rawValue,         70),
+                (4,  GMDrum.closedHat.rawValue,     65),
+                (6,  GMDrum.lowMidTom.rawValue,     72),
+                (7,  GMDrum.hiMidTom.rawValue,      76),
+                (8,  GMDrum.kick.rawValue,          88),
+                (9,  GMDrum.lowMidTom.rawValue,     80),
+                (10, GMDrum.highFloorTom.rawValue,  84),
+                (11, GMDrum.kick.rawValue,          90),
+                (12, GMDrum.lowMidTom.rawValue,     78),
+                (13, GMDrum.hiMidTom.rawValue,      85),
+                (14, GMDrum.highFloorTom.rawValue,  95),
+            ]
+
+        default: // Funk snare build — snare accents + kick build to beat 4 accent
+            pattern = [
+                (8,  GMDrum.snare.rawValue,         65),
+                (9,  GMDrum.snare2.rawValue,        72),
+                (10, GMDrum.kick.rawValue,          85),
+                (10, GMDrum.snare.rawValue,         78),
+                (11, GMDrum.kick.rawValue,          88),
+                (12, GMDrum.snare2.rawValue,        82),
+                (13, GMDrum.hiMidTom.rawValue,      88),
+                (14, GMDrum.snare.rawValue,         100),
+            ]
+        }
+
         return pattern.compactMap { (offset, note, velocity) in
             guard offset >= fromStep else { return nil }
             return MIDIEvent(stepIndex: barStart + offset, note: note,
