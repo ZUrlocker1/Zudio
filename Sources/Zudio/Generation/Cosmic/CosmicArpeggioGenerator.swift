@@ -293,13 +293,16 @@ struct KosmicArpeggioGenerator {
                                         velocity: anchorVel, durationSteps: 4))
 
                 // Interlocking groove — skip in intro/outro (anchor only)
+                // Cap: max 6 notes per bar total (anchor + 5 groove); prevents over-dense
+                // bars from KOS-RTHM-004 (Study 02 found up to 13.9 notes/bar in Flexure).
                 if !isIntroOutro {
                     let grooveSteps = [2, 3, 5, 6, 9, 10, 13, 14]
-                    for vIdx in 0..<voiceCount {
+                    grooveLoop: for vIdx in 0..<voiceCount {
                         let noteOffset = vIdx % pentNotes.count
                         let note       = pentNotes[(noteOffset + vIdx) % pentNotes.count]
                         let stepShift  = voiceStepOffsets[vIdx % voiceStepOffsets.count]
                         for gs in grooveSteps {
+                            guard events.count - countBefore < 6 else { break grooveLoop }
                             let s = gs + stepShift
                             guard s < 16 else { continue }
                             if rng.nextDouble() < 0.35 { continue }
@@ -861,9 +864,11 @@ struct KosmicArpeggioGenerator {
         return [place(0), place(third), place(fifth), place(octave)]
     }
 
-    /// Pentatonic major/minor note set for KOS-RTHM-004 in MIDI 58–76
+    /// Pentatonic major/minor note set for KOS-RTHM-004 in MIDI 58–76.
+    /// Always anchored to the song tonic (not the chord root) so notes stay in key
+    /// even when Modal Drift selects a non-tonic chord root.
     private static func pentatonicNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC = keySemitone(frame.key)   // tonic-anchored — was: (keySemitone + chordRoot offset)
         let mode   = entry.sectionMode
         // Minor pentatonic: root, b3, 4, 5, b7
         // Major pentatonic: root, 2, 3, 5, 6
@@ -880,9 +885,10 @@ struct KosmicArpeggioGenerator {
         return [place(0), place(third), place(fourth), place(7), place(sixth)]
     }
 
-    /// KOS-RTHM-005 note pool: root, modal 3rd, 5th, flat-7 in MIDI 60–80
+    /// KOS-RTHM-005 note pool: root, modal 3rd, 5th, flat-7 in MIDI 60–80.
+    /// Tonic-anchored to stay in key regardless of Modal Drift chord root.
     private static func dualRateNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC = keySemitone(frame.key)   // tonic-anchored — was: (keySemitone + chordRoot offset)
         let mode   = entry.sectionMode
         let third  = mode.nearestInterval(3)
         let flat7  = mode.nearestInterval(10)

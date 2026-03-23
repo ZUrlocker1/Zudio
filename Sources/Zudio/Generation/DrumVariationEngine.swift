@@ -105,8 +105,8 @@ struct DrumVariationEngine {
         for fillBar in fillBars.sorted() {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
-            // 60% 1-beat, 30% 2-beat, 10% 3-beat
-            let fillLength = rng.weightedPick([0.60, 0.30, 0.10])
+            // 70% 1-beat, 25% 2-beat, 5% 3-beat
+            let fillLength = rng.weightedPick([0.70, 0.25, 0.05])
             drumEvents = applyFill(to: drumEvents, bar: fillBar, fillLength: fillLength,
                                    frame: frame, structure: structure, rng: &rng)
             fillInfos.append(FillBarInfo(bar: fillBar, fillLength: fillLength))
@@ -151,7 +151,7 @@ struct DrumVariationEngine {
         for fillBar in fillBars.sorted() {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
-            let fillLength = rng.weightedPick([0.60, 0.30, 0.10])
+            let fillLength = rng.weightedPick([0.70, 0.25, 0.05])
             // Consume the variation rng draw to stay in step with the original sequence
             switch fillLength {
             case 0:  _ = rng.nextInt(upperBound: 6)
@@ -210,16 +210,15 @@ struct DrumVariationEngine {
             }
         }
 
-        // Periodic body fills: fire on bars 3, 7, 11, 15 … within each body section
-        // (one bar before each 4-bar phrase boundary). Modelled on Vanishing Point (Electric
-        // Buddha Band) which maintains a secondary fills layer throughout the body regardless
-        // of section transitions. The crash from applyFill() then lands on the natural downbeat.
+        // Periodic body fills: fire on bars 7, 15, 23 … within each body section
+        // (one bar before each 8-bar phrase boundary). Halved from 4-bar to 8-bar period
+        // to reduce fill density while preserving the phrase-anchor feel.
         // Skip bars already tagged to avoid double-fills.
         for bar in 0..<frame.totalBars {
             guard let sec = structure.section(atBar: bar),
                   sec.label != .intro && sec.label != .outro else { continue }
             let barInSection = bar - sec.startBar
-            guard (barInSection + 1) % 4 == 0 else { continue }
+            guard (barInSection + 1) % 8 == 0 else { continue }
             guard !fillBars.contains(bar) else { continue }
             fillBars.insert(bar)
         }

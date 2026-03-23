@@ -187,7 +187,13 @@ struct RhythmGenerator {
                            entry.chordWindow.chordType == .power
         let thirdPC = (rootPC + (isMajorThird ? 4 : 3)) % 12
         let fifthPC = (rootPC + 7) % 12
-        let flat7PC = (rootPC + 10) % 12
+        // Snap flat-7 to nearest in-scale pitch class to prevent Modal Drift on non-tonic chord roots.
+        let rawFlat7 = (rootPC + 10) % 12
+        let scalePCs = frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 }
+        let flat7PC  = scalePCs.min(by: {
+            min(($0 - rawFlat7 + 12) % 12, (rawFlat7 - $0 + 12) % 12) <
+            min(($1 - rawFlat7 + 12) % 12, (rawFlat7 - $1 + 12) % 12)
+        }) ?? rawFlat7
 
         let root  = nearestMIDI(target: findMIDI(pc: rootPC,  ref: 57), low: 45, high: 72, prev: prevNote)
         let fifth = nearestMIDI(target: findMIDI(pc: fifthPC, ref: 57), low: 48, high: 76, prev: prevNote)

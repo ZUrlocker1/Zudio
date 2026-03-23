@@ -278,13 +278,13 @@ struct TopBarView: View {
                                     .foregroundStyle(.white)
                                     .fixedSize()
                                 TextField("", value: Binding(
-                                    get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 0 },
+                                    get: { appState.tempoOverride ?? 120 },
                                     set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
                                 ), format: .number)
                                 .frame(width: 48)
                                 .textFieldStyle(.roundedBorder)
                                 Stepper("", value: Binding(
-                                    get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 138 },
+                                    get: { appState.tempoOverride ?? 120 },
                                     set: { appState.tempoOverride = max(20, min(200, $0)) }
                                 ), in: 20...200)
                                 .labelsHidden()
@@ -380,20 +380,20 @@ struct HelpView: View {
                     Image(nsImage: img)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 36, height: 36)
+                        .frame(width: 48, height: 48)
                 }
-                Text("Zudio Help").font(.title2.bold())
+                Text("Zudio Help").font(.title.bold())
             }
             Divider()
             VStack(alignment: .leading, spacing: 8) {
                 Text("Zudio generates Motorik, Kosmic and Ambient inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result, or leave them on Auto.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
-                helpLine("Export Audio (⌘E)", "Exports the song to an M4A file in Downloads.")
-                helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to Downloads. Open in any DAW to edit further.")
+                helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
+                helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to /Downloads. Also saves a log file of rules for the song. Open in any DAW to edit further.")
                 helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")
@@ -404,7 +404,7 @@ struct HelpView: View {
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 580, height: 600)
+        .frame(width: 580, height: 620)
     }
 
     private func helpLine(_ title: String, _ desc: String) -> some View {
@@ -435,12 +435,12 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.83 (alpha)").font(.system(size: 14))
-                Text("Built by analyzing classic Motorik and Kosmic artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A set of rules were defined to keep the instruments locked-in playing together. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
+                Text("Version: 0.86 (alpha)").font(.system(size: 14))
+                Text("Built by analyzing classic Motorik and Kosmic artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0: Motorik and Kosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2.0: Ambient style coming soon.").font(.system(size: 14))
+                Text("V2.0: Ambient style and continuous playback mode coming soon. Maybe.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -454,6 +454,6 @@ struct AboutView: View {
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
         }
         .padding(24)
-        .frame(width: 460, height: 420)
+        .frame(width: 580, height: 440)
     }
 }

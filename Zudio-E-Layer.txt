@@ -1,0 +1,74 @@
+=== Zudio Song Analysis Log ===
+Title:          E Layer
+Generated:      2026-03-23 14:36:18
+Seed:           4975072226875722168
+Style:          Motorik
+Key:            E  Mixolydian
+Tempo:          143 BPM
+Bars:           124
+Mood:           Bright
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3–120         (118 bars)
+  outro      Bars 121–124         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=b7  type=min7
+  Bars   3– 61         root=b7  type=min7
+  Bars  62–120         root=2  type=sus2
+  Bars 121–124         root=1  type=major
+
+--- Note Counts Per Track ---
+  Lead 1       269 notes
+  Lead 2       233 notes
+  Pads         422 notes
+  Rhythm       534 notes
+  Texture      16 notes
+  Bass         604 notes
+  Drums        2691 notes
+
+--- Generation Log ---
+  SONG             E Layer
+  Form             Steady A section
+  Chords           E Mixolydian  Minor loop: i - VI  Dm7, F#sus2, E
+  MOT-DRUM-004     Mostly Motorik
+  MOT-BASS-014     McCartney melodic drive
+  MOT-PADS-004     Stabs
+  MOT-LD1-002      Pentatonic cell
+  MOT-LD2-006      Neu! harmony
+  MOT-RTHM-001     8th-note Stride
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-002     Transition swell
+  MOT-TEXT-004     Shimmer hold
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar lock in
+  Bar 003    Section A    chords Dm7 F#sus2
+  Bar 003    Texture      stepping back
+  Bar 010    Drum fill    2 beat — Bonham tom cascade
+  Bar 011    Lead 1       steps into the spotlight
+  Bar 013    Bass         pattern evolving
+  Bar 017    Lead 2       steps into the spotlight
+  Bar 033    Lead 2       stepping back
+  Bar 033    Pads         stepping back
+  Bar 034    Texture      steps into the spotlight
+  Bar 038    Drum fill    2 beat — funk cross-pattern
+  Bar 049    Lead 2       steps into the spotlight
+  Bar 049    Pads         is back on stage
+  Bar 055    Texture      steps into the spotlight
+  Bar 059    Drum fill    2 beat — funk cross-pattern
+  Bar 065    Lead 1       stepping back
+  Bar 065    Pads         stepping back
+  Bar 072    Texture      steps into the spotlight
+  Bar 075    Drum fill    2 beat — funk cross-pattern
+  Bar 081    Lead 1       steps into the spotlight
+  Bar 081    Pads         is back on stage
+  Bar 090    Texture      steps into the spotlight
+  Bar 097    Lead 2       stepping back
+  Bar 113    Lead 2       steps into the spotlight
+  Bar 113    Rhythm       stepping back
+  Bar 119    Drum fill    2 beat — funk cross-pattern
+  Bar 120    Texture      steps into the spotlight
+  Bar 121    Outro        4 bar dissolve
+

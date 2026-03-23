@@ -1,0 +1,79 @@
+=== Zudio Song Analysis Log ===
+Title:          Leuchtet Zeit
+Generated:      2026-03-23 12:17:04
+Seed:           3113334531797631022
+Style:          Motorik
+Key:            A  Mixolydian
+Tempo:          130 BPM
+Bars:           112
+Mood:           Free
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 68         (64 bars)
+  B          Bars  69–104         (36 bars)
+  outro      Bars 105–112         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=b6  type=major
+  Bars   5– 68         root=b6  type=major
+  Bars  69– 80         root=b7  type=minor
+  Bars  81– 92         root=4  type=major
+  Bars  93–104         root=b7  type=sus2
+  Bars 105–112         root=1  type=sus2
+
+--- Note Counts Per Track ---
+  Lead 1       139 notes
+  Lead 2       397 notes
+  Pads         212 notes
+  Rhythm       243 notes
+  Texture      15 notes
+  Bass         504 notes
+  Drums        1641 notes
+
+--- Generation Log ---
+  SONG             Leuchtet Zeit
+  Form             Subtle A/B
+  Chords           A Mixolydian  Two chord: I - ♭VII  F, Gm, D, Gsus2, Asus2
+  MOT-DRUM-002     Open Pocket beat
+  MOT-BASS-015     Kraftwerk driving bass
+  MOT-PADS-003     Pulsed
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-LD1-001      Neu! motif first
+  MOT-LD2-004      Neu! counter melody
+  MOT-RTHM-004     2-bar Melodic Riff
+  MOT-RTHM-006     Harmonia arpeggio
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-005     Eno Cluster breath release
+  MOT-TEXT-006     High-tension touch
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar lock in
+  Bar 005    Section A    chords F
+  Bar 005    Lead 1       stepping back
+  Bar 006    Texture      stepping back
+  Bar 013    Drum fill    2 beat — Bonham tom cascade
+  Bar 021    Lead 1       steps into the spotlight
+  Bar 021    Bass         pattern evolving
+  Bar 022    Drum fill    2 beat — funk cross-pattern
+  Bar 023    Texture      steps into the spotlight
+  Bar 025    Lead 2       stepping back
+  Bar 032    Drum fill    3 beat — tom cascade — bass locked in
+  Bar 041    Lead 1       steps into the spotlight
+  Bar 041    Lead 2       stepping back
+  Bar 046    Texture      stepping back
+  Bar 049    Rhythm       stepping back
+  Bar 065    Lead 1       stepping back
+  Bar 068    Texture      steps into the spotlight
+  Bar 069    Form         Enter B section — Gm D Gsus2
+  Bar 069    Bass         pattern evolving
+  Bar 073    Rhythm       stepping back
+  Bar 073    Drum fill    2 beat — funk cross-pattern
+  Bar 084    Texture      stepping back
+  Bar 088    Drum fill    3 beat — alternating toms
+  Bar 089    Lead 2       stepping back
+  Bar 089    Rhythm       is back on stage
+  Bar 096    Drum fill    2 beat — Bonham tom cascade
+  Bar 104    Drum fill    3 beat — tom cascade
+  Bar 105    Outro        8 bar fade
+

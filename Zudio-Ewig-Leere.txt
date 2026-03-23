@@ -1,0 +1,60 @@
+=== Zudio Song Analysis Log ===
+Title:          Ewig Leere
+Generated:      2026-03-23 11:02:41
+Seed:           18082489922138908266
+Style:          Kosmic
+Key:            B  Dorian
+Tempo:          120 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5–120         (116 bars)
+  outro      Bars 121–124         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=sus2
+  Bars   5–120         root=1  type=sus2
+  Bars 121–124         root=1  type=major
+
+--- Note Counts Per Track ---
+  Lead 1       84 notes
+  Lead 2       41 notes
+  Pads         664 notes
+  Rhythm       249 notes
+  Texture      30 notes
+  Bass         303 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Ewig Leere
+  Style            Kosmic
+  Form             Steady evolution
+  Chords           B Dorian  Vangelis two chord pendulum  i - bVI  Bsus2, B
+  KOS-RTHM-007     Tangerine Dream pitch drift
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-013     Loscil sub-bass pulse
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — drum fill
+  Bar 005    Section A    chords Bsus2
+  Bar 033    Lead 1       stepping back
+  Bar 049    Pads         stepping back
+  Bar 065    Lead 1       steps into the spotlight
+  Bar 065    Lead 2       stepping back
+  Bar 065    Pads         is back on stage
+  Bar 065    Rhythm       stepping back
+  Bar 081    Rhythm       is back on stage
+  Bar 097    Rhythm       stepping back
+  Bar 113    Lead 2       steps into the spotlight
+  Bar 113    Rhythm       is back on stage
+  Bar 121    Outro        4 bar dissolve
+

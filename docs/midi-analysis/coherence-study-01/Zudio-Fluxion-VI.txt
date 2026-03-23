@@ -1,0 +1,56 @@
+=== Zudio Song Analysis Log ===
+Title:          Fluxion VI
+Generated:      2026-03-23 09:59:40
+Seed:           403177929481208947
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          116 BPM
+Bars:           112
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 62         (60 bars)
+  B          Bars  63–104         (42 bars)
+  outro      Bars 105–112         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=minor
+  Bars   3– 62         root=1  type=minor
+  Bars  63– 83         root=1  type=minor
+  Bars  84–104         root=1  type=minor
+  Bars 105–112         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       53 notes
+  Lead 2       68 notes
+  Pads         648 notes
+  Rhythm       74 notes
+  Texture      76 notes
+  Bass         272 notes
+  Drums        888 notes
+
+--- Generation Log ---
+  SONG             Fluxion VI
+  Style            Kosmic
+  Form             A - B
+  Chords           D Aeolian  Static Drone  Dm
+  KOS-RTHM-008     Jean Michel Jarre Oxygen 8-bar arc
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-PADS-001     Eno long drone
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-003     Spatial Sweep — chromatic passing
+  KOS-BASS-013     Loscil sub-bass pulse
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — hat crescendo
+  Bar 003    Section A    chords Dm
+  Bar 009    Rhythm       is back on stage
+  Bar 062    Drum fill    3 beat — tom cascade — bass locked in
+  Bar 063    Form         Enter B section — Dm Dm
+  Bar 063    Bass         pattern evolving
+  Bar 105    Outro        8 bar dissolve
+

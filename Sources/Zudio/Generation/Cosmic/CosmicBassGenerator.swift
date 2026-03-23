@@ -21,9 +21,9 @@ struct KosmicBassGenerator {
         let rules:   [String] = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-005",
                                   "KOS-BASS-008", "KOS-BASS-009", "KOS-BASS-010",
                                   "KOS-BASS-011", "KOS-BASS-012", "KOS-BASS-013"]
-        let weights: [Double] = [0.16,           0.13,          0.12,           0.09,           0.06,
-                                  0.08,           0.07,           0.05,
-                                  0.08,           0.06,           0.10]
+        let weights: [Double] = [0.09,           0.07,          0.11,           0.09,           0.06,
+                                  0.08,           0.07,           0.11,
+                                  0.12,           0.07,           0.13]
         // Only honour forceRuleID if it belongs to the Kosmic bass pool.
         // Test slots that force Motorik rules (e.g. MOT-BASS-015) must not bleed into Kosmic songs.
         let validForce = forceRuleID.flatMap { rules.contains($0) ? $0 : nil }
@@ -40,7 +40,7 @@ struct KosmicBassGenerator {
         // KOS-BASS-008 (Hallogallo Lock) REQUIRES the dual layer — sounds thin without it.
         // PBW (012) is already an 8-note melodic riff — dual staccato layer would clutter it.
         let canUseDualLayer = !bassAbsent && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
-        let useDualLayer    = canUseDualLayer && (ruleID == "KOS-BASS-008" || rng.nextDouble() < 0.55)
+        let useDualLayer    = canUseDualLayer && (ruleID == "KOS-BASS-008" || rng.nextDouble() < 0.25)
         if useDualLayer { usedRuleIDs.insert("KOS-BASS-006") }
 
         // KOS-BASS-007: pulsating tremolo — mutually exclusive with 006, blocked when absent,
@@ -114,31 +114,26 @@ struct KosmicBassGenerator {
             // KOS-BASS-005: truly absent in body — no notes at all
             if bassAbsent && section.label != .intro && section.label != .outro { continue }
 
-            // Intro: growing drone with beat-3 motion.
-            // Beat-1 (every 2 bars): root note, velocity ramp 20→88. Retriggers refresh velocity upward.
-            // Beat-3 (every bar): root + octave — different pitch so no noteOff conflict with beat-1.
-            //   Softer, adds upward motion and tension on each bar's 3rd beat.
-            // All noteOffs converge at intro end (same formula), no bleed into body.
+            // Intro: single sustained drone — no retriggers, no velocity ramp.
+            // PlaybackEngine handles the volume fade 0→1.0 via boosts[kTrackBass].outputVolume.
+            // Note 1: tonic root, full intro duration minus 2 steps.
+            // Note 2 (4+ bar intros only): soft octave enters at bar 2 — one extra voice,
+            //   no attack after that, pure harmonic build through the intro.
             if section.label == .intro {
-                let root       = bassRoot(entry: entry, frame: frame)
-                let introLen   = section.endBar - section.startBar
-                let barInIntro = bar - section.startBar
-                let p = introLen <= 2 ? 1.0
-                                      : min(1.0, max(0.0, Double(barInIntro) / Double(introLen - 2)))
-
-                if bar % 2 == 0 {
-                    let vel = UInt8(20 + Int(p * 68))  // 20 → 88
-                    let dur = (section.endBar - bar) * 16 - 1
-                    events.append(MIDIEvent(stepIndex: barStart, note: root, velocity: vel, durationSteps: dur))
-                }
-
-                let octaveNote = UInt8(min(127, Int(root) + 12))
-                let beat3Vel   = UInt8(12 + Int(p * 40))   // 12 → 52, softer complement
-                let beat3Step  = barStart + 8
-                let beat3Dur   = section.endBar * 16 - beat3Step - 1
-                if beat3Dur > 0 {
-                    events.append(MIDIEvent(stepIndex: beat3Step, note: octaveNote,
-                                            velocity: beat3Vel, durationSteps: beat3Dur))
+                guard bar == section.startBar else { continue }
+                let root      = bassRoot(entry: entry, frame: frame)
+                let introSteps = (section.endBar - section.startBar) * 16
+                events.append(MIDIEvent(stepIndex: barStart, note: root,
+                                        velocity: 65, durationSteps: introSteps - 2))
+                let introLen = section.endBar - section.startBar
+                if introLen >= 4 {
+                    let octaveNote = UInt8(min(127, Int(root) + 12))
+                    let octaveStart = barStart + 32  // bar 2
+                    let octaveDur   = introSteps - 32 - 2
+                    if octaveDur > 0 {
+                        events.append(MIDIEvent(stepIndex: octaveStart, note: octaveNote,
+                                                velocity: 38, durationSteps: octaveDur))
+                    }
                 }
                 continue
             }
@@ -349,7 +344,7 @@ struct KosmicBassGenerator {
         switch ruleID {
         case "KOS-BASS-001": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: isBody)
-        case "KOS-BASS-002": return rootFifthWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "KOS-BASS-002": return rootFifthWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
         case "KOS-BASS-003": return pedalPulseBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                    structure: structure, totalBars: totalBars)
         case "KOS-BASS-004": return moroderDriftBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
@@ -411,24 +406,77 @@ struct KosmicBassGenerator {
     }
 
     // MARK: - KOS-BAS-002: Root-Fifth Slow Walk
-    // Root 2 bars, fifth 2 bars, root; 8-bar cycle
+    // Root phase (bars 0–3 of 8-bar cycle) alternating with fifth/b7 phase (bars 4–7).
+    // Attacks every 2 bars; probabilistic variations on articulation, timing, approach tones,
+    // and a ghost echo within long holds to avoid the mechanical sustain feel.
 
     private static func rootFifthWalkBar(
-        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let cycle = bar % 8
-        let root  = bassRoot(entry: entry, frame: frame)
-        let fifth = UInt8(clamped(Int(root) + 7, low: 40, high: 55))
 
-        if cycle < 4 {
-            // Root for 4 bars (attack every 2 bars)
-            guard cycle % 2 == 0 else { return [] }
-            return [MIDIEvent(stepIndex: barStart, note: root, velocity: 100, durationSteps: 30)]
-        } else {
-            // Fifth for 4 bars
-            guard cycle % 2 == 0 else { return [] }
-            return [MIDIEvent(stepIndex: barStart, note: fifth, velocity: 100, durationSteps: 30)]
+        // Only attack on even bars of the cycle
+        guard cycle % 2 == 0 else { return [] }
+
+        let root    = bassRoot(entry: entry, frame: frame)
+        // 20% chance use b7 instead of fifth — more modal, suits Dorian well
+        let useB7   = rng.nextDouble() < 0.20
+        let upper   = useB7
+            ? UInt8(clamped(Int(root) + 10, low: 40, high: 55))
+            : UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
+        let note    = cycle < 4 ? root : upper
+
+        // Articulation: staccato (12 steps), medium (22 steps), full hold (30 steps)
+        let durChoice = rng.nextDouble()
+        let mainDur: Int
+        switch durChoice {
+        case ..<0.25: mainDur = 12   // staccato — leaves a breath before next attack
+        case ..<0.55: mainDur = 22   // medium hold
+        default:      mainDur = 30   // original full hold
         }
+
+        // Timing: 30% chance of a one-16th syncopated push (attack on step 2 rather than 0)
+        let attackStep = rng.nextDouble() < 0.30 ? 2 : 0
+        let vel        = UInt8(88 + rng.nextInt(upperBound: 18))   // 88–105
+
+        var events: [MIDIEvent] = []
+
+        // Optional approach tone: 25% chance of a 2-step passing note one diatonic step below
+        // the main note, fired 2 steps before the attack (or at step 0 if syncopated)
+        if rng.nextDouble() < 0.25 && attackStep >= 2 {
+            let scaleIntervals = entry.sectionMode.intervals
+            let notePc = Int(note) % 12
+            // Find the scale interval just below notePc
+            if let belowInterval = scaleIntervals.filter({ ($0 % 12) < notePc }).last {
+                let approachPC  = belowInterval % 12
+                var approachNote = Int(note) - (notePc - approachPC)
+                if approachNote < 36 { approachNote += 12 }
+                events.append(MIDIEvent(stepIndex: barStart,
+                                        note: UInt8(approachNote),
+                                        velocity: UInt8(vel - 20),
+                                        durationSteps: 2))
+            }
+        }
+
+        // Main note
+        events.append(MIDIEvent(stepIndex: barStart + attackStep,
+                                note: note, velocity: vel, durationSteps: mainDur))
+
+        // Ghost echo: for longer holds, 40% chance of a soft repeat on beat 3 (step 8)
+        // at ~60% velocity — implies the note ringing rather than a hard mechanical sustain
+        if mainDur >= 22 && rng.nextDouble() < 0.40 {
+            let echoStep = attackStep + 8
+            let echoEnd  = attackStep + mainDur
+            if echoStep < echoEnd {
+                events.append(MIDIEvent(stepIndex: barStart + echoStep,
+                                        note: note,
+                                        velocity: UInt8(Double(vel) * 0.60),
+                                        durationSteps: echoEnd - echoStep))
+            }
+        }
+
+        return events
     }
 
     // MARK: - KOS-BAS-003: Pedal Pulse with Mid-Song Evolution

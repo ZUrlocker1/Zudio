@@ -1,5 +1,7 @@
 // KosmicPadsGenerator.swift — Kosmic pads generation
-// Implements KOS-PADS-001 through KOS-PADS-005, KOS-PADS-007, KOS-RULE-07 (Wurlitzer), KOS-RULE-16 (shimmer)
+// Implements KOS-PADS-001 through KOS-PADS-008
+//   001 Eno Long Drone · 002 Swell Chord · 003 Unsync Layers · 004 Suspended Resolution
+//   005 Quartal Stack  · 006 Shimmer Layer · 007 Gated Chord Pulse · 008 bIII Colour Chord
 // Register: MIDI 36–72 (lower than Motorik pads at 48–84 — creates depth below arpeggio)
 
 import Foundation
@@ -18,7 +20,7 @@ struct KosmicPadsGenerator {
 
         // Pick primary pad rule
         let padRules:   [String] = ["KOS-PADS-001", "KOS-PADS-002", "KOS-PADS-003", "KOS-PADS-004", "KOS-PADS-005", "KOS-PADS-007"]
-        let padWeights: [Double] = [0.26,           0.18,           0.18,           0.13,           0.13,            0.12]
+        let padWeights: [Double] = [0.18,           0.20,           0.18,           0.13,           0.13,            0.18]
 
         // forceRuleID > quartal_stack/suspended_resolution constraints > weighted pick
         let primaryRule: String
@@ -32,7 +34,14 @@ struct KosmicPadsGenerator {
             primaryRule = padRules[rng.weightedPick(padWeights)]
         }
         usedRuleIDs.insert(primaryRule)
-        usedRuleIDs.insert("KOS-PADS-006")  // shimmer always present
+
+        // Secondary layers: decide once per song whether each is active.
+        // Per-bar probability compounds across many bars — a 40% per-bar rate fires in >99% of songs.
+        // A single song-level gate keeps these as genuine occasional colour, not guaranteed fixtures.
+        let use008 = rng.nextDouble() < 0.40   // KOS-PADS-008: bIII Colour Chord
+        let use006 = rng.nextDouble() < 0.30   // KOS-PADS-006: Shimmer Layer
+        if use008 { usedRuleIDs.insert("KOS-PADS-008") }
+        if use006 { usedRuleIDs.insert("KOS-PADS-006") }
 
         var events: [MIDIEvent] = []
 
@@ -41,40 +50,36 @@ struct KosmicPadsGenerator {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
 
-            // Intro: growing drone with beat-3 chord colour.
-            // Beat-1 (every 2 bars): root + fifth, velocity ramp 20→65 / 15→58.
-            // Beat-3 (every bar): modal third (major or minor per current mode) — completes the
-            //   triad, adds colour and gentle motion. Different pitch from beat-1 notes so no
-            //   noteOff conflict. All noteOffs converge at intro end, no bleed into body.
+            // Intro: single sustained chord — no retriggers, no velocity ramp.
+            // PlaybackEngine volume fade 0→1 handles the swell; static velocities here.
+            // Root + fifth + modal third all from bar 0 for full intro duration.
+            // For 4+ bar intros, a soft root octave enters at bar 2 — the only second event,
+            //   no further attacks; gives a sense of harmonic build without extra clicks.
             if section.label == .intro {
+                guard bar == section.startBar else { continue }
+                let introSteps = (section.endBar - section.startBar) * 16
                 let introLen   = section.endBar - section.startBar
-                let barInIntro = bar - section.startBar
-                let p = introLen <= 2 ? 1.0
-                                      : min(1.0, max(0.0, Double(barInIntro) / Double(introLen - 2)))
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-
-                if bar % 2 == 0 {
-                    let rootVel  = UInt8(20 + Int(p * 45))  // 20 → 65
-                    let fifthVel = UInt8(15 + Int(p * 43))  // 15 → 58
-                    let dur = (section.endBar - bar) * 16 - 1
-                    events += [
-                        MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: rootVel,  durationSteps: dur),
-                        MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: fifthVel, durationSteps: dur),
-                    ]
-                }
-
-                // Beat-3: modal third every bar — major or minor depending on current mode
-                let thirdST   = entry.sectionMode.intervals[2]
-                let thirdPC   = (rootPC + thirdST) % 12
-                let third     = noteInPadsRegister(pc: thirdPC, targetOct: 2)
-                let beat3Vel  = UInt8(10 + Int(p * 35))   // 10 → 45, softer colour note
-                let beat3Step = barStart + 8
-                let beat3Dur  = section.endBar * 16 - beat3Step - 1
-                if beat3Dur > 0 {
-                    events.append(MIDIEvent(stepIndex: beat3Step, note: UInt8(third),
-                                            velocity: beat3Vel, durationSteps: beat3Dur))
+                let thirdPC = (rootPC + entry.sectionMode.intervals[2]) % 12
+                let third   = noteInPadsRegister(pc: thirdPC, targetOct: 2)
+                let dur = introSteps - 1
+                events += [
+                    MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 40, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 32, durationSteps: dur),
+                    MIDIEvent(stepIndex: barStart, note: UInt8(third), velocity: 24, durationSteps: dur),
+                ]
+                // For longer intros: soft root octave enters at bar 2 for added warmth
+                if introLen >= 4 {
+                    let octPC  = rootPC
+                    let octave = noteInPadsRegister(pc: octPC, targetOct: 3)
+                    let octStart = barStart + 32  // bar 2
+                    let octDur   = introSteps - 32 - 1
+                    if octDur > 0 {
+                        events.append(MIDIEvent(stepIndex: octStart, note: UInt8(octave),
+                                                velocity: 22, durationSteps: octDur))
+                    }
                 }
                 continue
             }
@@ -244,13 +249,13 @@ struct KosmicPadsGenerator {
                 events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             }
 
-            // KOS-RULE-07: Wurlitzer chord track — bIII voicing, velocity ramp (not during bridges)
-            if !section.label.isBridge && rng.nextDouble() < 0.55 {
-                events += wurlitzerChordBar(barStart: barStart, entry: entry, frame: frame)
+            // KOS-PADS-008: bIII Colour Chord — fires per bar when song-level gate is open
+            if use008 && !section.label.isBridge && rng.nextDouble() < 0.55 {
+                events += bIIIColourChordBar(barStart: barStart, entry: entry, frame: frame)
             }
 
-            // KOS-RULE-16: Shimmer layer — high register, velocity ramp (not during bridges)
-            if !section.label.isBridge && rng.nextDouble() < 0.45 {
+            // KOS-PADS-006: Shimmer Layer — fires per bar when song-level gate is open
+            if use006 && !section.label.isBridge && rng.nextDouble() < 0.40 {
                 events += shimmerLayerBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             }
         }
@@ -426,9 +431,9 @@ struct KosmicPadsGenerator {
         return evs
     }
 
-    // MARK: - KOS-RULE-07: Wurlitzer chord track (bIII voicing, velocity ramp)
+    // MARK: - KOS-PADS-008: bIII Colour Chord (bIII voicing, velocity ramp)
 
-    private static func wurlitzerChordBar(
+    private static func bIIIColourChordBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
@@ -446,7 +451,7 @@ struct KosmicPadsGenerator {
         ]
     }
 
-    // MARK: - KOS-RULE-16: Shimmer layer (high register, velocity ramp 15→55)
+    // MARK: - KOS-PADS-006: Shimmer Layer (high register, velocity ramp 15→55)
 
     private static func shimmerLayerBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG

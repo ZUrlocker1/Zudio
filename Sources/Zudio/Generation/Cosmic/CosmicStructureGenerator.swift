@@ -50,8 +50,10 @@ struct KosmicStructureGenerator {
         let introLengths: [Int]    = [2,    4,     8    ]
         let introWeights: [Double] = [0.25, 0.625, 0.125]
         let introBars = introLengths[rng.weightedPick(introWeights)]
-        // Kosmic outro: 8 or 16 bars
-        let outroBars = rng.nextDouble() < 0.5 ? 8 : 16
+        // Kosmic outro: mirrors intro distribution — 2 bars (25%), 4 bars (62.5%), 8 bars (12.5%)
+        let outroLengths:        [Int]    = [2,    4,     8    ]
+        let outroLengthWeights:  [Double] = [0.25, 0.625, 0.125]
+        let outroBars = outroLengths[rng.weightedPick(outroLengthWeights)]
         let bodyBars  = Swift.max(4, totalBars - introBars - outroBars)
 
         var sections: [SongSection] = []
@@ -305,7 +307,7 @@ struct KosmicStructureGenerator {
             chordRootDegree: firstBodyChord.chordRoot,
             chordType: firstBodyChord.chordType,
             key: frame.key,
-            mode: introSection.mode
+            mode: frame.mode
         )
         return plan.map { window in
             guard window.startBar >= introSection.startBar,
@@ -347,20 +349,31 @@ struct KosmicStructureGenerator {
                           section.label == .bridgeMelody ||
                           section.label == .preRamp || section.label == .postRamp)
 
+        // Use frame.mode (actual key mode) for A sections — section.mode is hardcoded Dorian
+        // for all A sections regardless of the song key. B sections carry a meaningful mode
+        // (Aeolian or Mixolydian) so section.mode is correct there.
+        let effectiveMode: Mode
+        switch section.label {
+        case .A, .intro, .outro, .bridge, .bridgeAlt, .bridgeMelody, .preRamp, .postRamp:
+            effectiveMode = frame.mode
+        default:
+            effectiveMode = section.mode
+        }
+
         let barsEach = Swift.max(8, section.lengthBars / chordCount)
         var windows: [ChordWindow] = []
         var bar = section.startBar
         for i in 0..<chordCount {
             let length = (i == chordCount - 1) ? (section.endBar - bar) : barsEach
-            let rawRoot = pickKosmicChordRoot(section: section, progFamily: kosmicProgFamily, rng: &rng)
+            let rawRoot = pickKosmicChordRoot(mode: effectiveMode, progFamily: kosmicProgFamily, rng: &rng)
             let root = (section.label == .intro || section.label == .outro || forceTonic) ? "1" : rawRoot
             let type = forceTonic ? .minor :
-                pickKosmicChordType(progFamily: kosmicProgFamily, mode: section.mode, rng: &rng)
+                pickKosmicChordType(progFamily: kosmicProgFamily, mode: effectiveMode, rng: &rng)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
                 key: frame.key,
-                mode: section.mode
+                mode: effectiveMode
             )
             windows.append(ChordWindow(
                 startBar: bar, lengthBars: length,
@@ -373,7 +386,7 @@ struct KosmicStructureGenerator {
     }
 
     private static func pickKosmicChordRoot(
-        section: SongSection,
+        mode: Mode,
         progFamily: KosmicProgressionFamily,
         rng: inout SeededRNG
     ) -> String {
@@ -381,9 +394,16 @@ struct KosmicStructureGenerator {
         case .static_drone:
             return "1"
         case .two_chord_pendulum:
-            return rng.nextDouble() < 0.6 ? "1" : "b6"
+            // b6 (bVI) is diatonic only in Aeolian (natural minor). In Dorian and Mixolydian
+            // the 6th is raised — using b6 creates a borrowed root whose chord tones are
+            // entirely outside the key. Fall back to "4" (IV — always diatonic) for those modes.
+            let altRoot = (mode == .Aeolian || mode == .MinorPentatonic) ? "b6" : "4"
+            return rng.nextDouble() < 0.6 ? "1" : altRoot
         case .modal_drift:
-            let degrees = ["1", "b7", "b6", "b7"]
+            // b7 is diatonic in Dorian, Aeolian, Mixolydian. b6 only in Aeolian.
+            // Replace b6 with "4" for non-Aeolian modes: i - bVII - IV is equally atmospheric.
+            let b6Degree = (mode == .Aeolian || mode == .MinorPentatonic) ? "b6" : "4"
+            let degrees = ["1", "b7", b6Degree, "b7"]
             return degrees[rng.nextInt(upperBound: degrees.count)]
         case .suspended_resolution:
             return "1"

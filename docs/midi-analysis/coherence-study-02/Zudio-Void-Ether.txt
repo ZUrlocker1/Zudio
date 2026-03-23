@@ -1,0 +1,81 @@
+=== Zudio Song Analysis Log ===
+Title:          Void Ether
+Generated:      2026-03-23 11:03:06
+Seed:           9872100115779170071
+Style:          Kosmic
+Key:            E  Dorian
+Tempo:          120 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 32         (28 bars)
+  B          Bars  33– 60         (28 bars)
+  B          Bars  61– 88         (28 bars)
+  A          Bars  89–120         (32 bars)
+  outro      Bars 121–124         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=power
+  Bars   5– 32         root=1  type=power
+  Bars  33– 46         root=1  type=power
+  Bars  47– 60         root=1  type=sus2
+  Bars  61– 88         root=1  type=minor
+  Bars  89–120         root=1  type=minor
+  Bars 121–124         root=1  type=power
+
+--- Note Counts Per Track ---
+  Lead 1       61 notes
+  Lead 2       204 notes
+  Pads         605 notes
+  Rhythm       448 notes
+  Texture      465 notes
+  Bass         740 notes
+  Drums        869 notes
+
+--- Generation Log ---
+  SONG             Void Ether
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           E Dorian  Static Drone  E5, Esus2, Em, E5
+  KOS-RTHM-010     Craven Faults modular grit
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-PADS-002     Vangelis swell
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-010     Probabilistic Moroder Pulse
+  KOS-DRUM-005     Electric Buddha minimal beat
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — hat crescendo
+  Bar 005    Section A    chords E5
+  Bar 009    Lead 2       steps into the spotlight
+  Bar 009    Pads         is back on stage
+  Bar 009    Rhythm       stepping back
+  Bar 025    Lead 1       stepping back
+  Bar 025    Pads         is back on stage
+  Bar 032    Drum fill    3 beat — tom cascade
+  Bar 033    Form         Enter B section — E5 Esus2
+  Bar 033    Texture      octave lift
+  Bar 049    Lead 2       stepping back
+  Bar 057    Pads         stepping back
+  Bar 061    Form         Enter B section again — Em
+  Bar 061    Texture      back to original
+  Bar 061    Texture      octave lift
+  Bar 065    Lead 2       stepping back
+  Bar 065    Rhythm       stepping back
+  Bar 081    Lead 2       steps into the spotlight
+  Bar 081    Rhythm       stepping back
+  Bar 088    Drum fill    3 beat — crescendo roll
+  Bar 089    Form         Return to A section — Em
+  Bar 089    Pads         stepping back
+  Bar 089    Texture      back to original
+  Bar 097    Lead 2       steps into the spotlight
+  Bar 113    Lead 1       stepping back
+  Bar 113    Lead 2       steps into the spotlight
+  Bar 113    Rhythm       stepping back
+  Bar 121    Outro        4 bar fade
+

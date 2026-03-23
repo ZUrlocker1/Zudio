@@ -1,0 +1,73 @@
+=== Zudio Song Analysis Log ===
+Title:          A Flow
+Generated:      2026-03-23 14:31:31
+Seed:           12698408548355259030
+Style:          Motorik
+Key:            A  Ionian
+Tempo:          136 BPM
+Bars:           112
+Mood:           Free
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 66         (64 bars)
+  B          Bars  67–104         (38 bars)
+  outro      Bars 105–112         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=b3  type=sus2
+  Bars   3– 66         root=b3  type=sus2
+  Bars  67– 85         root=2  type=dom7
+  Bars  86–104         root=b3  type=min7
+  Bars 105–112         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       83 notes
+  Lead 2       114 notes
+  Pads         1058 notes
+  Rhythm       393 notes
+  Texture      18 notes
+  Bass         614 notes
+  Drums        2108 notes
+
+--- Generation Log ---
+  SONG             A Flow
+  Form             Subtle A/B
+  Chords           A Ionian  Two chord: I - ♭VII  Csus2, B7, Cm7, Am
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-005     McCartney drive
+  MOT-PADS-005     Harmonia charleston
+  MOT-LD1-003      Long Breath
+  MOT-LD2-005      Descending line
+  MOT-RTHM-003     Syncopated Motorik
+  MOT-RTHM-004     2-bar Melodic Riff
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-008     Phase slip
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar fade in
+  Bar 002    Lead 1       stepping back
+  Bar 003    Section A    chords Csus2
+  Bar 012    Texture      stepping back
+  Bar 017    Pads         stepping back
+  Bar 017    Bass         pattern evolving
+  Bar 021    Drum fill    2 beat — funk cross-pattern
+  Bar 033    Drum fill    3 beat — tom cascade
+  Bar 034    Texture      steps into the spotlight
+  Bar 036    Lead 1       steps into the spotlight
+  Bar 041    Lead 2       stepping back
+  Bar 055    Texture      steps into the spotlight
+  Bar 062    Drum fill    2 beat — funk cross-pattern
+  Bar 065    Lead 2       stepping back
+  Bar 065    Rhythm       stepping back
+  Bar 066    Drum fill    2 beat — funk cross-pattern
+  Bar 067    Form         Enter B section — B7 Cm7
+  Bar 067    Rhythm       rhythm pattern changes
+  Bar 069    Bass         pattern evolving
+  Bar 080    Drum fill    2 beat — funk cross-pattern
+  Bar 081    Lead 2       stepping back
+  Bar 081    Rhythm       stepping back
+  Bar 089    Drum fill    3 beat — tom cascade
+  Bar 102    Texture      steps into the spotlight
+  Bar 105    Outro        8 bar fade
+

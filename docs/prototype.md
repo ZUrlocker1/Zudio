@@ -211,7 +211,7 @@ Zudio should be oriented around visible, regenerable song parts instead of a pur
   - Default About text:
     - `Zudio`
     - `Generative music Application vibe coded with Claude!`
-    - `Version: 0.7 (alpha)`
+    - `Version: 0.86 (alpha)`
     - `This was built by analyzing Motorik and related songs and developing a set of rules to keep the instruments in sync and playing together. Sometimes it even sounds like music!`
     - `V1: Motorik style only. Instruments using GS MIDI. Effects not implemented.`
     - `V2: improve musicality, add effects, attempt additional musical styles such as Electronic, Ambient, etc.`
@@ -717,6 +717,13 @@ This is the implementation source of truth for Motorik. It consolidates prior Mo
     - Outro removes layers progressively (no sudden full stop unless in cold-stop variant).
     - Keep harmonic movement in intro/outro lower than in main body.
     - Spotlight and bass evolution annotations (step 4 and 5 of generation) do not extend into the outro — all variation and spotlight logic stops at the first outro bar.
+  - Implementation note — intro/outro volume fading (replaced velocity-based approach):
+    - Generators no longer scale note velocities in intro/outro bars. All notes are written at full body velocity.
+    - PlaybackEngine handles all intro/outro volume shaping via `AVAudioMixerNode.outputVolume` at runtime:
+      - Motorik: fades `engine.mainMixerNode.outputVolume` (all tracks together) — 0→1 over intro, 1→0 over outro.
+      - Kosmic: fades `boosts[bass].outputVolume` and `boosts[pads].outputVolume` (drone tracks only) — same ramp shape.
+    - On song start from step 0, `mainMixerNode` is zeroed 50ms before the scheduler fires to prevent the DSP-init click. The ramp then opens audio smoothly from silence.
+    - Seek correctness: `startMotorikFades` / `startKosmicDroneFades` use a 4-case position check (step 0, mid-intro, body, outro) so a seek to any position sets the correct volume immediately before starting the fade timer from that proportional point.
 
 ### Motorik-adjacent calibration profile (Electric Buddha set)
 

@@ -3,14 +3,13 @@
 //
 // Rule catalog (one primary style selected per song):
 //   PAD-001: Sustained whole-bar (duration 14 steps — visual gap between notes)
-//            Auto-breaks into PAD-007 after 4 consecutive whole-note bars.
+//            Auto-breaks into PAD-005 after 4 consecutive whole-note bars.
 //   PAD-002: Power/drone voicing (root+fifth+octave) whole-bar, same break rule.
 //   PAD-003: Pulsed — one attack every 2 bars (durationSteps: 30)
-//   PAD-004: Sparse intro/outro (50% skip)
-//   PAD-006: Chord stabs — beat 1 (dur 4), sometimes beat 3 (dur 4)
-//   PAD-007: Charleston rhythm — 3+3+2 feel, hits at steps 0, 6, 12
-//   PAD-010: Half-bar breathe — chord on beat 1 (dur 7), silence second half
-//   PAD-011: Backbeat stabs — chord hits on beats 2+4 only (steps 4, 12 dur 3)
+//   PAD-004: Chord stabs — beat 1 (dur 4), sometimes beat 3 (dur 4)
+//   PAD-005: Charleston rhythm — 3+3+2 feel, hits at steps 0, 6, 12
+//   PAD-006: Half-bar breathe — chord on beat 1 (dur 7), silence second half
+//   PAD-007: Backbeat stabs — chord hits on beats 2+4 only (steps 4, 12 dur 3)
 //
 // Note: arpeggios moved to RhythmGenerator (RHY-006) — pads are purely atmospheric.
 
@@ -25,13 +24,12 @@ struct PadsGenerator {
         var events: [MIDIEvent] = []
 
         // Weighted style selection — all rules are atmospheric/harmonic
-        let padRules:   [String] = ["MOT-PADS-001","MOT-PADS-002","MOT-PADS-003","MOT-PADS-006",
-                                    "MOT-PADS-007","MOT-PADS-010","MOT-PADS-011"]
+        let padRules:   [String] = ["MOT-PADS-001","MOT-PADS-002","MOT-PADS-003","MOT-PADS-004",
+                                    "MOT-PADS-005","MOT-PADS-006","MOT-PADS-007"]
         let padWeights: [Double] = [0.22,     0.17,     0.15,     0.14,
                                     0.18,     0.09,     0.05]
         let primaryRule = padRules[rng.weightedPick(padWeights)]
         usedRuleIDs.insert(primaryRule)
-        usedRuleIDs.insert("MOT-PADS-004")  // sparse intro/outro always applies
 
         let totalBars = frame.totalBars
         var sustainRunBars = 0   // tracks consecutive whole-note bars for 4-bar break rule
@@ -84,8 +82,8 @@ struct PadsGenerator {
             // 4-bar rule: after 4 consecutive sustained bars, inject a Charleston bar
             let activePrimary: String
             if (primaryRule == "MOT-PADS-001" || primaryRule == "MOT-PADS-002") && sustainRunBars >= 4 {
-                activePrimary = "MOT-PADS-007"
-                usedRuleIDs.insert("MOT-PADS-007")
+                activePrimary = "MOT-PADS-005"
+                usedRuleIDs.insert("MOT-PADS-005")
                 sustainRunBars = 0
             } else {
                 activePrimary = primaryRule
@@ -111,7 +109,7 @@ struct PadsGenerator {
                 }
 
             // MARK: Chord stabs (beat 1 + sometimes beat 3)
-            case "MOT-PADS-006":
+            case "MOT-PADS-004":
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
                                             velocity: velocity, durationSteps: 4))
@@ -126,7 +124,7 @@ struct PadsGenerator {
 
             // MARK: Charleston / 3+3+2
             // Hits at steps 0, 6, 12 — dotted-quarter, dotted-quarter, quarter
-            case "MOT-PADS-007":
+            case "MOT-PADS-005":
                 sustainRunBars = 0
                 for (offset, dur) in [(0, 5), (6, 5), (12, 4)] {
                     for note in voicing {
@@ -136,14 +134,14 @@ struct PadsGenerator {
                 }
 
             // MARK: Half-bar breathe — chord on beat 1, silence second half
-            case "MOT-PADS-010":
+            case "MOT-PADS-006":
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
                                             velocity: velocity, durationSteps: 7))
                 }
 
             // MARK: Backbeat stabs — beats 2+4 only
-            case "MOT-PADS-011":
+            case "MOT-PADS-007":
                 let bbVel = UInt8(clamped(Int(velocity) - 8, low: 40, high: 110))
                 for step in [4, 12] {
                     for note in voicing {
@@ -187,7 +185,23 @@ struct PadsGenerator {
         case .power:   offsets = [0, 7, 12, 19]
         }
 
-        return offsets.map { UInt8(clamped(rootMIDI + $0, low: 48, high: 84)) }
+        // Snap each chord tone to the nearest in-scale pitch class.
+        // Chord type intervals can add chromatic tones even when the chord root is diatonic
+        // (e.g. dom7 adds a minor 7th that may not be in the mode; F#m7 adds C# in E Aeolian).
+        // Snapping keeps voicings audible and in-key without removing notes entirely.
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        return offsets.map { offset -> UInt8 in
+            let rawMidi = clamped(rootMIDI + offset, low: 48, high: 84)
+            let pc = rawMidi % 12
+            guard !scalePCs.contains(pc) else { return UInt8(rawMidi) }
+            let nearestPC = scalePCs.min(by: {
+                min(($0 - pc + 12) % 12, (pc - $0 + 12) % 12) <
+                min(($1 - pc + 12) % 12, (pc - $1 + 12) % 12)
+            }) ?? pc
+            let dist  = (nearestPC - pc + 12) % 12
+            let shift = dist <= 6 ? dist : dist - 12   // shortest semitone path
+            return UInt8(clamped(rawMidi + shift, low: 48, high: 84))
+        }
     }
 
     // MARK: - Helpers

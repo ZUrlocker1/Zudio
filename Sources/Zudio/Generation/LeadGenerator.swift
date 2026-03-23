@@ -95,7 +95,13 @@ struct LeadGenerator {
         // A: Per-section rule — always consume two draws for RNG determinism across songs
         let aRule          = pickLd1Rule(rng: &rng)
         let bRuleCandidate = pickLd1Rule(rng: &rng)
-        let bRule          = (rng.nextDouble() < 0.70) ? aRule : bRuleCandidate
+        // Technique D: LD1-003 Long Breath is too passive for B sections; escalate to an active rule.
+        let bRule: String
+        if aRule == "MOT-LD1-003" {
+            bRule = (rng.nextDouble() < 0.60) ? "MOT-LD1-001" : "MOT-LD1-004"
+        } else {
+            bRule = (rng.nextDouble() < 0.70) ? aRule : bRuleCandidate
+        }
         usedRuleIDs.insert(aRule)
 
         // E: Delayed body entry — Lead 1 hard-silent for first 8 or 16 bars of A section
@@ -513,14 +519,16 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
         if isIntroOutro { return events }
         let bounds = kRegisterBounds[kTrackLead2]!
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        // LD2-004 plays a fixed tonic-anchored motif (NEU! style) — rootPC is the song tonic,
+        // not the current chord root, so the counter stays in-scale across all chord changes.
+        let rootPC = keySemitone(frame.key)
 
         let noteOffsets: [Int] = [5, 7, 2, 2,   5, 7, 0, 0]
         let steps:       [Int] = [0, 2, 4, 6,  10,12,14,15]
         let vels: [UInt8]      = [84, 82, 82, 80,  84, 82, 80, 76]
 
         for (i, step) in steps.enumerated() {
-            guard rng.nextDouble() < 0.75 else { continue }
+            guard rng.nextDouble() < 0.55 else { continue }
             let pc   = (rootPC + noteOffsets[i]) % 12
             let note = midiNoteForPC(pc, bounds: bounds, rng: &rng)
             events.append(MIDIEvent(stepIndex: barStart + step, note: note,
@@ -539,7 +547,8 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
         if isIntroOutro && rng.nextDouble() < 0.60 { return events }
         let bounds = kRegisterBounds[kTrackLead2]!
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        // LD2-005 uses the song tonic as base for scale degree offsets to stay diatonic.
+        let rootPC = keySemitone(frame.key)
 
         let (off1, off2): (Int, Int) = (bar % 2 == 0)
             ? (frame.mode.nearestInterval(9), 7)
@@ -560,7 +569,7 @@ struct LeadGenerator {
     /// Picks a new LD1 rule consuming one RNG draw (called twice in generateLead1 for determinism).
     private static func pickLd1Rule(rng: inout SeededRNG) -> String {
         let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005"]
-        let weights: [Double] = [0.25,      0.20,      0.15,      0.22,      0.18]
+        let weights: [Double] = [0.29,      0.20,      0.08,      0.25,      0.18]
         return rules[rng.weightedPick(weights)]
     }
 

@@ -1,0 +1,73 @@
+=== Zudio Song Analysis Log ===
+Title:          Frei Licht
+Generated:      2026-03-23 12:16:54
+Seed:           5962685206319861858
+Style:          Motorik
+Key:            G  Dorian
+Tempo:          141 BPM
+Bars:           104
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 96         (92 bars)
+  outro      Bars  97–104         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=major
+  Bars   5– 96         root=1  type=major
+  Bars  97–104         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       16 notes
+  Lead 2       267 notes
+  Pads         609 notes
+  Rhythm       253 notes
+  Texture      16 notes
+  Bass         243 notes
+  Drums        1858 notes
+
+--- Generation Log ---
+  SONG             Frei Licht
+  Form             Steady A section
+  Chords           G Dorian  Minor loop: i - VII  G, Gm
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-001     Root Anchor
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-PADS-007     Harmonia charleston
+  MOT-LD1-003      Long Breath
+  MOT-LD2-004      Neu! counter melody
+  MOT-RTHM-002     Quarter stride
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-002     Transition swell
+  MOT-TEXT-006     High-tension touch
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar lock in
+  Bar 004    Lead 1       stepping back
+  Bar 005    Section A    chords G
+  Bar 011    Drum fill    3 beat — tom cascade
+  Bar 014    Texture      stepping back
+  Bar 017    Lead 2       stepping back
+  Bar 024    Lead 1       steps into the spotlight
+  Bar 028    Drum fill    3 beat — alternating toms
+  Bar 030    Texture      stepping back
+  Bar 033    Lead 2       steps into the spotlight
+  Bar 033    Pads         stepping back
+  Bar 037    Bass         pattern evolving
+  Bar 047    Lead 1       steps into the spotlight
+  Bar 049    Lead 2       stepping back
+  Bar 049    Pads         is back on stage
+  Bar 049    Texture      steps into the spotlight
+  Bar 064    Lead 1       steps into the spotlight
+  Bar 065    Lead 2       steps into the spotlight
+  Bar 067    Texture      steps into the spotlight
+  Bar 075    Drum fill    2 beat — funk cross-pattern
+  Bar 081    Lead 2       stepping back
+  Bar 081    Pads         stepping back
+  Bar 081    Drum fill    2 beat — funk cross-pattern
+  Bar 085    Drum fill    2 beat — funk cross-pattern
+  Bar 090    Drum fill    2 beat — funk cross-pattern
+  Bar 096    Texture      steps into the spotlight
+  Bar 097    Outro        8 bar dissolve
+

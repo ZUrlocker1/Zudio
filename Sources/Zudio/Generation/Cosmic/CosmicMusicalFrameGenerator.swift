@@ -79,12 +79,11 @@ struct KosmicMusicalFrameGenerator {
         return moods[rng.weightedPick(weights)]
     }
 
-    /// Kosmic modes — Dorian 40%, Aeolian 30%, Phrygian 15%, Mixolydian 10%, Ionian 5%
+    /// Kosmic modes — Dorian 45%, Aeolian 32%, Mixolydian 15%, Ionian 8%
     /// (KOS-RULE-02: Dorian confirmed as primary from Mister Mosca analysis)
     private static func pickMode(rng: inout SeededRNG) -> Mode {
-        let modes:   [Mode]   = [.Dorian, .Aeolian, .Aeolian, .Mixolydian, .Ionian]
-        let weights: [Double] = [0.40,    0.30,     0.15,     0.10,        0.05]
-        // Phrygian not in Mode enum — use Aeolian as nearest dark mode
+        let modes:   [Mode]   = [.Dorian, .Aeolian, .Mixolydian, .Ionian]
+        let weights: [Double] = [0.45,    0.32,     0.15,        0.08]
         return modes[rng.weightedPick(weights)]
     }
 

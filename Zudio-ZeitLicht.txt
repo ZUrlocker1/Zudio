@@ -1,0 +1,85 @@
+=== Zudio Song Analysis Log ===
+Title:          ZeitLicht
+Generated:      2026-03-23 12:17:14
+Seed:           13614328079872675084
+Style:          Motorik
+Key:            F#  Aeolian
+Tempo:          139 BPM
+Bars:           148
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3–140         (138 bars)
+  outro      Bars 141–148         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=4  type=min7
+  Bars   3–140         root=4  type=min7
+  Bars 141–148         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       25 notes
+  Lead 2       472 notes
+  Pads         511 notes
+  Rhythm       416 notes
+  Texture      50 notes
+  Bass         801 notes
+  Drums        2727 notes
+
+--- Generation Log ---
+  SONG             ZeitLicht
+  Form             Steady A section
+  Chords           F# Aeolian  Two chord: I - ♭VII  Bm7, F#m
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-009     Vitamin Hook
+  MOT-PADS-001     Harmonia sustained notes
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-PADS-007     Harmonia charleston
+  MOT-LD1-003      Long Breath
+  MOT-LD2-004      Neu! counter melody
+  MOT-RTHM-006     Harmonia arpeggio
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-002     Transition swell
+  MOT-TEXT-004     Shimmer pair
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar lock in
+  Bar 003    Section A    chords Bm7
+  Bar 004    Texture      stepping back
+  Bar 009    Bass         pattern evolving
+  Bar 015    Drum fill    2 beat — Bonham tom cascade
+  Bar 017    Lead 2       stepping back
+  Bar 020    Lead 1       steps into the spotlight
+  Bar 025    Drum fill    2 beat — funk cross-pattern
+  Bar 026    Texture      steps into the spotlight
+  Bar 033    Lead 2       steps into the spotlight
+  Bar 033    Pads         is back on stage
+  Bar 038    Lead 1       stepping back
+  Bar 038    Drum fill    2 beat — funk cross-pattern
+  Bar 041    Drum fill    2 beat — Bonham tom cascade
+  Bar 048    Drum fill    2 beat — funk cross-pattern
+  Bar 049    Lead 2       stepping back
+  Bar 051    Drum fill    2 beat — funk cross-pattern
+  Bar 054    Texture      stepping back
+  Bar 058    Lead 1       stepping back
+  Bar 065    Lead 2       steps into the spotlight
+  Bar 073    Drum fill    2 beat — Bonham tom cascade
+  Bar 079    Lead 1       steps into the spotlight
+  Bar 079    Texture      stepping back
+  Bar 081    Lead 2       stepping back
+  Bar 081    Rhythm       stepping back
+  Bar 090    Drum fill    2 beat — funk cross-pattern
+  Bar 095    Drum fill    2 beat — funk cross-pattern
+  Bar 096    Drum fill    2 beat — Bonham tom cascade
+  Bar 097    Lead 2       steps into the spotlight
+  Bar 097    Rhythm       is back on stage
+  Bar 110    Lead 1       stepping back
+  Bar 120    Drum fill    2 beat — funk cross-pattern
+  Bar 122    Drum fill    3 beat — tom cascade
+  Bar 128    Drum fill    3 beat — alternating toms
+  Bar 132    Lead 1       steps into the spotlight
+  Bar 139    Drum fill    2 beat — Bonham tom cascade
+  Bar 140    Drum fill    2 beat — funk cross-pattern
+  Bar 141    Outro        8 bar fade
+

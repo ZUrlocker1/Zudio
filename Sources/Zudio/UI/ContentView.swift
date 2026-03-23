@@ -27,9 +27,9 @@ struct ContentView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                    infoChip("Mood",   song.frame.mood.rawValue.capitalized)
                     infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)")
                     infoChip("BPM",    "\(song.frame.tempo)")
-                    infoChip("Mood",   song.frame.mood.rawValue.capitalized)
                     infoChip("Length", songLength(song))
                 } else if !appState.isGenerating {
                     Text("No song — press Generate or Play")

@@ -1,0 +1,64 @@
+=== Zudio Song Analysis Log ===
+Title:          Astral Current
+Generated:      2026-03-23 11:48:20
+Seed:           4522538290218858729
+Style:          Kosmic
+Key:            B  Aeolian
+Tempo:          112 BPM
+Bars:           108
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 28         (24 bars)
+  B          Bars  29– 52         (24 bars)
+  A          Bars  53– 76         (24 bars)
+  B          Bars  77–106         (30 bars)
+  outro      Bars 107–108         (2 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=power
+  Bars   5– 28         root=1  type=power
+  Bars  29– 52         root=1  type=power
+  Bars  53– 76         root=1  type=minor
+  Bars  77– 91         root=1  type=minor
+  Bars  92–106         root=1  type=power
+  Bars 107–108         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       33 notes
+  Lead 2       34 notes
+  Pads         548 notes
+  Rhythm       1068 notes
+  Texture      78 notes
+  Bass         901 notes
+  Drums        811 notes
+
+--- Generation Log ---
+  SONG             Astral Current
+  Style            Kosmic
+  Form             A - B - A - B
+  Chords           B Aeolian  Static Drone  B5, Bm, B5, Bm
+  KOS-RTHM-002     Probabilistic JMJ melodic hook
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-003     Spatial Sweep — chromatic passing
+  KOS-BASS-012     McCartney melodic drive
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords B5
+  Bar 009    Lead 1       steps into the spotlight
+  Bar 028    Drum fill    3 beat — crescendo roll
+  Bar 029    Form         Enter B section — B5
+  Bar 029    Bass         pattern evolving
+  Bar 052    Drum fill    3 beat — tom cascade
+  Bar 053    Form         Return to A section — Bm
+  Bar 076    Drum fill    3 beat — crescendo roll
+  Bar 077    Form         Enter B section again — Bm B5
+  Bar 107    Outro        2 bar cold stop — drum fill ending
+

@@ -1,0 +1,56 @@
+=== Zudio Song Analysis Log ===
+Title:          Hexalon
+Generated:      2026-03-23 11:49:08
+Seed:           4538380235834863801
+Style:          Kosmic
+Key:            A  Aeolian
+Tempo:          120 BPM
+Bars:           128
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  8         (8 bars)
+  A          Bars   9–124         (116 bars)
+  outro      Bars 125–128         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  8         root=1  type=sus4
+  Bars   9–124         root=1  type=sus4
+  Bars 125–128         root=1  type=sus4
+
+--- Note Counts Per Track ---
+  Lead 1       58 notes
+  Lead 2       35 notes
+  Pads         366 notes
+  Rhythm       932 notes
+  Texture      31 notes
+  Bass         13 notes
+  Drums        985 notes
+
+--- Generation Log ---
+  SONG             Hexalon
+  Style            Kosmic
+  Form             Steady evolution
+  Chords           A Aeolian  Suspended Resolution — sus4 - minor  Asus4
+  KOS-RTHM-006     Kraftwerk locked pulse
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-002     Eno floating tones
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-005     No bass
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        8 bar cold start — rock fill
+  Bar 009    Section A    chords Asus4
+  Bar 009    Lead 1       steps into the spotlight
+  Bar 011    Lead 2       steps into the spotlight
+  Bar 041    Rhythm       octave shift
+  Bar 045    Rhythm       back to original
+  Bar 073    Rhythm       octave shift
+  Bar 077    Rhythm       back to original
+  Bar 105    Rhythm       octave shift
+  Bar 109    Rhythm       back to original
+  Bar 125    Outro        4 bar dissolve
+

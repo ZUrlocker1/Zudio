@@ -1,0 +1,77 @@
+=== Zudio Song Analysis Log ===
+Title:          Fahrt Maschine
+Generated:      2026-03-23 12:17:16
+Seed:           7886034767589621978
+Style:          Motorik
+Key:            A  Dorian
+Tempo:          133 BPM
+Bars:           132
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3–124         (122 bars)
+  outro      Bars 125–132         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=minor
+  Bars   3–124         root=1  type=minor
+  Bars 125–132         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       203 notes
+  Lead 2       237 notes
+  Pads         214 notes
+  Rhythm       296 notes
+  Texture      25 notes
+  Bass         883 notes
+  Drums        2385 notes
+
+--- Generation Log ---
+  SONG             Fahrt Maschine
+  Form             Steady A section
+  Chords           A Dorian  Minor loop: i - VII  Am
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-008     Moroder Pulse
+  MOT-PADS-001     Harmonia sustained notes
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-PADS-007     Harmonia charleston
+  MOT-LD1-002      Pentatonic cell
+  MOT-LD2-006      Neu! harmony
+  MOT-RTHM-006     Harmonia arpeggio
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-002     Transition swell
+  MOT-TEXT-004     Shimmer pair
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — rock fill
+  Bar 003    Section A    chords Am
+  Bar 005    Drum fill    2 beat — funk cross-pattern
+  Bar 013    Texture      stepping back
+  Bar 017    Pads         stepping back
+  Bar 019    Lead 2       steps into the spotlight
+  Bar 033    Lead 1       steps into the spotlight
+  Bar 033    Rhythm       stepping back
+  Bar 047    Texture      steps into the spotlight
+  Bar 049    Lead 1       stepping back
+  Bar 049    Lead 2       stepping back
+  Bar 049    Rhythm       is back on stage
+  Bar 060    Drum fill    2 beat — funk cross-pattern
+  Bar 065    Lead 1       steps into the spotlight
+  Bar 065    Lead 2       steps into the spotlight
+  Bar 065    Rhythm       stepping back
+  Bar 075    Drum fill    2 beat — funk cross-pattern
+  Bar 076    Texture      steps into the spotlight
+  Bar 077    Bass         pattern evolving
+  Bar 081    Pads         is back on stage
+  Bar 081    Rhythm       is back on stage
+  Bar 097    Pads         stepping back
+  Bar 097    Rhythm       stepping back
+  Bar 106    Texture      steps into the spotlight
+  Bar 112    Drum fill    2 beat — funk cross-pattern
+  Bar 113    Pads         is back on stage
+  Bar 113    Rhythm       is back on stage
+  Bar 117    Drum fill    3 beat — tom cascade — bass locked in
+  Bar 124    Texture      steps into the spotlight
+  Bar 125    Outro        8 bar dissolve
+

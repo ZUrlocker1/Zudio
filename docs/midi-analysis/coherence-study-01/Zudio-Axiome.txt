@@ -1,0 +1,78 @@
+=== Zudio Song Analysis Log ===
+Title:          Axiome
+Generated:      2026-03-23 10:04:33
+Seed:           8203874342556476758
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          120 BPM
+Bars:           112
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 28         (24 bars)
+  B          Bars  29– 52         (24 bars)
+  B          Bars  53– 76         (24 bars)
+  A          Bars  77–104         (28 bars)
+  outro      Bars 105–112         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=sus2
+  Bars   5– 28         root=1  type=sus2
+  Bars  29– 40         root=b6  type=minor
+  Bars  41– 52         root=1  type=sus2
+  Bars  53– 64         root=b6  type=major
+  Bars  65– 76         root=1  type=minor
+  Bars  77–104         root=b6  type=sus2
+  Bars 105–112         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       62 notes
+  Lead 2       52 notes
+  Pads         370 notes
+  Rhythm       4585 notes
+  Texture      401 notes
+  Bass         486 notes
+  Drums        751 notes
+
+--- Generation Log ---
+  SONG             Axiome
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           D Aeolian  Vangelis two chord pendulum  i - bVI  Dsus2, A#m, Dsus2, A#, Dm, A#sus2, Dm
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-003     Steve Roach unsync layers
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-006     Additive dual bass
+  KOS-BASS-008     Hallogallo Lock
+  KOS-DRUM-005     Electric Buddha minimal beat
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords Dsus2
+  Bar 017    Lead 2       stepping back
+  Bar 028    Drum fill    3 beat — tom cascade
+  Bar 029    Form         Enter B section — Bbm Dsus2
+  Bar 029    Texture      octave lift
+  Bar 033    Lead 2       steps into the spotlight
+  Bar 033    Pads         stepping back
+  Bar 038    Bass         pattern evolving
+  Bar 049    Lead 2       stepping back
+  Bar 049    Pads         is back on stage
+  Bar 053    Form         Enter B section again — Bb Dm
+  Bar 053    Texture      back to original
+  Bar 053    Texture      octave lift
+  Bar 065    Lead 2       steps into the spotlight
+  Bar 065    Pads         stepping back
+  Bar 071    Bass         pattern evolving
+  Bar 076    Drum fill    3 beat — crescendo roll
+  Bar 077    Form         Return to A section — Bbsus2
+  Bar 077    Texture      back to original
+  Bar 081    Lead 2       stepping back
+  Bar 081    Pads         is back on stage
+  Bar 097    Lead 2       steps into the spotlight
+  Bar 105    Outro        8 bar fade
+

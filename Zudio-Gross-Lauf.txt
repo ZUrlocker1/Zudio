@@ -1,0 +1,72 @@
+=== Zudio Song Analysis Log ===
+Title:          Gross Lauf
+Generated:      2026-03-23 12:17:10
+Seed:           14402151783716817604
+Style:          Motorik
+Key:            G  Dorian
+Tempo:          132 BPM
+Bars:           96
+Mood:           Bright
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 52         (48 bars)
+  B          Bars  53– 88         (36 bars)
+  outro      Bars  89– 96         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=b3  type=sus2
+  Bars   5– 28         root=b3  type=sus2
+  Bars  29– 52         root=4  type=min7
+  Bars  53– 64         root=2  type=dom7
+  Bars  65– 76         root=b6  type=major
+  Bars  77– 88         root=b7  type=sus2
+  Bars  89– 96         root=1  type=sus2
+
+--- Note Counts Per Track ---
+  Lead 1       103 notes
+  Lead 2       318 notes
+  Pads         192 notes
+  Rhythm       272 notes
+  Texture      12 notes
+  Bass         283 notes
+  Drums        1858 notes
+
+--- Generation Log ---
+  SONG             Gross Lauf
+  Form             Subtle A/B
+  Chords           G Dorian  Two chord: I - ♭VII  A#sus2, Cm7, A7, D#, Fsus2, Gsus2
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-001     Root Anchor
+  MOT-PADS-003     Pulsed
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-LD1-002      Pentatonic cell
+  MOT-LD2-004      Neu! counter melody
+  MOT-RTHM-003     Syncopated Motorik
+  MOT-RTHM-006     Harmonia arpeggio
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-002     Transition swell
+  MOT-TEXT-005     Eno Cluster breath release
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords Bbsus2 Cm7
+  Bar 005    Texture      stepping back
+  Bar 009    Bass         pattern evolving
+  Bar 013    Lead 1       steps into the spotlight
+  Bar 016    Drum fill    2 beat — funk cross-pattern
+  Bar 017    Lead 2       stepping back
+  Bar 041    Rhythm       stepping back
+  Bar 048    Texture      steps into the spotlight
+  Bar 052    Drum fill    2 beat — funk cross-pattern
+  Bar 053    Form         Enter B section — A7 Eb Fsus2
+  Bar 053    Bass         pattern evolving
+  Bar 053    Rhythm       rhythm pattern changes
+  Bar 065    Lead 1       stepping back
+  Bar 068    Drum fill    2 beat — funk cross-pattern
+  Bar 073    Rhythm       stepping back
+  Bar 081    Lead 1       steps into the spotlight
+  Bar 086    Drum fill    3 beat — tom cascade
+  Bar 087    Texture      steps into the spotlight
+  Bar 089    Outro        8 bar cold stop — drum fill ending
+

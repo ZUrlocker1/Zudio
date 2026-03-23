@@ -1,0 +1,71 @@
+=== Zudio Song Analysis Log ===
+Title:          Maxima
+Generated:      2026-03-23 10:08:04
+Seed:           16358172132188209329
+Style:          Kosmic
+Key:            D  Dorian
+Tempo:          119 BPM
+Bars:           120
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 30         (28 bars)
+  bridgeAlt  Bars  31– 34         (4 bars)
+  B          Bars  35– 62         (28 bars)
+  A          Bars  63–104         (42 bars)
+  outro      Bars 105–120         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=minor
+  Bars   3– 30         root=1  type=minor
+  Bars  31– 34         root=1  type=minor
+  Bars  35– 48         root=1  type=minor
+  Bars  49– 62         root=1  type=sus2
+  Bars  63–104         root=1  type=sus2
+  Bars 105–120         root=1  type=power
+
+--- Note Counts Per Track ---
+  Lead 1       66 notes
+  Lead 2       68 notes
+  Pads         447 notes
+  Rhythm       2106 notes
+  Texture      395 notes
+  Bass         706 notes
+  Drums        1116 notes
+
+--- Generation Log ---
+  SONG             Maxima
+  Style            Kosmic
+  Form             A - B - A + bridge
+  Chords           D Dorian  Static Drone  Dm, Dsus2, D5
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-001     Eno long drone
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-003     Tangerine Dream pulse
+  KOS-BASS-006     Additive dual bass
+  KOS-DRUM-002     Basic Channel minimal dub
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar lock in
+  Bar 003    Section A    chords Dm
+  Bar 017    Pads         stepping back
+  Bar 017    Rhythm       stepping back
+  Bar 029    Bass         pattern evolving
+  Bar 031    Form         Call and response bridge
+  Bar 035    Form         Enter B section — Dm Dsus2
+  Bar 035    Texture      octave lift
+  Bar 037    Bass         pattern evolving
+  Bar 057    Lead 2       stepping back
+  Bar 063    Form         Return to A section — Dsus2
+  Bar 063    Texture      back to original
+  Bar 065    Bass         pattern evolving
+  Bar 076    Lead 2       steps into the spotlight
+  Bar 081    Pads         stepping back
+  Bar 089    Rhythm       stepping back
+  Bar 105    Outro        16 bar fade
+

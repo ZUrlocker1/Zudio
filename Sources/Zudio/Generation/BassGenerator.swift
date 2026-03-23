@@ -270,41 +270,23 @@ struct BassGenerator {
         rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: IntroStyle
     ) -> [MIDIEvent] {
         let offsetBar = bar - introSection.startBar
-        let totalBars = introSection.lengthBars
 
         switch style {
         case .alreadyPlaying:
-            // Play the actual bass pattern at reduced velocity, ramping up bar by bar.
-            let factor = totalBars <= 1 ? 1.0 :
-                0.55 + 0.45 * Double(offsetBar) / Double(totalBars - 1)
-            let base = bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                               frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
-            return scaleVelocity(base, factor: factor)
+            // Play the actual bass pattern at full velocity — PlaybackEngine fades the master.
+            return bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
 
         case .progressiveEntry:
             // Simplified riff derived from the song's bass rule — signals "something is coming"
-            // without playing the actual groove. Ramps 65%→82% so the body arrival is still felt.
-            let factor = totalBars <= 1 ? 0.75 :
-                0.65 + 0.17 * Double(offsetBar) / Double(totalBars - 1)
-            return scaleVelocity(simplifiedIntroBar(ruleID: ruleID, barStart: barStart,
-                                                    entry: entry, frame: frame), factor: factor)
+            // without playing the actual groove. Volume fade handled by PlaybackEngine.
+            return simplifiedIntroBar(ruleID: ruleID, barStart: barStart, entry: entry, frame: frame)
 
         case .coldStart(let drumsOnly):
             // drumsOnly bar 0: drums alone, bass silent — full impact lands on bar 1.
-            // All other bars: simplified riff at near-full velocity (the groove arrives at body).
+            // All other bars: simplified riff at note-on velocity (master ramp provides the fade).
             if drumsOnly && offsetBar == 0 { return [] }
-            let factor: Double
-            if !drumsOnly && offsetBar == 0 {
-                factor = 0.72   // ground the drum pickup without dominating
-            } else {
-                // Bars 1+ ramp 82%→95% — just below body level so the body still "arrives".
-                let playedOffset = drumsOnly ? (offsetBar - 1) : offsetBar
-                let playedTotal  = drumsOnly ? max(1, totalBars - 1) : totalBars
-                factor = playedTotal <= 1 ? 0.92 :
-                    0.82 + 0.13 * Double(playedOffset) / Double(playedTotal - 1)
-            }
-            return scaleVelocity(simplifiedIntroBar(ruleID: ruleID, barStart: barStart,
-                                                    entry: entry, frame: frame), factor: factor)
+            return simplifiedIntroBar(ruleID: ruleID, barStart: barStart, entry: entry, frame: frame)
         }
     }
 
@@ -460,12 +442,9 @@ struct BassGenerator {
 
         switch style {
         case .fade:
-            // Actual bass pattern with velocity fading to ~25% by the final bar.
-            let factor = totalBars <= 1 ? 0.25 :
-                max(0.25, 1.0 - 0.75 * Double(offsetBar) / Double(totalBars - 1))
-            let base = bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                               frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
-            return scaleVelocity(base, factor: factor)
+            // Actual bass pattern at full velocity — PlaybackEngine fades the master out.
+            return bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
 
         case .dissolve:
             // Bass plays a simplified anchor in the first half, then drops out — pads hold alone.
@@ -493,16 +472,6 @@ struct BassGenerator {
             MIDIEvent(stepIndex: barStart,     note: root,  velocity: 78, durationSteps: 7),
             MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 70, durationSteps: 7),
         ]
-    }
-
-    // MARK: - Velocity scaling utility
-
-    private static func scaleVelocity(_ events: [MIDIEvent], factor: Double) -> [MIDIEvent] {
-        events.map { ev in
-            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                      velocity: UInt8(max(1, min(127, Int(Double(ev.velocity) * factor)))),
-                      durationSteps: ev.durationSteps)
-        }
     }
 
     // MARK: - BAS-001: Root Anchor — clean, locked to beat 1 and 3

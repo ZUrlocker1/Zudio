@@ -1,0 +1,76 @@
+=== Zudio Song Analysis Log ===
+Title:          Langsam Maschine
+Generated:      2026-03-23 14:39:07
+Seed:           6478269960572009373
+Style:          Motorik
+Key:            A  Dorian
+Tempo:          140 BPM
+Bars:           112
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 66         (64 bars)
+  B          Bars  67–108         (42 bars)
+  outro      Bars 109–112         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=b3  type=major
+  Bars   3– 34         root=b3  type=major
+  Bars  35– 66         root=b6  type=dom7
+  Bars  67– 87         root=4  type=minor
+  Bars  88–108         root=b6  type=sus2
+  Bars 109–112         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       130 notes
+  Lead 2       325 notes
+  Pads         161 notes
+  Rhythm       536 notes
+  Texture      11 notes
+  Bass         624 notes
+  Drums        1626 notes
+
+--- Generation Log ---
+  SONG             Langsam Maschine
+  Form             Subtle A/B
+  Chords           A Dorian  Two chord: I - ♭VII  C, F7, Dm, Fsus2, Am
+  MOT-DRUM-002     Open Pocket beat
+  MOT-BASS-015     Kraftwerk driving bass
+  MOT-PADS-006     Half-bar Breathe
+  MOT-LD1-004      Stepwise sequence
+  MOT-LD2-004      Neu! counter melody
+  MOT-RTHM-001     8th-note Stride
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-008     Phase slip
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — rock fill
+  Bar 003    Section A    chords C F7
+  Bar 003    Lead 1       stepping back
+  Bar 009    Lead 2       stepping back
+  Bar 009    Pads         is back on stage
+  Bar 017    Rhythm       stepping back
+  Bar 018    Texture      stepping back
+  Bar 018    Drum fill    2 beat — funk cross-pattern
+  Bar 025    Pads         stepping back
+  Bar 033    Lead 1       steps into the spotlight
+  Bar 033    Bass         pattern evolving
+  Bar 041    Pads         is back on stage
+  Bar 044    Drum fill    2 beat — funk cross-pattern
+  Bar 047    Drum fill    2 beat — funk cross-pattern
+  Bar 057    Lead 1       stepping back
+  Bar 057    Pads         is back on stage
+  Bar 057    Drum fill    2 beat — funk cross-pattern
+  Bar 058    Texture      steps into the spotlight
+  Bar 065    Rhythm       stepping back
+  Bar 065    Drum fill    2 beat — funk cross-pattern
+  Bar 067    Form         Enter B section — Dm Fsus2
+  Bar 069    Bass         pattern evolving
+  Bar 073    Pads         stepping back
+  Bar 076    Texture      steps into the spotlight
+  Bar 090    Pads         is back on stage
+  Bar 100    Drum fill    2 beat — funk cross-pattern
+  Bar 101    Texture      steps into the spotlight
+  Bar 109    Outro        4 bar cold stop — drum fill ending
+

@@ -1,0 +1,53 @@
+=== Zudio Song Analysis Log ===
+Title:          Polar Aurora
+Generated:      2026-03-23 11:49:02
+Seed:           15235342527440553090
+Style:          Kosmic
+Key:            C#  Mixolydian
+Tempo:          122 BPM
+Bars:           124
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 74         (72 bars)
+  B          Bars  75–122         (48 bars)
+  outro      Bars 123–124         (2 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=power
+  Bars   3– 74         root=1  type=power
+  Bars  75–122         root=1  type=minor
+  Bars 123–124         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       40 notes
+  Lead 2       40 notes
+  Pads         970 notes
+  Rhythm       992 notes
+  Texture      30 notes
+  Bass         773 notes
+  Drums        870 notes
+
+--- Generation Log ---
+  SONG             Polar Aurora
+  Style            Kosmic
+  Form             A - B
+  Chords           C# Mixolydian  Static Drone  C#5, C#m
+  KOS-RTHM-003     Jean Michel Jarre ascending, descending oscillation
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-PADS-002     Vangelis swell
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-010     Probabilistic Moroder Pulse
+  KOS-DRUM-005     Electric Buddha minimal beat
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — rock fill
+  Bar 003    Section A    chords C#5
+  Bar 074    Drum fill    3 beat — crescendo roll
+  Bar 075    Form         Enter B section — C#m
+  Bar 121    Bass         pattern evolving
+  Bar 123    Outro        2 bar fade
+

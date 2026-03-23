@@ -1,0 +1,54 @@
+=== Zudio Song Analysis Log ===
+Title:          Paradoxe IV
+Generated:      2026-03-23 11:47:22
+Seed:           8440231587162846387
+Style:          Kosmic
+Key:            F#  Dorian
+Tempo:          111 BPM
+Bars:           116
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  8         (8 bars)
+  A          Bars   9–112         (104 bars)
+  outro      Bars 113–116         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  8         root=1  type=minor
+  Bars   9–112         root=1  type=minor
+  Bars 113–116         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       35 notes
+  Lead 2       32 notes
+  Pads         884 notes
+  Rhythm       336 notes
+  Texture      28 notes
+  Bass         516 notes
+  Drums        863 notes
+
+--- Generation Log ---
+  SONG             Paradoxe IV
+  Style            Kosmic
+  Form             Steady evolution
+  Chords           F# Dorian  Vangelis two chord pendulum  i - bVI  F#m
+  KOS-RTHM-007     Tangerine Dream pitch drift
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-LEAD-004     Echo melody
+  KOS-PADS-007     Probabilistic gated chord pulse
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-006     Additive dual bass
+  KOS-BASS-008     Hallogallo Lock
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        8 bar cold start — Buddha atmospheric fill
+  Bar 009    Section A    chords F#m
+  Bar 009    Lead 2       steps into the spotlight
+  Bar 010    Lead 1       steps into the spotlight
+  Bar 043    Bass         pattern evolving
+  Bar 078    Bass         pattern evolving
+  Bar 113    Outro        4 bar dissolve
+

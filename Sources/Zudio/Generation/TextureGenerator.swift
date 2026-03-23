@@ -1,17 +1,19 @@
 // TextureGenerator.swift — generation step 9
 // Sparse atmosphere: boundary-weighted events plus occasional one-off colour moments.
-// Register: TEX-001/TEX-004/TEX-005/TEX-006: MIDI 72–108 (high)
-//           TEX-002/TEX-003: MIDI 60–84 (warm mid register for depth and warmth)
+// Register: TEXT-001/TEXT-003–TEXT-008: MIDI 72–108 (high)
+//           TEXT-002: MIDI 60–84 (warm mid register for depth and warmth)
 //
 // Rule catalog:
-//   TEX-001: Sparse — boundary-weighted single scale-tension notes (always active backbone)
-//   TEX-002: Transition Swell — sustained root/fifth at section boundaries, warm register
-//   TEX-003: Drone Anchor — 2-bar root/fifth hold, very quiet, fires ~once per 24 bars (body only)
-//   TEX-004: Shimmer Pair — two notes a maj-7/min-9 apart, off-beat, fires ~once per 10 bars
-//   TEX-005: Breath Release — quiet note on last step of a section's final bar (50% per section end)
-//   TEX-006: High Tension Touch — single scale-tension note, off-beat, fires ~once per 20 bars (body only)
+//   TEXT-001: Sparse — boundary-weighted single scale-tension notes (always active backbone)
+//   TEXT-002: Transition Swell — sustained root/fifth at section boundaries, warm register
+//   TEXT-003: Spatial Sweep — chromatic passing pair between scale tones, ~once per 14 body bars
+//   TEXT-004: Shimmer Hold — single scale tone sustained 4+ bars, very quiet, ~once per 16 bars
+//   TEXT-005: Breath Release — quiet note on last step of a section's final bar (50% per section end)
+//   TEXT-006: High Tension Touch — single scale-tension note, off-beat, fires ~once per 20 bars (body only)
+//   TEXT-007: Pedal Drone — tonic held quietly (vel 28–38) in MIDI 80–96, ~once per 32 body bars
+//   TEXT-008: Phase Slip — two adjacent semitone notes at same step (vel 25–35), ~once per 20 body bars
 //
-// Per song: TEX-001 always active; 1–2 supplementary rules chosen at generation time.
+// Per song: TEXT-001 always active; 1–2 supplementary rules chosen at generation time.
 
 struct TextureGenerator {
     static func generate(
@@ -27,8 +29,9 @@ struct TextureGenerator {
         usedRuleIDs.insert("MOT-TEXT-001")
 
         // Select 1–2 supplementary rules per song
-        let suppCandidates = ["MOT-TEXT-002", "MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005", "MOT-TEXT-006"]
-        let suppWeights:   [Double]  = [0.25,      0.20,      0.25,      0.15,      0.15]
+        let suppCandidates = ["MOT-TEXT-002", "MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005",
+                               "MOT-TEXT-006", "MOT-TEXT-007", "MOT-TEXT-008"]
+        let suppWeights:   [Double]  = [0.16, 0.14, 0.14, 0.12, 0.12, 0.16, 0.16]
         let primaryIdx = rng.weightedPick(suppWeights)
         var activeSupp: Set<String> = [suppCandidates[primaryIdx]]
         if rng.nextDouble() < 0.40 {
@@ -51,7 +54,7 @@ struct TextureGenerator {
             let rootPC  = (keyS + degreeSemitone(entry.chordWindow.chordRoot)) % 12
             let fifthPC = (rootPC + 7) % 12
 
-            // --- TEX-001: Sparse boundary-weighted single note ---
+            // --- TEXT-001: Sparse boundary-weighted single note ---
             let density: Double = (isSectionStart || isSectionEnd) ? 0.45 : 0.05
             if rng.nextDouble() < density {
                 let tensionPool = entry.chordWindow.scaleTensions.sorted()
@@ -68,7 +71,7 @@ struct TextureGenerator {
                 }
             }
 
-            // --- TEX-002: Transition Swell — section boundaries, warm mid register ---
+            // --- TEXT-002: Transition Swell — section boundaries, warm mid register ---
             if activeSupp.contains("MOT-TEXT-002") && (isSectionStart || isSectionEnd) {
                 if rng.nextDouble() < 0.70 {
                     let pc       = rng.nextDouble() < 0.60 ? rootPC : fifthPC
@@ -80,33 +83,40 @@ struct TextureGenerator {
                 }
             }
 
-            // --- TEX-003: Drone Anchor — ~once per 24 bars, body sections only ---
-            if activeSupp.contains("MOT-TEXT-003") && isBodySection && !isSectionEnd {
-                if rng.nextDouble() < (1.0 / 24.0) {
-                    let pc       = rng.nextDouble() < 0.65 ? rootPC : fifthPC
-                    let note     = noteInRange(pc: pc, low: 60, high: 72)
-                    let velocity = UInt8(28 + rng.nextInt(upperBound: 13))
-                    events.append(MIDIEvent(stepIndex: barStart, note: note,
-                                           velocity: velocity, durationSteps: 32))
+            // --- TEXT-003: Motorik Spatial Sweep — chromatic pair between scale tones, ~once per 14 body bars ---
+            // Adapted from KOS-TEXT-003 Spatial Sweep; pairs a scale tone with its chromatic lower neighbour.
+            if activeSupp.contains("MOT-TEXT-003") && isBodySection && rng.nextDouble() < (1.0 / 14.0) {
+                let pool = entry.chordWindow.chordTones.sorted()
+                if pool.count >= 2 {
+                    let loPC    = pool[rng.nextInt(upperBound: pool.count)]
+                    let passPC  = (loPC + 11) % 12   // chromatic lower neighbour
+                    let hiPC    = pool[rng.nextInt(upperBound: pool.count)]
+                    let offBeat = rng.nextInt(upperBound: 8)
+                    let vel     = UInt8(30 + rng.nextInt(upperBound: 16))
+                    events.append(MIDIEvent(stepIndex: barStart + offBeat,     note: noteInRange(pc: passPC, low: 72, high: 104),
+                                           velocity: UInt8(max(22, Int(vel) - 8)), durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: barStart + offBeat + 2, note: noteInRange(pc: loPC,   low: 72, high: 104),
+                                           velocity: vel, durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + offBeat + 6, note: noteInRange(pc: hiPC,   low: 72, high: 104),
+                                           velocity: UInt8(max(22, Int(vel) - 4)), durationSteps: 4))
                 }
             }
 
-            // --- TEX-004: Shimmer Pair — ~once per 10 bars ---
-            if activeSupp.contains("MOT-TEXT-004") && rng.nextDouble() < (1.0 / 10.0) {
-                let interval = rng.nextDouble() < 0.50 ? 11 : 14  // maj-7 or min-9
-                let hiPC     = (rootPC + interval) % 12
-                let loNote   = noteInRange(pc: rootPC, low: 72, high: 96)
-                let hiNote   = noteInRange(pc: hiPC,   low: 72, high: 96)
-                let offBeat  = [6, 10][rng.nextInt(upperBound: 2)]
-                let dur      = 4 + rng.nextInt(upperBound: 3)      // 4–6 steps
-                let vel      = UInt8(35 + rng.nextInt(upperBound: 16))
-                events.append(MIDIEvent(stepIndex: barStart + offBeat, note: loNote,
-                                        velocity: vel, durationSteps: dur))
-                events.append(MIDIEvent(stepIndex: barStart + offBeat, note: hiNote,
-                                        velocity: UInt8(max(30, Int(vel) - 5)), durationSteps: dur))
+            // --- TEXT-004: Motorik Shimmer Hold — single scale tone sustained 4+ bars very quietly ---
+            // Adapted from KOS-TEXT-002 EB Shimmer Hold; here rooted in scale tensions, not chord tones.
+            if activeSupp.contains("MOT-TEXT-004") && isBodySection && rng.nextDouble() < (1.0 / 16.0) {
+                let pool = (entry.chordWindow.scaleTensions.isEmpty
+                            ? entry.chordWindow.chordTones : entry.chordWindow.scaleTensions).sorted()
+                if !pool.isEmpty {
+                    let pc   = pool[rng.nextInt(upperBound: pool.count)]
+                    let note = noteInRange(pc: pc, low: 72, high: 100)
+                    let vel  = UInt8(20 + rng.nextInt(upperBound: 13))
+                    events.append(MIDIEvent(stepIndex: barStart, note: note,
+                                           velocity: vel, durationSteps: 64 + rng.nextInt(upperBound: 17)))
+                }
             }
 
-            // --- TEX-005: Breath Release — last step of a section's final bar ---
+            // --- TEXT-005: Breath Release — last step of a section's final bar ---
             if activeSupp.contains("MOT-TEXT-005") && isSectionEnd && rng.nextDouble() < 0.50 {
                 let note     = noteInRange(pc: rootPC, low: 72, high: 96)
                 let velocity = UInt8(25 + rng.nextInt(upperBound: 11))
@@ -114,7 +124,7 @@ struct TextureGenerator {
                                         velocity: velocity, durationSteps: 2))
             }
 
-            // --- TEX-006: High Tension Touch — ~once per 20 bars, body sections only ---
+            // --- TEXT-006: High Tension Touch — ~once per 20 bars, body sections only ---
             if activeSupp.contains("MOT-TEXT-006") && isBodySection && rng.nextDouble() < (1.0 / 20.0) {
                 let pool = entry.chordWindow.scaleTensions.sorted()
                 if !pool.isEmpty {
@@ -125,6 +135,36 @@ struct TextureGenerator {
                     let vel      = UInt8(35 + rng.nextInt(upperBound: 16))
                     events.append(MIDIEvent(stepIndex: barStart + offBeat, note: note,
                                            velocity: vel, durationSteps: dur))
+                }
+            }
+
+            // --- TEXT-007: Pedal Drone — tonic held quietly, ~once per 32 body bars ---
+            // Motorik reference: constant-tonic undercurrent under moving chord changes.
+            if activeSupp.contains("MOT-TEXT-007") && isBodySection && !isSectionEnd {
+                if rng.nextDouble() < (1.0 / 32.0) {
+                    let note    = noteInRange(pc: keyS, low: 80, high: 96)
+                    let vel     = UInt8(28 + rng.nextInt(upperBound: 11))
+                    events.append(MIDIEvent(stepIndex: barStart, note: note,
+                                           velocity: vel, durationSteps: 32))
+                }
+            }
+
+            // --- TEXT-008: Phase Slip — two adjacent semitone notes at same step, ~once per 20 body bars ---
+            // Cluster reference: very quiet dissonant crunch, Stockhausen-via-Cluster influence.
+            if activeSupp.contains("MOT-TEXT-008") && isBodySection && rng.nextDouble() < (1.0 / 20.0) {
+                let chordPool = entry.chordWindow.chordTones.sorted()
+                if !chordPool.isEmpty {
+                    let loPC    = chordPool[rng.nextInt(upperBound: chordPool.count)]
+                    let hiPC    = (loPC + 1) % 12
+                    let loNote  = noteInRange(pc: loPC, low: 72, high: 96)
+                    let hiNote  = noteInRange(pc: hiPC, low: 72, high: 96)
+                    let offBeat = [4, 8, 12][rng.nextInt(upperBound: 3)]
+                    let vel     = UInt8(25 + rng.nextInt(upperBound: 11))
+                    let dur     = 2 + rng.nextInt(upperBound: 3)
+                    events.append(MIDIEvent(stepIndex: barStart + offBeat, note: loNote,
+                                           velocity: vel, durationSteps: dur))
+                    events.append(MIDIEvent(stepIndex: barStart + offBeat, note: hiNote,
+                                           velocity: UInt8(max(20, Int(vel) - 5)), durationSteps: dur))
                 }
             }
         }

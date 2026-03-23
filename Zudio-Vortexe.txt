@@ -1,0 +1,71 @@
+=== Zudio Song Analysis Log ===
+Title:          Vortexe
+Generated:      2026-03-23 11:49:31
+Seed:           4718222750161897953
+Style:          Kosmic
+Key:            B  Aeolian
+Tempo:          119 BPM
+Bars:           120
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 32         (28 bars)
+  B          Bars  33– 60         (28 bars)
+  B          Bars  61– 88         (28 bars)
+  A          Bars  89–118         (30 bars)
+  outro      Bars 119–120         (2 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=b7  type=quartal
+  Bars   5– 32         root=b7  type=quartal
+  Bars  33– 46         root=1  type=sus4
+  Bars  47– 60         root=b7  type=quartal
+  Bars  61– 88         root=4  type=sus4
+  Bars  89–118         root=b7  type=sus4
+  Bars 119–120         root=1  type=sus4
+
+--- Note Counts Per Track ---
+  Lead 1       43 notes
+  Lead 2       44 notes
+  Pads         812 notes
+  Rhythm       912 notes
+  Texture      87 notes
+  Bass         345 notes
+  Drums        821 notes
+
+--- Generation Log ---
+  SONG             Vortexe
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           B Aeolian  Stacked fourths  A4th, Bsus4, A4th, Esus4, Asus4, Bsus4
+  KOS-RTHM-006     Kraftwerk locked pulse
+  KOS-LEAD-002     Eno floating tones
+  KOS-LEAD-002     Eno floating tones
+  KOS-PADS-005     Stacked fourths
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-004     Loscil aquatic shimmer
+  KOS-BASS-002     Root-Fifth Slow Walk
+  KOS-BASS-006     Additive dual bass
+  KOS-DRUM-005     Electric Buddha minimal beat
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords A
+  Bar 033    Form         Enter B section — Bsus4 A
+  Bar 033    Bass         pattern evolving
+  Bar 033    Rhythm       octave shift
+  Bar 045    Bass         pattern evolving
+  Bar 061    Form         Enter B section again — Esus4
+  Bar 061    Bass         pattern evolving
+  Bar 061    Rhythm       back to original
+  Bar 061    Rhythm       octave shift
+  Bar 078    Lead 2       stepping back
+  Bar 088    Drum fill    3 beat — crescendo roll
+  Bar 089    Form         Return to A section — Asus4
+  Bar 089    Bass         pattern evolving
+  Bar 089    Rhythm       back to original
+  Bar 117    Bass         pattern evolving
+  Bar 119    Outro        2 bar cold stop — drum fill ending
+

@@ -1,0 +1,74 @@
+=== Zudio Song Analysis Log ===
+Title:          Solaxe
+Generated:      2026-03-23 10:05:05
+Seed:           14916276614925994725
+Style:          Kosmic
+Key:            D  Dorian
+Tempo:          119 BPM
+Bars:           120
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 36         (34 bars)
+  preRamp    Bars  37– 43         (7 bars)
+  bridgeMelody Bars  44– 55         (12 bars)
+  postRamp   Bars  56– 62         (7 bars)
+  B          Bars  63–104         (42 bars)
+  outro      Bars 105–120         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=sus2
+  Bars   3– 36         root=1  type=sus2
+  Bars  37– 43         root=1  type=minor
+  Bars  44– 55         root=1  type=minor
+  Bars  56– 62         root=1  type=minor
+  Bars  63– 83         root=1  type=power
+  Bars  84–104         root=1  type=minor
+  Bars 105–120         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       233 notes
+  Lead 2       45 notes
+  Pads         268 notes
+  Rhythm       312 notes
+  Texture      67 notes
+  Bass         654 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Solaxe
+  Style            Kosmic
+  Form             A - B + bridge
+  Chords           D Dorian  Static Drone  Dsus2, Dm, D5, Dm
+  KOS-RTHM-003     Jean Michel Jarre ascending, descending oscillation
+  KOS-LEAD-002     Eno floating tones
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-003     Steve Roach unsync layers
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-003     Spatial Sweep — chromatic passing
+  KOS-BASS-010     Probabilistic Moroder Pulse
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar fade in
+  Bar 003    Section A    chords Dsus2
+  Bar 009    Lead 1       steps into the spotlight
+  Bar 009    Lead 2       stepping back
+  Bar 009    Pads         is back on stage
+  Bar 009    Rhythm       stepping back
+  Bar 025    Lead 1       steps into the spotlight
+  Bar 025    Lead 2       steps into the spotlight
+  Bar 037    Form         Transition
+  Bar 041    Lead 2       steps into the spotlight
+  Bar 044    Form         Melodic bridge
+  Bar 044    Rhythm       stepping back
+  Bar 056    Form         Returning to A section
+  Bar 057    Lead 2       stepping back
+  Bar 063    Form         Enter B section — D5 Dm
+  Bar 065    Rhythm       is back on stage
+  Bar 073    Lead 2       steps into the spotlight
+  Bar 097    Lead 1       stepping back
+  Bar 105    Outro        16 bar cold stop — drum fill ending
+

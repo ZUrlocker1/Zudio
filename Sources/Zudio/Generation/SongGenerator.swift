@@ -566,7 +566,7 @@ struct SongGenerator {
 
         // Texture
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: textureRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: textureRuleDescription(ruleID)))
         }
         if texRules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-TEXT-001",
@@ -742,14 +742,10 @@ struct SongGenerator {
         case "MOT-PADS-001": return "Harmonia sustained notes"
         case "MOT-PADS-002": return "Power Drone"
         case "MOT-PADS-003": return "Pulsed"
-        case "MOT-PADS-004": return "Dusseldorf sparse notes"
-        case "MOT-PADS-005": return "Arpeggio"
-        case "MOT-PADS-006": return "Stabs"
-        case "MOT-PADS-007": return "Harmonia charleston"
-        case "MOT-PADS-008": return "16th Chop"
-        case "MOT-PADS-009": return "Quarter Pump"
-        case "MOT-PADS-010": return "Half-bar Breathe"
-        case "MOT-PADS-011": return "Backbeat Stabs"
+        case "MOT-PADS-004": return "Stabs"
+        case "MOT-PADS-005": return "Harmonia charleston"
+        case "MOT-PADS-006": return "Half-bar Breathe"
+        case "MOT-PADS-007": return "Backbeat Stabs"
         default:             return ruleID
         }
     }
@@ -770,10 +766,12 @@ struct SongGenerator {
         switch ruleID {
         case "MOT-TEXT-001": return "Cluster sparse"
         case "MOT-TEXT-002": return "Transition swell"
-        case "MOT-TEXT-003": return "Harmonia drone anchor"
-        case "MOT-TEXT-004": return "Shimmer pair"
+        case "MOT-TEXT-003": return "Spatial sweep"
+        case "MOT-TEXT-004": return "Shimmer hold"
         case "MOT-TEXT-005": return "Eno Cluster breath release"
         case "MOT-TEXT-006": return "High-tension touch"
+        case "MOT-TEXT-007": return "Pedal drone"
+        case "MOT-TEXT-008": return "Phase slip"
         // Kosmic texture rules
         case "KOS-TEXT-001": return "Orbital looping motif"
         case "KOS-TEXT-002": return "EB Shimmer Hold"
@@ -826,6 +824,7 @@ struct SongGenerator {
         case "KOS-PADS-005":  return "Stacked fourths"
         case "KOS-PADS-006":  return "Electric Buddha cloud shimmer"
         case "KOS-PADS-007":  return "Probabilistic gated chord pulse"
+        case "KOS-PADS-008":  return "bIII colour chord layer"
         default:              return ruleID
         }
     }
@@ -883,9 +882,11 @@ struct SongGenerator {
     /// Rule IDs introduced recently — shown with a " *" suffix in the status log.
     /// Capped at 6; retire oldest when adding new ones.
     private static let newRuleIDs: Set<String> = [
-        "KOS-RTHM-009", "KOS-RTHM-010",
-        "KOS-TEXT-004",
-        "KOS-BASS-013",
+        "KOS-TEXT-004",     // Loscil aquatic shimmer (Kosmic)
+        "MOT-TEXT-003",     // Motorik spatial sweep
+        "MOT-TEXT-004",     // Motorik shimmer hold
+        "MOT-TEXT-007",     // Pedal drone
+        "MOT-TEXT-008",     // Phase slip
     ]
 
     private static func ruleTag(_ ruleID: String, testMode: Bool) -> String {
@@ -1381,6 +1382,8 @@ struct SongGenerator {
                 }
             } else {
                 // Path B: fingerprint inference (Motorik and patterns without explicit tracking)
+                // Fires at most once per body section — oscillating patterns like KOS-BASS-002
+                // (root ↔ fifth every 4 bars) would otherwise trigger on every window change.
                 let bassEvents = trackEvents[kTrackBass]
                 func bassFP(fromBar: Int) -> Set<UInt8> {
                     let windowEnd = min(fromBar + 4, totalBars)
@@ -1394,6 +1397,7 @@ struct SongGenerator {
                 }
                 var prevFP: Set<UInt8>? = nil
                 var prevCount: Int = 0
+                var lastEvolvedSectionStart: Int = -1
                 for bar in stride(from: 0, to: outroStartBar, by: 4) {
                     guard let sec = structure.section(atBar: bar),
                           sec.label == .A || sec.label == .B else { continue }
@@ -1411,9 +1415,10 @@ struct SongGenerator {
                         let pitchChanged = jaccard < adaptiveThreshold || (prev.count <= 2 && !newClasses.isEmpty)
                         let densityChanged = prevCount > 0 &&
                             abs(count - prevCount) > max(1, prevCount / 2)
-                        if pitchChanged || densityChanged {
+                        if (pitchChanged || densityChanged) && sec.startBar != lastEvolvedSectionStart {
                             fireBar(bar, tag: "Bass", desc: "pattern evolving")
                             lastEvolvedBar = bar
+                            lastEvolvedSectionStart = sec.startBar
                         }
                     }
                     if !fp.isEmpty {

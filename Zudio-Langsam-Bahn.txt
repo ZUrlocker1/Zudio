@@ -1,0 +1,74 @@
+=== Zudio Song Analysis Log ===
+Title:          Langsam Bahn
+Generated:      2026-03-23 14:30:09
+Seed:           8905213709699257479
+Style:          Motorik
+Key:            E  Aeolian
+Tempo:          120 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5–120         (116 bars)
+  outro      Bars 121–124         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=4  type=min7
+  Bars   5– 62         root=4  type=min7
+  Bars  63–120         root=2  type=sus2
+  Bars 121–124         root=1  type=sus2
+
+--- Note Counts Per Track ---
+  Lead 1       163 notes
+  Lead 2       37 notes
+  Pads         368 notes
+  Rhythm       543 notes
+  Texture      25 notes
+  Bass         301 notes
+  Drums        1768 notes
+
+--- Generation Log ---
+  SONG             Langsam Bahn
+  Form             Steady A section
+  Chords           E Aeolian  Minor loop: i - VII  Am7, F#sus2, Esus2
+  MOT-DRUM-002     Open Pocket beat
+  MOT-BASS-001     Root Anchor
+  MOT-PADS-001     Harmonia sustained notes
+  MOT-PADS-005     Harmonia charleston
+  MOT-LD1-001      Neu! motif first
+  MOT-LD2-001      Counter-response
+  MOT-RTHM-001     8th-note Stride
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-002     Transition swell
+  MOT-TEXT-004     Shimmer hold
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords Am7 F#sus2
+  Bar 017    Lead 1       steps into the spotlight
+  Bar 017    Rhythm       stepping back
+  Bar 017    Bass         pattern evolving
+  Bar 024    Lead 2       stepping back
+  Bar 025    Texture      stepping back
+  Bar 033    Pads         stepping back
+  Bar 033    Rhythm       is back on stage
+  Bar 034    Drum fill    3 beat — tom cascade — bass locked in
+  Bar 045    Drum fill    2 beat — Bonham tom cascade
+  Bar 049    Lead 2       stepping back
+  Bar 049    Pads         is back on stage
+  Bar 052    Texture      steps into the spotlight
+  Bar 060    Drum fill    2 beat — Bonham tom cascade
+  Bar 065    Drum fill    2 beat — funk cross-pattern
+  Bar 066    Lead 2       steps into the spotlight
+  Bar 068    Drum fill    2 beat — funk cross-pattern
+  Bar 080    Lead 1       stepping back
+  Bar 080    Drum fill    2 beat — Bonham tom cascade
+  Bar 081    Rhythm       stepping back
+  Bar 082    Texture      stepping back
+  Bar 083    Lead 2       stepping back
+  Bar 097    Rhythm       is back on stage
+  Bar 113    Lead 1       steps into the spotlight
+  Bar 113    Texture      steps into the spotlight
+  Bar 121    Outro        4 bar dissolve
+

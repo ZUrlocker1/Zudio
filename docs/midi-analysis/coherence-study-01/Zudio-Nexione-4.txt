@@ -1,0 +1,83 @@
+=== Zudio Song Analysis Log ===
+Title:          Nexione
+Generated:      2026-03-23 10:07:55
+Seed:           48791109850648303
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          119 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 28         (24 bars)
+  B          Bars  29– 52         (24 bars)
+  B          Bars  53– 76         (24 bars)
+  A          Bars  77–108         (32 bars)
+  outro      Bars 109–124         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=minor
+  Bars   5– 28         root=1  type=minor
+  Bars  29– 52         root=1  type=minor
+  Bars  53– 76         root=1  type=minor
+  Bars  77–108         root=1  type=minor
+  Bars 109–124         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       162 notes
+  Lead 2       34 notes
+  Pads         382 notes
+  Rhythm       2190 notes
+  Texture      28 notes
+  Bass         504 notes
+  Drums        1557 notes
+
+--- Generation Log ---
+  SONG             Nexione
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           D Aeolian  Static Drone  Dm
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-002     Eno floating tones
+  KOS-PADS-003     Steve Roach unsync layers
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-006     Additive dual bass
+  KOS-BASS-008     Hallogallo Lock
+  KOS-DRUM-006     Electric Buddha restrained
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — Bonham fill
+  Bar 005    Section A    chords Dm
+  Bar 005    Drums        switching to ride
+  Bar 017    Lead 1       steps into the spotlight
+  Bar 021    Drums        back on hi-hat
+  Bar 022    Drums        switching to ride
+  Bar 027    Drums        back on hi-hat
+  Bar 029    Form         Enter B section — Dm
+  Bar 030    Drums        switching to ride
+  Bar 031    Drums        back on hi-hat
+  Bar 033    Drums        switching to ride
+  Bar 033    Lead 1       stepping back
+  Bar 039    Bass         pattern evolving
+  Bar 041    Drums        back on hi-hat
+  Bar 046    Drums        switching to ride
+  Bar 049    Lead 1       steps into the spotlight
+  Bar 053    Form         Enter B section again — Dm
+  Bar 062    Drums        back on hi-hat
+  Bar 065    Drums        switching to ride
+  Bar 065    Lead 1       stepping back
+  Bar 074    Lead 2       stepping back
+  Bar 074    Bass         pattern evolving
+  Bar 075    Drums        back on hi-hat
+  Bar 077    Form         Return to A section — Dm
+  Bar 081    Drums        switching to ride
+  Bar 081    Lead 1       steps into the spotlight
+  Bar 089    Drums        back on hi-hat
+  Bar 091    Drums        switching to ride
+  Bar 097    Rhythm       stepping back
+  Bar 105    Drum fill    3 beat — tom cascade
+  Bar 109    Outro        16 bar dissolve
+

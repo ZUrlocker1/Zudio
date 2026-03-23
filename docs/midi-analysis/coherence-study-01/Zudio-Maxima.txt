@@ -1,0 +1,59 @@
+=== Zudio Song Analysis Log ===
+Title:          Maxima
+Generated:      2026-03-23 10:04:45
+Seed:           9373872146394508616
+Style:          Kosmic
+Key:            D  Dorian
+Tempo:          120 BPM
+Bars:           128
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3–112         (110 bars)
+  outro      Bars 113–128         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=b6  type=major
+  Bars   3–112         root=b6  type=major
+  Bars 113–128         root=1  type=major
+
+--- Note Counts Per Track ---
+  Lead 1       37 notes
+  Lead 2       47 notes
+  Pads         354 notes
+  Rhythm       970 notes
+  Texture      83 notes
+  Bass         535 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Maxima
+  Style            Kosmic
+  Form             Steady evolution
+  Chords           D Dorian  Vangelis two chord pendulum  i - bVI  A#, D
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-003     Steve Roach unsync layers
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-003     Spatial Sweep — chromatic passing
+  KOS-BASS-006     Additive dual bass
+  KOS-BASS-008     Hallogallo Lock
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar fade in
+  Bar 003    Section A    chords Bb
+  Bar 017    Lead 2       steps into the spotlight
+  Bar 033    Lead 2       stepping back
+  Bar 039    Bass         pattern evolving
+  Bar 049    Rhythm       stepping back
+  Bar 053    Lead 2       steps into the spotlight
+  Bar 065    Rhythm       is back on stage
+  Bar 076    Bass         pattern evolving
+  Bar 081    Rhythm       stepping back
+  Bar 097    Rhythm       is back on stage
+  Bar 113    Outro        16 bar dissolve
+

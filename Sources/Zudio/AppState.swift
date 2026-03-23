@@ -39,7 +39,14 @@ final class AppState: ObservableObject {
     // Fired on generateNew() and on the manual Reset button.
     @Published var defaultsResetToken: Int = 0
 
-    func resetTrackDefaults() { instrumentOverrides = [:]; songGenerationCount = 0; defaultsResetToken += 1 }
+    func resetTrackDefaults() {
+        instrumentOverrides = [:]
+        songGenerationCount = 0
+        keyOverride   = nil
+        tempoOverride = nil
+        moodOverride  = nil
+        defaultsResetToken += 1
+    }
 
     // MARK: - UI selectors (nil = Auto)
 
@@ -125,15 +132,15 @@ final class AppState: ObservableObject {
         switch trackIndex {
         case kTrackLead1:   return c ? ["Ocarina","Flute","Whistle","Calliope Lead","Fifths Lead"]
                                      : ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr","Flute"]
-        case kTrackLead2:   return c ? ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
-                                     : ["Brightness","Vibraphone","Marimba","Bell/Pluck","Soft Brass","Ocarina"]
+        case kTrackLead2:   return c ? ["Brightness","Warm Pad","Halo Pad","New Age Pad","Soft Brass"]
+                                     : ["Brightness","Vibraphone","Marimba","Bell/Pluck","Ocarina"]
         case kTrackPads:    return c ? ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
                                      : ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]
         case kTrackRhythm:  return c ? ["FX Crystal","Square Lead","Vibraphone","Elec Piano 2","Church Organ"]
                                      : ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Electric Piano","Muted Guitar","Tremolo Strings","Mono Synth"]
         case kTrackTexture: return c ? ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
                                      : ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
-        case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass","Cello"]
+        case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass"]
                                      : ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
         case kTrackDrums:   return c ? ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
                                      : ["Rock Kit","808 Kit","Brush Kit"]
@@ -337,7 +344,15 @@ final class AppState: ObservableObject {
         var newEntries: [GenerationLogEntry] = []
         for s in (lastEmittedStep + 1)...step {
             if let entries = annotations[s] {
-                newEntries.append(contentsOf: entries)
+                let bar = s / 16 + 1
+                let barTag = String(format: "Bar %03d", bar)
+                let prefixed = entries.map { e -> GenerationLogEntry in
+                    let desc = e.tag.isEmpty
+                        ? e.description
+                        : "\(e.tag.trimmingCharacters(in: .whitespaces))  \(e.description)"
+                    return GenerationLogEntry(tag: barTag, description: desc, isTitle: e.isTitle)
+                }
+                newEntries.append(contentsOf: prefixed)
             }
         }
         if !newEntries.isEmpty {
@@ -438,17 +453,19 @@ final class AppState: ObservableObject {
                 self.soloState = Array(repeating: false, count: 7)
                 self.playback.muteState = self.muteState
                 self.playback.soloState = self.soloState
-                // Reflect key/mood back so the user can see what was picked.
-                // BPM resets to Auto so the next generation is free to pick a fresh tempo.
-                self.keyOverride   = state.frame.key
+                // Keep all overrides at Auto after generation — key/mood/tempo are shown in
+                // the status log header. Writing them back here caused subsequent generations
+                // to treat the randomly-picked values as user-forced overrides.
+                self.keyOverride   = nil
                 self.tempoOverride = nil
-                self.moodOverride  = state.frame.mood
+                self.moodOverride  = nil
                 // Stop any in-progress playback cleanly before swapping in the new song.
                 // This prevents the old scheduler from firing events against the new song state
                 // during the brief window between load() and seek(), which caused desync.
                 let wasPlaying = self.playback.isPlaying
                 self.playback.stop()
-                self.playback.kosmicStyle = self.selectedStyle == .kosmic
+                self.playback.kosmicStyle  = self.selectedStyle == .kosmic
+                self.playback.motorikStyle = self.selectedStyle == .motorik
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 // Reset instruments + effects BEFORE play so setProgram() doesn't race
@@ -494,7 +511,8 @@ final class AppState: ObservableObject {
                 playback.seek(toStep: 0)
                 visibleBarOffset = 0
             }
-            playback.kosmicStyle = selectedStyle == .kosmic
+            playback.kosmicStyle  = selectedStyle == .kosmic
+            playback.motorikStyle = selectedStyle == .motorik
             playback.play()
         }
     }
@@ -602,6 +620,7 @@ final class AppState: ObservableObject {
             let url = try MIDIFileExporter.export(song)
             lastSaveURL = url
             print("MIDI saved: \(url.path)")
+            try? SongLogExporter.export(song, midiURL: url)
             appendToLog([
                 GenerationLogEntry(tag: "FILE", description: "Saved as MIDI \(url.lastPathComponent)")
             ])

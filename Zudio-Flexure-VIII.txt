@@ -1,0 +1,71 @@
+=== Zudio Song Analysis Log ===
+Title:          Flexure VIII
+Generated:      2026-03-23 11:48:50
+Seed:           17006419204505461817
+Style:          Kosmic
+Key:            F  Mixolydian
+Tempo:          119 BPM
+Bars:           128
+Mood:           Free
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 32         (28 bars)
+  B          Bars  33– 60         (28 bars)
+  B          Bars  61– 88         (28 bars)
+  A          Bars  89–124         (36 bars)
+  outro      Bars 125–128         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=sus4
+  Bars   5– 32         root=1  type=sus4
+  Bars  33– 46         root=1  type=sus4
+  Bars  47– 60         root=1  type=sus4
+  Bars  61– 88         root=1  type=sus4
+  Bars  89–124         root=1  type=sus4
+  Bars 125–128         root=1  type=sus4
+
+--- Note Counts Per Track ---
+  Lead 1       356 notes
+  Lead 2       40 notes
+  Pads         328 notes
+  Rhythm       413 notes
+  Texture      31 notes
+  Bass         691 notes
+  Drums        1246 notes
+
+--- Generation Log ---
+  SONG             Flexure VIII
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           F Mixolydian  Suspended Resolution — sus4 - minor  Fsus4
+  KOS-RTHM-009     Craven Faults phase drift
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-011     Kraftwerk driving bass
+  KOS-DRUM-002     Basic Channel minimal dub
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar lock in
+  Bar 005    Section A    chords Fsus4
+  Bar 017    Pads         stepping back
+  Bar 017    Bass         pattern evolving
+  Bar 033    Form         Enter B section — Fsus4 Fsus4
+  Bar 033    Pads         is back on stage
+  Bar 033    Bass         pattern evolving
+  Bar 049    Bass         pattern evolving
+  Bar 061    Form         Enter B section again — Fsus4
+  Bar 061    Bass         pattern evolving
+  Bar 065    Pads         stepping back
+  Bar 081    Pads         is back on stage
+  Bar 081    Bass         pattern evolving
+  Bar 089    Form         Return to A section — Fsus4
+  Bar 097    Bass         pattern evolving
+  Bar 113    Pads         stepping back
+  Bar 113    Bass         pattern evolving
+  Bar 125    Outro        4 bar fade
+

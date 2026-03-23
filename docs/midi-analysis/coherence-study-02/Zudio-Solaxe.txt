@@ -1,0 +1,68 @@
+=== Zudio Song Analysis Log ===
+Title:          Solaxe
+Generated:      2026-03-23 11:03:01
+Seed:           12855985252404826968
+Style:          Kosmic
+Key:            E  Dorian
+Tempo:          120 BPM
+Bars:           128
+Mood:           Free
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 38         (36 bars)
+  bridge     Bars  39– 42         (4 bars)
+  B          Bars  43– 78         (36 bars)
+  A          Bars  79–124         (46 bars)
+  outro      Bars 125–128         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=sus4
+  Bars   3– 38         root=1  type=sus4
+  Bars  39– 42         root=1  type=minor
+  Bars  43– 60         root=1  type=sus4
+  Bars  61– 78         root=1  type=minor
+  Bars  79–124         root=1  type=sus4
+  Bars 125–128         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       43 notes
+  Lead 2       70 notes
+  Pads         349 notes
+  Rhythm       499 notes
+  Texture      90 notes
+  Bass         71 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Solaxe
+  Style            Kosmic
+  Form             A - B - A + bridge
+  Chords           E Dorian  Suspended Resolution — sus4 - minor  Esus4, Em, Esus4, Em, Esus4, Em
+  KOS-RTHM-009     Craven Faults phase drift
+  KOS-LEAD-002     Eno floating tones
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-TEXT-004     Loscil aquatic shimmer
+  KOS-BASS-001     Berlin School drone
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — drum fill
+  Bar 003    Section A    chords Esus4
+  Bar 014    Lead 2       stepping back
+  Bar 017    Pads         stepping back
+  Bar 021    Bass         pattern evolving
+  Bar 033    Bass         pattern evolving
+  Bar 039    Form         Ascending bridge
+  Bar 043    Form         Enter B section — Esus4 Em
+  Bar 043    Bass         pattern evolving
+  Bar 047    Bass         pattern evolving
+  Bar 057    Bass         pattern evolving
+  Bar 069    Bass         pattern evolving
+  Bar 079    Form         Return to A section — Esus4
+  Bar 093    Bass         pattern evolving
+  Bar 117    Bass         pattern evolving
+  Bar 125    Outro        4 bar fade
+

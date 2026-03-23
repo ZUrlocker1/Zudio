@@ -1,0 +1,82 @@
+=== Zudio Song Analysis Log ===
+Title:          Cycle 2
+Generated:      2026-03-23 14:38:38
+Seed:           16616247754754612475
+Style:          Motorik
+Key:            B  Mixolydian
+Tempo:          132 BPM
+Bars:           132
+Mood:           Bright
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 36         (32 bars)
+  B          Bars  37–128         (92 bars)
+  outro      Bars 129–132         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=5  type=minor
+  Bars   5– 20         root=5  type=minor
+  Bars  21– 36         root=4  type=min7
+  Bars  37– 82         root=5  type=minor
+  Bars  83–128         root=b3  type=major
+  Bars 129–132         root=1  type=sus2
+
+--- Note Counts Per Track ---
+  Lead 1       182 notes
+  Lead 2       84 notes
+  Pads         229 notes
+  Rhythm       375 notes
+  Texture      18 notes
+  Bass         690 notes
+  Drums        2981 notes
+
+--- Generation Log ---
+  SONG             Cycle 2
+  Form             Subtle A/B
+  Chords           B Mixolydian  Two chord: I - ♭VII  F#m, Em7, F#m, D, Bsus2
+  MOT-DRUM-004     Mostly Motorik
+  MOT-BASS-013     Kraftwerk robotic bass
+  MOT-PADS-007     Backbeat Stabs
+  MOT-LD1-001      Neu! motif first
+  MOT-LD2-006      Neu! harmony
+  MOT-RTHM-001     8th-note Stride
+  MOT-RTHM-004     2-bar Melodic Riff
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-005     Eno Cluster breath release
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords F#m Em7
+  Bar 006    Texture      stepping back
+  Bar 009    Bass         pattern evolving
+  Bar 012    Drum fill    3 beat — alternating toms
+  Bar 013    Lead 1       steps into the spotlight
+  Bar 013    Lead 2       steps into the spotlight
+  Bar 017    Rhythm       stepping back
+  Bar 029    Texture      stepping back
+  Bar 032    Drum fill    2 beat — funk cross-pattern
+  Bar 033    Lead 1       stepping back
+  Bar 033    Lead 2       steps into the spotlight
+  Bar 033    Pads         stepping back
+  Bar 033    Rhythm       is back on stage
+  Bar 037    Form         Enter B section — F#m D
+  Bar 037    Bass         pattern evolving
+  Bar 037    Rhythm       rhythm pattern changes
+  Bar 049    Lead 1       steps into the spotlight
+  Bar 079    Drum fill    2 beat — funk cross-pattern
+  Bar 080    Texture      steps into the spotlight
+  Bar 081    Lead 2       stepping back
+  Bar 081    Pads         is back on stage
+  Bar 097    Lead 1       stepping back
+  Bar 097    Pads         stepping back
+  Bar 100    Texture      steps into the spotlight
+  Bar 113    Lead 1       steps into the spotlight
+  Bar 113    Lead 2       steps into the spotlight
+  Bar 113    Rhythm       stepping back
+  Bar 113    Drum fill    2 beat — funk cross-pattern
+  Bar 117    Drum fill    2 beat — funk cross-pattern
+  Bar 128    Texture      steps into the spotlight
+  Bar 128    Drum fill    2 beat — Bonham tom cascade
+  Bar 129    Outro        4 bar fade
+

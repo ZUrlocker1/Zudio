@@ -38,11 +38,12 @@ struct TrackRowView: View {
         case kTrackLead2:
             if isKosmic {
                 return [.init(name:"Brightness",   program:100), .init(name:"Warm Pad",       program:89),
-                        .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88)]
+                        .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88),
+                        .init(name:"Soft Brass",   program:56)]
             }
             return [.init(name:"Brightness",     program:100), .init(name:"Vibraphone",      program:11),
                     .init(name:"Marimba",          program:12), .init(name:"Bell/Pluck",      program:14),
-                    .init(name:"Soft Brass",        program:56), .init(name:"Ocarina",        program:79)]
+                    .init(name:"Ocarina",          program:79)]
         case kTrackPads:
             if isKosmic {
                 return [.init(name:"Choir Aahs",   program:52), .init(name:"String Ensemble", program:48),
@@ -74,8 +75,7 @@ struct TrackRowView: View {
         case kTrackBass:
             if isKosmic {
                 return [.init(name:"Moog Bass",    program:39), .init(name:"Synth Bass 1",   program:38),
-                        .init(name:"Lead Bass",    program:87), .init(name:"Fretless Bass",  program:35),
-                        .init(name:"Cello",        program:42)]
+                        .init(name:"Lead Bass",    program:87), .init(name:"Fretless Bass",  program:35)]
             }
             return [.init(name:"Moog Bass",       program:39), .init(name:"Lead Bass",      program:87),
                     .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]

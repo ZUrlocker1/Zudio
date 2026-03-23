@@ -1,0 +1,314 @@
+========================================================================
+ZUDIO MOTORIK — STUDY 01 MIDI ANALYSIS
+Songs: 10   (generated 2026-03-23)
+========================================================================
+
+── 1. SONG OVERVIEW ──────────────────────────────────────────────────
+
+  B-Loop                  B   Dorian       150 BPM  120 bars  Dream
+    intro(4) → A(48) → B(64) → outro(4)
+  E-Space                 E   Dorian       145 BPM  120 bars  Bright
+    intro(2) → A(48) → B(62) → outro(8)
+  Fahrt-Maschine          A   Dorian       133 BPM  132 bars  Deep
+    intro(2) → A(122) → outro(8)
+  Fahrt-Punkt             A   Dorian       148 BPM  160 bars  Dream
+    intro(2) → A(64) → B(86) → outro(8)
+  Frei-Licht              G   Dorian       141 BPM  104 bars  Dream
+    intro(4) → A(92) → outro(8)
+  Gross-Lauf              G   Dorian       132 BPM  96 bars  Bright
+    intro(4) → A(48) → B(36) → outro(8)
+  Leuchtet-Zeit           A   Mixolydian   130 BPM  112 bars  Free
+    intro(4) → A(64) → B(36) → outro(8)
+  Space-5                 B   Dorian       138 BPM  120 bars  Deep
+    intro(2) → A(32) → B(82) → outro(4)
+  TagNacht                E   Aeolian      133 BPM  100 bars  Deep
+    intro(4) → A(64) → B(28) → outro(4)
+  ZeitLicht               F#  Aeolian      139 BPM  148 bars  Deep
+    intro(2) → A(138) → outro(8)
+
+── 2. RULE FREQUENCY ─────────────────────────────────────────────────
+
+  MOT-PADS-004                ██████████    10/10  ← ALL SONGS (unconditional?)
+  MOT-TEXT-001                ██████████    10/10  ← ALL SONGS (unconditional?)
+  MOT-DRUM-001                ████████      8/10
+  MOT-LD2-004                 ██████        6/10
+  MOT-PADS-007                ██████        6/10
+  MOT-RTHM-006                █████         5/10
+  MOT-TEXT-002                █████         5/10
+  MOT-TEXT-005                ████          4/10
+  MOT-TEXT-006                ████          4/10
+  MOT-LD1-003                 ████          4/10
+  MOT-PADS-003                ███           3/10
+  MOT-RTHM-002                ███           3/10
+  MOT-BASS-001                ███           3/10
+  MOT-RTHM-001                ███           3/10
+  MOT-PADS-001                ███           3/10
+  MOT-TEXT-004                ███           3/10
+  MOT-LD1-001                 ███           3/10
+  MOT-RTHM-003                ██            2/10
+  MOT-LD1-002                 ██            2/10
+  MOT-LD2-006                 ██            2/10
+  MOT-BASS-006                ██            2/10
+  MOT-RTHM-004                ██            2/10
+  MOT-BASS-004                █             1/10
+  MOT-LD1-005                 █             1/10
+  MOT-PADS-006                █             1/10
+  MOT-LD2-005                 █             1/10
+  MOT-RTHM-005                █             1/10
+  MOT-BASS-008                █             1/10
+  MOT-LD2-003                 █             1/10
+  MOT-TEXT-003                █             1/10
+  MOT-DRUM-002                █             1/10
+  MOT-BASS-015                █             1/10
+  MOT-DRUM-004                █             1/10
+  MOT-BASS-013                █             1/10
+  MOT-PADS-002                █             1/10
+  MOT-BASS-009                █             1/10
+
+── 3. NOTE COUNTS PER TRACK ──────────────────────────────────────────
+
+  Song                     Lead1   Lead2    Pads  Rhythm  Texture    Bass   Drums
+  --------------------------------------------------------------------
+  B-Loop                     184     483     232     315      19     337    2314
+  E-Space                     29     156     465     367      19     394    2386 ←sparse
+  Fahrt-Maschine             203     237     214     296      25     883    2370
+  Fahrt-Punkt                227      61     421     684      49     523    3084
+  Frei-Licht                  16     267     609     253      15     238    1840 ←sparse
+  Gross-Lauf                 103     318     192     272      12     283    1844
+  Leuchtet-Zeit              139     397     212     243      15     501    1623
+  Space-5                     27     387     832     509      14     414    2371 ←sparse
+  TagNacht                   196     122     256     227       9     469    2256
+  ZeitLicht                   25     472     511     416      49     799    2707 ←sparse
+
+── 4. NOTES/BAR OVERALL ─────────────────────────────────────────────
+
+  Song                     Lead1   Lead2    Pads  Rhythm    Bass   Drums
+  --------------------------------------------------------------
+  B-Loop                     1.5     4.0     1.9     2.6     2.8    19.3
+  E-Space                    0.2     1.3     3.9     3.1     3.3    19.9
+  Fahrt-Maschine             1.5     1.8     1.6     2.2     6.7    18.0
+  Fahrt-Punkt                1.4     0.4     2.6     4.3     3.3    19.3
+  Frei-Licht                 0.2     2.6     5.9     2.4     2.3    17.7
+  Gross-Lauf                 1.1     3.3     2.0     2.8     2.9    19.2
+  Leuchtet-Zeit              1.2     3.5     1.9     2.2     4.5    14.5
+  Space-5                    0.2     3.2     6.9     4.2     3.5    19.8
+  TagNacht                   2.0     1.2     2.6     2.3     4.7    22.6
+  ZeitLicht                  0.2     3.2     3.5     2.8     5.4    18.3
+
+  Motorik target: Drums 4-8/bar (steady Apache),  Bass 2-4/bar,  Lead1 1-4/bar
+  Pads/Texture high density may create clutter against the Apache beat
+
+── 5. CONSONANCE RATES (fraction of notes in active mode's scale) ────
+
+  Song                      Lead1    Lead2     Pads     Bass   Rhythm  Texture
+  --------------------------------------------------------------------
+  B-Loop                    96.2%    92.3%    79.3%    88.4%    89.2%    94.7% ←bass
+  E-Space                  100.0%    76.3%   100.0%    95.2%   100.0%   100.0%
+  Fahrt-Maschine           100.0%   100.0%   100.0%   100.0%   100.0%    84.0%
+  Fahrt-Punkt              100.0%    88.5%    78.6%    78.0%    82.0%    89.8% ←bass
+  Frei-Licht               100.0%   100.0%    78.7%   100.0%   100.0%   100.0%
+  Gross-Lauf                83.5%    88.1%    84.4%    87.3%    75.4%   100.0% ←bass
+  Leuchtet-Zeit             94.2%    49.6%    51.9%    32.9%    63.0%    80.0% ←bass
+  Space-5                   55.6%    55.8%    59.7%    42.5%    53.8%    92.9% ←bass ←lead1
+  TagNacht                 100.0%    75.4%   100.0%    84.9%   100.0%    88.9% ←bass
+  ZeitLicht                 96.0%   100.0%   100.0%    84.6%   100.0%    77.6% ←bass
+
+  Target: Bass > 92%,  Leads > 72%
+
+── 6. LEAD OVERLAP IN BODY SECTIONS ──────────────────────────────────
+
+  B-Loop                    9.6%  ███
+  E-Space                   2.0%  
+  Fahrt-Maschine           20.3%  ████████
+  Fahrt-Punkt               1.1%  
+  Frei-Licht                0.3%  
+  Gross-Lauf                2.8%  █
+  Leuchtet-Zeit             7.5%  ███
+  Space-5                   2.9%  █
+  TagNacht                 23.1%  █████████
+  ZeitLicht                 1.5%  
+
+  Target: < 30% of body steps
+
+── 7. LEAD 1 DENSITY BY SECTION (notes/bar) ──────────────────────────
+
+  Song                      intro    bodyA    bodyB   bridge    outro
+  ------------------------------------------------------------
+  B-Loop                      0.0        0        0        0      0.5
+  E-Space                     0.0        0        0        0      0.0
+  Fahrt-Maschine              0.0        0        0        0      0.0
+  Fahrt-Punkt                 0.0        0        0        0      1.0
+  Frei-Licht                  0.2        0        0        0      0.0
+  Gross-Lauf                  0.0        0        0        0      0.0
+  Leuchtet-Zeit               0.8        0        0        0      0.5
+  Space-5                     0.5        0        0        0      0.0
+  TagNacht                    0.0        0        0        0      1.0
+  ZeitLicht                   0.0        0        0        0      0.1
+
+  Target: intro < 1.5,  bodyA 1-4,  bodyB 2-5,  outro < 2
+
+── 8. LEAD 1 vs LEAD 2 NOTE COUNT COMPARISON ─────────────────────────
+
+  B-Loop                  L1= 184 (28%)  L2= 483 (72%)  ← Lead2 dominant
+  E-Space                 L1=  29 (16%)  L2= 156 (84%)  ← Lead2 dominant
+  Fahrt-Maschine          L1= 203 (46%)  L2= 237 (54%)  ← Lead2 dominant
+  Fahrt-Punkt             L1= 227 (79%)  L2=  61 (21%)
+  Frei-Licht              L1=  16 (6%)  L2= 267 (94%)  ← Lead2 dominant
+  Gross-Lauf              L1= 103 (24%)  L2= 318 (76%)  ← Lead2 dominant
+  Leuchtet-Zeit           L1= 139 (26%)  L2= 397 (74%)  ← Lead2 dominant
+  Space-5                 L1=  27 (7%)  L2= 387 (93%)  ← Lead2 dominant
+  TagNacht                L1= 196 (62%)  L2= 122 (38%)
+  ZeitLicht               L1=  25 (5%)  L2= 472 (95%)  ← Lead2 dominant
+
+── 9. DRUMS DENSITY + FILL RATE ──────────────────────────────────────
+
+  Song                      notes    n/bar    fills   fills/bar   fills/16b
+  ----------------------------------------------------------------------
+  B-Loop                     2314     19.3        3       0.025        0.40
+  E-Space                    2386     19.9       14       0.117        1.87  ← high fills
+  Fahrt-Maschine             2370     18.0        6       0.045        0.73
+  Fahrt-Punkt                3084     19.3       22       0.138        2.20  ← high fills
+  Frei-Licht                 1840     17.7        6       0.058        0.92
+  Gross-Lauf                 1844     19.2        5       0.052        0.83
+  Leuchtet-Zeit              1623     14.5        7       0.062        1.00
+  Space-5                    2371     19.8       11       0.092        1.47
+  TagNacht                   2256     22.6        7       0.070        1.12
+  ZeitLicht                  2707     18.3       15       0.101        1.62  ← high fills
+
+  Motorik target: ~1 fill per 16-32 bars (0.03-0.06/bar).  Apache beat = relentless 4/4, fills break tension sparingly.
+
+── 10. PADS + TEXTURE DENSITY ────────────────────────────────────────
+
+  Song                     pads_n   pads/bar    tex_n    tex/bar
+  --------------------------------------------------------
+  B-Loop                      232        1.9       19        0.2
+  E-Space                     465        3.9       19        0.2
+  Fahrt-Maschine              214        1.6       25        0.2
+  Fahrt-Punkt                 421        2.6       49        0.3
+  Frei-Licht                  609        5.9 ←high       15        0.1
+  Gross-Lauf                  192        2.0       12        0.1
+  Leuchtet-Zeit               212        1.9       15        0.1
+  Space-5                     832        6.9 ←high       14        0.1
+  TagNacht                    256        2.6        9        0.1
+  ZeitLicht                   511        3.5       49        0.3
+
+  High pads/texture density clashes with the Apache beat's open space aesthetic
+
+── 11. BASS DENSITY + REGISTER ───────────────────────────────────────
+
+  Song                     n/bar   min_p   max_p   med_p
+  --------------------------------------------
+  B-Loop                     2.8      33      54      43
+  E-Space                    3.3      28      54      41
+  Fahrt-Maschine             6.7      45      52      48  ← overdense
+  Fahrt-Punkt                3.3      35      52      43
+  Frei-Licht                 2.3      29      50      39
+  Gross-Lauf                 2.9      29      52      40
+  Leuchtet-Zeit              4.5      38      57      47
+  Space-5                    3.5      38      54      46
+  TagNacht                   4.7      38      59      48
+  ZeitLicht                  5.4      42      56      49  ← overdense
+
+── 12. CHORD PLAN — WINDOW LENGTHS ───────────────────────────────────
+
+  B-Loop                  avg=20.0 bars  min=4  max=48  windows=6
+  E-Space                 avg=17.1 bars  min=2  max=24  windows=7
+  Fahrt-Maschine          avg=44.0 bars  min=2  max=122  windows=3
+  Fahrt-Punkt             avg=26.7 bars  min=2  max=64  windows=6
+  Frei-Licht              avg=34.7 bars  min=4  max=92  windows=3
+  Gross-Lauf              avg=13.7 bars  min=4  max=24  windows=7
+  Leuchtet-Zeit           avg=18.7 bars  min=4  max=64  windows=6
+  Space-5                 avg=24.0 bars  min=2  max=41  windows=5
+  TagNacht                avg=20.0 bars  min=4  max=64  windows=5
+  ZeitLicht               avg=49.3 bars  min=2  max=138  windows=3
+
+── 13. LEAD 1 DENSITY ARC (notes/bar, 10 equal slices) ──────────────
+
+  B-Loop                  [0447245095]  peak=3.2 n/bar
+  E-Space                 [0367393641]  peak=0.5 n/bar
+  Fahrt-Maschine          [0046099952]  peak=3.0 n/bar
+  Fahrt-Punkt             [0909070705]  peak=3.2 n/bar
+  Frei-Licht              [2022505279]  peak=0.4 n/bar
+  Gross-Lauf              [0277439103]  peak=2.4 n/bar
+  Leuchtet-Zeit           [0113963371]  peak=2.9 n/bar
+  Space-5                 [1373735393]  peak=0.4 n/bar
+  TagNacht                [0394389895]  peak=2.9 n/bar
+  ZeitLicht               [0294249928]  peak=0.3 n/bar
+
+── 14. DRUM DENSITY ARC (notes/bar, 10 equal slices) ────────────────
+
+  B-Loop                  [5788898887]  peak=20.9 n/bar
+  E-Space                 [5889989888]  peak=21.0 n/bar
+  Fahrt-Maschine          [5578888895]  peak=20.8 n/bar
+  Fahrt-Punkt             [5888888896]  peak=21.2 n/bar
+  Frei-Licht              [5569889885]  peak=20.9 n/bar
+  Gross-Lauf              [5688899888]  peak=20.8 n/bar
+  Leuchtet-Zeit           [7888888987]  peak=15.4 n/bar
+  Space-5                 [6888889887]  peak=21.1 n/bar
+  TagNacht                [8888888988]  peak=23.1 n/bar
+  ZeitLicht               [5578888897]  peak=20.9 n/bar
+
+── 15. ISSUES FLAGGED PER SONG ───────────────────────────────────────
+
+  B-Loop:
+    • Lead2 (483) > Lead1 (184) — role inversion
+    • Bass consonance low: 88.4%
+    • Pads consonance low: 79.3%
+    • Non-tonic dom7 chord roots: 1 windows — check consonance
+  E-Space:
+    • Lead1 very sparse: 29 notes / 120 bars (0.24/bar)
+    • Lead2 (156) > Lead1 (29) — role inversion
+    • Drum fills too frequent: 14 fills in 120 bars (0.117/bar)
+  Fahrt-Maschine:
+    • Lead2 (237) > Lead1 (203) — role inversion
+    • Bass overdense: 6.7 n/bar
+  Fahrt-Punkt:
+    • Drum fills too frequent: 22 fills in 160 bars (0.138/bar)
+    • Bass consonance low: 78.0%
+    • Pads consonance low: 78.6%
+    • Non-tonic dom7 chord roots: 2 windows — check consonance
+  Frei-Licht:
+    • Lead1 very sparse: 16 notes / 104 bars (0.15/bar)
+    • Lead2 (267) > Lead1 (16) — role inversion
+    • Pads overdense: 5.9 n/bar (clutter risk)
+    • Pads consonance low: 78.7%
+  Gross-Lauf:
+    • Lead2 (318) > Lead1 (103) — role inversion
+    • Bass consonance low: 87.3%
+    • Rhythm consonance low: 75.4%
+    • Non-tonic dom7 chord roots: 2 windows — check consonance
+  Leuchtet-Zeit:
+    • Lead2 (397) > Lead1 (139) — role inversion
+    • Bass consonance low: 32.9%
+    • Rhythm consonance low: 63.0%
+    • Pads consonance low: 51.9%
+  Space-5:
+    • Lead1 very sparse: 27 notes / 120 bars (0.23/bar)
+    • Lead2 (387) > Lead1 (27) — role inversion
+    • Pads overdense: 6.9 n/bar (clutter risk)
+    • Drum fills too frequent: 11 fills in 120 bars (0.092/bar)
+    • Bass consonance low: 42.5%
+    • Lead1 consonance low: 55.6%
+    • Rhythm consonance low: 53.8%
+    • Pads consonance low: 59.7%
+  TagNacht:
+    • Bass consonance low: 84.9%
+    • Non-tonic dom7 chord roots: 2 windows — check consonance
+  ZeitLicht:
+    • Lead1 very sparse: 25 notes / 148 bars (0.17/bar)
+    • Lead2 (472) > Lead1 (25) — role inversion
+    • Drum fills too frequent: 15 fills in 148 bars (0.101/bar)
+    • Bass consonance low: 84.6%
+    • Texture consonance low: 77.6%
+    • Non-tonic dom7 chord roots: 2 windows — check consonance
+
+── 16. AGGREGATE SUMMARY ─────────────────────────────────────────────
+
+  Average lead overlap:            7.1%  (target < 30%)
+  Lead1 very sparse (<0.8/bar):    4/10
+  Songs where Lead2 > Lead1:       8/10
+  Average Lead1 consonance:        92.5%  (target > 72%)
+  Average Bass consonance:         79.4%  (target > 90%)
+  Average drum fill rate:          0.0760/bar
+  Songs with high fill rate (>8%): 4/10
+  Rules in ALL 10 songs (unconditional?): MOT-PADS-004, MOT-TEXT-001

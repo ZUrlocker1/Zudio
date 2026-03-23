@@ -1,0 +1,57 @@
+=== Zudio Song Analysis Log ===
+Title:          Nexione
+Generated:      2026-03-23 10:04:55
+Seed:           12508862721351330500
+Style:          Kosmic
+Key:            D  Dorian
+Tempo:          113 BPM
+Bars:           120
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 64         (60 bars)
+  B          Bars  65–104         (40 bars)
+  outro      Bars 105–120         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=minor
+  Bars   5– 34         root=1  type=minor
+  Bars  35– 64         root=b7  type=power
+  Bars  65– 84         root=b7  type=minor
+  Bars  85–104         root=1  type=minor
+  Bars 105–120         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       60 notes
+  Lead 2       33 notes
+  Pads         606 notes
+  Rhythm       800 notes
+  Texture      402 notes
+  Bass         644 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Nexione
+  Style            Kosmic
+  Form             A - B
+  Chords           D Dorian  Modal Drift — i - bVII - bVI  Dm, C5, Cm, Dm
+  KOS-RTHM-006     Kraftwerk locked pulse
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-PADS-001     Eno long drone
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-010     Probabilistic Moroder Pulse
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords Dm C5
+  Bar 033    Bass         pattern evolving
+  Bar 065    Form         Enter B section — Cm Dm
+  Bar 065    Texture      octave lift
+  Bar 065    Rhythm       octave shift
+  Bar 085    Bass         pattern evolving
+  Bar 105    Outro        16 bar cold stop — drum fill ending
+

@@ -232,7 +232,6 @@ struct DrumGenerator {
         style: IntroStyle, barStart: Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let offsetBar  = bar - introSection.startBar
-        let totalBars  = introSection.lengthBars
         let isLastBar  = bar == introSection.endBar - 1
 
         // All styles add a 2-step snare pickup on the last intro bar to launch the body
@@ -247,12 +246,8 @@ struct DrumGenerator {
         switch style {
 
         case .alreadyPlaying:
-            // Full groove from bar 0 at reduced velocity, ramping up to 100% by the last bar.
-            // Sounds as if the music has been running and the listener is fading in.
-            let factor = totalBars <= 1 ? 1.0 :
-                0.55 + 0.45 * Double(offsetBar) / Double(totalBars - 1)
-            let base = bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng)
-            return withPickup(scaleVelocity(base, factor: factor))
+            // Full groove from bar 0 — PlaybackEngine fades the master in over the intro duration.
+            return withPickup(bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng))
 
         case .progressiveEntry:
             // Full Motorik sparse groove from bar 0 (kick+snare+hat all present).
@@ -347,11 +342,8 @@ struct DrumGenerator {
         switch style {
 
         case .fade:
-            // Full groove with velocity decaying from 100% to ~30% across all outro bars.
-            let factor = totalOutroBars <= 1 ? 0.30 :
-                max(0.30, 1.0 - 0.70 * Double(offsetBar) / Double(totalOutroBars - 1))
-            let base = bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng)
-            return scaleVelocity(base, factor: factor)
+            // Full groove at body velocity — PlaybackEngine fades the master out.
+            return bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng)
 
         case .dissolve:
             // Drums strip back progressively; pads hold to the final bar.
@@ -404,13 +396,4 @@ struct DrumGenerator {
         ]
     }
 
-    // MARK: - Velocity scaling utility
-
-    private static func scaleVelocity(_ events: [MIDIEvent], factor: Double) -> [MIDIEvent] {
-        events.map { ev in
-            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                      velocity: UInt8(max(1, min(127, Int(Double(ev.velocity) * factor)))),
-                      durationSteps: ev.durationSteps)
-        }
-    }
 }

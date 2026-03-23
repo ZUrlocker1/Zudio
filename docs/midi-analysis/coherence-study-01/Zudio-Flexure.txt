@@ -1,0 +1,75 @@
+=== Zudio Song Analysis Log ===
+Title:          Flexure
+Generated:      2026-03-23 10:05:54
+Seed:           1660332360319069569
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          116 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 40         (36 bars)
+  B          Bars  41– 68         (28 bars)
+  A          Bars  69–108         (40 bars)
+  outro      Bars 109–124         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=minor
+  Bars   5– 40         root=1  type=minor
+  Bars  41– 68         root=b7  type=minor
+  Bars  69– 88         root=1  type=minor
+  Bars  89–108         root=b7  type=minor
+  Bars 109–124         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       164 notes
+  Lead 2       43 notes
+  Pads         378 notes
+  Rhythm       733 notes
+  Texture      418 notes
+  Bass         320 notes
+  Drums        850 notes
+
+--- Generation Log ---
+  SONG             Flexure
+  Style            Kosmic
+  Form             A - B - A
+  Chords           D Aeolian  Modal Drift — i - bVII - bVI  Dm, Cm, Dm, Cm, Dm
+  KOS-RTHM-002     Probabilistic JMJ melodic hook
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-001     Eno long drone
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-001     Berlin School drone
+  KOS-BASS-006     Additive dual bass
+  KOS-DRUM-005     Electric Buddha minimal beat
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — rock fill
+  Bar 005    Section A    chords Dm
+  Bar 008    Pads         stepping back
+  Bar 009    Lead 2       stepping back
+  Bar 009    Rhythm       stepping back
+  Bar 017    Lead 1       stepping back
+  Bar 021    Bass         pattern evolving
+  Bar 025    Pads         is back on stage
+  Bar 025    Rhythm       stepping back
+  Bar 033    Lead 1       steps into the spotlight
+  Bar 034    Lead 2       steps into the spotlight
+  Bar 040    Drum fill    3 beat — tom cascade
+  Bar 041    Form         Enter B section — Cm
+  Bar 041    Texture      octave lift
+  Bar 045    Bass         pattern evolving
+  Bar 049    Pads         stepping back
+  Bar 051    Lead 2       steps into the spotlight
+  Bar 057    Rhythm       stepping back
+  Bar 069    Form         Return to A section — Dm Cm
+  Bar 069    Texture      back to original
+  Bar 081    Lead 2       steps into the spotlight
+  Bar 081    Bass         pattern evolving
+  Bar 105    Bass         pattern evolving
+  Bar 109    Outro        16 bar dissolve
+

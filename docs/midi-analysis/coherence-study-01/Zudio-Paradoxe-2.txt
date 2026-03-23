@@ -1,0 +1,68 @@
+=== Zudio Song Analysis Log ===
+Title:          Paradoxe
+Generated:      2026-03-23 10:02:36
+Seed:           17694985458381856443
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          124 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 32         (28 bars)
+  B          Bars  33– 60         (28 bars)
+  B          Bars  61– 88         (28 bars)
+  A          Bars  89–116         (28 bars)
+  outro      Bars 117–124         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=sus4
+  Bars   5– 32         root=1  type=sus4
+  Bars  33– 60         root=1  type=sus4
+  Bars  61– 88         root=1  type=minor
+  Bars  89–102         root=1  type=sus4
+  Bars 103–116         root=1  type=sus4
+  Bars 117–124         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       37 notes
+  Lead 2       36 notes
+  Pads         818 notes
+  Rhythm       2751 notes
+  Texture      449 notes
+  Bass         63 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Paradoxe
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           D Aeolian  Suspended Resolution — sus4 - minor  Dsus4, Dm, Dsus4, Dm
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-LEAD-003     Pentatonic Drift — slow 5-note move
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-001     Berlin School drone
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — drum fill
+  Bar 005    Section A    chords Dsus4
+  Bar 033    Form         Enter B section — Dsus4
+  Bar 033    Bass         pattern evolving
+  Bar 033    Texture      octave lift
+  Bar 057    Bass         pattern evolving
+  Bar 061    Form         Enter B section again — Dm
+  Bar 061    Texture      back to original
+  Bar 061    Texture      octave lift
+  Bar 069    Bass         pattern evolving
+  Bar 081    Bass         pattern evolving
+  Bar 089    Form         Return to A section — Dsus4 Dsus4
+  Bar 089    Texture      back to original
+  Bar 093    Bass         pattern evolving
+  Bar 105    Bass         pattern evolving
+  Bar 117    Outro        8 bar dissolve
+

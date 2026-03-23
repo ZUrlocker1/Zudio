@@ -1,0 +1,64 @@
+=== Zudio Song Analysis Log ===
+Title:          Proxima III
+Generated:      2026-03-23 11:03:04
+Seed:           11799305008791272448
+Style:          Kosmic
+Key:            A  Dorian
+Tempo:          121 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3–122         (120 bars)
+  outro      Bars 123–124         (2 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=4  type=quartal
+  Bars   3–122         root=4  type=quartal
+  Bars 123–124         root=1  type=quartal
+
+--- Note Counts Per Track ---
+  Lead 1       78 notes
+  Lead 2       60 notes
+  Pads         558 notes
+  Rhythm       1508 notes
+  Texture      90 notes
+  Bass         362 notes
+  Drums        1004 notes
+
+--- Generation Log ---
+  SONG             Proxima III
+  Style            Kosmic
+  Form             Steady evolution
+  Chords           A Dorian  Stacked fourths  D4th, A4th
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-004     Echo melody
+  KOS-PADS-005     Stacked fourths
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-003     Spatial Sweep — chromatic passing
+  KOS-BASS-002     Root-Fifth Slow Walk
+  KOS-BASS-006     Additive dual bass
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — Buddha atmospheric fill
+  Bar 003    Section A    chords D
+  Bar 009    Bass         pattern evolving
+  Bar 017    Bass         pattern evolving
+  Bar 025    Bass         pattern evolving
+  Bar 033    Bass         pattern evolving
+  Bar 041    Bass         pattern evolving
+  Bar 049    Bass         pattern evolving
+  Bar 057    Bass         pattern evolving
+  Bar 065    Bass         pattern evolving
+  Bar 073    Bass         pattern evolving
+  Bar 081    Bass         pattern evolving
+  Bar 089    Bass         pattern evolving
+  Bar 097    Bass         pattern evolving
+  Bar 105    Bass         pattern evolving
+  Bar 113    Bass         pattern evolving
+  Bar 121    Bass         pattern evolving
+  Bar 123    Outro        2 bar dissolve
+

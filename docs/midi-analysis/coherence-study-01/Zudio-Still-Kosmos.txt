@@ -1,0 +1,62 @@
+=== Zudio Song Analysis Log ===
+Title:          Still Kosmos
+Generated:      2026-03-23 10:03:02
+Seed:           2712966326605064395
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          125 BPM
+Bars:           124
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 34         (32 bars)
+  bridgeAlt  Bars  35– 38         (4 bars)
+  B          Bars  39– 66         (28 bars)
+  A          Bars  67–108         (42 bars)
+  outro      Bars 109–124         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=b6  type=major
+  Bars   3– 34         root=b6  type=major
+  Bars  35– 38         root=1  type=minor
+  Bars  39– 66         root=b6  type=minor
+  Bars  67– 87         root=1  type=minor
+  Bars  88–108         root=1  type=major
+  Bars 109–124         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       54 notes
+  Lead 2       37 notes
+  Pads         716 notes
+  Rhythm       824 notes
+  Texture      28 notes
+  Bass         896 notes
+  Drums        962 notes
+
+--- Generation Log ---
+  SONG             Still Kosmos
+  Style            Kosmic
+  Form             A - B - A + bridge
+  Chords           D Aeolian  Vangelis two chord pendulum  i - bVI  A#, Dm, A#m, Dm, D, Dm
+  KOS-RTHM-006     Kraftwerk locked pulse
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-002     Eno floating tones
+  KOS-PADS-005     Stacked fourths
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-012     McCartney melodic drive
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar fade in
+  Bar 003    Section A    chords Bb
+  Bar 035    Form         Call and response bridge
+  Bar 039    Form         Enter B section — Bbm
+  Bar 039    Bass         pattern evolving
+  Bar 039    Rhythm       octave shift
+  Bar 066    Drum fill    3 beat — crescendo roll
+  Bar 067    Form         Return to A section — Dm D
+  Bar 067    Rhythm       back to original
+  Bar 109    Outro        16 bar fade
+

@@ -1,0 +1,75 @@
+=== Zudio Song Analysis Log ===
+Title:          B Loop
+Generated:      2026-03-23 12:16:56
+Seed:           6193114059019663976
+Style:          Motorik
+Key:            B  Dorian
+Tempo:          150 BPM
+Bars:           120
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 52         (48 bars)
+  B          Bars  53–116         (64 bars)
+  outro      Bars 117–120         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=2  type=minor
+  Bars   5– 52         root=2  type=minor
+  Bars  53– 73         root=b7  type=min7
+  Bars  74– 94         root=4  type=sus2
+  Bars  95–116         root=1  type=min7
+  Bars 117–120         root=1  type=major
+
+--- Note Counts Per Track ---
+  Lead 1       184 notes
+  Lead 2       483 notes
+  Pads         232 notes
+  Rhythm       315 notes
+  Texture      19 notes
+  Bass         338 notes
+  Drums        2327 notes
+
+--- Generation Log ---
+  SONG             B Loop
+  Form             Subtle A/B
+  Chords           B Dorian  Minor loop: i - VII  C#m, Am7, Esus2, Bm7, B
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-004     Neu! Hallogallo lock
+  MOT-PADS-003     Pulsed
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-LD1-005      Call and answer
+  MOT-LD2-004      Neu! counter melody
+  MOT-RTHM-002     Quarter stride
+  MOT-RTHM-003     Syncopated Motorik
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-005     Eno Cluster breath release
+  MOT-TEXT-006     High-tension touch
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords C#m
+  Bar 006    Texture      stepping back
+  Bar 013    Lead 1       steps into the spotlight
+  Bar 017    Bass         pattern evolving
+  Bar 033    Rhythm       stepping back
+  Bar 035    Texture      steps into the spotlight
+  Bar 049    Rhythm       is back on stage
+  Bar 053    Form         Enter B section — Am7 Esus2 Bm7
+  Bar 053    Texture      steps into the spotlight
+  Bar 053    Bass         pattern evolving
+  Bar 053    Rhythm       rhythm pattern changes
+  Bar 055    Drum fill    2 beat — Bonham tom cascade
+  Bar 064    Drum fill    2 beat — funk cross-pattern
+  Bar 073    Texture      stepping back
+  Bar 081    Lead 1       stepping back
+  Bar 081    Rhythm       stepping back
+  Bar 097    Lead 1       steps into the spotlight
+  Bar 097    Lead 2       stepping back
+  Bar 097    Rhythm       is back on stage
+  Bar 103    Drum fill    3 beat — alternating toms
+  Bar 104    Texture      steps into the spotlight
+  Bar 113    Lead 2       steps into the spotlight
+  Bar 117    Outro        4 bar fade
+

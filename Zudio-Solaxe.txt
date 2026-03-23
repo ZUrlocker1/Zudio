@@ -1,0 +1,63 @@
+=== Zudio Song Analysis Log ===
+Title:          Solaxe
+Generated:      2026-03-23 16:13:58
+Seed:           13588088687930785692
+Style:          Kosmic
+Key:            C  Dorian
+Tempo:          119 BPM
+Bars:           120
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5–112         (108 bars)
+  outro      Bars 113–120         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=b7  type=minor
+  Bars   5–112         root=b7  type=minor
+  Bars 113–120         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       71 notes
+  Lead 2       50 notes
+  Pads         546 notes
+  Rhythm       864 notes
+  Texture      433 notes
+  Bass         676 notes
+  Drums        1162 notes
+
+--- Generation Log ---
+  SONG             Solaxe
+  Style            Kosmic
+  Form             Steady evolution
+  Chords           C Dorian  Modal Drift — i - bVII - bVI  A#m, Cm
+  KOS-RTHM-006     Kraftwerk locked pulse
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-004     Echo melody
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-001     Orbital looping motif
+  KOS-BASS-010     Probabilistic Moroder Pulse
+  KOS-DRUM-002     Basic Channel minimal dub
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — drum fill
+  Bar 005    Section A    chords Bbm
+  Bar 029    Texture      octave lift
+  Bar 037    Texture      back to original
+  Bar 037    Rhythm       octave shift
+  Bar 041    Rhythm       back to original
+  Bar 053    Texture      octave lift
+  Bar 061    Texture      back to original
+  Bar 069    Rhythm       octave shift
+  Bar 073    Rhythm       back to original
+  Bar 077    Texture      octave lift
+  Bar 085    Texture      back to original
+  Bar 101    Texture      octave lift
+  Bar 101    Rhythm       octave shift
+  Bar 105    Rhythm       back to original
+  Bar 109    Texture      back to original
+  Bar 113    Outro        8 bar dissolve
+

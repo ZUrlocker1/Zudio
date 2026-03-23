@@ -170,14 +170,16 @@ struct StructureGenerator {
             let length = (i == chordCount - 1) ? (section.endBar - bar) : barsEach
             // Consume the RNG call regardless, but anchor intro/outro to tonic so all
             // instruments (bass, pads) are tonally grounded before and after the main body.
-            let rawRoot = pickChordRoot(mode: section.mode, rng: &rng)
+            // Use frame.mode (actual key mode) — not section.mode which is hardcoded Dorian —
+            // so chord roots and scale tension pools are diatonic to the song's real key.
+            let rawRoot = pickChordRoot(mode: frame.mode, rng: &rng)
             let root = (section.label == .intro || section.label == .outro) ? "1" : rawRoot
-            let type = pickChordType(mode: section.mode, rng: &rng)
+            let type = pickChordType(mode: frame.mode, rng: &rng)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
                 key: frame.key,
-                mode: section.mode
+                mode: frame.mode
             )
             windows.append(ChordWindow(
                 startBar: bar, lengthBars: length,
@@ -190,9 +192,19 @@ struct StructureGenerator {
     }
 
     private static func pickChordRoot(mode: Mode, rng: inout SeededRNG) -> String {
-        // Diatonic degree strings for mode
-        let diatonicDegrees = ["1", "2", "b3", "4", "5", "b6", "b7"]
-        return diatonicDegrees[rng.nextInt(upperBound: diatonicDegrees.count)]
+        // Diatonic degree strings per mode — only degrees whose pitch class is in the scale.
+        // Using a fixed "Aeolian" list for all modes causes borrowed roots in major modes
+        // (e.g. b3=C natural in A Ionian, which has C#) producing severe cross-track clashes.
+        let degrees: [String]
+        switch mode {
+        case .Ionian:          degrees = ["1", "2", "3", "4", "5", "6", "7"]
+        case .Dorian:          degrees = ["1", "2", "b3", "4", "5", "6", "b7"]
+        case .Mixolydian:      degrees = ["1", "2", "3", "4", "5", "6", "b7"]
+        case .Aeolian:         degrees = ["1", "2", "b3", "4", "5", "b6", "b7"]
+        case .MinorPentatonic: degrees = ["1", "b3", "4", "5", "b7"]
+        case .MajorPentatonic: degrees = ["1", "2", "3", "5", "6"]
+        }
+        return degrees[rng.nextInt(upperBound: degrees.count)]
     }
 
     private static func pickChordType(mode: Mode, rng: inout SeededRNG) -> ChordType {

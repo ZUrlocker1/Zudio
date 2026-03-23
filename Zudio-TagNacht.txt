@@ -1,0 +1,71 @@
+=== Zudio Song Analysis Log ===
+Title:          TagNacht
+Generated:      2026-03-23 12:17:07
+Seed:           13759001905020758124
+Style:          Motorik
+Key:            E  Aeolian
+Tempo:          133 BPM
+Bars:           100
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 68         (64 bars)
+  B          Bars  69– 96         (28 bars)
+  outro      Bars  97–100         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=b7  type=sus2
+  Bars   5– 68         root=b7  type=sus2
+  Bars  69– 82         root=b7  type=dom7
+  Bars  83– 96         root=5  type=dom7
+  Bars  97–100         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       196 notes
+  Lead 2       122 notes
+  Pads         256 notes
+  Rhythm       227 notes
+  Texture      9 notes
+  Bass         471 notes
+  Drums        2268 notes
+
+--- Generation Log ---
+  SONG             TagNacht
+  Form             Subtle A/B
+  Chords           E Aeolian  Static tonic: I  Dsus2, D7, B7, Em
+  MOT-DRUM-004     Mostly Motorik
+  MOT-BASS-013     Kraftwerk robotic bass
+  MOT-PADS-002     Power Drone
+  MOT-PADS-004     Dusseldorf sparse notes
+  MOT-PADS-007     Harmonia charleston
+  MOT-LD1-001      Neu! motif first
+  MOT-LD2-006      Neu! harmony
+  MOT-RTHM-002     Quarter stride
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-005     Eno Cluster breath release
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords Dsus2
+  Bar 009    Bass         pattern evolving
+  Bar 010    Drum fill    2 beat — funk cross-pattern
+  Bar 012    Texture      stepping back
+  Bar 013    Lead 2       steps into the spotlight
+  Bar 016    Drum fill    2 beat — funk cross-pattern
+  Bar 017    Lead 1       steps into the spotlight
+  Bar 026    Drum fill    2 beat — Bonham tom cascade
+  Bar 033    Lead 2       steps into the spotlight
+  Bar 049    Rhythm       stepping back
+  Bar 064    Drum fill    2 beat — funk cross-pattern
+  Bar 065    Rhythm       is back on stage
+  Bar 067    Drum fill    2 beat — Bonham tom cascade
+  Bar 068    Texture      steps into the spotlight
+  Bar 069    Form         Enter B section — D7 B7
+  Bar 069    Bass         pattern evolving
+  Bar 081    Pads         stepping back
+  Bar 082    Drum fill    2 beat — Bonham tom cascade
+  Bar 084    Drum fill    2 beat — Bonham tom cascade
+  Bar 085    Texture      steps into the spotlight
+  Bar 097    Outro        4 bar fade
+

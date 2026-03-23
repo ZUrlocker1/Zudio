@@ -47,6 +47,10 @@ final class PlaybackEngine: ObservableObject {
     // Body entrance fade: tracks with no intro notes fade in over 1 bar at the body downbeat
     private var bodyEntranceFadeTimer: DispatchSourceTimer? = nil
 
+    // Motorik fade (intro 0→1, outro 1→0 on engine.mainMixerNode — all tracks together)
+    var motorikStyle: Bool = false
+    private var motorikFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
+
     // Step-event map: built once at load time for O(1) lookup in onStep.
     // nonisolated(unsafe): written on main actor in load(), read from background timer thread.
     // Writes always happen-before reads (load() runs before play() which starts the timer).
@@ -75,6 +79,8 @@ final class PlaybackEngine: ObservableObject {
     private var kosmicIntroSweepTimer:   DispatchSourceTimer? = nil
     private var kosmicIntroBassPanPhase: Double = 0.0
     private var kosmicIntroBassPanTimer: DispatchSourceTimer? = nil
+    // Intro volume ramp timer (bass + pads: 0 → 1.0 over intro duration)
+    private var kosmicIntroFadeTimer:    DispatchSourceTimer? = nil
 
     private static let compDesc = AudioComponentDescription(
         componentType: kAudioUnitType_Effect,
@@ -121,14 +127,12 @@ final class PlaybackEngine: ObservableObject {
         songState = state
         cachedSecondsPerStep = state.frame.secondsPerStep
         buildStepEventMap(state: state)
-        // Always restore bass+pads to full volume. Kosmic intro fade is now handled
-        // purely by velocity ramp in KosmicBassGenerator / KosmicPadsGenerator —
-        // no audio graph volume manipulation means zero render-thread race, zero pop.
-        // Outro fade still uses samplers[x].volume (ramps down), so restore here.
+        // Restore volumes that any in-progress intro/outro fade may have left at non-unity values.
         samplers[kTrackBass].volume = 1.0
         samplers[kTrackPads].volume = 1.0
         boosts[kTrackBass].outputVolume = 1.0
         boosts[kTrackPads].outputVolume = 1.0
+        engine.mainMixerNode.outputVolume = 1.0
     }
 
     private func buildStepEventMap(state: SongState) {
@@ -146,10 +150,42 @@ final class PlaybackEngine: ObservableObject {
         // Resume from current playhead position (currentStep already set correctly)
         isPlaying = true
         currentSchedulerID += 1
-        let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: currentSchedulerID)
-        scheduler = sched
-        sched.start()
-        if kosmicStyle { startKosmicDroneFades(state: state) }
+        let schedulerID = currentSchedulerID
+
+        if kosmicStyle && currentStep == 0 {
+            // Zero volumes first, then delay the scheduler start.
+            // AVAudioMixerNode.outputVolume has ~1 render-cycle latency (~10 ms) before the
+            // render thread sees the new value. Without the delay, the scheduler fires step-0
+            // notes immediately and the first render cycle executes at the old volume (1.0),
+            // producing the audible startup pop. Waiting 50 ms guarantees at least one full
+            // render cycle passes at volume=0 before any note reaches the audio graph.
+            boosts[kTrackBass].outputVolume = 0.0
+            boosts[kTrackPads].outputVolume = 0.0
+            engine.mainMixerNode.outputVolume = 0.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
+                guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
+                let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
+                self.scheduler = sched
+                sched.start()
+                self.startKosmicDroneFades(state: state)
+            }
+        } else if motorikStyle && currentStep == 0 && state.structure.introSection != nil {
+            // Same pop-prevention as Kosmic: zero master before first note fires.
+            engine.mainMixerNode.outputVolume = 0.0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
+                guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
+                let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
+                self.scheduler = sched
+                sched.start()
+                self.startMotorikFades(state: state)
+            }
+        } else {
+            let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: schedulerID)
+            scheduler = sched
+            sched.start()
+            if kosmicStyle  { startKosmicDroneFades(state: state) }
+            if motorikStyle { startMotorikFades(state: state) }
+        }
     }
 
     func stop() {
@@ -159,6 +195,7 @@ final class PlaybackEngine: ObservableObject {
         // Leave playhead in place — user can resume from here with Play
         allNotesOff()
         stopKosmicDroneFades()
+        stopMotorikFades()
     }
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
@@ -205,6 +242,7 @@ final class PlaybackEngine: ObservableObject {
             // Keep currentStep / currentBar at their last-set values (end of song)
             self.allNotesOff()
             self.stopKosmicDroneFades()
+            self.stopMotorikFades()
         }
     }
 
@@ -219,13 +257,15 @@ final class PlaybackEngine: ObservableObject {
             scheduler = nil
             allNotesOff()
             stopKosmicDroneFades()
+            stopMotorikFades()
             currentStep = clampedStep
             currentBar  = clampedStep / 16
             currentSchedulerID += 1
             let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
             scheduler = sched
             sched.start()
-            if kosmicStyle { startKosmicDroneFades(state: state) }
+            if kosmicStyle  { startKosmicDroneFades(state: state) }
+            if motorikStyle { startMotorikFades(state: state) }
         } else {
             currentStep = clampedStep
             currentBar  = clampedStep / 16
@@ -276,8 +316,6 @@ final class PlaybackEngine: ObservableObject {
         if !tremEnabled[trackIndex] {
             if trackIndex == kTrackBass && program == 87 {
                 samplers[trackIndex].volume = 0.56   // Lead Bass runs hot
-            } else if trackIndex == kTrackBass && program == 42 {
-                samplers[trackIndex].volume = 0.45   // Cello runs significantly louder than synth basses
             } else if trackIndex == kTrackTexture {
                 samplers[trackIndex].volume = 1.4    // Texture pads are quiet
             } else {
@@ -425,17 +463,80 @@ final class PlaybackEngine: ObservableObject {
     // Outro: 1 → 0 over the outro section duration.
 
     private func startKosmicDroneFades(state: SongState) {
-        stopKosmicDroneFades()
-        startKosmicIntroEffects()
-        let schedulerID = currentSchedulerID
+        // Cancel timers only — do NOT call stopKosmicDroneFades(), which would flash
+        // volumes to 1.0 right as notes begin and cause the startup pop.
+        droneFadeTimers[0]?.cancel();   droneFadeTimers[0]   = nil
+        droneFadeTimers[1]?.cancel();   droneFadeTimers[1]   = nil
+        kosmicIntroFadeTimer?.cancel(); kosmicIntroFadeTimer  = nil
+        bodyEntranceFadeTimer?.cancel(); bodyEntranceFadeTimer = nil
+        stopKosmicIntroEffects()
 
-        // Schedule the body entrance fade to fire exactly at the intro/body boundary.
-        // Bass+pads now use velocity ramp (in generators) so only non-bass/pads cold-entrant
-        // tracks need the entrance fade.
-        if let intro = state.structure.introSection {
-            let introEndStep    = intro.endBar * 16
-            let stepsUntilBody  = max(0, introEndStep - currentStep)
-            let delayToBody     = Double(stepsUntilBody) * state.frame.secondsPerStep
+        let schedulerID   = currentSchedulerID
+        let intro         = state.structure.introSection
+        let introEndStep  = (intro?.endBar ?? 0) * 16
+        let inIntro       = intro != nil && currentStep < introEndStep
+
+        // --- Volume setup: depends on where the playhead is ---
+        if currentStep == 0, intro != nil {
+            // Song start: zero everything; a master ramp + intro boost ramp will open audio.
+            boosts[kTrackBass].outputVolume      = 0.0
+            boosts[kTrackPads].outputVolume      = 0.0
+            engine.mainMixerNode.outputVolume    = 0.0
+            // Master mixer 0→1 over ~100 ms to absorb any DSP-init transient.
+            for i in 1...5 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.020) { [weak self] in
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    self.engine.mainMixerNode.outputVolume = Float(i) / 5.0
+                }
+            }
+        } else if inIntro {
+            // Mid-intro seek: jump to the proportional volume so the fade continues smoothly.
+            let startProg = Float(currentStep) / Float(max(1, introEndStep))
+            boosts[kTrackBass].outputVolume   = startProg
+            boosts[kTrackPads].outputVolume   = startProg
+            engine.mainMixerNode.outputVolume = 1.0
+        } else {
+            // Body or outro seek: full volume immediately — no ramp.
+            boosts[kTrackBass].outputVolume   = 1.0
+            boosts[kTrackPads].outputVolume   = 1.0
+            engine.mainMixerNode.outputVolume = 1.0
+        }
+
+        // Intro effects (Cathedral reverb, sweep LFO) only while playhead is in the intro.
+        if inIntro { startKosmicIntroEffects() }
+
+        // --- Intro boost ramp (only when playhead is inside the intro) ---
+        if inIntro, let intro = intro {
+            let startProg    = (currentStep == 0) ? Float(0) : Float(currentStep) / Float(max(1, introEndStep))
+            let remSteps     = max(1, introEndStep - currentStep)
+            let durationSecs = Double(remSteps) * state.frame.secondsPerStep
+            let startNanos   = DispatchTime.now().uptimeNanoseconds
+
+            let fadeSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            fadeSrc.setEventHandler { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                    let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
+                    let progress = startProg + fraction * (1.0 - startProg)
+                    let anySolo  = self.soloState.contains(true)
+                    let bassMuted = self.muteState[kTrackBass] || (anySolo && !self.soloState[kTrackBass])
+                    let padsMuted = self.muteState[kTrackPads] || (anySolo && !self.soloState[kTrackPads])
+                    self.boosts[kTrackBass].outputVolume = bassMuted ? 0.0 : progress
+                    self.boosts[kTrackPads].outputVolume = padsMuted ? 0.0 : progress
+                    if progress >= 1.0 {
+                        self.kosmicIntroFadeTimer?.cancel()
+                        self.kosmicIntroFadeTimer = nil
+                    }
+                }
+            }
+            fadeSrc.resume()
+            kosmicIntroFadeTimer = fadeSrc
+
+            // At body boundary: stop intro effects and start body entrance fade.
+            let stepsUntilBody = max(0, introEndStep - currentStep)
+            let delayToBody    = Double(stepsUntilBody) * state.frame.secondsPerStep
             DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delayToBody) {
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
@@ -469,8 +570,8 @@ final class PlaybackEngine: ObservableObject {
                 let remainingSecs  = Double(totalSteps - elapsedInOutro) * sps
                 let startNanos     = DispatchTime.now().uptimeNanoseconds
 
-                self.samplers[kTrackBass].volume = startProgress
-                self.samplers[kTrackPads].volume = startProgress
+                self.boosts[kTrackBass].outputVolume = startProgress
+                self.boosts[kTrackPads].outputVolume = startProgress
                 self.startKosmicIntroEffects()
 
                 let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
@@ -484,7 +585,7 @@ final class PlaybackEngine: ObservableObject {
                         let anySolo = self.soloState.contains(true)
                         for trackIdx in [kTrackBass, kTrackPads] {
                             let muted = self.muteState[trackIdx] || (anySolo && !self.soloState[trackIdx])
-                            self.samplers[trackIdx].volume = muted ? 0.0 : vol
+                            self.boosts[trackIdx].outputVolume = muted ? 0.0 : vol
                         }
                         if linearFade <= 0.0 {
                             self.droneFadeTimers[1]?.cancel()
@@ -507,6 +608,128 @@ final class PlaybackEngine: ObservableObject {
         bodyEntranceFadeTimer?.cancel()
         bodyEntranceFadeTimer = nil
         stopKosmicIntroEffects()
+        // Restore volumes that the intro/outro ramp may have left at non-unity values
+        boosts[kTrackBass].outputVolume = 1.0
+        boosts[kTrackPads].outputVolume = 1.0
+        engine.mainMixerNode.outputVolume = 1.0
+        applyMuteState()
+    }
+
+    // MARK: - Motorik fade (intro 0→1, outro 1→0 on mainMixerNode — all tracks)
+    // Unlike Kosmic (which fades per-track boosts for bass+pads only), Motorik fades all
+    // tracks together via the master mixer node, since every track participates in intro/outro.
+    // The same 4-case position logic as Kosmic is used to prevent the seek-silence bug.
+
+    private func startMotorikFades(state: SongState) {
+        // Cancel existing timers inline — no volume restore (position-based setup below handles it)
+        motorikFadeTimers[0]?.cancel(); motorikFadeTimers[0] = nil
+        motorikFadeTimers[1]?.cancel(); motorikFadeTimers[1] = nil
+
+        let schedulerID    = currentSchedulerID
+        let intro          = state.structure.introSection
+        let introEndStep   = (intro?.endBar ?? 0) * 16
+        let inIntro        = intro != nil && currentStep < introEndStep
+        let outro          = state.structure.outroSection
+        let outroStartStep = (outro?.startBar ?? Int.max) * 16
+        let outroEndStep   = (outro?.endBar   ?? Int.max) * 16
+        let inOutro        = outro != nil && currentStep >= outroStartStep && currentStep < outroEndStep
+
+        // --- Volume setup: depends on where the playhead is ---
+        if currentStep == 0, intro != nil {
+            // Song start: already zeroed in play(); confirm 0 here for safety.
+            engine.mainMixerNode.outputVolume = 0.0
+        } else if inIntro {
+            // Mid-intro seek: jump to proportional volume so the fade continues smoothly.
+            let startProg = Float(currentStep) / Float(max(1, introEndStep))
+            engine.mainMixerNode.outputVolume = startProg
+        } else if inOutro, let outro = outro {
+            // In outro: set to the proportional remaining volume.
+            let totalOutroSteps = outro.endBar * 16 - outroStartStep
+            let elapsed         = currentStep - outroStartStep
+            engine.mainMixerNode.outputVolume = Float(max(0.0, 1.0 - Double(elapsed) / Double(max(1, totalOutroSteps))))
+        } else {
+            // Body (past intro, before outro) or no intro/outro: full volume.
+            engine.mainMixerNode.outputVolume = 1.0
+        }
+
+        // --- Intro ramp timer ---
+        if inIntro, let intro = intro {
+            let startProg    = (currentStep == 0) ? Float(0) : Float(currentStep) / Float(max(1, introEndStep))
+            let remSteps     = max(1, introEndStep - currentStep)
+            let durationSecs = Double(remSteps) * state.frame.secondsPerStep
+            let startNanos   = DispatchTime.now().uptimeNanoseconds
+
+            let fadeSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            fadeSrc.setEventHandler { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                    let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
+                    let progress = startProg + fraction * (1.0 - startProg)
+                    self.engine.mainMixerNode.outputVolume = progress
+                    if progress >= 1.0 {
+                        self.motorikFadeTimers[0]?.cancel()
+                        self.motorikFadeTimers[0] = nil
+                    }
+                }
+            }
+            fadeSrc.resume()
+            motorikFadeTimers[0] = fadeSrc
+        }
+
+        startMotorikOutroFade(state: state, schedulerID: schedulerID)
+    }
+
+    private func startMotorikOutroFade(state: SongState, schedulerID: Int) {
+        guard let outro = state.structure.outroSection else { return }
+        let outroStartStep = outro.startBar * 16
+        let outroEndStep   = outro.endBar   * 16
+        let totalSteps     = outroEndStep - outroStartStep
+        guard totalSteps > 0, currentStep < outroEndStep else { return }
+
+        let sps             = state.frame.secondsPerStep
+        let stepsUntilStart = max(0, outroStartStep - currentStep)
+        let delaySeconds    = Double(stepsUntilStart) * sps
+
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delaySeconds) { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
+                guard self.motorikFadeTimers[1] == nil else { return }
+
+                let elapsedInOutro = max(0, self.currentStep - outroStartStep)
+                let startProgress  = Float(1.0 - Double(elapsedInOutro) / Double(totalSteps))
+                let remainingSecs  = Double(totalSteps - elapsedInOutro) * sps
+                let startNanos     = DispatchTime.now().uptimeNanoseconds
+
+                self.engine.mainMixerNode.outputVolume = startProgress
+
+                let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+                src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+                src.setEventHandler { [weak self] in
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, self.currentSchedulerID == schedulerID else { return }
+                        let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                        let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
+                        self.engine.mainMixerNode.outputVolume = startProgress * linearFade
+                        if linearFade <= 0.0 {
+                            self.motorikFadeTimers[1]?.cancel()
+                            self.motorikFadeTimers[1] = nil
+                        }
+                    }
+                }
+                src.resume()
+                self.motorikFadeTimers[1] = src
+            }
+        }
+    }
+
+    private func stopMotorikFades() {
+        motorikFadeTimers[0]?.cancel()
+        motorikFadeTimers[0] = nil
+        motorikFadeTimers[1]?.cancel()
+        motorikFadeTimers[1] = nil
+        engine.mainMixerNode.outputVolume = 1.0
         applyMuteState()
     }
 
@@ -569,6 +792,11 @@ final class PlaybackEngine: ObservableObject {
         kosmicIntroBassPanTimer?.cancel()
         kosmicIntroBassPanTimer = nil
 
+        // Bass: Cathedral reverb during the Kosmic intro — lush and spatial.
+        // wetDryMix 70 (vs Large Chamber 50 in body) for a deep, washy quality.
+        reverbs[kTrackBass].loadFactoryPreset(.cathedral)
+        reverbs[kTrackBass].wetDryMix = 70
+
         // Pads: sweep LFO (0.07 Hz, cutoff 400–3200 Hz) — same rate as user sweep chip
         // Only activate if the user hasn't already enabled sweep on pads (avoid double-timer)
         if !sweepEnabled[kTrackPads] {
@@ -607,6 +835,8 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func stopKosmicIntroEffects() {
+        kosmicIntroFadeTimer?.cancel()
+        kosmicIntroFadeTimer = nil
         kosmicIntroSweepTimer?.cancel()
         kosmicIntroSweepTimer = nil
         kosmicIntroSweepPhase = 0.0
@@ -622,6 +852,10 @@ final class PlaybackEngine: ObservableObject {
         if !panEnabled[kTrackBass] {
             boosts[kTrackBass].pan = 0.0
         }
+
+        // Revert bass reverb to Large Chamber for the body
+        reverbs[kTrackBass].loadFactoryPreset(.largeChamber)
+        reverbs[kTrackBass].wetDryMix = 50
     }
 
     // MARK: - All-notes-off (used by stop())
@@ -847,6 +1081,11 @@ final class PlaybackEngine: ObservableObject {
         tapState.fadeTotalFrames = totalFrames
         currentExportTap        = tapState
 
+        // Silence the first 100 ms of captured audio regardless of mixer volume state.
+        // This is a belt-and-suspenders guard against any DSP-init transient that slips
+        // through between the time outputVolume is set to 0 and the render thread picks it up.
+        let silenceFrames = Int64(0.100 * sr)
+
         mixerNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak self] buf, _ in
             guard !tapState.done else { return }
             let remaining = totalFrames - tapState.frames
@@ -855,8 +1094,16 @@ final class PlaybackEngine: ObservableObject {
                 buf.frameLength = AVAudioFrameCount(remaining)
             }
 
-            // Linear fade-out for sample mode.
+            // Zero the first 100 ms of the captured audio to suppress any startup transient.
             let bufStart = tapState.frames
+            if bufStart < silenceFrames, let channelData = buf.floatChannelData {
+                let nch     = Int(buf.format.channelCount)
+                let zeroEnd = min(silenceFrames - bufStart, Int64(buf.frameLength))
+                for ch in 0..<nch { memset(channelData[ch], 0, Int(zeroEnd) * MemoryLayout<Float>.size) }
+            }
+
+            // Linear fade-out for sample mode.
+
             let fadeLen  = tapState.fadeTotalFrames - tapState.fadeStartFrame
             if fadeLen > 0 && bufStart + Int64(buf.frameLength) > tapState.fadeStartFrame,
                let channelData = buf.floatChannelData {

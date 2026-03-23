@@ -1,0 +1,69 @@
+=== Zudio Song Analysis Log ===
+Title:          Fluxion
+Generated:      2026-03-23 11:02:55
+Seed:           13842483507810932979
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          122 BPM
+Bars:           128
+Mood:           Bright
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 48         (44 bars)
+  preRamp    Bars  49– 56         (8 bars)
+  bridgeMelody Bars  57– 68         (12 bars)
+  postRamp   Bars  69– 76         (8 bars)
+  B          Bars  77–124         (48 bars)
+  outro      Bars 125–128         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=sus4
+  Bars   5– 48         root=1  type=sus4
+  Bars  49– 56         root=1  type=minor
+  Bars  57– 68         root=1  type=minor
+  Bars  69– 76         root=1  type=minor
+  Bars  77–124         root=1  type=minor
+  Bars 125–128         root=1  type=sus4
+
+--- Note Counts Per Track ---
+  Lead 1       123 notes
+  Lead 2       38 notes
+  Pads         535 notes
+  Rhythm       448 notes
+  Texture      81 notes
+  Bass         734 notes
+  Drums        848 notes
+
+--- Generation Log ---
+  SONG             Fluxion
+  Style            Kosmic
+  Form             A - B + bridge
+  Chords           D Aeolian  Suspended Resolution — sus4 - minor  Dsus4, Dm, Dsus4
+  KOS-RTHM-003     Jean Michel Jarre ascending, descending oscillation
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-002     Eno floating tones
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-TEXT-003     Spatial Sweep — chromatic passing
+  KOS-BASS-010     Probabilistic Moroder Pulse
+  KOS-DRUM-005     Electric Buddha minimal beat
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — rock fill
+  Bar 005    Section A    chords Dsus4
+  Bar 009    Lead 2       steps into the spotlight
+  Bar 013    Bass         pattern evolving
+  Bar 048    Drum fill    3 beat — tom cascade
+  Bar 049    Form         Transition
+  Bar 056    Drum fill    3 beat — crescendo roll
+  Bar 056    Lead 2       stepping back
+  Bar 057    Form         Melodic bridge
+  Bar 057    Rhythm       stepping back
+  Bar 069    Form         Returning to A section
+  Bar 076    Drum fill    3 beat — crescendo roll
+  Bar 077    Form         Enter B section — Dm
+  Bar 098    Lead 2       stepping back
+  Bar 125    Outro        4 bar dissolve
+

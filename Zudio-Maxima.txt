@@ -1,0 +1,59 @@
+=== Zudio Song Analysis Log ===
+Title:          Maxima
+Generated:      2026-03-23 11:47:52
+Seed:           17490218756065513828
+Style:          Kosmic
+Key:            A  Mixolydian
+Tempo:          113 BPM
+Bars:           124
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 44         (40 bars)
+  B          Bars  45– 76         (32 bars)
+  A          Bars  77–120         (44 bars)
+  outro      Bars 121–124         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=4  type=quartal
+  Bars   5– 44         root=4  type=quartal
+  Bars  45– 76         root=1  type=quartal
+  Bars  77–120         root=4  type=sus4
+  Bars 121–124         root=1  type=quartal
+
+--- Note Counts Per Track ---
+  Lead 1       53 notes
+  Lead 2       51 notes
+  Pads         780 notes
+  Rhythm       4120 notes
+  Texture      30 notes
+  Bass         535 notes
+  Drums        910 notes
+
+--- Generation Log ---
+  SONG             Maxima
+  Style            Kosmic
+  Form             A - B - A
+  Chords           A Mixolydian  Stacked fourths  D4th, A4th, Dsus4, A4th
+  KOS-RTHM-001     Probabilistic Tangerine Dream sequencer
+  KOS-LEAD-002     Eno floating tones
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-004     Echo melody
+  KOS-PADS-005     Stacked fourths
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-PADS-008     bIII colour chord layer
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-003     Tangerine Dream pulse
+  KOS-DRUM-004     Electric Buddha groove
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — Buddha atmospheric fill
+  Bar 005    Section A    chords D
+  Bar 044    Drum fill    3 beat — crescendo roll
+  Bar 045    Form         Enter B section — A
+  Bar 045    Bass         pattern evolving
+  Bar 077    Form         Return to A section — Dsus4
+  Bar 077    Bass         pattern evolving
+  Bar 121    Outro        4 bar fade
+

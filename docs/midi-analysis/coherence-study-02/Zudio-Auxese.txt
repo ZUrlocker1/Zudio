@@ -1,0 +1,74 @@
+=== Zudio Song Analysis Log ===
+Title:          Auxese
+Generated:      2026-03-23 11:02:51
+Seed:           8986065709614615150
+Style:          Kosmic
+Key:            E  Dorian
+Tempo:          119 BPM
+Bars:           120
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 30         (28 bars)
+  preRamp    Bars  31– 30         (0 bars)
+  bridgeMelody Bars  31– 42         (12 bars)
+  postRamp   Bars  43– 42         (0 bars)
+  B          Bars  43– 74         (32 bars)
+  A          Bars  75–118         (44 bars)
+  outro      Bars 119–120         (2 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=sus4
+  Bars   3– 16         root=1  type=sus4
+  Bars  17– 30         root=1  type=minor
+  Bars  31– 30         root=1  type=minor
+  Bars  31– 42         root=1  type=minor
+  Bars  43– 42         root=1  type=minor
+  Bars  43– 74         root=1  type=sus4
+  Bars  75–118         root=1  type=sus4
+  Bars 119–120         root=1  type=sus4
+
+--- Note Counts Per Track ---
+  Lead 1       220 notes
+  Lead 2       66 notes
+  Pads         196 notes
+  Rhythm       271 notes
+  Texture      29 notes
+  Bass         376 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Auxese
+  Style            Kosmic
+  Form             A - B - A + bridge
+  Chords           E Dorian  Suspended Resolution — sus4 - minor  Esus4, Em, Esus4
+  KOS-RTHM-002     Probabilistic JMJ melodic hook
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-PADS-004     Suspended Resolution — sus4→minor
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-013     Loscil sub-bass pulse
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar fade in
+  Bar 003    Section A    chords Esus4 Em
+  Bar 017    Pads         is back on stage
+  Bar 030    Lead 2       stepping back
+  Bar 031    Form         Transition
+  Bar 031    Form         Melodic bridge
+  Bar 031    Rhythm       stepping back
+  Bar 043    Form         Returning to A section
+  Bar 043    Form         Enter B section — Em Esus4
+  Bar 043    Bass         pattern evolving
+  Bar 049    Lead 1       stepping back
+  Bar 065    Lead 1       steps into the spotlight
+  Bar 075    Form         Return to A section — Esus4
+  Bar 081    Rhythm       stepping back
+  Bar 096    Lead 1       stepping back
+  Bar 097    Rhythm       is back on stage
+  Bar 113    Lead 1       steps into the spotlight
+  Bar 119    Outro        2 bar cold stop — drum fill ending
+

@@ -1,0 +1,75 @@
+=== Zudio Song Analysis Log ===
+Title:          Vortexe VI
+Generated:      2026-03-23 11:02:44
+Seed:           10170428847040188362
+Style:          Kosmic
+Key:            E  Dorian
+Tempo:          119 BPM
+Bars:           128
+Mood:           Bright
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 32         (28 bars)
+  B          Bars  33– 60         (28 bars)
+  B          Bars  61– 88         (28 bars)
+  A          Bars  89–124         (36 bars)
+  outro      Bars 125–128         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=major
+  Bars   5– 32         root=1  type=major
+  Bars  33– 60         root=1  type=major
+  Bars  61– 74         root=b6  type=minor
+  Bars  75– 88         root=1  type=minor
+  Bars  89–124         root=1  type=sus2
+  Bars 125–128         root=1  type=sus2
+
+--- Note Counts Per Track ---
+  Lead 1       202 notes
+  Lead 2       69 notes
+  Pads         400 notes
+  Rhythm       772 notes
+  Texture      31 notes
+  Bass         599 notes
+  Drums        0 notes
+
+--- Generation Log ---
+  SONG             Vortexe VI
+  Style            Kosmic
+  Form             A - B - B - A
+  Chords           E Dorian  Vangelis two chord pendulum  i - bVI  E, Cm, Em, Esus2
+  KOS-RTHM-005     Probabilistic Jean Michel Jarre dual arpeggio
+  KOS-LEAD-002     Eno floating tones
+  KOS-LEAD-006     Jean Michel Jarre evolving phrase
+  KOS-LEAD-001     Berlin school slow arc
+  KOS-PADS-002     Vangelis swell
+  KOS-TEXT-002     Electric Buddha shimmer hold
+  KOS-BASS-003     Tangerine Dream pulse
+  KOS-DRUM-003     No percussion
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar fade in
+  Bar 005    Section A    chords E
+  Bar 009    Pads         stepping back
+  Bar 009    Rhythm       stepping back
+  Bar 017    Lead 1       stepping back
+  Bar 025    Pads         stepping back
+  Bar 033    Form         Enter B section — E
+  Bar 033    Bass         pattern evolving
+  Bar 041    Pads         is back on stage
+  Bar 041    Rhythm       stepping back
+  Bar 049    Lead 1       stepping back
+  Bar 054    Lead 2       stepping back
+  Bar 057    Pads         stepping back
+  Bar 061    Form         Enter B section again — Cm Em
+  Bar 061    Bass         pattern evolving
+  Bar 073    Bass         pattern evolving
+  Bar 078    Lead 2       stepping back
+  Bar 081    Lead 1       stepping back
+  Bar 081    Rhythm       stepping back
+  Bar 089    Form         Return to A section — Esus2
+  Bar 089    Pads         stepping back
+  Bar 089    Bass         pattern evolving
+  Bar 125    Outro        4 bar fade
+

@@ -1,0 +1,219 @@
+========================================================================
+ZUDIO KOSMIC — STUDY 02 MIDI ANALYSIS
+Songs: 11   (generated 2026-03-23)
+========================================================================
+
+── 1. SONG OVERVIEW ──────────────────────────────────────────────────
+
+  Auxese                  E   Dorian       119 BPM  120 bars  Dream
+    intro(2) → A(28) → bridgeMelody(12) → B(32) → A(44) → outro(2)
+  Deep-Solstice           G   Aeolian      118 BPM  120 bars  Dream
+    intro(4) → A(112) → outro(4)
+  Ewig-Leere              B   Dorian       120 BPM  124 bars  Dream
+    intro(4) → A(116) → outro(4)
+  Flexure                 G   Dorian       118 BPM  124 bars  Bright
+    intro(8) → A(112) → outro(4)
+  Fluxion                 D   Aeolian      122 BPM  128 bars  Bright
+    intro(4) → A(44) → preRamp(8) → bridgeMelody(12) → postRamp(8) → B(48) → outro(4)
+  Galaxie-VIII            E   Dorian       120 BPM  120 bars  Dream
+    intro(8) → A(64) → B(46) → outro(2)
+  Polar-Horizon           G   Aeolian      123 BPM  124 bars  Bright
+    intro(4) → A(24) → bridgeMelody(16) → B(32) → A(46) → outro(2)
+  Proxima-III             A   Dorian       121 BPM  124 bars  Dream
+    intro(2) → A(120) → outro(2)
+  Solaxe                  E   Dorian       120 BPM  128 bars  Free
+    intro(2) → A(36) → bridge(4) → B(36) → A(46) → outro(4)
+  Void-Ether              E   Dorian       120 BPM  124 bars  Dream
+    intro(4) → A(28) → B(28) → B(28) → A(32) → outro(4)
+  Vortexe-VI              E   Dorian       119 BPM  128 bars  Bright
+    intro(4) → A(28) → B(28) → B(28) → A(36) → outro(4)
+
+── 2. RULE FREQUENCY ─────────────────────────────────────────────────
+
+  KOS-LEAD-002            ████████      8/11
+  KOS-LEAD-001            ███████       7/11
+  KOS-LEAD-005            ██████        6/11
+  KOS-DRUM-003            ██████        6/11
+  KOS-LEAD-006            █████         5/11
+  KOS-TEXT-002            █████         5/11
+  KOS-PADS-004            ████          4/11
+  KOS-PADS-002            ████          4/11
+  KOS-LEAD-004            ████          4/11
+  KOS-PADS-006            ███           3/11
+  KOS-BASS-006            ███           3/11
+  KOS-BASS-010            ███           3/11
+  KOS-TEXT-001            ███           3/11
+  KOS-RTHM-002            ██            2/11
+  KOS-BASS-013            ██            2/11
+  KOS-RTHM-007            ██            2/11
+  KOS-PADS-008            ██            2/11
+  KOS-BASS-002            ██            2/11
+  KOS-TEXT-003            ██            2/11
+  KOS-DRUM-005            ██            2/11
+  KOS-LEAD-003            ██            2/11
+  KOS-DRUM-004            ██            2/11
+  KOS-BASS-004            █             1/11
+  KOS-DRUM-001            █             1/11
+  KOS-RTHM-004            █             1/11
+  KOS-PADS-001            █             1/11
+  KOS-RTHM-003            █             1/11
+  KOS-PADS-003            █             1/11
+  KOS-RTHM-006            █             1/11
+  KOS-BASS-011            █             1/11
+  KOS-RTHM-001            █             1/11
+  KOS-PADS-005            █             1/11
+  KOS-RTHM-009            █             1/11
+  KOS-TEXT-004            █             1/11
+  KOS-BASS-001            █             1/11
+  KOS-RTHM-010            █             1/11
+  KOS-RTHM-005            █             1/11
+  KOS-BASS-003            █             1/11
+
+── 3. NOTE COUNTS PER TRACK ──────────────────────────────────────────
+
+  Song                     Lead1   Lead2    Pads  Rhythm  Texture    Bass   Drums
+  --------------------------------------------------------------------
+  Auxese                     220      66     194     271      28     271       0
+  Deep-Solstice               37      42     453     676      29      87     521
+  Ewig-Leere                  84      41     530     249      30     183       0
+  Flexure                     39      42     173    1723      30     285       0
+  Fluxion                    123      36     528     338      81     730     848
+  Galaxie-VIII                45     110      55     368     441     695       0
+  Polar-Horizon               78      32     423     816     412     810     847
+  Proxima-III                 78      60     557     921      90     331    1004
+  Solaxe                      43      70     345     499      90      70       0
+  Void-Ether                  60     204     391     448     465     736     869
+  Vortexe-VI                 202      69     264     596      31     595       0
+
+── 4. CONSONANCE RATES (fraction of notes in active mode's scale) ────
+
+  Song                      Lead1    Lead2     Pads     Bass   Rhythm
+  ----------------------------------------------------------
+  Auxese                    94.5%    89.4%   100.0%   100.0%   100.0%
+  Deep-Solstice             78.4%    73.8%   100.0%   100.0%   100.0%
+  Ewig-Leere               100.0%   100.0%   100.0%   100.0%    85.5%
+  Flexure                  100.0%   100.0%   100.0%   100.0%   100.0%
+  Fluxion                   91.9%    88.9%   100.0%    99.2%   100.0%
+  Galaxie-VIII              73.3%    96.4%    78.2%    78.7%    62.0%
+  Polar-Horizon            100.0%    75.0%    99.8%   100.0%    75.0%
+  Proxima-III              100.0%   100.0%    99.8%   100.0%    77.0%
+  Solaxe                    95.3%    90.0%   100.0%   100.0%   100.0%
+  Void-Ether                98.3%    70.6%   100.0%   100.0%   100.0%
+  Vortexe-VI               100.0%    85.5%    93.9%    90.6%    89.9%
+
+  Target: Bass/Pads > 92%,  Leads > 72%
+
+── 5. LEAD OVERLAP IN BODY SECTIONS ──────────────────────────────────
+
+  Auxese                   11.2%  ████
+  Deep-Solstice            38.6%  ███████████████  ← HIGH
+  Ewig-Leere               19.6%  ███████
+  Flexure                  39.0%  ███████████████  ← HIGH
+  Fluxion                  14.8%  █████
+  Galaxie-VIII             50.1%  ████████████████████  ← HIGH
+  Polar-Horizon            36.7%  ██████████████  ← HIGH
+  Proxima-III              20.4%  ████████
+  Solaxe                   12.5%  █████
+  Void-Ether               30.3%  ████████████  ← HIGH
+  Vortexe-VI               10.3%  ████
+
+  Target: < 30% of body steps
+
+── 6. LEAD 1 DENSITY BY SECTION (notes/bar) ──────────────────────────
+
+  Song                      intro     body    outro
+  ---------------------------------------------
+  Auxese                      0.0      2.1      0.0
+  Deep-Solstice               0.0      0.3      0.0
+  Ewig-Leere                  0.0      0.7      0.0
+  Flexure                     0.0      0.3      0.0
+  Fluxion                     0.0      1.6      0.0
+  Galaxie-VIII                0.0      0.4      0.0
+  Polar-Horizon               0.0      1.1      0.0
+  Proxima-III                 0.0      0.7      0.0
+  Solaxe                      0.0      0.3      0.0
+  Void-Ether                  0.0      0.5      0.0
+  Vortexe-VI                  0.0      1.7      0.0
+
+  Target: intro < 1.5,  body 2-5,  outro < 2
+
+── 7. BASS REGISTER ANALYSIS ─────────────────────────────────────────
+
+  Song                      min    max    med      >60      <48
+  -------------------------------------------------------
+  Auxese                     28     52     40     0.0%    93.7%
+  Deep-Solstice              43     55     43     0.0%    98.9%
+  Ewig-Leere                 35     59     35     0.0%    99.5%
+  Flexure                    43     55     43     0.0%    60.4%
+  Fluxion                    45     62     50     0.1%    25.8%
+  Galaxie-VIII               40     62     50     0.1%    23.7%
+  Polar-Horizon              41     63     50     3.1%    40.0%
+  Proxima-III                45     62     50     0.3%    36.6%
+  Solaxe                     40     52     40     0.0%    97.1%
+  Void-Ether                 40     52     40     0.0%    77.4%
+  Vortexe-VI                 40     52     40     0.0%    90.4%
+
+  KOS-RULE-06 target: MIDI 40–55 (C2–G3).  >60 = too high, invades lead space.
+
+── 8. LEAD 1 VELOCITY STATS ──────────────────────────────────────────
+
+  Song                      mean     std    min    max
+  -----------------------------------------------
+  Auxese                    64.8     9.7     41     90
+  Deep-Solstice             59.3     6.0     47     72
+  Ewig-Leere                53.4    11.8     33     75
+  Flexure                   61.0     7.0     48     71
+  Fluxion                   68.4    13.2     43     87
+  Galaxie-VIII              57.8     6.8     46     73
+  Polar-Horizon             70.3    11.1     45     90
+  Proxima-III               58.3     7.4     41     72
+  Solaxe                    61.0     6.5     47     71
+  Void-Ether                53.5    10.8     31     74
+  Vortexe-VI                61.7     8.9     37     75
+
+── 9. LEAD 1 DENSITY ARC (notes/bar, 10 equal slices across song) ───
+
+  Auxese                  [7999067204]  peak=3.0 n/bar
+  Deep-Solstice           [3953325652]  peak=0.6 n/bar
+  Ewig-Leere              [6960069996]  peak=1.0 n/bar
+  Flexure                 [1974676644]  peak=0.5 n/bar
+  Fluxion                 [1111590000]  peak=3.9 n/bar
+  Galaxie-VIII            [1666669999]  peak=0.5 n/bar
+  Polar-Horizon           [0179111111]  peak=2.2 n/bar
+  Proxima-III             [6887898777]  peak=0.8 n/bar
+  Solaxe                  [4473999374]  peak=0.5 n/bar
+  Void-Ether              [6913314752]  peak=1.0 n/bar
+  Vortexe-VI              [4269323163]  peak=3.2 n/bar
+
+── 10. STRUCTURAL / CHORD ANOMALIES ──────────────────────────────────
+
+  Auxese:
+    • zero-bar sections in log: ['preRamp', 'postRamp']
+  Deep-Solstice:
+    • Lead overlap high: 38.6%
+  Ewig-Leere: no issues flagged
+  Flexure:
+    • Rhythm very dense: 1723 notes
+    • Lead overlap high: 39.0%
+  Fluxion: no issues flagged
+  Galaxie-VIII:
+    • Lead overlap high: 50.1%
+  Polar-Horizon:
+    • zero-bar sections in log: ['preRamp', 'postRamp']
+    • Bass very dense: 810 notes
+    • Lead overlap high: 36.7%
+  Proxima-III: no issues flagged
+  Solaxe: no issues flagged
+  Void-Ether:
+    • Lead2 consonance low: 70.6%
+    • Lead overlap high: 30.3%
+  Vortexe-VI: no issues flagged
+
+── 11. AGGREGATE FINDINGS ────────────────────────────────────────────
+
+  Average lead overlap:    25.8%  (target < 30%)
+  Average Lead1 consonance: 93.8%  (target > 72%)
+  Average Bass consonance:  97.1%  (target > 92%)
+  No-drums songs:          6/11
+  Lead1 very sparse (<0.8/bar): 8/11
+  Bass above MIDI 60 (>5%): 0/11

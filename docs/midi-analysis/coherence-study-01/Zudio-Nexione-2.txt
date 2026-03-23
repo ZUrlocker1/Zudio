@@ -1,0 +1,73 @@
+=== Zudio Song Analysis Log ===
+Title:          Nexione
+Generated:      2026-03-23 10:02:55
+Seed:           10264746292995961523
+Style:          Kosmic
+Key:            D  Aeolian
+Tempo:          116 BPM
+Bars:           120
+Mood:           Dream
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 28         (24 bars)
+  B          Bars  29– 52         (24 bars)
+  A          Bars  53– 76         (24 bars)
+  B          Bars  77–104         (28 bars)
+  outro      Bars 105–120         (16 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=1  type=minor
+  Bars   5– 28         root=1  type=minor
+  Bars  29– 52         root=1  type=minor
+  Bars  53– 64         root=b6  type=minor
+  Bars  65– 76         root=b7  type=sus2
+  Bars  77–104         root=1  type=minor
+  Bars 105–120         root=1  type=sus2
+
+--- Note Counts Per Track ---
+  Lead 1       39 notes
+  Lead 2       100 notes
+  Pads         800 notes
+  Rhythm       918 notes
+  Texture      77 notes
+  Bass         315 notes
+  Drums        518 notes
+
+--- Generation Log ---
+  SONG             Nexione
+  Style            Kosmic
+  Form             A - B - A - B
+  Chords           D Aeolian  Modal Drift — i - bVII - bVI  Dm, A#m, Csus2, Dm, Dsus2
+  KOS-RTHM-005     Probabilistic Jean Michel Jarre dual arpeggio
+  KOS-LEAD-002     Eno floating tones
+  KOS-LEAD-004     Echo melody
+  KOS-LEAD-005     Tangerine Dream arpeggio highlight
+  KOS-PADS-006     Electric Buddha cloud shimmer
+  KOS-PADS-007     Probabilistic gated chord pulse
+  KOS-TEXT-004     Loscil aquatic shimmer
+  KOS-BASS-002     Root-Fifth Slow Walk
+  KOS-BASS-006     Additive dual bass
+  KOS-DRUM-001     Minimal — JMJ Mini Pops style
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — drum fill
+  Bar 005    Section A    chords Dm
+  Bar 009    Bass         pattern evolving
+  Bar 017    Bass         pattern evolving
+  Bar 025    Bass         pattern evolving
+  Bar 029    Form         Enter B section — Dm
+  Bar 033    Bass         pattern evolving
+  Bar 041    Bass         pattern evolving
+  Bar 049    Bass         pattern evolving
+  Bar 053    Form         Return to A section — Bbm Csus2
+  Bar 065    Pads         stepping back
+  Bar 065    Bass         pattern evolving
+  Bar 077    Form         Enter B section again — Dm
+  Bar 077    Bass         pattern evolving
+  Bar 081    Pads         is back on stage
+  Bar 085    Bass         pattern evolving
+  Bar 093    Bass         pattern evolving
+  Bar 101    Bass         pattern evolving
+  Bar 105    Outro        16 bar fade
+
