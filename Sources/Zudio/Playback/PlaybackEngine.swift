@@ -781,6 +781,10 @@ final class PlaybackEngine: ObservableObject {
         onComplete: @escaping @Sendable (Error?) -> Void
     ) {
         stop()
+        // Increment schedulerID to invalidate any pending onStep async blocks from the
+        // previous playback session — they check this ID before writing currentStep and
+        // would otherwise race to overwrite the 0 we set here.
+        currentSchedulerID += 1
         currentStep = 0
         currentBar  = 0
 
