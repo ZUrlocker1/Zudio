@@ -133,7 +133,7 @@ final class AppState: ObservableObject {
                                      : ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Electric Piano","Muted Guitar","Tremolo Strings","Mono Synth"]
         case kTrackTexture: return c ? ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
                                      : ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
-        case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass"]
+        case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass","Cello"]
                                      : ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
         case kTrackDrums:   return c ? ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
                                      : ["Rock Kit","808 Kit","Brush Kit"]
@@ -253,6 +253,9 @@ final class AppState: ObservableObject {
                         guard let self, !self.isGenerating else { return }
                         self.generateNew()
                     }
+                case 14: // 'e' — export audio
+                    guard songState != nil, !isExportingAudio else { return event }
+                    Task { @MainActor [weak self] in self?.requestExport() }
                 case 1:  // 's' — save MIDI
                     guard songState != nil else { return event }
                     Task { @MainActor [weak self] in self?.saveMIDI() }
@@ -599,9 +602,68 @@ final class AppState: ObservableObject {
             let url = try MIDIFileExporter.export(song)
             lastSaveURL = url
             print("MIDI saved: \(url.path)")
+            appendToLog([
+                GenerationLogEntry(tag: "FILE", description: "Saved as MIDI \(url.lastPathComponent)")
+            ])
         } catch {
             print("MIDI export error: \(error)")
         }
+    }
+
+    // MARK: - Audio export
+
+    @Published var isExportingAudio:      Bool   = false
+    @Published var audioExportProgress:   Double = 0
+    @Published var audioExportFilename:   String = ""
+    @Published var showExportConfirmation: Bool  = false
+
+    /// Called from button/menu/keyboard — shows the confirmation dialog.
+    func requestExport() {
+        guard songState != nil, !isExportingAudio else { return }
+        showExportConfirmation = true
+    }
+
+    /// Called when the user presses Full Song or Sample in the confirmation dialog.
+    func startExport(sampleMode: Bool = false) {
+        guard let song = songState, !isExportingAudio else { return }
+        let url = AudioFileExporter.nextURL(songName: song.title, sampleMode: sampleMode)
+        audioExportFilename = url.lastPathComponent
+        audioExportProgress = 0
+        isExportingAudio    = true
+        visibleBarOffset    = 0   // snap scroll back to bar 0 so display matches the render
+        let style = selectedStyle.rawValue.capitalized
+        playback.exportAudio(url: url, state: song, sampleMode: sampleMode) { [weak self] progress in
+            Task { @MainActor [weak self] in self?.audioExportProgress = progress }
+        } onComplete: { [weak self] error in
+            Task { @MainActor [weak self] in
+                self?.isExportingAudio = false
+                if let error {
+                    if error is CancellationError {
+                        try? FileManager.default.removeItem(at: url)
+                        print("Audio export cancelled — file deleted")
+                    } else {
+                        print("Audio export error: \(error)")
+                    }
+                    return
+                }
+                // Success — log and add metadata.
+                print("Audio saved: \(url.path)")
+                self?.appendToLog([
+                    GenerationLogEntry(tag: "FILE", description: "Exported audio \(url.lastPathComponent)")
+                ])
+                await AudioFileExporter.addMetadata(
+                    to: url,
+                    title: song.title,
+                    artist: "Zudio",
+                    genre: style
+                )
+            }
+        }
+    }
+
+    /// Cancels an in-progress export; the partial file is deleted.
+    func cancelExport() {
+        playback.cancelExport()
     }
 
     // MARK: - Instrument

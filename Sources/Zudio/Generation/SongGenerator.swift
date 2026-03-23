@@ -245,14 +245,7 @@ struct SongGenerator {
         var rhythmRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackRhythm))
         var texRNG    = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackTexture))
 
-        // Arpeggio (rhythm slot) — the heartbeat of Kosmic
-        var rhythmRules: Set<String> = []
-        trackEvents[kTrackRhythm] = KosmicArpeggioGenerator.generate(
-            frame: frame, structure: structure, tonalMap: tonalMap,
-            rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceArpRuleID
-        )
-
-        // Lead 1
+        // Lead 1 (must run before arpeggio so xFilesBars are known)
         var lead1Rules: Set<String> = []
         var lead1BaseRule = ""
         var xFilesBars: [Int] = []
@@ -262,13 +255,21 @@ struct SongGenerator {
             lead1BaseRule: &lead1BaseRule, xFilesBars: &xFilesBars
         )
 
+        // Arpeggio (rhythm slot) — the heartbeat of Kosmic
+        var rhythmRules: Set<String> = []
+        trackEvents[kTrackRhythm] = KosmicArpeggioGenerator.generate(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceArpRuleID
+        )
+
         // Lead 2
         var lead2Rules: Set<String> = []
         trackEvents[kTrackLead2] = KosmicLeadGenerator.generateLead2(
             frame: frame, structure: structure, tonalMap: tonalMap,
             lead1Events: trackEvents[kTrackLead1],
             rng: &lead2RNG, usedRuleIDs: &lead2Rules,
-            lead1BaseRuleID: lead1BaseRule
+            lead1BaseRuleID: lead1BaseRule,
+            xFilesBars: xFilesBars
         )
 
         // Pads

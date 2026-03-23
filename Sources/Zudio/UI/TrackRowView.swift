@@ -74,7 +74,8 @@ struct TrackRowView: View {
         case kTrackBass:
             if isKosmic {
                 return [.init(name:"Moog Bass",    program:39), .init(name:"Synth Bass 1",   program:38),
-                        .init(name:"Lead Bass",    program:87), .init(name:"Fretless Bass",  program:35)]
+                        .init(name:"Lead Bass",    program:87), .init(name:"Fretless Bass",  program:35),
+                        .init(name:"Cello",        program:42)]
             }
             return [.init(name:"Moog Bass",       program:39), .init(name:"Lead Bass",      program:87),
                     .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]

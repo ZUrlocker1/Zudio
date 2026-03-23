@@ -56,6 +56,20 @@ final class PlaybackEngine: ObservableObject {
     // background timer thread. Set in load() alongside stepEventMap.
     nonisolated(unsafe) private var cachedSecondsPerStep: Double = 0
 
+    // Export tap state — allows cancelExport() to stop capture from outside the tap closure.
+    // @unchecked Sendable: written on main actor, read/written from audio thread; done flag is
+    // set once and only grows monotonically — no torn reads possible.
+    private final class ExportTapState: @unchecked Sendable {
+        var frames:        Int64 = 0
+        var done:          Bool  = false
+        // Fade-out: fadeStartFrame < fadeTotalFrames means a linear 0→silence fade is applied.
+        // Int64.max = no fade (default for full-song export).
+        var fadeStartFrame:  Int64 = Int64.max
+        var fadeTotalFrames: Int64 = 0
+    }
+    nonisolated(unsafe) private var currentExportTap:        ExportTapState?                        = nil
+    nonisolated(unsafe) private var currentExportOnComplete: (@Sendable (Error?) -> Void)?          = nil
+
     // Hidden intro/outro modulation: pads sweep LFO + bass slow pan (no UI change)
     private var kosmicIntroSweepPhase:   Double = 0.0
     private var kosmicIntroSweepTimer:   DispatchSourceTimer? = nil
@@ -262,6 +276,8 @@ final class PlaybackEngine: ObservableObject {
         if !tremEnabled[trackIndex] {
             if trackIndex == kTrackBass && program == 87 {
                 samplers[trackIndex].volume = 0.56   // Lead Bass runs hot
+            } else if trackIndex == kTrackBass && program == 42 {
+                samplers[trackIndex].volume = 0.45   // Cello runs significantly louder than synth basses
             } else if trackIndex == kTrackTexture {
                 samplers[trackIndex].volume = 1.4    // Texture pads are quiet
             } else {
@@ -745,5 +761,159 @@ final class PlaybackEngine: ObservableObject {
             let muted = muteState[i] || (anySolo && !soloState[i])
             samplers[i].volume = muted ? 0.0 : 1.0
         }
+    }
+
+    // MARK: - Audio export (real-time tap capture)
+
+    /// Records the song by tapping the main mixer output during live playback.
+    /// Captures exactly what the user hears — all effects, reverb, and samplers are live.
+    ///
+    /// A 500 ms pre-delay is inserted after stop() before the tap starts — this lets reverb
+    /// tails from prior playback drain to silence so they never bleed into the recorded file.
+    ///
+    /// Full-song mode adds a 2.5-second reverb tail after the last bar.
+    /// Sample mode captures up to 60 seconds with a 5-second linear fade-out at the end.
+    func exportAudio(
+        url: URL,
+        state: SongState,
+        sampleMode: Bool = false,
+        onProgress: @escaping @Sendable (Double) -> Void,
+        onComplete: @escaping @Sendable (Error?) -> Void
+    ) {
+        stop()
+        currentStep = 0
+        currentBar  = 0
+
+        // Store callback now so cancelExport() works even during the pre-delay window.
+        currentExportOnComplete = onComplete
+
+        // 500 ms silence: lets cathedral/chamber reverb tails from prior playback decay
+        // before the tap opens. The engine keeps running; samplers are silent via allNotesOff.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.currentExportOnComplete != nil else { return }
+            self.installExportTap(url: url, state: state, sampleMode: sampleMode,
+                                  onProgress: onProgress, onComplete: onComplete)
+        }
+    }
+
+    private func installExportTap(
+        url: URL,
+        state: SongState,
+        sampleMode: Bool,
+        onProgress: @escaping @Sendable (Double) -> Void,
+        onComplete: @escaping @Sendable (Error?) -> Void
+    ) {
+        let mixerNode       = engine.mainMixerNode
+        let tapFormat       = mixerNode.outputFormat(forBus: 0)
+        let sr              = tapFormat.sampleRate
+        let sps             = state.frame.secondsPerStep
+        let songMusicFrames = Int64(Double(state.frame.totalBars * 16) * sr * sps)
+
+        let musicFrames:    Int64
+        let totalFrames:    Int64
+        let fadeStartFrame: Int64
+
+        if sampleMode {
+            musicFrames    = min(songMusicFrames, Int64(60.0 * sr))
+            totalFrames    = musicFrames
+            fadeStartFrame = max(0, musicFrames - Int64(5.0 * sr))
+        } else {
+            musicFrames    = songMusicFrames
+            totalFrames    = musicFrames + Int64(sr * 2.5)
+            fadeStartFrame = Int64.max
+        }
+
+        let outputSettings: [String: Any] = [
+            AVFormatIDKey:         kAudioFormatMPEG4AAC,
+            AVSampleRateKey:       sr,
+            AVNumberOfChannelsKey: tapFormat.channelCount,
+            AVEncoderBitRateKey:   128_000
+        ]
+        let audioFile: AVAudioFile
+        do {
+            audioFile = try AVAudioFile(forWriting: url, settings: outputSettings)
+        } catch {
+            currentExportOnComplete = nil
+            onComplete(error)
+            return
+        }
+
+        let tapState = ExportTapState()
+        tapState.fadeStartFrame  = fadeStartFrame
+        tapState.fadeTotalFrames = totalFrames
+        currentExportTap        = tapState
+
+        mixerNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak self] buf, _ in
+            guard !tapState.done else { return }
+            let remaining = totalFrames - tapState.frames
+            guard remaining > 0 else { return }
+            if Int64(buf.frameLength) > remaining {
+                buf.frameLength = AVAudioFrameCount(remaining)
+            }
+
+            // Linear fade-out for sample mode.
+            let bufStart = tapState.frames
+            let fadeLen  = tapState.fadeTotalFrames - tapState.fadeStartFrame
+            if fadeLen > 0 && bufStart + Int64(buf.frameLength) > tapState.fadeStartFrame,
+               let channelData = buf.floatChannelData {
+                let nch = Int(buf.format.channelCount)
+                for i in 0..<Int(buf.frameLength) {
+                    let absFrame = bufStart + Int64(i)
+                    if absFrame >= tapState.fadeStartFrame {
+                        let t      = Float(absFrame - tapState.fadeStartFrame) / Float(fadeLen)
+                        let factor = max(0.0, 1.0 - t)
+                        for ch in 0..<nch { channelData[ch][i] *= factor }
+                    }
+                }
+            }
+
+            do {
+                try audioFile.write(from: buf)
+            } catch {
+                tapState.done = true
+                Task { @MainActor [weak self] in
+                    self?.finishExport(onComplete: onComplete, error: error)
+                }
+                return
+            }
+            tapState.frames += Int64(buf.frameLength)
+            onProgress(min(1.0, Double(tapState.frames) / Double(musicFrames)))
+            if tapState.frames >= totalFrames {
+                tapState.done = true
+                Task { @MainActor [weak self] in
+                    self?.finishExport(onComplete: onComplete, error: nil)
+                }
+            }
+        }
+
+        load(state)
+        play()
+    }
+
+    /// Cancels an in-progress export (including during the pre-delay window before the tap opens).
+    /// AppState is responsible for deleting the partial file on cancel.
+    func cancelExport() {
+        if let ts = currentExportTap, !ts.done {
+            // Tap is installed — stop it.
+            ts.done = true
+            currentExportTap = nil
+            let cb = currentExportOnComplete
+            currentExportOnComplete = nil
+            engine.mainMixerNode.removeTap(onBus: 0)
+            stop()
+            cb?(CancellationError())
+        } else if let cb = currentExportOnComplete {
+            // Cancel during pre-delay — tap not yet installed, no file written yet.
+            currentExportOnComplete = nil
+            cb(CancellationError())
+        }
+    }
+
+    private func finishExport(onComplete: @Sendable (Error?) -> Void, error: Error?) {
+        currentExportTap        = nil
+        currentExportOnComplete = nil
+        engine.mainMixerNode.removeTap(onBus: 0)
+        stop()
+        onComplete(error)
     }
 }

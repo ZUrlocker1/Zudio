@@ -10,7 +10,7 @@ struct MIDIFileExporter {
     static func export(_ song: SongState) throws -> URL {
         let dir = zudioDocumentsDir()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let filename = nextFilename(in: dir)
+        let filename = nextFilename(for: song.title, in: dir)
         let url = dir.appendingPathComponent(filename)
         try buildMIDIFile(song).write(to: url)
         return url
@@ -22,22 +22,17 @@ struct MIDIFileExporter {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
     }
 
-    private static func nextFilename(in dir: URL) -> String {
-        let date = DateFormatter()
-        date.dateFormat = "MM-dd-yyyy"
-        let dateStr = date.string(from: Date())
-
-        var maxNum = 0
-        if let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
-            for f in files where f.hasPrefix("Zudio-") && f.hasSuffix(".MID") {
-                // "Zudio-NNNN-MM-DD-YYYY.MID" → drop prefix (6) and suffix (4)
-                let inner = String(f.dropFirst(6).dropLast(4))  // "NNNN-MM-DD-YYYY"
-                if let dash = inner.firstIndex(of: "-"), let n = Int(inner[inner.startIndex..<dash]) {
-                    maxNum = max(maxNum, n)
-                }
-            }
+    private static func nextFilename(for songName: String, in dir: URL) -> String {
+        let safe = AudioFileExporter.sanitizedName(songName)
+        let base = "Zudio-\(safe)"
+        let fm   = FileManager.default
+        var candidate = "\(base).MID"
+        var n = 2
+        while fm.fileExists(atPath: dir.appendingPathComponent(candidate).path) {
+            candidate = "\(base)-\(n).MID"
+            n += 1
         }
-        return String(format: "Zudio-%04d-%@.MID", maxNum + 1, dateStr)
+        return candidate
     }
 
     // MARK: - MIDI file construction

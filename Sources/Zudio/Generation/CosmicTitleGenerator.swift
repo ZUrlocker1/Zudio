@@ -19,8 +19,8 @@ struct KosmicTitleGenerator {
         // Real
         "Galaxie", "Proxima", "Axiome", "Paradoxe", "Fluxion", "Maxima",
         // Invented in JMJ style
-        "Vortexe", "Galaxène", "Solaxe", "Nexione", "Hexalon", "Flexure",
-        "Auxèse", "Plexion", "Oxidane", "Luxième"
+        "Vortexe", "Galaxene", "Solaxe", "Nexione", "Hexalon", "Flexure",
+        "Auxese", "Plexion", "Oxidane", "Luxieme"
     ]
 
     private static let romanNumerals = ["II", "III", "IV", "V", "VI", "VII", "VIII"]
@@ -40,11 +40,11 @@ struct KosmicTitleGenerator {
 
     private static let germanAdjectives = [
         "Ewig", "Tief", "Dunkel", "Fern", "Kalt", "Weit", "Still",
-        "Schwarz", "Leer", "Uralt", "Groß", "Sanft", "Träge", "Fahl"
+        "Schwarz", "Leer", "Uralt", "Gross", "Sanft", "Trage", "Fahl"
     ]
 
     private static let germanKosmicNouns = [
-        "Kosmos", "Nebel", "Stern", "Raum", "Welle", "Licht", "Äther",
+        "Kosmos", "Nebel", "Stern", "Raum", "Welle", "Licht", "Aether",
         "Ferne", "Himmel", "Strom", "Feld", "Leere", "Geist", "Tiefe",
         "Schwere", "Dunkel", "Stille", "Weite", "Schein", "Hauch"
     ]

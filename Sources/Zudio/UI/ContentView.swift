@@ -134,6 +134,34 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 500)
         .background(Color(white: 0.20))
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $appState.showExportConfirmation) {
+            ExportConfirmationView()
+                .environmentObject(appState)
+        }
+        .overlay {
+            if appState.isExportingAudio {
+                ZStack {
+                    Color.black.opacity(0.55).ignoresSafeArea()
+                    VStack(spacing: 18) {
+                        Text("Exporting Audio…")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        ProgressView(value: appState.audioExportProgress)
+                            .frame(width: 300)
+                            .tint(.white)
+                        Text(appState.audioExportFilename)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Color.white.opacity(0.55))
+                        Button("Cancel") { appState.cancelExport() }
+                            .buttonStyle(.bordered)
+                            .foregroundStyle(.white)
+                            .tint(.white)
+                    }
+                    .padding(32)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                }
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -156,6 +184,59 @@ struct ContentView: View {
     private func songLength(_ song: SongState) -> String {
         let seconds = Int(Double(song.frame.totalBars) * 4.0 * 60.0 / Double(song.frame.tempo))
         return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+    }
+}
+
+// MARK: - Export confirmation dialog
+
+struct ExportConfirmationView: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Export Audio")
+                .font(.headline)
+            VStack(spacing: 8) {
+                Text("Export to an M4A Audio file will take approximately \(songMinutes).")
+                    .multilineTextAlignment(.center)
+                Text("Alternatively, we can save a 60 second sample.")
+                    .multilineTextAlignment(.center)
+            }
+            .frame(width: 300)
+            HStack(spacing: 12) {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Sample") {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        appState.startExport(sampleMode: true)
+                    }
+                }
+                Button("Full Song") {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        appState.startExport(sampleMode: false)
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(32)
+        .frame(width: 400)
+    }
+
+    private var songLength: String {
+        guard let song = appState.songState else { return "unknown" }
+        let seconds = Int(Double(song.frame.totalBars) * 4.0 * 60.0 / Double(song.frame.tempo))
+        return "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+    }
+
+    private var songMinutes: String {
+        guard let song = appState.songState else { return "unknown" }
+        let seconds = Double(song.frame.totalBars) * 4.0 * 60.0 / Double(song.frame.tempo)
+        let minutes = Int((seconds + 30) / 60)
+        return minutes == 1 ? "1 minute" : "\(minutes) minutes"
     }
 }
 

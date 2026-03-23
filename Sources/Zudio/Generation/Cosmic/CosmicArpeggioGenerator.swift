@@ -64,12 +64,10 @@ struct KosmicArpeggioGenerator {
         case "KOS-RTHM-010": events = generateCravenFaultsGrit(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         default:             events = generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         }
-        // Bridge A-1 (.bridge): arpeggio re-enters in final 2 bars with descending figure
+        // Bridge A-1 (.bridge): arpeggio re-enters with ascending/descending phase walk
         events += generateBridgeA1Arp(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         // Bridge A-2 (.bridgeAlt call+response): melodic response phrase on non-hit bars
         events += generateBridgeAltArp(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        // Bridge melody (.bridgeMelody): X-Files ostinato 25% of the time (otherwise silent)
-        events += generateBridgeMelodyArp(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         // Long intro hint: sparse ascending phrase from the midpoint of 6/8-bar intros
         events += generateLongIntroHint(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         return events
@@ -598,10 +596,6 @@ struct KosmicArpeggioGenerator {
         var events: [MIDIEvent] = []
         for section in structure.sections {
             guard section.label == .bridge else { continue }
-            let useXFiles = rng.nextDouble() < 0.25
-            let candidates = Array(section.startBar..<section.endBar)
-            let xFilesBars: Set<Int> = useXFiles
-                ? Set(pickXFilesBars(from: candidates, minGap: 2, rng: &rng)) : []
             let bridgeLen = max(1, section.endBar - section.startBar)
             let ascending = section.startBar % 3 != 2
             for bar in section.startBar..<section.endBar {
@@ -632,20 +626,7 @@ struct KosmicArpeggioGenerator {
 
                 let barStart = bar * 16
 
-                if xFilesBars.contains(bar) {
-                    // X-Files ostinato: root–3rd–5th–3rd cycling, last 2 hits shift to b7
-                    let flat7 = mode.nearestInterval(10)
-                    let cycle   = [lo, md, hi, md]
-                    let tension = [lo, place(flat7)]
-                    for i in 0..<8 {
-                        let step = i * 2
-                        let note = i < 6 ? cycle[i % 4] : tension[i - 6]
-                        let vel  = UInt8(max(20, min(127, 60 + rng.nextInt(upperBound: 12) - 6)))
-                        events.append(MIDIEvent(stepIndex: barStart + step,
-                                                note: UInt8(note), velocity: vel, durationSteps: 2))
-                    }
-                } else {
-                    switch phase {
+                switch phase {
                     case 0:
                         // 2 anchor hits: beats 1 and 3
                         for step in [0, 8] {
@@ -676,69 +657,9 @@ struct KosmicArpeggioGenerator {
                                                     note: UInt8(note), velocity: vel, durationSteps: 3))
                         }
                     }
-                }
             }
         }
         return events
-    }
-
-    // MARK: - Bridge melody arpeggio (X-Files ostinato 25% of bridgeMelody sections)
-
-    private static func generateBridgeMelodyArp(
-        frame: GlobalMusicalFrame, structure: SongStructure,
-        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
-    ) -> [MIDIEvent] {
-        var events: [MIDIEvent] = []
-        for section in structure.sections {
-            guard section.label == .bridgeMelody else { continue }
-            guard rng.nextDouble() < 0.25 else { continue }
-            let xBars = Set(pickXFilesBars(from: Array(section.startBar..<section.endBar),
-                                           minGap: 3, rng: &rng))
-            for bar in section.startBar..<section.endBar {
-                guard xBars.contains(bar) else { continue }
-                guard let entry = tonalMap.entry(atBar: bar) else { continue }
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let third  = mode.nearestInterval(3)
-                let flat7  = mode.nearestInterval(10)
-
-                func place(_ pc: Int) -> Int {
-                    var m = 60 + rootPC + pc
-                    while m > 72 { m -= 12 }
-                    while m < 60 { m += 12 }
-                    return m
-                }
-
-                let lo = place(0); let md = place(third); let hi = place(7)
-                let cycle   = [lo, md, hi, md]
-                let tension = [lo, place(flat7)]
-                let barStart = bar * 16
-                for i in 0..<8 {
-                    let step = i * 2
-                    let note = i < 6 ? cycle[i % 4] : tension[i - 6]
-                    let vel  = UInt8(max(20, min(127, 58 + rng.nextInt(upperBound: 12) - 6)))
-                    events.append(MIDIEvent(stepIndex: barStart + step,
-                                            note: UInt8(note), velocity: vel, durationSteps: 2))
-                }
-            }
-        }
-        return events
-    }
-
-    // MARK: - X-Files bar picker (mirrors CosmicLeadGenerator version)
-    private static func pickXFilesBars(from candidates: [Int], minGap: Int, rng: inout SeededRNG) -> [Int] {
-        guard !candidates.isEmpty else { return [] }
-        let tryDouble = candidates.count >= 4 && rng.nextDouble() < 0.50
-        if !tryDouble { return [candidates[rng.nextInt(upperBound: candidates.count)]] }
-        for _ in 0..<15 {
-            let i = rng.nextInt(upperBound: candidates.count)
-            let j = rng.nextInt(upperBound: candidates.count)
-            guard i != j else { continue }
-            let (a, b) = candidates[i] < candidates[j]
-                ? (candidates[i], candidates[j]) : (candidates[j], candidates[i])
-            if b - a >= minGap { return [a, b] }
-        }
-        return [candidates[rng.nextInt(upperBound: candidates.count)]]
     }
 
     // MARK: - Bridge A-2 melodic response (call + response)
@@ -762,12 +683,7 @@ struct KosmicArpeggioGenerator {
         for section in structure.sections {
             guard section.label == .bridgeAlt else { continue }
             // Choose one phrase variant (0-5) for all response bars in this bridge.
-            // Separately, 30% chance of X-Files ostinato on 1–2 response bars (spaced ≥4 apart).
             let mainVariant = rng.nextInt(upperBound: 6)
-            let useXFiles   = rng.nextDouble() < 0.30
-            let responseCandidates = (section.startBar..<section.endBar).filter { ($0 - section.startBar) % 2 == 1 }
-            let xFilesResponseBars: Set<Int> = useXFiles
-                ? Set(pickXFilesBars(from: responseCandidates, minGap: 4, rng: &rng)) : []
             for bar in section.startBar..<section.endBar {
                 let bridgeBar = bar - section.startBar
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
@@ -787,7 +703,7 @@ struct KosmicArpeggioGenerator {
                     continue
                 }
 
-                // Response bars (odd): X-Files on selected bars, mainVariant otherwise
+                // Response bars (odd): melodic phrase variant
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let mode   = entry.sectionMode
                 let third  = mode.nearestInterval(3)
@@ -808,42 +724,29 @@ struct KosmicArpeggioGenerator {
                 func vel(_ base: Int) -> UInt8 { UInt8(max(20, min(127, base + rng.nextInt(upperBound: 14) - 7))) }
                 let barStart = bar * 16
 
-                if xFilesResponseBars.contains(bar) {
-                    // X-Files ostinato: root–3rd–5th–3rd cycling, final 2 hits shift to b7
-                    let flat7   = mode.nearestInterval(10)
-                    let cycle   = [lo, md, hi, md]
-                    let tension = [lo, place(flat7)]
-                    for i in 0..<8 {
-                        let step = i * 2
-                        let note = i < 6 ? cycle[i % 4] : tension[i - 6]
-                        events.append(MIDIEvent(stepIndex: barStart + step,
-                                                note: UInt8(note), velocity: vel(74), durationSteps: 2))
+                switch mainVariant {
+                case 0:  // ascending arc
+                    for (i, n) in [lo, md, hi].enumerated() {
+                        events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(68), durationSteps: 4))
                     }
-                } else {
-                    switch mainVariant {
-                    case 0:  // ascending arc
-                        for (i, n) in [lo, md, hi].enumerated() {
-                            events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(68), durationSteps: 4))
-                        }
-                    case 1:  // descending arc
-                        for (i, n) in [hi, md, lo].enumerated() {
-                            events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(68), durationSteps: 4))
-                        }
-                    case 2:  // arch: up then partial fall
-                        for (i, n) in [lo, hi, md].enumerated() {
-                            events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(68), durationSteps: 4))
-                        }
-                    case 3:  // two long notes — spacious
-                        events.append(MIDIEvent(stepIndex: barStart,     note: UInt8(lo), velocity: vel(72), durationSteps: 6))
-                        events.append(MIDIEvent(stepIndex: barStart + 8, note: UInt8(hi), velocity: vel(64), durationSteps: 5))
-                    case 4:  // syncopated: beat 1, and-of-2, beat 4
-                        events.append(MIDIEvent(stepIndex: barStart,      note: UInt8(lo), velocity: vel(68), durationSteps: 3))
-                        events.append(MIDIEvent(stepIndex: barStart + 6,  note: UInt8(md), velocity: vel(62), durationSteps: 3))
-                        events.append(MIDIEvent(stepIndex: barStart + 12, note: UInt8(hi), velocity: vel(72), durationSteps: 3))
-                    default:  // high-root drop: upper root → 5th → lower root
-                        for (i, n) in [hiRoot, hi, lo].enumerated() {
-                            events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(65), durationSteps: 4))
-                        }
+                case 1:  // descending arc
+                    for (i, n) in [hi, md, lo].enumerated() {
+                        events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(68), durationSteps: 4))
+                    }
+                case 2:  // arch: up then partial fall
+                    for (i, n) in [lo, hi, md].enumerated() {
+                        events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(68), durationSteps: 4))
+                    }
+                case 3:  // two long notes — spacious
+                    events.append(MIDIEvent(stepIndex: barStart,     note: UInt8(lo), velocity: vel(72), durationSteps: 6))
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: UInt8(hi), velocity: vel(64), durationSteps: 5))
+                case 4:  // syncopated: beat 1, and-of-2, beat 4
+                    events.append(MIDIEvent(stepIndex: barStart,      note: UInt8(lo), velocity: vel(68), durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 6,  note: UInt8(md), velocity: vel(62), durationSteps: 3))
+                    events.append(MIDIEvent(stepIndex: barStart + 12, note: UInt8(hi), velocity: vel(72), durationSteps: 3))
+                default:  // high-root drop: upper root → 5th → lower root
+                    for (i, n) in [hiRoot, hi, lo].enumerated() {
+                        events.append(MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(n), velocity: vel(65), durationSteps: 4))
                     }
                 }
             }

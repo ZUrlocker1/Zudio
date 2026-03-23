@@ -1,5 +1,5 @@
 // TopBarView.swift — compact 3-row header
-// Row 1: blank spacer | Row 2: transport + controls | Row 3: Save MIDI
+// Row 1: blank spacer | Row 2: transport + controls | Row 3: Save Audio + Save MIDI
 
 import SwiftUI
 import AppKit
@@ -206,94 +206,102 @@ struct TopBarView: View {
 
                 Divider()
 
-                // Generate (row 2) and Save MIDI (row 3) in a VStack, plus selectors
-                // Fixed widths on all buttons/pickers ensure rows align without Grid's two-pass layout.
-                VStack(alignment: .leading, spacing: 6) {
-                    // Blank row above first button row
-                    Color.clear.frame(height: 22)
+                // Generate / Save MIDI / Export Audio stacked left; selectors + Reset right.
+                HStack(alignment: .center, spacing: 14) {
 
-                    // Row 2: Generate | Style | Mood | Key | BPM
-                    HStack(spacing: 14) {
+                    // Left column: three action buttons, all same width
+                    VStack(spacing: 6) {
                         Button(action: { appState.generateNew() }) {
                             Label {
                                 (Text("G").underline() + Text("enerate"))
                                     .fontWeight(.semibold)
                             } icon: { Image(systemName: "bolt.fill") }
-                            .frame(width: 116, alignment: .center)
+                            .frame(width: 128, alignment: .center)
                         }
                         .disabled(appState.isGenerating)
                         .keyboardShortcut("g", modifiers: .command)
+                        .help("Generate a new song (⌘G)")
 
-                        Picker("", selection: $appState.selectedStyle) {
-                            (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
-                            (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 140)
-
-                        Picker("Mood", selection: $appState.moodOverride) {
-                            Text("Auto").tag(Optional<Mood>.none)
-                            ForEach(Mood.allCases, id: \.self) { m in
-                                Text(m.rawValue.capitalized).tag(Optional(m))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 110)
-
-                        Picker("Key", selection: $appState.keyOverride) {
-                            Text("Auto").tag(Optional<String>.none)
-                            ForEach(kAllKeys, id: \.self) { k in
-                                Text(k).tag(Optional(k))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(width: 90)
-
-                        HStack(spacing: 6) {
-                            Text("BPM")
-                                .foregroundStyle(.white)
-                                .fixedSize()
-                            TextField("", value: Binding(
-                                get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 0 },
-                                set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
-                            ), format: .number)
-                            .frame(width: 48)
-                            .textFieldStyle(.roundedBorder)
-                            Stepper("", value: Binding(
-                                get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 138 },
-                                set: { appState.tempoOverride = max(20, min(200, $0)) }
-                            ), in: 20...200)
-                            .labelsHidden()
-                        }
-                    }
-
-                    // Row 3: Save MIDI | Reset
-                    HStack(spacing: 14) {
                         Button(action: { appState.saveMIDI() }) {
                             Label {
                                 (Text("S").underline() + Text("ave MIDI"))
                                     .fontWeight(.semibold)
                             } icon: { Image(systemName: "square.and.arrow.down") }
-                            .frame(width: 116, alignment: .center)
+                            .frame(width: 128, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
                         .keyboardShortcut("s", modifiers: .command)
                         .help("Save multi-track MIDI to ~/Downloads/ (⌘S)")
+
+                        Button(action: { appState.requestExport() }) {
+                            Label {
+                                (Text("E").underline() + Text("xport Audio"))
+                                    .fontWeight(.semibold)
+                            } icon: { Image(systemName: "waveform") }
+                            .frame(width: 128, alignment: .center)
+                        }
+                        .disabled(appState.songState == nil || appState.isExportingAudio)
+                        .keyboardShortcut("e", modifiers: .command)
+                        .help("Export song to M4A audio file in ~/Downloads/ (⌘E)")
+                    }
+
+                    // Right block: style selectors + Reset
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 14) {
+                            Picker("", selection: $appState.selectedStyle) {
+                                (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
+                                (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 140)
+
+                            Picker("Mood", selection: $appState.moodOverride) {
+                                Text("Auto").tag(Optional<Mood>.none)
+                                ForEach(Mood.allCases, id: \.self) { m in
+                                    Text(m.rawValue.capitalized).tag(Optional(m))
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 110)
+
+                            Picker("Key", selection: $appState.keyOverride) {
+                                Text("Auto").tag(Optional<String>.none)
+                                ForEach(kAllKeys, id: \.self) { k in
+                                    Text(k).tag(Optional(k))
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(width: 90)
+
+                            HStack(spacing: 6) {
+                                Text("BPM")
+                                    .foregroundStyle(.white)
+                                    .fixedSize()
+                                TextField("", value: Binding(
+                                    get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 0 },
+                                    set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
+                                ), format: .number)
+                                .frame(width: 48)
+                                .textFieldStyle(.roundedBorder)
+                                Stepper("", value: Binding(
+                                    get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 138 },
+                                    set: { appState.tempoOverride = max(20, min(200, $0)) }
+                                ), in: 20...200)
+                                .labelsHidden()
+                            }
+                        }
 
                         Button(action: { appState.resetTrackDefaults() }) {
                             Label {
                                 (Text("R").underline() + Text("eset"))
                                     .fontWeight(.semibold)
                             } icon: { Image(systemName: "arrow.counterclockwise") }
-                            .frame(width: 140, alignment: .center)
+                            .frame(width: 128, alignment: .center)
                         }
                         .disabled(appState.songState == nil)
                         .keyboardShortcut("r", modifiers: .command)
                         .help("Reset all instruments and effects to style defaults (⌘R)")
                     }
-
-                    // Blank row below second button row
-                    Color.clear.frame(height: 22)
                 }
                 .font(.callout)
                 .padding(.vertical, 5)
@@ -307,6 +315,7 @@ struct TopBarView: View {
                     Text("Copyright © 2026 Zack Urlocker")
                         .font(.callout)
                         .foregroundStyle(.white)
+                        .lineLimit(1)
                         .padding(.top, 6)
                 }
                 .font(.callout)
@@ -383,7 +392,8 @@ struct HelpView: View {
                 helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result, or leave them on Auto.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
-                helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to ~/Downloads/. Open in any DAW to edit further.")
+                helpLine("Export Audio (⌘E)", "Exports the song to an M4A file in Downloads.")
+                helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to Downloads. Open in any DAW to edit further.")
                 helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")

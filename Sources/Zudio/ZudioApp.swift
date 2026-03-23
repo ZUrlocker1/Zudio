@@ -72,6 +72,12 @@ struct ZudioApp: App {
                 .keyboardShortcut("g", modifiers: .command)
             }
             CommandGroup(replacing: .saveItem) {
+                Button("Export Audio") {
+                    appState.requestExport()
+                }
+                .keyboardShortcut("e", modifiers: .command)
+                .disabled(appState.songState == nil || appState.isExportingAudio)
+
                 Button("Save MIDI") {
                     appState.saveMIDI()
                 }

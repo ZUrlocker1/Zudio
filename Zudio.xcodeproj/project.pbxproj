@@ -54,6 +54,7 @@
 		AA000000000000000000036 /* CosmicDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000036 /* CosmicDrumGenerator.swift */; };
 		AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000037 /* CosmicTextureGenerator.swift */; };
 		AA000000000000000000038 /* CosmicTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000038 /* CosmicTitleGenerator.swift */; };
+		AA000000000000000000039 /* AudioFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000039 /* AudioFileExporter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -104,6 +105,7 @@
 		BB000000000000000000036 /* CosmicDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicDrumGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000037 /* CosmicTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTextureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000038 /* CosmicTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTitleGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000039 /* AudioFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000000000000000000021 /* Zudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -217,6 +219,7 @@
 			children = (
 				BB00000000000000000001D /* AssetLoader.swift */,
 				BB000000000000000000022 /* MIDIFileExporter.swift */,
+				BB000000000000000000039 /* AudioFileExporter.swift */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -368,6 +371,7 @@
 				AA000000000000000000035 /* CosmicBassGenerator.swift in Sources */,
 				AA000000000000000000036 /* CosmicDrumGenerator.swift in Sources */,
 				AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */,
+				AA000000000000000000039 /* AudioFileExporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

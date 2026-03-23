@@ -14,10 +14,10 @@ struct TitleGenerator {
     ]
     private static let motorikAdjectives = [
         "Ewig", "Dunkel", "Hell", "Klar", "Tief", "Weit", "Stark", "Ruhig",
-        "Endlos", "Frei", "Neu", "Alt", "Groß", "Klein", "Schnell", "Langsam"
+        "Endlos", "Frei", "Neu", "Alt", "Gross", "Klein", "Schnell", "Langsam"
     ]
     private static let motorikVerbs = [
-        "Fährt", "Läuft", "Dreht", "Fließt", "Leuchtet", "Klingt", "Bewegt", "Zieht"
+        "Fahrt", "Lauft", "Dreht", "Fliesst", "Leuchtet", "Klingt", "Bewegt", "Zieht"
     ]
     private static let englishAtmospheric = [
         "Phase", "Drift", "Pulse", "Grid", "Loop", "Arc", "Current", "Signal",
