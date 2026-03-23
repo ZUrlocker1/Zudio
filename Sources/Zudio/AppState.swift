@@ -130,9 +130,9 @@ final class AppState: ObservableObject {
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
         let c = style == .kosmic
         switch trackIndex {
-        case kTrackLead1:   return c ? ["Ocarina","Flute","Whistle","Calliope Lead","Fifths Lead"]
+        case kTrackLead1:   return c ? ["Ocarina","Flute","Whistle","Calliope Lead","Fifths Lead","Soft Brass"]
                                      : ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr","Flute"]
-        case kTrackLead2:   return c ? ["Brightness","Warm Pad","Halo Pad","New Age Pad","Soft Brass"]
+        case kTrackLead2:   return c ? ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
                                      : ["Brightness","Vibraphone","Marimba","Bell/Pluck","Ocarina"]
         case kTrackPads:    return c ? ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
                                      : ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]

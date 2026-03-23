@@ -29,7 +29,7 @@ struct TrackRowView: View {
             if isKosmic {
                 return [.init(name:"Ocarina",        program:79),  .init(name:"Flute",        program:73),
                         .init(name:"Whistle",        program:78),  .init(name:"Calliope Lead", program:82),
-                        .init(name:"Fifths Lead",    program:86)]
+                        .init(name:"Fifths Lead",    program:86),  .init(name:"Soft Brass",   program:56)]
             }
             return [.init(name:"Square Lead",      program:80), .init(name:"Mono Synth",      program:81),
                     .init(name:"Synth Brass",      program:63), .init(name:"Synth Brass 2",   program:62),
@@ -38,8 +38,7 @@ struct TrackRowView: View {
         case kTrackLead2:
             if isKosmic {
                 return [.init(name:"Brightness",   program:100), .init(name:"Warm Pad",       program:89),
-                        .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88),
-                        .init(name:"Soft Brass",   program:56)]
+                        .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88)]
             }
             return [.init(name:"Brightness",     program:100), .init(name:"Vibraphone",      program:11),
                     .init(name:"Marimba",          program:12), .init(name:"Bell/Pluck",      program:14),
