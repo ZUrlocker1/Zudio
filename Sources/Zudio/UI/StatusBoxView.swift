@@ -11,7 +11,7 @@ struct StatusBoxView: View {
 
     // Tag column fixed width in monospaced chars (must exceed longest rule ID + space)
     private let tagWidth = 15
-    
+            
     // Cached Text built from the log — rebuilt only when entry count changes,
     // not on every body evaluation (which fires on nearly every step tick).
     @State private var builtText: Text = Text("")

@@ -56,6 +56,16 @@
 		AA000000000000000000038 /* CosmicTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000038 /* CosmicTitleGenerator.swift */; };
 		AA000000000000000000039 /* AudioFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000039 /* AudioFileExporter.swift */; };
 		AA000000000000000000040 /* SongLogExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000040 /* SongLogExporter.swift */; };
+		AA000000000000000000041 /* AmbientTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000041 /* AmbientTitleGenerator.swift */; };
+		AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */; };
+		AA000000000000000000051 /* AmbientStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000051 /* AmbientStructureGenerator.swift */; };
+		AA000000000000000000052 /* AmbientLoopTiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000052 /* AmbientLoopTiler.swift */; };
+		AA000000000000000000053 /* AmbientPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000053 /* AmbientPadsGenerator.swift */; };
+		AA000000000000000000054 /* AmbientBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000054 /* AmbientBassGenerator.swift */; };
+		AA000000000000000000055 /* AmbientDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000055 /* AmbientDrumGenerator.swift */; };
+		AA000000000000000000056 /* AmbientLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000056 /* AmbientLeadGenerator.swift */; };
+		AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000057 /* AmbientRhythmGenerator.swift */; };
+		AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000058 /* AmbientTextureGenerator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -106,6 +116,16 @@
 		BB000000000000000000036 /* CosmicDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicDrumGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000037 /* CosmicTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTextureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000038 /* CosmicTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTitleGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000041 /* AmbientTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientTitleGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientMusicalFrameGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000051 /* AmbientStructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientStructureGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000052 /* AmbientLoopTiler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLoopTiler.swift; sourceTree = "<group>"; };
+		BB000000000000000000053 /* AmbientPadsGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientPadsGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000054 /* AmbientBassGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBassGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000055 /* AmbientDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientDrumGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000056 /* AmbientLeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLeadGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000057 /* AmbientRhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientRhythmGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000058 /* AmbientTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientTextureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000039 /* AudioFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000040 /* SongLogExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongLogExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -169,12 +189,14 @@
 				BB00000000000000000000F /* StructureGenerator.swift */,
 				BB000000000000000000010 /* TitleGenerator.swift */,
 				BB000000000000000000038 /* CosmicTitleGenerator.swift */,
+				BB000000000000000000041 /* AmbientTitleGenerator.swift */,
 				BB000000000000000000011 /* MusicalFrameGenerator.swift */,
 				BB000000000000000000012 /* LeadGenerator.swift */,
 				BB000000000000000000013 /* BassGenerator.swift */,
 				BB000000000000000000014 /* TextureGenerator.swift */,
 				BB000000000000000000015 /* RhythmGenerator.swift */,
 				DD000000000000000000010 /* Cosmic */,
+			DD000000000000000000011 /* Ambient */,
 			);
 			path = Generation;
 			sourceTree = "<group>";
@@ -192,6 +214,22 @@
 				BB000000000000000000037 /* CosmicTextureGenerator.swift */,
 			);
 			path = Cosmic;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000011 /* Ambient */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */,
+				BB000000000000000000051 /* AmbientStructureGenerator.swift */,
+				BB000000000000000000052 /* AmbientLoopTiler.swift */,
+				BB000000000000000000053 /* AmbientPadsGenerator.swift */,
+				BB000000000000000000054 /* AmbientBassGenerator.swift */,
+				BB000000000000000000055 /* AmbientDrumGenerator.swift */,
+				BB000000000000000000056 /* AmbientLeadGenerator.swift */,
+				BB000000000000000000057 /* AmbientRhythmGenerator.swift */,
+				BB000000000000000000058 /* AmbientTextureGenerator.swift */,
+			);
+			path = Ambient;
 			sourceTree = "<group>";
 		};
 		DD000000000000000000005 /* Playback */ = {
@@ -351,6 +389,7 @@
 				AA00000000000000000000F /* StructureGenerator.swift in Sources */,
 				AA000000000000000000010 /* TitleGenerator.swift in Sources */,
 				AA000000000000000000038 /* CosmicTitleGenerator.swift in Sources */,
+				AA000000000000000000041 /* AmbientTitleGenerator.swift in Sources */,
 				AA000000000000000000011 /* MusicalFrameGenerator.swift in Sources */,
 				AA000000000000000000012 /* LeadGenerator.swift in Sources */,
 				AA000000000000000000013 /* BassGenerator.swift in Sources */,
@@ -376,6 +415,15 @@
 				AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */,
 				AA000000000000000000039 /* AudioFileExporter.swift in Sources */,
 				AA000000000000000000040 /* SongLogExporter.swift in Sources */,
+				AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
+				AA000000000000000000051 /* AmbientStructureGenerator.swift in Sources */,
+				AA000000000000000000052 /* AmbientLoopTiler.swift in Sources */,
+				AA000000000000000000053 /* AmbientPadsGenerator.swift in Sources */,
+				AA000000000000000000054 /* AmbientBassGenerator.swift in Sources */,
+				AA000000000000000000055 /* AmbientDrumGenerator.swift in Sources */,
+				AA000000000000000000056 /* AmbientLeadGenerator.swift in Sources */,
+				AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */,
+				AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

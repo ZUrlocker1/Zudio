@@ -614,13 +614,41 @@ Example pairing (too uniform): Pads=Warm Pad + Texture=Halo Pad + Lead=Space Voi
 
 ### 6.2 Instrument Preset Lists Per Track
 
-- **Lead 1 (Ambient):** Flute (73), Ocarina (79), Brightness (100), Halo Pad (94), New Age Pad (88), Choir Aahs (52), Vibraphone (11)
-- **Lead 2 (Ambient):** Warm Pad (89), Space Voice (91), FX Atmosphere (99), Recorder (74), Pan Flute (75)
-- **Pads (Ambient):** Warm Pad (89), Halo Pad (94), String Ensemble 1 (48), Synth Strings 1 (50), Choir Aahs (52), Bowed Glass (92), New Age Pad (88)
-- **Rhythm/Arpeggio (Ambient):** Vibraphone (11), Marimba (12), Glockenspiel (9), FX Echoes (102), Music Box (10) — sparse/soft only
-- **Texture (Ambient):** Space Voice (91), FX Atmosphere (99), Sweep Pad (95), Bowed Glass (92), String Ensemble 2 (49), Tubular Bells (14)
-- **Bass (Ambient):** Moog Bass (39), Synth Bass 1 (38), Cello (42) at low register, Contrabass (43)
-- **Drums (Ambient):** Brush Kit (40) for textural percussion; absent otherwise
+Each track lists instruments in two families. At song generation time, AMB-SYNC-007 (see Part 13) requires at least one acoustic and one electronic instrument across the 7-track assignment. Instruments marked (A) are acoustic family; (E) are electronic.
+
+**Lead 1 — primary floating melody**
+- Acoustic: Flute (73) (A), Ocarina (79) (A), Pan Flute (75) (A), Whistle (78) (A), Recorder (74) (A)
+- Electronic: Brightness (100) (E), Halo Pad (94) (E), New Age Pad (88) (E), Calliope Lead (82) (E)
+- Design note: Lead 1 is the primary melody voice. Woodwind and breath timbres give it an organic, slightly imperfect quality that contrasts with the electronic pad sustain underneath.
+
+**Lead 2 — shimmer / echo response**
+- Acoustic: Vibraphone (11) (A), Celesta (8) (A), Glockenspiel (9) (A), Grand Piano (0) (A)
+- Electronic: Warm Pad (89) (E), Space Voice (91) (E), FX Atmosphere (99) (E)
+- Design note: Lead 2 never exceeds Lead 1 in note count. Metallic-bell and keyboard timbres make a natural acoustic foil to the electronic pad choices. Grand Piano is valid here provided it is used as Lead 2 requires: single sparse notes at velocity 40–65, never chords, never melodic runs. Under heavy reverb a soft single piano note becomes a tuned-percussion event rather than a piano performance — this is exactly Eno's technique in Music for Airports 1/2 (8 individual piano notes looped with reverb) and Harold Budd's approach on The Plateaux of Mirror. The "no new age piano" constraint is about usage pattern, not the instrument. Bright Acoustic Piano (1) is a valid alternative — marginally more percussive attack, integrates cleanly at low velocity. If Lead 1 is acoustic (flute, ocarina), Lead 2 should favour electronic (warm pad), and vice versa.
+
+**Pads — harmonic foundation**
+- Acoustic: String Ensemble 1 (48) (A), Choir Aahs (52) (A), Synth Strings 1 (50) (A/E), Bowed Glass (92) (A/E)
+- Electronic: Warm Pad (89) (E), Halo Pad (94) (E), New Age Pad (88) (E), Sweep Pad (95) (E)
+- Design note: Pads are the foreground voice in Ambient (primary layer velocity 85–100). String Ensemble with heavy reverb becomes nearly indistinguishable from a synth pad — this blurring of the acoustic/electronic boundary is the target texture.
+
+**Rhythm — sparse accent / arpeggio when used**
+- Acoustic: Vibraphone (11) (A), Marimba (12) (A), Tubular Bells (14) (A), Glockenspiel (9) (A)
+- Electronic: FX Crystal (98) (E), FX Echoes (102) (E), Church Organ (19) (E)
+- Design note: Rhythm track is absent in 60% of Ambient songs. When present, metallic-percussive timbres (vibraphone, tubular bells) pair well with the drone foundation — they mark time without creating a groove. FX Echoes provides a purely electronic counterpart.
+
+**Texture — sustain / shimmer mass**
+- Acoustic: String Ensemble 2 (49) (A), Bowed Glass (92) (A/E), Choir Aahs (52) (A)
+- Electronic: Space Voice (91) (E), FX Atmosphere (99) (E), Sweep Pad (95) (E), Pad 3 Poly (90) (E)
+- Design note: Texture is at very low velocity (20–45) — it adds harmonic mass, not melody. Bowed Glass sits at the acoustic/electronic boundary intentionally: it sounds like a wine glass or glass harmonica under heavy reverb, bridging both families.
+
+**Bass — sub-presence**
+- Acoustic: Cello (42) (A) — low register only (MIDI 28–48), Contrabass (43) (A)
+- Electronic: Moog Bass (39) (E), Synth Bass 1 (38) (E), Fretless Bass (35) (E)
+- Design note: Bass is sub-presence only (velocity 55–65, root held 4–8 bars). Cello or Contrabass in the low register with reverb creates an organic low-end that contrasts strongly with Moog Bass's synthetic character — this is one of the most effective acoustic/electronic pairings in the entire style.
+
+**Drums — textural or absent**
+- Brush Kit (40) (A) — only kit used; absent in 60% of songs
+- Design note: Brush Kit is the most acoustic-feeling kit available in GM and suits the intimate, non-mechanical quality of ambient percussion. If present, all hits should be at velocity 20–50 and tagged with heavy reverb.
 
 ---
 
@@ -834,3 +862,576 @@ All 7 songs: 69–82 BPM. Percussion: absent or textural-only in all 7. Not one 
 - `.softPulse` 5% (lowered from 15% — rare in practice)
 
 The 95–110 BPM "mid pulse" operating mode may be more characteristic of Kosmic-leaning ambient crossover than pure Ambient.
+
+---
+
+## Part 13: Tonal Consistency and Cross-Generator Sync Rules (AMB-SYNC)
+
+These rules were derived from the Kosmic coherence analysis (musical-coherence-plan.md, Studies 01–03) and must be applied to Ambient from the start to prevent the class of bugs that required three rounds of post-generation debugging in Kosmic.
+
+**These are not probabilistic firing rules.** AMB-SYNC rules are structural invariants — preconditions and postconditions baked into the generator architecture that hold for every song, every section, every note. They do not appear in the generation log as "fired" events. They are either upheld (invisible) or violated (audible clashes). The SYNC prefix distinguishes them from AMB-PAD, AMB-LD, and AMB-RULE entries which are generative rules that fire with some probability. They address the difference between individual generators that look correct in isolation versus a system that sounds correct as a whole.
+
+---
+
+### AMB-SYNC-001: All scale pools anchor to song tonic — never to chord root
+
+All note-pool derivations (pentatonic, diatonic, modal scale degrees) must use `keySemitone(frame.key)` as the root. When a progression family like `modal_drift` or `drone_two` selects a non-tonic chord root (e.g., a bVII chord in a D major song), generators must still produce notes from D major — not from the bVII chord's local scale. The chord root sets the lowest voice; the upper voices remain in the global key.
+
+This is the root cause of the Kosmic Study 02 "Modal Drift consonance fault" where Rhythm track consonance fell to 62% — generators were deriving their note pools from the chord root rather than the song tonic. Fixed in Kosmic Phase 3 by anchoring `pentatonicNotes` to `keySemitone(frame.key)` unconditionally.
+
+Ambient is at higher risk of this bug because `modal_drift` and `drone_two` are common (45% combined), both involving non-tonic chord roots.
+
+---
+
+### AMB-SYNC-002: Bass root must match chord plan at bar boundaries
+
+The bass generator does not independently select root pitches. It receives the chord plan and at each bar boundary must output the chord plan's current root as the bass note. Non-root bass notes are only permitted in the middle of a chord window (as passing color), not at the boundary.
+
+This is the cross-track check "Do bass notes agree with chord plan roots at bar boundaries?" from the coherence analysis. In Ambient, where bass drones for 4–8 bars at a time, a wrong root is extremely audible against the pad layer.
+
+---
+
+### AMB-SYNC-003: Lead 1 is the statement — Lead 2 is the response
+
+Lead 1 is the primary floating melody. Lead 2 receives the Lead 1 event array before it generates its own notes. Lead 2 must:
+- Never exceed Lead 1 in total note count for the song
+- Prefer different bar windows from Lead 1 (if Lead 1 is active in bars 5–6, Lead 2 favours bars 7–8)
+- Sit in a lower register than Lead 1 when both play simultaneously
+
+If Lead 1 is absent for a section (`AMB-LD-003`), Lead 2 may fill. If Lead 1 is present, Lead 2 steps back. The `lead1Events` parameter (a pattern established in Kosmic) must be passed into `generateLead2` and must demonstrably affect note placement — not silently ignored as it was initially in Kosmic.
+
+---
+
+### AMB-SYNC-004: No silent parameter discarding
+
+Every generator function that accepts `frame`, `mode`, `key`, or `section` parameters must use them. This is a structural rule, not a musical one — it prevents the class of bug where a function has a correct signature but internally defaults to a hardcoded mode or scale.
+
+Inspection checklist before implementation is considered complete:
+- Every function that receives `frame.mode` must branch on its value, not use a `let mode = .dorian` fallback
+- Every function that receives `frame.key` must derive its note pool root from it
+- Every function that receives a section parameter must produce different output for intro vs. body vs. outro
+
+The canonical example from Kosmic: a chord window builder received `sectionStructure` and `mode` parameters but used a hardcoded Dorian mode internally, producing wrong scale-tension pools in non-Dorian songs. This was only caught through log analysis of generated songs, not by reading the code.
+
+---
+
+### AMB-SYNC-005: Key and mode state cleared after generation
+
+`keyOverride`, `moodOverride`, and `tempoOverride` must be set to `nil` after song generation completes. If they persist as non-nil, every subsequent song will be locked to the first-generated key, mood, and tempo — producing the key clustering bug observed in Kosmic Study 02 (5 of 11 songs in E Dorian, a ~0.1% probability event explained entirely by the lock-in bug).
+
+In Ambient this is especially damaging because the pool of musically interesting keys is narrow (D major, G major, C major, Ab major dominate) — any accidental lock-in to a single key would make all songs sound identical.
+
+---
+
+### AMB-SYNC-006: Per-track density caps
+
+Caps prevent runaway density from individual rules, equivalent to the KOS-RTHM-004 electric buddha groove reaching 13.9 notes/bar before a ceiling was added.
+
+- Lead 1: 2.0 notes/bar maximum in body sections (ambient is spare; exceeding this shifts the style toward Kosmic)
+- Lead 2: 1.2 notes/bar maximum
+- Rhythm (when present): 3.0 notes/bar maximum
+- Pads primary layer: 4 re-attacks per bar maximum
+- Texture: 1.5 notes/bar maximum
+
+These are hard ceilings enforced via a labeled `break` or early return once the count is exceeded — not probabilistic thinning. Probabilistic thinning can still produce dense outputs on unlucky seeds; a hard ceiling cannot.
+
+---
+
+### AMB-SYNC-007: Acoustic/electronic instrument pairing per song
+
+At song generation time, after random instrument selection, verify that the 7-track assignment includes at minimum one instrument from the acoustic family (strings, woodwinds, bells, Bowed Glass, Cello, Contrabass, Brush Kit) and one from the electronic family (any pad preset, FX class, Moog Bass, Synth Bass 1, Brightness, Space Voice).
+
+If all selected instruments fall into the same family, override the Lead 2 instrument to supply the missing family:
+- If all electronic: override Lead 2 to Vibraphone (11)
+- If all acoustic: override Lead 2 to Warm Pad (89)
+
+Log the constraint as `AMB-SYNC-007 acoustic/electronic balance enforced` when it fires.
+
+The design intent: a song with only synth pads feels sterile; a song with only strings feels like classical. The contrast between a flute melody over an electronic pad drone, or a cello bass line under a bright synth shimmer, is the defining texture of the Ambient style as designed.
+
+---
+
+### AMB-SYNC-008: Harmonic consonance floor per track
+
+From the coherence analysis, bass and pads should achieve >92% harmonic consonance (fraction of notes whose pitch class is diatonic to the active mode). Leads can run lower (75–85% is acceptable for expressiveness) but should not fall below 70% except in `dissonant_haze` mode.
+
+Verification approach (same as Kosmic): export MIDI + log pairs from 8–12 generated songs, run the consonance analysis script, confirm numbers before deployment. Do not assume the generators are correct just because they compile and run. The coherence bugs in Kosmic were invisible in the code and only surfaced in the generated output.
+
+---
+
+### AMB-SYNC-009: Pads and bass use the same chord root within any bar
+
+This is the Ambient version of the Kosmic cross-track check. At every bar boundary, the lowest note of the pad voicing must match the bass note (same pitch class, any octave). If Modal Drift moves to a bVII root, both the pads and the bass must update simultaneously to that root. A mismatch between pad root and bass root is the most audible harmonic clash in a sparse ambient texture.
+
+Implementation: bass generator receives the chord plan directly (not a summary) and derives its root note from the same chord-plan object that the pad generator reads. No independent root selection.
+
+---
+
+## Part 14: Effects Architecture for Ambient
+
+### 14.1 What Is Already in the Signal Chain
+
+Every track already has the following nodes wired in series:
+
+`sampler → boost (gain/pan LFO) → sweepFilter (LFO low-pass) → delay (AVAudioUnitDelay) → comp → lowEQ → reverb (AVAudioUnitReverb) → master mixer`
+
+The existing `TrackEffect` buttons the user sees (Boost, Delay, Reverb, Trem, Comp, Low, Sweep, Pan, Space) are all implemented by enabling/bypassing nodes already in this chain. No new hardware is needed for most Ambient improvements — the work is in setting different **parameter values** when `style == .ambient`.
+
+---
+
+### 14.2 The Two Effects That Matter Most for Ambient
+
+**1. Delay — high feedback, long time, high wet**
+
+The current delay defaults are configured for Motorik/Kosmic use: 16th-note delay time (0.125s at 120 BPM), feedback 40%, wet 40%. These produce a crisp tight echo suitable for rhythmic music. For Ambient this is wrong in every parameter.
+
+Ambient delay target:
+- **Delay time:** `(60.0 / bpm) * 1.5` — dotted half note. At 75 BPM this is 1.2 seconds. This is Brian Eno's primary delay time in Discreet Music. One echo every 1–2 seconds transforms a single note into a slowly decaying phrase without any additional MIDI.
+- **Feedback:** 65–80%. At 75%, a single note produces approximately 6–8 audible repeats before falling below perception. This is the generative delay — the repeats become the texture, not the original note.
+- **Low-pass cutoff:** 3500–4500 Hz (lower than the current 6000 Hz). Each repeat rolls off slightly more high end than the last, giving the echos a natural decay into warmth rather than staying bright.
+- **Wet/dry mix:** 55–70% wet. The echos are nearly as loud as the original. This is aggressive by Motorik/Kosmic standards; it is correct for Ambient. The dry signal can feel almost buried in the echo field.
+
+`AVAudioUnitDelay` supports these values natively: `delayTime` (0–2 seconds), `feedback` (–100 to 100), `lowPassCutoff` (10–22050 Hz), `wetDryMix` (0–100). No new nodes required.
+
+A clean implementation: when `PlaybackEngine.ambientStyle` is true, configure delay nodes at song load time with the ambient parameters before playback begins. The user's per-track Delay button still toggles on/off, but when it's on in Ambient mode, it uses the ambient parameters rather than the default ones.
+
+**2. Reverb — deep wet, cathedral for all atmospheric tracks**
+
+Current behaviour: atmospheric tracks (Lead 1, Lead 2, Pads, Texture) load Cathedral preset; rhythmic tracks (Rhythm, Bass, Drums) load Large Chamber. Space effect = cathedral at 70% wet. Regular reverb = large chamber at 50% wet.
+
+For Ambient, every track benefits from more reverb depth:
+- Lead 1, Lead 2: cathedral, 80–85% wet. Single notes need to bloom and sustain well past their MIDI duration. A 3-second reverb tail on a 1-beat note at 75 BPM means the sound continues for ~4× its played duration. This is the "eternal sustain" sensation from pads, applied to lead notes.
+- Pads: cathedral, 85–90% wet. Pads are already long sustain; reverb at this depth merges the attack into a continuous wash.
+- Texture: cathedral, 85–90% wet. At this level texture is essentially pure reverb — the original dry signal is almost inaudible.
+- Bass: large hall, 60–65% wet. Bass with too much reverb loses its root-anchoring function; it becomes mush. 60% is the Ambient limit before the pitch center blurs unacceptably.
+- Rhythm (when present): large chamber, 65% wet. The goal is "distant bell, not dry click."
+- Drums (textural): plate preset, 70% wet. Loscil-style drums are almost entirely reverb tail; the original hit is just a trigger.
+
+The `AVAudioUnitReverb` presets available (`smallRoom`, `mediumRoom`, `largeChamber`, `mediumHall`, `largeHall`, `cathedral`, `plate`) span a range from ~0.3s tail to ~4–5s tail for cathedral. Cathedral at 90% wet is approximately the maximum achievable tail length with the built-in presets. For now this is sufficient; longer tails would require a third-party convolution reverb AU (see Section 14.4).
+
+---
+
+### 14.3 Per-Track Ambient Effect Defaults
+
+These replace the Motorik/Kosmic defaults in `applyDefaultEffects()` when style is Ambient. The user can still toggle effects manually; these are the starting state.
+
+**Lead 1:**
+- Delay ON — dotted half note (1.5 beats), feedback 72%, lowpass 4000 Hz, wet 60%
+- Reverb (Space) ON — cathedral, wet 82%
+- Sweep OFF by default (can enable for a slow filter-open effect on sparse melodic phrases)
+
+**Lead 2:**
+- Delay ON — dotted quarter (0.75 beats), feedback 65%, lowpass 4500 Hz, wet 55%
+  (shorter delay time than Lead 1 creates the echo counterpoint between the two leads)
+- Reverb (Space) ON — cathedral, wet 78%
+
+**Pads:**
+- Delay OFF — delay on sustained pad chords causes frequency beating against themselves; creates muddiness rather than depth
+- Reverb (Space) ON — cathedral, wet 88%
+- Sweep optional — a very slow LFO sweep (32-bar period) on pads creates a long opening/closing filter breath effect; off by default but worth enabling manually
+
+**Rhythm:**
+- Delay ON — dotted half note, feedback 55%, lowpass 3500 Hz, wet 48%
+  (distant bell character; sparse rhythm events should feel like they come from far away)
+- Reverb ON — large chamber, wet 65%
+
+**Texture:**
+- Delay OFF — texture notes are already subliminal; delay would only thicken mush
+- Reverb (Space) ON — cathedral, wet 90%
+- Sweep ON — very slow LFO (16–32 bar period); texture is the ideal track for a barely-perceptible filter breath because its low volume means the sweep is subtle
+
+**Bass:**
+- Delay OFF — bass delay causes low-frequency smearing that muddies the harmonic root
+- Reverb ON — large chamber, wet 62%
+- Low Shelf ON — +5 dB at 80 Hz; sub-presence reinforcement
+
+**Drums (when present, textural style):**
+- Delay ON — 1-beat, feedback 40%, lowpass 3000 Hz, wet 45%
+  (textural drums with short delay become more like processed noise texture)
+- Reverb ON — plate, wet 70%
+- Compression ON — flattens velocity variation in the sparse hits; makes the texture more consistent
+
+---
+
+### 14.4 Possible Additions Not Currently in the System
+
+**High-pass filter (easy — recommend adding)**
+A high-pass filter on Lead and Texture tracks in Ambient removes low-frequency muddiness that collides with the bass and pad root notes. With heavy reverb on all tracks, low-end build-up is a real risk. `AVAudioUnitEQ(numberOfBands: 1)` with `filterType = .highPass`, `frequency = 200–350 Hz` on Lead 1, Lead 2, and Texture would clean this up significantly. The existing `lowEQ` node (currently a low shelf boost) could be reconfigured for this, or a separate HPF node added to the chain. Implementation cost: low — same node class, different parameters.
+
+**Ping-pong delay (medium — consider for v2)**
+True ping-pong delay alternates each echo between left and right channels. `AVAudioUnitDelay` does not support ping-pong natively. Simulation approach: two delay nodes with complementary pan settings on their boost mixers (boost A panned left, boost B panned right), each at half the target delay time, feeding into each other — complex to wire but achievable within `AVAudioEngine`. For Ambient, ping-pong delay on Lead 1 creates a wide spatial sensation that reinforces the "music coming from the space around you" feel. Worth adding in a post-launch iteration.
+
+**Chorus / ensemble width (hard — skip for now)**
+macOS Core Audio has no standard public chorus effect AU. The `kAudioUnitSubType_Distortion` type with specific preset modes can produce vaguely chorus-like artifacts, but it is not clean. The detuned-voice approach (AMB-RULE-06, AMB-PAD-002) achieves the same beating-chorus sensation directly in MIDI by scheduling two notes a few cents apart. This is the better implementation path than trying to wire an effects-based chorus.
+
+**Extended reverb tail beyond 5 seconds (hard — future consideration)**
+`AVAudioUnitReverb` cathedral preset produces approximately 4–5 seconds of tail. Eno's reference spaces (real airport terminals, large halls) have reverb tails of 8–15 seconds. Achieving this would require either chaining two reverb nodes (doubles CPU cost, some phasing artifacts) or loading a convolution reverb AU with a long impulse response. macOS provides `AUMatrixReverb` as a private AU; `AVAudioUnit` with the corresponding AudioComponentDescription can load it. A 10-second stereo IR file at 44.1 kHz adds ~3.5 MB to the bundle. Worth investigating when Ambient is implemented — the difference between 5s and 10s reverb tail is not subtle in a fully ambient mix.
+
+**Tremolo on ambient pads (note — already exists)**
+The existing `.tremolo` TrackEffect drives a volume LFO on the boost node. At a very slow LFO rate (0.3–0.6 Hz), this produces a slow swell rather than the faster vibrato-like effect used in Motorik. For Ambient pads this could simulate the slow volume automation used in reference recordings. The LFO rate would need to be settable per-style, or a second LFO rate parameter added. Currently the tremolo rate is fixed — check the PlaybackEngine LFO implementation before deciding whether to expose this.
+
+---
+
+## Part 15: Implementation Roadmap — Staged Coding Plan
+
+This section is the build plan. It follows the same foundation-first discipline used for Motorik (drums → bass → pads → leads) and Kosmic, but Ambient has a different core architecture — the loop tiling engine — that must be built before any generator produces meaningful output. The stages are ordered by dependency, not by importance.
+
+Each stage has a test gate: a specific audible or measurable check that must pass before proceeding to the next stage.
+
+---
+
+### Stage 0 — Type System and UI Scaffolding
+
+**Goal:** Style selector shows Motorik | Kosmic | Ambient. Selecting Ambient generates a valid (but silent) song without crashing.
+
+**Files to modify:**
+- `Sources/Zudio/Models/Types.swift`
+  - Add `.ambient` to `MusicStyle` enum
+  - Add `PercussionStyle` enum: `.absent`, `.textural`, `.softPulse`
+  - Add `AmbientProgressionFamily` enum: `.droneSingle`, `.droneTwo`, `.modalDrift`, `.suspendedDrone`, `.dissonantHaze`
+  - Add `AmbientTempoStyle` enum: `.beatless`, `.slowPulse`, `.midPulse`
+  - Add `AmbientLoopLengths` struct: 7 `Int` values (one loop length in bars per track), a `songBars: Int` total, and a `stepsPerLoop: [Int]` computed property
+- `Sources/Zudio/Generation/SongGenerator.swift`
+  - Add `case .ambient:` branch in `generate()` that calls a new stub `generateAmbient()` returning an empty 64-bar silent SongState
+- `Sources/Zudio/UI/TopBarView.swift`
+  - Add third segment to the style picker: Motorik | Kosmic | Ambient
+- `Sources/Zudio/AppState.swift`
+  - Add `.ambient` case to `selectedStyle` handling
+  - Add stub Ambient instrument pool names to `instrumentPoolNames()`
+- `Sources/Zudio/UI/TrackRowView.swift`
+  - Add `isAmbient` branch returning stub instrument lists for all 7 tracks
+
+**Test gate:** Build succeeds. UI shows three-way picker. Selecting Ambient generates a silent song. All other styles continue working.
+
+---
+
+### Stage 1 — AmbientMusicalFrameGenerator
+
+**Goal:** The frame generator produces a valid, varied musical context for every song.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientMusicalFrameGenerator.swift`
+  - Generates `AmbientMusicalFrame`: BPM, key (chromatic note), mode, progressionFamily, percussionStyle, tempoStyle
+  - BPM: beatless 62–78 / slowPulse 72–92 / midPulse 95–110; distribution 60% / 35% / 5%
+  - Key weights: D major 15%, G major 12%, C major 12%, Ab major 8%, F major 7%, Eb major 6%, A minor 10%, D minor 8%, E minor 7%, other 15% (AMB-RULE-17)
+  - Mode weights: Aeolian 40%, Dorian 25%, Mixolydian 15%, Ionian 15%, Phrygian 5%
+  - Progression family weights: droneSingle 35%, droneTwo 25%, modalDrift 20%, suspendedDrone 15%, dissonantHaze 5%
+  - Enforces AMB-SYNC-005: keyOverride / moodOverride / tempoOverride set to nil after read; never written back to AppState after generation
+  - Generates `AmbientLoopLengths`: assigns a co-prime bar count to each of the 7 tracks from the set {5, 7, 11, 13, 17, 19, 23}; longer primes for slower-cycling tracks (Pads gets the largest; Drums is stochastic so gets no loop length, assigned 0). Bass shares the Pads loop length for harmonic consistency (AMB-RULE-01, AMB-RULE-18).
+  - Song total bars = LCM of the three largest loop lengths capped at 96 bars maximum (prevents excessively long songs while keeping the phase-relationship effect meaningful within one listening session)
+  - Song length target: triangular distribution min=180s, peak=300s, max=480s; back-calculate totalBars from BPM and target duration
+
+**Files to modify:**
+- `Sources/Zudio/Generation/SongGenerator.swift` — `generateAmbient()` calls `AmbientMusicalFrameGenerator.generate()` and logs the result
+
+**Test gate:** Generate 10 songs via logs only. Verify: key distribution is not clustering, BPM varies across the three tempo styles, progression families include at least droneSingle and droneTwo across the set. Confirm no key persistence across back-to-back generations.
+
+---
+
+### Stage 2 — AmbientStructureGenerator
+
+**Goal:** Songs have a valid section structure. The loop tiling architecture is established.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientStructureGenerator.swift`
+  - Generates `SongStructure` compatible with the existing structure type
+  - Ambient section shapes:
+    - Pure drone (40%): body only, no intro/outro; the loop architecture provides all variation
+    - Minimal arc (45%): 4-bar intro, body, 4-bar outro — intro/outro for the volume fade; body is the loop engine
+    - Breathing arc (15%): 6-bar intro, body, 6-bar outro — slightly more formal fade
+  - Intro/outro are marked for the PlaybackEngine's mainMixerNode volume fade (same approach as Motorik)
+  - No bridge sections, no fills, no transitions — Ambient structure is the simplest of the three styles
+- `Sources/Zudio/Generation/Ambient/AmbientLoopTiler.swift`
+  - The architectural core unique to Ambient
+  - `static func tile(events: [MIDIEvent], loopBars: Int, totalBars: Int, stepsPerBar: Int) -> [MIDIEvent]`
+  - Takes a pattern of `loopBars` length and repeats it to fill `totalBars` via modulo step arithmetic: for each tiling pass, add `loopBars * stepsPerBar` to each event's stepIndex
+  - Handles the case where the final tile is partial (totalBars % loopBars != 0): only include events whose tiled stepIndex < totalBars * stepsPerBar
+  - This is what produces the Eno phase-shifting effect: Pads looping every 17 bars, Lead1 every 13 bars, Lead2 every 11 bars will never produce the same alignment twice within a 96-bar song
+
+**Test gate:** Stub out one generator (e.g. a 4-note Pads pattern of 13 bars). Tile it to 64 bars. Verify in the MIDI lane view that the pattern repeats at the correct interval and never overruns totalBars. Verify two patterns of different loop lengths (11 and 13 bars) produce visibly offset starting points after the first loop.
+
+---
+
+### Stage 3 — AmbientPadsGenerator
+
+**Goal:** The primary harmonic voice is audible and sounds like ambient music. This is the most important generator — everything else is built against it.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientPadsGenerator.swift`
+  - Generates one loop of `loopLengths.pads` bars, then tiled by AmbientLoopTiler
+  - Implements all AMB-PAD rules:
+    - AMB-PAD-001: primary layer — re-attack every 4–5 beats, 5–6 beat duration (1-beat overlap), velocity 85–100
+    - AMB-PAD-001 secondary layer: same chord, offset by 2–4 steps, velocity 25–55
+    - AMB-PAD-002: shimmer — second voice at +7 cents (two separate notes same pitch, small detune creates beating; in MIDI this is approximated by slight velocity variation between the two notes)
+    - AMB-PAD-003: swell chord variant — velocity ramp 20→75 over 16 steps
+    - AMB-PAD-004: suspended drone variant — sus2 or sus4 voicing for `suspendedDrone` progression family
+    - AMB-PAD-006: bell accent layer (sparse, short-duration chord tones in high register, ~0.07 notes/bar)
+    - AMB-PAD-007: broken chord — chord tones scattered across 2–4 bars with irregular timing
+  - Voicing: root + 5th + octave + optional 3rd; root register MIDI 36–60, 5th above, octave doubling
+  - Chord from progressionFamily: droneSingle = same chord all song; droneTwo = alternates every 16–32 bars; modalDrift = slow 3–4 chord movement, each chord 8–16 bars
+  - AMB-SYNC-001: scale pool always `keySemitone(frame.key)` — never chord-root shifted
+  - AMB-SYNC-009: lowest pad note pitch class must match bass root (verified post-generation)
+
+**Test gate:** Generate 5 Ambient songs with only Pads active (mute all other tracks). Listen: should sound like a slowly evolving pad drone. Re-attacks should be audible (not a single infinitely held note). Dual-layer should create a subtle shimmer. Consonance rate target: >92%.
+
+---
+
+### Stage 4 — AmbientBassGenerator
+
+**Goal:** Bass confirms the harmonic root without becoming melodic.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientBassGenerator.swift`
+  - Generates one loop of `loopLengths.bass` bars (same as Pads loop length — shares harmonic cycle), tiled
+  - AMB-BAS-001: root note held 32–64 steps (2–4 bars), re-attack, velocity 55–65, register MIDI 28–48
+  - AMB-BAS-002: absent (30% of songs — returns empty events)
+  - AMB-BAS-003: slow pulse — root on every 2 beats at velocity 45, short duration (2 steps)
+  - AMB-SYNC-002: bass root at bar boundaries must equal chord plan root for that bar
+  - AMB-SYNC-009: pitch class of bass note must match lowest pad note pitch class
+
+**Test gate:** With Pads + Bass active, verify bass root agrees with pad chord root in every bar of the log. Bass should be felt more than heard — a sub-presence.
+
+---
+
+### Stage 5 — AmbientDrumGenerator
+
+**Goal:** Drums are absent, textural noise, or a heartbeat — never a groove.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientDrumGenerator.swift`
+  - Routes to three modes based on `frame.percussionStyle`:
+  - `.absent` (60%): returns `[]`
+  - `.textural` (35%): 16th-note grid, 25% trigger probability per step, velocity 20–35, duration 2 steps; occasional kick on beat 1 every 4th bar at velocity 40–55; no snare; all events tagged for heavy reverb and compression
+  - `.softPulse` (5%): kick on steps 0/4/8/12, hi-hat 25% probability, velocity 15–30
+  - Drums are stochastic — no loop length / no tiling; generate freshly across all totalBars
+
+**Test gate:** With Pads + Bass + Drums, confirm drums are absent 60% of the time; when textural, they are quiet and feel more like rain than a drum pattern; they never drive the music.
+
+---
+
+### Stage 6 — AmbientLeadGenerator (Lead 1)
+
+**Goal:** A sparse, on/off floating melody appears — audible, but does not dominate.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientLeadGenerator.swift`
+  - Generates one loop of `loopLengths.lead1` bars, tiled
+  - Routes to rule by weighted pick:
+    - AMB-LD-003 Absent: 40% — returns empty for the section; silence is correct
+    - AMB-LD-001 Floating Tone: 30% — 0.5–0.7 notes/bar, 0.8–2.0 beat duration, velocity 45–75, diatonic only, register MIDI 60–84; stochastic firing (AMB-RULE-19) — phrase of 4–8 notes where each has 55% fire probability
+    - AMB-LD-004 Echo Phrase: 20% — 3–4 note descending phrase (5th→3rd→root), held long, then silence for ≥4 bars before next phrase
+    - AMB-LD-002 Pentatonic Shimmer: 10% — 2–3 note figure, each held 2 bars, root/4th/octave only
+  - AMB-RULE-02: after each note, rest ≥ 2× note duration before next event (Eno's rule)
+  - AMB-SYNC-001: all notes diatonic to `frame.key` + `frame.mode`; no chromatic passing
+  - AMB-SYNC-006: hard density cap — if note count exceeds 2.0 notes/bar for any bar, truncate
+  - Stores generated events in a return value that SongGenerator passes to Lead 2
+
+**Test gate:** Lead 1 should be absent in roughly 40% of songs. When present, note density 0.5–2.0 notes/bar. Consonance target: >80%. Should feel like occasional phrases drifting in and out.
+
+---
+
+### Stage 7 — AmbientLead2Generator (Lead 2)
+
+**Goal:** A quieter secondary voice that responds to Lead 1 rather than competing.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientLead2Generator.swift`
+  - Receives `lead1Events: [MIDIEvent]` — this parameter must be used, not ignored (AMB-SYNC-004)
+  - Generates one loop of `loopLengths.lead2` bars (different prime from Lead 1), tiled
+  - Determines Lead 1 activity windows: any 4-bar window where Lead 1 has ≥ 1 event is "Lead 1 active"
+  - In Lead 1 active windows: Lead 2 generates at most 0.4 notes/bar (steps back)
+  - In Lead 1 silent windows: Lead 2 may generate at 0.6–1.2 notes/bar (fills the space)
+  - Register: MIDI 55–78 — consistently below Lead 1's 60–84 range
+  - Rule mix (different weights from Lead 1):
+    - AMB-LD-003 Absent: 30% (still often silent)
+    - AMB-LD-001 Floating Tone: 35% — same sparse rules as Lead 1 but quieter (velocity 35–60)
+    - AMB-LD-004 Echo Phrase: 25% — responds to Lead 1's last phrase by playing a shorter version 2–4 bars later
+    - AMB-LD-002 Pentatonic Shimmer: 10%
+  - AMB-SYNC-003: total Lead 2 note count must not exceed Lead 1 note count for any 8-bar section
+  - AMB-SYNC-006: hard cap — 1.2 notes/bar maximum
+
+**Test gate:** Lead overlap (bars where both leads are playing simultaneously) should be < 25% of total bars. Lead 2 note count should be less than Lead 1 in ≥ 70% of songs.
+
+---
+
+### Stage 8 — AmbientRhythmGenerator
+
+**Goal:** An accent voice that marks occasional moments without creating a pattern.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientRhythmGenerator.swift`
+  - Routes by weighted pick:
+    - AMB-RHY-001 Absent: 60% — returns `[]`
+    - AMB-RHY-002 Single Tone Pulse: 20% — one pitch, repeated every 2 bars at velocity 25–40, duration 2 steps
+    - AMB-RHY-003 Sparse Arpeggio: 10% — 4 notes ascending (root→3rd→5th→octave), once per 4 bars, then 4 bars silence; velocity 35–55
+    - AMB-RHY-004 Stochastic Phrase: 10% — 4–8 diatonic notes with 40–75% fire probability per slot (AMB-RULE-19); phrase fills one loop, then stochastic variation makes each repeat sound different
+  - Loop length: `loopLengths.rhythm` (shortest prime — 5 or 7 bars — so it cycles most frequently)
+  - AMB-SYNC-001: all notes from song-tonic scale
+  - AMB-SYNC-006: hard cap — 3.0 notes/bar
+
+**Test gate:** Rhythm absent in ~60% of songs. When present, should be nearly inaudible as a supporting texture — noticeable only when listening for it.
+
+---
+
+### Stage 9 — AmbientTextureGenerator
+
+**Goal:** A subliminal harmonic mass that adds depth without drawing attention.
+
+**Files to create:**
+- `Sources/Zudio/Generation/Ambient/AmbientTextureGenerator.swift`
+  - Routes by weighted pick:
+    - AMB-TEX-003 Absent: 40% — returns `[]`
+    - AMB-TEX-001 Orbital Shimmer: 30% — root + 5th + octave at velocity 20–35, whole notes (held 16 steps), loop length is the largest prime not used by any other track
+    - AMB-TEX-002 Ghost Tone: 20% — scale degree 5 held 64–128 steps at velocity 15–25; one event per loop, rest is silence
+    - AMB-TEX-004 Chime Scatter: 10% — one chord-tone chime event every 8–16 bars at velocity 30–50, duration 0.25–0.5 beats (AMB-RULE-24)
+  - Loop length: `loopLengths.texture` (medium prime — 7 or 11 bars)
+  - AMB-SYNC-006: hard cap — 1.5 notes/bar
+
+**Test gate:** Texture should be inaudible in isolation at normal listening volume. Its contribution should only be noticed as added warmth when it is muted.
+
+---
+
+### Stage 10 — SongGenerator Wiring and HarmonicFilter Pass
+
+**Goal:** All 7 generators are wired together and a complete song generates correctly end to end.
+
+**Files to modify:**
+- `Sources/Zudio/Generation/SongGenerator.swift`
+  - Implement full `generateAmbient()` replacing the Stage 0 stub:
+
+```
+generateAmbient() order:
+1. AmbientMusicalFrameGenerator → frame + loopLengths
+2. AmbientStructureGenerator → structure
+3. AmbientPadsGenerator → raw loop → AmbientLoopTiler → trackEvents[kTrackPads]
+4. AmbientBassGenerator → raw loop → AmbientLoopTiler → trackEvents[kTrackBass]
+5. AmbientDrumGenerator → trackEvents[kTrackDrums] (stochastic, no tiling)
+6. AmbientLeadGenerator → raw loop → AmbientLoopTiler → lead1Events
+7. AmbientLead2Generator(lead1Events:) → raw loop → AmbientLoopTiler → trackEvents[kTrackLead2]
+8. AmbientRhythmGenerator → raw loop → AmbientLoopTiler → trackEvents[kTrackRhythm]
+9. AmbientTextureGenerator → raw loop → AmbientLoopTiler → trackEvents[kTrackTexture]
+10. HarmonicFilter.apply() — enforce diatonic constraint; no DensitySimplifier, ArrangementFilter, PatternEvolver, or DrumVariationEngine for Ambient
+11. Build SongState and return
+```
+
+  - No `DensitySimplifier` — Ambient notes are already sparse; thinning them would destroy the texture
+  - No `ArrangementFilter` — no structural events (fills, bridges, X-Files) in Ambient
+  - No `PatternEvolver` — loop phasing via AmbientLoopTiler provides variation; PatternEvolver would corrupt the loop integrity
+  - No `DrumVariationEngine` — Ambient drums are stochastic from the start
+  - Add `regenerateTrack()` Ambient branch (mirrors Kosmic branch) — regenerates the track's raw loop and re-tiles
+
+**Test gate:** Generate 10 complete Ambient songs. All 7 tracks populated. HarmonicFilter passes without rejecting large numbers of notes. Status log shows varied keys, modes, and progression families. Build succeeds, no crashes.
+
+---
+
+### Stage 11 — PlaybackEngine: Ambient Effects Configuration
+
+**Goal:** When Ambient is selected, delay and reverb parameters match the Ambient targets defined in Part 14.
+
+**Files to modify:**
+- `Sources/Zudio/Playback/PlaybackEngine.swift`
+  - Add `var ambientStyle: Bool = false` property (alongside existing `kosmicStyle` and `motorikStyle`)
+  - Add `configureAmbientEffects(bpm: Double)` — called at song load when `ambientStyle` is true:
+    - For each atmospheric track (Lead1, Lead2, Pads, Texture): `delay.delayTime = (60.0 / bpm) * 1.5`, `delay.feedback = 72`, `delay.lowPassCutoff = 4000`, `delay.wetDryMix = 0` (actual wet mix applied when user enables Delay)
+    - For Bass/Rhythm/Drums: `delay.delayTime = (60.0 / bpm) * 1.0`, `delay.feedback = 40`, `delay.lowPassCutoff = 3500`
+    - Configure reverb presets per Part 14.2 (cathedral for Lead/Pads/Texture, largeChamber for Bass/Rhythm, plate for Drums) — preset loaded at song start, not at play time
+  - Add ambient intro/outro fade via `mainMixerNode.outputVolume` ramp (same approach as Motorik — all tracks fade together; 4–6 bar ramp)
+- `Sources/Zudio/AppState.swift`
+  - Add `playback.ambientStyle = selectedStyle == .ambient` in both generation trigger points (alongside existing kosmicStyle and motorikStyle assignments)
+- `Sources/Zudio/UI/TrackRowView.swift`
+  - Add `isAmbient` branch in `applyDefaultEffects()`:
+    - Lead 1: Space ON, Delay ON
+    - Lead 2: Space ON, Delay ON
+    - Pads: Space ON (delay OFF — sustain + delay causes beating muddiness)
+    - Rhythm: Reverb ON, Delay ON
+    - Texture: Space ON, Sweep ON
+    - Bass: Reverb ON, Low Shelf ON
+    - Drums: Reverb ON, Compression ON
+
+**Test gate:** Switch style to Ambient. Generate a song. Play back. Delay on Lead 1 should be clearly audible as a long echo (not a tight 16th-note effect). Reverb on Pads should feel deep and spatial. Pan automations from Motorik should not apply.
+
+---
+
+### Stage 12 — Instrument Pools and TrackRowView
+
+**Goal:** Ambient instrument picker shows the correct acoustic/electronic per-track lists defined in Part 6.2.
+
+**Files to modify:**
+- `Sources/Zudio/AppState.swift` — `instrumentPoolNames()` Ambient branch: all 7 tracks with the lists from Part 6.2
+- `Sources/Zudio/UI/TrackRowView.swift` — `instruments` property Ambient branch: matching lists with GM program numbers
+
+**Acoustic / electronic pairing validation (AMB-SYNC-007):** After random instrument assignment at generation time, verify at least one acoustic-family instrument is present. If all electronic, override Lead 2 to Vibraphone (11). Log the override as `AMB-SYNC-007 acoustic/electronic balance enforced`.
+
+**Test gate:** Ambient instrument pickers show correct lists. Cycling through Lead 1 presets shows woodwinds and pads mixed together. Acoustic/electronic mix rule fires at least occasionally in a set of 10 songs.
+
+---
+
+### Stage 13 — Status Log and Generation Logging
+
+**Goal:** Generation log entries for Ambient songs follow the same format as Motorik/Kosmic so the coherence analysis tools work correctly.
+
+**Files to modify or create:**
+- Log entries needed per song: style, key, mode, BPM, totalBars, percussionStyle, progressionFamily, loop lengths per track, instrument assignments, per-rule firing log for each generator
+- Confirm `SongLogExporter` handles Ambient correctly — particularly AMB-SYNC-005 (key persistence cleared) and zero-bar section suppression (already fixed for Kosmic, should carry over)
+- Add Ambient-specific log entries: `AMB-SYNC-007 acoustic/electronic balance enforced` (when fired), loop length assignments per track
+
+**Test gate:** Export MIDI + log for 3 songs. Open logs. Verify loop lengths are logged, percussion style is logged, progression family is visible.
+
+---
+
+### Stage 14 — Coherence Analysis Pass
+
+**Goal:** Confirm the generated output meets the musical quality targets before release.
+
+Same methodology as Kosmic Studies 01–03. Generate 12 songs, export MIDI + logs, run consonance analysis script.
+
+**Targets to verify (from AMB-SYNC-008 and Part 11):**
+- Bass consonance > 92%
+- Lead 1 consonance > 80%
+- Lead overlap (both leads active simultaneously) < 25% of bars
+- Lead 2 note count ≤ Lead 1 note count in ≥ 70% of songs
+- Drums absent in ~60%, textural in ~35%
+- No key/mode clustering across a batch of 12 (confirms AMB-SYNC-005 fix is working)
+- All songs: at least 2 tracks with different loop lengths visible in the MIDI lane
+- Progression family distribution: at least droneSingle, droneTwo, and modalDrift appear across 12 songs
+
+If findings require generator changes, fix and re-run a smaller study (6–8 songs) to confirm. Do not proceed to Stage 15 until the coherence pass is clean.
+
+---
+
+### Stage 15 — Ambient Name Generator (Deferred)
+
+**Goal:** Songs get names that feel spatial, geographic, or poetically abstract — consistent with the Eno/Loscil aesthetic.
+
+**Files to create:**
+- `Sources/Zudio/Generation/AmbientTitleGenerator.swift`
+  - Different vocabulary from Motorik (mechanical, angular) and Kosmic (cosmic, astronomical)
+  - Eno influence: geographic / atmospheric / material: "Thursday", "Lantern", "Drift", "Shore", "Fog", "Pale", "Open"
+  - Loscil influence: technical / aquatic / textural: "Submers", "Stase", "Plume", "Falls", "Depth"
+  - Suggested structure: [adjective/material] + [noun] or single evocative word; 1–2 words max
+  - No "IX" or "-e" or "-ique" suffixes — those are Motorik/Kosmic conventions
+  - Should feel like a place or a state of mind, not a name
+
+---
+
+### Stage 16 — Test Mode Support
+
+**Goal:** Cmd-T generates a short 1-minute Ambient song for rapid audition.
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientMusicalFrameGenerator.swift` — when `testMode == true`, cap `totalBars` at the equivalent of ~60 seconds at the generated BPM
+- Verify status log emits test mode indicators as per existing test mode convention
+
+**Test gate:** Cmd-T in Ambient mode generates a ~1-minute song. Status log shows test mode flag. Full-length songs still generate correctly without test mode.
+
+---
+
+### Implementation Notes
+
+**Do not apply to Ambient:** `DensitySimplifier`, `ArrangementFilter`, `PatternEvolver`, `DrumVariationEngine`. These four post-processing passes are Motorik/Kosmic-specific and would corrupt the loop-tiling architecture.
+
+**Do apply to Ambient:** `HarmonicFilter`. The diatonic constraint is universal — it enforces AMB-SYNC-001.
+
+**Loop tiling is the core architectural difference.** Each generator produces a short loop (5–19 bars), not a full-length song. `AmbientLoopTiler` repeats it. The phase relationship between different-length loops is what produces variation. If any generator bypasses the tiler and writes directly to the full song length, the phase effect is lost.
+
+**Build order matters.** Pads must sound right before anything is added. The test gate at Stage 3 is the most important checkpoint — if the pad generator produces monotonous or clashing output, all subsequent stages will sound wrong on top of it.

@@ -23,27 +23,47 @@ struct TrackRowView: View {
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
-        let isKosmic = activeStyle == .kosmic
+        let isKosmic  = activeStyle == .kosmic
+        let isAmbient = activeStyle == .ambient
         switch trackIndex {
         case kTrackLead1:
+            if isAmbient {
+                return [.init(name:"Flute",         program:73),  .init(name:"Ocarina",       program:79),
+                        .init(name:"Pan Flute",     program:75),  .init(name:"Whistle",       program:78),
+                        .init(name:"Recorder",      program:74),  .init(name:"Brightness",    program:100),
+                        .init(name:"Halo Pad",      program:94),  .init(name:"New Age Pad",   program:88),
+                        .init(name:"Calliope Lead", program:82)]
+            }
             if isKosmic {
                 return [.init(name:"Ocarina",        program:79),  .init(name:"Flute",        program:73),
                         .init(name:"Whistle",        program:78),  .init(name:"Calliope Lead", program:82),
-                        .init(name:"Fifths Lead",    program:86),  .init(name:"Soft Brass",   program:56)]
+                        .init(name:"Soft Brass",     program:56)]
             }
             return [.init(name:"Square Lead",      program:80), .init(name:"Mono Synth",      program:81),
                     .init(name:"Synth Brass",      program:63), .init(name:"Synth Brass 2",   program:62),
                     .init(name:"Fifths Lead",      program:86), .init(name:"Moog Lead",        program:39),
-                    .init(name:"Overdrive Gtr",    program:29), .init(name:"Flute",            program:82)]
+                    .init(name:"Overdrive Gtr",    program:29)]
         case kTrackLead2:
+            if isAmbient {
+                return [.init(name:"Vibraphone",   program:11),  .init(name:"Celesta",        program:8),
+                        .init(name:"Glockenspiel", program:9),   .init(name:"Grand Piano",    program:0),
+                        .init(name:"Warm Pad",     program:89),  .init(name:"Space Voice",    program:91),
+                        .init(name:"FX Atmosphere",program:99)]
+            }
             if isKosmic {
                 return [.init(name:"Brightness",   program:100), .init(name:"Warm Pad",       program:89),
-                        .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88)]
+                        .init(name:"Halo Pad",     program:94),  .init(name:"New Age Pad",    program:88),
+                        .init(name:"Ocarina",       program:79)]
             }
             return [.init(name:"Brightness",     program:100), .init(name:"Vibraphone",      program:11),
-                    .init(name:"Marimba",          program:12), .init(name:"Bell/Pluck",      program:14),
-                    .init(name:"Ocarina",          program:79)]
+                    .init(name:"Bell/Pluck",       program:14)]
         case kTrackPads:
+            if isAmbient {
+                return [.init(name:"String Ensemble",program:48), .init(name:"Choir Aahs",   program:52),
+                        .init(name:"Synth Strings", program:50), .init(name:"Bowed Glass",   program:92),
+                        .init(name:"Warm Pad",      program:89), .init(name:"Halo Pad",      program:94),
+                        .init(name:"New Age Pad",   program:88), .init(name:"Sweep Pad",     program:95)]
+            }
             if isKosmic {
                 return [.init(name:"Choir Aahs",   program:52), .init(name:"String Ensemble", program:48),
                         .init(name:"Synth Strings", program:50), .init(name:"Warm Pad",       program:89),
@@ -54,16 +74,28 @@ struct TrackRowView: View {
                     .init(name:"Bowed Glass",     program:92), .init(name:"Synth Strings",   program:50),
                     .init(name:"String Pad",      program:48), .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
-            if isKosmic {
-                return [.init(name:"FX Crystal",   program:98), .init(name:"Square Lead",    program:80),
-                        .init(name:"Vibraphone",   program:11), .init(name:"Elec Piano 2",   program:5),
+            if isAmbient {
+                return [.init(name:"Vibraphone",   program:11),  .init(name:"Marimba",        program:12),
+                        .init(name:"Tubular Bells",program:14),  .init(name:"Glockenspiel",   program:9),
+                        .init(name:"FX Crystal",   program:98),  .init(name:"FX Echoes",      program:102),
                         .init(name:"Church Organ", program:19)]
+            }
+            if isKosmic {
+                return [.init(name:"FX Crystal",      program:98), .init(name:"Vibraphone",      program:11),
+                        .init(name:"Elec Piano 2",    program:5),  .init(name:"Church Organ",    program:19),
+                        .init(name:"Tremolo Strings", program:44)]
             }
             return [.init(name:"Guitar Pulse",     program:28), .init(name:"Wurlitzer",         program:5),
                     .init(name:"Rock Organ",        program:18), .init(name:"Clavinet",          program:7),
                     .init(name:"Electric Piano",    program:4),  .init(name:"Muted Guitar",      program:29),
-                    .init(name:"Tremolo Strings",   program:44), .init(name:"Mono Synth",        program:80)]
+                    .init(name:"Mono Synth",        program:80)]
         case kTrackTexture:
+            if isAmbient {
+                return [.init(name:"String Ensemble 2",program:49), .init(name:"Bowed Glass",  program:92),
+                        .init(name:"Choir Aahs",    program:52), .init(name:"Space Voice",      program:91),
+                        .init(name:"FX Atmosphere", program:99), .init(name:"Sweep Pad",        program:95),
+                        .init(name:"Pad 3 Poly",    program:90)]
+            }
             if isKosmic {
                 return [.init(name:"FX Atmosphere", program:99), .init(name:"Pad 3 Poly",    program:90),
                         .init(name:"Sweep Pad",      program:95)]
@@ -72,13 +104,21 @@ struct TrackRowView: View {
                     .init(name:"Space Voice",      program:91), .init(name:"Swell",           program:95),
                     .init(name:"FX Atmosphere",    program:99), .init(name:"FX Echoes",       program:102)]
         case kTrackBass:
+            if isAmbient {
+                return [.init(name:"Cello",        program:42),  .init(name:"Contrabass",     program:43),
+                        .init(name:"Moog Bass",    program:39),  .init(name:"Synth Bass 1",   program:38),
+                        .init(name:"Fretless Bass",program:35)]
+            }
             if isKosmic {
                 return [.init(name:"Moog Bass",    program:39), .init(name:"Synth Bass 1",   program:38),
-                        .init(name:"Lead Bass",    program:87), .init(name:"Fretless Bass",  program:35)]
+                        .init(name:"Fretless Bass", program:35)]
             }
             return [.init(name:"Moog Bass",       program:39), .init(name:"Lead Bass",      program:87),
                     .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]
         case kTrackDrums:
+            if isAmbient {
+                return [.init(name:"Brush Kit",    program:40)]
+            }
             if isKosmic {
                 return [.init(name:"Brush Kit",    program:40), .init(name:"808 Kit",      program:25),
                         .init(name:"Machine Kit",  program:24), .init(name:"Standard Kit", program:0)]
@@ -224,14 +264,17 @@ struct TrackRowView: View {
 
     // MARK: - Helpers
 
-    // Per-track effect subset — exactly 3 per track (style-specific for Kosmic)
+    // Per-track effect subset — exactly 3 per track (style-specific)
     private var trackEffects: [TrackEffect] {
-        let isKosmic = activeStyle == .kosmic
+        let isKosmic  = activeStyle == .kosmic || activeStyle == .ambient
+        let isAmbient = activeStyle == .ambient
         switch trackIndex {
-        case kTrackLead1:   return isKosmic ? [.boost, .delay, .space]  : [.boost, .delay, .tremolo]
-        case kTrackLead2:              return [.boost, .delay, .reverb]
+        case kTrackLead1:   return isKosmic  ? [.boost, .delay, .space]  : [.boost, .delay, .tremolo]
+        case kTrackLead2:   return isKosmic  ? [.boost, .delay, .space]  : [.boost, .delay, .reverb]
         case kTrackPads:               return [.sweep, .delay, .space]
-        case kTrackTexture: return isKosmic ? [.pan, .delay, .space]    : [.pan, .delay, .reverb]
+        case kTrackTexture:
+            if isAmbient { return [.pan, .sweep, .space] }
+            return isKosmic ? [.pan, .delay, .space] : [.pan, .delay, .reverb]
         case kTrackBass:               return [.lowShelf, .delay, .reverb]
         case kTrackDrums:              return [.compression, .delay, .reverb]
         default:                       return [.boost, .delay, .reverb]  // Rhythm
@@ -265,9 +308,20 @@ struct TrackRowView: View {
             appState.setEffect(fx, enabled: false, forTrack: trackIndex)
         }
 
-        let isKosmic = activeStyle == .kosmic
         let defaults: [TrackEffect]
-        if isKosmic {
+        if activeStyle == .ambient {
+            // Plan 14.3: deep reverb on everything; selective delay; no boost/comp/lowShelf
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.delay, .space]   // dotted-half delay, cathedral 82%
+            case kTrackLead2:   [.delay, .space]   // dotted-quarter delay, cathedral 78%
+            case kTrackPads:    [.space, .sweep]    // delay causes beating; cathedral 88% + slow sweep
+            case kTrackRhythm:  [.delay, .reverb]  // distant bell; large chamber 65%
+            case kTrackTexture: [.space, .sweep]   // delay = mush; cathedral 90% + sweep
+            case kTrackBass:    [.reverb]           // large chamber 62%; no delay (smears root)
+            case kTrackDrums:   [.delay, .reverb]  // plate 70%; 1-beat delay for texture
+            default:            []
+            }
+        } else if activeStyle == .kosmic {
             defaults = switch trackIndex {
             case kTrackLead1:    [.delay, .space]
             case kTrackLead2:    [.space]

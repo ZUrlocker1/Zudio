@@ -114,6 +114,8 @@ struct TopBarView: View {
                             .keyboardShortcut("m", modifiers: .command)
                         Button("") { appState.selectedStyle = .kosmic }
                             .keyboardShortcut("k", modifiers: .command)
+                        Button("") { appState.selectedStyle = .ambient }
+                            .keyboardShortcut("a", modifiers: .command)
                         Button("") { appState.seekToStart() }
                             .keyboardShortcut("b", modifiers: .command)
                             .disabled(appState.songState == nil)
@@ -124,7 +126,7 @@ struct TopBarView: View {
                 Divider()
 
                 // Transport — ⏮ ◀ ▶ ■ ▶ ⏭
-                HStack(spacing: 10) {
+                HStack(spacing: 4) {
                     // Jump to start
                     Button(action: { appState.seekToStart() }) {
                         Image(systemName: "backward.end.fill")
@@ -245,16 +247,34 @@ struct TopBarView: View {
                         .help("Export song to M4A audio file in ~/Downloads/ (⌘E)")
                     }
 
-                    // Right block: style selectors + Reset
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 14) {
+                    // Right block: [style picker + reset centered] [20pt gap] [mood + key/bpm]
+                    HStack(alignment: .top, spacing: 20) {
+
+                        // Left column: style picker (full width) + reset (centered beneath it)
+                        VStack(alignment: .center, spacing: 6) {
                             Picker("", selection: $appState.selectedStyle) {
                                 (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
                                 (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
+                                (Text("A").underline() + Text("mbient")).tag(MusicStyle.ambient)
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 140)
+                            .frame(width: 210)
 
+                            Button(action: { appState.resetTrackDefaults() }) {
+                                Label {
+                                    (Text("R").underline() + Text("eset"))
+                                        .fontWeight(.semibold)
+                                } icon: { Image(systemName: "arrow.counterclockwise") }
+                                .frame(width: 105, alignment: .center)
+                            }
+                            .disabled(appState.songState == nil)
+                            .keyboardShortcut("r", modifiers: .command)
+                            .help("Reset all instruments and effects to style defaults (⌘R)")
+                        }
+                        .frame(width: 210)
+
+                        // Right column: Mood centered above Key + BPM
+                        VStack(alignment: .center, spacing: 4) {
                             Picker("Mood", selection: $appState.moodOverride) {
                                 Text("Auto").tag(Optional<Mood>.none)
                                 ForEach(Mood.allCases, id: \.self) { m in
@@ -264,43 +284,34 @@ struct TopBarView: View {
                             .pickerStyle(.menu)
                             .frame(width: 110)
 
-                            Picker("Key", selection: $appState.keyOverride) {
-                                Text("Auto").tag(Optional<String>.none)
-                                ForEach(kAllKeys, id: \.self) { k in
-                                    Text(k).tag(Optional(k))
+                            HStack(spacing: 8) {
+                                Picker("Key", selection: $appState.keyOverride) {
+                                    Text("Auto").tag(Optional<String>.none)
+                                    ForEach(kAllKeys, id: \.self) { k in
+                                        Text(k).tag(Optional(k))
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 90)
+
+                                HStack(spacing: 6) {
+                                    Text("BPM")
+                                        .foregroundStyle(.white)
+                                        .fixedSize()
+                                    TextField("", value: Binding(
+                                        get: { appState.tempoOverride ?? 120 },
+                                        set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
+                                    ), format: .number)
+                                    .frame(width: 48)
+                                    .textFieldStyle(.roundedBorder)
+                                    Stepper("", value: Binding(
+                                        get: { appState.tempoOverride ?? 120 },
+                                        set: { appState.tempoOverride = max(20, min(200, $0)) }
+                                    ), in: 20...200)
+                                    .labelsHidden()
                                 }
                             }
-                            .pickerStyle(.menu)
-                            .frame(width: 90)
-
-                            HStack(spacing: 6) {
-                                Text("BPM")
-                                    .foregroundStyle(.white)
-                                    .fixedSize()
-                                TextField("", value: Binding(
-                                    get: { appState.tempoOverride ?? 120 },
-                                    set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
-                                ), format: .number)
-                                .frame(width: 48)
-                                .textFieldStyle(.roundedBorder)
-                                Stepper("", value: Binding(
-                                    get: { appState.tempoOverride ?? 120 },
-                                    set: { appState.tempoOverride = max(20, min(200, $0)) }
-                                ), in: 20...200)
-                                .labelsHidden()
-                            }
                         }
-
-                        Button(action: { appState.resetTrackDefaults() }) {
-                            Label {
-                                (Text("R").underline() + Text("eset"))
-                                    .fontWeight(.semibold)
-                            } icon: { Image(systemName: "arrow.counterclockwise") }
-                            .frame(width: 128, alignment: .center)
-                        }
-                        .disabled(appState.songState == nil)
-                        .keyboardShortcut("r", modifiers: .command)
-                        .help("Reset all instruments and effects to style defaults (⌘R)")
                     }
                 }
                 .font(.callout)
@@ -435,7 +446,7 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.86 (alpha)").font(.system(size: 14))
+                Text("Version: 0.87 (alpha)").font(.system(size: 14))
                 Text("Built by analyzing classic Motorik and Kosmic artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0: Motorik and Kosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.system(size: 14))

@@ -26,6 +26,21 @@ final class PlaybackEngine: ObservableObject {
     private var reverbs     = [AVAudioUnitReverb]()
     private let mixer       = AVAudioMixerNode()
 
+    // Ambient mode — set before defaultsResetToken fires so setEffect uses Ambient values
+    var ambientMode: Bool = false
+
+    // Per-track Ambient reverb wet values (cathedral for Lead/Pads/Texture, largeChamber for rest)
+    // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums
+    private let ambientReverbWet: [Float]    = [82, 78, 88, 65, 90, 62, 70]
+
+    // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
+    private let ambientDelayWet:      [Float] = [60,  55, -1, 48, -1, -1, 45]
+    private let ambientDelayFeedback: [Float] = [72,  65, -1, 55, -1, -1, 40]
+    private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, -1, -1, 3000]
+    // Delay times in beats: Lead1=dotted-half(1.5), Lead2=dotted-quarter(0.75),
+    //                       Rhythm=dotted-half(1.5), Drums=1-beat(1.0)
+    private let ambientDelayBeats:   [Double] = [1.5, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0]
+
     // Tremolo LFO
     private var tremEnabled = Array(repeating: false, count: 7)
     private var tremPhase   = Array(repeating: Double(0), count: 7)
@@ -316,6 +331,8 @@ final class PlaybackEngine: ObservableObject {
         if !tremEnabled[trackIndex] {
             if trackIndex == kTrackBass && program == 87 {
                 samplers[trackIndex].volume = 0.56   // Lead Bass runs hot
+            } else if trackIndex == kTrackLead2 && program == 0 {
+                samplers[trackIndex].volume = 1.8    // Grand Piano runs soft in GM
             } else if trackIndex == kTrackTexture {
                 samplers[trackIndex].volume = 1.4    // Texture pads are quiet
             } else {
@@ -324,6 +341,34 @@ final class PlaybackEngine: ObservableObject {
         }
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
         applyMuteState()
+    }
+
+    // MARK: - Ambient mode configuration
+
+    /// Call before defaultsResetToken fires so all subsequent setEffect calls use Ambient values.
+    func setAmbientMode(_ enabled: Bool) {
+        ambientMode = enabled
+        guard enabled else { return }
+        // Set per-track reverb presets for Ambient
+        let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture]
+        for i in 0..<reverbs.count {
+            if i == kTrackDrums {
+                reverbs[i].loadFactoryPreset(.plate)
+            } else if atmosphericTracks.contains(i) {
+                reverbs[i].loadFactoryPreset(.cathedral)
+            } else {
+                reverbs[i].loadFactoryPreset(.largeChamber)
+            }
+        }
+        // Set Ambient delay times based on current song tempo
+        let tempo = songState?.frame.tempo ?? 75
+        let beatSecs = 60.0 / Double(tempo)
+        for i in 0..<delays.count {
+            guard i < ambientDelayBeats.count && ambientDelayWet[i] >= 0 else { continue }
+            delays[i].delayTime     = Swift.min(2.0, beatSecs * ambientDelayBeats[i])
+            delays[i].feedback      = ambientDelayFeedback[i]
+            delays[i].lowPassCutoff = ambientDelayLowpass[i]
+        }
     }
 
     // MARK: - Per-track effect toggle
@@ -335,7 +380,11 @@ final class PlaybackEngine: ObservableObject {
             boosts[trackIndex].outputVolume = enabled ? 1.7 : 1.0  // 1.7 ≈ +4.6 dB
         case .delay:
             delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            delays[trackIndex].wetDryMix = enabled ? 40 : 0
+            if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
+                delays[trackIndex].wetDryMix = enabled ? ambientDelayWet[trackIndex] : 0
+            } else {
+                delays[trackIndex].wetDryMix = enabled ? 40 : 0
+            }
         case .sweep:
             if enabled { startSweep(forTrack: trackIndex) }
             else       { stopSweep(forTrack: trackIndex) }
@@ -351,10 +400,14 @@ final class PlaybackEngine: ObservableObject {
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb:
             reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            reverbs[trackIndex].wetDryMix = enabled ? 50 : 0
+            let wet: Float = ambientMode && trackIndex < ambientReverbWet.count
+                ? ambientReverbWet[trackIndex] : 50
+            reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         case .space:
             reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            reverbs[trackIndex].wetDryMix = enabled ? 70 : 0
+            let wet: Float = ambientMode && trackIndex < ambientReverbWet.count
+                ? ambientReverbWet[trackIndex] : 70
+            reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         }
     }
 

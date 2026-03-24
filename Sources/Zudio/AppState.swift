@@ -33,7 +33,7 @@ final class AppState: ObservableObject {
 
     // MARK: - Style selector
 
-    @Published var selectedStyle: MusicStyle = .kosmic
+    @Published var selectedStyle: MusicStyle = .ambient
 
     // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
     // Fired on generateNew() and on the manual Reset button.
@@ -81,28 +81,20 @@ final class AppState: ObservableObject {
         testCycleIndex = 0
     }
 
-    // 10-slot cycle focused on new Loscil/Craven Faults rules + bridges (90% bridge coverage).
-    // Slot 0:  RTHM-009 * + BASS-013 * — call+response bridge                       [Kosmic]
-    // Slot 1:  RTHM-010 * + BASS-013 * — escalating drum bridge                     [Kosmic]
-    // Slot 2:  RTHM-009 * + TEXT-004 * — melody bridge                               [Kosmic]
-    // Slot 3:  RTHM-010 * + TEXT-004 * — call+response bridge                        [Kosmic]
-    // Slot 4:  RTHM-009 * + BASS-013 * + TEXT-004 * — escalating drum bridge         [Kosmic]
-    // Slot 5:  RTHM-010 * + BASS-013 * — melody bridge                               [Kosmic]
-    // Slot 6:  RTHM-009 * + TEXT-004 * — call+response bridge                        [Kosmic]
-    // Slot 7:  RTHM-010 * + BASS-013 * + TEXT-004 * — melody bridge                  [Kosmic]
-    // Slot 8:  RTHM-009 * + BASS-013 * — random bridge archetype                     [Kosmic]
-    // Slot 9:  RTHM-010 * + TEXT-004 * — no forced bridge (free)                     [Kosmic]
+    // 10-slot cycle: no forced rules, high bridge frequency for Kosmic (90%). Ambient ignores bridge params.
+    // Slots 0–8: bridge forced with varied archetypes  [Kosmic]
+    // Slot 9:    free (no forced bridge)               [Kosmic]
     private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drum"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "melody"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drum"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "melody"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: .electricBuddhaRestrained, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "melody"),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-009", forceBassRuleID: "KOS-BASS-013", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil,            forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-010", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil,                         forceBridge: true,  forceBridgeArchetype: "drum"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drum"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drum"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "melody"),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
     ]
 
     private func nextTestConfig() -> TestModeConfig? {
@@ -128,23 +120,29 @@ final class AppState: ObservableObject {
     ]
 
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
-        let c = style == .kosmic
-        switch trackIndex {
-        case kTrackLead1:   return c ? ["Ocarina","Flute","Whistle","Calliope Lead","Fifths Lead","Soft Brass"]
-                                     : ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr","Flute"]
-        case kTrackLead2:   return c ? ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
-                                     : ["Brightness","Vibraphone","Marimba","Bell/Pluck","Ocarina"]
-        case kTrackPads:    return c ? ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
-                                     : ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]
-        case kTrackRhythm:  return c ? ["FX Crystal","Square Lead","Vibraphone","Elec Piano 2","Church Organ"]
-                                     : ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Electric Piano","Muted Guitar","Tremolo Strings","Mono Synth"]
-        case kTrackTexture: return c ? ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
-                                     : ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
-        case kTrackBass:    return c ? ["Moog Bass","Synth Bass 1","Lead Bass","Fretless Bass"]
-                                     : ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
-        case kTrackDrums:   return c ? ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
-                                     : ["Rock Kit","808 Kit","Brush Kit"]
-        default:            return []
+        switch (trackIndex, style) {
+        case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Halo Pad","New Age Pad","Calliope Lead"]
+        case (kTrackLead1,   .kosmic):  return ["Ocarina","Flute","Whistle","Calliope Lead","Soft Brass"]
+        case (kTrackLead1,   _):        return ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr"]
+        case (kTrackLead2,   .ambient): return ["Vibraphone","Celesta","Glockenspiel","Grand Piano","Warm Pad","Space Voice","FX Atmosphere"]
+        case (kTrackLead2,   .kosmic):  return ["Brightness","Warm Pad","Halo Pad","New Age Pad","Ocarina"]
+        case (kTrackLead2,   _):        return ["Brightness","Vibraphone","Bell/Pluck"]
+        case (kTrackPads,    .ambient): return ["String Ensemble","Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
+        case (kTrackPads,    .kosmic):  return ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
+        case (kTrackPads,    _):        return ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]
+        case (kTrackRhythm,  .ambient): return ["Vibraphone","Marimba","Tubular Bells","Glockenspiel","FX Crystal","FX Echoes","Church Organ"]
+        case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Elec Piano 2","Church Organ","Tremolo Strings"]
+        case (kTrackRhythm,  _):        return ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Electric Piano","Muted Guitar","Mono Synth"]
+        case (kTrackTexture, .ambient): return ["String Ensemble 2","Bowed Glass","Choir Aahs","Space Voice","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
+        case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
+        case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
+        case (kTrackBass,    .ambient): return ["Cello","Contrabass","Moog Bass","Synth Bass 1","Fretless Bass"]
+        case (kTrackBass,    .kosmic):  return ["Moog Bass","Synth Bass 1","Fretless Bass"]
+        case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
+        case (kTrackDrums,   .ambient): return ["Brush Kit"]
+        case (kTrackDrums,   .kosmic):  return ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
+        case (kTrackDrums,   _):        return ["Rock Kit","808 Kit","Brush Kit"]
+        default:                        return []
         }
     }
 
@@ -468,6 +466,9 @@ final class AppState: ObservableObject {
                 self.playback.motorikStyle = self.selectedStyle == .motorik
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
+                // Configure ambient mode before defaultsResetToken fires so setEffect
+                // uses the correct Ambient reverb/delay values from the start.
+                self.playback.setAmbientMode(self.selectedStyle == .ambient)
                 // Reset instruments + effects BEFORE play so setProgram() doesn't race
                 // against the first note firing.
                 self.defaultsResetToken += 1

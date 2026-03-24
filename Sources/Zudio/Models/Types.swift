@@ -139,7 +139,7 @@ enum ProgressionFamily: String, Codable, Sendable {
 enum MusicStyle: String, CaseIterable, Codable, Sendable {
     case motorik = "Motorik"
     case kosmic  = "Kosmic"
-    // case ambient = "Ambient"  // future
+    case ambient = "Ambient"
 }
 
 // MARK: - Percussion style (Kosmic + future Ambient)
@@ -176,6 +176,47 @@ enum KosmicProgressionFamily: String, Codable, Sendable {
     case modal_drift
     case suspended_resolution
     case quartal_stack
+}
+
+// MARK: - Ambient progression families
+
+enum AmbientProgressionFamily: String, Codable, Sendable {
+    case droneSingle    // Single root drone throughout
+    case droneTwo       // Two-chord pendulum, very slow movement
+    case modalDrift     // Gradual mode drift over the song
+    case suspendedDrone // Sus2/sus4 chord as drone base
+    case dissonantHaze  // Minor cluster with min7 tension
+}
+
+// MARK: - Ambient tempo style
+
+enum AmbientTempoStyle: String, Codable, Sendable {
+    case beatless   // 62–78 BPM
+    case slowPulse  // 72–92 BPM
+    case midPulse   // 95–110 BPM
+}
+
+// MARK: - Ambient loop lengths (co-prime primes, one per track)
+
+struct AmbientLoopLengths: Sendable {
+    let lead1: Int
+    let lead2: Int
+    let pads: Int
+    let rhythm: Int
+    let texture: Int
+    let bass: Int
+
+    func loopBars(forTrack trackIndex: Int) -> Int {
+        switch trackIndex {
+        case kTrackLead1:   return lead1
+        case kTrackLead2:   return lead2
+        case kTrackPads:    return pads
+        case kTrackRhythm:  return rhythm
+        case kTrackTexture: return texture
+        case kTrackBass:    return bass
+        default:            return pads
+        }
+    }
 }
 
 enum SongForm: String, Sendable {

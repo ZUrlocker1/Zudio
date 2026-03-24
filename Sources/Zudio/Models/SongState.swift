@@ -27,11 +27,51 @@ struct SongState: Sendable {
     let percussionStyle: PercussionStyle
     /// Kosmic-only: chord family selected at generation time. `.static_drone` default for Motorik.
     let kosmicProgFamily: KosmicProgressionFamily
+    /// Ambient-only: progression family. `.droneSingle` default for Motorik/Kosmic.
+    let ambientProgFamily: AmbientProgressionFamily
+    /// Ambient-only: co-prime loop lengths per track. `nil` for Motorik/Kosmic.
+    let ambientLoopLengths: AmbientLoopLengths?
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
     /// reaches that step, giving precise timing (e.g. fills fire 2 beats before the hit).
     let stepAnnotations: [Int: [GenerationLogEntry]]
+
+    // MARK: - Custom init (default values for Ambient fields preserve all existing call sites)
+
+    init(
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        tonalMap: TonalGovernanceMap,
+        trackEvents: [[MIDIEvent]],
+        globalSeed: UInt64,
+        trackOverrides: [Int: UInt64],
+        title: String,
+        form: SongForm,
+        style: MusicStyle,
+        percussionStyle: PercussionStyle,
+        kosmicProgFamily: KosmicProgressionFamily,
+        generationLog: [GenerationLogEntry],
+        stepAnnotations: [Int: [GenerationLogEntry]],
+        ambientProgFamily: AmbientProgressionFamily = .droneSingle,
+        ambientLoopLengths: AmbientLoopLengths? = nil
+    ) {
+        self.frame              = frame
+        self.structure          = structure
+        self.tonalMap           = tonalMap
+        self.trackEvents        = trackEvents
+        self.globalSeed         = globalSeed
+        self.trackOverrides     = trackOverrides
+        self.title              = title
+        self.form               = form
+        self.style              = style
+        self.percussionStyle    = percussionStyle
+        self.kosmicProgFamily   = kosmicProgFamily
+        self.ambientProgFamily  = ambientProgFamily
+        self.ambientLoopLengths = ambientLoopLengths
+        self.generationLog      = generationLog
+        self.stepAnnotations    = stepAnnotations
+    }
 
     // MARK: - Convenience
 
@@ -46,7 +86,8 @@ struct SongState: Sendable {
                   trackEvents: trackEvents, globalSeed: globalSeed,
                   trackOverrides: trackOverrides, title: title, form: form, style: style,
                   percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
-                  generationLog: generationLog, stepAnnotations: stepAnnotations)
+                  generationLog: generationLog, stepAnnotations: stepAnnotations,
+                  ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -64,7 +105,8 @@ struct SongState: Sendable {
             trackEvents: updated, globalSeed: globalSeed,
             trackOverrides: trackOverrides, title: title, form: form, style: style,
             percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
-            generationLog: generationLog + extra, stepAnnotations: stepAnnotations
+            generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
+            ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths
         )
     }
 }
