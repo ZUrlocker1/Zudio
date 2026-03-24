@@ -447,11 +447,11 @@ struct AboutView: View {
             Divider()
             VStack(alignment: .leading, spacing: 6) {
                 Text("Version: 0.91 (alpha)").font(.system(size: 14))
-                Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
+                Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk,Neu!, Deluxe, Harmonia,  Tangerine Dream, Loscil, Craven Faults and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1.0: Instruments using GS MIDI. Arpeggios, pads, textures, sweeps, pans, Berlin school bass and Dinger beat. Basic audio effects for boost, reverb, delay, tremolo and space echo.").font(.system(size: 14))
+                Text("V1.0: Uses GS MIDI instruments as well as Arpeggios, pads, textures, sweeps, pans, Berlin school bass and Dinger beat. Basic audio effects for boost, reverb, delay, tremolo and space echo.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2.0: Continuous playback, improved synth sounds and iPad port coming soon. Maybe.").font(.system(size: 14))
+                Text("V2.0: Continuous playback, improved synth sounds and iPad version coming soon. Maybe.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
