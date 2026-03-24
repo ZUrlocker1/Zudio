@@ -117,7 +117,8 @@ struct TrackRowView: View {
                     .init(name:"Analog Bass",     program:38), .init(name:"Electric Bass",   program:33)]
         case kTrackDrums:
             if isAmbient {
-                return [.init(name:"Brush Kit",    program:40)]
+                return [.init(name:"Percussion Kit", program:0),
+                        .init(name:"Brush Kit",      program:40)]
             }
             if isKosmic {
                 return [.init(name:"Brush Kit",    program:40), .init(name:"808 Kit",      program:25),
@@ -269,14 +270,20 @@ struct TrackRowView: View {
         let isKosmic  = activeStyle == .kosmic || activeStyle == .ambient
         let isAmbient = activeStyle == .ambient
         switch trackIndex {
-        case kTrackLead1:   return isKosmic  ? [.boost, .delay, .space]  : [.boost, .delay, .tremolo]
-        case kTrackLead2:   return isKosmic  ? [.boost, .delay, .space]  : [.boost, .delay, .reverb]
-        case kTrackPads:               return [.sweep, .delay, .space]
+        case kTrackLead1:
+            if isAmbient { return [.sweep, .delay, .space] }
+            return isKosmic ? [.boost, .delay, .space] : [.boost, .delay, .tremolo]
+        case kTrackLead2:
+            if isAmbient { return [.tremolo, .delay, .space] }
+            return isKosmic ? [.boost, .delay, .space] : [.boost, .delay, .reverb]
+        case kTrackPads:    return isAmbient ? [.sweep, .tremolo, .space] : [.sweep, .delay, .space]
         case kTrackTexture:
-            if isAmbient { return [.pan, .sweep, .space] }
+            if isAmbient { return [.pan, .delay, .space] }
             return isKosmic ? [.pan, .delay, .space] : [.pan, .delay, .reverb]
-        case kTrackBass:               return [.lowShelf, .delay, .reverb]
-        case kTrackDrums:              return [.compression, .delay, .reverb]
+        case kTrackBass:
+            if isAmbient { return [.sweep, .delay, .reverb] }
+            return [.lowShelf, .delay, .reverb]
+        case kTrackDrums:              return [.sweep, .delay, .reverb]
         default:                       return [.boost, .delay, .reverb]  // Rhythm
         }
     }
@@ -314,10 +321,10 @@ struct TrackRowView: View {
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]   // dotted-half delay, cathedral 82%
             case kTrackLead2:   [.delay, .space]   // dotted-quarter delay, cathedral 78%
-            case kTrackPads:    [.space, .sweep]    // delay causes beating; cathedral 88% + slow sweep
+            case kTrackPads:    [.space, .tremolo] // cathedral 88% + breath tremolo; sweep available but off
             case kTrackRhythm:  [.delay, .reverb]  // distant bell; large chamber 65%
-            case kTrackTexture: [.space, .sweep]   // delay = mush; cathedral 90% + sweep
-            case kTrackBass:    [.reverb]           // large chamber 62%; no delay (smears root)
+            case kTrackTexture: [.space, .pan]     // cathedral 90% + slow tempo-synced pan; delay available but off
+            case kTrackBass:    [.reverb, .sweep]  // large chamber 62% + slow filter sweep
             case kTrackDrums:   [.delay, .reverb]  // plate 70%; 1-beat delay for texture
             default:            []
             }

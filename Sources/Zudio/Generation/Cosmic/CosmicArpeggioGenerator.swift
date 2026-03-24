@@ -830,8 +830,14 @@ struct KosmicArpeggioGenerator {
     /// JMJ hook note set: 4 notes in MIDI 60–80, scale degrees depend on shape
     private static func jmjHookNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, shape: Int) -> [Int] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let mode   = entry.sectionMode
-        let third  = mode.nearestInterval(3)
+        // Use chord type (not song mode) for third quality — avoids C natural against a major chord
+        // in a Dorian/Aeolian song (mode.nearestInterval gives minor third regardless of chord type).
+        let isMajorChord: Bool
+        switch entry.chordWindow.chordType {
+        case .major, .sus2, .sus4, .add9, .dom7: isMajorChord = true
+        default: isMajorChord = false
+        }
+        let third  = isMajorChord ? 4 : 3
         let fifth  = 7
         let octave = 12
 
@@ -851,8 +857,13 @@ struct KosmicArpeggioGenerator {
     /// JMJ Oxygène 4-note set, quarter-note register MIDI 58–78
     private static func jmjOxygeneNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let mode   = entry.sectionMode
-        let third  = mode.nearestInterval(3)
+        // Use chord type (not song mode) — same fix as jmjHookNotes
+        let isMajorChord: Bool
+        switch entry.chordWindow.chordType {
+        case .major, .sus2, .sus4, .add9, .dom7: isMajorChord = true
+        default: isMajorChord = false
+        }
+        let third  = isMajorChord ? 4 : 3
         let fifth  = 7
         let octave = 12
         func place(_ pc: Int) -> Int {

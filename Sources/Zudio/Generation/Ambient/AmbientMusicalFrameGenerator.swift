@@ -67,8 +67,8 @@ struct AmbientMusicalFrameGenerator {
     }
 
     private static func pickPercussionStyle(rng: inout SeededRNG) -> PercussionStyle {
-        let styles:  [PercussionStyle] = [.absent, .textural, .softPulse]
-        let weights: [Double]          = [0.60,    0.35,      0.05]
+        let styles:  [PercussionStyle] = [.handPercussion, .textural, .absent, .softPulse]
+        let weights: [Double]          = [0.45,            0.30,      0.20,    0.05]
         return styles[rng.weightedPick(weights)]
     }
 

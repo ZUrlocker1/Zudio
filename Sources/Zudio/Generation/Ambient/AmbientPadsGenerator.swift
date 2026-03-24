@@ -36,7 +36,7 @@ struct AmbientPadsGenerator {
         var step = rng.nextInt(upperBound: 8)   // small random offset at start
         while step < loopSteps {
             if rng.nextDouble() > 0.30 {   // 70% chance each re-attack fires (30% skip = organic gap)
-                let vel = UInt8(75 + rng.nextInt(upperBound: 21))  // 75–95
+                let vel = UInt8(55 + rng.nextInt(upperBound: 21))  // 55–75
                 for note in spread {
                     let dur = Swift.min(duration, loopSteps - step)
                     if dur >= 4 {

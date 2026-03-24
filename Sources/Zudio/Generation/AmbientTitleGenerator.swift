@@ -171,9 +171,9 @@ struct AmbientTitleGenerator {
         "a Revolving Door That Moves Too Slowly"
     ]
 
-    private static let frenchWords   = ["Deuxième", "Troisième", "Quatrième", "Fragment", "Suite", "Reprise"]
+    private static let frenchWords   = ["Deuxieme", "Troisieme", "Quatrieme", "Fragment", "Suite", "Reprise"]
     private static let frenchTargets = [
-        "Part Deux", "Pensées", "Pour le Car Park", "Numéro Trois",
+        "Part Deux", "Pensees", "Pour le Car Park", "Numero Trois",
         "Pour la Salle d'Attente", "Studies", "Encore Une Fois (Reluctant)",
         "Interlude (Unnecessary)", "Coda (Unresolved)"
     ]
@@ -194,12 +194,12 @@ struct AmbientTitleGenerator {
         "Outstanding Actions", "Deferrals", "Reconciliations", "Variance Reports"
     ]
 
-    // JMJ-style French concept words (parody of Oxygène, Équinoxe, etc.)
+    // JMJ-style French concept words (parody of Oxygene, Equinoxe, etc.)
     private static let jmjConcepts = [
-        "Oxygène", "Équinoxe", "Magnétique", "Chronologie",
-        "Métamorphoses", "Électronique", "Atmosphère",
-        "Cosmique", "Solstice", "Méridien", "Lumineux",
-        "Téléphonie", "Zénith", "Isotrope"
+        "Oxygene", "Equinoxe", "Magnetique", "Chronologie",
+        "Metamorphoses", "Electronique", "Atmosphere",
+        "Cosmique", "Solstice", "Meridien", "Lumineux",
+        "Telephonie", "Zenith", "Isotrope"
     ]
 
     // JMJ mundane deflating suffixes

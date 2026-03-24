@@ -151,8 +151,9 @@ enum PercussionStyle: String, Codable, Sendable {
     case motorikGrid               // Electric Buddha groove — 8th-note hi-hat + varied rock kick/snare (KOS-DRUM-004)
     case electricBuddhaPulse       // Electric Buddha pulse — quarter-note hi-hat + half-time kick/snare (KOS-DRUM-005)
     case electricBuddhaRestrained  // Electric Buddha restrained — ride+clap+4-on-floor kick, periodic dropouts (KOS-DRUM-006)
-    case textural     // Ambient future use
-    case softPulse   // Ambient future use
+    case handPercussion              // Ambient: congas, bongos, shakers (AMB-DRUM-004)
+    case textural                    // Ambient: sparse brush/ride (AMB-DRUM-001)
+    case softPulse                   // Ambient: gentle kick + hat (AMB-DRUM-002)
 }
 
 // MARK: - Kosmic song forms

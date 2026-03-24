@@ -5,3 +5,7 @@
 **/xcuserdata/
 **/*.xcuserstate
 /Zudio
+
+# Generated song output — not source
+Zudio-*.MID
+Zudio-*.txt

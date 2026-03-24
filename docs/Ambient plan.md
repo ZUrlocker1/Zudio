@@ -1368,7 +1368,8 @@ generateAmbient() order:
 
 ### Stage 13 — Status Log and Generation Logging
 
-**Goal:** Generation log entries for Ambient songs follow the same format as Motorik/Kosmic so the coherence analysis tools work correctly.
+**Goal:** Generation log entries for Ambient songs follo
+w the same format as Motorik/Kosmic so the coherence analysis tools work correctly.
 
 **Files to modify or create:**
 - Log entries needed per song: style, key, mode, BPM, totalBars, percussionStyle, progressionFamily, loop lengths per track, instrument assignments, per-rule firing log for each generator
@@ -1433,5 +1434,166 @@ If findings require generator changes, fix and re-run a smaller study (6–8 son
 **Do apply to Ambient:** `HarmonicFilter`. The diatonic constraint is universal — it enforces AMB-SYNC-001.
 
 **Loop tiling is the core architectural difference.** Each generator produces a short loop (5–19 bars), not a full-length song. `AmbientLoopTiler` repeats it. The phase relationship between different-length loops is what produces variation. If any generator bypasses the tiler and writes directly to the full song length, the phase effect is lost.
+
+---
+
+## Part 9: Harmonic Variety & Melodic Interest — Analysis and Plan (2026-03-24)
+
+### 9.1 Observations from 10-Song Listening Analysis
+
+Analysis of 15 Ambient songs (log files + MIDI) identified two structural weaknesses:
+
+**Bass monotony:**
+- `AmbientBassGenerator` plays only the root note, repeated for the entire song as a tiled loop.
+- Bass note counts are very low (6–22 notes for full-length songs), which is correct for the style,
+  but every note is identical in pitch — no harmonic movement whatsoever.
+- More critically: the generator only reads `tonalMap.entry(atBar: 0)`, so for songs with
+  multi-chord plans (root=b7, root=b6 sections — present in 5 of the 10 songs analysed), the
+  bass continues to play the opening chord's root even when the harmony has shifted. This is
+  harmonically wrong, not just aesthetically dull.
+
+**Absence of a "melodic moment":**
+- All Lead 1 rules (floatingTone, echoPhrase, pentaShimmer) generate notes chosen at random from
+  the scale pool. None has an intentional melodic shape — a contour that rises to a peak and
+  resolves, or a clear interval identity. The result is pleasant but featureless.
+- There is no equivalent of the Kosmic Bridge Melody: a single, shaped, memorable gesture that
+  appears once per song and gives the listener something to hold onto.
+
+**Secondary observations:**
+- Drums (Percussion Kit, Brush Kit) are now audible following the volume fix — hand percussion
+  in particular sounds good. This makes the bass monotony more noticeable by contrast.
+- Lead 2 ghost-echo (AMB-SYNC-004) works well and should be preserved.
+- Songs with sus2 chord type sound notably brighter and more interesting than minor drone songs
+  — harmonic variety at the macro level is already working.
+
+---
+
+### 9.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003) ✓ DONE
+
+**What:** New bass rule where holds alternate between the chord root (even holds) and the perfect
+fifth (root+7 semitones, odd holds). 10% chance any fifth hold becomes a major third instead.
+Both intervals stay in the same bass register (MIDI 40–64) as the root. The bass still uses
+long holds (32–64 steps) with silences (16–32 steps) between — the character remains drone-like.
+
+**Why the alternating hold approach (vs. the original midpoint plan):** Alternating by hold index
+means every chord window gets both the root and fifth visited in proportion to the window length,
+regardless of how long the window is. The original plan (place 5th at loop midpoint) could leave
+a very long chord window with only root for most of its duration.
+
+**Rarely:** 10% chance on fifth holds of using the major third instead. This is the most affecting
+interval in a drone context — brief and harmonically warm.
+
+**Probability distribution (when bass present, i.e. 70% of songs):**
+- AMB-BASS-001 (root only): 50%
+- AMB-BASS-003 (alternating root + fifth): 50%
+- AMB-BASS-002 already gates the 30% absent case before this split
+
+**Files modified:**
+- `Sources/Zudio/Generation/Ambient/AmbientBassGenerator.swift` — `useRootFifth` flag, odd-hold fifth logic
+- `Sources/Zudio/Generation/SongGenerator.swift` — `AMB-BASS-003` log description added
+
+---
+
+### 9.3 Plan B — Bass Chord-Following Fix ✓ DONE
+
+**What:** `AmbientBassGenerator` now iterates every `TonalGovernanceEntry` in the `tonalMap`
+directly. For each chord window it computes the root pitch class from that window's `chordRoot`
+degree, generates holds within `[window.startBar * 16, window.endBar * 16)`, then moves on to the
+next window. The bass is no longer loop-tiled at all — it produces a single full-song event array.
+
+**Why this approach (vs. the post-tiling re-pitch alternative):** Cleaner and correct by
+construction. The loop-tile approach would have required detecting which tiled events fall in which
+chord window and re-pitching them — fragile and harder to reason about. Generating per window and
+concatenating is straightforward and requires no post-processing.
+
+**Effect:** In a `modalDrift` (i–♭VII–♭VI) song the bass now correctly plays the tonic root
+during the i section, drops a whole tone (♭VII) for the second section, and drops again (♭VI) for
+the third. Previously it played the tonic root throughout.
+
+**Signature change:** `loopBars` parameter removed. `SongGenerator` assigns the result directly
+without calling `AmbientLoopTiler.tile`. Regen path (kTrackBass case) updated to match.
+
+**Files modified:**
+- `Sources/Zudio/Generation/Ambient/AmbientBassGenerator.swift` — full rewrite, chord-window iteration
+- `Sources/Zudio/Generation/SongGenerator.swift` — removed tile call, updated regen path
+
+---
+
+### 9.4 Plan C — Celestial Phrase (AMB-RTHM-005) ✓ DONE
+
+**What:** A 4–5 note ascending phrase on the Rhythm track using the major pentatonic of the song
+key — regardless of the modal context. Deliberately "major feel": ♭7 and minor 3rd of
+Dorian/Aeolian are excluded. Pentatonic intervals: root, +2, +4, +7, +9 (1–2–M3–5–6).
+
+**Placement on Rhythm (not Lead 2 as originally planned):** The Rhythm track already generates
+melodic content (arpeggios, stochastic phrases); an ascending gesture fits naturally there and
+inherits the track's reverb and instrument (Vibraphone, Marimba, Tubular Bells). Named
+AMB-RTHM-005 per track-based convention.
+
+**How it sounds:** Picks 4 or 5 ascending consecutive pentatonic notes starting in the lower 55%
+of the Rhythm register (MIDI 45–76). Each note held 8–12 steps; 2–4 step gap between notes.
+Total phrase ~50–80 steps. Placed at a random offset within the loop — so the phrase returns each
+tile cycle at a different position relative to the pads and bass, creating the phase-drift effect
+characteristic of the Eno tape-loop aesthetic.
+
+**Velocity:** 33–52, gentle. Emerges softly from the texture; does not dominate.
+
+**Probability:** 5% of Rhythm selections (reduced AMB-RTHM-003 stochastic phrase from 10% to 5%
+to make room; silent at 60% unchanged).
+
+**Files modified:**
+- `Sources/Zudio/Generation/Ambient/AmbientRhythmGenerator.swift` — `celestialPhrase()` added, `forceRuleID` support, switch-based dispatch
+- `Sources/Zudio/Generation/SongGenerator.swift` — log description added
+
+---
+
+### 9.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%) ✓ DONE
+
+**What:** A new Lead 1 rule with an intentional melodic arc: low → mid → peak → step-down.
+4 notes with a clear contour (not random scale walking). Uses scale tones biased toward the
+brighter intervals — degrees 1, 3, 5, 6 (or 1, 2, 4, 5 for sus2 contexts). The peak note sits
+a 6th or 7th above the opening note; the final note steps down a 2nd from the peak.
+
+**Timing:** 10–14 steps per note (held, not staccato), 6-step gaps. Total phrase ~72 steps.
+One occurrence per loop tile.
+
+**Why:** The existing echo phrase (AMB-LEAD-002) descends with diminishing velocity — it fades
+away. The Lyric Fragment ascends toward a peak and has a brief resolution, giving the listener a
+moment of arrival rather than pure evaporation. This is the "pretty melody" quality without
+imposing a tune — it's more of a contour than a recognisable theme.
+
+**Probability:** 5% of Lead 1 selections (added to pool, reducing floatingTone from 30% to 26%
+and echoPhrase from 20% to 19%).
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientLeadGenerator.swift` — add `lyricalFragment()` function as AMB-LEAD-007, add to roll table
+
+---
+
+### 9.6 Plan E — AMB-RTHM-006: Bell Cell ✓ DONE
+
+**What:** A new Rhythm track rule: a 3-note repeating cell — root → fifth → octave — each note
+4 steps long, with long silences (8+ bars) between repetitions. The cell repeats 1–2 times per
+loop. With the long reverb on the rhythm track, these three bell-tones bloom into each other and
+create a gentle harmonic pillar beneath the texture.
+
+**Note:** AMB-RTHM-003 (stochastic phrase) is already in use; this becomes AMB-RTHM-006.
+
+**Character:** Inspired by the bell gestures in Eno's "Thursday Afternoon" and Craven Faults' use
+of sparse melodic elements to punctuate otherwise static textures.
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientRhythmGenerator.swift` — add `bellCell()` function as AMB-RTHM-006
+- `Sources/Zudio/Generation/SongGenerator.swift` — add log description
+
+---
+
+### 9.7 Implementation Order
+
+- Plan B (chord-following bass fix) — ✓ DONE — full-song chord-window iteration, no tiling
+- Plan A (AMB-BASS-003 root+fifth drone) — ✓ DONE — alternating holds, 50% probability
+- Plan C (AMB-RTHM-005 celestial phrase) — ✓ DONE — ascending pentatonic, 5% on Rhythm track
+- Plan D (AMB-LEAD-007 lyric fragment) — ✓ DONE — 4-note arc, 5% on Lead 1
+- Plan E (AMB-RTHM-006 bell cell) — ✓ DONE — root→fifth→octave, 4% on Rhythm track
 
 **Build order matters.** Pads must sound right before anything is added. The test gate at Stage 3 is the most important checkpoint — if the pad generator produces monotonous or clashing output, all subsequent stages will sound wrong on top of it.

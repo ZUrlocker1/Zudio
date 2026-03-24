@@ -1,6 +1,7 @@
 // AmbientLeadGenerator.swift — Lead 1 and Lead 2 generators for Ambient style
-// Lead 1 rules: AMB-LD1-004 (40%), AMB-LD1-001 floating tone (30%),
-//               AMB-LD1-002 echo phrase (20%), AMB-LD1-003 pentatonic shimmer (10%)
+// Lead 1 rules: AMB-LEAD-004 (40%), AMB-LEAD-001 floating tone (26%),
+//               AMB-LEAD-002 echo phrase (19%), AMB-LEAD-003 pentatonic shimmer (10%),
+//               AMB-LEAD-007 lyric fragment (5%)
 // Lead 2: AMB-SYNC-003 — fills Lead 1 silent windows (absent if no windows).
 // AMB-RULE-02 enforced: rest ≥ 2× note duration after each note event.
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
@@ -16,7 +17,9 @@ struct AmbientLeadGenerator {
         tonalMap: TonalGovernanceMap,
         loopBars: Int,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceNonSilent: Bool = false,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackLead1]!  // low:60, high:88
         let loopSteps = loopBars * 16
@@ -24,22 +27,40 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        let roll = rng.nextDouble()
-        if roll < 0.40 {
-            usedRuleIDs.insert("AMB-LD1-004"); return []
+        // If a specific rule is forced (test pool override), skip the random roll
+        if let forced = forceRuleID {
+            let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+            let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
+            switch forced {
+            case "AMB-LEAD-001": usedRuleIDs.insert("AMB-LEAD-001"); return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
+            case "AMB-LEAD-002": usedRuleIDs.insert("AMB-LEAD-002"); return echoPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)
+            case "AMB-LEAD-003": usedRuleIDs.insert("AMB-LEAD-003"); return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)
+            case "AMB-LEAD-004": usedRuleIDs.insert("AMB-LEAD-004"); return []
+            case "AMB-LEAD-007": usedRuleIDs.insert("AMB-LEAD-007"); return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
+            default: break
+            }
         }
-        if roll < 0.70 {
-            usedRuleIDs.insert("AMB-LD1-001")
+
+        let roll = rng.nextDouble()
+        if !forceNonSilent && roll < 0.40 {
+            usedRuleIDs.insert("AMB-LEAD-004"); return []
+        }
+        if roll < 0.66 {
+            usedRuleIDs.insert("AMB-LEAD-001")
             return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
         }
-        if roll < 0.90 {
-            usedRuleIDs.insert("AMB-LD1-002")
+        if roll < 0.85 {
+            usedRuleIDs.insert("AMB-LEAD-002")
             return echoPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)
         }
-        usedRuleIDs.insert("AMB-LD1-003")
-        let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
-        let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
-        return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)
+        if roll < 0.95 {
+            usedRuleIDs.insert("AMB-LEAD-003")
+            let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+            let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
+            return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)
+        }
+        usedRuleIDs.insert("AMB-LEAD-007")
+        return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
     }
 
     // MARK: - Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows)
@@ -58,6 +79,28 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
+        // AMB-SYNC-004 (40%): ghost echo — delay Lead 1 notes by 4–8 steps at 60–65% velocity.
+        // Creates a natural echo/shadow effect; only fires when Lead 1 has content.
+        if !lead1Events.isEmpty && rng.nextDouble() < 0.40 {
+            usedRuleIDs.insert("AMB-SYNC-004")
+            var echoEvents: [MIDIEvent] = []
+            for ev in lead1Events where ev.stepIndex < loopSteps {
+                let offset = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
+                let step   = ev.stepIndex + offset
+                guard step < loopSteps else { continue }
+                let vel = UInt8(Swift.max(20, Int(Double(ev.velocity) * 0.62)))
+                let dur = Swift.min(ev.durationSteps, loopSteps - step)
+                if dur >= 2 {
+                    echoEvents.append(MIDIEvent(stepIndex: step, note: ev.note,
+                                                velocity: vel, durationSteps: dur))
+                }
+            }
+            if !echoEvents.isEmpty {
+                return echoEvents.sorted { $0.stepIndex < $1.stepIndex }
+            }
+        }
+
+        // AMB-SYNC-003: fill Lead 1 silent windows
         // Build set of steps occupied by lead1 (within loop)
         var occupied = Set<Int>()
         for ev in lead1Events where ev.stepIndex < loopSteps {
@@ -78,8 +121,8 @@ struct AmbientLeadGenerator {
         }
         if let ws = winStart, loopSteps - ws >= 8 { windows.append((ws, loopSteps - ws)) }
 
-        if windows.isEmpty { usedRuleIDs.insert("AMB-LD2-002"); return [] }
-        usedRuleIDs.insert("AMB-LD2-001")
+        if windows.isEmpty { usedRuleIDs.insert("AMB-LEAD-006"); return [] }
+        usedRuleIDs.insert("AMB-LEAD-005")
 
         var events: [MIDIEvent] = []
         for window in windows {
@@ -99,7 +142,7 @@ struct AmbientLeadGenerator {
 
     // MARK: - Lead 1 rule implementations
 
-    /// AMB-LD1-001: Floating tone — 1–3 sustained notes, long rests between them.
+    /// AMB-LEAD-001: Floating tone — 1–3 sustained notes, long rests between them.
     private static func floatingTone(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let count  = 1 + rng.nextInt(upperBound: 3)   // 1–3 notes
@@ -119,7 +162,7 @@ struct AmbientLeadGenerator {
         return events
     }
 
-    /// AMB-LD1-002: Echo phrase — 2–3 note descending phrase with diminishing velocity.
+    /// AMB-LEAD-002: Echo phrase — 2–3 note descending phrase with diminishing velocity.
     private static func echoPhrase(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let phraseCount = 1 + rng.nextInt(upperBound: 2)
@@ -152,7 +195,7 @@ struct AmbientLeadGenerator {
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
-    /// AMB-LD1-003: Pentatonic shimmer — short ascending run, then long rest.
+    /// AMB-LEAD-003: Pentatonic shimmer — short ascending run, then long rest.
     private static func pentaShimmer(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         var cursor = rng.nextInt(upperBound: 4)
@@ -168,6 +211,45 @@ struct AmbientLeadGenerator {
             }
             // AMB-RULE-02: long rest after shimmer
             cursor += count * 3 + 24 + rng.nextInt(upperBound: 16)
+        }
+        return events
+    }
+
+    /// AMB-LEAD-007: Lyric fragment — 4-note arc with intentional contour: low → mid → peak → step-down.
+    /// Uses scale tones; each note held 10–14 steps; 6-step gaps. One occurrence per loop.
+    private static func lyricalFragment(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        guard notes.count >= 5 else { return [] }
+
+        // Start in the lower third of the register; build arc upward then resolve down
+        let maxStart = Swift.max(1, notes.count / 3)
+        let startIdx = rng.nextInt(upperBound: maxStart)
+        let step1    = 2 + rng.nextInt(upperBound: 2)           // +2 or +3 positions
+        let step2    = 2 + rng.nextInt(upperBound: 2)           // +2 or +3 positions
+        let step3    = -(1 + rng.nextInt(upperBound: 2))        // -1 or -2 from peak
+
+        let idx0 = startIdx
+        let idx1 = Swift.min(notes.count - 1, startIdx + step1)
+        let idx2 = Swift.min(notes.count - 1, idx1 + step2)
+        let idx3 = Swift.max(0, idx2 + step3)
+        let phrase = [notes[idx0], notes[idx1], notes[idx2], notes[idx3]]
+
+        let holdSteps = 10 + rng.nextInt(upperBound: 5)         // 10–14 steps per note
+        let gapSteps  = 6
+        let phraseLen = phrase.count * (holdSteps + gapSteps)
+        guard phraseLen < loopSteps else { return [] }
+        let offset = rng.nextInt(upperBound: loopSteps - phraseLen)
+
+        // Velocity arc mirrors the pitch arc: rises to peak, settles at resolution
+        let baseVels: [Int] = [52, 63, 72, 60]
+        var events: [MIDIEvent] = []
+        var cursor = offset
+        for (i, note) in phrase.enumerated() {
+            let vel = UInt8(Swift.min(100, baseVels[i] + rng.nextInt(upperBound: 8)))
+            let dur = Swift.min(holdSteps, loopSteps - cursor)
+            if dur >= 4 {
+                events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
+            }
+            cursor += holdSteps + gapSteps
         }
         return events
     }

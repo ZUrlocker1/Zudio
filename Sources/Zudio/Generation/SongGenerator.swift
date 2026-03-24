@@ -416,14 +416,12 @@ struct SongGenerator {
                                                          loopBars: loopLengths.pads,
                                                          totalBars: frame.totalBars)
 
-        // Bass
+        // Bass — full-song chord-following (no tiling)
         var bassRules: Set<String> = []
-        let bassLoop = AmbientBassGenerator.generate(frame: frame, tonalMap: tonalMap,
-                                                      loopBars: loopLengths.bass, rng: &bassRNG,
-                                                      usedRuleIDs: &bassRules)
-        trackEvents[kTrackBass] = AmbientLoopTiler.tile(events: bassLoop,
-                                                         loopBars: loopLengths.bass,
-                                                         totalBars: frame.totalBars)
+        trackEvents[kTrackBass] = AmbientBassGenerator.generate(frame: frame, tonalMap: tonalMap,
+                                                                  rng: &bassRNG,
+                                                                  usedRuleIDs: &bassRules,
+                                                                  forceRuleID: forceBassRuleID)
 
         // Drums (stochastic full-song — no tiling)
         var drumRules: Set<String> = []
@@ -431,11 +429,19 @@ struct SongGenerator {
                                                                    percussionStyle: percussionStyle,
                                                                    rng: &drumRNG, usedRuleIDs: &drumRules)
 
-        // Lead 1
+        // Lead 1 — if silent and pads are non-empty, force a second attempt with a real rule
         var lead1Rules: Set<String> = []
-        let lead1Loop = AmbientLeadGenerator.generateLead1(frame: frame, tonalMap: tonalMap,
+        var lead1Loop = AmbientLeadGenerator.generateLead1(frame: frame, tonalMap: tonalMap,
                                                             loopBars: loopLengths.lead1, rng: &lead1RNG,
-                                                            usedRuleIDs: &lead1Rules)
+                                                            usedRuleIDs: &lead1Rules,
+                                                            forceRuleID: forceLeadRuleID)
+        if lead1Loop.isEmpty && !padLoop.isEmpty && forceLeadRuleID == nil {
+            lead1Rules.removeAll()
+            lead1Loop = AmbientLeadGenerator.generateLead1(frame: frame, tonalMap: tonalMap,
+                                                            loopBars: loopLengths.lead1, rng: &lead1RNG,
+                                                            usedRuleIDs: &lead1Rules,
+                                                            forceNonSilent: true)
+        }
         trackEvents[kTrackLead1] = AmbientLoopTiler.tile(events: lead1Loop,
                                                           loopBars: loopLengths.lead1,
                                                           totalBars: frame.totalBars)
@@ -454,7 +460,8 @@ struct SongGenerator {
         var rhythmRules: Set<String> = []
         let rythmLoop = AmbientRhythmGenerator.generate(frame: frame, tonalMap: tonalMap,
                                                          loopBars: loopLengths.rhythm, rng: &rythmRNG,
-                                                         usedRuleIDs: &rhythmRules)
+                                                         usedRuleIDs: &rhythmRules,
+                                                         forceRuleID: forceArpRuleID)
         trackEvents[kTrackRhythm] = AmbientLoopTiler.tile(events: rythmLoop,
                                                             loopBars: loopLengths.rhythm,
                                                             totalBars: frame.totalBars)
@@ -471,6 +478,51 @@ struct SongGenerator {
         // Post-processing: harmonic filter only (no Density/Arrangement/PatternEvolver/DrumVariation)
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
+        // X-Files whistle — injected AFTER harmonic filter so the melody is not scale-snapped.
+        // 5% chance (75% in test mode) of appearing once in the 30–60 second window.
+        // Plays once, starting at bar 2 of the block; phrase spills into bar 3 (bars 1 and 4 silent).
+        var ambientXFilesBars: [Int] = []
+        let xFilesProb = testMode ? 0.75 : 0.05
+        if lead1RNG.nextDouble() < xFilesProb {
+            let stepsPerSec = (Double(frame.tempo) / 60.0) * 4.0
+            let bar30 = max(0, Int(stepsPerSec * 30.0) / 16)
+            let bar60 = min(frame.totalBars - 4, Int(stepsPerSec * 60.0) / 16)
+            if bar30 <= bar60 {
+                let candidates = Array(bar30...bar60)
+                let blockStart     = candidates[lead1RNG.nextInt(upperBound: candidates.count)]
+                let blockStartStep = blockStart * 16
+                let blockEndStep   = blockStartStep + 64   // 4 bars × 16 steps
+                // Clear Lead 1 and Lead 2 in the 4-bar block.
+                // Also truncate any note that starts before the block but bleeds into it.
+                func clearBlock(_ evs: [MIDIEvent]) -> [MIDIEvent] {
+                    evs.compactMap { ev in
+                        if ev.stepIndex >= blockStartStep && ev.stepIndex < blockEndStep {
+                            return nil   // starts inside block — remove
+                        }
+                        if ev.stepIndex < blockStartStep {
+                            let bleed = ev.stepIndex + ev.durationSteps - blockStartStep
+                            if bleed > 0 {
+                                // Truncate to end exactly at block start
+                                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                                 velocity: ev.velocity,
+                                                 durationSteps: ev.durationSteps - bleed)
+                            }
+                        }
+                        return ev
+                    }
+                }
+                trackEvents[kTrackLead1] = clearBlock(trackEvents[kTrackLead1])
+                trackEvents[kTrackLead2] = clearBlock(trackEvents[kTrackLead2])
+                // Play whistle once starting at bar 2 of the block — phrase naturally spills into bar 3.
+                let whistleEvents = KosmicLeadGenerator.xFilesWhistleBar(
+                    bar: blockStart + 1, frame: frame, tonalMap: tonalMap, rng: &lead1RNG)
+                trackEvents[kTrackLead1] = (trackEvents[kTrackLead1] + whistleEvents)
+                    .sorted { $0.stepIndex < $1.stepIndex }
+                // Annotate only the first whistle bar at runtime
+                ambientXFilesBars = [blockStart + 1]
+            }
+        }
+
         // Title
         let title = AmbientTitleGenerator.generate(rng: &rng)
 
@@ -483,11 +535,20 @@ struct SongGenerator {
             percussionStyle: percussionStyle, ambientProgFamily: ambientProgFamily,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules, texRules: texRules, testMode: testMode
+            rhythmRules: rhythmRules, texRules: texRules, testMode: testMode,
+            forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
+            forceLeadRuleID: forceLeadRuleID, forcePercussionStyle: forcePercussionStyle
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
-                                                    frame: frame, includeDrumFills: false)
+                                                    frame: frame, xFilesBars: ambientXFilesBars,
+                                                    includeDrumFills: false)
+
+        // Derive the 4-bar block step range for PlaybackEngine delay muting.
+        let ambientXFilesBlockRange: Range<Int>? = ambientXFilesBars.first.map {
+            let s = ($0 - 1) * 16   // blockStart = firstXFilesBar - 1
+            return s ..< s + 64     // 4 bars × 16 steps
+        }
 
         return SongState(
             frame: frame, structure: structure, tonalMap: tonalMap,
@@ -495,7 +556,8 @@ struct SongGenerator {
             title: title, form: form, style: .ambient,
             percussionStyle: percussionStyle, kosmicProgFamily: .static_drone,
             generationLog: log, stepAnnotations: stepAnnotations,
-            ambientProgFamily: ambientProgFamily, ambientLoopLengths: loopLengths
+            ambientProgFamily: ambientProgFamily, ambientLoopLengths: loopLengths,
+            ambientXFilesBlockRange: ambientXFilesBlockRange
         )
     }
 
@@ -532,11 +594,9 @@ struct SongGenerator {
             }
         case kTrackBass:
             if isAmbient {
-                let loopBars = ambLoopLengths?.bass ?? 8
-                let loop = AmbientBassGenerator.generate(
+                events = AmbientBassGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
-                    loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
-                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                    rng: &rng, usedRuleIDs: &usedRules)
             } else if isKosmic {
                 var ignored: [Int] = []
                 events = KosmicBassGenerator.generate(
@@ -1077,6 +1137,8 @@ struct SongGenerator {
         "MOT-TEXT-004",     // Motorik shimmer hold
         "MOT-TEXT-007",     // Pedal drone
         "MOT-TEXT-008",     // Phase slip
+        "KOS-BASS-012",     // McCartney PBW bass — third/fifth walk
+        "KOS-RTHM-002",     // JMJ hook arpeggiation
     ]
 
     private static func ruleTag(_ ruleID: String, testMode: Bool) -> String {
@@ -1197,8 +1259,28 @@ struct SongGenerator {
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
         texRules: Set<String>,
-        testMode: Bool = false
+        testMode: Bool = false,
+        forceBassRuleID: String? = nil,
+        forceArpRuleID: String? = nil,
+        forceLeadRuleID: String? = nil,
+        forcePercussionStyle: PercussionStyle? = nil
     ) -> [GenerationLogEntry] {
+        // Build the set of rule IDs that were forced by the test pool — these get a * marker.
+        var forcedRuleIDs: Set<String> = []
+        if testMode {
+            if let bass = forceBassRuleID  { forcedRuleIDs.insert(bass) }
+            if let rthm = forceArpRuleID   { forcedRuleIDs.insert(rthm) }
+            if let lead = forceLeadRuleID  { forcedRuleIDs.insert(lead) }
+            if let perc = forcePercussionStyle {
+                switch perc {
+                case .handPercussion: forcedRuleIDs.insert("AMB-DRUM-004")
+                case .absent:         forcedRuleIDs.insert("AMB-DRUM-003")
+                case .textural:       forcedRuleIDs.insert("AMB-DRUM-001")
+                case .softPulse:      forcedRuleIDs.insert("AMB-DRUM-002")
+                default: break
+                }
+            }
+        }
         var log: [GenerationLogEntry] = []
 
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
@@ -1231,27 +1313,28 @@ struct SongGenerator {
         let loopDesc = "pads \(loopLengths.pads)  lead1 \(loopLengths.lead1)  lead2 \(loopLengths.lead2)  rhythm \(loopLengths.rhythm)  tex \(loopLengths.texture)  bass \(loopLengths.bass)"
         log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
 
-        // Per-track rules
+        // Per-track rules — append * to tag for any rule forced by the test pool
+        func ruleTag(_ id: String) -> String { forcedRuleIDs.contains(id) ? id + "*" : id }
         for ruleID in padRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead2Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
         for ruleID in rhythmRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
         for ruleID in bassRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
         for ruleID in drumRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
         }
 
         return log
@@ -1262,33 +1345,40 @@ struct SongGenerator {
     private static func ambientRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         // Pads
-        case "AMB-PADS-001":    return "Sustained chord layer — overlapping reattacks"
-        case "AMB-PADS-002":    return "Shimmer layer — offset chord tones, low velocity"
-        case "AMB-PADS-006":    return "Bell accents — staccato high register"
+        case "AMB-PADS-001":    return "Sustained chord layer"
+        case "AMB-PADS-002":    return "Electric Buddha shimmer layer"
+        case "AMB-PADS-006":    return "Electric Buddha bell accents"
         // Bass
-        case "AMB-BASS-001":  return "Drone root — long held notes with silences"
+        case "AMB-BASS-001":  return "Loscil drone root"
         case "AMB-BASS-002":  return "No bass"
+        case "AMB-BASS-003":  return "Root+fifth drone"
         // Lead 1
-        case "AMB-LD1-001":  return "Floating tone — 1–3 sustained notes"
-        case "AMB-LD1-002":  return "Echo phrase — stepwise descent, fading velocity"
-        case "AMB-LD1-003":  return "Pentatonic shimmer — ascending run"
-        case "AMB-LD1-004":  return "No lead 1"
+        case "AMB-LEAD-001":  return "Eno floating tone"
+        case "AMB-LEAD-002":  return "Echo phrase"
+        case "AMB-LEAD-003":  return "Harold Budd pentatonic shimmer"
+        case "AMB-LEAD-004":  return "No lead 1"
+        case "AMB-LEAD-007":  return "Lyric fragment"
         // Lead 2
-        case "AMB-LD2-001":  return "Silent-window fill — single held tone"
-        case "AMB-LD2-002":  return "No lead 2"
+        case "AMB-LEAD-005":     return "Silent-window fill"
+        case "AMB-LEAD-006":     return "No lead 2"
+        case "AMB-SYNC-004":    return "Ghost echo"
+        case "AMB-XFILES-001":  return "Spooky  X-Files theme"
         // Rhythm
-        case "AMB-RTHM-001": return "Single-tone pulse — sparse repeated note"
-        case "AMB-RTHM-002": return "Sparse arpeggio — 3–4 chord tones"
-        case "AMB-RTHM-003": return "Stochastic phrase — random scale tones"
+        case "AMB-RTHM-001": return "Single-tone pulse"
+        case "AMB-RTHM-002": return "Sparse arpeggio"
+        case "AMB-RTHM-003": return "Stochastic phrase"
         case "AMB-RTHM-004": return "No rhythm"
+        case "AMB-RTHM-005": return "Celestial phrase"
+        case "AMB-RTHM-006": return "Craven Faults bell cell"
         // Texture
-        case "AMB-TEXT-001": return "Orbital shimmer — sparse high register"
-        case "AMB-TEXT-002": return "Ghost tone — long low-velocity chord tone"
-        case "AMB-TEXT-003": return "Chime scatter — 2–5 staccato notes"
+        case "AMB-TEXT-001": return "Orbital shimmer"
+        case "AMB-TEXT-002": return "Ghost tone"
+        case "AMB-TEXT-003": return "Chime scatter"
         case "AMB-TEXT-004": return "No texture"
         // Drums
-        case "AMB-DRUM-001": return "Textural percussion — sparse brush/ride"
-        case "AMB-DRUM-002": return "Soft pulse — gentle kick and hat"
+        case "AMB-DRUM-004": return "Claude hand percussion"
+        case "AMB-DRUM-001": return "Sparse ride/hat with cymbal shimmer"
+        case "AMB-DRUM-002": return "Soft pulse"
         case "AMB-DRUM-003": return "No percussion"
         default:                   return ruleID
         }
@@ -1576,13 +1666,13 @@ struct SongGenerator {
             fire(fillBar * 16 + max(0, fillRegionOffset - 4), tag: "Drum fill", desc: desc)
         }
 
-        // 3. Drum cymbal variations — announce only on transitions, not every bar.
+        // 3. Drum cymbal variations — Kosmic/Motorik only; Ambient drums are too sparse for this.
         // DRM-003 (Ride Groove) uses ride as its baseline — skip ride annotations for it
         // since the generation log already documents this. For all other drum rules, track
         // the cymbal mode across the whole song (no reset between sections) so a transition
         // back to ride after a non-body section doesn't re-trigger.
         let isRideGroove = drumRules.contains("MOT-DRUM-003")
-        if kTrackDrums < trackEvents.count {
+        if includeDrumFills && kTrackDrums < trackEvents.count {
             let drumEvs = trackEvents[kTrackDrums]
             var prevCymbalMode: String? = nil
             for bar in 0..<totalBars {

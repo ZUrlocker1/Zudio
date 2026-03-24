@@ -808,13 +808,16 @@ struct KosmicBassGenerator {
     ) -> [MIDIEvent] {
         let root  = bassRoot(entry: entry, frame: frame)
         let fifth = UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
-        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 40, high: 55))
 
+        // Use chord type (not song mode) to determine the third quality.
+        // frame.mode.nearestInterval would give minor third in Dorian even when the
+        // active chord is major — producing C natural against an A major chord, for example.
         let isMajorContext: Bool
         switch entry.chordWindow.chordType {
         case .major, .sus2, .sus4, .add9: isMajorContext = true
         default:                          isMajorContext = false
         }
+        let third     = UInt8(clamped(Int(root) + (isMajorContext ? 4 : 3), low: 40, high: 55))
         let flatSeven = isMajorContext ? fifth : UInt8(clamped(Int(root) + 10, low: 40, high: 55))
 
         let pitches: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]

@@ -253,9 +253,9 @@ struct TopBarView: View {
                         // Left column: style picker (full width) + reset (centered beneath it)
                         VStack(alignment: .center, spacing: 6) {
                             Picker("", selection: $appState.selectedStyle) {
-                                (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
-                                (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
                                 (Text("A").underline() + Text("mbient")).tag(MusicStyle.ambient)
+                                (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
+                                (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
                             }
                             .pickerStyle(.segmented)
                             .frame(width: 210)
@@ -446,12 +446,12 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.87 (alpha)").font(.system(size: 14))
-                Text("Built by analyzing classic Motorik and Kosmic artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
+                Text("Version: 0.91 (alpha)").font(.system(size: 14))
+                Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Neu!, Deluxe, Harmonia, Kraftwerk, Jean Michel Jarre, Tangerine Dream, Brian Eno and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, just add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1.0: Motorik and Kosmic styles. Instruments using GS MIDI. Arpeggios, pads, textures, Berlin School bass. Basic audio effects for boost, reverb, delay, etc.").font(.system(size: 14))
+                Text("V1.0: Instruments using GS MIDI. Arpeggios, pads, textures, sweeps, pans, Berlin school bass and Dinger beat. Basic audio effects for boost, reverb, delay, tremolo and space echo.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2.0: Ambient style and continuous playback mode coming soon. Maybe.").font(.system(size: 14))
+                Text("V2.0: Continuous playback, improved synth sounds and iPad port coming soon. Maybe.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()

@@ -31,6 +31,9 @@ struct SongState: Sendable {
     let ambientProgFamily: AmbientProgressionFamily
     /// Ambient-only: co-prime loop lengths per track. `nil` for Motorik/Kosmic.
     let ambientLoopLengths: AmbientLoopLengths?
+    /// Ambient-only: step range of the X-Files block (4 bars). `nil` if no X-Files in this song.
+    /// Used by PlaybackEngine to mute Lead 1 delay during the whistle phrase.
+    let ambientXFilesBlockRange: Range<Int>?
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
@@ -54,7 +57,8 @@ struct SongState: Sendable {
         generationLog: [GenerationLogEntry],
         stepAnnotations: [Int: [GenerationLogEntry]],
         ambientProgFamily: AmbientProgressionFamily = .droneSingle,
-        ambientLoopLengths: AmbientLoopLengths? = nil
+        ambientLoopLengths: AmbientLoopLengths? = nil,
+        ambientXFilesBlockRange: Range<Int>? = nil
     ) {
         self.frame              = frame
         self.structure          = structure
@@ -67,9 +71,10 @@ struct SongState: Sendable {
         self.style              = style
         self.percussionStyle    = percussionStyle
         self.kosmicProgFamily   = kosmicProgFamily
-        self.ambientProgFamily  = ambientProgFamily
-        self.ambientLoopLengths = ambientLoopLengths
-        self.generationLog      = generationLog
+        self.ambientProgFamily       = ambientProgFamily
+        self.ambientLoopLengths      = ambientLoopLengths
+        self.ambientXFilesBlockRange = ambientXFilesBlockRange
+        self.generationLog           = generationLog
         self.stepAnnotations    = stepAnnotations
     }
 
@@ -87,7 +92,8 @@ struct SongState: Sendable {
                   trackOverrides: trackOverrides, title: title, form: form, style: style,
                   percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
-                  ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths)
+                  ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
+                  ambientXFilesBlockRange: ambientXFilesBlockRange)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -106,7 +112,8 @@ struct SongState: Sendable {
             trackOverrides: trackOverrides, title: title, form: form, style: style,
             percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
             generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
-            ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths
+            ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
+            ambientXFilesBlockRange: ambientXFilesBlockRange
         )
     }
 }

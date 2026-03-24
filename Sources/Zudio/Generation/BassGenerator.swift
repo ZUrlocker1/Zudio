@@ -49,10 +49,10 @@ struct BassGenerator {
                                   "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
                                   "MOT-BASS-010","MOT-BASS-011",
                                   "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014","MOT-BASS-015"]
-        let weights: [Double] = [0.07,     0.07,     0.05,     0.07,
-                                  0.08,     0.05,     0.08,     0.06,     0.06,
-                                  0.07,     0.05,
-                                  0.07,     0.07,     0.07,     0.08]
+        let weights: [Double] = [0.07,     0.11,     0.04,     0.04,
+                                  0.09,     0.05,     0.08,     0.10,     0.06,
+                                  0.03,     0.03,
+                                  0.07,     0.04,     0.08,     0.11]
         let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
 

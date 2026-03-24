@@ -90,20 +90,24 @@ struct KosmicLeadGenerator {
                         let b = section.startBar + max(2, (bridgeLen * 2) / 3)
                         xBars = (b > a) ? [a, b] : [a]
                     }
+                    // Collect whistle events separately so per-bar silence filters only affect
+                    // the generated melody and never clip notes from a prior whistle phrase.
+                    var whistleEvents: [MIDIEvent] = []
                     for xBar in xBars {
                         let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
                         guard !barEvs.isEmpty else { continue }
                         xFilesBars.append(xBar)
                         let xStart = xBar * 16
-                        // Silence: 6 beats (24 steps) before whistle; 2 beats (8 steps) after last held note
-                        // Whistle runs xStart…xStart+36; post-silence ends at xStart+44
+                        // Whistle: pickup at xStart+12, last note ends at xStart+40 (half note at step 32).
+                        // Silence: 6 beats (24 steps) before pickup; 2 beats (8 steps) after last held note.
                         let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
-                        let postPadEnd  = xBar < section.endBar - 1   ? xStart + 44 : xStart + 36
+                        let postPadEnd  = xBar < section.endBar - 1   ? xStart + 48 : xStart + 40
                         melodyEvents = melodyEvents.filter {
                             $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
                         }
-                        melodyEvents += barEvs
+                        whistleEvents += barEvs
                     }
+                    melodyEvents += whistleEvents
                 }
                 events += melodyEvents
                 continue
@@ -597,8 +601,8 @@ struct KosmicLeadGenerator {
                     // Lead 2: no whistle; just silence around Lead 1's X-Files bars (2 beats before, 2 after held note)
                     for xb in readonlyXFilesBars {
                         let xStart = xb * 16
-                        let prePadStart = xStart - 8    // 2 beats before whistle
-                        let postPadEnd  = xStart + 44   // whistle end (36) + 2 beats (8)
+                        let prePadStart = xStart - 8    // 2 beats before pickup (xStart+12)
+                        let postPadEnd  = xStart + 48   // whistle end (xStart+40) + 2 beats (8)
                         melodyEvents = melodyEvents.filter {
                             $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
                         }
@@ -615,20 +619,24 @@ struct KosmicLeadGenerator {
                         let b = section.startBar + max(2, (bridgeLen * 2) / 3)
                         xBars = (b > a) ? [a, b] : [a]
                     }
+                    // Collect whistle events separately so per-bar silence filters only affect
+                    // the generated melody and never clip notes from a prior whistle phrase.
+                    var whistleEvents: [MIDIEvent] = []
                     for xBar in xBars {
                         let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
                         guard !barEvs.isEmpty else { continue }
                         xFilesBars.append(xBar)
                         let xStart = xBar * 16
-                        // Silence: 6 beats (24 steps) before whistle; 2 beats (8 steps) after last held note
-                        // Whistle runs xStart…xStart+36; post-silence ends at xStart+44
+                        // Whistle: pickup at xStart+12, last note ends at xStart+40 (half note at step 32).
+                        // Silence: 6 beats (24 steps) before pickup; 2 beats (8 steps) after last held note.
                         let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
-                        let postPadEnd  = xBar < section.endBar - 1   ? xStart + 44 : xStart + 36
+                        let postPadEnd  = xBar < section.endBar - 1   ? xStart + 48 : xStart + 40
                         melodyEvents = melodyEvents.filter {
                             $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
                         }
-                        melodyEvents += barEvs
+                        whistleEvents += barEvs
                     }
+                    melodyEvents += whistleEvents
                 }
                 events += melodyEvents
                 continue
@@ -827,37 +835,34 @@ struct KosmicLeadGenerator {
     }
 
     // MARK: - X-Files whistle — single bar helper
-    // Emits the 6-note whistle phrase (root→5th→4th→5th→b7→5th held) for one bar.
-    // In A minor: A–E–D–E–G–E. Transposed to any key via rootPC.
-    // Phrase spans ~2.25 bars; last two notes spill past the bar boundary.
-    // Used by drum bridge (every bar) and melody bridge (middle bar only).
+    // Emits the 6-note whistle phrase verbatim from the reference MIDI.
+    // In A minor (root = A3 = MIDI 57): A3–E4–D4–E4–G4–E4(half).
+    // Phrase starts at beat 4 of `bar` (step +12) and spills ~2 bars forward.
+    // Transposed to any key by shifting root; intervals never change.
+    // Used by drum bridge (every bar) and melody bridge / Ambient (once per block).
 
-    private static func xFilesWhistleBar(
+    static func xFilesWhistleBar(
         bar: Int, frame: GlobalMusicalFrame,
         tonalMap: TonalGovernanceMap, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         guard let entry = tonalMap.entry(atBar: bar) else { return [] }
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let fifth  = 7
-        let fourth = 5   // exact semitone — no scale snapping
-        let flat7  = 10  // exact semitone — no scale snapping
 
-        func place(_ pc: Int) -> Int {
-            var m = 72 + rootPC + pc
-            while m > 84 { m -= 12 }
-            while m < 72 { m += 12 }
-            return m
-        }
+        // Root at MIDI 48 + rootPC — places A at A3 (MIDI 57), matching reference MIDI.
+        // Keys C–E (rootPC 0–4) land at C3–E3 which sounds ~an octave too low; push them up.
+        // Ascending intervals: root, +7, +5, +7, +10, +7.
+        var root = 48 + rootPC   // e.g. A3=57, Bb3=58, F#3=54
+        if root < 53 { root += 12 }  // C3–E3 → C4–E4, keeps all keys in the F3–E4 range
 
-        // A–E–D–E–G–E: five quarters then a whole note (held).
-        // Total = 36 steps (2.25 bars); G spills into bar+1, held E into bar+2.
+        // Step offsets match reference MIDI exactly: pickup on beat 4 (+12),
+        // then beats 1–4 of bar+1 (+16–+28), then held half note at bar+2 beat 1 (+32).
         let xPhrase: [(Int, Int, Int)] = [
-            (place(0),       0,  4),   // A — quarter (root)
-            (place(fifth),   4,  4),   // E — quarter
-            (place(fourth),  8,  4),   // D — quarter
-            (place(fifth),  12,  4),   // E — quarter
-            (place(flat7),  16,  4),   // G — quarter (spills into next bar)
-            (place(fifth),  20, 16),   // E — whole note, held (spills ~1 bar)
+            (root,      12, 4),   // root  (A3) — beat 4 pickup
+            (root +  7, 16, 4),   // 5th   (E4) — bar+1 beat 1
+            (root +  5, 20, 4),   // 4th   (D4) — beat 2
+            (root +  7, 24, 4),   // 5th   (E4) — beat 3
+            (root + 10, 28, 4),   // b7    (G4) — beat 4
+            (root +  7, 32, 8),   // 5th   (E4) — bar+2 beat 1, half note
         ]
         let barStart = bar * 16
         return xPhrase.map { (note, step, dur) in

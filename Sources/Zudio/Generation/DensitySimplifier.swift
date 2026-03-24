@@ -48,10 +48,11 @@ struct DensitySimplifier {
     // MARK: - Helpers
 
     private static func eventDensity(_ events: [MIDIEvent], startStep: Int, endStep: Int) -> Double {
-        let windowEvents = events.filter { $0.stepIndex >= startStep && $0.stepIndex < endStep }
         let totalSteps = endStep - startStep
         guard totalSteps > 0 else { return 0 }
-        return Double(windowEvents.count) / Double(totalSteps)
+        var count = 0
+        for ev in events where ev.stepIndex >= startStep && ev.stepIndex < endStep { count += 1 }
+        return Double(count) / Double(totalSteps)
     }
 
     /// Keeps `keepRate` fraction of events in the given step range (deterministically via index).
