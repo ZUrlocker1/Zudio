@@ -714,6 +714,33 @@ bass ±8ms, rhythm ±7ms, leads ±10ms.
 
 ---
 
+## Tonal Consistency Rules (MOT-SYNC)
+
+These are structural invariants, not probabilistic firing rules. They hold for every song and every note. For the study findings and bug history that produced them, see `musical-coherence-plan.md` (Motorik Studies 01–02).
+
+**MOT-SYNC-001: Scale pools anchor to song tonic**
+All note-pool derivations use `keySemitone(frame.key)` as root. When chord roots are non-tonic (e.g. bVII in a Dorian song), generators stay in the global key. The flat7 in bass patterns is snapped to the nearest in-scale pitch class. LD2-004 Hallogallo Counter and LD2-005 Descending Line use the song tonic as their reference pitch — they are fixed tonic-anchored motifs and must not shift when chord roots change.
+
+**MOT-SYNC-002: Chord root selection is mode-aware**
+`pickChordRoot` uses a mode-specific degree list. Aeolian: `[1,2,b3,4,5,b6,b7]`. Dorian: `[1,2,b3,4,5,6,b7]` (raised 6th, no b6). Ionian: `[1,2,3,4,5,6,7]`. Mixolydian: `[1,2,3,4,5,6,b7]`. Using a hardcoded Aeolian list for all modes introduces non-diatonic chord roots that cause system-wide consonance failures.
+
+**MOT-SYNC-003: NotePoolBuilder receives frame.mode**
+`buildChordWindows` passes `frame.mode` (not `section.mode`) to both `pickChordRoot` and `NotePoolBuilder.build`. Section mode for A sections is hardcoded Dorian and must not be used as the scale reference.
+
+**MOT-SYNC-004: Pad voicing snapped to scale**
+After applying chord-type interval offsets, each voiced note's pitch class is snapped to the nearest diatonic PC. Chord type offsets (e.g. dom7, min7) can land on chromatic pitches that are not in the key; the snap corrects this without removing the note from the voicing.
+
+**MOT-SYNC-005: Lead role separation**
+Lead 2 receives the Lead 1 event array before generating. When Lead 1 picks a sparse rule (LD1-003 Long Breath) for the A section, the B section escalates to an active melodic rule (LD1-001 or LD1-004). Lead 2 note share should stay below 60% of total lead notes.
+
+**Consonance targets** (verified via MIDI batch analysis — see musical-coherence-plan.md):
+- Bass: > 92%
+- Pads and Rhythm: > 85%
+- Leads: > 80%
+- Drum fill rate: < 1 fill per 8 bars
+
+---
+
 ## Title Generator
 
 New title on each Generate; unchanged on per-track regen. Seed-deterministic. 1–3 words. Short,
