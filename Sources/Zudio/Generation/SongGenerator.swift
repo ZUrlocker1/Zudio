@@ -475,6 +475,95 @@ struct SongGenerator {
                                                              loopBars: loopLengths.texture,
                                                              totalBars: frame.totalBars)
 
+        // Guard: if rhythm, texture, bass, and drums are all empty, force a non-silent texture pass.
+        let allAccompEmpty = trackEvents[kTrackRhythm].isEmpty
+                          && trackEvents[kTrackTexture].isEmpty
+                          && trackEvents[kTrackBass].isEmpty
+                          && trackEvents[kTrackDrums].isEmpty
+        if allAccompEmpty {
+            var texRules2: Set<String> = []
+            let texLoop2 = AmbientTextureGenerator.generate(frame: frame, tonalMap: tonalMap,
+                                                             loopBars: loopLengths.texture, rng: &texRNG,
+                                                             usedRuleIDs: &texRules2,
+                                                             forceNonSilent: true)
+            trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoop2,
+                                                                loopBars: loopLengths.texture,
+                                                                totalBars: frame.totalBars)
+            texRules = texRules2
+        }
+
+        // Plan J: Strip Rhythm and Texture events from intro and outro bars.
+        // Lets those tracks emerge with the body rather than starting from bar 1.
+        let introEndStep   = (structure.introSection?.endBar   ?? 0) * 16
+        let outroStartStep = (structure.outroSection?.startBar ?? frame.totalBars) * 16
+        if introEndStep > 0 {
+            trackEvents[kTrackRhythm]  = trackEvents[kTrackRhythm].filter  { $0.stepIndex >= introEndStep }
+            trackEvents[kTrackTexture] = trackEvents[kTrackTexture].filter { $0.stepIndex >= introEndStep }
+        }
+        if outroStartStep < frame.totalBars * 16 {
+            trackEvents[kTrackRhythm]  = trackEvents[kTrackRhythm].filter  { $0.stepIndex < outroStartStep }
+            trackEvents[kTrackTexture] = trackEvents[kTrackTexture].filter { $0.stepIndex < outroStartStep }
+        }
+
+        // Plan H: Coordinated breath silence — 2–4 bars of stillness in Pads + Lead 1 mid-body (40% chance).
+        // Bass and texture continue through it. Creates a moment of arrival when pads return.
+        var breathSilenceBar: Int? = nil
+        var breathSilenceLenBars: Int = 0
+        if let body = structure.bodySections.first, body.lengthBars >= 8, rng.nextDouble() < 0.40 {
+            let silenceLenBars = 2 + rng.nextInt(upperBound: 3)   // 2–4 bars
+            let safeStart = body.startBar + 4
+            let safeEnd   = body.endBar - silenceLenBars - 4
+            if safeEnd > safeStart {
+                let silenceBar       = safeStart + rng.nextInt(upperBound: safeEnd - safeStart)
+                let silenceStartStep = silenceBar * 16
+                let silenceEndStep   = silenceStartStep + silenceLenBars * 16
+                func clearBreath(_ evs: [MIDIEvent]) -> [MIDIEvent] {
+                    evs.compactMap { ev in
+                        if ev.stepIndex >= silenceStartStep && ev.stepIndex < silenceEndStep { return nil }
+                        if ev.stepIndex < silenceStartStep {
+                            let bleed = ev.stepIndex + ev.durationSteps - silenceStartStep
+                            if bleed > 0 {
+                                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                                 velocity: ev.velocity,
+                                                 durationSteps: ev.durationSteps - bleed)
+                            }
+                        }
+                        return ev
+                    }
+                }
+                trackEvents[kTrackPads]  = clearBreath(trackEvents[kTrackPads])
+                trackEvents[kTrackLead1] = clearBreath(trackEvents[kTrackLead1])
+                breathSilenceBar     = silenceBar
+                breathSilenceLenBars = silenceLenBars
+            }
+        }
+
+        // Plan G: Dynamic arc — scale velocity for Pads and Lead 1 across the song.
+        // Intro fades up (72%→100%), body stays full, outro fades down (100%→72%).
+        let totalSteps  = frame.totalBars * 16
+        let introStepsD = Double((structure.introSection?.lengthBars ?? 0) * 16)
+        let outroStepsD = Double((structure.outroSection?.lengthBars ?? 0) * 16)
+        let arcMin: Double = 0.72
+        func dynamicFactor(step: Int) -> Double {
+            let s = Double(step)
+            let total = Double(totalSteps)
+            if introStepsD > 0 && s < introStepsD {
+                return arcMin + (1.0 - arcMin) * (s / introStepsD)
+            }
+            if outroStepsD > 0 && s >= total - outroStepsD {
+                return 1.0 - (1.0 - arcMin) * ((s - (total - outroStepsD)) / outroStepsD)
+            }
+            return 1.0
+        }
+        for track in [kTrackPads, kTrackLead1] {
+            trackEvents[track] = trackEvents[track].map { ev in
+                let scaled = Int((Double(ev.velocity) * dynamicFactor(step: ev.stepIndex)).rounded())
+                let vel = UInt8(Swift.max(20, Swift.min(110, scaled)))
+                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                 velocity: vel, durationSteps: ev.durationSteps)
+            }
+        }
+
         // Post-processing: harmonic filter only (no Density/Arrangement/PatternEvolver/DrumVariation)
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
@@ -542,7 +631,9 @@ struct SongGenerator {
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
                                                     frame: frame, xFilesBars: ambientXFilesBars,
-                                                    includeDrumFills: false)
+                                                    breathSilenceBar: breathSilenceBar,
+                                                    breathSilenceLenBars: breathSilenceLenBars,
+                                                    isAmbient: true, includeDrumFills: false)
 
         // Derive the 4-bar block step range for PlaybackEngine delay muting.
         let ambientXFilesBlockRange: Range<Int>? = ambientXFilesBars.first.map {
@@ -1399,6 +1490,9 @@ struct SongGenerator {
         rhythmRules: Set<String> = [],
         texRules: Set<String> = [],
         xFilesBars: [Int] = [],
+        breathSilenceBar: Int? = nil,
+        breathSilenceLenBars: Int = 0,
+        isAmbient: Bool = false,
         includeDrumFills: Bool = true
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
@@ -1426,11 +1520,14 @@ struct SongGenerator {
             fire(bar * 16, tag: tag, desc: desc)
         }
 
-        // Helper: format chord name from degree string + type
+        // Helper: format chord name from degree string + type, respecting flat/sharp key context
         func chordName(_ rootDegree: String, _ type: ChordType) -> String {
             let keyST = keySemitone(frame.key)
             let rootST = (keyST + degreeSemitone(rootDegree) + 12) % 12
-            let names = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
+            let flatKeys: Set<String> = ["F", "Bb", "Eb", "Ab", "Db", "Gb"]
+            let names = flatKeys.contains(frame.key)
+                ? ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"]
+                : ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
             let root = names[rootST]
             switch type {
             case .major:   return root
@@ -1445,9 +1542,12 @@ struct SongGenerator {
             }
         }
 
-        // Helper: 2–3 chord names covering a section's bars
+        // Helper: 2–3 chord names covering a section's bars.
+        // Includes windows that started before the section but are still active during it.
         func chordsLabel(for section: SongSection) -> String {
-            let windows = structure.chordPlan.filter { $0.startBar >= section.startBar && $0.startBar < section.endBar }
+            let windows = structure.chordPlan.filter {
+                $0.startBar < section.endBar && $0.endBar > section.startBar
+            }
             let names = windows.prefix(3).map { chordName($0.chordRoot, $0.chordType) }
             guard !names.isEmpty else { return "" }
             let joined = names.joined(separator: " ")
@@ -1614,11 +1714,13 @@ struct SongGenerator {
                 }
                 fireBar(bar, tag: "Intro", desc: introDesc)
             case .A:
-                let chords = chordsLabel(for: section)
-                if seenLabels.contains(.A) {
-                    fireBar(bar, tag: "Form", desc: "Return to A section" + (chords.isEmpty ? "" : " — \(chords)"))
-                } else {
-                    fireBar(bar, tag: "Section A", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
+                if !isAmbient {
+                    let chords = chordsLabel(for: section)
+                    if seenLabels.contains(.A) {
+                        fireBar(bar, tag: "Form", desc: "Return to A section" + (chords.isEmpty ? "" : " — \(chords)"))
+                    } else {
+                        fireBar(bar, tag: "Section A", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
+                    }
                 }
             case .B:
                 let chords = chordsLabel(for: section)
@@ -1906,6 +2008,22 @@ struct SongGenerator {
             guard let section = structure.section(atBar: bar) else { continue }
             guard annotatedBridges.insert(section.startBar).inserted else { continue }
             fireBar(bar, tag: "Spooky", desc: "X-Files theme")
+        }
+
+        // Breath silence annotation
+        if let bBar = breathSilenceBar, breathSilenceLenBars > 0 {
+            fireBar(bBar, tag: "Breath", desc: "\(breathSilenceLenBars) bar\(breathSilenceLenBars == 1 ? "" : "s") more quiet")
+        }
+
+        // Ambient chord shift annotations — fire at each chord boundary after bar 0.
+        // First window is the opening tonic; subsequent windows are shifts or returns.
+        if isAmbient && structure.chordPlan.count > 1 {
+            let first = structure.chordPlan[0]
+            for window in structure.chordPlan.dropFirst() {
+                let name = chordName(window.chordRoot, window.chordType)
+                let isReturn = window.chordRoot == first.chordRoot && window.chordType == first.chordType
+                fireBar(window.startBar, tag: isReturn ? "Return" : "Chord shift", desc: name)
+            }
         }
 
         return out

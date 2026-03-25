@@ -35,8 +35,8 @@ final class PlaybackEngine: ObservableObject {
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
-    private let ambientDelayWet:      [Float] = [60,  55, -1, 48, 18, -1, 45]
-    private let ambientDelayFeedback: [Float] = [72,  65, -1, 55, 35, -1, 40]
+    private let ambientDelayWet:      [Float] = [60,  55, -1, 48, 18, -1, 28]
+    private let ambientDelayFeedback: [Float] = [72,  65, -1, 55, 35, -1, 18]
     private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, 2500, -1, 3000]
     // Delay times in beats: Lead1=dotted-half(1.5), Lead2=dotted-quarter(0.75),
     //                       Rhythm=dotted-half(1.5), Texture=1-beat, Drums=1-beat

@@ -177,14 +177,6 @@ private struct NoteLayerView: View, Equatable {
                      with: .color(.white.opacity(alpha)))
         }
 
-        // Drum lane separators
-        if isDrumTrack {
-            for norm in drumLaneNorms {
-                let y = norm * (h - noteH)
-                ctx.fill(Path(CGRect(x: 0, y: y + noteH, width: w, height: 1)),
-                         with: .color(.white.opacity(0.07)))
-            }
-        }
 
         // Notes — only those overlapping visible window
         let (lo, hi) = pitchRange
@@ -221,30 +213,49 @@ private struct NoteLayerView: View, Equatable {
 
     private func drumY(for note: Int, height: CGFloat) -> CGFloat {
         let norms: [Int: CGFloat] = [
+            // Standard GM kit (rows top→bottom: cymbal → hat → tom → snare → kick)
             49: 0.04, 57: 0.04,
-            51: 0.15, 53: 0.15, 55: 0.15,
-            46: 0.26,
-            42: 0.36, 44: 0.36,
-            48: 0.48, 50: 0.48,
-            37: 0.58, 39: 0.58,
-            38: 0.67, 40: 0.67,
-            41: 0.77, 43: 0.77, 45: 0.77, 47: 0.77,
-            35: 0.90, 36: 0.90
+            51: 0.13, 53: 0.13, 55: 0.13,
+            46: 0.22,
+            42: 0.31, 44: 0.31,
+            48: 0.40, 50: 0.40,
+            37: 0.49, 39: 0.49,
+            38: 0.58, 40: 0.58,
+            41: 0.67, 43: 0.67, 45: 0.67, 47: 0.67,
+            35: 0.80, 36: 0.80,
+            // Hand percussion (AMB-DRUM-004) — shaker/maracas/claves → bongos → congas
+            82: 0.04,           // Shaker         — top row (light, fast)
+            70: 0.17,           // Maracas
+            75: 0.30,           // Claves
+            60: 0.44,           // Hi Bongo
+            61: 0.56,           // Low Bongo
+            63: 0.67,           // Open Hi Conga
+            62: 0.78,           // Mute Hi Conga
+            64: 0.90,           // Low Conga       — bottom row (heaviest)
         ]
         return (norms[note] ?? 0.50) * (height - noteH)
     }
 
-    private let drumLaneNorms: [CGFloat] = [0.04, 0.15, 0.26, 0.36, 0.48, 0.58, 0.67, 0.77, 0.90]
+    private let drumLaneNorms: [CGFloat] = [
+        // Standard kit separators
+        0.04, 0.13, 0.22, 0.31, 0.40, 0.49, 0.58, 0.67, 0.80,
+        // Hand percussion separators
+        0.17, 0.30, 0.44, 0.56, 0.78, 0.90
+    ]
 
     // MARK: - Colors
 
     private func noteColor(for note: Int) -> Color {
         if isDrumTrack {
             switch note {
-            case 35, 36:     return trackColor
-            case 38, 40:     return trackColor.opacity(0.85)
-            case 42, 44, 46: return trackColor.opacity(0.60)
-            default:         return trackColor.opacity(0.75)
+            case 35, 36:         return trackColor                    // kick
+            case 38, 40:         return trackColor.opacity(0.85)      // snare
+            case 42, 44, 46:     return trackColor.opacity(0.60)      // hats
+            case 82, 70:         return trackColor.opacity(0.55)      // shaker / maracas
+            case 75:             return trackColor.opacity(0.70)      // claves
+            case 60, 61:         return trackColor.opacity(0.80)      // bongos
+            case 62, 63, 64:     return trackColor.opacity(0.90)      // congas
+            default:             return trackColor.opacity(0.75)
             }
         }
         let oct = min(max(note / 12, 0), 8)

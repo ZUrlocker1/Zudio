@@ -397,7 +397,7 @@ struct HelpView: View {
             }
             Divider()
             VStack(alignment: .leading, spacing: 8) {
-                Text("Zudio generates Motorik, Kosmic and Ambient inspired music using MIDI.")
+                Text("Zudio generates Ambient, Kosmic and Motorik inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
                 helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result.")
@@ -442,16 +442,16 @@ struct AboutView: View {
                 }
                 Text("Zudio").font(.title.bold())
             }
-            Text("Generative music application vibe coded with Claude!")
+            Text("Generative music application vibe coded in a week with Claude!")
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
                 Text("Version: 0.91 (alpha)").font(.system(size: 14))
-                Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk,Neu!, Deluxe, Harmonia,  Tangerine Dream, Loscil, Craven Faults and others. A rule set is used to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
+                Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk, Neu!, Deluxe, Harmonia, Tangerine Dream, Electric Buddha Band, Loscil, Craven Faults and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1.0: Uses GS MIDI instruments as well as Arpeggios, pads, textures, sweeps, pans, Berlin school bass and Dinger beat. Basic audio effects for boost, reverb, delay, tremolo and space echo.").font(.system(size: 14))
+                Text("V1.0 uses GS MIDI instruments as well as arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass and Dinger beat. There are basic audio effects per track for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V2.0: Continuous playback, improved synth sounds and iPad version coming soon. Maybe.").font(.system(size: 14))
+                Text("Continuous playback, improved sound and an iPad version coming soon. Maybe.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()

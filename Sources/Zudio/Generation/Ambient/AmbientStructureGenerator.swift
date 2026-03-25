@@ -63,18 +63,21 @@ struct AmbientStructureGenerator {
 
         case .droneSingle:
             let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: "1", chordType: .minor, key: key, mode: mode)
-            return [ChordWindow(startBar: 0, lengthBars: totalBars, chordRoot: "1", chordType: .minor,
-                                chordTones: ct, scaleTensions: st, avoidTones: at)]
+            let single = ChordWindow(startBar: 0, lengthBars: totalBars, chordRoot: "1", chordType: .minor,
+                                     chordTones: ct, scaleTensions: st, avoidTones: at)
+            return injectMidShift(tonic: single, key: key, mode: mode, totalBars: totalBars, rng: &rng)
 
         case .suspendedDrone:
             let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: "1", chordType: .sus2, key: key, mode: mode)
-            return [ChordWindow(startBar: 0, lengthBars: totalBars, chordRoot: "1", chordType: .sus2,
-                                chordTones: ct, scaleTensions: st, avoidTones: at)]
+            let single = ChordWindow(startBar: 0, lengthBars: totalBars, chordRoot: "1", chordType: .sus2,
+                                     chordTones: ct, scaleTensions: st, avoidTones: at)
+            return injectMidShift(tonic: single, key: key, mode: mode, totalBars: totalBars, rng: &rng)
 
         case .dissonantHaze:
             let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: "1", chordType: .min7, key: key, mode: mode)
-            return [ChordWindow(startBar: 0, lengthBars: totalBars, chordRoot: "1", chordType: .min7,
-                                chordTones: ct, scaleTensions: st, avoidTones: at)]
+            let single = ChordWindow(startBar: 0, lengthBars: totalBars, chordRoot: "1", chordType: .min7,
+                                     chordTones: ct, scaleTensions: st, avoidTones: at)
+            return injectMidShift(tonic: single, key: key, mode: mode, totalBars: totalBars, rng: &rng)
 
         case .droneTwo:
             let half = Swift.max(4, (totalBars / 2 / 4) * 4)
@@ -103,5 +106,55 @@ struct AmbientStructureGenerator {
                             chordTones: ct3, scaleTensions: st3, avoidTones: at3),
             ]
         }
+    }
+
+    // MARK: - Plan I: Mid-song chord shift
+
+    /// 50% chance of injecting a 4–8 bar harmonic excursion mid-song, then returning to tonic.
+    /// Applied only to single-chord families (droneSingle, suspendedDrone, dissonantHaze).
+    /// Bass and leads follow automatically via TonalGovernanceMap; pads remain on original chord tones.
+    private static func injectMidShift(
+        tonic: ChordWindow, key: String, mode: Mode, totalBars: Int, rng: inout SeededRNG
+    ) -> [ChordWindow] {
+        guard totalBars >= 16, rng.nextDouble() < 0.50 else { return [tonic] }
+
+        // Mode-appropriate shift chord
+        let (shiftDegree, shiftType): (String, ChordType) = {
+            switch mode {
+            case .Ionian:     return ("4", .major)        // IV — classic major pivot
+            case .Mixolydian: return ("b7", .major)       // bVII — Mixolydian's signature chord
+            default:          return (rng.nextDouble() < 0.65 ? "b7" : "b6", .major)  // Dorian/Aeolian
+            }
+        }()
+        let (ctS, stS, atS) = NotePoolBuilder.build(chordRootDegree: shiftDegree, chordType: shiftType,
+                                                     key: key, mode: mode)
+
+        // Place shift in the middle third, aligned to 4-bar grid
+        let third    = Swift.max(4, totalBars / 3)
+        let rawStart = third + rng.nextInt(upperBound: Swift.max(1, third))
+        let shiftStart = (rawStart / 4) * 4
+        let shiftLen   = rng.nextDouble() < 0.60 ? 4 : 8   // 4 bars (60%) or 8 bars (40%)
+        let shiftEnd   = Swift.min(shiftStart + shiftLen, totalBars - 4)
+        guard shiftEnd > shiftStart, shiftStart > 0 else { return [tonic] }
+
+        var windows: [ChordWindow] = []
+        // Tonic up to shift
+        let tonicType = tonic.chordType
+        let (ct1, st1, at1) = (tonic.chordTones, tonic.scaleTensions, tonic.avoidTones)
+        windows.append(ChordWindow(startBar: 0, lengthBars: shiftStart, chordRoot: tonic.chordRoot,
+                                   chordType: tonicType, chordTones: ct1, scaleTensions: st1, avoidTones: at1))
+        // Shift window
+        windows.append(ChordWindow(startBar: shiftStart, lengthBars: shiftEnd - shiftStart,
+                                   chordRoot: shiftDegree, chordType: shiftType,
+                                   chordTones: ctS, scaleTensions: stS, avoidTones: atS))
+        // Return to tonic
+        if shiftEnd < totalBars {
+            let (ct2, st2, at2) = NotePoolBuilder.build(chordRootDegree: tonic.chordRoot,
+                                                         chordType: tonicType, key: key, mode: mode)
+            windows.append(ChordWindow(startBar: shiftEnd, lengthBars: totalBars - shiftEnd,
+                                       chordRoot: tonic.chordRoot, chordType: tonicType,
+                                       chordTones: ct2, scaleTensions: st2, avoidTones: at2))
+        }
+        return windows
     }
 }

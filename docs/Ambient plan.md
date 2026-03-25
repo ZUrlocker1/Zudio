@@ -1597,3 +1597,168 @@ of sparse melodic elements to punctuate otherwise static textures.
 - Plan E (AMB-RTHM-006 bell cell) — ✓ DONE — root→fifth→octave, 4% on Rhythm track
 
 **Build order matters.** Pads must sound right before anything is added. The test gate at Stage 3 is the most important checkpoint — if the pad generator produces monotonous or clashing output, all subsequent stages will sound wrong on top of it.
+
+---
+
+## 10. Musical Depth Plans (F–L)
+
+Seven plans to move Ambient from generative texture toward something that feels composed. Each is independent and can be implemented in any order. Simpler plans are listed first.
+
+---
+
+### 10.1 Plan F — Arpeggiated Chord Onsets (Pads)
+
+**Rule:** AMB-PADS-001 enhancement (no new rule ID — modifies existing behaviour)
+
+**What:** When the primary pad chord fires (3–4 notes), stagger note-on times by 1–2 steps per note rather than triggering all simultaneously. The lowest note fires first, then mid, then high — like a slow harp roll. Net duration per note is unchanged.
+
+**Why:** A hard block chord sounds like a keyboard. A rolled chord sounds like breath. The difference is subtle at slow tempos but immediately perceptible to a listener — it removes the "MIDI" quality from pad attacks.
+
+**Parameters:**
+- Roll gap: 1–2 steps per note (randomly chosen per reattack)
+- Order: always low→mid→high (ascending roll; descending would sound like a fall)
+- Probability: apply on 60% of reattacks (40% stay as hard block for variety)
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientPadsGenerator.swift` — in primary loop, offset `stepIndex` of each note by `rollGap * notePosition` with 60% probability
+
+---
+
+### 10.2 Plan G — Dynamic Arc (Pads + Lead)
+
+**Rule:** AMB-PADS-001 and AMB-LEAD-xxx enhancement
+
+**What:** Apply a song-wide velocity arc: notes in the intro region are softer (−15 velocity), body notes are at full velocity, outro notes taper back down (−15). This replaces the current flat-random velocity with a shaped envelope across the song's duration.
+
+**Why:** Every piece of music has a dynamic shape. Flat dynamics across 20+ bars is the main reason AI-generated ambient sounds mechanical — there's no arc, no arrival, no release. Even a gentle 15-point swell across the body makes the music feel like it's going somewhere.
+
+**Implementation approach:**
+- In `AmbientLoopTiler.tile()`, after tiling events, apply a velocity multiplier based on the event's `stepIndex` relative to total song steps
+- Or in the post-processing step in `generateAmbient()`, walk `trackEvents[kTrackPads]` and `trackEvents[kTrackLead1]` and scale velocity
+- Curve: `factor = introFade(step) * outroFade(step)` where each fade covers the intro/outro bar count
+- Clamp final velocity to 20–110
+
+**Files to modify:**
+- `Sources/Zudio/Generation/SongGenerator.swift` — post-processing loop after tiling, before harmonic filter
+- Or `Sources/Zudio/Generation/Ambient/AmbientLoopTiler.swift` — add optional `dynamicArc` parameter
+
+---
+
+### 10.3 Plan H — Structural Silence (Breath Moment)
+
+**Rule:** No new rule ID — structural post-processing
+
+**What:** Once per song, in the body section, introduce a deliberate 2–4 bar gap in Pads and Lead 1 simultaneously. This is not the existing 30% random skip — it's a coordinated silence chosen at a musically meaningful point (e.g., bar 8–12 of the body). Bass and texture continue through it.
+
+**Why:** Random skips produce occasional short gaps. A coordinated 2–4 bar silence is qualitatively different — it creates a "breath" moment, a point of stillness that makes the listener lean in. When the pads return, they feel like an arrival. Eno's "Discreet Music" and Stars of the Lid both use this technique deliberately.
+
+**Implementation approach:**
+- In `generateAmbient()`, after tiling, select a random 2–4 bar window in the body (not in the first or last 4 bars of body)
+- Clear all `trackEvents[kTrackPads]` and `trackEvents[kTrackLead1]` events whose `stepIndex` falls in that window (truncating bleed-overs as the X-Files block-clear already does)
+- 40% chance the silence occurs (not every song needs it)
+- Log the silence bar range in the playback annotations
+
+**Files to modify:**
+- `Sources/Zudio/Generation/SongGenerator.swift` — post-processing step after tiling, before harmonic filter; reuse the `clearBlock()` pattern from X-Files injection
+
+---
+
+### 10.4 Plan I — Chord Movement (Mid-Song Shift)
+
+**Rule:** AMB-HARM-001 (new rule category: Harmonic)
+
+**What:** Currently `AmbientStructureGenerator` produces a single chord window for the entire song (or occasionally two). Plan I forces at least one chord change mid-body — a move to a closely related chord (relative major/minor, or a mode-appropriate ii or IV chord). The bass, pads, and lead all follow via the existing `TonalGovernanceMap` architecture.
+
+**Why:** A single sustained chord is the most common weakness in generative ambient. The TonalGovernanceMap and chord-following generators are already built to handle multiple windows — this plan simply ensures they're used. Even a single chord change (e.g., Gm → Bb for 4 bars, then back) creates enormous harmonic interest.
+
+**Parameters:**
+- Probability: 50% of songs get a chord shift
+- Timing: shift occurs at the halfway point of the body (±2 bars random)
+- Duration of shift: 4–8 bars
+- Chord options per mode (examples):
+  - Dorian: i → IV or i → VII
+  - Phrygian: i → II (the characteristic flat-II)
+  - Lydian: I → II (the Lydian pivot)
+  - Minor: i → III or i → VI
+- After the shift, return to the original chord for the final bars + outro
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientStructureGenerator.swift` — extend chord plan generation to optionally produce 3 windows (tonic → shift → tonic)
+- No changes needed in generators — they already follow `TonalGovernanceMap` per window
+
+---
+
+### 10.5 Plan J — Intro/Outro Density Gate
+
+**Rule:** Structural post-processing (no new rule ID)
+
+**What:** Suppress Rhythm and Texture track events that fall within the intro and outro bar ranges. Pads, Bass, Lead 1 remain. This creates a natural thinning at the edges of the song — sparse at the start, full in the body, sparse at the end — mirroring how ambient records are typically structured.
+
+**Why:** Currently all tracks start simultaneously (subject to random rule probabilities). Occasionally Rhythm fires from bar 1, which removes the sense of gradual emergence. The intro/outro fade-in/out on volume is already implemented; this is the complementary arrangement-level version.
+
+**Implementation approach:**
+- In `generateAmbient()`, after tiling all tracks:
+  - Remove events in `trackEvents[kTrackRhythm]` whose `stepIndex < introEndStep`
+  - Remove events in `trackEvents[kTrackTexture]` whose `stepIndex < introEndStep`
+  - Remove events in `trackEvents[kTrackRhythm]` whose `stepIndex >= outroStartStep`
+  - Remove events in `trackEvents[kTrackTexture]` whose `stepIndex >= outroStartStep`
+- This is a simple filter — no generation changes needed
+
+**Files to modify:**
+- `Sources/Zudio/Generation/SongGenerator.swift` — 4 filter lines after tiling, before harmonic filter
+
+---
+
+### 10.6 Plan K — Lead 1 Phrase Memory (Returning Motif)
+
+**Rule:** AMB-LEAD-008 (new rule)
+
+**What:** A new Lead 1 rule that selects a short 2–3 note motif (from scale notes) and returns to it at intervals across the loop — approximately every 8–12 bars. Between returns, the track is silent. The motif is always the same pitches but can vary slightly in timing (±2 steps) to avoid mechanical repetition.
+
+**Why:** The existing floating tone and echo phrase rules select notes independently each loop tile. There's no sense that the music "remembers" itself. A returning motif — even just two notes — gives the listener something to hold onto. This is the technique Eno uses in "1/1" (Music for Airports) where the same melodic fragment recurs at irregular intervals.
+
+**Parameters:**
+- Motif length: 2–3 notes drawn from lower-middle of scale register
+- Note duration: 8–12 steps each
+- Return interval: every 8–14 bars (not every loop tile; the motif spans a long loop or is placed directly)
+- Timing jitter: ±2 steps per recurrence
+- Velocity: consistent per motif (45–60), slightly varying per note
+- Probability: 8% of Lead 1 selections
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientLeadGenerator.swift` — add `returningMotif()` function, add AMB-LEAD-008 to roll table
+
+---
+
+### 10.7 Plan L — Bass Melodic Neighbour Tones (AMB-BASS-001 enhancement)
+
+**Rule:** AMB-BASS-001 enhancement (no new rule ID)
+
+**What:** The existing Loscil drone root holds the root note for 32–64 steps. Plan L gives the bass a small amount of melodic motion: on approximately 20% of holds, after holding the root for half the hold duration, the bass steps to the scale note immediately above or below (±1 scale step), then returns to root for the final portion. The effect is a barely-perceptible melodic inflection — not a melody, just a breath.
+
+**Why:** A completely static bass drone has no character. The Loscil aesthetic uses very slow glides and subtle pitch movement to animate otherwise static tones. A single note a semitone or scale-step away, appearing once every 4–6 minutes, is enough to make the bass feel alive rather than programmed.
+
+**Parameters:**
+- Probability: 20% of individual holds in AMB-BASS-001
+- Neighbour: ±1 scale step from root (prefers scale tones, avoids chromatic neighbours unless mode requires)
+- Split: hold root for first 60% of hold duration, neighbour for next 25%, root again for final 15%
+- Velocity: neighbour note is 10 points softer than root note
+
+**Files to modify:**
+- `Sources/Zudio/Generation/Ambient/AmbientBassGenerator.swift` — in the AMB-BASS-001 hold loop, add neighbour-tone split with 20% probability
+
+---
+
+### 10.8 Implementation Order
+
+Recommended sequencing based on musical impact vs implementation complexity:
+
+- Plan J (Intro/Outro Density Gate) — highest impact, simplest implementation (4 filter lines)
+- Plan H (Structural Silence / Breath Moment) — high impact, uses existing clearBlock pattern
+- Plan G (Dynamic Arc) — high impact, post-processing velocity pass
+- Plan F (Arpeggiated Chord Onsets) — medium impact, clean change isolated to PadsGenerator
+- Plan I (Chord Movement) — highest musical impact, touches StructureGenerator
+- Plan K (Lead 1 Returning Motif) — medium impact, new rule in LeadGenerator
+- Plan L (Bass Neighbour Tones) — subtle but character-defining, isolated to BassGenerator
+
+Plans J, H, and G together address the most common complaint (flat, undifferentiated texture) and can be done in a single session. Plans I and K require more care but are the most musically transformative.

@@ -14,10 +14,11 @@ struct AmbientTextureGenerator {
         tonalMap: TonalGovernanceMap,
         loopBars: Int,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceNonSilent: Bool = false
     ) -> [MIDIEvent] {
         let roll = rng.nextDouble()
-        if roll < 0.40 { usedRuleIDs.insert("AMB-TEXT-004"); return [] }
+        if !forceNonSilent && roll < 0.40 { usedRuleIDs.insert("AMB-TEXT-004"); return [] }
 
         let bounds    = kRegisterBounds[kTrackTexture]!  // low:36, high:96
         let loopSteps = loopBars * 16

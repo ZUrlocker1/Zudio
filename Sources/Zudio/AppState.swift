@@ -102,26 +102,26 @@ final class AppState: ObservableObject {
         TestModeConfig(forceArpRuleID: "KOS-RTHM-002",  forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
     ]
 
-    // Ambient 12-slot cycle: exercises lead rules, new bass/rhythm rules, and percussion styles.
-    // Slots 0–3: each Lead rule with textural drums
-    // Slots 4–5: soft-pulse drums with floating tone / echo phrase
-    // Slot  6:   AMB-BASS-003* (root+fifth drone) — hear harmonic interest in bass
-    // Slot  7:   AMB-RTHM-005* (celestial phrase) — hear ascending pentatonic gesture
-    // Slot  8:   AMB-LEAD-007* (lyric fragment) — hear 4-note arc with peak resolution
-    // Slot  9:   AMB-RTHM-006* (bell cell) — hear root/fifth/octave sparse cell
-    // Slot 10:   absent drums (silent percussion — confirms pads+lead carry the song)
+    // Ambient 12-slot cycle: exercises all lead rules, bass rules, and rhythm rules.
+    // Slots 0–4: Lead 1 rules (floating, echo, shimmer, lyric fragment, returning motif)
+    // Slot  5:   AMB-BASS-001* — root drone with Plan L neighbour-tone inflections
+    // Slot  6:   AMB-BASS-003* — root+fifth drone
+    // Slot  7:   AMB-RTHM-005* — celestial phrase (ascending pentatonic on Rhythm)
+    // Slot  8:   AMB-RTHM-006* — Craven Faults bell cell (root/fifth/octave)
+    // Slot  9:   softPulse drums / floating lead (drum style variation)
+    // Slot 10:   absent drums (confirms pads+bass+lead carry the song without percussion)
     // Slot 11:   all random (let the generator pick freely)
     private static let ambientTestCycle: [TestModeConfig] = [
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-002", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-003", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-004", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-002", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: "AMB-BASS-001", forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: "AMB-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: "AMB-RTHM-005", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: "AMB-RTHM-006", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: .absent,    forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil,         forceBridge: false, forceBridgeArchetype: nil),
     ]

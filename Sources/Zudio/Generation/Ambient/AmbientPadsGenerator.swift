@@ -29,20 +29,33 @@ struct AmbientPadsGenerator {
         // AMB-PAD-001: Primary layer — spread chord, long holds, re-attack every 2–4 bars.
         // Duration is shorter than reattack so each chord fades before the next arrives (breathing).
         // 30% chance any given re-attack is skipped to add organic gaps.
-        let reattack = 32 + rng.nextInt(upperBound: 33)   // 32–64 steps (2–4 bars)
-        let duration = reattack - 4 - rng.nextInt(upperBound: 9)  // slightly shorter = brief gap between
-        let spread   = spreadNotes(from: allNotes, count: 3)
+        // Voicing varies per reattack: note count (2–4) and inversion rotate for variety.
+        let reattack  = 32 + rng.nextInt(upperBound: 33)   // 32–64 steps (2–4 bars)
+        let duration  = reattack - 4 - rng.nextInt(upperBound: 9)  // slightly shorter = brief gap
+        let baseVel   = 55 + rng.nextInt(upperBound: 16)    // 55–70, consistent base per loop
+        var invOffset = 0   // rotates through inversions
 
         var step = rng.nextInt(upperBound: 8)   // small random offset at start
+        var primarySteps = Set<Int>()           // track primary steps for bell accent spacing
         while step < loopSteps {
-            if rng.nextDouble() > 0.30 {   // 70% chance each re-attack fires (30% skip = organic gap)
-                let vel = UInt8(55 + rng.nextInt(upperBound: 21))  // 55–75
-                for note in spread {
-                    let dur = Swift.min(duration, loopSteps - step)
-                    if dur >= 4 {
-                        events.append(MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: dur))
+            if rng.nextDouble() > 0.30 {   // 70% fire rate
+                // Vary note count: 2 notes (20%), 3 notes (60%), 4 notes (20%)
+                let r = rng.nextDouble()
+                let noteCount = r < 0.20 ? 2 : (r < 0.80 ? 3 : Swift.min(4, allNotes.count))
+                let spread = spreadNotesInverted(from: allNotes, count: noteCount, invOffset: invOffset)
+                let vel = UInt8(Swift.max(40, Swift.min(95, baseVel + rng.nextInt(upperBound: 11) - 5)))
+                // Plan F: 60% chance of arpeggiated harp-roll onset (low→mid→high, 1–2 steps apart)
+                let doRoll  = rng.nextDouble() < 0.60
+                let rollGap = doRoll ? (1 + rng.nextInt(upperBound: 2)) : 0
+                for (ni, note) in spread.enumerated() {
+                    let noteStep = step + (doRoll ? ni * rollGap : 0)
+                    let dur = Swift.min(duration - (doRoll ? ni * rollGap : 0), loopSteps - noteStep)
+                    if dur >= 4 && noteStep < loopSteps {
+                        events.append(MIDIEvent(stepIndex: noteStep, note: note, velocity: vel, durationSteps: dur))
                     }
                 }
+                primarySteps.insert(step)
+                invOffset = (invOffset + 1) % Swift.max(1, allNotes.count - 2)
             }
             step += reattack
         }
@@ -51,7 +64,7 @@ struct AmbientPadsGenerator {
         if rng.nextDouble() < 0.40 {
             usedRuleIDs.insert("AMB-PADS-002")
             let offset  = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps behind primary
-            let shimmer = spread.suffix(2).map { $0 }       // upper notes only
+            let shimmer = Array(allNotes.suffix(2))          // upper two notes only
             var step2   = offset
             while step2 < loopSteps {
                 if rng.nextDouble() > 0.35 {   // 65% fire rate (35% skip)
@@ -68,16 +81,24 @@ struct AmbientPadsGenerator {
         }
 
         // AMB-PAD-006: Bell accent — sparse staccato in high register
+        // Avoids steps within ±8 of any primary chord attack to prevent crowded clusters.
         if rng.nextDouble() < 0.50 {
             usedRuleIDs.insert("AMB-PADS-006")
             let highNotes = notesInRegister(pitchClasses: chordPCs, low: 72, high: 100)
             if !highNotes.isEmpty {
                 let bellCount = Swift.max(1, Int(Double(loopBars) * 0.07))
-                for _ in 0..<bellCount {
-                    let s    = rng.nextInt(upperBound: loopSteps)
+                var placed = 0
+                var attempts = 0
+                while placed < bellCount && attempts < bellCount * 10 {
+                    attempts += 1
+                    let s = rng.nextInt(upperBound: loopSteps)
+                    // Skip if within 8 steps of any primary chord attack
+                    let tooClose = primarySteps.contains(where: { abs($0 - s) < 8 })
+                    guard !tooClose else { continue }
                     let note = highNotes[rng.nextInt(upperBound: highNotes.count)]
                     let vel  = UInt8(35 + rng.nextInt(upperBound: 21))  // 35–55
                     events.append(MIDIEvent(stepIndex: s, note: note, velocity: vel, durationSteps: 4))
+                    placed += 1
                 }
             }
         }
@@ -92,9 +113,15 @@ struct AmbientPadsGenerator {
         return (low...high).compactMap { n in pitchClasses.contains(n % 12) ? UInt8(n) : nil }
     }
 
-    /// Returns [low, mid, high] spread across the available notes.
-    private static func spreadNotes(from notes: [UInt8], count: Int) -> [UInt8] {
-        guard notes.count >= count else { return notes }
-        return [notes[0], notes[notes.count / 2], notes[notes.count - 1]]
+    /// Returns `count` notes spread across `notes`, starting from `invOffset` for inversion rotation.
+    private static func spreadNotesInverted(from notes: [UInt8], count: Int, invOffset: Int) -> [UInt8] {
+        guard notes.count >= 2 else { return notes }
+        let n = notes.count
+        let start = invOffset % Swift.max(1, n - count + 1)
+        // Pick evenly-spaced indices across the available range starting at `start`
+        return (0..<Swift.min(count, n)).map { i in
+            let idx = start + (i * (n - 1 - start)) / Swift.max(1, count - 1)
+            return notes[Swift.min(idx, n - 1)]
+        }
     }
 }

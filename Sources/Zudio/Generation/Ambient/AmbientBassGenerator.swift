@@ -63,8 +63,40 @@ struct AmbientBassGenerator {
                         noteToPlay = rootNote
                     }
 
-                    events.append(MIDIEvent(stepIndex: cursor, note: UInt8(noteToPlay),
-                                            velocity: vel, durationSteps: dur))
+                    // Plan L: 20% chance of neighbour-tone inflection for AMB-BASS-001 root holds.
+                    // Splits hold: root (60%) → scale neighbour (25%) → root (15%).
+                    // Neighbour note is 10 velocity points softer.
+                    var didNeighbour = false
+                    if !useRootFifth && noteToPlay == rootNote && dur >= 12 && rng.nextDouble() < 0.20 {
+                        let scalePCs   = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+                        let scaleNotes = (bounds.low...bounds.high).filter { scalePCs.contains($0 % 12) }
+                        if let rootIdx = scaleNotes.firstIndex(of: rootNote) {
+                            let neighbour: Int? = rootIdx > 0 && rootIdx < scaleNotes.count - 1
+                                ? (rng.nextDouble() < 0.5 ? scaleNotes[rootIdx - 1] : scaleNotes[rootIdx + 1])
+                                : rootIdx > 0 ? scaleNotes[rootIdx - 1]
+                                : rootIdx < scaleNotes.count - 1 ? scaleNotes[rootIdx + 1] : nil
+                            if let neigh = neighbour {
+                                let rootPart  = Int(Double(dur) * 0.60)
+                                let neighPart = Int(Double(dur) * 0.25)
+                                let retPart   = dur - rootPart - neighPart
+                                let neighVel  = UInt8(Swift.max(20, Int(vel) - 10))
+                                events.append(MIDIEvent(stepIndex: cursor, note: UInt8(rootNote),
+                                                        velocity: vel, durationSteps: rootPart))
+                                events.append(MIDIEvent(stepIndex: cursor + rootPart, note: UInt8(neigh),
+                                                        velocity: neighVel, durationSteps: neighPart))
+                                if retPart >= 4 {
+                                    events.append(MIDIEvent(stepIndex: cursor + rootPart + neighPart,
+                                                            note: UInt8(rootNote), velocity: vel,
+                                                            durationSteps: retPart))
+                                }
+                                didNeighbour = true
+                            }
+                        }
+                    }
+                    if !didNeighbour {
+                        events.append(MIDIEvent(stepIndex: cursor, note: UInt8(noteToPlay),
+                                                velocity: vel, durationSteps: dur))
+                    }
                     holdIndex += 1
                 }
                 cursor += hold + silent

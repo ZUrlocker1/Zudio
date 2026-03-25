@@ -37,6 +37,7 @@ struct AmbientLeadGenerator {
             case "AMB-LEAD-003": usedRuleIDs.insert("AMB-LEAD-003"); return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)
             case "AMB-LEAD-004": usedRuleIDs.insert("AMB-LEAD-004"); return []
             case "AMB-LEAD-007": usedRuleIDs.insert("AMB-LEAD-007"); return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
+            case "AMB-LEAD-008": usedRuleIDs.insert("AMB-LEAD-008"); return returningMotif(notes: notes, loopSteps: loopSteps, rng: &rng)
             default: break
             }
         }
@@ -45,22 +46,26 @@ struct AmbientLeadGenerator {
         if !forceNonSilent && roll < 0.40 {
             usedRuleIDs.insert("AMB-LEAD-004"); return []
         }
-        if roll < 0.66 {
+        if roll < 0.63 {
             usedRuleIDs.insert("AMB-LEAD-001")
             return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
         }
-        if roll < 0.85 {
+        if roll < 0.81 {
             usedRuleIDs.insert("AMB-LEAD-002")
             return echoPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)
         }
-        if roll < 0.95 {
+        if roll < 0.91 {
             usedRuleIDs.insert("AMB-LEAD-003")
             let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
             let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
             return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)
         }
-        usedRuleIDs.insert("AMB-LEAD-007")
-        return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
+        if roll < 0.95 {
+            usedRuleIDs.insert("AMB-LEAD-007")
+            return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
+        }
+        usedRuleIDs.insert("AMB-LEAD-008")
+        return returningMotif(notes: notes, loopSteps: loopSteps, rng: &rng)
     }
 
     // MARK: - Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows)
@@ -250,6 +255,38 @@ struct AmbientLeadGenerator {
                 events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
             }
             cursor += holdSteps + gapSteps
+        }
+        return events
+    }
+
+    /// AMB-LEAD-008: Returning motif — a 2–3 note phrase that recurs every 8–14 bars with ±2 step jitter.
+    /// The same pitches return at semi-regular intervals; spacing is irregular enough to feel unscheduled.
+    private static func returningMotif(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        guard notes.count >= 3 else { return [] }
+        // Pick 2–3 notes from the lower half of the register
+        let motifLen  = 2 + rng.nextInt(upperBound: 2)           // 2–3 notes
+        let maxStart  = Swift.max(1, notes.count / 2)
+        let startIdx  = rng.nextInt(upperBound: maxStart)
+        let motif     = Array(notes[startIdx..<Swift.min(startIdx + motifLen, notes.count)])
+        let holdSteps = 8 + rng.nextInt(upperBound: 5)           // 8–12 steps per note
+        let baseVel   = UInt8(45 + rng.nextInt(upperBound: 16))  // 45–60
+        let returnInterval = (8 + rng.nextInt(upperBound: 7)) * 16  // 8–14 bars
+        var events: [MIDIEvent] = []
+        var cursor = rng.nextInt(upperBound: 16)
+        while cursor < loopSteps {
+            let jitter     = rng.nextInt(upperBound: 5) - 2      // ±2 steps
+            var noteCursor = Swift.max(0, cursor + jitter)
+            for note in motif {
+                guard noteCursor < loopSteps else { break }
+                let dur = Swift.min(holdSteps, loopSteps - noteCursor)
+                if dur >= 4 {
+                    let vel = UInt8(Swift.min(100, Int(baseVel) + rng.nextInt(upperBound: 8) - 4))
+                    events.append(MIDIEvent(stepIndex: noteCursor, note: note,
+                                           velocity: vel, durationSteps: dur))
+                }
+                noteCursor += holdSteps + 2   // 2-step gap between motif notes
+            }
+            cursor += returnInterval
         }
         return events
     }
