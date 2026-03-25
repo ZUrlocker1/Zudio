@@ -291,6 +291,10 @@ struct TrackRowView: View {
     private func cycleInstrument(by delta: Int) {
         instrumentIndex = (instrumentIndex + delta + instruments.count) % instruments.count
         appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
+        // Ambient drum kit change: remap note numbers (shaker↔maracas, claves↔triangle)
+        if trackIndex == kTrackDrums && appState.selectedStyle == .ambient {
+            appState.remapAmbientDrumNotes(instrumentIndex: instrumentIndex)
+        }
     }
 
     private static let effectActiveColor = Color(red: 0.18, green: 0.42, blue: 0.78) // dark blue

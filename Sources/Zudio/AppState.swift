@@ -303,8 +303,8 @@ final class AppState: ObservableObject {
                     Task { @MainActor [weak self] in self?.selectedStyle = .kosmic }
                 case 4:  // 'h' — help
                     Task { @MainActor [weak self] in self?.triggerShowHelp.toggle() }
-                case 0:  // 'a' — about
-                    Task { @MainActor [weak self] in self?.triggerShowAbout.toggle() }
+                case 0:  // 'a' — Ambient
+                    Task { @MainActor [weak self] in self?.selectedStyle = .ambient }
                 case 11: // 'b' — beginning
                     guard songState != nil else { return event }
                     Task { @MainActor [weak self] in self?.seekToStart() }
@@ -408,6 +408,8 @@ final class AppState: ObservableObject {
         isGenerating = true
         let style = selectedStyle
         let testConfig = nextTestConfig()
+        // Brush Kit is index 1 in the Ambient drum pool ["Percussion Kit", "Brush Kit"]
+        let useBrushKit = style == .ambient && (instrumentOverrides[kTrackDrums] ?? 0) == 1
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let state = SongGenerator.generate(
@@ -423,7 +425,8 @@ final class AppState: ObservableObject {
                 forceTexRuleID:       testConfig?.forceTexRuleID,
                 forcePercussionStyle: testConfig?.forcePercussionStyle,
                 forceBridge:          testConfig?.forceBridge ?? false,
-                forceBridgeArchetype: testConfig?.forceBridgeArchetype
+                forceBridgeArchetype: testConfig?.forceBridgeArchetype,
+                useBrushKit:          useBrushKit
             )
             await MainActor.run {
                 self.songState    = state
@@ -507,6 +510,30 @@ final class AppState: ObservableObject {
                 NSApp.keyWindow?.makeFirstResponder(nil)
             }
         }
+    }
+
+    /// Called when the user cycles the drum kit in Ambient mode.
+    /// Remaps the 2-3 affected note numbers in existing drum events — no regeneration needed.
+    /// Percussion Kit: Shaker=82, Claves=75  |  Brush Kit: Maracas=70, Triangle=81
+    func remapAmbientDrumNotes(instrumentIndex: Int) {
+        guard let current = songState, current.style == .ambient else { return }
+        let useBrushKit = instrumentIndex == 1
+        instrumentOverrides[kTrackDrums] = instrumentIndex
+        let remapped = current.trackEvents[kTrackDrums].map { ev in
+            var n = ev.note
+            if useBrushKit {
+                if n == 82 { n = 70 }   // Shaker → Maracas
+                if n == 75 { n = 81 }   // Claves → Open Triangle
+            } else {
+                if n == 70 { n = 82 }   // Maracas → Shaker
+                if n == 81 { n = 75 }   // Triangle → Claves
+            }
+            return MIDIEvent(stepIndex: ev.stepIndex, note: n, velocity: ev.velocity, durationSteps: ev.durationSteps)
+        }
+        let updated = current.withAmbientBrushKit(useBrushKit).replacingEvents(remapped, forTrack: kTrackDrums)
+        songState = updated
+        if playback.isPlaying { playback.load(updated) }
+        if !generationHistory.isEmpty { generationHistory[generationHistory.count - 1] = updated }
     }
 
     func regenerateTrack(_ trackIndex: Int) {

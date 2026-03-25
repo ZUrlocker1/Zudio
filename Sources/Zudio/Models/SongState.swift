@@ -34,6 +34,9 @@ struct SongState: Sendable {
     /// Ambient-only: step range of the X-Files block (4 bars). `nil` if no X-Files in this song.
     /// Used by PlaybackEngine to mute Lead 1 delay during the whistle phrase.
     let ambientXFilesBlockRange: Range<Int>?
+    /// Ambient-only: true when Brush Kit (program 40) was selected at generation time.
+    /// Stored so per-track drum regen can reproduce the same note substitutions.
+    let ambientUseBrushKit: Bool
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
@@ -58,7 +61,8 @@ struct SongState: Sendable {
         stepAnnotations: [Int: [GenerationLogEntry]],
         ambientProgFamily: AmbientProgressionFamily = .droneSingle,
         ambientLoopLengths: AmbientLoopLengths? = nil,
-        ambientXFilesBlockRange: Range<Int>? = nil
+        ambientXFilesBlockRange: Range<Int>? = nil,
+        ambientUseBrushKit: Bool = false
     ) {
         self.frame              = frame
         self.structure          = structure
@@ -74,6 +78,7 @@ struct SongState: Sendable {
         self.ambientProgFamily       = ambientProgFamily
         self.ambientLoopLengths      = ambientLoopLengths
         self.ambientXFilesBlockRange = ambientXFilesBlockRange
+        self.ambientUseBrushKit      = ambientUseBrushKit
         self.generationLog           = generationLog
         self.stepAnnotations    = stepAnnotations
     }
@@ -85,6 +90,18 @@ struct SongState: Sendable {
         return trackEvents[trackIndex]
     }
 
+    /// Returns a copy of this state with ambientUseBrushKit updated (used when user cycles drum kit).
+    func withAmbientBrushKit(_ useBrushKit: Bool) -> SongState {
+        SongState(frame: frame, structure: structure, tonalMap: tonalMap,
+                  trackEvents: trackEvents, globalSeed: globalSeed,
+                  trackOverrides: trackOverrides, title: title, form: form, style: style,
+                  percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
+                  generationLog: generationLog, stepAnnotations: stepAnnotations,
+                  ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
+                  ambientXFilesBlockRange: ambientXFilesBlockRange,
+                  ambientUseBrushKit: useBrushKit)
+    }
+
     /// Returns a copy of this state with the frame replaced (used for real-time tempo changes).
     func withFrame(_ newFrame: GlobalMusicalFrame) -> SongState {
         SongState(frame: newFrame, structure: structure, tonalMap: tonalMap,
@@ -93,7 +110,8 @@ struct SongState: Sendable {
                   percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
-                  ambientXFilesBlockRange: ambientXFilesBlockRange)
+                  ambientXFilesBlockRange: ambientXFilesBlockRange,
+                  ambientUseBrushKit: ambientUseBrushKit)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -113,7 +131,8 @@ struct SongState: Sendable {
             percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
             generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
-            ambientXFilesBlockRange: ambientXFilesBlockRange
+            ambientXFilesBlockRange: ambientXFilesBlockRange,
+            ambientUseBrushKit: ambientUseBrushKit
         )
     }
 }

@@ -1437,9 +1437,9 @@ If findings require generator changes, fix and re-run a smaller study (6–8 son
 
 ---
 
-## Part 9: Harmonic Variety & Melodic Interest — Analysis and Plan (2026-03-24)
+## Part 16: Harmonic Variety & Melodic Interest — Analysis and Plan (2026-03-24)
 
-### 9.1 Observations from 10-Song Listening Analysis
+### 16.1 Observations from 10-Song Listening Analysis
 
 Analysis of 15 Ambient songs (log files + MIDI) identified two structural weaknesses:
 
@@ -1468,7 +1468,7 @@ Analysis of 15 Ambient songs (log files + MIDI) identified two structural weakne
 
 ---
 
-### 9.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003) ✓ DONE
+### 16.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003) ✓ DONE
 
 **What:** New bass rule where holds alternate between the chord root (even holds) and the perfect
 fifth (root+7 semitones, odd holds). 10% chance any fifth hold becomes a major third instead.
@@ -1494,7 +1494,7 @@ interval in a drone context — brief and harmonically warm.
 
 ---
 
-### 9.3 Plan B — Bass Chord-Following Fix ✓ DONE
+### 16.3 Plan B — Bass Chord-Following Fix ✓ DONE
 
 **What:** `AmbientBassGenerator` now iterates every `TonalGovernanceEntry` in the `tonalMap`
 directly. For each chord window it computes the root pitch class from that window's `chordRoot`
@@ -1519,7 +1519,7 @@ without calling `AmbientLoopTiler.tile`. Regen path (kTrackBass case) updated to
 
 ---
 
-### 9.4 Plan C — Celestial Phrase (AMB-RTHM-005) ✓ DONE
+### 16.4 Plan C — Celestial Phrase (AMB-RTHM-005) ✓ DONE
 
 **What:** A 4–5 note ascending phrase on the Rhythm track using the major pentatonic of the song
 key — regardless of the modal context. Deliberately "major feel": ♭7 and minor 3rd of
@@ -1547,7 +1547,7 @@ to make room; silent at 60% unchanged).
 
 ---
 
-### 9.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%) ✓ DONE
+### 16.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%) ✓ DONE
 
 **What:** A new Lead 1 rule with an intentional melodic arc: low → mid → peak → step-down.
 4 notes with a clear contour (not random scale walking). Uses scale tones biased toward the
@@ -1570,7 +1570,7 @@ and echoPhrase from 20% to 19%).
 
 ---
 
-### 9.6 Plan E — AMB-RTHM-006: Bell Cell ✓ DONE
+### 16.6 Plan E — AMB-RTHM-006: Bell Cell ✓ DONE
 
 **What:** A new Rhythm track rule: a 3-note repeating cell — root → fifth → octave — each note
 4 steps long, with long silences (8+ bars) between repetitions. The cell repeats 1–2 times per
@@ -1588,7 +1588,7 @@ of sparse melodic elements to punctuate otherwise static textures.
 
 ---
 
-### 9.7 Implementation Order
+### 16.7 Implementation Order
 
 - Plan B (chord-following bass fix) — ✓ DONE — full-song chord-window iteration, no tiling
 - Plan A (AMB-BASS-003 root+fifth drone) — ✓ DONE — alternating holds, 50% probability
@@ -1600,13 +1600,13 @@ of sparse melodic elements to punctuate otherwise static textures.
 
 ---
 
-## 10. Musical Depth Plans (F–L)
+## Part 17: Musical Depth Plans (F–L)
 
 Seven plans to move Ambient from generative texture toward something that feels composed. Each is independent and can be implemented in any order. Simpler plans are listed first.
 
 ---
 
-### 10.1 Plan F — Arpeggiated Chord Onsets (Pads)
+### 17.1 Plan F — Arpeggiated Chord Onsets (Pads)
 
 **Rule:** AMB-PADS-001 enhancement (no new rule ID — modifies existing behaviour)
 
@@ -1624,7 +1624,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.2 Plan G — Dynamic Arc (Pads + Lead)
+### 17.2 Plan G — Dynamic Arc (Pads + Lead)
 
 **Rule:** AMB-PADS-001 and AMB-LEAD-xxx enhancement
 
@@ -1644,7 +1644,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.3 Plan H — Structural Silence (Breath Moment)
+### 17.3 Plan H — Structural Silence (Breath Moment)
 
 **Rule:** No new rule ID — structural post-processing
 
@@ -1663,7 +1663,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.4 Plan I — Chord Movement (Mid-Song Shift)
+### 17.4 Plan I — Chord Movement (Mid-Song Shift)
 
 **Rule:** AMB-HARM-001 (new rule category: Harmonic)
 
@@ -1688,7 +1688,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.5 Plan J — Intro/Outro Density Gate
+### 17.5 Plan J — Intro/Outro Density Gate
 
 **Rule:** Structural post-processing (no new rule ID)
 
@@ -1709,7 +1709,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.6 Plan K — Lead 1 Phrase Memory (Returning Motif)
+### 17.6 Plan K — Lead 1 Phrase Memory (Returning Motif)
 
 **Rule:** AMB-LEAD-008 (new rule)
 
@@ -1730,7 +1730,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.7 Plan L — Bass Melodic Neighbour Tones (AMB-BASS-001 enhancement)
+### 17.7 Plan L — Bass Melodic Neighbour Tones (AMB-BASS-001 enhancement)
 
 **Rule:** AMB-BASS-001 enhancement (no new rule ID)
 
@@ -1749,7 +1749,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 10.8 Implementation Order
+### 17.8 Implementation Order
 
 Recommended sequencing based on musical impact vs implementation complexity:
 

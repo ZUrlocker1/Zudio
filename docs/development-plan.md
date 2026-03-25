@@ -1,134 +1,114 @@
-# Zudio Development Plan (v0.1 to v0.9)
+# Zudio Development Stages
 
-Scope note:
+- This document describes the stages of development for Zudio, a generative music application
+- More details are defined in `implementation.md`.
 
-- This document is development staging only.
-- Musical generation rules and UX/status behavior are defined in `prototype.md`.
+## Version scope 0.5
 
-## Version scope
+In scope for the initial 0.5 version:
 
-In scope for this first version:
+- One-click song generation
+- Motorik style only
+- Track-level regenerate
+- Transport controls (play, stop, later add reverse, fast forward etc)
+- Per-track mute/solo
+- Per-track instrument cycling
+- Piano-roll style lane visualization (display only; no note editing in v1)
+- Music is randomized by applying different rules for different tracks
+- MIDI export (Type-1 multi-track file to /Downloads)
+- Use built-in Apple MIDI instruments
 
-- one-click song generation
-- track-level regenerate
-- transport controls (play, stop, seek, reverse, fast forward)
-- per-track mute/solo
-- per-track instrument cycling
-- piano-roll style lane visualization (display only; no note editing in v1)
-- MIDI export (Type-1 multi-track file to ~/Downloads/)
+After version 0.5 is stable add:
 
-Out of scope for first version:
-
-- full effects editing workflow
-- continuous post-1.0 evolution mode
+- Additional musical styles one at a time (Kosmic, then Ambient)
+- Full per track audio effects
+- More complex song structures e.g. A - B - Bridge etc
+- Improved MIDI instruments
+- Continuous play evolution mode
 
 ## Stage plan
 
-- [x] **0.1 Drums foundation**
+- **0.1 Drums & Bass, UX foundation**
   - Build:
-    - Drums generation engine and playback.
-    - Drum lane visualization.
-    - Kit switching baseline.
+    - Drums & Bass generation engine and playback
+    - Drum and bass lane visualization
+    - Minimal functional UI for play, stop, generate, mute / solo and regenerate track
+    - Non-functioning track effects
+    - Select different Drum kit or bass instruments, e.g. rock kit, electronic kit, electric bass, synth bass, etc.
+    - Define the song structure, e.g. length, tempo, key, mood
+    - Generate a proper Motorik / Apache beat track
+    - Use different rules for variations in the beat, e.g.
+      - DRUM-001 classic Motorik beat
+      - DRUM-002 more open beat
+      - BASS-001 motorik bass line
+      - BASS-002 more complex bass
+  - Build rules by examining classic Motorik songs or Motorik adjacent songs from Neu!, Kraftwerk, Electric Buddha Band etc
+  - Create a minimal UI with transport controls (stop, play, other functions greyed out), buttons for generate
   - Test gate:
-    - playback stable; lane updates correctly on generate/play.
+    - Playback stable; lane updates correctly on generate/play
+    - Bass and drums in sync
+    - Regeneration applies different random rules for Drums, Bass
 
-- [x] **0.2 Add Bass**
+- **0.2 Add Pads, Rhythm, Textures**
+  - Build additional tracks that follow the song structure, key and chords
+  - Each has its own rules built from analyzing songs
+    - TEXT-001 light shimmer etc
+    - PADS-001 motorik pads
+  - Select the appropriate pool of instruments for each track, e.g. different pad or synth styles
+
+- **0.3 Add Leads**
   - Build:
-    - Bass generation and playback.
-    - Bass lane visualization.
-    - Bass instrument cycling baseline.
-  - Test gate:
-    - bass aligns with drum timing and remains stable under regenerate.
+    - Lead 1 generation and playback
+    - Lead 1 lane visualization
+    - Lead 1 instrument cycling baseline
+    - Primary minimal melody in Lead 1
+    - Use Lead 2 to complement or echo Lead 1
+    - Define a set of rules for Leads
+    - Define instrument pool for Lead 1 and Lead 2
 
-- [x] **0.3 Add Pads**
+- **0.5 Add Effects, MIDI Save, Test mode**
   - Build:
-    - Pad/chord generation and playback.
-    - Pad lane visualization.
-    - Pad instrument cycling baseline.
-  - Test gate:
-    - harmonic alignment across sections remains stable.
+    - Add audio effects for Boost, Reverb, Delay etc using Apple's built-in sound capabilities
+    - Create some track specific effects, e.g. Compression on Drums, Low Filter on bass
+    - Save the current song as a MIDI file for review or editing in a DAW
+    - Define a test mode that generates shorter songs and puts recently changed rules in high rotation
 
-- [x] **0.4 Add Lead 1**
+- **0.6 Sound engine upgrade**
   - Build:
-    - Lead 1 generation and playback.
-    - Lead 1 lane visualization.
-    - Lead 1 instrument cycling baseline.
-  - Test gate:
-    - Lead 1 regenerates cleanly without destabilizing existing tracks.
+    - Replace the existing built-in Apple MIDI sound bank with the open source GS User MIDI sound bank
+    - Bundle the soundbank into the application
 
-- [x] **0.5 Add Lead 2**
-  - Build:
-    - Lead 2 generation and playback.
-    - Lead 2 lane visualization.
-    - Lead 2 instrument cycling baseline.
-  - Test gate:
-    - Lead 2 integration stable with mute/solo and regenerate flows.
+- **0.7 Add Kosmic style**
+  - Build a new song style Kosmic derived from Jean-Michel Jarre, Tangerine Dream, Electric Buddha Band etc
+  - This should allow more complex structures, A-B, A-B-A, A-B-A-B, A-B-Bridge-A etc
+  - Introduce Kosmic specific rules for each track
+  - Use Kosmic specific instruments for the tracks
+  - Have Claude analyze Kosmic tracks and adjust generation rules
 
-- [x] **0.6 Add Rhythm**
-  - Build:
-    - Rhythm track generation and playback.
-    - Rhythm lane visualization.
-    - Rhythm instrument cycling baseline.
-  - Test gate:
-    - rhythm integrates without timing glitches and UI remains responsive.
+- **0.75 Audio export**
+  - File export to save song or a 60 second sample as an M4A audio file
 
-- [x] **0.7 Add Texture**
-  - Build:
-    - Texture event generation and playback.
-    - Texture lane visualization.
-    - Texture instrument cycling baseline.
-  - Test gate:
-    - texture layer stable and regenerates without audio artifacts.
+- **0.76 Performance optimization**
+  - Periodically ask Claude to optimize generation and playback to consume less CPU
+  - Test, test, test!
 
-- [x] **0.75 Sound engine decision gate**
-  - Build:
-    - A/B pass between Apple DLS baseline and higher-quality GM soundfont path.
-  - Test gate:
-    - confirmed Apple DLS acceptable for v1; GM-soundfont upgrade deferred to post-v1.
+- **0.8 Analyze songs**
+  - Add a text file representation of songs (based on the log messages) so that the MIDI file and text log file can be analyzed by Claude
+  - Identify problems in the generation phase as well as musical clashes
+  - Develop additional rules for making the songs more coherent, e.g. more coordination around song structure, leads, etc
+  - Tune the rules and code as appropriate
+  - Repeat two or three times
 
-- [ ] **0.76 Upgraded GM bank pass** *(deferred post-v1)*
-  - Build:
-    - optional higher-quality GM bank integration while preserving MIDI mappings and generation logic.
-  - Test gate:
-    - audible improvement with no control/regression breakage.
+- **0.9 Add Ambient style**
+  - Build a new song style Ambient derived from Eno, Loscil, Craven Faults etc
+  - Simulate varying length loops for playback rather than structured A-B sections
+  - Minimal use of drums, sparse arrangements
+  - Introduce Ambient specific rules
+  - Use a mix of natural sounding instruments with some synths, e.g. cello, latin percussion, etc
+  - Rerun Claude analysis on Ambient songs
 
-- [x] **0.8 Full app workflow integration**
-  - Build:
-    - full-track generation flow, UI wiring, and transport integration.
-    - track regenerate + mute/solo behavior finalized.
-    - arrangement filter (intro/outro layer entry/exit).
-    - harmonic filter (chord-window pitch enforcement across melodic tracks).
-    - pattern evolver for bass (gradual mutation across evolution windows).
-    - drum variation engine (fills at transitions, cymbal variation on runs).
-    - song title generation.
-    - MIDI export (Type-1 multi-track to ~/Downloads/).
-    - full transport: play, stop, go-to-start, go-to-end, reverse (tap/hold), fast forward (tap/hold).
-    - DAW-style auto-scroll during playback; edge-sensitive scroll during manual seek.
-    - space bar global play/stop toggle.
-    - per-track regenerate wired to post-processors (drums → variation engine; bass → pattern evolver).
-    - key/mood/BPM reflected back to UI after each generate; BPM resets to Auto for next generate.
-  - Test gate:
-    - complete workflow stable with expected visual updates and no critical timing failures.
-
-- [ ] **0.9 Stabilization and hardening**
-  - Build:
-    - determinism checks, performance tuning, regression coverage, preset polish.
-    - Help and About dialog content review and final copy.
-    - status log accuracy pass (rule IDs match generated output).
-  - Test gate:
-    - repeatability in internal test mode, CPU/audio reliability, and no critical regressions.
-
-## Test strategy (applies to all stages)
-
-- deterministic replay checks in internal test mode
-- transport/mute/solo/regenerate reliability checks
-- lane rendering and scrolling behavior checks
-- audio glitch and timing drift checks
-
-## Post-1.0 placeholder
-
-- [ ] **1.1 Upgraded GM bank**
-  - Higher-quality GM soundfont integration (deferred from 0.76).
-
-- [ ] **1.2 Evolution mode**
-  - Continuous morphing playback between related song states.
+- **Possible future development**
+  - Adding more rules for improved harmony, coherence and musicality
+  - Upgrade MIDI instruments to Fluid R3 MIDI sound bank
+  - Continuous play / evolution mode
+  - iPad and/or iPhone version

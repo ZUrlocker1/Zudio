@@ -1,14 +1,49 @@
 # Zudio
 
-Zudio is a personal research prototype for generative music on macOS. 
-This was built using CLaude with 3 days work on the docs and then a week of vibe-coding. 
+Zudio is a generative music app for macOS. It generates complete multi-track songs in one click using human-curated musical rules derived from analyzing real artists rather than machine learning.
 
-It generates Ambient, Cosmik and Motorik insopired songs with multi-track structure based on style specific rules. Rules were built by analyzing tracks from artists including Brian Eno, Jean Michel Jarre, Tangerine Dream, Neu!, Kraftwerk, Electric Buddha Band, Loscil, Craven Faults and more. Then I had Claude analyze the songs and make improvements to the rules. There are built-in effects (reverb, delay, auto-pan, sweep, etc) for each track. You can save a MIDI version of the songs or expert audio to an M4A file. 
+It supports three styles: **Motorik** (Neu!, Kraftwerk, Harmonia), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Vangelis, Electric Buddha Band), and **Ambient** (Brian Eno, Loscil, Craven Faults). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation so the same seed always produces the same song.
 
-This repository currently contains product research, implementation notes as well as Swift source code and a compiled binary. 
+Rules were developed by analyzing tracks from artists across those styles, then refining the generators through repeated review passes. The app includes built-in effects such as reverb, delay, auto-pan, and sweep, and it can export both MIDI and M4A audio.
+
+This repository contains the macOS app source, implementation notes, and supporting design documentation.
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.91a/Zudio-0.91a.dmg)
 
 Current release: `0.91a (alpha)`. This build is unsigned, so macOS Gatekeeper will likely show warnings the first time you open it.
 
 To run it anyway, download the DMG, install the app, then right-click the app in Finder and choose `Open`. macOS will show a warning dialog, but that path lets you bypass the initial block and launch the app.
+
+---
+
+## Documentation
+
+### Core
+
+- [architecture.md](docs/architecture.md) — System overview, technology stack, generation pipeline, playback engine, UI architecture, and musical foundations. Start here.
+- [development-plan.md](docs/development-plan.md) — Staged development roadmap from v0.1 through future versions.
+- [implementation.md](docs/implementation.md) — Detailed implementation reference: UX specification, musical rules, generation pipeline, rule ID catalog, and performance engineering notes.
+
+### Style guides
+
+- [motorik-plan.md](docs/motorik-plan.md) — Motorik style: genre research, song analysis, universal rules, and complete implemented specification (drums, bass, pads, leads, voicings).
+- [kosmic-plan.md](docs/kosmic-plan.md) — Kosmic style: genre research, artist-by-artist analysis, universal rules, MIDI analysis findings, and complete implemented specification.
+- [ambient-plan.md](docs/ambient-plan.md) — Ambient style: genre research, artist-by-artist analysis, universal rules, generator design, and MIDI analysis.
+
+### Analysis and quality
+
+- [musical-coherence-plan.md](docs/musical-coherence-plan.md) — Methods and findings from analyzing generated output for musical coherence; derived rule improvements.
+- [optimization-plan.md](docs/optimization-plan.md) — Performance engineering research and CPU optimization techniques.
+- [comps.md](docs/comps.md) — Comparable generative music applications: feature analysis and product notes.
+
+### Feature plans
+
+- [save-as-audio-plan.md](docs/save-as-audio-plan.md) — Audio export (M4A) feature design. (Done)
+- [continuous-play.md](docs/continuous-play.md) — Continuous play and song evolution mode design.
+- [distribution-plan.md](docs/distribution-plan.md) — macOS distribution and release plan.
+
+### Future platform
+
+- [ios-ipad-plan.md](docs/ios-ipad-plan.md) — iOS and iPad port planning, design considerations, and architecture notes.
+- [ipad-layout-proposals.md](docs/ipad-layout-proposals.md) — iPad UI layout proposals and sketches.
+- [sample-library-plan.md](docs/sample-library-plan.md) — Research on upgraded sound banks (Fluid R3 and alternatives) for improved instrument quality.

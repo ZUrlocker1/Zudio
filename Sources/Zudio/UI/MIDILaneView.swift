@@ -227,6 +227,7 @@ private struct NoteLayerView: View, Equatable {
             82: 0.04,           // Shaker         — top row (light, fast)
             70: 0.17,           // Maracas
             75: 0.30,           // Claves
+            81: 0.30,           // Open Triangle  — same row as Claves (Brush Kit substitute)
             60: 0.44,           // Hi Bongo
             61: 0.56,           // Low Bongo
             63: 0.67,           // Open Hi Conga
@@ -252,7 +253,7 @@ private struct NoteLayerView: View, Equatable {
             case 38, 40:         return trackColor.opacity(0.85)      // snare
             case 42, 44, 46:     return trackColor.opacity(0.60)      // hats
             case 82, 70:         return trackColor.opacity(0.55)      // shaker / maracas
-            case 75:             return trackColor.opacity(0.70)      // claves
+            case 75, 81:         return trackColor.opacity(0.70)      // claves / triangle
             case 60, 61:         return trackColor.opacity(0.80)      // bongos
             case 62, 63, 64:     return trackColor.opacity(0.90)      // congas
             default:             return trackColor.opacity(0.75)

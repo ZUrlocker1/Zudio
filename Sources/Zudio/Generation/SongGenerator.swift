@@ -20,7 +20,8 @@ struct SongGenerator {
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil
+        forceBridgeArchetype: String? = nil,
+        useBrushKit:          Bool    = false
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
@@ -28,7 +29,8 @@ struct SongGenerator {
                         forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
                         forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                         forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
-                        forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
+                        forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype,
+                        useBrushKit: useBrushKit)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
@@ -46,7 +48,8 @@ struct SongGenerator {
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil
+        forceBridgeArchetype: String? = nil,
+        useBrushKit:          Bool    = false
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -66,7 +69,8 @@ struct SongGenerator {
                                    forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
                                    forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                                    forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
-                                   forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
+                                   forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype,
+                                   useBrushKit: useBrushKit)
         }
     }
 
@@ -377,7 +381,8 @@ struct SongGenerator {
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil
+        forceBridgeArchetype: String? = nil,
+        useBrushKit:          Bool    = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -427,7 +432,8 @@ struct SongGenerator {
         var drumRules: Set<String> = []
         trackEvents[kTrackDrums] = AmbientDrumGenerator.generate(frame: frame, structure: structure,
                                                                    percussionStyle: percussionStyle,
-                                                                   rng: &drumRNG, usedRuleIDs: &drumRules)
+                                                                   rng: &drumRNG, usedRuleIDs: &drumRules,
+                                                                   useBrushKit: useBrushKit)
 
         // Lead 1 — if silent and pads are non-empty, force a second attempt with a real rule
         var lead1Rules: Set<String> = []
@@ -648,7 +654,8 @@ struct SongGenerator {
             percussionStyle: percussionStyle, kosmicProgFamily: .static_drone,
             generationLog: log, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: loopLengths,
-            ambientXFilesBlockRange: ambientXFilesBlockRange
+            ambientXFilesBlockRange: ambientXFilesBlockRange,
+            ambientUseBrushKit: useBrushKit
         )
     }
 
@@ -671,7 +678,8 @@ struct SongGenerator {
                 events = AmbientDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     percussionStyle: songState.percussionStyle,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules,
+                    useBrushKit: songState.ambientUseBrushKit)
             } else if isKosmic {
                 events = KosmicDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1438,7 +1446,7 @@ struct SongGenerator {
         // Pads
         case "AMB-PADS-001":    return "Sustained chord layer"
         case "AMB-PADS-002":    return "Electric Buddha shimmer layer"
-        case "AMB-PADS-006":    return "Electric Buddha bell accents"
+        case "AMB-PADS-006":    return "Ambient bell accents"
         // Bass
         case "AMB-BASS-001":  return "Loscil drone root"
         case "AMB-BASS-002":  return "No bass"

@@ -91,16 +91,22 @@ struct TopBarView: View {
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if appState.testModeEnabled {
-                        Text("TEST")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.orange)
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                            .padding(4)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if appState.testModeEnabled {
+                            Text("TEST")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color.orange)
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                        }
+                        Text("V 0.91 alpha")
+                            .font(.callout)
+                            .foregroundStyle(.white.opacity(0.55))
                     }
+                    .padding(4)
+                    .offset(x: 20)
                 }
                 .onTapGesture { appState.toggleTestMode() }
                 .frame(width: 200, alignment: .center)
@@ -322,7 +328,7 @@ struct TopBarView: View {
                 // Help / About — rows align with Generate (row 2) and Save MIDI (row 3)
                 VStack(alignment: .trailing, spacing: 6) {
                     Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: 52) }
-                    Button { showAbout = true } label: { (Text("A").underline() + Text("bout")).frame(width: 52) }
+                    Button { showAbout = true } label: { Text("About").frame(width: 52) }
                     Text("Copyright © 2026 Zack Urlocker")
                         .font(.callout)
                         .foregroundStyle(.white)
@@ -456,10 +462,13 @@ struct AboutView: View {
             }
             Spacer()
             HStack(spacing: 4) {
-                Text("Source code available:")
+                Text("Design docs and source code:")
                     .foregroundStyle(.white)
                 Link("https://github.com/ZUrlocker1/Zudio",
                      destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
+                    .onHover { isHovering in
+                        if isHovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
             }
             .font(.system(size: 14))
             HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.defaultAction) }
