@@ -7,7 +7,7 @@ It supports three styles: **Motorik** (Neu!, Kraftwerk, Harmonia), **Kosmic** (T
 Rules were developed by analyzing tracks from artists across those styles. The resulting songs were analyzed by AI to spot generation errors, tone clashes etc and then further improve the rules. 
 The app includes built-in effects such as reverb, delay, auto-pan and sweep. You can export both MIDI and M4A audio.
 
-This repository contains the macOS app source, implementation notes, and supporting design documentation.
+This repository contains the macOS app source, implementation notes, and supporting design documentation all developed using Claude. 
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.91a/Zudio-0.91a.dmg)
 
