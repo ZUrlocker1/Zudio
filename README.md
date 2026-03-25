@@ -11,6 +11,8 @@ This repository contains the macOS app source, implementation notes, and support
 
 ![Zudio screenshot](assets/images/logo/Zudio%20091a%20screenshot.jpg)
 
+**Listen to a sample (Ambient style):** [A-Transformative-Meeting-About-Quarterly-Targets](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
+
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.91a/Zudio-0.91a.dmg)
 
 Current release: `0.91a (alpha)`. This build is unsigned, so macOS Gatekeeper will likely show warnings the first time you open it.
