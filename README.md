@@ -8,4 +8,6 @@ This repository currently contains product research, architecture notes, mockups
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.91a/Zudio-0.91a.dmg)
 
-Current release: `0.91a (alpha)`. The app is not code signed yet, so macOS Gatekeeper may show a warning the first time you open it.
+Current release: `0.91a (alpha)`. This build is unsigned, so macOS Gatekeeper will likely show warnings the first time you open it.
+
+To run it anyway, download the DMG, install the app, then right-click the app in Finder and choose `Open`. macOS will show a warning dialog, but that path lets you bypass the initial block and launch the app.
