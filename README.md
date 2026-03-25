@@ -9,6 +9,8 @@ The app includes built-in effects such as reverb, delay, auto-pan and sweep. You
 
 This repository contains the macOS app source, implementation notes, and supporting design documentation all developed using Claude. 
 
+![Zudio screenshot](assets/images/logo/Zudio%20091a%20screenshot.jpg)
+
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.91a/Zudio-0.91a.dmg)
 
 Current release: `0.91a (alpha)`. This build is unsigned, so macOS Gatekeeper will likely show warnings the first time you open it.
