@@ -2,9 +2,9 @@
 
 Zudio is a personal research prototype for generative music on macOS.
 
-It focuses first on a Motorik-style song generator with multi-track structure (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`), one-click generation, and deterministic seed-based variation.
+It generates Ambient, Cosmik and Motorik insopired songs with multi-track structure based on style specific rules. Rules were built by analyzing tracks from artists including Brian Eno, Jean Michel Jarre, Tangerine Dream, Neu!, Kraftwerk, Electric Buddha Band, Loscil, Craven Faults and more. There are built-in effects (reverb, delay, auto-pan, sweep, etc) for each track. You can save a MIDI version of the songs or expert audio to an M4A file.
 
-This repository currently contains product research, architecture notes, mockups, and a staged development plan.
+This repository currently contains product research, implementation notes as well as Swift source code and a compiled binary. 
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.91a/Zudio-0.91a.dmg)
 
