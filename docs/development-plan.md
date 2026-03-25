@@ -3,9 +3,9 @@
 - This document describes the stages of development for Zudio, a generative music application
 - More details are defined in `implementation.md`.
 
-## Version scope 0.5
+## Initial version goals
 
-In scope for the initial 0.5 version:
+In scope for the initial working version:
 
 - One-click song generation
 - Motorik style only
@@ -66,29 +66,27 @@ After version 0.5 is stable add:
     - Define a set of rules for Leads
     - Define instrument pool for Lead 1 and Lead 2
 
-- **0.5 Add Effects, MIDI Save, Test mode**
+- **0.4 Add Effects, MIDI Save, Test mode**
   - Build:
     - Add audio effects for Boost, Reverb, Delay etc using Apple's built-in sound capabilities
     - Create some track specific effects, e.g. Compression on Drums, Low Filter on bass
     - Save the current song as a MIDI file for review or editing in a DAW
     - Define a test mode that generates shorter songs and puts recently changed rules in high rotation
 
-- **0.6 Sound engine upgrade**
+- **0.5 Sound engine upgrade**
   - Build:
     - Replace the existing built-in Apple MIDI sound bank with the open source GS User MIDI sound bank
     - Bundle the soundbank into the application
 
-- **0.7 Add Kosmic style**
+- **0.6 Add Kosmic style**
   - Build a new song style Kosmic derived from Jean-Michel Jarre, Tangerine Dream, Electric Buddha Band etc
   - This should allow more complex structures, A-B, A-B-A, A-B-A-B, A-B-Bridge-A etc
   - Introduce Kosmic specific rules for each track
   - Use Kosmic specific instruments for the tracks
   - Have Claude analyze Kosmic tracks and adjust generation rules
 
-- **0.75 Audio export**
+- **0.7 Audio export and performance optimization**
   - File export to save song or a 60 second sample as an M4A audio file
-
-- **0.76 Performance optimization**
   - Periodically ask Claude to optimize generation and playback to consume less CPU
   - Test, test, test!
 
