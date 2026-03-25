@@ -1400,18 +1400,9 @@ If findings require generator changes, fix and re-run a smaller study (6–8 son
 
 ---
 
-### Stage 15 — Ambient Name Generator (Deferred)
+### Stage 15 — Ambient Name Generator ✓ DONE
 
-**Goal:** Songs get names that feel spatial, geographic, or poetically abstract — consistent with the Eno/Loscil aesthetic.
-
-**Files to create:**
-- `Sources/Zudio/Generation/AmbientTitleGenerator.swift`
-  - Different vocabulary from Motorik (mechanical, angular) and Kosmic (cosmic, astronomical)
-  - Eno influence: geographic / atmospheric / material: "Thursday", "Lantern", "Drift", "Shore", "Fog", "Pale", "Open"
-  - Loscil influence: technical / aquatic / textural: "Submers", "Stase", "Plume", "Falls", "Depth"
-  - Suggested structure: [adjective/material] + [noun] or single evocative word; 1–2 words max
-  - No "IX" or "-e" or "-ique" suffixes — those are Motorik/Kosmic conventions
-  - Should feel like a place or a state of mind, not a name
+See `Sources/Zudio/Generation/AmbientTitleGenerator.swift`. See also the Title Generator section at the end of this document.
 
 ---
 
@@ -1762,3 +1753,13 @@ Recommended sequencing based on musical impact vs implementation complexity:
 - Plan L (Bass Neighbour Tones) — subtle but character-defining, isolated to BassGenerator
 
 Plans J, H, and G together address the most common complaint (flat, undifferentiated texture) and can be done in a single session. Plans I and K require more care but are the most musically transformative.
+
+---
+
+## Title Generator
+
+Deliberately humorous — satirising the pomposity of generative ambient music naming conventions. Where Motorik titles sound industrial and Germanic and Kosmic titles sound astronomical and pretentious, Ambient titles undercut the genre's self-seriousness with mundane British bathos.
+
+Patterns include: *Music for [mundane place]* (parodies Eno's *Music for Airports*), *An Ending ([bureaucratic parenthetical])*, weather + drab UK geography, fake philosophical observations, faux-French neologisms, and Loscil-style corrupted words applied to entirely undramatic subjects.
+
+**Examples:** Music for Dentist Waiting Rooms, An Ending (Awaiting Confirmation), Damp Pavement at Slough, A Meaningful Meeting About Quarterly Targets, Stochastic Patterns for a Slow Elevator, Ambient 4: The One Where Nothing Resolves, Blandeur, Drizzlement

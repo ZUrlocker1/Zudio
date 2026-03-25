@@ -743,34 +743,6 @@ Lead 2 receives the Lead 1 event array before generating. When Lead 1 picks a sp
 
 ## Title Generator
 
-New title on each Generate; unchanged on per-track regen. Seed-deterministic. 1–3 words. Short,
-pulse-oriented, slightly cryptic. English + Germanic mix.
+Short (1–3 words), pulse-oriented, slightly cryptic. Mixes English with German place names, motion words, and musician references from the Motorik canon (Neu!, Kraftwerk, Harmonia).
 
-**Generation patterns (weighted):**
-
-- `Place + Motion` 22% | `Texture + Motion` 20% | `Name + Motion` 14% | `MusicWord + Motion` 14%
-- `Adj + Noun` 12% | `Three-word cinematic` 10% | `Phonetic parody blend` 8%
-
-**Word banks:**
-
-- Place/scene: Koln, Dusseldorf, Berlin, Ruhr, Autobahn, Tunnel, Nordhausen, Detroit, Forest,
-  Flughafen, Ausgang, Ausfahrt, Strasse, See, Fluss
-- Motion/energy: Drive, Pulse, Drift, Flow, Run, Loop, Roll, Counter, Motor, Velocity, Nonstop,
-  Speed, Fast, Schnell, Tempo, Geschwindigkeit, Exit
-- Texture/tone: Chrome, Static, Neon, Halo, Tape, Glass, Metal, Buzz, Klang, Kosmiche,
-  Elektronischer, Light, Dark, Licht, Dunkel, Night, Moon, Sun, Stars, Zen, Zeitgeist
-- Music-structure: Chord, Pattern, Sequence, Ostinato, Motif, Echo, Signal, Flux, Phase
-- Musician names: Klaus, Dinger, Michael, Rother, Thomas, Hans, Roedelius, Dieter, Moebius,
-  Ralf, Hutter, Florian, Schneider, Karl, Bartos, Wolfgang, Flur
-- Album/track-derived (rearranged): Hallo, Immer, Neu, Deluxe, Monza, Hollywood, Express,
-  Europe, Endlos, Dynamik, Weiter, Zentrale, Zignal
-- Approved numerics: 1977, '85, No. 7, Part 1, Part 2
-
-**Post-processing:**
-
-- Avoid exact known song titles; require at least one token change/reorder
-- Avoid repeating same first token in consecutive titles
-- Prefer hard consonants and short vowels for one-word titles
-
-**Examples:** Mittelwerk Pulse, Detroit Driftline, Neon Nordhausen, Klaus in Tunnel, Rother Flux,
-Von Braun Drive, Flur Motor, Panzinger Echo
+**Examples:** Mittelwerk Pulse, Detroit Driftline, Neon Nordhausen, Klaus in Tunnel, Rother Flux, Von Braun Drive, Flur Motor, Panzinger Echo

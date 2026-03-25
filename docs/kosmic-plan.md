@@ -1176,10 +1176,6 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
 
 ## Title Generator
 
-Draws from space and cosmos vocabulary in English, French, and faux-German. Four patterns:
-- Single JMJ-X word: 3-syllable word containing X (real French/Latin or invented JMJ style)
-- JMJ-X word + Roman numeral (e.g. "Galaxie IV")
-- Two-word English kosmic: adjective + kosmic noun
-- Faux-German adjective + kosmic noun (Tangerine Dream tradition)
+Space and cosmos vocabulary mixing English, French, and faux-German — drawing on the JMJ invented-word tradition (Oxygène, Équinoxe) and Tangerine Dream's Germanic spaciousness.
 
 **Examples:** Vortexe, Proxima III, Dark Nebula, Silent Void, Ewig Kosmos, Tief Nebel, Dunkel Stern
