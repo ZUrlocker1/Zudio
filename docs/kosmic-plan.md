@@ -914,33 +914,6 @@ Four Electric Buddha Band Kosmic songs now analyzed. Combined picture:
 
 ---
 
-## Tonal Consistency Rules (KOS-SYNC)
-
-These are structural invariants, not probabilistic firing rules. They hold for every song and every note. For the study findings and bug history that produced them, see `musical-coherence-plan.md` (Kosmic Studies 01–03).
-
-**KOS-SYNC-001: Scale pools anchor to song tonic**
-All note-pool derivations use `keySemitone(frame.key)` as root. When `modal_drift` or `two_chord_pendulum` selects a non-tonic chord root, generators remain in the global key. The chord root sets the lowest voice; upper voices stay diatonic to the song tonic.
-
-**KOS-SYNC-002: Chord root selection is mode-aware**
-`pickKosmicChordRoot` receives `effectiveMode` (= `frame.mode` for A/intro/outro sections; `section.mode` for B sections). For `two_chord_pendulum`, the degree bVI is only valid in Aeolian and MinorPentatonic — in other modes it is replaced with "4" (subdominant, always diatonic). For `modal_drift`, the same substitution applies so the i→bVII→bVI drift becomes i→bVII→IV in non-Aeolian modes.
-
-**KOS-SYNC-003: NotePoolBuilder uses frame.mode for A sections**
-`buildChordWindows` computes `effectiveMode` at the loop top: A sections and non-body sections use `frame.mode`; B sections use `section.mode`. Both `pickKosmicChordType` and `NotePoolBuilder.build` receive `effectiveMode`. The A-section `section.mode` is hardcoded Dorian and must not be used as the scale reference.
-
-**KOS-SYNC-004: Lead 1 is melodic primary — Lead 2 is sparse response**
-Lead 1 targets 2–5 notes/bar in body sections. Lead 2 excludes KOS-LEAD-006 (JMJ Phrase Loop) entirely — it cannot compete for the primary melodic role. When Lead 1 picks a sparse ambient rule (KOS-LEAD-001/002/003) for the A section, the B section always escalates to KOS-LEAD-004 or KOS-LEAD-006. Lead 2 sits in a lower register (MIDI 55–80) and stays below 30% simultaneous overlap with Lead 1.
-
-**KOS-SYNC-005: Key and override state cleared after generation**
-`keyOverride`, `moodOverride`, and `tempoOverride` are set to nil after song generation completes. Persisting these values locks all subsequent songs to the first-generated key — the root cause of the 5/11 E Dorian clustering in Study 02.
-
-**Consonance targets** (verified via MIDI batch analysis — see musical-coherence-plan.md):
-- Bass: > 92%
-- Pads and Rhythm: > 85%
-- Lead 1: > 72%
-- Lead overlap rate: < 30% of body steps
-
----
-
 ## Detailed Implementation
 
 Reference artists: Jean-Michel Jarre, Tangerine Dream, Vangelis, Klaus Schulze, Loscil, Craven
@@ -1179,3 +1152,30 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
 Space and cosmos vocabulary mixing English, French, and faux-German — drawing on the JMJ invented-word tradition (Oxygène, Équinoxe) and Tangerine Dream's Germanic spaciousness.
 
 **Examples:** Vortexe, Proxima III, Dark Nebula, Silent Void, Ewig Kosmos, Tief Nebel, Dunkel Stern
+
+---
+
+## Tonal Consistency Rules (KOS-SYNC)
+
+These are structural invariants, not probabilistic firing rules. They hold for every song and every note. For the study findings and bug history that produced them, see `musical-coherence-plan.md` (Kosmic Studies 01–03).
+
+**KOS-SYNC-001: Scale pools anchor to song tonic**
+All note-pool derivations use `keySemitone(frame.key)` as root. When `modal_drift` or `two_chord_pendulum` selects a non-tonic chord root, generators remain in the global key. The chord root sets the lowest voice; upper voices stay diatonic to the song tonic.
+
+**KOS-SYNC-002: Chord root selection is mode-aware**
+`pickKosmicChordRoot` receives `effectiveMode` (= `frame.mode` for A/intro/outro sections; `section.mode` for B sections). For `two_chord_pendulum`, the degree bVI is only valid in Aeolian and MinorPentatonic — in other modes it is replaced with "4" (subdominant, always diatonic). For `modal_drift`, the same substitution applies so the i→bVII→bVI drift becomes i→bVII→IV in non-Aeolian modes.
+
+**KOS-SYNC-003: NotePoolBuilder uses frame.mode for A sections**
+`buildChordWindows` computes `effectiveMode` at the loop top: A sections and non-body sections use `frame.mode`; B sections use `section.mode`. Both `pickKosmicChordType` and `NotePoolBuilder.build` receive `effectiveMode`. The A-section `section.mode` is hardcoded Dorian and must not be used as the scale reference.
+
+**KOS-SYNC-004: Lead 1 is melodic primary — Lead 2 is sparse response**
+Lead 1 targets 2–5 notes/bar in body sections. Lead 2 excludes KOS-LEAD-006 (JMJ Phrase Loop) entirely — it cannot compete for the primary melodic role. When Lead 1 picks a sparse ambient rule (KOS-LEAD-001/002/003) for the A section, the B section always escalates to KOS-LEAD-004 or KOS-LEAD-006. Lead 2 sits in a lower register (MIDI 55–80) and stays below 30% simultaneous overlap with Lead 1.
+
+**KOS-SYNC-005: Key and override state cleared after generation**
+`keyOverride`, `moodOverride`, and `tempoOverride` are set to nil after song generation completes. Persisting these values locks all subsequent songs to the first-generated key — the root cause of the 5/11 E Dorian clustering in Study 02.
+
+**Consonance targets** (verified via MIDI batch analysis — see musical-coherence-plan.md):
+- Bass: > 92%
+- Pads and Rhythm: > 85%
+- Lead 1: > 72%
+- Lead overlap rate: < 30% of body steps

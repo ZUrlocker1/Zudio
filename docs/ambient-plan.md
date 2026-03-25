@@ -865,111 +865,9 @@ The 95–110 BPM "mid pulse" operating mode may be more characteristic of Kosmic
 
 ---
 
-## Part 13: Tonal Consistency and Cross-Generator Sync Rules (AMB-SYNC)
+## Part 13: Effects Architecture for Ambient
 
-These rules were derived from the Kosmic coherence analysis (musical-coherence-plan.md, Studies 01–03) and must be applied to Ambient from the start to prevent the class of bugs that required three rounds of post-generation debugging in Kosmic.
-
-**These are not probabilistic firing rules.** AMB-SYNC rules are structural invariants — preconditions and postconditions baked into the generator architecture that hold for every song, every section, every note. They do not appear in the generation log as "fired" events. They are either upheld (invisible) or violated (audible clashes). The SYNC prefix distinguishes them from AMB-PAD, AMB-LD, and AMB-RULE entries which are generative rules that fire with some probability. They address the difference between individual generators that look correct in isolation versus a system that sounds correct as a whole.
-
----
-
-### AMB-SYNC-001: All scale pools anchor to song tonic — never to chord root
-
-All note-pool derivations (pentatonic, diatonic, modal scale degrees) must use `keySemitone(frame.key)` as the root. When a progression family like `modal_drift` or `drone_two` selects a non-tonic chord root (e.g., a bVII chord in a D major song), generators must still produce notes from D major — not from the bVII chord's local scale. The chord root sets the lowest voice; the upper voices remain in the global key.
-
-This is the root cause of the Kosmic Study 02 "Modal Drift consonance fault" where Rhythm track consonance fell to 62% — generators were deriving their note pools from the chord root rather than the song tonic. Fixed in Kosmic Phase 3 by anchoring `pentatonicNotes` to `keySemitone(frame.key)` unconditionally.
-
-Ambient is at higher risk of this bug because `modal_drift` and `drone_two` are common (45% combined), both involving non-tonic chord roots.
-
----
-
-### AMB-SYNC-002: Bass root must match chord plan at bar boundaries
-
-The bass generator does not independently select root pitches. It receives the chord plan and at each bar boundary must output the chord plan's current root as the bass note. Non-root bass notes are only permitted in the middle of a chord window (as passing color), not at the boundary.
-
-This is the cross-track check "Do bass notes agree with chord plan roots at bar boundaries?" from the coherence analysis. In Ambient, where bass drones for 4–8 bars at a time, a wrong root is extremely audible against the pad layer.
-
----
-
-### AMB-SYNC-003: Lead 1 is the statement — Lead 2 is the response
-
-Lead 1 is the primary floating melody. Lead 2 receives the Lead 1 event array before it generates its own notes. Lead 2 must:
-- Never exceed Lead 1 in total note count for the song
-- Prefer different bar windows from Lead 1 (if Lead 1 is active in bars 5–6, Lead 2 favours bars 7–8)
-- Sit in a lower register than Lead 1 when both play simultaneously
-
-If Lead 1 is absent for a section (`AMB-LD-003`), Lead 2 may fill. If Lead 1 is present, Lead 2 steps back. The `lead1Events` parameter (a pattern established in Kosmic) must be passed into `generateLead2` and must demonstrably affect note placement — not silently ignored as it was initially in Kosmic.
-
----
-
-### AMB-SYNC-004: No silent parameter discarding
-
-Every generator function that accepts `frame`, `mode`, `key`, or `section` parameters must use them. This is a structural rule, not a musical one — it prevents the class of bug where a function has a correct signature but internally defaults to a hardcoded mode or scale.
-
-Inspection checklist before implementation is considered complete:
-- Every function that receives `frame.mode` must branch on its value, not use a `let mode = .dorian` fallback
-- Every function that receives `frame.key` must derive its note pool root from it
-- Every function that receives a section parameter must produce different output for intro vs. body vs. outro
-
-The canonical example from Kosmic: a chord window builder received `sectionStructure` and `mode` parameters but used a hardcoded Dorian mode internally, producing wrong scale-tension pools in non-Dorian songs. This was only caught through log analysis of generated songs, not by reading the code.
-
----
-
-### AMB-SYNC-005: Key and mode state cleared after generation
-
-`keyOverride`, `moodOverride`, and `tempoOverride` must be set to `nil` after song generation completes. If they persist as non-nil, every subsequent song will be locked to the first-generated key, mood, and tempo — producing the key clustering bug observed in Kosmic Study 02 (5 of 11 songs in E Dorian, a ~0.1% probability event explained entirely by the lock-in bug).
-
-In Ambient this is especially damaging because the pool of musically interesting keys is narrow (D major, G major, C major, Ab major dominate) — any accidental lock-in to a single key would make all songs sound identical.
-
----
-
-### AMB-SYNC-006: Per-track density caps
-
-Caps prevent runaway density from individual rules, equivalent to the KOS-RTHM-004 electric buddha groove reaching 13.9 notes/bar before a ceiling was added.
-
-- Lead 1: 2.0 notes/bar maximum in body sections (ambient is spare; exceeding this shifts the style toward Kosmic)
-- Lead 2: 1.2 notes/bar maximum
-- Rhythm (when present): 3.0 notes/bar maximum
-- Pads primary layer: 4 re-attacks per bar maximum
-- Texture: 1.5 notes/bar maximum
-
-These are hard ceilings enforced via a labeled `break` or early return once the count is exceeded — not probabilistic thinning. Probabilistic thinning can still produce dense outputs on unlucky seeds; a hard ceiling cannot.
-
----
-
-### AMB-SYNC-007: Acoustic/electronic instrument pairing per song
-
-At song generation time, after random instrument selection, verify that the 7-track assignment includes at minimum one instrument from the acoustic family (strings, woodwinds, bells, Bowed Glass, Cello, Contrabass, Brush Kit) and one from the electronic family (any pad preset, FX class, Moog Bass, Synth Bass 1, Brightness, Space Voice).
-
-If all selected instruments fall into the same family, override the Lead 2 instrument to supply the missing family:
-- If all electronic: override Lead 2 to Vibraphone (11)
-- If all acoustic: override Lead 2 to Warm Pad (89)
-
-Log the constraint as `AMB-SYNC-007 acoustic/electronic balance enforced` when it fires.
-
-The design intent: a song with only synth pads feels sterile; a song with only strings feels like classical. The contrast between a flute melody over an electronic pad drone, or a cello bass line under a bright synth shimmer, is the defining texture of the Ambient style as designed.
-
----
-
-### AMB-SYNC-008: Harmonic consonance floor per track
-
-From the coherence analysis, bass and pads should achieve >92% harmonic consonance (fraction of notes whose pitch class is diatonic to the active mode). Leads can run lower (75–85% is acceptable for expressiveness) but should not fall below 70% except in `dissonant_haze` mode.
-
-Verification approach (same as Kosmic): export MIDI + log pairs from 8–12 generated songs, run the consonance analysis script, confirm numbers before deployment. Do not assume the generators are correct just because they compile and run. The coherence bugs in Kosmic were invisible in the code and only surfaced in the generated output.
-
----
-
-### AMB-SYNC-009: Pads and bass use the same chord root within any bar
-
-This is the Ambient version of the Kosmic cross-track check. At every bar boundary, the lowest note of the pad voicing must match the bass note (same pitch class, any octave). If Modal Drift moves to a bVII root, both the pads and the bass must update simultaneously to that root. A mismatch between pad root and bass root is the most audible harmonic clash in a sparse ambient texture.
-
-Implementation: bass generator receives the chord plan directly (not a summary) and derives its root note from the same chord-plan object that the pad generator reads. No independent root selection.
-
----
-
-## Part 14: Effects Architecture for Ambient
-
-### 14.1 What Is Already in the Signal Chain
+### 13.1 What Is Already in the Signal Chain
 
 Every track already has the following nodes wired in series:
 
@@ -979,7 +877,7 @@ The existing `TrackEffect` buttons the user sees (Boost, Delay, Reverb, Trem, Co
 
 ---
 
-### 14.2 The Two Effects That Matter Most for Ambient
+### 13.2 The Two Effects That Matter Most for Ambient
 
 **1. Delay — high feedback, long time, high wet**
 
@@ -1011,7 +909,7 @@ The `AVAudioUnitReverb` presets available (`smallRoom`, `mediumRoom`, `largeCham
 
 ---
 
-### 14.3 Per-Track Ambient Effect Defaults
+### 13.3 Per-Track Ambient Effect Defaults
 
 These replace the Motorik/Kosmic defaults in `applyDefaultEffects()` when style is Ambient. The user can still toggle effects manually; these are the starting state.
 
@@ -1053,7 +951,7 @@ These replace the Motorik/Kosmic defaults in `applyDefaultEffects()` when style 
 
 ---
 
-### 14.4 Possible Additions Not Currently in the System
+### 13.4 Possible Additions Not Currently in the System
 
 **High-pass filter (easy — recommend adding)**
 A high-pass filter on Lead and Texture tracks in Ambient removes low-frequency muddiness that collides with the bass and pad root notes. With heavy reverb on all tracks, low-end build-up is a real risk. `AVAudioUnitEQ(numberOfBands: 1)` with `filterType = .highPass`, `frequency = 200–350 Hz` on Lead 1, Lead 2, and Texture would clean this up significantly. The existing `lowEQ` node (currently a low shelf boost) could be reconfigured for this, or a separate HPF node added to the chain. Implementation cost: low — same node class, different parameters.
@@ -1072,7 +970,7 @@ The existing `.tremolo` TrackEffect drives a volume LFO on the boost node. At a 
 
 ---
 
-## Part 15: Implementation Roadmap — Staged Coding Plan
+## Part 14: Implementation Roadmap — Staged Coding Plan
 
 This section is the build plan. It follows the same foundation-first discipline used for Motorik (drums → bass → pads → leads) and Kosmic, but Ambient has a different core architecture — the loop tiling engine — that must be built before any generator produces meaningful output. The stages are ordered by dependency, not by importance.
 
@@ -1428,9 +1326,9 @@ See `Sources/Zudio/Generation/AmbientTitleGenerator.swift`. See also the Title G
 
 ---
 
-## Part 16: Harmonic Variety & Melodic Interest — Analysis and Plan (2026-03-24)
+## Part 15: Harmonic Variety & Melodic Interest — Analysis and Plan (2026-03-24)
 
-### 16.1 Observations from 10-Song Listening Analysis
+### 15.1 Observations from 10-Song Listening Analysis
 
 Analysis of 15 Ambient songs (log files + MIDI) identified two structural weaknesses:
 
@@ -1459,7 +1357,7 @@ Analysis of 15 Ambient songs (log files + MIDI) identified two structural weakne
 
 ---
 
-### 16.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003) ✓ DONE
+### 15.2 Plan A — Bass Root/Fifth Variation (AMB-BASS-003) ✓ DONE
 
 **What:** New bass rule where holds alternate between the chord root (even holds) and the perfect
 fifth (root+7 semitones, odd holds). 10% chance any fifth hold becomes a major third instead.
@@ -1485,7 +1383,7 @@ interval in a drone context — brief and harmonically warm.
 
 ---
 
-### 16.3 Plan B — Bass Chord-Following Fix ✓ DONE
+### 15.3 Plan B — Bass Chord-Following Fix ✓ DONE
 
 **What:** `AmbientBassGenerator` now iterates every `TonalGovernanceEntry` in the `tonalMap`
 directly. For each chord window it computes the root pitch class from that window's `chordRoot`
@@ -1510,7 +1408,7 @@ without calling `AmbientLoopTiler.tile`. Regen path (kTrackBass case) updated to
 
 ---
 
-### 16.4 Plan C — Celestial Phrase (AMB-RTHM-005) ✓ DONE
+### 15.4 Plan C — Celestial Phrase (AMB-RTHM-005) ✓ DONE
 
 **What:** A 4–5 note ascending phrase on the Rhythm track using the major pentatonic of the song
 key — regardless of the modal context. Deliberately "major feel": ♭7 and minor 3rd of
@@ -1538,7 +1436,7 @@ to make room; silent at 60% unchanged).
 
 ---
 
-### 16.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%) ✓ DONE
+### 15.5 Plan D — AMB-LEAD-007: Lyric Fragment (Lead 1 rule, ~5%) ✓ DONE
 
 **What:** A new Lead 1 rule with an intentional melodic arc: low → mid → peak → step-down.
 4 notes with a clear contour (not random scale walking). Uses scale tones biased toward the
@@ -1561,7 +1459,7 @@ and echoPhrase from 20% to 19%).
 
 ---
 
-### 16.6 Plan E — AMB-RTHM-006: Bell Cell ✓ DONE
+### 15.6 Plan E — AMB-RTHM-006: Bell Cell ✓ DONE
 
 **What:** A new Rhythm track rule: a 3-note repeating cell — root → fifth → octave — each note
 4 steps long, with long silences (8+ bars) between repetitions. The cell repeats 1–2 times per
@@ -1579,7 +1477,7 @@ of sparse melodic elements to punctuate otherwise static textures.
 
 ---
 
-### 16.7 Implementation Order
+### 15.7 Implementation Order
 
 - Plan B (chord-following bass fix) — ✓ DONE — full-song chord-window iteration, no tiling
 - Plan A (AMB-BASS-003 root+fifth drone) — ✓ DONE — alternating holds, 50% probability
@@ -1591,13 +1489,13 @@ of sparse melodic elements to punctuate otherwise static textures.
 
 ---
 
-## Part 17: Musical Depth Plans (F–L)
+## Part 16: Musical Depth Plans (F–L)
 
 Seven plans to move Ambient from generative texture toward something that feels composed. Each is independent and can be implemented in any order. Simpler plans are listed first.
 
 ---
 
-### 17.1 Plan F — Arpeggiated Chord Onsets (Pads)
+### 16.1 Plan F — Arpeggiated Chord Onsets (Pads)
 
 **Rule:** AMB-PADS-001 enhancement (no new rule ID — modifies existing behaviour)
 
@@ -1615,7 +1513,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.2 Plan G — Dynamic Arc (Pads + Lead)
+### 16.2 Plan G — Dynamic Arc (Pads + Lead)
 
 **Rule:** AMB-PADS-001 and AMB-LEAD-xxx enhancement
 
@@ -1635,7 +1533,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.3 Plan H — Structural Silence (Breath Moment)
+### 16.3 Plan H — Structural Silence (Breath Moment)
 
 **Rule:** No new rule ID — structural post-processing
 
@@ -1654,7 +1552,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.4 Plan I — Chord Movement (Mid-Song Shift)
+### 16.4 Plan I — Chord Movement (Mid-Song Shift)
 
 **Rule:** AMB-HARM-001 (new rule category: Harmonic)
 
@@ -1679,7 +1577,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.5 Plan J — Intro/Outro Density Gate
+### 16.5 Plan J — Intro/Outro Density Gate
 
 **Rule:** Structural post-processing (no new rule ID)
 
@@ -1700,7 +1598,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.6 Plan K — Lead 1 Phrase Memory (Returning Motif)
+### 16.6 Plan K — Lead 1 Phrase Memory (Returning Motif)
 
 **Rule:** AMB-LEAD-008 (new rule)
 
@@ -1721,7 +1619,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.7 Plan L — Bass Melodic Neighbour Tones (AMB-BASS-001 enhancement)
+### 16.7 Plan L — Bass Melodic Neighbour Tones (AMB-BASS-001 enhancement)
 
 **Rule:** AMB-BASS-001 enhancement (no new rule ID)
 
@@ -1740,7 +1638,7 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
-### 17.8 Implementation Order
+### 16.8 Implementation Order
 
 Recommended sequencing based on musical impact vs implementation complexity:
 
@@ -1763,3 +1661,72 @@ Deliberately humorous — satirising the pomposity of generative ambient music n
 Patterns include: *Music for [mundane place]* (parodies Eno's *Music for Airports*), *An Ending ([bureaucratic parenthetical])*, weather + drab UK geography, fake philosophical observations, faux-French neologisms, and Loscil-style corrupted words applied to entirely undramatic subjects.
 
 **Examples:** Music for Dentist Waiting Rooms, An Ending (Awaiting Confirmation), Damp Pavement at Slough, A Meaningful Meeting About Quarterly Targets, Stochastic Patterns for a Slow Elevator, Ambient 4: The One Where Nothing Resolves, Blandeur, Drizzlement
+
+---
+
+## Tonal Consistency Rules (AMB-SYNC)
+
+These rules were derived from the Kosmic coherence analysis (musical-coherence-plan.md, Studies 01–03) and must be applied to Ambient from the start to prevent the class of bugs that required three rounds of post-generation debugging in Kosmic.
+
+**These are not probabilistic firing rules.** AMB-SYNC rules are structural invariants — preconditions and postconditions baked into the generator architecture that hold for every song, every section, every note. They do not appear in the generation log as "fired" events. They are either upheld (invisible) or violated (audible clashes).
+
+---
+
+### AMB-SYNC-001: All scale pools anchor to song tonic — never to chord root
+
+All note-pool derivations (pentatonic, diatonic, modal scale degrees) must use `keySemitone(frame.key)` as the root. When a progression family like `modal_drift` or `drone_two` selects a non-tonic chord root (e.g., a bVII chord in a D major song), generators must still produce notes from D major — not from the bVII chord's local scale. The chord root sets the lowest voice; the upper voices remain in the global key.
+
+Ambient is at higher risk of this bug because `modal_drift` and `drone_two` are common (45% combined), both involving non-tonic chord roots.
+
+---
+
+### AMB-SYNC-002: Bass root must match chord plan at bar boundaries
+
+The bass generator does not independently select root pitches. It receives the chord plan and at each bar boundary must output the chord plan's current root as the bass note. Non-root bass notes are only permitted in the middle of a chord window (as passing color), not at the boundary. In Ambient, where bass drones for 4–8 bars at a time, a wrong root is extremely audible against the pad layer.
+
+---
+
+### AMB-SYNC-003: Lead 1 is the statement — Lead 2 is the response
+
+Lead 1 is the primary floating melody. Lead 2 receives the Lead 1 event array before generating. Lead 2 must never exceed Lead 1 in total note count, must prefer different bar windows, and must sit in a lower register when both play simultaneously. The `lead1Events` parameter must demonstrably affect note placement — not silently ignored as it was initially in Kosmic.
+
+---
+
+### AMB-SYNC-004: No silent parameter discarding
+
+Every generator function that accepts `frame`, `mode`, `key`, or `section` parameters must use them. Every function that receives `frame.mode` must branch on its value; every function that receives a section parameter must produce different output for intro vs. body vs. outro.
+
+---
+
+### AMB-SYNC-005: Key and mode state cleared after generation
+
+`keyOverride`, `moodOverride`, and `tempoOverride` must be set to `nil` after song generation completes. In Ambient this is especially damaging because the pool of musically interesting keys is narrow — any accidental lock-in makes all songs sound identical.
+
+---
+
+### AMB-SYNC-006: Per-track density caps
+
+Hard ceilings enforced via labeled `break` or early return — not probabilistic thinning:
+- Lead 1: 2.0 notes/bar maximum in body sections
+- Lead 2: 1.2 notes/bar maximum
+- Rhythm (when present): 3.0 notes/bar maximum
+- Pads primary layer: 4 re-attacks per bar maximum
+- Texture: 1.5 notes/bar maximum
+
+---
+
+### AMB-SYNC-007: Acoustic/electronic instrument pairing per song
+
+After instrument selection, verify the 7-track assignment includes at least one acoustic instrument (strings, woodwinds, bells, Cello, Brush Kit) and one electronic (pad presets, FX class, Moog Bass, Synth Bass). If all fall into the same family, override Lead 2: all-electronic → Vibraphone (11); all-acoustic → Warm Pad (89).
+
+---
+
+### AMB-SYNC-008: Harmonic consonance floor per track
+
+Bass and pads target >92% harmonic consonance. Leads can run 75–85% but should not fall below 70% except in `dissonant_haze` mode. Verify via MIDI batch analysis before deployment — coherence bugs are invisible in code and only surface in generated output.
+
+---
+
+### AMB-SYNC-009: Pads and bass use the same chord root within any bar
+
+At every bar boundary, the lowest note of the pad voicing must match the bass note (same pitch class, any octave). Bass generator receives the chord plan directly and derives its root from the same object the pad generator reads — no independent root selection.

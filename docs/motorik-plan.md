@@ -714,6 +714,14 @@ bass ±8ms, rhythm ±7ms, leads ±10ms.
 
 ---
 
+## Title Generator
+
+Short (1–3 words), pulse-oriented, slightly cryptic. Mixes English with German place names, motion words, and musician references from the Motorik canon (Neu!, Kraftwerk, Harmonia).
+
+**Examples:** Mittelwerk Pulse, Detroit Driftline, Neon Nordhausen, Klaus in Tunnel, Rother Flux, Von Braun Drive, Flur Motor, Panzinger Echo
+
+---
+
 ## Tonal Consistency Rules (MOT-SYNC)
 
 These are structural invariants, not probabilistic firing rules. They hold for every song and every note. For the study findings and bug history that produced them, see `musical-coherence-plan.md` (Motorik Studies 01–02).
@@ -738,11 +746,3 @@ Lead 2 receives the Lead 1 event array before generating. When Lead 1 picks a sp
 - Pads and Rhythm: > 85%
 - Leads: > 80%
 - Drum fill rate: < 1 fill per 8 bars
-
----
-
-## Title Generator
-
-Short (1–3 words), pulse-oriented, slightly cryptic. Mixes English with German place names, motion words, and musician references from the Motorik canon (Neu!, Kraftwerk, Harmonia).
-
-**Examples:** Mittelwerk Pulse, Detroit Driftline, Neon Nordhausen, Klaus in Tunnel, Rother Flux, Von Braun Drive, Flur Motor, Panzinger Echo
