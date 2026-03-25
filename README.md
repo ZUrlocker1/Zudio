@@ -2,9 +2,10 @@
 
 Zudio is a generative music app for macOS. It generates complete multi-track songs in one click using human-curated musical rules derived from analyzing real artists rather than machine learning.
 
-It supports three styles: **Motorik** (Neu!, Kraftwerk, Harmonia), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Vangelis, Electric Buddha Band), and **Ambient** (Brian Eno, Loscil, Craven Faults). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation so the same seed always produces the same song.
+It supports three styles: **Motorik** (Neu!, Kraftwerk, Harmonia), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Vangelis, Electric Buddha Band), and **Ambient** (Brian Eno, Loscil, Craven Faults). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation.
 
-Rules were developed by analyzing tracks from artists across those styles, then refining the generators through repeated review passes. The app includes built-in effects such as reverb, delay, auto-pan, and sweep, and it can export both MIDI and M4A audio.
+Rules were developed by analyzing tracks from artists across those styles. The resulting songs were analyzed by AI to spot generation errors, tone clashes etc and then further improve the rules. 
+The app includes built-in effects such as reverb, delay, auto-pan and sweep. You can export both MIDI and M4A audio.
 
 This repository contains the macOS app source, implementation notes, and supporting design documentation.
 
