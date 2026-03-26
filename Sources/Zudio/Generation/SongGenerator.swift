@@ -814,6 +814,7 @@ struct SongGenerator {
     /// Route a ruleID to the correct description function by trackIndex.
     private static func ruleDescription(_ ruleID: String, trackIndex: Int) -> String {
         if ruleID.hasPrefix("AMB-") { return ambientRuleDescription(ruleID) }
+        if ruleID.hasPrefix("KOS-RTHM-") { return kosmicRthmRuleDescription(ruleID) }
         switch trackIndex {
         case kTrackDrums:   return drumRuleDescription(ruleID)
         case kTrackBass:    return bassRuleDescription(ruleID)
