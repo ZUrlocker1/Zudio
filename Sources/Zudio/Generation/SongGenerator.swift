@@ -681,9 +681,13 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules,
                     useBrushKit: songState.ambientUseBrushKit)
             } else if isKosmic {
+                // Re-pick percussionStyle so regen can change drum character, not just notes.
+                // Using the same tempo-weighted distribution as initial generation.
+                let regenPercStyle = KosmicMusicalFrameGenerator.pickPercussionStyle(
+                    tempo: songState.frame.tempo, rng: &rng)
                 events = KosmicDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    percussionStyle: songState.percussionStyle,
+                    percussionStyle: regenPercStyle,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules)

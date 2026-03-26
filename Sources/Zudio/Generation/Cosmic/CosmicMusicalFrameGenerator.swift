@@ -111,7 +111,7 @@ struct KosmicMusicalFrameGenerator {
     ///   absent 22%, sparse 18%, minimal 13%,
     ///   electricBuddhaGroove 27%, electricBuddhaPulse 10%, electricBuddhaRestrained 10%
     /// Below 100 BPM: Electric Buddha patterns redistributed to absent/sparse/restrained.
-    private static func pickPercussionStyle(tempo: Int, rng: inout SeededRNG) -> PercussionStyle {
+    static func pickPercussionStyle(tempo: Int, rng: inout SeededRNG) -> PercussionStyle {
         if tempo >= 100 {
             let styles:  [PercussionStyle] = [.absent, .sparse, .minimal, .motorikGrid, .electricBuddhaPulse, .electricBuddhaRestrained]
             let weights: [Double]          = [0.22,    0.18,    0.13,     0.27,          0.10,                  0.10]
