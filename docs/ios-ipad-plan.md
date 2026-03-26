@@ -85,9 +85,12 @@ The current `.icns` format is macOS-only. Add an `AppIcon.appiconset` to the Ass
 
 ## Part 4: File Export
 
-Current: `MIDIFileExporter.swift` writes to `~/Downloads/` using `.downloadsDirectory`, which does not exist on iOS.
+iOS has no shared filesystem — each app is sandboxed and there is no `~/Downloads` folder. Both export functions need an output path change and a share sheet added. The core recording/writing logic is otherwise unchanged.
 
-Fix:
+### Output path (both MIDI and Audio)
+
+Both `MIDIFileExporter.swift` and `AudioFileExporter.swift` use `.downloadsDirectory`, which does not exist on iOS. Replace with a platform conditional in both files:
+
 ```swift
 #if os(macOS)
 let baseURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
@@ -96,11 +99,41 @@ let baseURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainM
 #endif
 ```
 
-On iOS, files written to `.documentDirectory` appear in the Files app under "On My iPhone/iPad → Zudio". Users can AirDrop or share them from there.
+On iOS, files written to `.documentDirectory` appear in the Files app under "On My iPhone/iPad → Zudio" once the two Info.plist keys below are set.
 
-Additionally, after saving on iOS, present a `ShareLink` or `UIActivityViewController` sheet so the user can immediately share the MIDI file to GarageBand, AirDrop it, or send it elsewhere. This is better UX than silently writing to a directory.
+### Share sheet (both MIDI and Audio)
 
-The `Info.plist` will need `UIFileSharingEnabled = YES` and `LSSupportsOpeningDocumentsInPlace = YES` to expose the Documents folder in the Files app.
+On macOS, export silently writes a file and shows a status message. On iOS this is the wrong pattern — the user has no easy way to find the file. Instead, after the file is written, immediately present a `UIActivityViewController` with the file URL:
+
+```swift
+#if os(iOS)
+let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+// present from the current UIViewController or SwiftUI sheet
+#endif
+```
+
+The share sheet gives the user immediate options:
+- Save to Files app (iCloud Drive, On My iPhone, etc.)
+- AirDrop to a Mac or another device
+- Open directly in GarageBand (appears as an import target for both MIDI and M4A)
+- Share via Mail, Messages, or any other app
+
+This is better UX than the Mac approach — no need to find the file manually after export.
+
+### MIDI export specifics
+
+`MIDIFileExporter.swift` writes a `.mid` file. No format change needed on iOS. After writing, trigger the share sheet with the `.mid` file URL.
+
+### Audio export specifics
+
+`AudioFileExporter.swift` records via an `AVAudioEngine` tap and writes an M4A file. `AVAudioEngine` tap capture is fully supported on iOS, so the recording logic is unchanged. After writing, trigger the share sheet with the `.m4a` file URL. GarageBand recognises M4A as a valid audio import, so users can bring the exported song directly into a GarageBand project.
+
+### Info.plist additions
+
+Two keys are required to make exported files visible in the Files app independent of the share sheet:
+
+- `UIFileSharingEnabled = YES` — exposes the app's Documents folder in Files under "On My iPhone/iPad → Zudio"
+- `LSSupportsOpeningDocumentsInPlace = YES` — allows other apps (e.g. GarageBand) to open files directly from Zudio's folder without copying them
 
 ---
 
