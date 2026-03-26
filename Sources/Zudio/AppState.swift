@@ -586,11 +586,15 @@ final class AppState: ObservableObject {
         playback.seek(toStep: step)
         // Reset annotation pointer so seeks don't re-emit or skip annotations
         lastEmittedStep = step - 1
-        // Recenter visible window on seek position
+        // Only scroll the window if the target bar is outside the current visible range.
+        // When the user clicks inside the visible lane the window stays put so the
+        // playhead lands on exactly the pixel that was clicked.
         let totalBars = songState?.frame.totalBars ?? 32
         let targetBar = step / 16
-        let newOffset = max(0, min(targetBar - Int(Double(visibleBars) * 0.15), totalBars - visibleBars))
-        visibleBarOffset = newOffset
+        if targetBar < visibleBarOffset || targetBar >= visibleBarOffset + visibleBars {
+            let newOffset = max(0, min(targetBar - Int(Double(visibleBars) * 0.15), totalBars - visibleBars))
+            visibleBarOffset = newOffset
+        }
     }
 
     /// Rewind to bar 1. Keeps current play state.
