@@ -280,6 +280,80 @@ struct AmbientTitleGenerator {
         "Octatonic (Missing One Note)", "Altered (Barely)"
     ]
 
+    // Classical music forms — used in tech-grief pattern
+    private static let classicalForms = [
+        "Suite", "Nocturne", "Requiem", "Étude", "Notes",
+        "Elegy", "Lament", "Prelude", "Dirge", "Threnody",
+        "Interlude", "Fugue", "Variations", "Aria", "Coda"
+    ]
+
+    // Tech/SaaS/midlife tragedies — "for/from a ___"
+    private static let techTragedies = [
+        "SaaS Funeral", "Failed Pivot", "Midlife Crisis",
+        "Forced Restructuring", "Dying Startup",
+        "Redundancy Notice", "Failed MVP",
+        "Deprioritised Roadmap", "Post-Acquisition Reorg",
+        "Series C That Didn't Close", "Pivot That Wasn't",
+        "Missed Runway", "Down Round", "Strategic Reset",
+        "Quiet Layoff", "Vision Misalignment"
+    ]
+
+    // People who are suffering — "Tears/Lament of a ___"
+    private static let techVictims = [
+        "SaaS Investor", "Product Manager",
+        "Burned-Out Founder", "Pivoting CEO",
+        "Bootstrapped Developer", "Laid-Off Engineer",
+        "Venture Partner (Ret.)", "Thought Leader",
+        "Pre-Revenue Startup", "Disruptive Innovator",
+        "Chief Transformation Officer",
+        "First-Time Angel Investor",
+        "Head of Growth (Redundant)",
+        "Technical Co-Founder (Diluted)",
+        "Series A Optimist"
+    ]
+
+    // Tech grief emotions — "Tears/Lament/Requiem of ___"
+    private static let techGriefNouns = [
+        "Tears", "Regrets", "Lament", "Dirge",
+        "Elegy", "Eulogy", "Last Words", "Notes"
+    ]
+
+    // AI entities — for "The ___ Arrangements" style
+    private static let aiEntities = [
+        "Claude", "ChatGPT", "Copilot", "Gemini",
+        "The LLM", "The Foundation Model", "The Transformer",
+        "The Inference Engine", "GPT", "The Prompt"
+    ]
+
+    // Words that follow an AI entity name
+    private static let aiArrangementWords = [
+        "Arrangements", "Sessions", "Variations", "Studies",
+        "Meditations", "Transcriptions", "Improvisations",
+        "Sketches", "Compositions", "Directives"
+    ]
+
+    // AI-specific tragedies and concepts
+    private static let aiTragedies = [
+        "a Failed AI Pivot", "a Hallucinated Roadmap",
+        "a Deprecated Model", "an Orphaned Prompt",
+        "a Token Limit", "the Context Window",
+        "Fine-Tuned Disappointment", "a Vibe-Coded Startup",
+        "the Alignment Problem", "an AI Wrapper",
+        "a RAG Pipeline That Never Shipped",
+        "Prompt Engineering", "a Missed Inference",
+        "a Confident Wrong Answer", "Latency"
+    ]
+
+    // Places where tech grief occurs
+    private static let techPlaces = [
+        "Silicon Valley", "Palo Alto", "San Francisco",
+        "Shoreditch", "a WeWork", "a Hot-Desk",
+        "a Pitch Deck", "a Pre-Seed Round",
+        "the Catered Office", "the Off-Site",
+        "an Unconference", "the Open Plan",
+        "a Standing Meeting", "the All-Hands"
+    ]
+
     // Fake musical terms — corruptions of Italian/Spanish performance directions
     // that sound plausible until you think about them
     private static let fakeMusicalTerms = [
@@ -513,6 +587,67 @@ struct AmbientTitleGenerator {
             let scale = fakeScaleNames[rng.nextInt(upperBound: fakeScaleNames.count)]
             let term  = fakeMusicalTerms[rng.nextInt(upperBound: fakeMusicalTerms.count)]
             return "\(scale) \(term)"
+        },
+
+        // 17. Tech/SaaS grief — three sub-formats  (weight ×3)
+
+        // 17a. [Classical form] for/from [tech tragedy] — "Suite for a SaaS Funeral"
+        { rng in
+            let form   = classicalForms[rng.nextInt(upperBound: classicalForms.count)]
+            let trag   = techTragedies[rng.nextInt(upperBound: techTragedies.count)]
+            let prep   = rng.nextInt(upperBound: 3) == 0 ? "from" : "for"
+            return "\(form) for \(prep == "for" ? "a" : "the") \(trag)"
+        },
+
+        // 17b. [Emotion] of a [tech victim] — "Tears of a SaaS Investor"
+        { rng in
+            let grief  = techGriefNouns[rng.nextInt(upperBound: techGriefNouns.count)]
+            let victim = techVictims[rng.nextInt(upperBound: techVictims.count)]
+            return "\(grief) of a \(victim)"
+        },
+
+        // 17c. [Event] in [tech place] — "Funeral in Silicon Valley"
+        { rng in
+            let events = ["Funeral", "Wake", "Merger", "Pivot", "Reorg", "Acqui-hire",
+                          "Liquidation Event", "Soft Landing", "Strategic Reset"]
+            let event  = events[rng.nextInt(upperBound: events.count)]
+            let place  = techPlaces[rng.nextInt(upperBound: techPlaces.count)]
+            return "\(event) in \(place)"
+        },
+
+        // 17d. "The [AI entity] [arrangement word]" — "The Claude Arrangements"  (weight ×2)
+        { rng in
+            let entity = aiEntities[rng.nextInt(upperBound: aiEntities.count)]
+            let word   = aiArrangementWords[rng.nextInt(upperBound: aiArrangementWords.count)]
+            return "The \(entity) \(word)"
+        },
+        { rng in
+            let entity = aiEntities[rng.nextInt(upperBound: aiEntities.count)]
+            let word   = aiArrangementWords[rng.nextInt(upperBound: aiArrangementWords.count)]
+            return "The \(entity) \(word)"
+        },
+
+        // 17e. "[Classical form] for [AI entity or tragedy]"  (weight ×2)
+        // — "Arias for ChatGPT", "Sonata for a Failed AI Pivot"
+        { rng in
+            let form = classicalForms[rng.nextInt(upperBound: classicalForms.count)]
+            if rng.nextInt(upperBound: 2) == 0 {
+                let entity = aiEntities[rng.nextInt(upperBound: aiEntities.count)]
+                return "\(form) for \(entity)"
+            } else {
+                let trag = aiTragedies[rng.nextInt(upperBound: aiTragedies.count)]
+                return "\(form) for \(trag)"
+            }
+        },
+        { rng in
+            let form = classicalForms[rng.nextInt(upperBound: classicalForms.count)]
+            if rng.nextInt(upperBound: 2) == 0 {
+                let entity = aiEntities[rng.nextInt(upperBound: aiEntities.count)]
+                return "\(form) for \(entity)"
+            } else {
+                let trag = aiTragedies[rng.nextInt(upperBound: aiTragedies.count)]
+                return "\(form) for \(trag)"
+            }
         },
     ]
 }
