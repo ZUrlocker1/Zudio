@@ -80,6 +80,16 @@ final class PlaybackEngine: ObservableObject {
     var motorikStyle: Bool = false
     private var motorikFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
 
+    // Ambient per-note attack/decay fades on boosts[kTrackBass] and boosts[kTrackPads].
+    // Each note-on triggers a ramp to 1.0; each note-off triggers a ramp to 0.0.
+    // Duration is capped to 1/3 of the note's duration so short notes still sound.
+    // Index: [0]=Bass, [1]=Pads. 50ms polling interval — identical pattern to Kosmic drone fades.
+    private var ambientNoteFadeTimers:     [DispatchSourceTimer?] = [nil, nil]
+    private var ambientNoteFadeStartNanos: [UInt64] = [0, 0]
+    private var ambientNoteFadeFromVol:    [Float]  = [0, 0]
+    private var ambientNoteFadeToVol:      [Float]  = [1, 1]
+    private var ambientNoteFadeDuration:   [Double] = [0.5, 0.5]   // stored at note-on; reused at note-off
+
     // Step-event map: built once at load time for O(1) lookup in onStep.
     // nonisolated(unsafe): written on main actor in load(), read from background timer thread.
     // Writes always happen-before reads (load() runs before play() which starts the timer).
@@ -161,6 +171,8 @@ final class PlaybackEngine: ObservableObject {
     func load(_ state: SongState) {
         songState = state
         buildStepEventMap(state: state)
+        // Cancel any in-progress note fades before restoring volumes.
+        stopAmbientNoteFades()
         // Restore volumes that any in-progress intro/outro fade may have left at non-unity values.
         samplers[kTrackBass].volume = trackBaseVolume[kTrackBass]
         samplers[kTrackPads].volume = trackBaseVolume[kTrackPads]
@@ -239,6 +251,11 @@ final class PlaybackEngine: ObservableObject {
                 self.startMotorikFades(state: state)
             }
         } else {
+            // Ambient: start with boost at 0 from the top so the first note fades in cleanly.
+            if ambientMode && currentStep == 0 {
+                boosts[kTrackBass].outputVolume = 0.0
+                boosts[kTrackPads].outputVolume = 0.0
+            }
             let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: schedulerID)
             scheduler = sched
             sched.start()
@@ -255,6 +272,7 @@ final class PlaybackEngine: ObservableObject {
         allNotesOff()
         stopKosmicDroneFades()
         stopMotorikFades()
+        stopAmbientNoteFades()
     }
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
@@ -282,6 +300,28 @@ final class PlaybackEngine: ObservableObject {
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             self.currentBar  = bar
+            // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
+            // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
+            // The chosen duration is stored per-track and reused for the matching note-off.
+            if self.ambientMode {
+                let sps = self.songState?.frame.secondsPerStep ?? 0.1
+                for (trackIndex, ev) in self.stepEventMap[step] ?? [] {
+                    if trackIndex == kTrackBass || trackIndex == kTrackPads {
+                        let noteSecs  = Double(ev.durationSteps) * sps
+                        let fadeSecs  = min(0.5, max(0.03, noteSecs / 3.0))
+                        let idx       = trackIndex == kTrackBass ? 0 : 1
+                        self.ambientNoteFadeDuration[idx] = fadeSecs
+                        self.startAmbientBoostFade(trackIndex: trackIndex, toVolume: 1.0, duration: fadeSecs)
+                    }
+                }
+                for (trackIndex, _) in self.noteOffMap[step] ?? [] {
+                    if trackIndex == kTrackBass || trackIndex == kTrackPads {
+                        let idx      = trackIndex == kTrackBass ? 0 : 1
+                        let fadeSecs = self.ambientNoteFadeDuration[idx]
+                        self.startAmbientBoostFade(trackIndex: trackIndex, toVolume: 0.0, duration: fadeSecs)
+                    }
+                }
+            }
             // Mute Lead 1 delay at block start; restore at block end (4 bars later).
             if let range = self.xFilesDelayBlockRange {
                 if step == range.lowerBound {
@@ -312,6 +352,7 @@ final class PlaybackEngine: ObservableObject {
             self.allNotesOff()
             self.stopKosmicDroneFades()
             self.stopMotorikFades()
+            self.stopAmbientNoteFades()
         }
     }
 
@@ -327,6 +368,7 @@ final class PlaybackEngine: ObservableObject {
             allNotesOff()
             stopKosmicDroneFades()
             stopMotorikFades()
+            stopAmbientNoteFades()
             currentStep = clampedStep
             currentBar  = clampedStep / 16
             currentSchedulerID += 1
@@ -891,6 +933,45 @@ final class PlaybackEngine: ObservableObject {
         motorikFadeTimers[1] = nil
         engine.mainMixerNode.outputVolume = 1.0
         applyMuteState()
+    }
+
+    // MARK: - Ambient per-note attack/decay fades
+
+    /// Smoothly ramps boosts[trackIndex].outputVolume to `toVolume` over `duration` seconds.
+    /// Called on the main actor (from the onStep main.async block).
+    /// Replaces any in-progress fade for that track so rapid note changes don't stack timers.
+    private func startAmbientBoostFade(trackIndex: Int, toVolume: Float, duration: Double) {
+        let idx = trackIndex == kTrackBass ? 0 : 1
+        ambientNoteFadeTimers[idx]?.cancel()
+        ambientNoteFadeFromVol[idx]    = boosts[trackIndex].outputVolume
+        ambientNoteFadeToVol[idx]      = toVolume
+        ambientNoteFadeDuration[idx]   = duration
+        ambientNoteFadeStartNanos[idx] = DispatchTime.now().uptimeNanoseconds
+
+        let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+        src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(10))
+        src.setEventHandler { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let elapsed = Double(DispatchTime.now().uptimeNanoseconds - self.ambientNoteFadeStartNanos[idx]) / 1_000_000_000.0
+                let t       = Float(min(1.0, elapsed / self.ambientNoteFadeDuration[idx]))
+                let vol     = self.ambientNoteFadeFromVol[idx] + t * (self.ambientNoteFadeToVol[idx] - self.ambientNoteFadeFromVol[idx])
+                let muted   = self.muteState[trackIndex] || (self.anySoloActive && !self.soloState[trackIndex])
+                self.boosts[trackIndex].outputVolume = muted ? 0.0 : vol
+                if t >= 1.0 {
+                    self.ambientNoteFadeTimers[idx]?.cancel()
+                    self.ambientNoteFadeTimers[idx] = nil
+                }
+            }
+        }
+        src.resume()
+        ambientNoteFadeTimers[idx] = src
+    }
+
+    private func stopAmbientNoteFades() {
+        for i in 0..<2 { ambientNoteFadeTimers[i]?.cancel(); ambientNoteFadeTimers[i] = nil }
+        boosts[kTrackBass].outputVolume = 1.0
+        boosts[kTrackPads].outputVolume = 1.0
     }
 
     // MARK: - Kosmic body entrance fade

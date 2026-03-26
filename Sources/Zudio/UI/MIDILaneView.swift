@@ -64,7 +64,8 @@ struct MIDILaneView: View {
                             .onChanged { value in
                                 let fraction = max(0, min(1.0, value.location.x / geo.size.width))
                                 let clampedVisible = max(1, min(visibleBars, totalBars))
-                                let startStep = barOffset * 16
+                                let clampedOffset  = max(0, min(barOffset, totalBars - clampedVisible))
+                                let startStep = clampedOffset * 16
                                 let visibleSteps = clampedVisible * 16
                                 let step = startStep + Int(fraction * Double(visibleSteps))
                                 onSeek?(step)

@@ -20,7 +20,8 @@ struct RhythmGenerator {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
@@ -28,13 +29,26 @@ struct RhythmGenerator {
         // 0=up  1=down  2=up-down  3=down-up  4=ping-pong
         let arpDirection = rng.nextInt(upperBound: 5)
 
+        // Forced pattern index (nil = pick randomly per section as normal)
+        let forcedPatternType: Int? = forceRuleID.flatMap { id in
+            switch id {
+            case "MOT-RTHM-001": return 0
+            case "MOT-RTHM-002": return 1
+            case "MOT-RTHM-003": return 2
+            case "MOT-RTHM-004": return 3
+            case "MOT-RTHM-005": return 4
+            case "MOT-RTHM-006": return 5
+            default: return nil
+            }
+        }
+
         for section in structure.sections {
             // Rhythm is silent in intro/outro
             guard section.label != .intro && section.label != .outro else { continue }
 
-            // Pick pattern type once per section
+            // Pick pattern type once per section (or use forced value for all sections)
             let patternWeights: [Double] = [0.30, 0.17, 0.17, 0.13, 0.08, 0.15]
-            let patternType = rng.weightedPick(patternWeights)
+            let patternType = forcedPatternType ?? rng.weightedPick(patternWeights)
             switch patternType {
             case 0:  usedRuleIDs.insert("MOT-RTHM-001")
             case 1:  usedRuleIDs.insert("MOT-RTHM-002")

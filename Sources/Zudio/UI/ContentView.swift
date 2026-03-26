@@ -7,6 +7,10 @@ struct ContentView: View {
 
     private let trackLabels = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"]
 
+    // Pinch-to-zoom state — anchor captured on first tick of each gesture
+    @State private var pinchAnchorBars: Int = 16
+    @State private var isPinching: Bool = false
+
     // Layout constants matching TrackRowView internals
     // TrackRowView: .padding(.horizontal, 8) wraps HStack(spacing:0)
     //   left panel: .frame(width:232).padding(.horizontal,6)  → 8+6+232+6 = 252 from left edge
@@ -86,6 +90,29 @@ struct ContentView: View {
             .background(Color(white: 0.18))   // single slab behind all rows — eliminates inter-row seams
             .padding(.top, 2)
             .layoutPriority(1)   // shrinks after status box, before top bar
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { scale in
+                        if !isPinching {
+                            pinchAnchorBars = appState.visibleBars
+                            isPinching = true
+                        }
+                        let total = appState.songState?.frame.totalBars ?? 64
+                        let raw = Int((Double(pinchAnchorBars) / scale).rounded())
+                        let clamped = max(4, min(total, raw))
+                        appState.visibleBars = clamped
+                        // Keep offset in bounds as window shrinks or grows
+                        appState.visibleBarOffset = max(0, min(appState.visibleBarOffset, total - clamped))
+                    }
+                    .onEnded { _ in
+                        isPinching = false
+                        // Snap to nearest multiple of 4 to match the zoom slider behaviour
+                        let total = appState.songState?.frame.totalBars ?? 64
+                        let snapped = max(4, min(total, ((appState.visibleBars + 2) / 4) * 4))
+                        appState.visibleBars = snapped
+                        appState.visibleBarOffset = max(0, min(appState.visibleBarOffset, total - snapped))
+                    }
+            )
             .overlay {
                 if appState.isGenerating {
                     ProgressView("Generating…")

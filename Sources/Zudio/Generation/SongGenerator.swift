@@ -14,6 +14,7 @@ struct SongGenerator {
         style: MusicStyle = .kosmic,
         testMode: Bool = false,
         forceBassRuleID:      String? = nil,
+        forceDrumRuleID:      String? = nil,
         forceArpRuleID:       String? = nil,
         forcePadsRuleID:      String? = nil,
         forceLeadRuleID:      String? = nil,
@@ -26,7 +27,8 @@ struct SongGenerator {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                         moodOverride: moodOverride, style: style, testMode: testMode,
-                        forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
+                        forceBassRuleID: forceBassRuleID, forceDrumRuleID: forceDrumRuleID,
+                        forceArpRuleID: forceArpRuleID,
                         forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                         forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
                         forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype,
@@ -42,6 +44,7 @@ struct SongGenerator {
         style: MusicStyle = .kosmic,
         testMode: Bool = false,
         forceBassRuleID:      String? = nil,
+        forceDrumRuleID:      String? = nil,
         forceArpRuleID:       String? = nil,
         forcePadsRuleID:      String? = nil,
         forceLeadRuleID:      String? = nil,
@@ -62,7 +65,9 @@ struct SongGenerator {
         case .motorik:
             return generateMotorik(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                    moodOverride: moodOverride, testMode: testMode,
-                                   forceBassRuleID: forceBassRuleID)
+                                   forceBassRuleID:   forceBassRuleID,
+                                   forceDrumRuleID:   forceDrumRuleID,
+                                   forceRhythmRuleID: forceArpRuleID)
         case .ambient:
             return generateAmbient(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                    moodOverride: moodOverride, testMode: testMode,
@@ -82,7 +87,9 @@ struct SongGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         testMode: Bool = false,
-        forceBassRuleID: String? = nil
+        forceBassRuleID:   String? = nil,
+        forceDrumRuleID:   String? = nil,
+        forceRhythmRuleID: String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -115,7 +122,7 @@ struct SongGenerator {
 
         // Step 4 — Drums
         var drumRules: Set<String> = []
-        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules)
+        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: forceDrumRuleID)
 
         // Step 5 — Bass
         var bassRules: Set<String> = []
@@ -133,7 +140,7 @@ struct SongGenerator {
 
         // Step 8 — Rhythm
         var rhythmRules: Set<String> = []
-        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules)
+        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID)
 
         // Step 9 — Texture
         var texRules: Set<String> = []
@@ -675,9 +682,10 @@ struct SongGenerator {
         switch trackIndex {
         case kTrackDrums:
             if isAmbient {
+                let regenPercStyle = AmbientMusicalFrameGenerator.pickPercussionStyle(rng: &rng)
                 events = AmbientDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    percussionStyle: songState.percussionStyle,
+                    percussionStyle: regenPercStyle,
                     rng: &rng, usedRuleIDs: &usedRules,
                     useBrushKit: songState.ambientUseBrushKit)
             } else if isKosmic {

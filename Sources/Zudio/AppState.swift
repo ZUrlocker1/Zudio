@@ -63,6 +63,7 @@ final class AppState: ObservableObject {
     struct TestModeConfig {
         var forceArpRuleID:        String?
         var forceBassRuleID:       String?
+        var forceDrumRuleID:       String?
         var forcePadsRuleID:       String?
         var forceLeadRuleID:       String?
         var forceTexRuleID:        String?
@@ -140,6 +141,8 @@ final class AppState: ObservableObject {
     // instrumentOverrides maps trackIndex → instrumentIndex; TrackRowView reads this on defaultsResetToken.
 
     private var songGenerationCount = 0
+    // Tracks which styles have had at least one song generated — used for best-song mode.
+    private var stylesWithGeneratedSongs: Set<MusicStyle> = []
     var instrumentOverrides: [Int: Int] = [:]
 
     private static let randomizableTrackIndices = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass, kTrackDrums]
@@ -408,23 +411,56 @@ final class AppState: ObservableObject {
         isGenerating = true
         let style = selectedStyle
         let testConfig = nextTestConfig()
+        let isFirstForStyle = !stylesWithGeneratedSongs.contains(style)
         // Brush Kit is index 1 in the Ambient drum pool ["Percussion Kit", "Brush Kit"]
         let useBrushKit = style == .ambient && (instrumentOverrides[kTrackDrums] ?? 0) == 1
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
+            // Best-song params: applied on first generation per style; testConfig overrides where set.
+            let bestBass: String?
+            let bestDrum: String?
+            let bestArp:  String?
+            let bestLead: String?
+            let bestPerc: PercussionStyle?
+            let bestBridge: Bool
+            switch style {
+            case .motorik:
+                bestBass   = "MOT-BASS-015"
+                bestDrum   = "MOT-DRUM-001"
+                bestArp    = "MOT-RTHM-001"
+                bestLead   = nil
+                bestPerc   = nil
+                bestBridge = false
+            case .kosmic:
+                bestBass   = "KOS-BASS-010"
+                bestDrum   = nil
+                bestArp    = "KOS-RTHM-002"
+                bestLead   = nil
+                bestPerc   = .motorikGrid   // → KOS-DRUM-004 Electric Buddha groove
+                bestBridge = true
+            case .ambient:
+                bestBass   = nil
+                bestDrum   = nil
+                bestArp    = nil
+                bestLead   = "AMB-LEAD-003"
+                bestPerc   = .handPercussion  // → AMB-DRUM-004 hand percussion
+                bestBridge = false
+            }
+            let useBest = isFirstForStyle
             let state = SongGenerator.generate(
                 keyOverride:     await self.keyOverride,
                 tempoOverride:   await self.tempoOverride,
                 moodOverride:    await self.moodOverride,
                 style:           style,
                 testMode:        await self.testModeEnabled,
-                forceBassRuleID:      testConfig?.forceBassRuleID,
-                forceArpRuleID:       testConfig?.forceArpRuleID,
+                forceBassRuleID:      testConfig?.forceBassRuleID      ?? (useBest ? bestBass   : nil),
+                forceDrumRuleID:      testConfig?.forceDrumRuleID      ?? (useBest ? bestDrum   : nil),
+                forceArpRuleID:       testConfig?.forceArpRuleID       ?? (useBest ? bestArp    : nil),
                 forcePadsRuleID:      testConfig?.forcePadsRuleID,
-                forceLeadRuleID:      testConfig?.forceLeadRuleID,
+                forceLeadRuleID:      testConfig?.forceLeadRuleID      ?? (useBest ? bestLead   : nil),
                 forceTexRuleID:       testConfig?.forceTexRuleID,
-                forcePercussionStyle: testConfig?.forcePercussionStyle,
-                forceBridge:          testConfig?.forceBridge ?? false,
+                forcePercussionStyle: testConfig?.forcePercussionStyle ?? (useBest ? bestPerc   : nil),
+                forceBridge:          testConfig?.forceBridge ?? (useBest ? bestBridge : false),
                 forceBridgeArchetype: testConfig?.forceBridgeArchetype,
                 useBrushKit:          useBrushKit
             )
@@ -462,6 +498,7 @@ final class AppState: ObservableObject {
                     self.instrumentOverrides = [:]
                 }
                 self.songGenerationCount += 1
+                self.stylesWithGeneratedSongs.insert(style)
 
                 // Build the batch to append: optional separator + generation log + instruments entry
                 var batch: [GenerationLogEntry] = []

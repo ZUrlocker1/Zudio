@@ -18,17 +18,22 @@ struct DrumGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
-        // Weighted rule selection: DRM-001 50%, DRM-002 20%, DRM-003 15%, DRM-004 15%
-        let ruleWeights: [Double] = [0.50, 0.20, 0.15, 0.15]
-        let ruleIndex = rng.weightedPick(ruleWeights)
         let ruleID: String
-        switch ruleIndex {
-        case 1:  ruleID = "MOT-DRUM-002"
-        case 2:  ruleID = "MOT-DRUM-003"
-        case 3:  ruleID = "MOT-DRUM-004"
-        default: ruleID = "MOT-DRUM-001"
+        if let forced = forceRuleID {
+            ruleID = forced
+        } else {
+            // Weighted rule selection: DRM-001 50%, DRM-002 20%, DRM-003 15%, DRM-004 15%
+            let ruleWeights: [Double] = [0.50, 0.20, 0.15, 0.15]
+            let ruleIndex = rng.weightedPick(ruleWeights)
+            switch ruleIndex {
+            case 1:  ruleID = "MOT-DRUM-002"
+            case 2:  ruleID = "MOT-DRUM-003"
+            case 3:  ruleID = "MOT-DRUM-004"
+            default: ruleID = "MOT-DRUM-001"
+            }
         }
         usedRuleIDs.insert(ruleID)
 
