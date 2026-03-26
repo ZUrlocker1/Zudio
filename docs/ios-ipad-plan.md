@@ -360,7 +360,25 @@ This phase is a separate design and implementation project. `horizontalSizeClass
 
 ---
 
-## Part 13: Verification
+## Part 13: Monetization Options
+
+Two viable models for the iOS/iPadOS release at a price point under $5.
+
+**Option A — Flat paid (~$2.99 upfront)**
+- Free tier: none — pay once to download
+- Pros: no StoreKit/IAP infrastructure, no entitlement checks throughout the codebase, simpler to build and maintain, no "crippled demo" perception, single clear value proposition
+- Cons: higher friction to download, smaller top-of-funnel, harder to grow audience organically in a crowded App Store
+
+**Option B — Free with one-time unlock IAP (~$2.99)**
+- Free tier: generate and play in one style (Motorik is the most immediately recognizable), full MIDI grid and per-track regen, no export
+- Paid unlock: audio and MIDI export, Kosmic and Ambient styles unlocked
+- Pros: zero-friction discovery, users hear the value before paying, natural upsell moment when they want to keep a song they made
+- Cons: significant added complexity (StoreKit integration, entitlement checks at export and style-switch points, sandbox/test environment), meaningful extra development time for a solo project
+- Key principle: never limit the number of generations — the generative loop is the core value and capping it would undermine the whole experience; only gate export and style access
+
+---
+
+## Part 14: Verification
 
 1. `xcodebuild -scheme Zudio -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)' build` — must build without errors
 2. App launches on iPhone SE simulator — no crashes
