@@ -26,10 +26,18 @@ struct SongLogExporter {
         // ── Header ───────────────────────────────────────────────────────────────
         lines += [
             "=== Zudio Song Analysis Log ===",
-            col("Title:",     16) + song.title,
-            col("Generated:", 16) + dateStr,
-            col("Seed:",      16) + "\(song.globalSeed)",
-            col("Style:",     16) + song.style.rawValue.capitalized,
+            col("Title:",          16) + song.title,
+            col("Generated:",      16) + dateStr,
+            col("Zudio Version:",  16) + "0.93",
+            col("Seed:",           16) + "\(song.globalSeed)",
+            col("Style:",          16) + song.style.rawValue.capitalized,
+        ]
+        if !song.trackOverrides.isEmpty {
+            let overridesStr = song.trackOverrides.sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
+            lines.append(col("Track Overrides:", 16) + overridesStr)
+        }
+        lines += [
             col("Key:",       16) + "\(song.frame.key)  \(song.frame.mode.rawValue)",
             col("Tempo:",     16) + "\(song.frame.tempo) BPM",
             col("Bars:",      16) + "\(song.frame.totalBars)",

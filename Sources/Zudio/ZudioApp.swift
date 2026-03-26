@@ -72,17 +72,25 @@ struct ZudioApp: App {
                 .keyboardShortcut("g", modifiers: .command)
             }
             CommandGroup(replacing: .saveItem) {
-                Button("Export Audio") {
-                    appState.requestExport()
+                Button("Load Song") {
+                    appState.loadFromLog()
                 }
-                .keyboardShortcut("e", modifiers: .command)
-                .disabled(appState.songState == nil || appState.isExportingAudio)
+                .keyboardShortcut("l", modifiers: .command)
+                .disabled(appState.isGenerating)
+
+                Divider()
 
                 Button("Save MIDI") {
                     appState.saveMIDI()
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(appState.songState == nil)
+
+                Button("Export Audio") {
+                    appState.requestExport()
+                }
+                .keyboardShortcut("e", modifiers: .command)
+                .disabled(appState.songState == nil || appState.isExportingAudio)
             }
 
             // Empty out Edit menu groups so the menu is blank before removal.

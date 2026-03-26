@@ -280,7 +280,7 @@ final class AppState: ObservableObject {
                 }
 
             // Plain-letter shortcuts — all guard against text-field focus and open sheets
-            case 5, 1, 46, 15, 40, 4, 0, 11, 6:
+            case 5, 1, 37, 46, 15, 40, 4, 0, 11, 6:
                 guard mods.isEmpty else { return event }
                 let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
                 let sheetOpen   = !(NSApp.keyWindow?.sheets.isEmpty ?? true)
@@ -297,6 +297,9 @@ final class AppState: ObservableObject {
                 case 1:  // 's' — save MIDI
                     guard songState != nil else { return event }
                     Task { @MainActor [weak self] in self?.saveMIDI() }
+                case 37: // 'l' — load song
+                    guard !isGenerating else { return event }
+                    Task { @MainActor [weak self] in self?.loadFromLog() }
                 case 46: // 'm' — Motorik
                     Task { @MainActor [weak self] in self?.selectedStyle = .motorik }
                 case 15: // 'r' — reset
@@ -725,6 +728,106 @@ final class AppState: ObservableObject {
             ])
         } catch {
             print("MIDI export error: \(error)")
+        }
+    }
+
+    // MARK: - Load from log
+
+    func loadFromLog() {
+        let panel = NSOpenPanel()
+        panel.title = "Load Song from Log File"
+        panel.message = "Select a Zudio .txt log file to reload the song"
+        panel.allowedContentTypes = [.plainText]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadFromLogURL(url)
+    }
+
+    private func loadFromLogURL(_ url: URL) {
+        guard !isGenerating else { return }
+        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
+            appendToLog([GenerationLogEntry(tag: "FILE", description: "Could not load file -- could not read \(url.lastPathComponent)", isTitle: false)])
+            return
+        }
+
+        var globalSeed: UInt64? = nil
+        var style: MusicStyle = .kosmic
+        var trackOverrides: [Int: UInt64] = [:]
+        var songTitle: String = ""
+        var zudioVersion: String = "0.91a"   // inferred for logs that pre-date version field
+
+        for line in content.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("Title:") {
+                songTitle = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Zudio Version:") {
+                zudioVersion = trimmed.dropFirst(14).trimmingCharacters(in: .whitespaces)
+            } else if trimmed.hasPrefix("Seed:") {
+                globalSeed = UInt64(trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces))
+            } else if trimmed.hasPrefix("Style:") {
+                let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces).lowercased()
+                style = MusicStyle(rawValue: val) ?? .kosmic
+            } else if trimmed.hasPrefix("Track Overrides:") {
+                let val = trimmed.dropFirst(16).trimmingCharacters(in: .whitespaces)
+                for pair in val.components(separatedBy: "  ") {
+                    let parts = pair.trimmingCharacters(in: .whitespaces).components(separatedBy: "=")
+                    if parts.count == 2, let idx = Int(parts[0]), let s = UInt64(parts[1]) {
+                        trackOverrides[idx] = s
+                    }
+                }
+            }
+        }
+
+        guard let seed = globalSeed else {
+            appendToLog([GenerationLogEntry(tag: "FILE", description: "Could not load file -- missing seed information", isTitle: false)])
+            return
+        }
+
+        isGenerating = true
+        let overrides = trackOverrides
+        let loadTitle   = songTitle
+        let loadVersion = zudioVersion
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            var state = SongGenerator.generate(seed: seed, style: style)
+            for trackIdx in overrides.keys.sorted() {
+                state = SongGenerator.regenerateTrack(trackIdx, songState: state, overrideSeed: overrides[trackIdx])
+            }
+            await MainActor.run {
+                self.selectedStyle    = style
+                self.songState        = state
+                self.generationHistory.append(state)
+                if self.generationHistory.count > 5 { self.generationHistory.removeFirst() }
+                self.isGenerating     = false
+                self.visibleBarOffset = 0
+                self.lastEmittedStep  = -1
+                self.instrumentOverrides = [:]
+                self.songGenerationCount += 1
+                self.stylesWithGeneratedSongs.insert(style)
+                self.muteState = Array(repeating: false, count: 7)
+                self.soloState = Array(repeating: false, count: 7)
+                self.playback.muteState = self.muteState
+                self.playback.soloState = self.soloState
+                var batch: [GenerationLogEntry] = []
+                if !self.statusLog.isEmpty {
+                    batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
+                }
+                let nameStr = loadTitle.isEmpty ? "" : " \(loadTitle)"
+                batch.append(GenerationLogEntry(tag: "FILE", description: "Loading song:\(nameStr)  --Zudio \(loadVersion)", isTitle: false))
+                batch.append(contentsOf: state.generationLog)
+                self.appendToLog(batch)
+                let wasPlaying = self.playback.isPlaying
+                self.playback.stop()
+                self.playback.kosmicStyle  = style == .kosmic
+                self.playback.motorikStyle = style == .motorik
+                self.playback.load(state)
+                self.playback.seek(toStep: 0)
+                self.playback.setAmbientMode(style == .ambient)
+                self.defaultsResetToken += 1
+                if wasPlaying { self.playback.play() }
+                NSApp.keyWindow?.makeFirstResponder(nil)
+            }
         }
     }
 

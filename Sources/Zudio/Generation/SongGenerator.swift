@@ -670,8 +670,8 @@ struct SongGenerator {
 
     /// Regenerates a single track without touching any other track or the global seed.
     /// Appends regen log entries so the status box reflects the new rules used.
-    static func regenerateTrack(_ trackIndex: Int, songState: SongState) -> SongState {
-        let newTrackSeed = UInt64.random(in: .min ... .max)
+    static func regenerateTrack(_ trackIndex: Int, songState: SongState, overrideSeed: UInt64? = nil) -> SongState {
+        let newTrackSeed = overrideSeed ?? UInt64.random(in: .min ... .max)
         var rng = SeededRNG(seed: newTrackSeed)
         var usedRules: Set<String> = []
 

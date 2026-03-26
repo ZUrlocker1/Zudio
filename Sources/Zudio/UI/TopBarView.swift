@@ -101,7 +101,7 @@ struct TopBarView: View {
                                 .background(Color.orange)
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        Text("V 0.92 alpha")
+                        Text("V 0.93 alpha")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -240,6 +240,17 @@ struct TopBarView: View {
                         .disabled(appState.songState == nil)
                         .keyboardShortcut("s", modifiers: .command)
                         .help("Save multi-track MIDI to ~/Downloads/ (⌘S)")
+
+                        Button(action: { appState.loadFromLog() }) {
+                            Label {
+                                (Text("L").underline() + Text("oad Song"))
+                                    .fontWeight(.semibold)
+                            } icon: { Image(systemName: "doc.text") }
+                            .frame(width: 128, alignment: .center)
+                        }
+                        .disabled(appState.isGenerating)
+                        .keyboardShortcut("l", modifiers: .command)
+                        .help("Reload a song from a saved .txt log file (⌘L)")
 
                         Button(action: { appState.requestExport() }) {
                             Label {
@@ -452,7 +463,7 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.92 (alpha)").font(.system(size: 14))
+                Text("Version: 0.93 (alpha)").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk, Neu!, Deluxe, Harmonia, Tangerine Dream, Electric Buddha Band, Loscil, Craven Faults and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments as well as arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass and Dinger beat. There are basic audio effects per track for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
