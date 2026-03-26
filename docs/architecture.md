@@ -54,7 +54,10 @@ the pipeline always produces the same song.
 
 **Seeded RNG**: Generation uses SplitMix64, a fast deterministic pseudo-random number generator.
 The global seed is a random UInt64 chosen at generation time; per-track seeds can differ when
-individual tracks are regenerated.
+individual tracks are regenerated. Both the global seed and any per-track override seeds are
+written to the companion `.txt` log file saved alongside each MIDI export. **Load Song**
+(File menu, ⌘L) reads the seed from a log file and replays it through the same deterministic
+generator, reproducing the song exactly.
 
 **SongState** is the single source of truth for a loaded song. It is an immutable Swift struct
 containing the musical frame, structure, tonal map, all track events, the generation log, and

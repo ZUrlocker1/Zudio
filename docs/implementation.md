@@ -221,6 +221,8 @@ All tracks must generate exactly `totalBars` bars of MIDI events.
 
 Same seed + same controls = same song. Per-track seed: `splitmix64(globalSeed XOR (trackIndex × 0x9e3779b97f4a7c15))`. Per-track regenerate generates a new entropy value for that track only.
 
+The global seed and any per-track override seeds are written to the `.txt` log file saved alongside each MIDI export. **Load Song** (File menu, ⌘L) parses those seeds and replays them through the deterministic generator, reproducing the song identically.
+
 ### One-button generate: 14 ordered steps
 
 1. Global musical frame (style, mood, tempo, key, mode, totalBars)
