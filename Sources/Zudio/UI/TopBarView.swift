@@ -421,7 +421,7 @@ struct HelpView: View {
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
-                helpLine("Save MIDI (⌘S)", "Exports a multi-track MIDI file to /Downloads. Also saves a log file of rules for the song. Open in any DAW to edit further.")
+                helpLine("Save MIDI (⌘S) / Load Song (⌘L)", "Exports a multi-track MIDI file to /Downloads. Open in any DAW to edit further. Also saves a text log file of rules. The log file can be reloaded to restore a song.")
                 helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")

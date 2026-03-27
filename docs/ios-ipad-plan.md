@@ -204,6 +204,7 @@ iPhone landscape gives ~667–932pt width but only ~375–430pt height. Seven tr
 - Replace `NSImage` logo with asset catalog image (cross-platform)
 - Move Help/About to a settings sheet on iPhone
 - `.keyboardShortcut` modifiers on Generate and Test Mode buttons work on iOS 15+ with hardware keyboards (iPad/iPhone with keyboard attached) — keep them
+- A significant proportion of iPad users (especially iPad Pro/Air) use a hardware keyboard. Do not remove keyboard shortcuts or the underline hotkey indicators on button labels when porting to iPad — they are useful and expected by that audience
 
 ### TrackRowView.swift
 - Add sizeClass environment variable
@@ -393,7 +394,19 @@ This phase is a separate design and implementation project. `horizontalSizeClass
 
 ---
 
-## Part 13: Monetization Options
+## Part 13: Shared Code Strategy — Keeping Mac and iPad in Sync
+
+All musical logic (generators, rules, models, playback engine, exporters) should be extracted into a local **Swift Package** (`ZudioCore`) that both the Mac and iPad app targets depend on. This means any improvement to a musical rule, generator, or model is made once and automatically applies to both platforms.
+
+**What goes in ZudioCore:** everything under `Generation/`, `Models/`, `Playback/`, and `Assets/` — the entire non-UI layer.
+
+**What stays platform-specific:** all UI views, `NSApp`/`AppKit` code on Mac, and `UIKit`/share sheet code on iPad.
+
+This refactor should be done at the start of the iPad port, not before. It is mechanical work (moving files, fixing imports) — the musical logic itself does not change. Once in place, the workflow is: edit a generator in ZudioCore, both apps update on next build.
+
+---
+
+## Part 14: Monetization Options
 
 Two viable models for the iOS/iPadOS release at a price point under $5.
 
@@ -411,7 +424,7 @@ Two viable models for the iOS/iPadOS release at a price point under $5.
 
 ---
 
-## Part 14: Verification
+## Part 15: Verification
 
 1. `xcodebuild -scheme Zudio -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)' build` — must build without errors
 2. App launches on iPhone SE simulator — no crashes

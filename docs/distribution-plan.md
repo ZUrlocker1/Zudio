@@ -48,3 +48,9 @@ update notifications, you get crash reports, and the install experience is polis
 
 The $99/year also covers notarization for frictionless direct distribution and is required for any
 future App Store release.
+
+---
+
+## Current release approach (Apple Developer account active)
+
+Releases are built as a **universal binary** (arm64 + x86_64), so the same app runs natively on both Apple Silicon and Intel Macs. As of 2025/2026 roughly 35-40% of Macs in active use are still Intel — a large enough share to be worth supporting, especially among creative/professional users who tend to keep hardware longer. A universal binary adds negligible size overhead and requires no separate build or download. The app is signed with a Developer ID certificate, notarized by Apple, and distributed as a `.dmg` file. Users can open it without any Gatekeeper prompts.
