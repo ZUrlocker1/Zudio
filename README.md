@@ -15,9 +15,16 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.93a/Zudio-0.93a.dmg)
 
-Current release: `0.93a (alpha)`. This build is unsigned, so macOS Gatekeeper will likely show warnings the first time you open it.
+Current release: `0.93a (alpha)`. This build is unsigned, so macOS Gatekeeper will show warnings the first time you open it. Follow these steps: 
 
-To run it anyway, download the DMG, install the app, then right-click the app in Finder and choose `Open`. macOS will show a warning dialog, but that path lets you bypass the initial block and launch the app.
+- Download the DMG disk image file and and open it
+- Click on the Zudio app
+- Go to System Settings > Privacy & Security 
+- Scroll to the Security section at the bottom
+- Click Open Anyway next to the blocked app name
+- Confirm your choice and enter your password 
+
+Once you've done this, the app will open normally in the future. 
 
 ---
 
