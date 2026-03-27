@@ -212,8 +212,13 @@ final class PlaybackEngine: ObservableObject {
                 offMap[ev.stepIndex + ev.durationSteps, default: []].append((trackIndex, ev.note))
             }
         }
-        stepEventMap = map
-        noteOffMap   = offMap
+        // Sync to stepTimerQueue so the assignment can't race with an in-flight onStep read.
+        // The timer fires on stepTimerQueue (serial), so this sync waits for any running
+        // tick to finish before writing, and blocks the timer until both writes are done.
+        stepTimerQueue.sync {
+            stepEventMap = map
+            noteOffMap   = offMap
+        }
     }
 
     func play() {

@@ -101,7 +101,7 @@ struct TopBarView: View {
                                 .background(Color.orange)
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        Text("V 0.93 alpha")
+                        Text("V 0.94 alpha")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -214,6 +214,10 @@ struct TopBarView: View {
 
                 Divider()
 
+                // Flex gap between transport and action buttons — expands up to 48pt on wide displays,
+                // collapses to 0 on compact windows so the small-screen layout is unchanged.
+                Spacer(minLength: 0).frame(maxWidth: 48)
+
                 // Generate / Save MIDI / Export Audio stacked left; selectors + Reset right.
                 HStack(alignment: .center, spacing: 14) {
 
@@ -264,7 +268,7 @@ struct TopBarView: View {
                         .help("Export song to M4A audio file in ~/Downloads/ (⌘E)")
                     }
 
-                    // Right block: [style picker + reset centered] [20pt gap] [mood + key/bpm]
+                    // Right block: [style picker + reset centered] [flex gap] [mood + key/bpm]
                     HStack(alignment: .top, spacing: 20) {
 
                         // Left column: style picker (full width) + reset (centered beneath it)
@@ -275,6 +279,7 @@ struct TopBarView: View {
                                 (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
                             }
                             .pickerStyle(.segmented)
+                            .accentColor(.gray)
                             .frame(width: 210)
 
                             Button(action: { appState.resetTrackDefaults() }) {
@@ -463,7 +468,7 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.93 (alpha)").font(.system(size: 14))
+                Text("Version: 0.94 (alpha)").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk, Neu!, Deluxe, Harmonia, Tangerine Dream, Electric Buddha Band, Loscil, Craven Faults and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments as well as arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass and Dinger beat. There are basic audio effects per track for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))

@@ -515,12 +515,17 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 
 - LD1-001 — Neu! motif first: 4-bar phrase seeds cycling with slow mutation; chord tones 80%,
   tensions 20%.
-- LD1-002 — Pentatonic Cell: short driving cell from pentatonic scale, locked 16 bars then
-  one-interval mutation.
+- LD1-002 — Pentatonic Cell: short driving cell from pentatonic scale. Pitch mutates every 4 bars
+  (occasionally two intervals shift at once); rhythm grid (step positions and durations) refreshes
+  independently every 8 bars; 15% rest-bar chance for breathing room. Previously the cell was locked
+  for 16 bars with only one-interval mutation — causing monotonous repetition across whole songs.
 - LD1-003 — Long Breath: sparse, long sustained notes with generous rests.
 - LD1-004 — Stepwise Sequence: descending sequence development (5→4→2→1 bar A, b7→5→4→2 bar B).
 - LD1-005 — Statement-Answer: bar A ascends 1→2→b3→5; bar B silent then answers 4→b3. From
   Hallogallo analysis.
+- LD1-006 — Long Arc Solo: one held note per bar, stepping through the mode scale ascending then
+  reversing direction at register boundaries. Variable duration (short/normal/held) and 15% rest-bar
+  chance add rhythmic variety. Suppressed in intro/outro.
 
 ### Lead 2
 
@@ -542,10 +547,15 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 
 - LD2-001 — Counter-response: density ≤55% of Lead 1, avoids Lead 1 steps.
 - LD2-002 — Sustained Drone: very sparse, long holds on root or 5th.
-- LD2-003 — Rhythmic Counter: short bursts offset from Lead 1 rhythm.
+- LD2-003 — Rhythmic Counter: short off-beat bursts avoiding Lead 1 step positions. Density
+  corrected to scale properly with section intensity (previously a double * 0.5 penalty kept it at
+  ~1 note/bar regardless of intensity); slight velocity variation added.
 - LD2-004 — Neu! counter melody: 16th-note pairs at steps 0, 2, 4, 6, 10, 12, 14, 15. From
   guitar 2 analysis.
-- LD2-005 — Descending Line: off-beat 2-bar arc 6→5→b3→2 with velocity diminuendo.
+- LD2-005 — Descending Line: off-beat 2-bar arc 6→5→b3→2 with velocity diminuendo. Now cycles
+  through 4 distinct descent positions every 8 bars (5th/4th, 4th/♭3, ♭3/2, and back) so the line
+  travels across the register rather than repeating the same two pitches for the whole song; 20%
+  rest-bar chance. Previously a bug caused only the same 2 pitches to alternate endlessly.
 - LD2-006 — Neu! harmony: interval-shadow counterline following Lead 1 contour at consonant
   interval.
 

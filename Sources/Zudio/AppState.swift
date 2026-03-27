@@ -82,25 +82,29 @@ final class AppState: ObservableObject {
         testCycleIndex = 0
     }
 
-    // Kosmic/Motorik 12-slot cycle: high bridge frequency (90%) to exercise all archetypes,
-    // plus dedicated slots for the fixed bass/rhythm rules.
-    // Slots 0–8: bridge forced with varied archetypes  [Kosmic]
-    // Slot 9:    free (no forced bridge)               [Kosmic]
-    // Slot 10:   KOS-BASS-012* forced                  [Kosmic]
-    // Slot 11:   KOS-RTHM-002* forced                  [Kosmic]
+    // Kosmic/Motorik 10-slot cycle: 90% of slots target currently new/modified rules.
+    // Motorik lead rules (MOT-LD1-*) are silently ignored when style=Kosmic, and vice versa.
+    // Slot 0: MOT-LD1-001* lead                    [Motorik — directional contour]
+    // Slot 1: MOT-LD1-006* lead                    [Motorik — long arc solo]
+    // Slot 2: KOS-LEAD-006* lead                   [Kosmic  — JMJ phrase loop]
+    // Slot 3: KOS-LEAD-007* lead                   [Kosmic  — TD skip sequence]
+    // Slot 4: KOS-LEAD-004* lead                   [Kosmic  — echo melody]
+    // Slot 5: KOS-BASS-012* bass                   [Kosmic  — McCartney PBW]
+    // Slot 6: MOT-LD1-001* lead (repeat)           [Motorik]
+    // Slot 7: KOS-LEAD-006* lead + KOS-BASS-012*   [Kosmic combo]
+    // Slot 8: MOT-LD1-006* lead (repeat)           [Motorik]
+    // Slot 9: fully free                           [sanity / comparison baseline]
     private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drum"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "melody"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drum"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "melody"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "drumAlt"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: "melody"),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: true,  forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,             forceBassRuleID: "KOS-BASS-012", forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: "KOS-RTHM-002",  forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-001", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-004", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-012", forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-001", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-012", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
     ]
 
     // Ambient 12-slot cycle: exercises all lead rules, bass rules, and rhythm rules.
@@ -754,6 +758,7 @@ final class AppState: ObservableObject {
         var globalSeed: UInt64? = nil
         var style: MusicStyle = .kosmic
         var trackOverrides: [Int: UInt64] = [:]
+        var forcedRules: [String: String] = [:]
         var songTitle: String = ""
         var zudioVersion: String = "0.91a"   // inferred for logs that pre-date version field
 
@@ -766,7 +771,7 @@ final class AppState: ObservableObject {
             } else if trimmed.hasPrefix("Seed:") {
                 globalSeed = UInt64(trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces))
             } else if trimmed.hasPrefix("Style:") {
-                let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces).lowercased()
+                let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
                 style = MusicStyle(rawValue: val) ?? .kosmic
             } else if trimmed.hasPrefix("Track Overrides:") {
                 let val = trimmed.dropFirst(16).trimmingCharacters(in: .whitespaces)
@@ -774,6 +779,14 @@ final class AppState: ObservableObject {
                     let parts = pair.trimmingCharacters(in: .whitespaces).components(separatedBy: "=")
                     if parts.count == 2, let idx = Int(parts[0]), let s = UInt64(parts[1]) {
                         trackOverrides[idx] = s
+                    }
+                }
+            } else if trimmed.hasPrefix("Forced Rules:") {
+                let val = trimmed.dropFirst(13).trimmingCharacters(in: .whitespaces)
+                for pair in val.components(separatedBy: "  ") {
+                    let parts = pair.trimmingCharacters(in: .whitespaces).components(separatedBy: "=")
+                    if parts.count == 2 {
+                        forcedRules[parts[0]] = parts[1]
                     }
                 }
             }
@@ -785,12 +798,22 @@ final class AppState: ObservableObject {
         }
 
         isGenerating = true
-        let overrides = trackOverrides
-        let loadTitle   = songTitle
-        let loadVersion = zudioVersion
+        let overrides     = trackOverrides
+        let loadForced    = forcedRules
+        let loadTitle     = songTitle
+        let loadVersion   = zudioVersion
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            var state = SongGenerator.generate(seed: seed, style: style)
+            var state = SongGenerator.generate(
+                seed:             seed,
+                style:            style,
+                forceBassRuleID:  loadForced["Bass"],
+                forceDrumRuleID:  loadForced["Drums"],
+                forceArpRuleID:   loadForced["Rhythm"],
+                forcePadsRuleID:  loadForced["Pads"],
+                forceLeadRuleID:  loadForced["Lead"],
+                forceTexRuleID:   loadForced["Tex"]
+            )
             for trackIdx in overrides.keys.sorted() {
                 state = SongGenerator.regenerateTrack(trackIdx, songState: state, overrideSeed: overrides[trackIdx])
             }

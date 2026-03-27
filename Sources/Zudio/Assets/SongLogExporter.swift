@@ -28,7 +28,7 @@ struct SongLogExporter {
             "=== Zudio Song Analysis Log ===",
             col("Title:",          16) + song.title,
             col("Generated:",      16) + dateStr,
-            col("Zudio Version:",  16) + "0.93",
+            col("Zudio Version:",  16) + "0.94",
             col("Seed:",           16) + "\(song.globalSeed)",
             col("Style:",          16) + song.style.rawValue.capitalized,
         ]
@@ -36,6 +36,11 @@ struct SongLogExporter {
             let overridesStr = song.trackOverrides.sorted { $0.key < $1.key }
                 .map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
             lines.append(col("Track Overrides:", 16) + overridesStr)
+        }
+        if !song.forcedRules.isEmpty {
+            let forcedStr = song.forcedRules.sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
+            lines.append(col("Forced Rules:", 16) + forcedStr)
         }
         lines += [
             col("Key:",       16) + "\(song.frame.key)  \(song.frame.mode.rawValue)",

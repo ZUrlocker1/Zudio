@@ -1,11 +1,13 @@
 // KosmicLeadGenerator.swift — Kosmic lead melody generation
-// Implements KOS-LEAD-001 through KOS-LEAD-006
-// KOS-LEAD-006  JMJ Phrase Loop: 4–6 note melodic phrase generated once per body section,
+// Implements KOS-LEAD-001 through KOS-LEAD-007
+// KOS-LEAD-006  JMJ Phrase Loop: 4–6 note melodic phrase built with arch contour (peaks at ~65%),
 //              repeated identically for 4 bars, then one note shifts a scale step on bar 5,
-//              another shifts on bar 7. JMJ keyboard-solo-over-sequencer feel.
+//              another shifts on bar 7. Final phrase note lands on a chord tone. JMJ feel.
+// KOS-LEAD-007  TD Skip Sequence: Tangerine Dream ascending 6–8 note scale run per bar,
+//              1–2 ghost notes (very soft) give the characteristic skip-drop texture.
 // Lead 1 register: MIDI 60–96 (celestial, higher than arpeggio's 55–72)
 // Lead 2 register: MIDI 55–80 (lower/darker than Lead 1; counter-melody role)
-// Lead 2 rule pool: KOS-LEAD-001 through 005 only — KOS-LEAD-006 is Lead 1 exclusive
+// Lead 2 rule pool: KOS-LEAD-001 through 005 only — KOS-LEAD-006/007 are Lead 1 exclusive
 // Velocity: 45–72 (softer than Motorik — kosmic is never aggressive)
 
 import Foundation
@@ -222,9 +224,9 @@ struct KosmicLeadGenerator {
     // MARK: - Rule selection
 
     private static func pickLeadRule(rng: inout SeededRNG) -> String {
-        // Lead 1 is the primary melody — strongly favour JMJ Phrase Loop (006) for identifiable phrases
-        let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006"]
-        let weights: [Double] = [0.12,           0.08,           0.15,           0.20,           0.05,           0.40]
+        // Lead 1 is the primary melody — favour JMJ Phrase Loop (006); TD Skip (007) adds variety
+        let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007"]
+        let weights: [Double] = [0.12,           0.08,           0.13,           0.18,           0.05,           0.34,           0.10]
         return rules[rng.weightedPick(weights)]
     }
 
@@ -245,7 +247,7 @@ struct KosmicLeadGenerator {
 
     /// Pick a lead rule that is different from `current`. Used by Technique D and bridge melody.
     private static func pickLeadRuleDifferentFrom(_ current: String, rng: inout SeededRNG) -> String {
-        let allRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006"]
+        let allRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007"]
         let candidates = allRules.filter { $0 != current }
         guard !candidates.isEmpty else { return current }
         return candidates[rng.nextInt(upperBound: candidates.count)]
@@ -440,6 +442,7 @@ struct KosmicLeadGenerator {
         case "KOS-LEAD-003": return pentatonicDriftBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, entry: entry, rng: &rng)
         case "KOS-LEAD-004": return echoMelodyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         case "KOS-LEAD-005": return arpeggioHighlightBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, entry: entry, frame: frame, rng: &rng)
+        case "KOS-LEAD-007": return tdSkipSequenceBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         default:           return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         }
     }
@@ -539,8 +542,10 @@ struct KosmicLeadGenerator {
         if cycle < 6 {
             let baseIdx = cycle - 4
             let baseNote = scaleNotes[Swift.min(baseIdx, scaleNotes.count - 1)]
-            // Transpose up or down by approximately a 3rd
-            let transposedNote = Swift.max(60, Swift.min(96, baseNote + (rng.nextDouble() < 0.5 ? 4 : -3)))
+            // Transpose by exact diatonic 3rd: shift ±2 scale positions (one 3rd interval in any mode)
+            let origIdx = scaleNotes.firstIndex(of: baseNote) ?? (scaleNotes.count / 2)
+            let shift = rng.nextDouble() < 0.5 ? 2 : -2
+            let transposedNote = scaleNotes[Swift.max(0, Swift.min(scaleNotes.count - 1, origIdx + shift))]
             let vel = UInt8(45 + rng.nextInt(upperBound: 18))
             return [MIDIEvent(stepIndex: barStart, note: UInt8(transposedNote), velocity: vel, durationSteps: 14)]
         }
@@ -564,6 +569,45 @@ struct KosmicLeadGenerator {
         let vel     = UInt8(52 + rng.nextInt(upperBound: 20))  // 52–71
 
         return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 14)]
+    }
+
+    // MARK: - KOS-LEAD-007: TD Skip Sequence
+    // Tangerine Dream ascending scale run: 6–8 evenly spaced notes climbing through the scale.
+    // 1–2 ghost notes (very soft, very short) create the characteristic "skip" drop — a note
+    // that drops out of the ascending line, leaving a gap before the run continues above it.
+    // Pattern advances one scale step every 2 bars for gradual harmonic drift.
+    // Occasional rest bars (25%) let the sequence breathe between phrases.
+
+    private static func tdSkipSequenceBar(
+        barStart: Int, bar: Int, scaleNotes: [Int], rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        guard scaleNotes.count >= 4 else { return [] }
+        guard rng.nextDouble() > 0.25 else { return [] }   // 25% rest bar
+
+        let seqLen      = 6 + rng.nextInt(upperBound: 3)   // 6–8 notes
+        let stepSpacing = max(1, 16 / seqLen)               // even distribution across bar
+
+        // Advance start position every 2 bars — sequence slowly climbs the scale
+        let startIdx = (bar / 2) % max(1, scaleNotes.count)
+
+        // Pick 1–2 ghost positions: very soft (vel 20–33), duration = 1 step
+        let ghost1 = rng.nextInt(upperBound: seqLen)
+        let ghost2 = (ghost1 + 2 + rng.nextInt(upperBound: max(1, seqLen - 3))) % seqLen
+        let twoGhosts = rng.nextDouble() < 0.40
+
+        var events: [MIDIEvent] = []
+        for i in 0..<seqLen {
+            let step = i * stepSpacing
+            guard step < 16 else { break }
+            let noteIdx = (startIdx + i) % scaleNotes.count
+            let isGhost = i == ghost1 || (twoGhosts && i == ghost2)
+            let vel = UInt8(isGhost ? 20 + rng.nextInt(upperBound: 14) : 50 + rng.nextInt(upperBound: 18))
+            let dur = isGhost ? 1 : 3
+            events.append(MIDIEvent(stepIndex: barStart + step,
+                                    note: UInt8(scaleNotes[noteIdx]),
+                                    velocity: vel, durationSteps: dur))
+        }
+        return events
     }
 
     // MARK: - KOS-LEAD-006: JMJ Phrase Loop
@@ -646,19 +690,42 @@ struct KosmicLeadGenerator {
             let scaleNotes = jmjPhraseScaleNotes(entry: firstEntry, frame: frame)
             guard scaleNotes.count >= 4 else { continue }
 
-            // Build the phrase once per section: 4–6 notes with quarter/8th-note durations
-            let phraseLen = 4 + rng.nextInt(upperBound: 3)
+            // Build the phrase once per section: 4–6 notes with quarter/8th-note durations.
+            // Arch shape: rises to peak at ~65% through the phrase (slightly later than bridge's 60%),
+            // giving a sense of reach before settling. Final note snapped to a chord tone.
+            let phraseLen  = 4 + rng.nextInt(upperBound: 3)
             var phraseNotes: [Int] = []
             var phraseDurs:  [Int] = []
             var stepAccum = 0
-            for _ in 0..<phraseLen {
+            let archPeak   = max(1, phraseLen * 2 / 3)
+            let archAscend = rng.nextDouble() < 0.55
+            let snLow  = max(0, scaleNotes.count / 5)
+            let snHigh = min(scaleNotes.count - 1, scaleNotes.count * 4 / 5)
+            let snSpan = max(1, snHigh - snLow)
+            let chordTonePCs = Set(firstEntry.chordWindow.chordTones.map { $0 % 12 })
+            for i in 0..<phraseLen {
                 guard stepAccum < 16 else { break }
-                phraseNotes.append(scaleNotes[rng.nextInt(upperBound: scaleNotes.count)])
+                let archFrac: Double = i < archPeak
+                    ? Double(i) / Double(archPeak)
+                    : Double(phraseLen - i) / Double(max(1, phraseLen - archPeak))
+                let base = archAscend
+                    ? snLow  + Int(Double(snSpan) * archFrac)
+                    : snHigh - Int(Double(snSpan) * archFrac)
+                let jitter = rng.nextInt(upperBound: 3) - 1  // ±1 step for natural variation
+                let noteIdx = max(0, min(scaleNotes.count - 1, base + jitter))
+                phraseNotes.append(scaleNotes[noteIdx])
                 let dur = 4 + rng.nextInt(upperBound: 5)  // 4–8 steps (1–2 beats)
                 phraseDurs.append(dur)
                 stepAccum += dur
             }
             guard !phraseNotes.isEmpty else { continue }
+            // Stable landing: snap last phrase note to nearest chord tone in the scale
+            let chordScaleNotes = scaleNotes.filter { chordTonePCs.contains($0 % 12) }
+            if !chordScaleNotes.isEmpty {
+                let lastNote = phraseNotes[phraseNotes.count - 1]
+                let nearest = chordScaleNotes.min(by: { abs($0 - lastNote) < abs($1 - lastNote) }) ?? chordScaleNotes[0]
+                phraseNotes[phraseNotes.count - 1] = nearest
+            }
 
             // Which note index shifts and in which direction for each variation
             let var1Idx   = rng.nextInt(upperBound: phraseNotes.count)

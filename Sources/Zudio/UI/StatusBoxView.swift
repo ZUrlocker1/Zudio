@@ -80,7 +80,7 @@ struct StatusBoxView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollIndicators(.visible)
-                .frame(minHeight: 60, idealHeight: 200, maxHeight: 280)
+                .frame(minHeight: 60)   // no maxHeight — expands to fill remaining window space on large displays
                 .background(Color(white: 0.10))
                 .onAppear { builtText = buildLogText() }
                 .onChange(of: appState.statusLogVersion) { _ in

@@ -354,7 +354,7 @@ Lead melody in Kosmic is sparse and long-note-oriented. Not absent, but not rhyt
 
 **KOS-LD-003: Pentatonic Drift** — slow movement through pentatonic scale (5 notes only), each step 2–4 bars. The pentatonic constraint prevents dissonance. Sounds like a Japanese koto or Mellotron flute.
 
-**KOS-LD-004: Echo Melody** — a 4-note phrase (2 bars), followed by 2-bar silence, then the same phrase transposed up or down by a 3rd (question/answer). Repeats for the section. The classic Vangelis structural device.
+**KOS-LD-004: Echo Melody** — a 4-note phrase (2 bars), followed by 2-bar silence, then the same phrase transposed up or down by a diatonic 3rd snapped to the active mode (question/answer). Repeats for the section. The classic Vangelis structural device. (Transposition was previously a fixed chromatic interval causing out-of-key notes; fixed to mode-aware diatonic 3rd.)
 
 **KOS-LD-005: Arpeggio Highlight** — picks one note from the underlying arpeggio pattern and holds it for a full bar. Changes which note it highlights every 4 bars. Ties melody to arpeggio without duplicating it.
 
@@ -1142,8 +1142,13 @@ creating the "instrument arriving" effect heard in Dark Sun and Mister Mosca.
 In melody bridges (Archetype B): bridge lead picks rule not used in A or B; plays upper register
 (MIDI 72–84); generated phrase repeats once to fill the bridge duration.
 
+- KOS-LEAD-004 — Echo Melody: 4-note phrase (2 bars), 2-bar silence, then phrase repeated transposed
+  by a diatonic 3rd (question/answer). Transposition is snapped to the active mode scale so it stays
+  consonant. Classic Vangelis structural device.
 - KOS-LEAD-006 — JMJ evolving phrase loop: 4–6 note melodic phrase generated once per body section
-  and looped throughout; phrase mutates slightly at section boundaries (Jean-Michel Jarre style)
+  and looped throughout; phrase mutates slightly at section boundaries (Jean-Michel Jarre style).
+- KOS-LEAD-007 — TD Skip Sequence: ascending skip pattern through chord tones with rhythmic
+  displacement per bar, inspired by Tangerine Dream sequencer-melody hybrids.
 
 ---
 

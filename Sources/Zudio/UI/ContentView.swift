@@ -98,7 +98,8 @@ struct ContentView: View {
                             isPinching = true
                         }
                         let total = appState.songState?.frame.totalBars ?? 64
-                        let raw = Int((Double(pinchAnchorBars) / scale).rounded())
+                        let divided = scale > 0 ? Double(pinchAnchorBars) / scale : Double(total)
+                        let raw = divided.isFinite ? Int(divided.rounded()) : total
                         let clamped = max(4, min(total, raw))
                         appState.visibleBars = clamped
                         // Keep offset in bounds as window shrinks or grows

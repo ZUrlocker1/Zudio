@@ -1,10 +1,11 @@
 // LeadGenerator.swift — generation step 7
-// LD1-001: Phrase-first — v2 starter phrases (4 bars, 8 phrases), cycling with slow mutation
+// LD1-001: Phrase-first — v2 starter phrases (4 bars, 8 phrases), cycling with directional mutation
 // LD1-002: Pentatonic Cell — short driving cell, locked 16 bars then one-interval mutation
 // LD1-003: Long Breath — sparse, long sustained notes with lots of rests
 // LD1-004: Stepwise Sequence — descending 5→4→2→1 (bar A), shifted b7→5→4→2 (bar B)
 // LD1-005: Statement-Answer — bar A ascends 1→2→b3→5, bar B silent then answers 4→b3
-// LD2-001: Counter-response — density ≤55% of Lead 1, avoids Lead 1 steps
+// LD1-006: Long Arc Solo — single note per bar, ascending or descending through register across section
+// LD2-001: Counter-response — density ≤55% of Lead 1, attacks offset by half-beat for call-and-response
 // LD2-002: Sustained Drone — very sparse, long holds on root or 5th
 // LD2-003: Rhythmic Counter — short bursts offset from Lead 1 rhythm
 // LD2-004: Hallogallo Motif Counter — 16th-note pairs at steps 0,2,4,6,10,12,14,15
@@ -89,12 +90,15 @@ struct LeadGenerator {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceLeadRuleID: String? = nil
     ) -> [MIDIEvent] {
 
-        // A: Per-section rule — always consume two draws for RNG determinism across songs
-        let aRule          = pickLd1Rule(rng: &rng)
+        // A: Per-section rule — always consume two draws for RNG determinism across songs.
+        // forceLeadRuleID is honoured only for known Motorik-lead IDs; cross-style IDs are ignored.
+        let pickedA        = pickLd1Rule(rng: &rng)
         let bRuleCandidate = pickLd1Rule(rng: &rng)
+        let aRule: String  = forceLeadRuleID.flatMap { $0.hasPrefix("MOT-LD1-") ? $0 : nil } ?? pickedA
         // Technique D: LD1-003 Long Breath is too passive for B sections; escalate to an active rule.
         let bRule: String
         if aRule == "MOT-LD1-003" {
@@ -114,15 +118,35 @@ struct LeadGenerator {
         var nextPhraseBar = entryBar + 16   // mutate once per 4-cycle (16 bars)
 
         // B: Motif lock state for LD1-002 pentatonic cell
-        var motifIntervals:  [Int] = []
-        var motifSteps:      [Int] = []
-        var motifDurs:       [Int] = []
-        var motifVels:       [Int] = []
-        var motifBuilt            = false
-        var motifMutationBar      = entryBar + 16
+        var motifIntervals:       [Int] = []
+        var motifSteps:           [Int] = []
+        var motifDurs:            [Int] = []
+        var motifVels:            [Int] = []
+        var motifBuilt                 = false
+        var motifMutationBar           = entryBar + 4    // pitch shifts every 4 bars
+        var motifRhythmMutationBar     = entryBar + 8    // rhythm grid refreshes every 8 bars
 
         // D: Previous note for octave-smooth voice leading across bars
         var prevNote: UInt8? = nil
+
+        // F: Long-arc solo state for LD1-006 — ascending or descending through the mode scale
+        var arcAscending = rng.nextDouble() < 0.5   // var so arc can reverse at boundaries
+        let arcScale: [Int] = {
+            let keyST  = keySemitone(frame.key)
+            let bounds = kRegisterBounds[kTrackLead1]!
+            var notes: [Int] = []
+            for oct in 0...7 {
+                for interval in frame.mode.intervals {
+                    let midi = keyST + interval + (oct * 12)
+                    if midi >= bounds.low && midi <= bounds.high { notes.append(midi) }
+                }
+            }
+            return notes.sorted()
+        }()
+        var arcScaleIdx = arcAscending ? 0 : max(0, arcScale.count - 1)
+
+        // G: Sparse-phrase gate for LD1-001 — 35% of 4-bar cycles thin to ~45% note density
+        var phraseSparseCycle = false
 
         var events: [MIDIEvent] = []
 
@@ -161,9 +185,17 @@ struct LeadGenerator {
                     let phraseStepBase = cycleBar * 16
                     let bounds        = kRegisterBounds[kTrackLead1]!
                     let keyRoot       = 60 + keySemitone(frame.key)
+                    // G: Decide sparse mode at the start of each 4-bar cycle (35% chance).
+                    // Sparse mode thins the phrase to ~45% of notes, giving 4–6 from a 10–13 note phrase.
+                    if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.35 }
+                    let gateProb: Double = phraseSparseCycle ? 0.45 : 1.0
                     for evt in currentPhrase where evt.step >= phraseStepBase && evt.step < phraseStepBase + 16 {
+                        guard rng.nextDouble() < gateProb else { continue }   // G: sparse gate
                         let localStep = evt.step - phraseStepBase
-                        let rawMIDI   = bounds.clamp(keyRoot + evt.deg + evt.oct * 12)
+                        // Mode-snap deg to current mode's nearest interval — fixes out-of-scale notes
+                        // when the same phrase is replayed in a different mode (e.g. deg:9 in Aeolian).
+                        let modeDeg = frame.mode.nearestInterval((evt.deg % 12 + 12) % 12)
+                        let rawMIDI   = bounds.clamp(keyRoot + modeDeg + evt.oct * 12)
                         let velAdj: Int
                         switch intensity { case .low: velAdj = -15; case .medium: velAdj = -5; case .high: velAdj = 5 }
                         let vel = UInt8(max(50, min(110, evt.vel + velAdj)))
@@ -173,7 +205,7 @@ struct LeadGenerator {
                     // Legato fill: extend each note toward the next attack so phrases breathe
                     // rather than chopping at the raw dur:2 (8th note) stored in the JSON data.
                     barEvents.sort { $0.stepIndex < $1.stepIndex }
-                    for i in 0..<(barEvents.count - 1) {
+                    for i in 0 ..< Swift.max(0, barEvents.count - 1) {
                         let gap    = barEvents[i + 1].stepIndex - barEvents[i].stepIndex
                         let newDur = max(barEvents[i].durationSteps, min(gap - 1, 12))
                         barEvents[i] = MIDIEvent(stepIndex: barEvents[i].stepIndex,
@@ -194,20 +226,40 @@ struct LeadGenerator {
 
             case "MOT-LD1-002":
                 if !isIntroOutro {
-                    // B: Build motif on first body bar; lock and mutate every 16 bars
+                    // B: Build motif on first body bar; pitch mutates every 4 bars, rhythm every 8.
                     if !motifBuilt {
                         (motifIntervals, motifSteps, motifDurs, motifVels) =
                             buildPentatonicCell(frame: frame, rng: &rng)
                         motifBuilt = true
                     }
+                    // Pitch mutation: shift one interval (30% chance: two intervals) every 4 bars
                     if bar >= motifMutationBar {
                         motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
-                        motifMutationBar += 8
+                        if rng.nextDouble() < 0.30 {
+                            motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
+                        }
+                        motifMutationBar += 4
                     }
-                    barEvents = replayPentatonicCell(
-                        intervals: motifIntervals, steps: motifSteps, durs: motifDurs, vels: motifVels,
-                        barStart: barStart, entry: entry, frame: frame,
-                        intensity: intensity, prevNote: prevNote)
+                    // Rhythm mutation: rebuild step grid every 8 bars; keeps pitch, refreshes rhythm.
+                    // Resize motifIntervals to match the new step count (cycling existing pitches)
+                    // so replayPentatonicCell never indexes out of bounds.
+                    if bar >= motifRhythmMutationBar {
+                        let (_, newSteps, newDurs, newVels) = buildPentatonicCell(frame: frame, rng: &rng)
+                        if !motifIntervals.isEmpty {
+                            motifIntervals = (0..<newSteps.count).map { motifIntervals[$0 % motifIntervals.count] }
+                        }
+                        motifSteps = newSteps
+                        motifDurs  = newDurs
+                        motifVels  = newVels
+                        motifRhythmMutationBar += 8
+                    }
+                    // 15% rest bar — breathing room between repetitions
+                    if rng.nextDouble() >= 0.15 {
+                        barEvents = replayPentatonicCell(
+                            intervals: motifIntervals, steps: motifSteps, durs: motifDurs, vels: motifVels,
+                            barStart: barStart, entry: entry, frame: frame,
+                            intensity: intensity, prevNote: prevNote)
+                    }
                 }
 
             case "MOT-LD1-003":
@@ -215,12 +267,63 @@ struct LeadGenerator {
                     intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
 
             case "MOT-LD1-004":
-                barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
-                    intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
+                if !isIntroOutro {
+                    // Phrase gate: 25% of 4-bar cycles are completely silent (Motorik breathing room).
+                    // Bar gate: 15% of individual bars in active phrases are also silent.
+                    let cycleBar = (bar - entryBar) % 4
+                    if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.25 }
+                    if !phraseSparseCycle && rng.nextDouble() >= 0.15 {
+                        barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                            intensity: intensity, isIntroOutro: false, prevNote: prevNote, rng: &rng)
+                    }
+                } else {
+                    barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
+                }
 
             case "MOT-LD1-005":
-                barEvents = lead1StatementAnswer(barStart: barStart, bar: bar, entry: entry, frame: frame,
-                    intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
+                if !isIntroOutro {
+                    let cycleBar = (bar - entryBar) % 4
+                    if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.25 }
+                    if !phraseSparseCycle && rng.nextDouble() >= 0.15 {
+                        barEvents = lead1StatementAnswer(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                            intensity: intensity, isIntroOutro: false, prevNote: prevNote, rng: &rng)
+                    }
+                } else {
+                    barEvents = lead1StatementAnswer(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
+                }
+
+            case "MOT-LD1-006":
+                // F: One held note per bar, stepping through mode scale.
+                // Reverses direction at register boundaries so it doesn't clamp on one note.
+                // Variable duration and occasional rests add rhythmic variety.
+                if !isIntroOutro && !arcScale.isEmpty {
+                    // 15% chance of a rest bar — creates breathing space in the arc
+                    if rng.nextDouble() > 0.15 {
+                        let note = UInt8(arcScale[max(0, min(arcScale.count - 1, arcScaleIdx))])
+                        let vel  = velocityForIntensity(intensity, rng: &rng)
+                        // Variable duration: short (8), normal (12), or held (16 steps)
+                        let durRoll = rng.nextDouble()
+                        let dur = durRoll < 0.20 ? 8 : durRoll < 0.35 ? 16 : 12
+                        barEvents = [MIDIEvent(stepIndex: barStart, note: note, velocity: vel, durationSteps: dur)]
+                    }
+                    // Advance arc 1–2 scale steps; reverse direction at register boundaries
+                    let step = 1 + rng.nextInt(upperBound: 2)
+                    if arcAscending {
+                        arcScaleIdx += step
+                        if arcScaleIdx >= arcScale.count - 1 {
+                            arcScaleIdx = arcScale.count - 1
+                            arcAscending = false   // reverse at top
+                        }
+                    } else {
+                        arcScaleIdx -= step
+                        if arcScaleIdx <= 0 {
+                            arcScaleIdx = 0
+                            arcAscending = true    // reverse at bottom
+                        }
+                    }
+                }
 
             default:
                 barEvents = lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
@@ -427,7 +530,9 @@ struct LeadGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let density = isIntroOutro ? 0.1 : densityForIntensity(intensity) * 0.55
-        for step in [0, 4, 8, 12] {
+        // Steps offset by 2 (half-beat) from Lead 1's beat-aligned attacks — creates
+        // call-and-response feel: Lead 1 speaks on the beat, Lead 2 answers a half-beat later.
+        for step in [2, 6, 10, 14] {
             let conflicts = lead1StepSet.contains(barStart + step)
             guard rng.nextDouble() < density && (!conflicts || rng.nextDouble() < 0.15) else { continue }
             let note = pickNoteHarmonized(entry: entry, frame: frame, trackIndex: kTrackLead2,
@@ -502,9 +607,10 @@ struct LeadGenerator {
         let density = densityForIntensity(intensity) * 0.55
         for step in [2, 4, 6, 8, 10, 12, 14] {
             guard !lead1StepSet.contains(barStart + step) else { continue }
-            guard rng.nextDouble() < density * 0.5 else { continue }
+            guard rng.nextDouble() < density else { continue }
             let note = pickNote(entry: entry, frame: frame, trackIndex: kTrackLead2, rng: &rng)
-            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: 62, durationSteps: 2))
+            let vel = UInt8(58 + rng.nextInt(upperBound: 16))
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 2))
         }
         return events
     }
@@ -546,14 +652,27 @@ struct LeadGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         if isIntroOutro && rng.nextDouble() < 0.60 { return events }
+        guard rng.nextDouble() >= 0.20 else { return events }   // 20% rest bar
         let bounds = kRegisterBounds[kTrackLead2]!
         // LD2-005 uses the song tonic as base for scale degree offsets to stay diatonic.
         let rootPC = keySemitone(frame.key)
 
-        let (off1, off2): (Int, Int) = (bar % 2 == 0)
-            ? (frame.mode.nearestInterval(9), 7)
-            : (frame.mode.nearestInterval(3), 2)
-        let (vel1, vel2): (UInt8, UInt8) = (bar % 2 == 0) ? (70, 72) : (68, 66)
+        // Cycle through 4 descent positions every 8 bars so the line travels across the song
+        // rather than repeating the same 2-bar phrase endlessly.
+        let descPhase = (bar / 8) % 4
+        let evenBar   = bar % 2 == 0
+        let (off1, off2): (Int, Int)
+        switch descPhase {
+        case 1:  (off1, off2) = evenBar ? (7, frame.mode.nearestInterval(5))
+                                        : (2, 0)
+        case 2:  (off1, off2) = evenBar ? (frame.mode.nearestInterval(5), frame.mode.nearestInterval(3))
+                                        : (0, frame.mode.nearestInterval(11))
+        case 3:  (off1, off2) = evenBar ? (frame.mode.nearestInterval(3), 2)
+                                        : (frame.mode.nearestInterval(11), 7)
+        default: (off1, off2) = evenBar ? (frame.mode.nearestInterval(9), 7)
+                                        : (frame.mode.nearestInterval(3), 2)
+        }
+        let (vel1, vel2): (UInt8, UInt8) = evenBar ? (70, 72) : (68, 66)
 
         for (pcOffset, step, vel) in [(off1, 5, vel1), (off2, 13, vel2)] {
             let pc   = (rootPC + pcOffset) % 12
@@ -568,18 +687,27 @@ struct LeadGenerator {
 
     /// Picks a new LD1 rule consuming one RNG draw (called twice in generateLead1 for determinism).
     private static func pickLd1Rule(rng: inout SeededRNG) -> String {
-        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005"]
-        let weights: [Double] = [0.29,      0.20,      0.08,      0.25,      0.18]
+        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006"]
+        let weights: [Double] = [0.26,          0.18,          0.08,          0.22,          0.16,          0.10]
         return rules[rng.weightedPick(weights)]
     }
 
     /// Shifts one random event's degree by one diatonic step (±2 semitones, snapped to mode).
+    /// Applies directional bias: if the phrase already trends upward, bias mutations upward
+    /// (65% chance) and vice versa — reinforces melodic arcs rather than random drift.
     private static func mutatePhraseOnce(_ phrase: Ph, mode: Mode, rng: inout SeededRNG) -> Ph {
         guard !phrase.isEmpty else { return phrase }
         var result = phrase
         let idx    = rng.nextInt(upperBound: result.count)
         let evt    = result[idx]
-        let delta  = rng.nextDouble() < 0.5 ? 2 : -2
+        // Detect phrase trend: compare first-half avg degree vs second-half avg degree
+        let half       = max(1, phrase.count / 2)
+        let firstAvg   = phrase.prefix(half).map(\.deg).reduce(0, +) / half
+        let secondAvg  = phrase.suffix(half).map(\.deg).reduce(0, +) / max(1, phrase.count - half)
+        let trendingUp = secondAvg > firstAvg
+        let delta: Int = trendingUp
+            ? (rng.nextDouble() < 0.65 ? 2 : -2)   // 65% up when phrase already rising
+            : (rng.nextDouble() < 0.65 ? -2 : 2)   // 65% down when phrase already falling
         let newDeg = mode.nearestInterval(((evt.deg + delta) % 12 + 12) % 12)
         result[idx] = PhEvent(step: evt.step, deg: newDeg, oct: evt.oct, dur: evt.dur, vel: evt.vel)
         return result
@@ -632,6 +760,7 @@ struct LeadGenerator {
         switch intensity { case .low: velAdj = -12; case .medium: velAdj = 0; case .high: velAdj = 10 }
         var localPrev = prevNote
         for (i, step) in steps.enumerated() {
+            guard i < intervals.count && i < durs.count && i < vels.count else { break }
             let pc   = (rootPC + intervals[i]) % 12
             let note = nearestMIDI(pc: pc, bounds: bounds, prevNote: localPrev)
             let vel  = UInt8(max(50, min(110, vels[i] + velAdj)))

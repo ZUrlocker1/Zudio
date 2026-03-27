@@ -54,3 +54,13 @@ future App Store release.
 ## Current release approach (Apple Developer account active)
 
 Releases are built as a **universal binary** (arm64 + x86_64), so the same app runs natively on both Apple Silicon and Intel Macs. As of 2025/2026 roughly 35-40% of Macs in active use are still Intel — a large enough share to be worth supporting, especially among creative/professional users who tend to keep hardware longer. A universal binary adds negligible size overhead and requires no separate build or download. The app is signed with a Developer ID certificate, notarized by Apple, and distributed as a `.dmg` file. Users can open it without any Gatekeeper prompts.
+
+---
+
+## iPad/iOS Distribution (future)
+
+- **Testing on simulator**: Xcode includes iPad simulators (Pro, Air, mini, multiple iOS versions) — just change the build target. Good for layout; real device is better for audio.
+- **Testing on a real iPad**: connect via USB, select it as the Xcode target, click Run. Direct install, no App Store or TestFlight needed. First time requires trusting your developer certificate on the iPad under Settings → General → VPN & Device Management.
+- **iPads cannot open DMG files** — that format is macOS only.
+- **Sharing with testers**: use TestFlight (free with Developer account). Testers install the TestFlight app and accept an email invite. Much simpler than any alternative.
+- **Public release**: App Store, requires Apple review (typically 1–2 days for a new app).

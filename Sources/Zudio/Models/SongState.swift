@@ -37,6 +37,10 @@ struct SongState: Sendable {
     /// Ambient-only: true when Brush Kit (program 40) was selected at generation time.
     /// Stored so per-track drum regen can reproduce the same note substitutions.
     let ambientUseBrushKit: Bool
+    /// Force-rule IDs passed to generators at generation time (e.g. best-song path, test mode).
+    /// Keys: "Bass", "Drums", "Rhythm", "Pads", "Lead", "Tex". Written to the log file so that
+    /// Load Song can restore the exact generators used and reproduce the song from the seed.
+    let forcedRules: [String: String]
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
@@ -62,7 +66,8 @@ struct SongState: Sendable {
         ambientProgFamily: AmbientProgressionFamily = .droneSingle,
         ambientLoopLengths: AmbientLoopLengths? = nil,
         ambientXFilesBlockRange: Range<Int>? = nil,
-        ambientUseBrushKit: Bool = false
+        ambientUseBrushKit: Bool = false,
+        forcedRules: [String: String] = [:]
     ) {
         self.frame              = frame
         self.structure          = structure
@@ -79,6 +84,7 @@ struct SongState: Sendable {
         self.ambientLoopLengths      = ambientLoopLengths
         self.ambientXFilesBlockRange = ambientXFilesBlockRange
         self.ambientUseBrushKit      = ambientUseBrushKit
+        self.forcedRules             = forcedRules
         self.generationLog           = generationLog
         self.stepAnnotations    = stepAnnotations
     }
@@ -99,7 +105,7 @@ struct SongState: Sendable {
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
                   ambientXFilesBlockRange: ambientXFilesBlockRange,
-                  ambientUseBrushKit: useBrushKit)
+                  ambientUseBrushKit: useBrushKit, forcedRules: forcedRules)
     }
 
     /// Returns a copy of this state with the frame replaced (used for real-time tempo changes).
@@ -111,7 +117,7 @@ struct SongState: Sendable {
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
                   ambientXFilesBlockRange: ambientXFilesBlockRange,
-                  ambientUseBrushKit: ambientUseBrushKit)
+                  ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -132,7 +138,7 @@ struct SongState: Sendable {
             generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
             ambientXFilesBlockRange: ambientXFilesBlockRange,
-            ambientUseBrushKit: ambientUseBrushKit
+            ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules
         )
     }
 }

@@ -519,12 +519,21 @@ struct BassGenerator {
         var events: [MIDIEvent] = []
         let rootNote    = chordRootNote(entry: entry, frame: frame)
         let fifthNote   = UInt8(clamped(Int(rootNote) + 7, low: 28, high: 52))
+        // Approach note: 2 semitones below root. Only use it when it falls on a scale tone —
+        // the chromatic approach clashes badly in Dorian/Aeolian where -2 from the chord root
+        // often lands outside the mode.
+        let approachPC   = (Int(rootNote) - 2 + 12) % 12
+        let keyST        = keySemitone(frame.key)
+        let scalePCs     = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+        let useApproach  = scalePCs.contains(approachPC)
         let approachNote = UInt8(clamped(Int(rootNote) - 2, low: 28, high: 52))
 
         if bar % 2 == 0 {
-            events.append(MIDIEvent(stepIndex: barStart,      note: rootNote,     velocity: 92, durationSteps: 7))
-            events.append(MIDIEvent(stepIndex: barStart + 10, note: fifthNote,    velocity: 76, durationSteps: 3))
-            events.append(MIDIEvent(stepIndex: barStart + 15, note: approachNote, velocity: 65, durationSteps: 1))
+            events.append(MIDIEvent(stepIndex: barStart,      note: rootNote,  velocity: 92, durationSteps: 7))
+            events.append(MIDIEvent(stepIndex: barStart + 10, note: fifthNote, velocity: 76, durationSteps: useApproach ? 3 : 6))
+            if useApproach {
+                events.append(MIDIEvent(stepIndex: barStart + 15, note: approachNote, velocity: 65, durationSteps: 1))
+            }
         } else {
             events.append(MIDIEvent(stepIndex: barStart,     note: rootNote,  velocity: 92, durationSteps: 3))
             events.append(MIDIEvent(stepIndex: barStart + 5, note: rootNote,  velocity: 78, durationSteps: 2))
