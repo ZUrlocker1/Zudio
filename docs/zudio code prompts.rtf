@@ -1160,7 +1160,6 @@ can you give me  a plan \
 -Is the soft brass lead sound more suited to Kosmic or Motorik?\
 \
 \
-\
 I'd like you to write a 1400-1500 word blog post in the style of Zack Urlocker's Build to Scale substack (this article in particular: https://buildtoscale.substack.com/p/vibe) which describes the approach to a more advanced vibe coding project called Zudio stored here: https://github.com/ZUrlocker1/Zudio there are documents in the docs folder which describe the prototype PRD, comparable products called comps.md, research.md that was used as background research, Cosmic Plan that was used to add Cosmic after the initial Motorik style, Ambient plan for a future update, a musical coherance plan I used to improve the musicality etc. I can also share with you most of the prompts that I used. What I'd like is for the article to explain how to I used claude code to build the comps, research and prototype docs, then generate code, then improve it by adding rules, test them, then add Cosmic mode, MIDI file save, Audio file save, and other features. And give some tips about how to do this and what lessons or conclusions can be drawn. But make it sound like Zack urlockers other build to scale substack article,s not like the usual AI generated snappy ChatGPT style. What do you need to get started? I would like a brief outline before genreating the article.\
 \
 \
@@ -1168,12 +1167,35 @@ I'd like you to write a 1400-1500 word blog post in the style of Zack Urlocker's
 Here's the prompts. Also be sure to look at the Musical Coherence plan in the repo as that identifies quite a few issues it found. There's also a performance optimization section in the prototype document that describes things we did to optimize playback.\
 \
 \
-\
-\
-\
 note also while I could have written the previous video black jack and video poker games described in the build to scale blog post (and in fact had written such programs for DOS and Windows) the Zudio app, a music app for the Mac, was beyond my skills. I had never built a music app before.  I spent several day building the research docs and PRD refining them.  The first version was built using ChatGPT, but then I switched to Claude code and it was much better. More definitive, able to close things out. Whereas ChatGPT felt like it would continue to add unresolved items and more vague details without getting clarity. The first versions of the music were candidly not very musical.  But by getting the bass and drums locked in for Motorik helped.  Then we could add other tracks. \
 Balanced appraoch is fine.  Generate it as a word doc.\
 \
+\
+I'd like to add a new detail to the release process. When we create a DMG, please use the "drag-to-install DMG" approach so when the user opens the DMG they see\
+	\'95	The Zudio.app\
+	\'95	A shortcut (alias) to the Applications folder\
+	\'95	A visual arrow guiding them\
+\
+I'm not yet ready to do this, but when we release v 0.94 that''s what I'd like\
+\
+\
+My friend is running OS 26 and the default color of the style selector is blue. Please change this to grey. \
+\
+On a large screen monitor there is empty space above and below the top and bottom sections. Please fix this.  Space out the top level controls without changing how the look on a normal laptop. \
+\
+I was able to reproduce a crash on a very wide screen 27" 5k resoluition monitor when the user pinches the screen to zoom out to an extreme \
+line 101 of ContentView.swift \
+    let raw = Int((Double(pinchAnchorBars) / scale).rounded())\
+Thread 1: Swift runtime failure: Double value cannot be converted to Int because it is either infinite or NaN\
+This does not crash if the user adjusts the zoom bar slide, only with pinch\
+\
+\
+In Zudio I added Save MIDI file initially and then later realized I could save the status text infromation as a log file for debugging. That was very handy.  Then I realized because the text log file include the Seed number, I could relaod saved songs.  It's just a text file, so its human readable which is a nice convenience and the file size is very small.  \
+In the context of mac applications is that strange?  Should I instead save the Log file as a Zudio or ZDO file or something like that?  But that sort of obscures the fact that it's humand readable. Give me the pros and cons and whether I should make a change later on.\
+\
+when is the UT info.plist work done? is that when the application installs? when it starts? or something else?\
+\
+can you add all this information into the distribution plan with a suitable title as a future enhancement but before the iPad/iOS section\
 \
 \
 \
