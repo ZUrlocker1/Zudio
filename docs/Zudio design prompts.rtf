@@ -1,0 +1,298 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica-Bold;\f1\fswiss\fcharset0 Helvetica;\f2\fswiss\fcharset0 Helvetica-Oblique;
+}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\vieww12000\viewh15840\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f0\b\fs24 \cf0 Zudio Design Prompts
+\f1\b0 \
+\
+
+\f2\i Edited version of the ChatGPT Zudio design prompts with headers
+\f1\i0 \
+\
+
+\f0\b Project framing and document structure
+\f1\b0 \
+\
+I would like to do some research on building a generative music application called Zudio. We will build a prototype as a native Mac application. Later on we might choose to port it to iPhone and iPad. For now it will be something just for personal use and research. I am going to do a bunch of research and then at some point ask to create mockup design and a product requirements document.\
+\
+Let's name these research, architecture, comps, prototype respectively.\
+\
+Let's start with some notes for Comps. Please be clear these are notes on examples of similar comparable applications. I might ask for some short research on these. Most directly comparable are EON by Jean-Michelle Jarre. Brian Eno has a number of applications including Reflections and Trope which are somewhat similar. However, these applications do not enable much interaction. Write up a few bullets on each of these applications of notable good things, design decisions and limitations.\
+\
+Anything you can find out about their underlying implementation would be good to know. Can you determine what underlying sound engines they use, how they were designed, whether there are limitations about the type of music they use, and whether they are synthesizer based or sample based.\
+\
+Please organize the additional implementation notes directly under each of the applications rather than as its own section.\
+\
+Shorten the title headers in the implementation section to omit confirmed, likely, undisclosed, and similar qualifiers.\
+\
+
+\f0\b Core musical model
+\f1\b0 \
+\
+What I am thinking is to have something that is a bit more oriented towards the way I think about music, so that we can visibly see and manipulate multiple tracks that form a song. We will stick to the overall ambient and/or Motorik style. I would like to think of a song as having multiple parts: Drums, Bass, Pads, Lead. There should also be a tempo, key, and style that you can choose.\
+\
+Let's stick with the prototype concepts for now. You should be able to click a Generate button that automatically creates a song which has the various components and the global controls in accordance with a style. What are some styles we should have?\
+\
+In addition to key there should be a scale mode, but I do not want this to be overly complicated or surface too much music theory. Is there perhaps a better name for scale. I want to enable just a few variations in this regard: major, minor, what else?\
+\
+Sometimes there is ambient music that is seemingly without any real scale, for example Music for Airports. What should we call that?\
+\
+Similarly for tempo, while we might allow fine tuning of the tempo in BPM, what would be a few settings here that simplify it for the user?\
+\
+I also want to identify for each track a set of effects. In a full-featured music app the effects are things like reverb, delay, or for lead parts crunch, distortion, chorus, and so on. What do you think we should do here?\
+\
+I should have raised this before the effects, but I also want to have different instrument options for each track. For drums there might be different sample-based drums such as vintage electronic drum kit, modern electronic drum kit, jazz drum kit, rock drum kit. Bass could have different instruments such as different synth basses, electric bass guitar, upright jazz bass, cello. Pads could have several variations. Lead instruments might include synth leads, electric guitar type sounds, brass synth sounds, piano, Rhodes electric piano, and similar variations.\
+\
+I would like the user to be able to click one button and it generates a full song using the appropriate default settings or whatever the user has selected, so we need rules to define overall musicality that would influence each of the parts so they work together.\
+\
+
+\f0\b Motorik research agenda
+\f1\b0 \
+\
+I think we need to identify some research for you to undertake that helps guide these rules. For example, if you explored the music of the Motorik band Neu!, could you come up with rules that define Motorik pulse. These often stay in a single key, are at a fairly brisk tempo, and the drums play mostly Dinger's so-called Apache beat, also known as motorik. I am not sure what key or scale they use. Can you define some research around this?\
+\
+Note that the Neu song Negativeland is not representative of the style I like. I suggest Neuschnee instead. Also consider the offshoot band Harmonia as highly representative. Classic songs include Deluxe, Walky-Talky, and Monza. You will need to analyze these types of songs to make rules to define melody, tempo, drum and bass parts, instruments, and related characteristics.\
+\
+We may also be able to use some instrumental Kraftwerk songs or instrumental parts of other songs, with highly representative songs being Autobahn, Aero Dynamik, and Endless Endless.\
+\
+Let's identify a separate research section for each of Jean-Michelle Jarre, since he has the related app EON, and Brian Eno, who has the apps Reflections and Trope. Can you identify some suitable melodic ambient music for each of them that could define songs to help us define rules for ambient type songs?\
+\
+If we wanted to start with just one style, which do you think would be easier to create songs that seem stylistically representative: ambient or motorik?\
+\
+Please examine some of the motorik songs we have identified. Are there any other instrument tracks we would need to add, for example a second rhythm instrument or lead instruments?\
+\
+Let's call these tracks Rhythm, Texture, Lead 2 and add appropriate information about how they might be generated, the appropriate instruments, effects, and related behavior.\
+\
+Please make sure that all references to instruments are in the revised order of the screenshot I shared earlier so we do not deviate from that.\
+\
+I think having Lead 2 come in after 8 or 16 bars is good. Also, to be clear because this is a generative music app, I want us to use randomization in many areas. For example, the rule might be that we randomly decide when Lead 2 comes in at 8 or 16 bars. We should similarly randomly choose between different drum patterns, bass patterns, A/B sections, swells, effects, drum types, instrument types, and so on. These are based on probabilities that you decide reflect the overall musicality of Motorik.\
+\
+Should we establish some probabilistic rules that define the instruments or tones further for the Motorik version, for example what kind of bass sounds, what kind of pad sounds, what kind of synthesizer sounds, drum kit type, effects, length of song, how many sections, key, scale, and similar decisions?\
+\
+Also I think we need some further musicality rules to define the bass rhythm and lead parts for motorik. Can you analyze some of the existing songs to define more clear musical rules?\
+\
+Complete all the open research items regarding Motorik music and consolidate all of our findings, rules, and probability guidelines in a clearly marked section of the prototype document. Remove duplicate information. Anything we have ruled out, like orchestral libraries, can be consolidated to a single line.\
+\
+Is there any musical information or instrument information that you think we are missing in the prototype details?\
+\
+
+\f0\b Interface layout and mockup direction
+\f1\b0 \
+\
+The way I envision the app is that we would have some buttons, controls, and global display elements at the top of the screen, then a section that includes the rows for the tracks with some controls on the left, a middle section that shows a DAW-like grid or piano roll of generated notes, and then on the right some additional buttons for effects. Can you capture this and other information in a Design section of the docs?\
+\
+If you create some mockup screens, where would we put those?\
+\
+I need to see the DAW or piano roll for each track. So if there are 7 tracks there are 7 rows of small DAW grid or piano rolls, with buttons to the left for mute and other sections, and buttons to the right for effects.\
+\
+The grid must be much more compact and must not overlap with the text or buttons. The idea is to have some controls on the left, then the middle DAW grid section, then some buttons for effects on the right.\
+\
+I want each row to be more narrow. Controls for effects and volume need to be to the left of the DAW grid, not above it. Effects buttons like grit, echo, space, reverb need to be to the right of the grid, not below it.\
+\
+Let's simplify further. On the left, just M and S buttons for mute and solo, and the name of the instrument. The actual grid section does not need a label. The colored grids themselves need to be a bit taller so we can see notes at different levels. Also I would like the order of the instruments to be what I showed in my screenshot from top to bottom: Lead 1, Lead 2, Pads, Rhythm, Texture, Bass, Drums. Use different colors for related instruments, for example Drums yellow, leads red, pads rhythm and texture blue, Bass purple.\
+\
+There should be a transport set of buttons with arrows for previous track, play, stop, next track. There should also be a Generate button. These buttons control playback and generation. There should be a logo on the screen in the upper left area with a stylistic rendering of the name Zudio with a small lightning bolt. There should be a Help button and an About button. Each of these brings up a dialog box with appropriate text.\
+\
+There should also be a text status box at the bottom of the window below all the tracks. Use this to display information about what the application is doing at any given time. When a song is generated, please display in the status box the relevant information about the intro being used, the structure of the song, and similar details.\
+\
+The title of the song generated should appear somewhere on the top portion of the screen in a title section, as should tempo, key, mood, and style. Those do not need to be in the status area. Please make sure the UX has appropriate places to display all of those.\
+\
+To the left of each track, show a small icon that represents the type, for example drums, bass, and so on.\
+\
+I want the status text area to be somewhat user friendly, so do not include time stamps, seed information, or transport. Just stick to the basics so we do not overwhelm the user. It should be a wide status area, as wide as the MIDI grids, but only about 3 to 5 lines of text.\
+\
+The status area should definitely tell us about rules that are used in structuring the song, the intro, the outro, and rules related to any tracks, for example how the bass part is generated and how other tracks are being created. So it is mostly telling us about musical decisions that have been made. Make sure the status text area is scrollable in case there is a lot of information generated.\
+\
+Since the user can select the style, tempo, key, and mood, put those more on the left in a nice arrangement below the transport section. Since the title is not editable, do not use the text Title. Just show the name of the song in a larger font. Add a lightning bolt to the Generate button. Move the track regenerate button to the left track controls section, but just make it a simple small lightning bolt. I would prefer graphical icons for each track that represent drums, bass, lead, and so on rather than text labels.\
+\
+Center the song title and make the font a bit smaller. Make the Zudio logo and lightning bolt a bit larger. Change Track Actions to Effects. Spread out the transport controls so that the top row of buttons is the same width as the second row of buttons. Eliminate unnecessary vertical space in the top section.\
+\
+The transport buttons should be more narrow. The Generate button should be 2 to 3 times wider than the transport buttons. Put the Help and About buttons in the upper right. Lower the song title so it is aligned vertically with the transport controls and centered horizontally with the MIDI grid. Eliminate the large gap of unused space between the button area and the track working area.\
+\
+
+\f0\b Architecture and implementation options
+\f1\b0 \
+\
+For now, I also want to identify some research for what options we have for implementing the music in a Mac native application. Can you identify a research plan for the music architecture, for example what open source libraries we could use, what samples we could use, how we build the instruments, drum kits, and synth sounds. Identify the options here and let me know if there are decisions I need to make. It would be nice if we could later, not version 1, create a version that also runs on iPhone and iPad without changing the underlying music technology.\
+\
+Do some further research on AVAudioEngine, whether that will cover what we need for credible sounding Motorik songs, at least as musically interesting as Hallogallo and Fur Immer, or if we need to add AudioKit in the first version.\
+\
+As a further research item, can you identify open source or Creative Commons samples or full instruments we can use, for example for drum kits and other sampled instruments.\
+\
+Does the Apple native only approach include synthesizers and samples or do we need to go find outside sources for those?\
+\
+Tell me more about Philharmonia, what kind of music does it have, is it a fit for Motorik, and is the license really free.\
+\
+Let's skip Philharmonia and try to find some samples that would fit closer to the Motorik sound palette. They must be free for use in the app, though we are not distributing them. Note also that I have Logic Pro on the Mac which has many samples and loops. Can we use those?\
+\
+Please be careful. I do not want orchestra samples. They must be proper instruments that fit with the Motorik sound palette: synth bass, synth lead, guitar, electronic or rock drums, synthesizer pads, synthesizer brass, synthesizer strings, synthesizer leads, and similar sounds.\
+\
+I have a set of free samples I downloaded from MusicRadar and SampleRadar.\
+\
+
+\f0\b Development plan and V1 scope
+\f1\b0 \
+\
+I would like to create a very simplified plan of development that starts with a very minimal 0.1 level of functionality and then gradually adds more, testing at each stage. 0.1 should generate a drum track in the Apache beat from the drum rules in accordance with global settings. The drum track should be dynamic, not a simple 4-bar loop, with some parts more intense, some more sparse, and some louder or softer according to overall rules. You should be able to choose different drum kits, at least two: vintage electronic and Rock Kit. 0.2 adds a bass track that matches the drum track and follows it. 0.3 adds a Pads track which conveys the musicality of chords. Then continue through 0.9 as necessary.\
+\
+We will not worry about effects in this first version.\
+\
+Make sure for each instrument other than drums we identify at least three instruments, for example different bass sounds and different lead sounds that can be randomly generated or user selected. For drums we will start with just two different kits.\
+\
+Please identify the specific sounds for each instrument by analyzing some of the songs we have identified and the notes I have provided earlier. Please verify that all of the names of instruments you are suggesting make sense.\
+\
+If we are not ready to begin coding, is there anything you are missing that you need to have sufficient detail to begin coding this up?\
+\
+Regarding V1: there should be a Generate button, a Play button like a green arrow, per-track Mute and Solo buttons, and track regenerate buttons. Exclude effects and evolution mode. Tracks as defined.\
+\
+As a research project, I would like you to go locate open source or free assets that will make up all the starter pack basics. Option 2 is fine, allow CC BY. If you do not find good sound choices, note that we can also use General MIDI sounds that are part of the Mac included in the Apple General MIDI Downloadable Sound bank synthesizer.\
+\
+I think with all of these sounds included on the Mac, let's revise the development plan to first use General MIDI to define all the sounds we want to work with. Please identify your preferred choices for each of the instruments. Then let's add a step 0.75 where we consider swapping to a different sample-based approach, rather than MIDI. This will enable us to hear that things are working with General MIDI before we go to samples.\
+\
+Later, when we start coding, I will want to make sure to move the entire project from VSCode to Xcode.\
+\
+For V1 we will have the full transport, previous, play, stop, next, generate, but previous and next will be non-functional initially. Help and About should be implemented in V1. No need to show seed in the display or status. Effects buttons should appear in the UX but be non-functional in V1. Tempo is the right language in all cases. We are only going to use two drum kits in the initial V1 prototype: an electronic kit and a rock kit.\
+\
+Please run an editorial analysis of the development plan and the prototype document to see whether there is anything missing needed before we go to code generation, anything confusing or conflicting that might cause problems, and enough clarity in the musical rules to guide the programming so that we have a shot at creating legitimate sounding motorik music.\
+\
+
+\f0\b General MIDI instruments and soundfont direction
+\f1\b0 \
+\
+Here are a few other ideas on some Apple General MIDI channels that might be useful for Lead synths, synth bass, pads, and synth brass. Please research and decide which General MIDI instruments you want to start with. Since some might not be great, I think we should have 3 to 6 choices, recognizing some will not sound very good. I would rather have an initial list that we know we can test.\
+\
+For each track there will need to be a button choice near the instrument name that lets us cycle through and try a different instrument. Whenever we change the instrument the music should switch to the new instrument and we should display what the instrument name is. Can you define this and any other user stories as appropriate for each step in the development plan?\
+\
+How do you think this will sound using General MIDI? Will it sound like motorik music? Please review the choices of the MIDI instruments and make sure that for each instrument the most fitting in the Motorik style are used first.\
+\
+Is there an intermediate step we should consider before going to full sample-based music that would be an improved General MIDI library of higher quality than the default Mac General MIDI library? Please make a suggestion on a better higher quality soundfont GM bank that is free or open source. GeneralUser sounds like the first upgrade we should try.\
+\
+
+\f0\b Song generation behavior and piano-roll display
+\f1\b0 \
+\
+I am going to give a bit more detail on what it means to generate a song. You, the generative app, will decide with some suitable degree of randomization based on the user parameters what structure to generate for the song, how many sections, what the chord sequence is, how sections repeat, the tempo, key, style, and so on. Then for each instrument track, according to the rules we have defined, define the notes of the track. Every time a new track is generated, I want to see a DAW-style piano roll or grid representation of the notes in the middle area. The width of that region will be limited, so only show a portion of the whole track. If the user resizes the window or scrolls the display, we can pan and show more or different parts of the MIDI grid representation. It should be in a color that matches the instrument. If a track is muted, gray out the MIDI representation. If a track is soloed, gray out all the other tracks and play only what is appropriate.\
+\
+Even at plan stage 0.1 when we have just a drum track, there should be a corresponding MIDI grid area using yellow. When we generate a drum track we should see a new grid representation of the notes. When we play, the MIDI grid should scroll in time as the notes are played like in a standard DAW such as GarageBand.\
+\
+When we add each new instrument at each development plan step, we should add the corresponding MIDI grid representation in the appropriate color.\
+\
+
+\f0\b Additional song templates and title generation
+\f1\b0 \
+\
+What musical songs might also be templates that are maybe not classic motorik but could be close enough that they would suggest additional rules in terms of chord progressions, bass parts, or solo parts that we might want to add to our rules?\
+\
+La Dusseldorf is a good variation and seems to have a chord progression. Simple Minds Theme for Great Cities also has some good chord sequence and melodies. Please identify these chord sequences and use them as a rule for slightly more melodic variations. Jenny Ondioline is definitely straight up motorik. Trans-Europe Express is a bit more dance beat, but go ahead and use that also. Cluster's Hollywood could be a fit. If you can glean any drum, bass, or melody patterns from Mother Sky, feel free. Can you figure out some new rules from these songs?\
+\
+When we generate a new track, let's also generate a motorik-inspired song title. Create a clever algorithm that comes up with variations inspired by the words we have used to identify motorik songs, instruments, songwriters, musicians, the cities they lived in, words that describe it, or parodies of real motorik songs that sound phonetically correct. Later, when we add back ambient music or hybrid, we will use a different set of words for title generation.\
+\
+Please add these words into the mix: Mittelwerk, Koln, Detroit, Tunnel, Bomb, Nordhausen, Von Neumann, Schuler, Waters, Von Braun, Panzinger, Panks, Dieter. Please also identify the first names and last names of some of the musicians in classic Motorik bands so those get added also. You can also plunder words from album and song titles as long as they are rearranged. Neon Highway would be a good title also.\
+\
+
+\f0\b Intro, outro, and status logic
+\f1\b0 \
+\
+Many songs have an intro and outro which is distinct from the main part. It might be different rhythmically or simply that not all of the instruments are used, for example perhaps a 2-bar drum intro, or 4 bars of bass and drums or other combinations. Do we need to define intro and outro rules for Motorik? What research did you base this on, and can you validate it with some of the motorik tracks we identified? Go ahead and codify the rules for intro and outro.\
+\
+In the prototype doc, I have modified the intro rules slightly so that drums only is 20 percent and there are two other intro types that feature Lead and Lead plus Texture.\
+\
+The status box should show structure, intro, outro, and track-generation decisions in user-friendly form, and where practical it should also show relevant rule numbers with brief text explanations.\
+\
+
+\f0\b Analysis of my original music and classic references
+\f1\b0 \
+\
+If I upload some original songs I created in Logic Pro as MP3s, can you analyze them as potential examples of Motorik songs. These are not pure motorik like Neu, but they have elements of that style. I would like you to analyze these songs and see what additional melodic rules you can define for intros, outros, bass parts, lead melodies, lead 2 counter melodies, rhythmic instruments, pads or strings, drums, and related parts. Also feel free to infer anything about the instruments themselves, what should be used in creating motorik sounds, and what kinds of effects are in place even though that is currently for later stage development.\
+\
+Please analyze these Electric Buddha Band MP3s as potential examples: Time Loops, Dark Sun, Vanishing Point, Into The Night, Blakely Lab, Schulers Dream 05.\
+\
+Would it be useful to run this analysis on other classic motorik songs like Fur Immer and Hallogallo? Please analyze Hallogallo, Neuschnee 78, Fur Immer, Seeland, and Wave Mother in the same fashion. In particular, I want you to try to derive rules for bass, lead, and rhythm instruments.\
+\
+Also analyze these Harmonia and Cluster tracks: Deluxe, Walky-Talky, Monza, Breitengrad 20, and Hollywood.\
+\
+Should we save the Swift analyzer script in the local repository? Go ahead and do that. Also, is there anything about the analyze_motorik program script that is really specific to Motorik, or could this be used later on to analyze ambient music in the style of Brian Eno and others, or cosmic electronic music in the style of Jean-Michel Jarre and others? Let's rename it to something more general with a suitable README.\
+\
+I cannot do a manual transcription. I would like you instead to analyze a couple of songs to find melodic parts that are representative of Motorik. You can pick the best songs and then create more clear rules for melody, Lead 1, counter melody, Lead 2, rhythm, and pads. Also analyze some of the songs I created in Logic Pro and shared earlier to identify some additional rules for melody, lead 1, lead 2, and pads from those.\
+\
+I would also like you to do some research on the web more broadly about what makes for good repetitive melodic phrases or counter melodies that would be appropriate for Motorik. Even if the music it pertains to is not strictly motorik, those rules may still be valid here. Please do this with the goal of generating additional rules that will help us with lead 1, lead 2, melodies, counter melodies, variations, riffs, and similar behavior.\
+\
+Are there any guidelines regarding scales that should be incorporated into the Lead 1 or Lead 2 rules, for example use of specific major, minor, pentatonic, or other scales to create good melodic hooks? Also, it is important that Lead 1 and Lead 2 melodies and the scales from which they are derived do not clash with the overall chord progression. Are there further rules that should define this?\
+\
+
+\f0\b Generation algorithm and rule sequencing
+\f1\b0 \
+\
+I want to reconsider the generation algorithm mapping defined in the research.md document. Step 1 needs more detail, so that when we say tonal center we must define the key and scale that is appropriate. Also, I believe there is a new step after Step 1 where the structure of the song needs to be determined, that is how many bars, what is the chord sequence to be used, what is the overall structure, for example whether it is all one section, an A/B section, a bridge, or similar. For each section we need to define the chords even if it is not a traditional pop structure. When we generate a song we should also update the status to display the structure and chord information, using both the chord names and the suitable Nashville notation.\
+\
+Related to that, the bass generation should follow the structure step. I would like you to define the bass generation in more detail, so we are clear about what kinds of MIDI notes should be used there to reinforce the overall decisions from the tonal and structural steps. I am assuming most bass parts in motorik are playing root notes with subtle variations. What bass patterns or scales should bass notes be drawn from?\
+\
+I would also like to move the pads earlier so they come after the bass, since this is often a good way to write music. The pads are the most important instrument for conveying the chord progression and they must absolutely match the song structure and chords identified earlier. Are there additional rules to define how pads should be used in Motorik, how busy or sparse these parts should be, and whether substitute chords or embellished chords should be used, or whether it should just stick to the overall major or minor chords defined in the song structure.\
+\
+The drum track also needs to be much earlier. It should be the second step after overall song information, structure, and tone, and should be before the bass track is generated. Define clear rules for the drums based on your earlier analysis so there are rules to define how the drum track is generated, when to use fills, when to consider louder or softer sections, and when to change which drum notes are being used during which sections.\
+\
+Now that the drum track is before the bass track, are there any additional rules for the bass player to follow the drum track? I want them to feel like a very locked-in rhythm section. Although classic Motorik such as Fur Immer or Hallogallo does not have much variation in the drums, I think for most cases it is better to have more variation so it is not too boring. Does this suggest any new rules?\
+\
+Now based on your analysis of the motorik songs and your research, please also provide additional detail and rules for the music generation sections for Lead 1, Lead 2, Rhythm, and Texture. Lead 2, Rhythm, and Texture should all be considered embellishments to the main drums, bass, pad, and lead. They should not overwhelm the song or clash with those sections but add some nice additional flavors to the music. I want you to define rules here that are clear enough to guide later code development.\
+\
+
+\f0\b Starter assets and generated examples
+\f1\b0 \
+\
+I can give you a very lengthy MIDI drum track that defines a starting drum pattern. If you think that is useful, you can add it as a resource in a music assets folder.\
+\
+I think you will need to generate suitable starter assets for Bass, Pads, and Leads based on the rules you have identified.\
+\
+I have created a PNG transparent logo. Can you add this as a resource under assets. Also reference that the prototype should use this logo in the upper left corner of the screen rather than text, scaled as appropriate.\
+\
+Could you generate a basic drum, bass, and pad track using the rules we have defined and the starter packs so I can hear what it sounds like. Then give me one that includes drums, bass, pads, and some Lead 1 and Texture.\
+\
+Both songs are pretty boring. Can you try to force the generation of a song that has more variation, with the same instruments. The most recent one was better, but the first section of Lead 1 was too crowded and too repetitive. Consider whether the generation is not paying enough attention to the rules or whether we need more rules to define Lead 1 melody. Give me another variation with all the tracks.\
+\
+The most important thing is to make sure we learn from these and have rules in place to improve musicality. In the most recent song, some lead segments were just two notes, and that is probably not long enough to be memorable and create a proper solo. Please do some research on what makes a good solo in motorik, jazz, and rock so we are not overly constrained. We do not have to make them super complicated, but they have to be more complex than we are currently generating. Please also take another pass to identify more melodic hook identity and more solo journey so the lead becomes more musical and melodic.\
+\
+One thing I noticed is that the Bass part is too low. When generating MIDI notes, it often feels like the bass should be one octave higher. Let's make sure to capture that in the generation rules.\
+\
+
+\f0\b MIDI references from Wings, Neu!, and The Doors
+\f1\b0 \
+\
+I am thinking maybe I should provide a few more MIDI starter sounds for drums, bass, and maybe other instruments that are more musical. I have personally analyzed Paul McCartney and Wings' Silly Love Songs. Although it is not classic Motorik, if you listen to the drums, percussion, bass, and rhythm keyboard parts it has some excellent patterns you can work with. The file maps Rhythm to electric piano, Bass to electric bass, Texture to a percussion intro, and Drums to a rock kit. There are clear sections including an intro, a pre-verse, a verse, a bridge, and a chorus, and each section suggests arrangement and rhythm ideas worth adapting. If necessary you can break this down into separate tracks for instruments, or separate parts such as intro, verse, bridge, chorus, or both.\
+\
+Here is a description and tab file for Neu Hallogallo. You will need to translate this to MIDI. The bass riff is played throughout the entire song, Guitar 1 plays the same thing with power chords, and Guitar 2 plays a short upper riff a few times. Use this as a direct symbolic source.\
+\
+Here is a tablature file for a song by Neu! called Super, sometimes called Super 16, which is a fast tempo guitar-driven song. Here consider the guitar chords as the Rhythm part. At minimum it shows a chord progression and a strong rhythmic guitar approach.\
+\
+Generate a new song for me based on the samples I have provided, with emphasis on high musicality.\
+\
+The bass, though a bit too close to McCartney in parts, had a good tone and some good changes to it when it is more melodic and then more driving. The drums are also good. The Classic Pads need more variation. It would be rare that you can just have whole notes throughout the piece. The Rhythm track was the weakest of them all. It is too repetitive. Rhythm cannot be nonstop whole notes or nonstop eighth notes or nonstop sixteenth notes. It has to have more variety, and unlike drums, it is better for the Rhythm track to be more sparse than too dense. Update the rules as appropriate.\
+\
+While each of the parts is good, there is still some clash going on, primarily between the bass and Lead 2. It feels that the bass is playing a different mood of music than Lead 2. Please do some deep research on scale and note-pool rules so that when you generate a song there are strict rules about what instruments like bass, lead, and rhythm play from. You can still use the starter MIDI pieces where appropriate, but you may need to map the notes to a different scale, or transpose them to a different key.\
+\
+Another song that is worth considering is The Doors' L.A. Woman. Although not classic Motorik, it is very close to the four-on-the-floor Apache drum beat of Motorik. It also has some good interplay of Lead 1 electric guitar and Lead 2 electric piano. The bass is driving with simple repeated patterns, but more interesting than just root notes. The song centers on an A major chord but uses notes from the D major scale, producing A Mixolydian mode, which could be a good model to consider for generating songs.\
+\
+I have attached the MIDI file of L.A. Woman, but it is likely that when Logic Pro saved this it lost the instrument information, so they might all appear as piano. From top to bottom they are actually Lead 1 electric guitar, Rhythm electric guitar, Electric Piano as Lead 2, Bass intro track plus a later bass variation track, and drums. The electric piano part that starts earlier can be considered a good example of Lead 2, and later sections where the guitar drops out let the electric piano effectively become Lead 1. Later the electric piano doubles the rhythm guitar. That kind of doubling is something worth doing occasionally in music. Are you ready to create more generalized rules from this song?\
+\
+
+\f0\b Rule catalog and documentation cleanup
+\f1\b0 \
+\
+Based on today's MIDI files that were shared, can you provide a list of all the rules that were generated. If we wanted to have rules enumerated with short numeric guides, give me some examples of what they would look like. Would it make sense to organize these rules with a designation for what it is about, for example B for Bass, D for drums, L for lead, and what other categorization makes sense without going too extreme?\
+\
+Go ahead and give all the rules IDs as described. They should be sequential. Where it makes sense organize the rules together by category. Do not lose any details. Also reference these same rule IDs in the research document as appropriate. Let me know if anything needs to be reconciled or disambiguated afterward.\
+\
+Remove all attempts at table formatting in the rules, it is too cluttered. Remove the quotation marks around the rules if they are not important, because that is just clutter.\
+\
+Add a note in the prototype document that where possible, we would like to show in the status section relevant rules that have been used in creating tracks, both the rule number and a brief text explanation.\
+\
+In the title word banks please add some extra words: zen, zoetrope, zietgiest, zeno, zug, zoo, 1977, '85, No. 7, Part 1, Part 2. Also, can you suggest some real words with a Z in them or faux-sounding German words with a Z. Zentrale is good, Zignal is okay, the others are not to be used.\
+\
+There are some sections in prototype that seem to be possible rules, however some are just probabilistic constraints. Do we need to reconcile this or have a more consistent approach. Please review this with an eye toward ensuring consistency during the code generation stage. I want to make sure we do not miss or lose any information.\
+\
+Please carefully review the development plan and prototype docs, and any others, to determine what improvements could be made to these documents to increase the likelihood of success in the programming phase to create good code that can replicate motorik style music.\
+\
+}
