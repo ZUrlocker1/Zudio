@@ -27,7 +27,8 @@ Current release: `0.94a (alpha)`. Universal binary — runs natively on both App
 - [architecture.md](docs/architecture.md) — System overview, technology stack, generation pipeline, playback engine, UI architecture, and musical foundations. Start here.
 - [development-plan.md](docs/development-plan.md) — Staged development roadmap from v0.1 through future versions.
 - [implementation.md](docs/implementation.md) — Detailed implementation reference: UX specification, musical rules, generation pipeline, rule ID catalog, and performance engineering notes.
-- [Zudio prompts.rtf](Zudio%20prompts.rtf) — Many of the prompts used to develop Zudio with Claude.
+- [zudio design prompts.txt](docs/zudio%20design%20prompts.txt) — ChatGPT prompts for the initial research, design and specification of Zudio.
+- [zudio code prompts.rtf](docs/zudio%20code%20prompts.rtf) — Claude prompts for most of the coding of Zudio.
 
 ### Style guides
 
