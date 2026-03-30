@@ -1,0 +1,45 @@
+=== Zudio Song Analysis Log ===
+Title:          Middlespace
+Generated:      2026-03-30 10:56:59
+Zudio Version:  0.95
+Seed:           15581196561183188887
+Style:          Ambient
+Forced Rules:   Lead=AMB-LEAD-009
+Key:            G  Dorian
+Tempo:          64 BPM
+Bars:           24
+Mood:           Bright
+
+--- Structure ---
+  A          Bars   1– 24         (24 bars)
+
+--- Chord Plan ---
+  Bars   1– 24         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       22 notes
+  Lead 2       4 notes
+  Pads         30 notes
+  Rhythm       0 notes
+  Texture      0 notes
+  Bass         0 notes
+  Drums        9 notes
+
+--- Generation Log ---
+  SONG             Middlespace
+  Style            Ambient
+  Form             Pure drone — no intro/outro
+  Chords           G Dorian  Static drone  Gm
+  Loops            pads 19  lead1 23  lead2 5  rhythm 7  tex 13  bass 19
+  AMB-PADS-001     Sustained chord layer
+  AMB-LEAD-009*    Magnetik solo
+  AMB-LEAD-005     Silent-window fill
+  AMB-RTHM-004     No rhythm
+  AMB-TEXT-004     No texture
+  AMB-BASS-002     No bass
+  AMB-DRUM-001*    Sparse ride/hat with cymbal shimmer
+
+--- Playback Annotations ---
+  Bar 013    Lead 2       stepping back
+  Bar 016    Spooky       X-Files theme
+

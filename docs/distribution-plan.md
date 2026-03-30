@@ -57,42 +57,31 @@ Releases are built as a **universal binary** (arm64 + x86_64), so the same app r
 
 ---
 
-## Future Enhancement: Custom Document Type (.zudio)
+## Custom Document Type (.zudio) — Implemented in 0.95
 
-### Background
+Zudio saves song data as a `.zudio` file. The format is plain text — it contains the seed number, style, key, tempo, and all generation parameters needed to fully reconstruct a song. Any text editor can open it, seeds can be read and copied directly, and files can be shared in forum posts or emails without any special tool. There is no proprietary or binary format.
 
-Zudio currently saves song data as a plain `.txt` log file. This file contains the seed number, style, key, tempo, and all generation parameters — enough to fully reconstruct a song. Because it's plain text it's human-readable, shareable, and trivially small. The seed-based reload feature was a natural evolution from the debug log.
+### What the .zudio extension provides
 
-### The tradeoff: .txt vs. a custom extension
-
-Keeping `.txt` has real advantages — any text editor opens it, users can read and copy seeds, share files in forum posts, and understand what a song is made of without any special tool. There is no proprietary or binary format to worry about.
-
-The main limitation is that macOS has no way to associate `.txt` files with Zudio, so double-clicking a saved song in Finder does nothing useful. Users must use the Load button inside the app and navigate to the file manually.
-
-A custom extension such as `.zudio` would solve this:
-
-- Double-clicking a `.zudio` file anywhere in Finder opens it directly in Zudio
-- A custom Finder icon makes saved songs visually distinct from generic text files
-- It signals clearly to users that the file "belongs to" Zudio — less likely to be accidentally deleted
+- Double-clicking a `.zudio` file in Finder opens it directly in Zudio
+- macOS associates the file type with the app automatically when the app is installed
+- Files are visually distinct from generic text files in Finder
 - Consistent with how other Mac creative apps handle document formats (GarageBand `.band`, Logic `.logicx`, Ableton `.als`)
 
-The file format itself stays identical plain text — the extension is purely cosmetic from a data standpoint.
+The file format itself is identical plain text — the extension is purely cosmetic from a data standpoint.
 
-### How macOS document type registration works
+### Backwards compatibility
 
-The UTI (Uniform Type Identifier) declaration lives in `Info.plist`. macOS reads it at **install time** — when Launch Services scans the app bundle after it is copied into Applications, or when `lsregister` is run explicitly (already part of the Zudio release script). No runtime code is needed for the association itself.
+The Load Song button and file picker accept both `.zudio` and legacy `.txt` files. Users with existing `.txt` song files can rename them to `.zudio` in Finder and double-click to open — no conversion needed, the content is identical.
 
-The actual file-open handling requires a small addition: the app delegate needs to respond to the `application(_:open:)` callback that macOS sends when a user double-clicks an associated file. If Zudio is already running, macOS routes the open to the existing instance rather than launching a second copy.
+### How registration works
 
-### Implementation when ready
+The UTI (Uniform Type Identifier) declaration lives in `Info.plist` with identifier `com.zudio.song`, conforming to `public.plain-text`. macOS registers the association at install time when Launch Services scans the app
+ bundle after it is copied into Applications, or when `lsregister` is run explicitly (part of the Zudio release script). The `.onOpenURL` SwiftUI handler routes Finder double-clicks to the existing `loadFromLogURL` path, whether the app is already running or is being launched fresh.
 
-- Register `.zudio` as a document type in `Info.plist` with a UTI such as `com.zudio.song`
-- Implement `application(_:open:)` in the app delegate to call the existing `loadFromLogURL` path
-- Support both `.txt` and `.zudio` extensions in `loadFromLog` so existing saved files continue to work
-- New saves can default to `.zudio`, or offer both as options in the save panel
-- Optionally add a custom document icon (a variant of the Zudio app icon) for Finder display
+### Document icon
 
-This is a polish item appropriate for a wider public release, not an urgent correctness fix.
+A custom document icon (`zudio-doc.icns`) showing a styled "Z!" is implemented and ships with the app. `.zudio` files display with this icon in Finder rather than a generic text file icon.
 
 ---
 

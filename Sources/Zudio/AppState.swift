@@ -3,6 +3,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import UniformTypeIdentifiers
 
 @MainActor
 final class AppState: ObservableObject {
@@ -82,29 +83,29 @@ final class AppState: ObservableObject {
         testCycleIndex = 0
     }
 
-    // Kosmic/Motorik 10-slot cycle: 90% of slots target currently new/modified rules.
-    // Motorik lead rules (MOT-LD1-*) are silently ignored when style=Kosmic, and vice versa.
-    // Slot 0: MOT-LD1-001* lead                    [Motorik — directional contour]
-    // Slot 1: MOT-LD1-006* lead                    [Motorik — long arc solo]
-    // Slot 2: KOS-LEAD-006* lead                   [Kosmic  — JMJ phrase loop]
-    // Slot 3: KOS-LEAD-007* lead                   [Kosmic  — TD skip sequence]
-    // Slot 4: KOS-LEAD-004* lead                   [Kosmic  — echo melody]
-    // Slot 5: KOS-BASS-012* bass                   [Kosmic  — McCartney PBW]
-    // Slot 6: MOT-LD1-001* lead (repeat)           [Motorik]
-    // Slot 7: KOS-LEAD-006* lead + KOS-BASS-012*   [Kosmic combo]
-    // Slot 8: MOT-LD1-006* lead (repeat)           [Motorik]
-    // Slot 9: fully free                           [sanity / comparison baseline]
+    // Motorik 10-slot cycle: all slots force the two new extended solos (007/008) alternating.
+    // Old Motorik rules (001–006), old bass rules, and Kosmic rules removed from rotation.
+    // Slot 0: MOT-LD1-007* lead   [Vanishing solo]
+    // Slot 1: MOT-LD1-008* lead   [Visiting solo]
+    // Slot 2: MOT-LD1-007* lead   [Vanishing solo]
+    // Slot 3: MOT-LD1-008* lead   [Visiting solo]
+    // Slot 4: MOT-LD1-007* lead   [Vanishing solo]
+    // Slot 5: MOT-LD1-008* lead   [Visiting solo]
+    // Slot 6: MOT-LD1-007* lead   [Vanishing solo]
+    // Slot 7: MOT-LD1-008* lead   [Visiting solo]
+    // Slot 8: MOT-LD1-007* lead   [Vanishing solo]
+    // Slot 9: MOT-LD1-008* lead   [Visiting solo]
     private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-001", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-004", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-012", forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-001", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-012", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
     ]
 
     // Ambient 12-slot cycle: exercises all lead rules, bass rules, and rhythm rules.
@@ -117,23 +118,42 @@ final class AppState: ObservableObject {
     // Slot 10:   absent drums (confirms pads+bass+lead carry the song without percussion)
     // Slot 11:   all random (let the generator pick freely)
     private static let ambientTestCycle: [TestModeConfig] = [
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-010", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-010", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-002", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-003", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: "AMB-BASS-001", forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: "AMB-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: "AMB-RTHM-005", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: "AMB-RTHM-006", forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: "AMB-BASS-001", forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: .absent,    forceBridge: false, forceBridgeArchetype: nil),
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil,         forceBridge: false, forceBridgeArchetype: nil),
     ]
 
+    // Kosmic 10-slot cycle: exercises new lead rules (005–009) and bass rule 003, with a nil slot.
+    private static let kosmicTestCycle: [TestModeConfig] = [
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-005", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-005", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+    ]
+
     private func nextTestConfig() -> TestModeConfig? {
         guard testModeEnabled else { return nil }
-        let cycle = selectedStyle == .ambient ? Self.ambientTestCycle : Self.testCycle
+        let cycle: [TestModeConfig]
+        switch selectedStyle {
+        case .ambient: cycle = Self.ambientTestCycle
+        case .kosmic:  cycle = Self.kosmicTestCycle
+        default:       cycle = Self.testCycle
+        }
         let config = cycle[testCycleIndex % cycle.count]
         testCycleIndex += 1
         return config
@@ -215,6 +235,14 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+
+        // Load .zudio files opened from Finder while the app is already running.
+        // AppDelegate posts this notification instead of letting SwiftUI open a new window.
+        NotificationCenter.default.addObserver(forName: .zudioOpenFile, object: nil,
+                                               queue: .main) { [weak self] note in
+            guard let url = note.object as? URL else { return }
+            self?.loadFromLogURL(url)
+        }
 
         // Global key monitor — intercepts transport/generation shortcuts regardless of focus.
         // NSEvent monitor callbacks always run on the main thread.
@@ -739,16 +767,19 @@ final class AppState: ObservableObject {
 
     func loadFromLog() {
         let panel = NSOpenPanel()
-        panel.title = "Load Song from Log File"
-        panel.message = "Select a Zudio .txt log file to reload the song"
-        panel.allowedContentTypes = [.plainText]
+        panel.title = "Load Zudio Song"
+        panel.message = "Select a Zudio song file (.zudio or .txt)"
+        // Accept both the new .zudio type and plain-text .txt files from earlier versions
+        var types: [UTType] = [.plainText]
+        if let zudioType = UTType("com.zudio.song") { types.insert(zudioType, at: 0) }
+        panel.allowedContentTypes = types
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         loadFromLogURL(url)
     }
 
-    private func loadFromLogURL(_ url: URL) {
+    func loadFromLogURL(_ url: URL) {
         guard !isGenerating else { return }
         guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             appendToLog([GenerationLogEntry(tag: "FILE", description: "Could not load file -- could not read \(url.lastPathComponent)", isTitle: false)])

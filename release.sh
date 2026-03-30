@@ -31,7 +31,7 @@ set -euo pipefail
 SCHEME="Zudio"
 BUNDLE_ID="com.zudio.app"
 TEAM_ID="K66MA9TR8Z"
-VERSION="0.94a"
+VERSION="0.95"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
 NOTARYTOOL_PROFILE="AC_PASSWORD"          # keychain profile name set up with xcrun notarytool store-credentials
 ENTITLEMENTS="$(pwd)/Zudio.entitlements"
@@ -73,6 +73,12 @@ ICON_SRC="${APP_SRC}/Contents/Resources/assets/zudio-icon.icns"
 ICON_DST="${APP_SRC}/Contents/Resources/zudio-icon.icns"
 if [ -f "${ICON_SRC}" ] && [ ! -f "${ICON_DST}" ]; then
     cp "${ICON_SRC}" "${ICON_DST}"
+fi
+
+DOC_ICON_SRC="${APP_SRC}/Contents/Resources/assets/zudio-doc.icns"
+DOC_ICON_DST="${APP_SRC}/Contents/Resources/zudio-doc.icns"
+if [ -f "${DOC_ICON_SRC}" ] && [ ! -f "${DOC_ICON_DST}" ]; then
+    cp "${DOC_ICON_SRC}" "${DOC_ICON_DST}"
 fi
 
 # ---------------------------------------------------------------------------

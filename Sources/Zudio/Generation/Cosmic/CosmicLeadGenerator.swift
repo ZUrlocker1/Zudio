@@ -1,13 +1,20 @@
 // KosmicLeadGenerator.swift — Kosmic lead melody generation
-// Implements KOS-LEAD-001 through KOS-LEAD-007
+// Implements KOS-LEAD-001 through KOS-LEAD-009
 // KOS-LEAD-006  JMJ Phrase Loop: 4–6 note melodic phrase built with arch contour (peaks at ~65%),
 //              repeated identically for 4 bars, then one note shifts a scale step on bar 5,
 //              another shifts on bar 7. Final phrase note lands on a chord tone. JMJ feel.
 // KOS-LEAD-007  TD Skip Sequence: Tangerine Dream ascending 6–8 note scale run per bar,
 //              1–2 ghost notes (very soft) give the characteristic skip-drop texture.
+// KOS-LEAD-008  Caligari Solo: slow lyrical chord-tone lead (from Caligari Drop bars 10–18).
+//              1–2 chord-tone notes per bar, held 2–3 beats, slight rhythmic offset.
+//              Plays in 2–3 windows of 8 bars with ≥6-bar gaps between repeats.
+// KOS-LEAD-009  Dark Sun Solo: spacious 70s analog synth lead (from Dark Sun bars 21–46).
+//              One sustained note per bar, stepwise ascent then descent through scale.
+//              Occasional chromatic trill ornament. Lower register (MIDI 60–76).
+//              Plays in 2–3 windows of 10 bars with ≥8-bar gaps between repeats.
 // Lead 1 register: MIDI 60–96 (celestial, higher than arpeggio's 55–72)
 // Lead 2 register: MIDI 55–80 (lower/darker than Lead 1; counter-melody role)
-// Lead 2 rule pool: KOS-LEAD-001 through 005 only — KOS-LEAD-006/007 are Lead 1 exclusive
+// Lead 2 rule pool: KOS-LEAD-001 through 005 only — KOS-LEAD-006/007/008/009 are Lead 1 exclusive
 // Velocity: 45–72 (softer than Motorik — kosmic is never aggressive)
 
 import Foundation
@@ -35,15 +42,18 @@ struct KosmicLeadGenerator {
         // Sparse ambient rules (001, 002, 003) always escalate to a denser rule in B sections
         // so the song has a genuine arc: ambient A → melodic B → return.
         // Other Lead 1 rules keep the original 60% Technique D probability.
+        // bRule must be a per-bar-compatible rule (001–007 only); section-level solo rules
+        // (008, 009) must never serve as bRule since emitLeadBar doesn't dispatch them.
         let sparseLeadRules: Set<String> = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003"]
+        let hasBSection = structure.sections.contains { $0.label == .B }
         let bRule: String
         if sparseLeadRules.contains(aRule) {
             // Always escalate — B section must use a denser rule (004 or 006)
             bRule = pickDenseLeadRule(rng: &rng)
-            usedRuleIDs.insert(bRule)
+            if hasBSection { usedRuleIDs.insert(bRule) }
         } else if rng.nextDouble() < 0.60 {
-            bRule = pickLeadRuleDifferentFrom(aRule, rng: &rng)
-            usedRuleIDs.insert(bRule)
+            bRule = pickBSectionRule(excluding: aRule, rng: &rng)
+            if hasBSection && bRule != aRule { usedRuleIDs.insert(bRule) }
         } else {
             bRule = aRule
         }
@@ -51,11 +61,19 @@ struct KosmicLeadGenerator {
         // Bridge melody sections always use a distinct rule (independent of Technique D)
         let bridgeMelodyRule = pickLeadRuleDifferentFrom(aRule, rng: &rng)
 
-        // KOS-LEAD-006 uses section-level phrase generation — bypass per-bar dispatch
+        // KOS-LEAD-006/008/009 use section-level phrase generation — bypass per-bar dispatch
         if aRule == "KOS-LEAD-006" {
             return generateJMJPhraseLoop(frame: frame, structure: structure,
                                          tonalMap: tonalMap, bRule: bRule, rng: &rng,
                                          xFilesBars: &xFilesBars)
+        }
+        if aRule == "KOS-LEAD-008" {
+            return generateCaligariSolo(frame: frame, structure: structure,
+                                        tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+        }
+        if aRule == "KOS-LEAD-009" {
+            return generateDarkSunSolo(frame: frame, structure: structure,
+                                       tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
         }
 
         // KOS-RULE-24: commit to interval style
@@ -162,7 +180,10 @@ struct KosmicLeadGenerator {
 
         // When Lead 2 draws the same rule as Lead 1, shift bar index by 1 so Lead 2
         // always fires at least one bar after Lead 1, and skip the first bar of each section.
-        let sameRule = (lead1BaseRuleID != nil && rule == lead1BaseRuleID)
+        // KOS-LEAD-005 special case: 2-bar lag + diatonic 3rd offset (scaleNotes rotated by +2).
+        let sameRule    = (lead1BaseRuleID != nil && rule == lead1BaseRuleID)
+        let sameRule005 = sameRule && rule == "KOS-LEAD-005"
+        let sameRuleLag = sameRule005 ? 2 : (sameRule ? 1 : 0)
 
         var events: [MIDIEvent] = []
 
@@ -176,13 +197,17 @@ struct KosmicLeadGenerator {
             guard section.label != .bridge && section.label != .bridgeMelody else { continue }
             guard section.label != .bridgeAlt else { continue }
             for bar in section.startBar..<section.endBar {
-                // Same-rule fixup: skip section's first bar (Lead 1 fires there), lag by 1 bar
-                if sameRule && bar == section.startBar { continue }
-                let virtualBar = sameRule ? bar - 1 : bar
+                // Same-rule fixup: skip leading bars per lag, then offset virtualBar
+                if sameRule && bar < section.startBar + sameRuleLag { continue }
+                let virtualBar = sameRule ? bar - sameRuleLag : bar
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
-                let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
+                var scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
                                                       low: 55, high: 80)
+                // KOS-LEAD-005 dual-same-rule: offset pitch by +2 scale positions (diatonic 3rd)
+                if sameRule005 && scaleNotes.count > 2 {
+                    scaleNotes = Array(scaleNotes.dropFirst(2)) + Array(scaleNotes.prefix(2))
+                }
                 events += emitLeadBar(rule: rule, barStart: barStart, bar: virtualBar,
                                       scaleNotes: scaleNotes, entry: entry, frame: frame,
                                       useWideInterval: false, rng: &rng)
@@ -224,9 +249,9 @@ struct KosmicLeadGenerator {
     // MARK: - Rule selection
 
     private static func pickLeadRule(rng: inout SeededRNG) -> String {
-        // Lead 1 is the primary melody — favour JMJ Phrase Loop (006); TD Skip (007) adds variety
-        let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007"]
-        let weights: [Double] = [0.12,           0.08,           0.13,           0.18,           0.05,           0.34,           0.10]
+        // Lead 1 rule pool — 006 reduced to 15% so other rules get more airtime.
+        let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007", "KOS-LEAD-008", "KOS-LEAD-009"]
+        let weights: [Double] = [0.12,           0.09,           0.13,           0.16,           0.07,           0.15,           0.11,           0.09,           0.08]
         return rules[rng.weightedPick(weights)]
     }
 
@@ -245,10 +270,20 @@ struct KosmicLeadGenerator {
         return rng.nextDouble() < 0.60 ? "KOS-LEAD-006" : "KOS-LEAD-004"
     }
 
-    /// Pick a lead rule that is different from `current`. Used by Technique D and bridge melody.
+    /// Pick a lead rule that is different from `current`. Used by bridge melody selection.
     private static func pickLeadRuleDifferentFrom(_ current: String, rng: inout SeededRNG) -> String {
-        let allRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007"]
+        let allRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007", "KOS-LEAD-008", "KOS-LEAD-009"]
         let candidates = allRules.filter { $0 != current }
+        guard !candidates.isEmpty else { return current }
+        return candidates[rng.nextInt(upperBound: candidates.count)]
+    }
+
+    /// Pick a B-section rule for Technique D. Restricted to per-bar-compatible rules only
+    /// (001–007 excluding 006 which also bypasses emitLeadBar). KOS-LEAD-008 and 009 are
+    /// section-level solo generators that don't work through the per-bar dispatch path.
+    private static func pickBSectionRule(excluding current: String, rng: inout SeededRNG) -> String {
+        let perBarRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-007"]
+        let candidates = perBarRules.filter { $0 != current }
         guard !candidates.isEmpty else { return current }
         return candidates[rng.nextInt(upperBound: candidates.count)]
     }
@@ -554,20 +589,63 @@ struct KosmicLeadGenerator {
     }
 
     // MARK: - KOS-LD-005: Arpeggio Highlight
-    // Picks one arpeggio note and holds it 1 bar; changes every 4 bars
+    // Held single-note lead that follows a contour shape across 20-bar phrases.
+    // Contour (ascending/descending/arch/valley) and start position are stable within a phrase,
+    // derived from a sub-RNG seeded by song seed + phrase number.
+    // 35% rest bars give breathing space. Chord-tone bias (70%) anchors held notes harmonically.
 
     private static func arpeggioHighlightBar(
         barStart: Int, bar: Int, scaleNotes: [Int],
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        // Change highlight note every 4 bars
-        let highlightGroup = bar / 4
         guard !scaleNotes.isEmpty else { return [] }
-        let noteIdx = highlightGroup % scaleNotes.count
-        let note    = scaleNotes[noteIdx]
-        let vel     = UInt8(52 + rng.nextInt(upperBound: 20))  // 52–71
 
+        // Improvement 2: 35% rest gate — adds breathing space
+        guard rng.nextDouble() > 0.35 else { return [] }
+
+        // Improvement 1: Contour shapes in 20-bar phrases.
+        // Derive stable per-phrase parameters deterministically from musical frame properties
+        // so contour is consistent across all bars in the phrase, and varies between songs.
+        let phraseLen = 20
+        let phraseNum = bar / phraseLen
+        let keyVal    = frame.keySemitoneValue  // 0–11, stable per song
+
+        // Pick contour: 0=ascending, 1=descending, 2=arch, 3=valley
+        let contour = (phraseNum * 3 + keyVal) % 4
+
+        // Starting index in the middle 60% of the scale range
+        let scLo  = max(0, scaleNotes.count / 5)
+        let scHi  = min(scaleNotes.count - 1, scaleNotes.count * 4 / 5)
+        let span  = max(1, scHi - scLo)
+        let startIdx = scLo + (phraseNum * 7 + keyVal * 3) % span
+        let halfSpan = max(2, span / 2)
+
+        // Map bar position within phrase to a 0.0–1.0 contour fraction
+        let posInPhrase = bar % phraseLen
+        let progress    = Double(posInPhrase) / Double(max(1, phraseLen - 1))
+        let contourFrac: Double
+        switch contour {
+        case 0:  contourFrac = progress                                        // ascending
+        case 1:  contourFrac = 1.0 - progress                                 // descending
+        case 2:  contourFrac = progress < 0.5 ? progress * 2.0 : (1.0 - progress) * 2.0  // arch
+        default: contourFrac = progress < 0.5 ? 1.0 - progress * 2.0 : (progress - 0.5) * 2.0  // valley
+        }
+
+        let rawIdx  = (startIdx + Int(contourFrac * Double(halfSpan))) % scaleNotes.count
+        let rawNote = scaleNotes[rawIdx]
+
+        // Improvement 4: Chord-tone bias — 70% chance to snap to nearest chord tone
+        let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
+        let chordNotes   = scaleNotes.filter { chordTonePCs.contains($0 % 12) }
+        let note: Int
+        if !chordNotes.isEmpty && rng.nextDouble() < 0.70 {
+            note = chordNotes.min(by: { abs($0 - rawNote) < abs($1 - rawNote) }) ?? rawNote
+        } else {
+            note = rawNote
+        }
+
+        let vel = UInt8(52 + rng.nextInt(upperBound: 20))
         return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 14)]
     }
 
@@ -777,7 +855,195 @@ struct KosmicLeadGenerator {
         return events
     }
 
+    // MARK: - KOS-LEAD-008: Caligari Solo
+    // Slow, lyrical chord-tracking lead inspired by Caligari Drop bars 10–18.
+    // "Freely soft" character: 1–2 chord-tone notes per bar, held 2–3 beats, slight rhythmic offset.
+    // Plays in 2–3 windows of 8 bars with ≥6-bar gaps between repeats.
+
+    private static func generateCaligariSolo(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        xFilesBars: inout [Int]
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        events += generateDrumBridgeLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+        events += generateBridgeAltLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+
+        let windowCount = 2 + rng.nextInt(upperBound: 2)   // 2 or 3 windows
+        let windows = pickSoloWindows(structure: structure, soloLength: 8, windowCount: windowCount,
+                                      minGap: 6, rng: &rng)
+
+        for window in windows {
+            for bar in window {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let barStart = bar * 16
+                let allNotes   = scaleNotesInRegister(entry: entry, frame: frame, low: 67, high: 82)
+                guard !allNotes.isEmpty else { continue }
+                let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
+                let chordNotes   = allNotes.filter { chordTonePCs.contains($0 % 12) }
+                let pool = chordNotes.isEmpty ? allNotes : chordNotes
+
+                // First note: offset 0, 1, or 1.5 beats (0, 4, or 6 steps)
+                let offsets = [0, 4, 6]
+                let offset1   = offsets[rng.nextInt(upperBound: 3)]
+                let dur1      = 8 + rng.nextInt(upperBound: 7)     // 8–14 steps (2–3.5 beats)
+                let playedDur1 = min(dur1, 16 - offset1)           // actual duration after bar clamp
+                let vel1      = UInt8(50 + rng.nextInt(upperBound: 19))
+                let note1     = pool[rng.nextInt(upperBound: pool.count)]
+                events.append(MIDIEvent(stepIndex: barStart + offset1, note: UInt8(note1),
+                                        velocity: vel1, durationSteps: playedDur1))
+
+                // Second note (55% chance): starts immediately after the first ends
+                if rng.nextDouble() < 0.55 {
+                    let offset2 = offset1 + playedDur1   // use actual played duration, not requested
+                    guard offset2 < 15 else { continue }
+                    let note2 = pool[rng.nextInt(upperBound: pool.count)]
+                    let vel2  = UInt8(48 + rng.nextInt(upperBound: 17))
+                    let dur2  = 6 + rng.nextInt(upperBound: 7)    // 6–12 steps
+                    events.append(MIDIEvent(stepIndex: barStart + offset2, note: UInt8(note2),
+                                            velocity: vel2, durationSteps: min(dur2, 16 - offset2)))
+                }
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-LEAD-009: Dark Sun Solo
+    // Spacious 70s analog synth lead inspired by Dark Sun bars 21–46.
+    // One sustained note per bar, stepwise ascent then descent through scale (MIDI 60–76).
+    // Occasional chromatic trill ornament (4 alternating semitone steps at very low velocity).
+    // Plays in 2–3 windows of 10 bars with ≥8-bar gaps between repeats.
+
+    private static func generateDarkSunSolo(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        xFilesBars: inout [Int]
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        events += generateDrumBridgeLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+        events += generateBridgeAltLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
+
+        let windowCount = 2 + rng.nextInt(upperBound: 2)   // 2 or 3 windows
+        let windows = pickSoloWindows(structure: structure, soloLength: 10, windowCount: windowCount,
+                                      minGap: 8, rng: &rng)
+
+        for window in windows {
+            guard !window.isEmpty, let firstEntry = tonalMap.entry(atBar: window.lowerBound) else { continue }
+            let refScale = scaleNotesInRegister(entry: firstEntry, frame: frame, low: 60, high: 76)
+            guard refScale.count >= 4 else { continue }
+
+            let winLen    = window.upperBound - window.lowerBound
+            let ascending = rng.nextDouble() < 0.60          // 60% ascend first
+            let peakBar   = winLen / 2 + rng.nextInt(upperBound: Swift.max(1, winLen / 4))
+            // Ascending: start in lower third and climb; descending: start in upper third and fall.
+            var scaleIdx: Int
+            if ascending {
+                scaleIdx = rng.nextInt(upperBound: Swift.max(1, refScale.count / 3))
+            } else {
+                let topThirdBase = refScale.count * 2 / 3
+                scaleIdx = topThirdBase + rng.nextInt(upperBound: Swift.max(1, refScale.count / 3))
+                scaleIdx = Swift.min(scaleIdx, refScale.count - 1)
+            }
+
+            for (i, bar) in window.enumerated() {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let barStart = bar * 16
+                let scale = scaleNotesInRegister(entry: entry, frame: frame, low: 60, high: 76)
+                guard !scale.isEmpty else { continue }
+
+                // Advance scale position: ascend to peak, then descend
+                if i > 0 {
+                    if ascending {
+                        scaleIdx = i < peakBar
+                            ? Swift.min(scaleIdx + 1, scale.count - 1)
+                            : Swift.max(scaleIdx - 1, 0)
+                    } else {
+                        scaleIdx = i < peakBar
+                            ? Swift.max(scaleIdx - 1, 0)
+                            : Swift.min(scaleIdx + 1, scale.count - 1)
+                    }
+                }
+                let note = scale[Swift.min(scaleIdx, scale.count - 1)]
+
+                // Chromatic trill ornament (20%, not on first bar)
+                var mainOffset = 0
+                if i > 0 && rng.nextDouble() < 0.20 {
+                    let ornStart = 2 + rng.nextInt(upperBound: 3)  // start at step 2–4
+                    let upper    = note + 1                         // semitone up
+                    for j in 0..<4 {
+                        let ornStep = ornStart + j
+                        guard ornStep < 14 else { break }
+                        let ornNote = (j % 2 == 0) ? note : upper
+                        let ornVel  = UInt8(18 + rng.nextInt(upperBound: 14))
+                        events.append(MIDIEvent(stepIndex: barStart + ornStep, note: UInt8(ornNote),
+                                                velocity: ornVel, durationSteps: 1))
+                    }
+                    mainOffset = ornStart + 4
+                }
+
+                // Main held note: nearly fills the bar
+                let mainStart = Swift.max(0, mainOffset)
+                let dur  = 14 - mainOffset + rng.nextInt(upperBound: 3)  // 14–16 steps
+                let vel  = UInt8(52 + rng.nextInt(upperBound: 20))
+                events.append(MIDIEvent(stepIndex: barStart + mainStart, note: UInt8(note),
+                                        velocity: vel, durationSteps: Swift.min(dur, 16 - mainStart)))
+            }
+        }
+        return events
+    }
+
     // MARK: - Helpers
+
+    /// Picks `windowCount` non-overlapping solo windows of `soloLength` bars from body sections,
+    /// with at least `minGap` bars between the end of one window and the start of the next.
+    /// Each window start is chosen randomly from the first half of remaining valid candidates
+    /// so the repeats feel spread across the song rather than clustered at the start.
+    private static func pickSoloWindows(
+        structure: SongStructure,
+        soloLength: Int,
+        windowCount: Int,
+        minGap: Int,
+        rng: inout SeededRNG
+    ) -> [Range<Int>] {
+        // Collect all body bars (non-intro, non-outro, non-bridge)
+        var bodyBarSet = Set<Int>()
+        for section in structure.sections {
+            guard section.label != .intro && section.label != .outro else { continue }
+            guard !section.label.isBridge && section.label != .bridgeMelody else { continue }
+            for b in section.startBar..<section.endBar { bodyBarSet.insert(b) }
+        }
+        // A window start is valid if every bar in [start, start+soloLength) is a body bar
+        let validStarts = bodyBarSet.sorted().filter { start in
+            (start..<(start + soloLength)).allSatisfy { bodyBarSet.contains($0) }
+        }
+        guard !validStarts.isEmpty else { return [] }
+
+        var windows: [Range<Int>] = []
+        var earliestNext = validStarts[0]
+        for _ in 0..<windowCount {
+            let available = validStarts.filter { $0 >= earliestNext }
+            guard !available.isEmpty else { break }
+            // Pick from the first half of available starts so repeats spread across the song
+            let pickFrom = Swift.max(1, available.count / 2)
+            let chosenStart = available[rng.nextInt(upperBound: pickFrom)]
+            windows.append(chosenStart..<(chosenStart + soloLength))
+            earliestNext = chosenStart + soloLength + minGap
+        }
+        return windows
+    }
+
+    /// Pitch class of the current chord root (0–11).
+    private static func chordRootPC(frame: GlobalMusicalFrame, entry: TonalGovernanceEntry) -> Int {
+        (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+    }
+
+    /// Transposes `midi` by octaves until it sits within [low, high].
+    private static func clampToRegister(_ midi: Int, low: Int, high: Int) -> Int {
+        var m = midi
+        while m > high { m -= 12 }
+        while m < low  { m += 12 }
+        return m
+    }
 
     /// Scale notes for KOS-LEAD-006 phrase loop: MIDI 65–84 (upper-mid solo register)
     private static func jmjPhraseScaleNotes(entry: TonalGovernanceEntry,
@@ -838,17 +1104,12 @@ struct KosmicLeadGenerator {
                 guard bridgeBar % 2 == 1 else { continue }   // odd bars = response bars
                 guard !silencedBars.contains(bar) else { continue }   // silent during/after X-Files whistle
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let rootPC = chordRootPC(frame: frame, entry: entry)
                 let mode   = entry.sectionMode
                 let third  = mode.nearestInterval(3)
                 let fifth  = 7
 
-                func place(_ pc: Int) -> Int {
-                    var m = 64 + rootPC + pc
-                    while m > 76 { m -= 12 }
-                    while m < 64 { m += 12 }
-                    return m
-                }
+                func place(_ pc: Int) -> Int { clampToRegister(64 + rootPC + pc, low: 64, high: 76) }
 
                 // 2-note ascending complement: 3rd → 5th (dotted quarters = 6 steps each)
                 let barStart = bar * 16
@@ -874,7 +1135,7 @@ struct KosmicLeadGenerator {
         for section in structure.sections {
             guard section.label == .bridge else { continue }
             guard let entry = tonalMap.entry(atBar: section.startBar) else { continue }
-            let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let rootPC = chordRootPC(frame: frame, entry: entry)
             let useXFiles = rng.nextDouble() < 0.25
 
             if useXFiles {
@@ -913,7 +1174,7 @@ struct KosmicLeadGenerator {
         tonalMap: TonalGovernanceMap, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         guard let entry = tonalMap.entry(atBar: bar) else { return [] }
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC = chordRootPC(frame: frame, entry: entry)
 
         // Root at MIDI 48 + rootPC — places A at A3 (MIDI 57), matching reference MIDI.
         // Keys C–E (rootPC 0–4) land at C3–E3 which sounds ~an octave too low; push them up.
@@ -983,7 +1244,7 @@ struct KosmicLeadGenerator {
             for bar in section.startBar..<section.endBar {
                 let bridgeBar = bar - section.startBar
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let rootPC = chordRootPC(frame: frame, entry: entry)
                 let mode   = entry.sectionMode
                 let third  = mode.nearestInterval(3)
                 let fifth  = 7
@@ -991,12 +1252,7 @@ struct KosmicLeadGenerator {
                 let fourth = 5   // exact — no scale snapping for X-Files intervals
                 let flat7  = 10  // exact — no scale snapping for X-Files intervals
 
-                func place(_ pc: Int) -> Int {
-                    var m = 72 + rootPC + pc
-                    while m > 84 { m -= 12 }
-                    while m < 72 { m += 12 }
-                    return m
-                }
+                func place(_ pc: Int) -> Int { clampToRegister(72 + rootPC + pc, low: 72, high: 84) }
 
                 let barStart = bar * 16
 

@@ -240,7 +240,7 @@ struct BassGenerator {
             case .major, .sus2, .sus4, .add9: isMajorCtx = true
             default:                          isMajorCtx = false
             }
-            let flatSeven = isMajorCtx ? fifth : UInt8(clamped(Int(root) + 10, low: 28, high: 52))
+            let flatSeven = isMajorCtx ? fifth : UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 28, high: 52))
             let pitches14: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]
             let vels14:    [UInt8] = [94,   84,    88,   80,        82,    78,   84,    74  ]
             var evs14: [MIDIEvent] = []
@@ -665,10 +665,18 @@ struct BassGenerator {
     }
 
     // MARK: - BAS-009: Vitamin Hook — Holger Czukay / CAN "Vitamin C" ascending arpeggio
-    // 2-bar rolling arpeggio spanning root→fifth→octave with chromatic passing tones.
-    // Bar 1 (ascent): root×2 drive, fifth, tritone passing note, octave arrival, m3 colour, fifth tail.
-    // Bar 2 (descent): octave→fifth→root (long breathe), minor-6th upper neighbour, fifth, root pickup.
+    // 2-bar rolling arpeggio spanning root→fifth→octave with scale-snapped passing tones.
+    // Bar 1 (ascent): root×2 drive, fifth, scale passing note, octave arrival, mode 3rd colour, fifth tail.
+    // Bar 2 (descent): octave→fifth→root (long breathe), scale upper neighbour, fifth, root pickup.
     // Source: Ege Bamyasi (1972) — Czukay's signature ascending string-crossing arpeggiation.
+
+    /// Returns the nearest in-scale MIDI note to `target`, clamped to [low, high].
+    private static func nearestScaleNote(to target: Int, frame: GlobalMusicalFrame, low: Int, high: Int) -> UInt8 {
+        let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let nearest  = (low...high).filter { scalePCs.contains($0 % 12) }
+                                   .min(by: { abs($0 - target) < abs($1 - target) })
+        return UInt8(clamped(nearest ?? target, low: low, high: high))
+    }
 
     private static func vitaminHookBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
@@ -677,9 +685,9 @@ struct BassGenerator {
         let root       = chordRootNote(entry: entry, frame: frame)
         let fifth      = UInt8(clamped(Int(root) + 7,  low: 28, high: 56))
         let octave     = UInt8(clamped(Int(root) + 12, low: 28, high: 56))  // wide range for arpeggio
-        let minorThird = UInt8(clamped(Int(root) + 3,  low: 28, high: 56))  // b3 Dorian colour
-        let tritPass   = UInt8(clamped(Int(root) + 6,  low: 28, high: 56))  // passing between 5th and octave
-        let upperNeigh = UInt8(clamped(Int(root) + 8,  low: 28, high: 56))  // m6 upper neighbour of 5th
+        let minorThird = nearestScaleNote(to: Int(root) + 3, frame: frame, low: 28, high: 56)  // mode 3rd colour
+        let tritPass   = nearestScaleNote(to: Int(root) + 6, frame: frame, low: 28, high: 56)  // scale passing tone
+        let upperNeigh = nearestScaleNote(to: Int(root) + 8, frame: frame, low: 28, high: 56)  // scale upper neighbour
 
         if bar % 2 == 0 {
             // Ascent bar: root pump → fifth → chromatic pass → octave arrival → m3 colour → fifth tail

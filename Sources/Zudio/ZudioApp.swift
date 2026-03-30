@@ -3,17 +3,58 @@
 import SwiftUI
 import AppKit
 
+extension Notification.Name {
+    /// Posted by AppDelegate when Finder asks us to open a .zudio file.
+    /// Object is the URL. AppState observes this and loads the file into the
+    /// existing window rather than opening a second instance.
+    static let zudioOpenFile = Notification.Name("zudioOpenFile")
+}
+
 // Quit the app when the last window closes (window-close = full exit, not just hide)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         removeUnwantedMenus()
+
+        // macOS State Restoration can re-open the previous session window alongside the new one,
+        // giving two windows on startup. Mark all windows non-restorable and close any extras.
+        DispatchQueue.main.async {
+            let content = NSApp.windows.filter { !($0 is NSPanel) }
+            content.forEach { $0.isRestorable = false }
+            // Keep only the first content window; close any duplicates from state restore.
+            content.dropFirst().forEach { $0.close() }
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
         // Re-apply removals in case SwiftUI rebuilds menus after activation.
         removeUnwantedMenus()
+    }
+
+    /// Prevent a new window from opening when the user clicks the Dock icon
+    /// while the app is already running and has a visible window.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if flag {
+            sender.windows.first(where: { $0.isVisible && !($0 is NSPanel) })?.makeKeyAndOrderFront(nil)
+        }
+        return !flag
+    }
+
+    /// Called by macOS when the user double-clicks a .zudio file in Finder, both when Zudio
+    /// is already running and when macOS launches it fresh to open the file.
+    /// Routes the URL to the existing window via notification; async dispatch ensures AppState
+    /// has finished initialising before the notification fires on fresh launch.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first else { return }
+        // Bring the existing window to the front.
+        if let window = application.windows.first(where: { $0.isVisible && !($0 is NSPanel) }) {
+            window.makeKeyAndOrderFront(nil)
+            application.activate(ignoringOtherApps: true)
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .zudioOpenFile, object: url)
+        }
     }
 
     private func removeUnwantedMenus() {
@@ -55,6 +96,9 @@ struct ZudioApp: App {
                 .environmentObject(appState)
                 .environmentObject(appState.playback)  // MIDILaneView observes directly — no AppState cascade on each step
         }
+        // Prevent WindowGroup from opening a second window when a .zudio file is opened.
+        // File loading is handled entirely by AppDelegate.application(_:open:) → zudioOpenFile notification.
+        .handlesExternalEvents(matching: [])
         .windowStyle(.titleBar)
         .commands {
             // App menu: wire "About Zudio" to our custom AboutView
@@ -64,7 +108,7 @@ struct ZudioApp: App {
                 }
             }
 
-            // File menu: Generate New + Save MIDI
+            // File menu: Generate New + Save Song
             CommandGroup(replacing: .newItem) {
                 Button("Generate New") {
                     appState.generateNew()
@@ -80,7 +124,7 @@ struct ZudioApp: App {
 
                 Divider()
 
-                Button("Save MIDI") {
+                Button("Save Song") {
                     appState.saveMIDI()
                 }
                 .keyboardShortcut("s", modifiers: .command)

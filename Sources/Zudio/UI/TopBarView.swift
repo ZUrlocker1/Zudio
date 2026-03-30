@@ -1,5 +1,5 @@
 // TopBarView.swift — compact 3-row header
-// Row 1: blank spacer | Row 2: transport + controls | Row 3: Save Audio + Save MIDI
+// Row 1: blank spacer | Row 2: transport + controls | Row 3: Export Audio + Save Song
 
 import SwiftUI
 import AppKit
@@ -101,7 +101,7 @@ struct TopBarView: View {
                                 .background(Color.orange)
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        Text("V 0.94 alpha")
+                        Text("V 0.95 alpha")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -218,7 +218,7 @@ struct TopBarView: View {
                 // collapses to 0 on compact windows so the small-screen layout is unchanged.
                 Spacer(minLength: 0).frame(maxWidth: 48)
 
-                // Generate / Save MIDI / Export Audio stacked left; selectors + Reset right.
+                // Generate / Save Song / Export Audio stacked left; selectors + Reset right.
                 HStack(alignment: .center, spacing: 14) {
 
                     // Left column: three action buttons, all same width
@@ -236,7 +236,7 @@ struct TopBarView: View {
 
                         Button(action: { appState.saveMIDI() }) {
                             Label {
-                                (Text("S").underline() + Text("ave MIDI"))
+                                (Text("S").underline() + Text("ave Song"))
                                     .fontWeight(.semibold)
                             } icon: { Image(systemName: "square.and.arrow.down") }
                             .frame(width: 128, alignment: .center)
@@ -279,7 +279,7 @@ struct TopBarView: View {
                                 (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
                             }
                             .pickerStyle(.segmented)
-                            .accentColor(.gray)
+                            .tint(Color(NSColor.systemGray))
                             .frame(width: 210)
 
                             Button(action: { appState.resetTrackDefaults() }) {
@@ -314,7 +314,7 @@ struct TopBarView: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .frame(width: 90)
+                                .frame(width: 105)
 
                                 HStack(spacing: 6) {
                                     Text("BPM")
@@ -341,7 +341,7 @@ struct TopBarView: View {
 
                 Spacer()
 
-                // Help / About — rows align with Generate (row 2) and Save MIDI (row 3)
+                // Help / About — rows align with Generate (row 2) and Save Song (row 3)
                 VStack(alignment: .trailing, spacing: 6) {
                     Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: 52) }
                     Button { showAbout = true } label: { Text("About").frame(width: 52) }
@@ -359,6 +359,10 @@ struct TopBarView: View {
             .background(Color(white: 0.15))
             .onAppear {
                 // Prevent BPM text field from stealing focus on launch so plain keyboard shortcuts work
+                DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
+            }
+            .onChange(of: appState.selectedStyle) { _ in
+                // Segmented style picker can shift focus to the BPM text field — clear it immediately
                 DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
             }
 
@@ -426,7 +430,7 @@ struct HelpView: View {
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
-                helpLine("Save MIDI (⌘S) / Load Song (⌘L)", "Exports a multi-track MIDI file to /Downloads. Open in any DAW to edit further. Also saves a text log file of rules. The log file can be reloaded to restore a song.")
+                helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to /Downloads. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
                 helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")
@@ -468,7 +472,7 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.94 (alpha)").font(.system(size: 14))
+                Text("Version: 0.95 (alpha)").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk, Neu!, Deluxe, Harmonia, Tangerine Dream, Electric Buddha Band, Loscil, Craven Faults and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments as well as arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass and Dinger beat. There are basic audio effects per track for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))

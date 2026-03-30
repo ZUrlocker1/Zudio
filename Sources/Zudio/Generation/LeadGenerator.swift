@@ -5,6 +5,8 @@
 // LD1-004: Stepwise Sequence — descending 5→4→2→1 (bar A), shifted b7→5→4→2 (bar B)
 // LD1-005: Statement-Answer — bar A ascends 1→2→b3→5, bar B silent then answers 4→b3
 // LD1-006: Long Arc Solo — single note per bar, ascending or descending through register across section
+// LD1-007: Vanishing Solo — 10-bar pentatonic guitar-style solo; Lead 2 silenced during solo
+// LD1-008: Visiting Solo — 9-bar Dorian moog-style solo with octave arpeggios; Lead 2 silenced
 // LD2-001: Counter-response — density ≤55% of Lead 1, attacks offset by half-beat for call-and-response
 // LD2-002: Sustained Drone — very sparse, long holds on root or 5th
 // LD2-003: Rhythmic Counter — short bursts offset from Lead 1 rhythm
@@ -91,8 +93,9 @@ struct LeadGenerator {
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceLeadRuleID: String? = nil
-    ) -> [MIDIEvent] {
+        forceLeadRuleID: String? = nil,
+        testMode: Bool = false
+    ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
 
         // A: Per-section rule — always consume two draws for RNG determinism across songs.
         // forceLeadRuleID is honoured only for known Motorik-lead IDs; cross-style IDs are ignored.
@@ -148,15 +151,24 @@ struct LeadGenerator {
         // G: Sparse-phrase gate for LD1-001 — 35% of 4-bar cycles thin to ~45% note density
         var phraseSparseCycle = false
 
+        // H: Solo placement for LD1-007 / LD1-008 — single well-placed window in the A section.
+        let isSoloRule = aRule == "MOT-LD1-007" || aRule == "MOT-LD1-008"
+        let soloLen    = aRule == "MOT-LD1-007" ? 10 : 9
+        let soloWindow: Range<Int>? = isSoloRule
+            ? pickSoloStartBar(structure: structure, soloLength: soloLen, rng: &rng, testMode: testMode)
+            : nil
+        let soloRange: Range<Int>? = soloWindow
+
         var events: [MIDIEvent] = []
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar),
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
 
-            // E: Body section hard-silent before entryBar
+            // E: Body section hard-silent before entryBar.
+            // Solo rules (007/008) bypass this — their solo window starts near the top of the body.
             let isBodySection = section.label == .A || section.label == .B
-            if isBodySection && bar < entryBar { continue }
+            if isBodySection && bar < entryBar && !isSoloRule { continue }
 
             let isIntroOutro = section.label == .intro || section.label == .outro
             let intensity    = section.subPhaseIntensity(atBar: bar)
@@ -166,6 +178,17 @@ struct LeadGenerator {
             let ruleID = (section.label == .B) ? bRule : aRule
 
             var barEvents: [MIDIEvent] = []
+
+            // H: Solo window — checked before the switch so bRule never interferes.
+            if !isIntroOutro, let window = soloWindow, window.contains(bar) {
+                let soloBar = bar - window.lowerBound
+                barEvents = aRule == "MOT-LD1-007"
+                    ? generateGuitarSolo007(soloBar: soloBar, barStart: barStart, frame: frame)
+                    : generateMoogSolo008(soloBar: soloBar, barStart: barStart, frame: frame)
+                events.append(contentsOf: barEvents)
+                prevNote = barEvents.last?.note
+                continue
+            }
 
             switch ruleID {
 
@@ -294,6 +317,15 @@ struct LeadGenerator {
                         intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
                 }
 
+            case "MOT-LD1-007", "MOT-LD1-008":
+                // H: Solo windows handled by the pre-switch guard above.
+                // Intro/outro: use motif-first so the track isn't silent before the song body.
+                // Body bars not in any solo window: silent (Lead 1 yields to the solo identity).
+                if isIntroOutro {
+                    barEvents = lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
+                        intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
+                }
+
             case "MOT-LD1-006":
                 // F: One held note per bar, stepping through mode scale.
                 // Reverses direction at register boundaries so it doesn't clamp on one note.
@@ -338,7 +370,7 @@ struct LeadGenerator {
             }
         }
 
-        return events
+        return (events, soloRange)
     }
 
     // MARK: - Lead 2
@@ -349,7 +381,8 @@ struct LeadGenerator {
         tonalMap: TonalGovernanceMap,
         lead1Events: [MIDIEvent],
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        soloRange: Range<Int>? = nil
     ) -> [MIDIEvent] {
         let ld2Rules:   [String] = ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
         let ld2Weights: [Double] = [0.20,      0.15,      0.10,      0.20,      0.15,      0.20]
@@ -361,6 +394,9 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
 
         for bar in 0..<frame.totalBars {
+            // Silence Lead 2 during the Lead 1 extended solo window
+            if let sr = soloRange, sr.contains(bar) { continue }
+
             guard let section = structure.section(atBar: bar),
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
 
@@ -455,7 +491,7 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
         if isIntroOutro && rng.nextDouble() < 0.65 { return events }
         let bounds = kRegisterBounds[kTrackLead1]!
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC = chordRootPC(frame: frame, entry: entry)
 
         let offsets: [Int] = (bar % 2 == 0) ? [7, 5, 2, 0] : [frame.mode.nearestInterval(10), 7, 5, 2]
         let durs:    [Int] = [3, 2, 3, 4]
@@ -484,7 +520,7 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
         if isIntroOutro && rng.nextDouble() < 0.65 { return events }
         let bounds = kRegisterBounds[kTrackLead1]!
-        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
         let baseVel = Int(velocityForIntensity(intensity, rng: &rng))
         var localPrev = prevNote
 
@@ -554,7 +590,7 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
         if isIntroOutro { return events }
         let bounds = kRegisterBounds[kTrackLead2]!
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC = chordRootPC(frame: frame, entry: entry)
 
         let barL1 = lead1Events
             .filter { $0.stepIndex >= barStart && $0.stepIndex < barStart + 16 }
@@ -587,10 +623,10 @@ struct LeadGenerator {
         let prob: Double = isIntroOutro ? 0.08 : 0.22
         guard rng.nextDouble() < prob else { return events }
         let bounds  = kRegisterBounds[kTrackLead2]!
-        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
         let fifthPC = (rootPC + 7) % 12
         let pc      = rng.nextDouble() < 0.65 ? fifthPC : rootPC
-        let note    = midiNoteForPC(pc, bounds: bounds, rng: &rng)
+        let note    = nearestMIDI(pc: pc, bounds: bounds, prevNote: nil)
         let dur     = [8, 12, 16][rng.nextInt(upperBound: 3)]
         events.append(MIDIEvent(stepIndex: barStart, note: note, velocity: 55, durationSteps: dur))
         return events
@@ -636,7 +672,7 @@ struct LeadGenerator {
         for (i, step) in steps.enumerated() {
             guard rng.nextDouble() < 0.55 else { continue }
             let pc   = (rootPC + noteOffsets[i]) % 12
-            let note = midiNoteForPC(pc, bounds: bounds, rng: &rng)
+            let note = nearestMIDI(pc: pc, bounds: bounds, prevNote: nil)
             events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                     velocity: vels[i], durationSteps: 1))
         }
@@ -676,7 +712,7 @@ struct LeadGenerator {
 
         for (pcOffset, step, vel) in [(off1, 5, vel1), (off2, 13, vel2)] {
             let pc   = (rootPC + pcOffset) % 12
-            let note = midiNoteForPC(pc, bounds: bounds, rng: &rng)
+            let note = nearestMIDI(pc: pc, bounds: bounds, prevNote: nil)
             events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                     velocity: vel, durationSteps: 2))
         }
@@ -687,8 +723,8 @@ struct LeadGenerator {
 
     /// Picks a new LD1 rule consuming one RNG draw (called twice in generateLead1 for determinism).
     private static func pickLd1Rule(rng: inout SeededRNG) -> String {
-        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006"]
-        let weights: [Double] = [0.26,          0.18,          0.08,          0.22,          0.16,          0.10]
+        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008"]
+        let weights: [Double] = [0.15,          0.14,          0.10,          0.15,          0.14,          0.11,          0.11,          0.10]
         return rules[rng.weightedPick(weights)]
     }
 
@@ -755,7 +791,7 @@ struct LeadGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let bounds = kRegisterBounds[kTrackLead1]!
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC = chordRootPC(frame: frame, entry: entry)
         let velAdj: Int
         switch intensity { case .low: velAdj = -12; case .medium: velAdj = 0; case .high: velAdj = 10 }
         var localPrev = prevNote
@@ -779,6 +815,11 @@ struct LeadGenerator {
         case .medium: return 0.55
         case .high:   return 0.80
         }
+    }
+
+    /// Pitch class of the current chord root (0–11).
+    private static func chordRootPC(frame: GlobalMusicalFrame, entry: TonalGovernanceEntry) -> Int {
+        (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
     }
 
     private static func velocityForIntensity(_ intensity: SectionIntensity, rng: inout SeededRNG) -> UInt8 {
@@ -825,38 +866,14 @@ struct LeadGenerator {
         return nearestMIDI(pc: pc, bounds: bounds, prevNote: prevNote)
     }
 
-    /// Legacy chord-tone/tension picker (first-match octave). Used by LD2 rules.
+    /// Chord-tone/tension picker with smooth octave selection. Used by LD2 rules.
     private static func pickNote(
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, trackIndex: Int, rng: inout SeededRNG
     ) -> UInt8 {
-        let pool: [Int]
-        if rng.nextDouble() < 0.80 {
-            pool = entry.chordWindow.chordTones.sorted()
-        } else {
-            pool = entry.chordWindow.scaleTensions.sorted()
-        }
-        guard !pool.isEmpty else {
-            return frame.midiNote(degree: "1", oct: 0, trackIndex: trackIndex)
-        }
-        let pc     = pool[rng.nextInt(upperBound: pool.count)]
-        let bounds = kRegisterBounds[trackIndex] ?? RegisterBounds(low: 60, high: 96)
-        for oct in 3...7 {
-            let midi = oct * 12 + pc
-            if midi >= Int(bounds.low) && midi <= Int(bounds.high) { return UInt8(midi) }
-        }
-        return UInt8(bounds.low)
+        pickNoteNearest(entry: entry, frame: frame, trackIndex: trackIndex, prevNote: nil, rng: &rng)
     }
 
-    /// First-match pitch-class → MIDI note. Used by LD2 rules (no prevNote needed there).
-    private static func midiNoteForPC(_ pc: Int, bounds: RegisterBounds, rng: inout SeededRNG) -> UInt8 {
-        for oct in 3...7 {
-            let midi = oct * 12 + pc
-            if midi >= bounds.low && midi <= bounds.high { return UInt8(midi) }
-        }
-        return UInt8(bounds.low)
-    }
-
-    // MARK: - LD2-001 / LD2-006 harmony helpers
+// MARK: - LD2-001 / LD2-006 harmony helpers
 
     /// Picks a chord tone whose pitch class forms a consonant interval with Lead 1's last note.
     /// Falls back to a random chord tone if no consonant option is available.
@@ -881,7 +898,7 @@ struct LeadGenerator {
             return nearestMIDI(pc: pc, bounds: bounds, prevNote: nil)
         } else {
             let pc = pool[rng.nextInt(upperBound: pool.count)]
-            return midiNoteForPC(pc, bounds: bounds, rng: &rng)
+            return nearestMIDI(pc: pc, bounds: bounds, prevNote: nil)
         }
     }
 
@@ -907,5 +924,176 @@ struct LeadGenerator {
         let idx    = modeIndex(pitchClass: pitchClass, mode: mode, rootPC: rootPC)
         let newIdx = (idx + degrees) % count
         return (rootPC + mode.intervals[newIdx]) % 12
+    }
+
+    // MARK: - LD1-007 / LD1-008: Solo placement
+
+    /// Returns the bar range for the solo window, always within the A section.
+    /// Never uses the B section — the bar loop applies bRule there, which would silence the solo.
+    /// In test mode, places the solo near the start of the body so it is heard quickly.
+    private static func pickSoloStartBar(
+        structure: SongStructure, soloLength: Int, rng: inout SeededRNG, testMode: Bool = false
+    ) -> Range<Int> {
+        // Test mode: place solo 2 bars into the body so the tester hears it immediately.
+        if testMode {
+            let bodyStart = (structure.bodySections.first?.startBar ?? 0) + 2
+            return bodyStart ..< bodyStart + soloLength
+        }
+        // Normal mode: place in the first two-thirds of the A section so the solo isn't too late.
+        // For long A sections (pure A-form songs), 1/2 pushes the solo past the 50% mark.
+        // Using 1/3 as earliest and 2/3 as latest cap keeps it roughly centred in the song.
+        if let a = structure.sections.first(where: { $0.label == .A }),
+           a.lengthBars >= soloLength + 8 {
+            let earliest = a.startBar + a.lengthBars / 3
+            let latest   = min(a.startBar + (a.lengthBars * 2) / 3,
+                               a.startBar + a.lengthBars - soloLength - 4)
+            let start    = latest > earliest ? earliest + rng.nextInt(upperBound: latest - earliest) : earliest
+            return start ..< start + soloLength
+        }
+        // Fallback: place near the first body bar
+        let bodyStart = structure.bodySections.first?.startBar ?? 0
+        return bodyStart ..< bodyStart + soloLength
+    }
+
+    // MARK: - LD1-007: Vanishing Solo
+    // 10-bar pentatonic solo derived from Vanishing Point guitar solo (Electric Buddha Band).
+    // Uses only minor pentatonic: root, m3, P4, P5, m7.
+    // Phase 1 (bars 0–3): active eighth/quarter motion, primary 5-note motif × 2
+    // Phase 2 (bars 4–6): wind-down, half-note motion, descending
+    // Phase 3 (bars 7–9): dissolution, 1–3 notes/bar, final single root on beat 2 of bar 9
+
+    private static func generateGuitarSolo007(soloBar: Int, barStart: Int, frame: GlobalMusicalFrame) -> [MIDIEvent] {
+        let bounds  = kRegisterBounds[kTrackLead1]!
+        let kr      = 60 + keySemitone(frame.key)  // root in octave 4
+
+        // Named pitch offsets (all relative to kr, clamped to register)
+        func n(_ offset: Int, vel: Int, step: Int, dur: Int) -> MIDIEvent {
+            MIDIEvent(stepIndex: barStart + step,
+                      note: UInt8(max(Int(bounds.low), min(Int(bounds.high), kr + offset))),
+                      velocity: UInt8(vel), durationSteps: dur)
+        }
+
+        switch soloBar {
+        case 0: // Pickup — enters on beat 3; P5(low) then m3
+            return [n(-5, vel:84, step:8,  dur:4),
+                    n( 3, vel:67, step:12, dur:4)]
+
+        case 1: // Primary motif: m3 – m7(low) – m3 long – root – m3
+            return [n( 3, vel:66, step:0,  dur:2),
+                    n(-2, vel:50, step:2,  dur:2),
+                    n( 3, vel:43, step:4,  dur:4),
+                    n( 0, vel:93, step:8,  dur:4),
+                    n( 3, vel:65, step:12, dur:4)]
+
+        case 2: // Peak bar: brief m3 – P5(high) peak – P5(low) drop – m7(low)
+            return [n( 3, vel:55, step:2,  dur:2),
+                    n( 7, vel:47, step:4,  dur:2),
+                    n(-5, vel:86, step:8,  dur:4),
+                    n(-2, vel:81, step:12, dur:4)]
+
+        case 3: // Primary motif reprise (verbatim of bar 1)
+            return [n( 3, vel:73, step:0,  dur:2),
+                    n(-2, vel:55, step:2,  dur:2),
+                    n( 3, vel:42, step:4,  dur:4),
+                    n( 0, vel:96, step:8,  dur:5),
+                    n( 3, vel:77, step:12, dur:4)]
+
+        case 4: // Wind-down: P5 brief – m3 brief – m7(low) held
+            return [n( 7, vel:65, step:0, dur:2),
+                    n( 3, vel:52, step:2, dur:2),
+                    n(-2, vel:50, step:4, dur:8)]
+
+        case 5: // Half-note motion: m7(low) – root – m3
+            return [n(-2, vel:84, step:0,  dur:8),
+                    n( 0, vel:93, step:8,  dur:4),
+                    n( 3, vel:93, step:12, dur:5)]
+
+        case 6: // root(beat 2) – P5(low)
+            return [n( 0, vel:93, step:4,  dur:7),
+                    n(-5, vel:93, step:12, dur:5)]
+
+        case 7: // Sparse: m3(beat 2) – root
+            return [n( 3, vel:77, step:4,  dur:5),
+                    n( 0, vel:50, step:10, dur:6)]
+
+        case 8: // Brief motion: m3 – m7(low) – P5(low) – m7(low)
+            return [n( 3, vel:71, step:0,  dur:4),
+                    n(-2, vel:39, step:4,  dur:6),
+                    n(-5, vel:72, step:10, dur:4),
+                    n(-2, vel:72, step:14, dur:5)]
+
+        case 9: // Final: single root on beat 2
+            return [n( 0, vel:74, step:4, dur:4)]
+
+        default:
+            return []
+        }
+    }
+
+    // MARK: - LD1-008: Visiting Solo
+    // 9-bar Dorian moog-style solo derived from Visitor from the Past (Electric Buddha Band).
+    // Uses Dorian scale: root, M2, m3, P4, P5, M6, m7.
+    // Phase 1 (bars 0–1): root anchor + active circling eighth-note phrase
+    // Phase 2 (bars 2–5): sparse long held notes + octave arpeggio motif (root–oct–2oct–oct)
+    // Phase 3 (bars 6–8): terminal — stepwise descent, final low root
+
+    private static func generateMoogSolo008(soloBar: Int, barStart: Int, frame: GlobalMusicalFrame) -> [MIDIEvent] {
+        let bounds = kRegisterBounds[kTrackLead1]!
+        let kr     = 60 + keySemitone(frame.key)
+
+        func n(_ offset: Int, vel: Int, step: Int, dur: Int) -> MIDIEvent {
+            MIDIEvent(stepIndex: barStart + step,
+                      note: UInt8(max(Int(bounds.low), min(Int(bounds.high), kr + offset))),
+                      velocity: UInt8(vel), durationSteps: dur)
+        }
+
+        switch soloBar {
+        case 0: // Root long hold + P5(low)/root eighth pickup at end
+            return [n( 0, vel:80, step:0,  dur:12),
+                    n(-5, vel:87, step:12, dur:2),
+                    n( 0, vel:96, step:14, dur:2)]
+
+        case 1: // Active circling phrase — P4→P5→m3→root→M6→m3→P4 in eighths
+            return [n( 5, vel:73, step:0,  dur:2),
+                    n( 7, vel:75, step:2,  dur:2),
+                    n( 3, vel:79, step:4,  dur:2),
+                    n( 0, vel:86, step:6,  dur:2),
+                    n( 9, vel:60, step:8,  dur:4),
+                    n( 3, vel:75, step:12, dur:2),
+                    n( 5, vel:79, step:14, dur:4)]
+
+        case 2: // Root brief + P5(low) long hold (ties into bar 3)
+            return [n( 0, vel:95, step:0, dur:4),
+                    n(-5, vel:82, step:4, dur:20)]
+
+        case 3: // P5(low) still sounding; root enters mid-bar
+            return [n( 0, vel:94, step:8, dur:12)]
+
+        case 4: // Octave arpeggio: root – root+12 – root+24(clamped) – root+12
+            return [n(  0, vel:81, step:2, dur:2),
+                    n( 12, vel:81, step:4, dur:2),
+                    n( 24, vel:79, step:6, dur:4),
+                    n( 12, vel:81, step:10, dur:2)]
+
+        case 5: // Arpeggio echo: root+12 – root – root+12 held
+            return [n( 12, vel:84, step:2, dur:4),
+                    n(  0, vel:81, step:6, dur:2),
+                    n( 12, vel:80, step:8, dur:8)]
+
+        case 6: // Stepwise walk: root – M2 – m3 – root
+            return [n( 0, vel:82, step:0,  dur:4),
+                    n( 2, vel:76, step:4,  dur:4),
+                    n( 3, vel:74, step:8,  dur:4),
+                    n( 0, vel:88, step:12, dur:4)]
+
+        case 7: // Long M2 whole bar
+            return [n( 2, vel:50, step:0, dur:16)]
+
+        case 8: // Terminal: dramatic low root long hold (one octave below)
+            return [n(-12, vel:60, step:0, dur:16)]
+
+        default:
+            return []
+        }
     }
 }

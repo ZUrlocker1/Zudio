@@ -439,6 +439,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.4    // Texture pads are quiet
             } else if trackIndex == kTrackDrums && ambientMode {
                 vol = 2.2    // Drums sit under heavy Ambient reverb — boost so they're audible
+            } else if trackIndex == kTrackRhythm && kosmicStyle {
+                vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — pull back
             } else {
                 vol = 1.0
             }

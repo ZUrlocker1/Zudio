@@ -1619,6 +1619,22 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 ---
 
+### 16.6a AMB-LEAD-009 — Magnetik Solo ✓ DONE
+
+**Rule:** AMB-LEAD-009 (Lead 1, 9%)
+
+Inspired by the freely-played analog lead in "Magnetik" (bars 10–18). Two sparse windows of ~8 bars each, with a gap of at least 8 bars between them. Notes land just past the beat ("after-beat" feel), 2–4 events per bar, 35% rest bars. Soft velocity (38–68), chord-tone biased (60%). Occasional two-note dyad (25%). Register MIDI 62–78.
+
+---
+
+### 16.6b AMB-LEAD-010 — Oxygenerator Solo ✓ DONE
+
+**Rule:** AMB-LEAD-010 (Lead 1, 7%)
+
+Inspired by the classic analog pad ornamental melody in "Oxygenerator" (bars 5–13, 20–37). Two windows of ~9 bars each. Each bar: a flowing ascending run of 5–7 scale tones (very soft, 2-step each) rising to one louder held chord-tone peak. Optional diatonic upper-neighbour trill (25%). Optional gentle descent after peak (55%). Register MIDI 64–80.
+
+---
+
 ### 16.7 Plan L — Bass Melodic Neighbour Tones (AMB-BASS-001 enhancement)
 
 **Rule:** AMB-BASS-001 enhancement (no new rule ID)

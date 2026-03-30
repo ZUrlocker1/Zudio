@@ -2,16 +2,19 @@
 // Output: same base name as the MIDI file, .txt extension.
 // Used by the Musical Coherence analysis workflow (docs/musical-coherence-plan.md).
 
+import AppKit
 import Foundation
 
 struct SongLogExporter {
 
     // MARK: - Public entry point
 
-    /// Writes a .txt log file next to `midiURL` (same stem, .txt extension).
+    /// Writes a .zudio log file next to `midiURL` (same stem, .zudio extension).
     static func export(_ song: SongState, midiURL: URL) throws {
-        let logURL = midiURL.deletingPathExtension().appendingPathExtension("txt")
-        try buildLog(song).write(to: logURL, atomically: true, encoding: .utf8)
+        let logURL = midiURL.deletingPathExtension().appendingPathExtension("zudio")
+        guard let data = buildLog(song).data(using: .utf8) else { return }
+        try data.write(to: logURL, options: .atomic)
+        setZudioIcon(on: logURL)
     }
 
     // MARK: - Log construction
@@ -28,7 +31,7 @@ struct SongLogExporter {
             "=== Zudio Song Analysis Log ===",
             col("Title:",          16) + song.title,
             col("Generated:",      16) + dateStr,
-            col("Zudio Version:",  16) + "0.94",
+            col("Zudio Version:",  16) + "0.95",
             col("Seed:",           16) + "\(song.globalSeed)",
             col("Style:",          16) + song.style.rawValue.capitalized,
         ]
@@ -112,5 +115,12 @@ struct SongLogExporter {
     /// 1-based bar number as a 3-digit string.
     private static func barStr(_ bar: Int) -> String {
         String(format: "%3d", bar + 1)
+    }
+
+    /// Stamps the Z! document icon onto the saved file so Finder shows it in icon view.
+    private static func setZudioIcon(on url: URL) {
+        guard let iconURL = Bundle.main.url(forResource: "zudio-doc", withExtension: "icns"),
+              let icon = NSImage(contentsOf: iconURL) else { return }
+        NSWorkspace.shared.setIcon(icon, forFile: url.path, options: [])
     }
 }

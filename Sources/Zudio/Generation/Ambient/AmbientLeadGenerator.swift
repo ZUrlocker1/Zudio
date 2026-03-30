@@ -1,7 +1,10 @@
 // AmbientLeadGenerator.swift — Lead 1 and Lead 2 generators for Ambient style
-// Lead 1 rules: AMB-LEAD-004 (40%), AMB-LEAD-001 floating tone (26%),
-//               AMB-LEAD-002 echo phrase (19%), AMB-LEAD-003 pentatonic shimmer (10%),
-//               AMB-LEAD-007 lyric fragment (5%)
+// Lead 1 rules: silence (20%), AMB-LEAD-001 floating tone (15%),
+//               AMB-LEAD-002 echo phrase (15%), AMB-LEAD-003 pentatonic shimmer (15%),
+//               AMB-LEAD-007 lyric fragment (9%), AMB-LEAD-008 returning motif (10%),
+//               AMB-LEAD-009 Magnetik solo (9%), AMB-LEAD-010 Oxygenerator solo (7%)
+// AMB-LEAD-009 and AMB-LEAD-010 are section-level solos: they bypass the loop tiler and
+// return full-song events (require structure != nil; degrade gracefully to silence if absent).
 // Lead 2: AMB-SYNC-003 — fills Lead 1 silent windows (absent if no windows).
 // AMB-RULE-02 enforced: rest ≥ 2× note duration after each note event.
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
@@ -19,7 +22,8 @@ struct AmbientLeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceNonSilent: Bool = false,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        structure: SongStructure? = nil
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackLead1]!  // low:60, high:88
         let loopSteps = loopBars * 16
@@ -27,10 +31,11 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
+        let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
+
         // If a specific rule is forced (test pool override), skip the random roll
         if let forced = forceRuleID {
-            let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
-            let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
             switch forced {
             case "AMB-LEAD-001": usedRuleIDs.insert("AMB-LEAD-001"); return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
             case "AMB-LEAD-002": usedRuleIDs.insert("AMB-LEAD-002"); return echoPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)
@@ -38,34 +43,55 @@ struct AmbientLeadGenerator {
             case "AMB-LEAD-004": usedRuleIDs.insert("AMB-LEAD-004"); return []
             case "AMB-LEAD-007": usedRuleIDs.insert("AMB-LEAD-007"); return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
             case "AMB-LEAD-008": usedRuleIDs.insert("AMB-LEAD-008"); return returningMotif(notes: notes, loopSteps: loopSteps, rng: &rng)
+            case "AMB-LEAD-009":
+                usedRuleIDs.insert("AMB-LEAD-009")
+                guard let str = structure else { return [] }
+                return generateMagnetikSolo(frame: frame, structure: str, tonalMap: tonalMap, rng: &rng)
+            case "AMB-LEAD-010":
+                usedRuleIDs.insert("AMB-LEAD-010")
+                guard let str = structure else { return [] }
+                return generateOxygeneratorSolo(frame: frame, structure: str, tonalMap: tonalMap, rng: &rng)
             default: break
             }
         }
 
         let roll = rng.nextDouble()
-        if !forceNonSilent && roll < 0.40 {
-            usedRuleIDs.insert("AMB-LEAD-004"); return []
+        if !forceNonSilent && roll < 0.20 {
+            usedRuleIDs.insert("AMB-LEAD-004"); return []   // 20% silence
         }
-        if roll < 0.63 {
+        if roll < 0.35 {
             usedRuleIDs.insert("AMB-LEAD-001")
-            return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
+            return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)  // 15%
         }
-        if roll < 0.81 {
+        if roll < 0.50 {
             usedRuleIDs.insert("AMB-LEAD-002")
-            return echoPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)
+            return echoPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)    // 15%
         }
-        if roll < 0.91 {
+        if roll < 0.65 {
             usedRuleIDs.insert("AMB-LEAD-003")
-            let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
-            let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
-            return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)
+            return pentaShimmer(notes: pentaNotes.isEmpty ? notes : pentaNotes, loopSteps: loopSteps, rng: &rng)  // 15%
         }
-        if roll < 0.95 {
+        if roll < 0.74 {
             usedRuleIDs.insert("AMB-LEAD-007")
-            return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)
+            return lyricalFragment(notes: notes, loopSteps: loopSteps, rng: &rng)  // 9%
         }
-        usedRuleIDs.insert("AMB-LEAD-008")
-        return returningMotif(notes: notes, loopSteps: loopSteps, rng: &rng)
+        if roll < 0.84 {
+            usedRuleIDs.insert("AMB-LEAD-008")
+            return returningMotif(notes: notes, loopSteps: loopSteps, rng: &rng)   // 10%
+        }
+        if roll < 0.93 {
+            if let str = structure {
+                usedRuleIDs.insert("AMB-LEAD-009")
+                return generateMagnetikSolo(frame: frame, structure: str, tonalMap: tonalMap, rng: &rng)  // 9%
+            }
+        }
+        if let str = structure {
+            usedRuleIDs.insert("AMB-LEAD-010")
+            return generateOxygeneratorSolo(frame: frame, structure: str, tonalMap: tonalMap, rng: &rng)  // 7%
+        }
+        // Fallback if structure not available: floating tone
+        usedRuleIDs.insert("AMB-LEAD-001")
+        return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
     }
 
     // MARK: - Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows)
@@ -84,10 +110,10 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        // AMB-SYNC-004 (40%): ghost echo — delay Lead 1 notes by 4–8 steps at 60–65% velocity.
+        // AMB-LEAD-004 (40%): ghost echo — delay Lead 1 notes by 4–8 steps at 60–65% velocity.
         // Creates a natural echo/shadow effect; only fires when Lead 1 has content.
         if !lead1Events.isEmpty && rng.nextDouble() < 0.40 {
-            usedRuleIDs.insert("AMB-SYNC-004")
+            usedRuleIDs.insert("AMB-LEAD-004")
             var echoEvents: [MIDIEvent] = []
             for ev in lead1Events where ev.stepIndex < loopSteps {
                 let offset = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
@@ -289,6 +315,196 @@ struct AmbientLeadGenerator {
             cursor += returnInterval
         }
         return events
+    }
+
+    // MARK: - AMB-LEAD-009: Magnetik solo
+    // Inspired by Magnetik bars 10–18 "Keyboard Player - Freely": 70s freely-played analog lead.
+    // Character: chord tones at "after-beat" positions (notes land just past the beat, legato),
+    // 2–4 events per bar, short durations, occasional 2-note event. Soft, floaty velocity.
+    // Plays in exactly 2 windows of 8 bars with ≥12-bar gap. Sparse: ~35% rest bars.
+
+    private static func generateMagnetikSolo(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let windows = pickAmbSoloWindows(structure: structure, soloLength: 8, windowCount: 2,
+                                         minGap: 12, rng: &rng)
+        guard !windows.isEmpty else { return [] }
+
+        let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        var events: [MIDIEvent] = []
+
+        for window in windows {
+            for bar in window {
+                // ~35% rest bar
+                if rng.nextDouble() < 0.35 { continue }
+
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let barStart = bar * 16
+                let allNotes = notesInRegister(pitchClasses: scalePCs, low: 62, high: 78)
+                guard !allNotes.isEmpty else { continue }
+
+                // Prefer chord tones (60% bias)
+                let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
+                let chordNotes   = allNotes.filter { chordTonePCs.contains(Int($0) % 12) }
+                let pool = chordNotes.isEmpty ? allNotes : chordNotes
+
+                // "After-beat" positions: just past beats 1-4 (steps 2, 6, 10, 14) ± 1 jitter
+                let baseOffsets = [2, 6, 10, 14]
+                let eventCount  = 2 + rng.nextInt(upperBound: 3)  // 2–4 events
+                var used = Set<Int>()
+
+                for _ in 0..<eventCount {
+                    // Pick an unused base offset
+                    let candidates = baseOffsets.filter { !used.contains($0) }
+                    guard !candidates.isEmpty else { break }
+                    let base   = candidates[rng.nextInt(upperBound: candidates.count)]
+                    let jitter = rng.nextInt(upperBound: 3) - 1   // -1, 0, +1
+                    let step   = Swift.max(0, Swift.min(15, base + jitter))
+                    used.insert(base)
+
+                    let note = pool[rng.nextInt(upperBound: pool.count)]
+                    let dur  = Swift.min(4 + rng.nextInt(upperBound: 5), 16 - step)  // 4–8 steps
+                    guard dur >= 2 else { continue }
+                    let vel  = UInt8(38 + rng.nextInt(upperBound: 31))  // 38–68
+
+                    events.append(MIDIEvent(stepIndex: barStart + step, note: note,
+                                            velocity: vel, durationSteps: dur))
+                }
+            }
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    // MARK: - AMB-LEAD-010: Oxygenerator solo
+    // Inspired by Oxygenerator "Synth Lead 2" bars 21–23: classic analog pad ornamental melody.
+    // Character: flowing 8th-note run of scale tones (all very soft) peaking at one chord tone,
+    // with occasional trill ornament (X, X+semitone, X → resolve). Dense within active bars,
+    // but ~30% rest bars keep it sparse.
+    // Plays in exactly 2 windows of 9 bars with ≥12-bar gap.
+
+    private static func generateOxygeneratorSolo(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let windows = pickAmbSoloWindows(structure: structure, soloLength: 9, windowCount: 2,
+                                         minGap: 12, rng: &rng)
+        guard !windows.isEmpty else { return [] }
+
+        let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        var events: [MIDIEvent] = []
+
+        for window in windows {
+            for bar in window {
+                // ~30% rest bar
+                if rng.nextDouble() < 0.30 { continue }
+
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let barStart = bar * 16
+                let allNotes = notesInRegister(pitchClasses: scalePCs, low: 64, high: 80)
+                guard allNotes.count >= 4 else { continue }
+
+                let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
+                let chordNotes   = allNotes.filter { chordTonePCs.contains(Int($0) % 12) }
+
+                // Pick ascending run start — lower portion of register
+                let runLen   = 5 + rng.nextInt(upperBound: 3)    // 5–7 notes
+                let maxStart = Swift.max(0, allNotes.count - runLen - 2)
+                let startIdx = rng.nextInt(upperBound: Swift.max(1, maxStart / 2 + 1))
+
+                // Occasional trill ornament on one note in the run (25%)
+                let trillPos = rng.nextDouble() < 0.25 ? rng.nextInt(upperBound: runLen) : -1
+
+                var step = 0
+                var peakPlaced = false
+
+                for i in 0..<runLen {
+                    guard step < 12 else { break }
+                    let noteIdx = Swift.min(startIdx + i, allNotes.count - 1)
+                    let note    = Int(allNotes[noteIdx])
+
+                    if i == trillPos && step + 3 < 12 && noteIdx + 1 < allNotes.count {
+                        // Trill ornament: note, diatonic upper neighbour, note (3 steps at soft vel)
+                        let upper = Int(allNotes[noteIdx + 1])  // next scale tone — avoids chromatic clashes
+                        events.append(MIDIEvent(stepIndex: barStart + step,     note: UInt8(note),  velocity: 22, durationSteps: 1))
+                        events.append(MIDIEvent(stepIndex: barStart + step + 1, note: UInt8(upper), velocity: 28, durationSteps: 1))
+                        events.append(MIDIEvent(stepIndex: barStart + step + 2, note: UInt8(note),  velocity: 18, durationSteps: 1))
+                        step += 3
+                        continue
+                    }
+
+                    // Last note in run or a chord tone: make it the "peak" (louder, held longer)
+                    let isChordTone = chordTonePCs.contains(note % 12)
+                    let isPeak = (i == runLen - 1 || isChordTone) && !peakPlaced
+                    if isPeak { peakPlaced = true }
+                    let vel = isPeak ? UInt8(62 + rng.nextInt(upperBound: 19))  // 62–80
+                                     : UInt8(14 + rng.nextInt(upperBound: 22))  // 14–35 (soft)
+                    let dur = isPeak ? Swift.min(5 + rng.nextInt(upperBound: 3), 16 - step)  // 5–7 steps
+                                     : 2                                                       // 2 steps (8th note)
+                    guard dur >= 1 else { break }
+                    events.append(MIDIEvent(stepIndex: barStart + step, note: UInt8(note),
+                                            velocity: vel, durationSteps: dur))
+                    step += isPeak ? dur : 2
+                }
+
+                // Optional gentle descent after peak (2–3 notes, very soft)
+                if peakPlaced && step < 14 && rng.nextDouble() < 0.55 {
+                    let descentLen = 2 + rng.nextInt(upperBound: 2)
+                    let topIdx     = Swift.min(startIdx + runLen - 1, allNotes.count - 1)
+                    for j in 1...descentLen {
+                        guard step < 15 else { break }
+                        let idx  = Swift.max(0, topIdx - j)
+                        let vel  = UInt8(12 + rng.nextInt(upperBound: 16))  // 12–27
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: allNotes[idx],
+                                                velocity: vel, durationSteps: 2))
+                        step += 2
+                    }
+                }
+            }
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    // MARK: - Solo window picker (mirrors KosmicLeadGenerator.pickSoloWindows)
+    // Picks exactly `windowCount` non-overlapping windows of `soloLength` bars from body sections.
+    // Enforces `minGap` between window end and next window start.
+    // Picks from the first half of remaining valid starts so repeats spread across the song.
+
+    private static func pickAmbSoloWindows(
+        structure: SongStructure,
+        soloLength: Int,
+        windowCount: Int,
+        minGap: Int,
+        rng: inout SeededRNG
+    ) -> [Range<Int>] {
+        var bodyBarSet = Set<Int>()
+        for section in structure.sections {
+            guard section.label != .intro && section.label != .outro else { continue }
+            guard !section.label.isBridge && section.label != .bridgeMelody else { continue }
+            for b in section.startBar..<section.endBar { bodyBarSet.insert(b) }
+        }
+        let validStarts = bodyBarSet.sorted().filter { start in
+            (start..<(start + soloLength)).allSatisfy { bodyBarSet.contains($0) }
+        }
+        guard !validStarts.isEmpty else { return [] }
+
+        // Reduce gap if the body is too short to fit windowCount windows at the requested minGap.
+        let minNeeded    = soloLength * windowCount + minGap * (windowCount - 1)
+        let effectiveGap = bodyBarSet.count >= minNeeded
+            ? minGap
+            : Swift.max(4, (bodyBarSet.count - soloLength * windowCount) / Swift.max(1, windowCount - 1))
+
+        var windows: [Range<Int>] = []
+        var earliestNext = validStarts[0]
+        for _ in 0..<windowCount {
+            let available = validStarts.filter { $0 >= earliestNext }
+            guard !available.isEmpty else { break }
+            let pickFrom    = Swift.max(1, available.count / 2)
+            let chosenStart = available[rng.nextInt(upperBound: pickFrom)]
+            windows.append(chosenStart..<(chosenStart + soloLength))
+            earliestNext = chosenStart + soloLength + effectiveGap
+        }
+        return windows
     }
 
     // MARK: - Shared utility

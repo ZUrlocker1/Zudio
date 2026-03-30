@@ -368,7 +368,7 @@ Pattern selection by section intensity: low → sparse, medium → core_a, high 
 **Velocity ranges:**
 
 - Low: kick 92–106, snare 84–100, hats 62–86
-- Medium: kick 104–118, snare 96–112, hats 72–100
+- MediLDum: kick 104–118, snare 96–112, hats 72–100
 - High: kick 112–124, snare 104–120, hats 82–108
 - Accent pulse every 2 or 4 bars: +6 to +10 velocity
 
@@ -526,6 +526,12 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 - LD1-006 — Long Arc Solo: one held note per bar, stepping through the mode scale ascending then
   reversing direction at register boundaries. Variable duration (short/normal/held) and 15% rest-bar
   chance add rhythmic variety. Suppressed in intro/outro.
+- LD1-007 — Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
+  Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 silenced during solo
+  window. Status log fires "Extended solo — Vanishing solo" at solo start bar.
+- LD1-008 — Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
+  octave arpeggio motif. Inspired by the synth solo in *Visitor from the Past* (bars 21–30). Lead 2
+  silenced during solo window. Status log fires "Extended solo — Visiting solo" at solo start bar.
 
 ### Lead 2
 

@@ -1,0 +1,70 @@
+=== Zudio Song Analysis Log ===
+Title:          E Drift
+Generated:      2026-03-30 11:12:58
+Zudio Version:  0.95
+Seed:           12473989435566703541
+Style:          Motorik
+Key:            E  Dorian
+Tempo:          132 BPM
+Bars:           100
+Mood:           Deep
+
+--- Structure ---
+  intro      Bars   1–  4         (4 bars)
+  A          Bars   5– 92         (88 bars)
+  outro      Bars  93–100         (8 bars)
+
+--- Chord Plan ---
+  Bars   1–  4         root=5  type=minor
+  Bars   5– 92         root=5  type=minor
+  Bars  93–100         root=1  type=dom7
+
+--- Note Counts Per Track ---
+  Lead 1       32 notes
+  Lead 2       109 notes
+  Pads         158 notes
+  Rhythm       167 notes
+  Texture      13 notes
+  Bass         553 notes
+  Drums        1412 notes
+
+--- Generation Log ---
+  SONG             E Drift
+  Form             Steady A section
+  Chords           E Dorian  Static tonic: I  Bm, E7
+  MOT-DRUM-002     Open Pocket beat
+  MOT-BASS-009     Vitamin Hook
+  MOT-PADS-002     Power Drone
+  MOT-PADS-005     Harmonia charleston
+  MOT-LD1-008      Visiting solo
+  MOT-LD2-003      Rhythmic Counter
+  MOT-RTHM-005     Chord Stab
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-006     High-tension touch
+
+--- Playback Annotations ---
+  Bar 001    Intro        4 bar cold start — rock fill
+  Bar 005    Section A    chords Bm
+  Bar 005    Lead 1       stepping back
+  Bar 009    Bass         pattern evolving
+  Bar 016    Lead 2       stepping back
+  Bar 017    Pads         stepping back
+  Bar 017    Texture      stepping back
+  Bar 032    Drum fill    2 beat — funk cross-pattern
+  Bar 033    Lead 2       steps into the spotlight
+  Bar 033    Pads         is back on stage
+  Bar 033    Rhythm       stepping back
+  Bar 040    Drum fill    2 beat — funk cross-pattern
+  Bar 041                 Extended solo  Visiting solo
+  Bar 041    Lead 1       steps into the spotlight
+  Bar 044    Drum fill    3 beat — alternating toms — bass locked in
+  Bar 045    Texture      steps into the spotlight
+  Bar 049    Drum fill    3 beat — tom cascade
+  Bar 049    Rhythm       is back on stage
+  Bar 050    Lead 2       steps into the spotlight
+  Bar 065    Pads         stepping back
+  Bar 066    Texture      steps into the spotlight
+  Bar 089    Drum fill    2 beat — funk cross-pattern
+  Bar 090    Texture      steps into the spotlight
+  Bar 093    Outro        8 bar fade
+

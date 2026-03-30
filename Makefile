@@ -21,6 +21,7 @@ bundle: build
 	cp $(PLIST_SRC) $(APP_DIR)/Contents/Info.plist
 	cp -r assets    $(APP_DIR)/Contents/Resources/
 	cp assets/images/icon/zudio-icon.icns $(APP_DIR)/Contents/Resources/
+	cp assets/zudio-doc.icns             $(APP_DIR)/Contents/Resources/
 
 ## Run tests
 test:

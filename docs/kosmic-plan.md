@@ -1149,6 +1149,12 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
   and looped throughout; phrase mutates slightly at section boundaries (Jean-Michel Jarre style).
 - KOS-LEAD-007 — TD Skip Sequence: ascending skip pattern through chord tones with rhythmic
   displacement per bar, inspired by Tangerine Dream sequencer-melody hybrids.
+- KOS-LEAD-008 — Caligari Solo ✓ DONE: slow lyrical chord-tone lead inspired by Caligari Drop
+  bars 10–18. 1–2 held notes per bar, slight rhythmic offset. Plays in 2–3 windows of 8 bars
+  with ≥6-bar gaps. Register MIDI 60–76.
+- KOS-LEAD-009 — Dark Sun Solo ✓ DONE: spacious 70s analog synth lead inspired by Dark Sun
+  bars 21–46. One sustained note per bar, stepwise ascent then descent through scale.
+  Occasional diatonic trill ornament. Register MIDI 60–76.
 
 ---
 

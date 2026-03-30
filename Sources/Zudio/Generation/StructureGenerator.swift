@@ -71,9 +71,10 @@ struct StructureGenerator {
 
     private static func buildSubtleAB(bodyBars: Int, cursor: Int, rng: inout SeededRNG) -> [SongSection] {
         // A section lengths: 32:25%, 48:35%, 64:30%, 80:10%
+        // Clamped so A + B (≥16) fits within bodyBars (important for test mode short songs).
         let aLengths = [32, 48, 64, 80]
         let aWeights: [Double] = [0.25, 0.35, 0.30, 0.10]
-        let aBars = aLengths[rng.weightedPick(aWeights)]
+        let aBars = min(aLengths[rng.weightedPick(aWeights)], max(16, bodyBars - 16))
         let bBars = max(16, bodyBars - aBars)
 
         let aIntensity: SectionIntensity = rng.nextDouble() < 0.20 ? .low : .medium
@@ -88,7 +89,7 @@ struct StructureGenerator {
         // A section lengths: 32:30%, 48:40%, 64:25%, 80:5%
         let aLengths = [32, 48, 64, 80]
         let aWeights: [Double] = [0.30, 0.40, 0.25, 0.05]
-        let aBars = aLengths[rng.weightedPick(aWeights)]
+        let aLengthRaw = aLengths[rng.weightedPick(aWeights)]
 
         // Decide reprise first so B can be sized to exactly fill the remainder.
         let hasReprise = rng.nextDouble() < 0.30 // A/B/A' reprise variant 30%
@@ -97,6 +98,9 @@ struct StructureGenerator {
         // Always consume the reprise-length RNG draw so seed outputs stay stable.
         let repriseLength = rng.nextDouble() < 0.5 ? 16 : 32
         let repriseBars = hasReprise ? repriseLength : 0
+
+        // Clamp A so A + B (≥16) + reprise fits within bodyBars (important for test mode short songs).
+        let aBars = min(aLengthRaw, max(16, bodyBars - 16 - repriseBars))
 
         // B fills whatever bodyBars remain after A (and reprise), ensuring no uncovered bars.
         let bBars = max(16, bodyBars - aBars - repriseBars)

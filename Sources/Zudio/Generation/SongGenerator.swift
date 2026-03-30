@@ -137,8 +137,9 @@ struct SongGenerator {
         // Step 7 — Leads
         var lead1Rules: Set<String> = []
         var lead2Rules: Set<String> = []
-        trackEvents[kTrackLead1]   = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID)
-        trackEvents[kTrackLead2]   = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: trackEvents[kTrackLead1], rng: &lead2RNG, usedRuleIDs: &lead2Rules)
+        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, testMode: testMode)
+        trackEvents[kTrackLead1] = lead1Events
+        trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange)
 
         // Step 8 — Rhythm
         var rhythmRules: Set<String> = []
@@ -182,7 +183,7 @@ struct SongGenerator {
             rhythmRules: rhythmRules, texRules: texRules, testMode: testMode
         )
 
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules)
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }))
 
         var forced: [String: String] = [:]
         if let r = forceBassRuleID   { forced["Bass"]   = r }
@@ -464,17 +465,20 @@ struct SongGenerator {
         var lead1Loop = AmbientLeadGenerator.generateLead1(frame: frame, tonalMap: tonalMap,
                                                             loopBars: loopLengths.lead1, rng: &lead1RNG,
                                                             usedRuleIDs: &lead1Rules,
-                                                            forceRuleID: forceLeadRuleID)
+                                                            forceRuleID: forceLeadRuleID,
+                                                            structure: structure)
         if lead1Loop.isEmpty && !padLoop.isEmpty && forceLeadRuleID == nil {
             lead1Rules.removeAll()
             lead1Loop = AmbientLeadGenerator.generateLead1(frame: frame, tonalMap: tonalMap,
                                                             loopBars: loopLengths.lead1, rng: &lead1RNG,
                                                             usedRuleIDs: &lead1Rules,
-                                                            forceNonSilent: true)
+                                                            forceNonSilent: true,
+                                                            structure: structure)
         }
-        trackEvents[kTrackLead1] = AmbientLoopTiler.tile(events: lead1Loop,
-                                                          loopBars: loopLengths.lead1,
-                                                          totalBars: frame.totalBars)
+        // AMB-LEAD-009 and AMB-LEAD-010 return full-song events — skip the loop tiler for those.
+        let isAmbSectionSolo = lead1Rules.contains("AMB-LEAD-009") || lead1Rules.contains("AMB-LEAD-010")
+        trackEvents[kTrackLead1] = isAmbSectionSolo ? lead1Loop
+            : AmbientLoopTiler.tile(events: lead1Loop, loopBars: loopLengths.lead1, totalBars: frame.totalBars)
 
         // Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows)
         var lead2Rules: Set<String> = []
@@ -764,10 +768,15 @@ struct SongGenerator {
         case kTrackLead1:
             if isAmbient {
                 let loopBars = ambLoopLengths?.lead1 ?? 11
+                var regenRules: Set<String> = []
                 let loop = AmbientLeadGenerator.generateLead1(
                     frame: songState.frame, tonalMap: songState.tonalMap,
-                    loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
-                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                    loopBars: loopBars, rng: &rng, usedRuleIDs: &regenRules,
+                    structure: songState.structure)
+                let isSectionSolo = regenRules.contains("AMB-LEAD-009") || regenRules.contains("AMB-LEAD-010")
+                usedRules.formUnion(regenRules)
+                events = isSectionSolo ? loop
+                    : AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
             } else if isKosmic {
                 var discardedBaseRule = ""
                 var discardedXFiles: [Int] = []
@@ -776,7 +785,7 @@ struct SongGenerator {
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     lead1BaseRule: &discardedBaseRule, xFilesBars: &discardedXFiles)
             } else {
-                events = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+                (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackLead2:
             if isAmbient {
@@ -1108,6 +1117,8 @@ struct SongGenerator {
         case "MOT-LD1-004": return "Stepwise sequence"
         case "MOT-LD1-005": return "Call and answer"
         case "MOT-LD1-006": return "Long arc solo"
+        case "MOT-LD1-007": return "Vanishing solo"
+        case "MOT-LD1-008": return "Visiting solo"
         default:            return ruleID
         }
     }
@@ -1225,6 +1236,8 @@ struct SongGenerator {
         case "KOS-LEAD-005": return "Tangerine Dream arpeggio highlight"
         case "KOS-LEAD-006": return "Jean Michel Jarre evolving phrase"
         case "KOS-LEAD-007": return "Tangerine Dream skip sequence"
+        case "KOS-LEAD-008": return "Caligari solo"
+        case "KOS-LEAD-009": return "Dark Sun solo"
         default:             return ruleID
         }
     }
@@ -1270,11 +1283,11 @@ struct SongGenerator {
     /// Rule IDs introduced recently — shown with a " *" suffix in the status log.
     /// Capped at 6; retire oldest when adding new ones.
     private static let newRuleIDs: Set<String> = [
-        "KOS-LEAD-006",     // JMJ Phrase Loop — arch shape + stable chord-tone landing
-        "KOS-LEAD-007",     // TD Skip Sequence (new — Tangerine Dream ascending run with ghost notes)
-        "KOS-LEAD-004",     // Echo Melody — transposition now exact diatonic 3rd
-        "MOT-LD1-001",      // Neu! motif — directional contour bias in mutation
-        "MOT-LD1-006",      // Long Arc Solo (new — ascending/descending line across section)
+        "KOS-LEAD-007",     // TD Skip Sequence — Tangerine Dream ascending run with ghost notes
+        "KOS-LEAD-008",     // Caligari solo — slow lyrical chord-tone lead (from Caligari Drop)
+        "KOS-LEAD-009",     // Dark Sun solo — spacious 70s analog synth lead (from Dark Sun)
+        "MOT-LD1-006",      // Long Arc Solo — ascending/descending line across section
+        "MOT-LD1-007",      // Motorik solo window — lyrical single-section lead
         "KOS-BASS-012",     // McCartney PBW bass — third/fifth walk
     ]
 
@@ -1493,12 +1506,14 @@ struct SongGenerator {
         case "AMB-LEAD-001":  return "Eno floating tone"
         case "AMB-LEAD-002":  return "Echo phrase"
         case "AMB-LEAD-003":  return "Harold Budd pentatonic shimmer"
-        case "AMB-LEAD-004":  return "No lead 1"
         case "AMB-LEAD-007":  return "Lyric fragment"
+        case "AMB-LEAD-008":  return "Returning motif"
+        case "AMB-LEAD-009":  return "Magnetik solo"
+        case "AMB-LEAD-010":  return "Oxygenerator solo"
         // Lead 2
         case "AMB-LEAD-005":     return "Silent-window fill"
         case "AMB-LEAD-006":     return "No lead 2"
-        case "AMB-SYNC-004":    return "Ghost echo"
+        case "AMB-LEAD-004":    return "Echo lead phrase"
         case "AMB-XFILES-001":  return "Spooky  X-Files theme"
         // Rhythm
         case "AMB-RTHM-001": return "Single-tone pulse"
@@ -1539,7 +1554,9 @@ struct SongGenerator {
         breathSilenceBar: Int? = nil,
         breathSilenceLenBars: Int = 0,
         isAmbient: Bool = false,
-        includeDrumFills: Bool = true
+        includeDrumFills: Bool = true,
+        soloRange: Range<Int>? = nil,
+        soloRuleID: String? = nil
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -1564,6 +1581,17 @@ struct SongGenerator {
         // fireBar: convenience — fires at the start of a bar
         func fireBar(_ bar: Int, tag: String, desc: String) {
             fire(bar * 16, tag: tag, desc: desc)
+        }
+
+        // Extended solo annotation — fires at the first bar of the solo window
+        if let sr = soloRange, let ruleID = soloRuleID {
+            let desc: String
+            switch ruleID {
+            case "MOT-LD1-007": desc = "Extended solo  Vanishing solo"
+            case "MOT-LD1-008": desc = "Extended solo  Visiting solo"
+            default:            desc = "Extended solo"
+            }
+            fireBar(sr.lowerBound, tag: "", desc: desc)
         }
 
         // Helper: format chord name from degree string + type, respecting flat/sharp key context

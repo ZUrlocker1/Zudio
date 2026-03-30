@@ -1,9 +1,9 @@
-{\rtf1\ansi\ansicpg1252\cocoartf2822
+{\rtf1\ansi\ansicpg1252\cocoartf2869
 \cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica-Bold;\f1\fswiss\fcharset0 Helvetica-Oblique;\f2\fswiss\fcharset0 Helvetica;
 }
 {\colortbl;\red255\green255\blue255;}
 {\*\expandedcolortbl;;}
-\margl1440\margr1440\vieww11200\viewh10200\viewkind0
+\margl1440\margr1440\vieww11160\viewh9920\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\b\fs28 \cf0 Zudio Code prompts\
@@ -795,7 +795,50 @@ Balanced appraoch is fine.  Generate it as a word doc.\
 \
 I'm not yet ready to do this, but when we release v 0.94 that''s what I'd like\
 \
+In Zudio I added Save MIDI file initially and then later realized I could save the status text infromation as a log file for debugging. That was very handy.  Then I realized because the text log file include the Seed number, I could relaod saved songs.  It's just a text file, so its human readable which is a nice convenience and the file size is very small.  \
+In the context of mac applications is that strange?  Should I instead save the Log file as a Zudio or ZDO file or something like that?  But that sort of obscures the fact that it's humand readable. Give me the pros and cons and whether I should make a change later on.\
 \
+when is the UT info.plist work done? is that when the application installs? when it starts? or something else?\
+\
+can you add all this information into the distribution plan with a suitable title as a future enhancement but before the iPad/iOS section\
+\
+tell me in more detail how the custom document type .Zudio gets created for the user.  is it when the Zudio app starts up or in an  install script with the DMG file or do I need to make a more complete install program?\
+\
+if I have an existing .txt file that I've saved previously and we have the new Zudio file type will the user be able to rename those txt files to .Zudio and have the file open work?\
+\
+change the Save MIDI button and menu choices to Save Song but keep the functionality the same.  (e.g when we save, continue to save both the .Zudio file and the MIDI file.)\
+\
+ok lets go ahead and make all these changes\
+\
+how do we create a custom document icon Z! for Zudio files?\
+\
+yes just create somethig that has a Z! in it in italics and has the typical look for documents\
+\
+I'm still not seeing the Z! document icons on Zudio files. Is that because:\
+1. I test by compiling a new version in xCode?\
+2. we need to do a proper fully signed release?\
+3. this is more complicated than expected and you need to research it more?\
+\
+if I double click on a Zudio file, I would like it to open in the current instance of Zudio rather than opening a second instance. \
+\
+double clicking on a Zudio file while Zudio is running still brings up a second instance of Zudio both of which load the song.  I want it to load into the existing running instance. \
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 Plannning for continuous play mode
+\f2\b0 \
+We are in planning mode. No code changes. I'd like to consider further how to implement a new continuous play mode.  There should be 3 modes, selected with a Mode selector.  First mode is what exists, Song mode where we generate one song at a time in the current style. \
+I can see two more modes but I am not sure the best way to describe them: \
+2. evolve the existing song several times, then eventually generate a new song in the existing style. Make it continuously play, fading into new songs as appropriate. \
+3. a third mode that is like the above but also changes styles occasionally, mixing from Ambient to Motorik, From Motorik to Kosmic, And from Kosmic to either Ambient or Motorik. eg to a its next nearest style.  \
+What should we call these styles.  What are the other implications for design, for the the transport controls etc.\
+\
+when we do the micro within song evolution, I would like it to be shorter than the original song. So if its a single form song structure (e.g. A or mostly A with no B or Bridge) then just make it half the lenght of the original.  If't s a more complex song structure such as Kosmic A, B, Bridge etc, then leave out either the A or the B or the Bridge randomly, again aiming for about half the length.  What do you think?\
+\
+
+\f0\b Bug Fixes
+\f2\b0 \
 My friend is running OS 26 and the default color of the style selector is blue. Please change this to grey. \
 \
 On a large screen monitor there is empty space above and below the top and bottom sections. Please fix this.  Space out the top level controls without changing how the look on a normal laptop. \
@@ -806,15 +849,80 @@ line 101 of ContentView.swift \
 Thread 1: Swift runtime failure: Double value cannot be converted to Int because it is either infinite or NaN\
 This does not crash if the user adjusts the zoom bar slide, only with pinch\
 \
+
+\f0\b More bug fixes 
+\f2\b0 \
+Here are some minor fixes:\
+- Previously I asked you to make sure that on OS 26, the current style in the style selector user interface should default to grey rather than blue which is the OS default.  I have upgraded to OS 26 myself and it\'92s clearly still Blue.  Please make sure the default selected style is in grey on OS 26 overriding the OS default. \
+-please widen the key selector control so Auto is not abbreviated \
+- please reduce the volume slihgtly of the Kosmic Rhythm instrument as its overpowering the lead instruments\
 \
-In Zudio I added Save MIDI file initially and then later realized I could save the status text infromation as a log file for debugging. That was very handy.  Then I realized because the text log file include the Seed number, I could relaod saved songs.  It's just a text file, so its human readable which is a nice convenience and the file size is very small.  \
-In the context of mac applications is that strange?  Should I instead save the Log file as a Zudio or ZDO file or something like that?  But that sort of obscures the fact that it's humand readable. Give me the pros and cons and whether I should make a change later on.\
+
+\f0\b New Solos
+\f2\b0 \
+I\'92\'92d like to create some new rules for Motorik solos. These are for longer running melodic solis that span multiple 8-9 bars. I\'92d like you to examine the MIDI files Vanishing Point.MID which you have previously analyzed and the new one I put in Zudio Visitor from the past.MID and.  These are songs by the Electric Buddha Band. You will need to determine how to transpose these and scale to appropriate keys for Motorik solos.  Tell me your plan\
+   Visitor from the past: Bars 21-30 synth solo, moog solo (2 tracks)\
+   Vanishing Point:  metal guitar solo bars 34-43\
 \
-when is the UT info.plist work done? is that when the application installs? when it starts? or something else?\
+Lets do both as new separate MOT-LD1-00x type rules. If either of these solo plays there should be no other competing solo in that section of either Lead 1 or Lead 2.  When one of these solo plays add a status notification along the lines of \
+Bar 66  Extended solo - description\
 \
-can you add all this information into the distribution plan with a suitable title as a future enhancement but before the iPad/iOS section\
+Use Lead 1 for the extended solo\
+\
+something is broken. MOT-LD-1-007 was specified but there was no solo. I put 4 new motorik MIDI and text log files in the Zudio durectory. Please examine why these failed and fix the bugs.\
+\
+remove all the old Motorik solos, bass or other parts out of rotation in test mode.\
+When we used the new solos for Motorik since they are 8-10 bars you can play them a second or third time as long as there are some number of empty bars in between.\
+\
+check this Motorik song for clashes with the bass or perhaps the lead or both \
+Zudio-Fliesst-Welle\
+\
+is this an issue for other Motorik Leads or other Leads in Kosmic?\
+\
+I think whenever there's a solo its safer to use the active chord tones.\
+\
+I generated a motorik song Zudio-C-Drift in the Zudio folder. it has MOT-LD1-007 but there is only one solo note in Lead 1 until the outro. What is wrong?  I would like you to review and simplify the new MOT-LD1-007 and 008 code so that it is less likely to have problems like this.\
 \
 \
+For Kosmic please examine these two songs. You should have the MIDI files already.  Create new solo leads built on these patterns but adjusted for the scale as appropriate. The solos can repeat 2 or 3 times with sufficient gaps in between.  \
+  Caligari drop:  bars 10-18 and 42-50  freely soft saw solo \
+  Dark Sun: bars 21- 46 70s analog synth solo \
+any questions before generating code?\
 \
 \
-}
+I generated a song with 2 of the same leads:\
+KOS-LEAD-005   Tangerine Dream arpeggio highlight\
+KOS-LEAD-005   Tangerine Dream arpeggio highlight\
+and both leads seem to be boring, just a single long ascending phrase.\
+what ideas do you have to vary this solo? (both when it occurs on one lead track and both lead tracks)\
+I put the song Zudio-Solaxe-II in the Zudio folder\
+\
+I generated a song with\
+KOS-BASS-003   Tangerine Dream pulse\
+and it has a monotonous single 8th note bass playing for many many bars. We cannot have it be so boring for so many bars. Is this a bug?  or is there an easy way using that bass to have it vary a bit.  What is within the rule that we could do or do we need to modify that rule further? \
+I put Zudio-Galaxie in the Zudio folder\
+\
+There is a similar issue with KOS-BASS-007   Berlin school tremolo\
+it is the same note for 20+ bars. Can you ensure there is some subtle evolution in this pattern both tonally and rhytmically after 12 or 16 bars?  Wobble velocity is not an adquate solution by itself. I put the song Zudio-Paradoxe in the Zudio folder  \
+\
+\
+For Ambient please examine these two songs. You should have the MIDI files already.  Create new solo leads built on these patterns but adjusted for the scale as appropriate. The solos can repeat 2 or 3 times with sufficient gaps in between.  \
+ Magnetic:  bars 10-18 and bars 50-58 freely70s analog lead\
+ Oyxgenerator: bars 5-13 and 20-37   classic analog pad\
+\
+I put 4 new Ambient songs in the Zudio folder. Please examine these to see if they are producing the right lead effects of our new Ambient leads. Also check the MIDI files for clashes or other indication that the code is not exactly correct.\
+\
+I noticed in the new ambient song Zudio-Middlespace in the Zudio folder the magnetik solo has some parts where 2 notes play at the same time e.g. in Bar 6.  I have seen that in other Magnetik solo songs. Is that by design or is that a bug?\
+\
+lets keep it monophonic, single notes please. verify this with the other new solo also\
+\
+\
+
+\f0\b Two minor bugs
+\f2\b0 \
+double clicking on a Zudio file while Zudio is running still brings up a second instance of Zudio both of which load the song.  I want it to load into the existing running instance. \
+\
+if I click on Ambient when first starting Zudio, the focus then seems to go to the BPM selector and it is intercepting hot keys like Enter for generate.  Please don\'92t put the focus on the BPM selector. \
+\
+\
+when you upload to github note V0.95 includes new file handling, new solos and 14% fewer tonal clashes. }

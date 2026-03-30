@@ -40,6 +40,11 @@ The main body of the song plays in full — whatever structure the style uses (M
 
 This repeats 2–3 times (randomly chosen per session). After the final evolution pass, the Outro plays and the song transitions to the next.
 
+**Evolution pass length — aim for roughly half the original song:**
+- Single-form songs (Motorik A-only, Ambient A-only): play the main body at half the original bar count. Drums and bass tile to the shorter length via `adaptEvents`.
+- Multi-section Kosmic songs (A-B, A-B-B-A, A-B-Bridge, etc.): randomly omit one section to reach approximately half the total length. Prefer dropping B or Bridge over dropping A — the pass should always start from the beginning of the main material, not mid-song. If the song is A-only or A-B (no Bridge), use half-length of what remains rather than stripping further.
+- Minimum floor: never shorten an evolution pass below 16 bars (~30 seconds), regardless of the rule above.
+
 **Entry breath**: On the last bar before each evolution pass, fade melodic tracks slightly so the new content enters cleanly on the downbeat. Drums and bass carry through uninterrupted.
 
 **Track drop**: On each evolution pass, randomly omit one melodic track (e.g. Lead 2 or Rhythm sits out entirely). Restore it — or choose a different omission — on the next pass. This creates a strip-down/build-up arc across evolution passes, a classic technique in Krautrock and ambient music.
@@ -210,8 +215,9 @@ private var currentEndlessStyle: String = "Motorik"
 
 1. Build: `xcodebuild -scheme Zudio -configuration Debug build`
 2. Enable test mode (Cmd-T), generate a song — confirm it runs ~1 minute
-3. Enable Evolve, let A/B play, confirm evolution pass fires with new melodic content and locked drums/bass
-4. Confirm track-drop: one melodic track absent per evolution pass, different track next pass
+3. Enable Evolve on a Motorik song — confirm evolution pass is ~half the original length with new melodic content and locked drums/bass
+4. Enable Evolve on a Kosmic A-B-Bridge song — confirm one section is omitted per pass, pass always starts from A
+5. Confirm track-drop: one melodic track absent per evolution pass, different track next pass
 5. After 2–3 passes, confirm Outro plays and crossfade to new song occurs
 6. Let 4 songs play in Evolve — verify drums lock for 3 macro-transitions then refresh, bass alternates
 7. Switch to Endless, let 4–6 songs play — verify style shift fires and style indicator updates

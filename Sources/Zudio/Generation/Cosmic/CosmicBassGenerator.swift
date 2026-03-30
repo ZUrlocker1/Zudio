@@ -287,8 +287,17 @@ struct KosmicBassGenerator {
             }
 
             // Pulsating tremolo layer (KOS-RULE-23)
-            if usePulsatingLayer && bar % 4 == 0 {
-                events += pulsatingTremoloLayer(barStart: barStart, entry: entry, frame: frame)
+            if usePulsatingLayer {
+                let bodyStartBar  = structure.introSection?.endBar ?? 0
+                let barInBody     = bar - bodyStartBar
+                // Primary trigger: every 4 bars (unchanged)
+                let primaryFire   = bar % 4 == 0
+                // After 12 bars: occasional phase-shifted trigger on bar%4==2 (~30%)
+                let altFire       = barInBody >= 12 && bar % 4 == 2 && rng.nextDouble() < 0.30
+                if primaryFire || altFire {
+                    events += pulsatingTremoloLayer(barStart: barStart, entry: entry, frame: frame,
+                                                    barInBody: barInBody, rng: &rng)
+                }
             }
         }
 
@@ -346,7 +355,7 @@ struct KosmicBassGenerator {
                                                   rng: &rng, totalBars: totalBars, isBody: isBody)
         case "KOS-BASS-002": return rootFifthWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
         case "KOS-BASS-003": return pedalPulseBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
-                                                   structure: structure, totalBars: totalBars)
+                                                   structure: structure, totalBars: totalBars, rng: &rng)
         case "KOS-BASS-004": return moroderDriftBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "KOS-BASS-005": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: false)
@@ -423,7 +432,7 @@ struct KosmicBassGenerator {
         // 20% chance use b7 instead of fifth — more modal, suits Dorian well
         let useB7   = rng.nextDouble() < 0.20
         let upper   = useB7
-            ? UInt8(clamped(Int(root) + 10, low: 40, high: 55))
+            ? UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 40, high: 55))
             : UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
         let note    = cycle < 4 ? root : upper
 
@@ -499,13 +508,15 @@ struct KosmicBassGenerator {
     private static func pedalPulseBar(
         barStart: Int, bar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        structure: SongStructure, totalBars: Int
+        structure: SongStructure, totalBars: Int,
+        rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let root = bassRoot(entry: entry, frame: frame)
 
         // Determine body boundaries
         guard let introSection = structure.introSection else {
-            return pedalPulseSimple(barStart: barStart, root: root)
+            return pedalPulseSimple(barStart: barStart, root: root, fifth: nil,
+                                    barInBody: 0, rng: &rng)
         }
         let bodyStart = introSection.endBar
         let outroStart = structure.outroSection?.startBar ?? totalBars
@@ -524,24 +535,60 @@ struct KosmicBassGenerator {
         }
 
         if shouldEvolve {
-            return pedalPulseEvolved(barStart: barStart, entry: entry, frame: frame, root: root)
+            return pedalPulseEvolved(barStart: barStart, entry: entry, frame: frame, root: root, rng: &rng)
         }
-        return pedalPulseSimple(barStart: barStart, root: root)
+
+        // Compute fifth for optional tonal variation in plain sections
+        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let fifthPC = (rootPC + 7) % 12
+        var fifthMidi = 36 + fifthPC
+        while fifthMidi < 40 { fifthMidi += 12 }
+        while fifthMidi > 55 { fifthMidi -= 12 }
+
+        return pedalPulseSimple(barStart: barStart, root: root, fifth: UInt8(fifthMidi),
+                                barInBody: barInBody, rng: &rng)
     }
 
-    // Original plain pedal pulse
-    private static func pedalPulseSimple(barStart: Int, root: UInt8) -> [MIDIEvent] {
-        return [
-            MIDIEvent(stepIndex: barStart,      note: root, velocity: 100, durationSteps: 3),
-            MIDIEvent(stepIndex: barStart + 4,  note: root, velocity: 88,  durationSteps: 3),
-            MIDIEvent(stepIndex: barStart + 8,  note: root, velocity: 95,  durationSteps: 3),
-            MIDIEvent(stepIndex: barStart + 12, note: root, velocity: 88,  durationSteps: 3),
-        ]
+    // Plain pedal pulse — four-on-the-floor root pulse with TD-style breathing:
+    // ~15% rest bars, ~10% half-time (beats 1+3 only), velocity wobble ±8.
+    // After 12 bars in body: ~20% chance beats 2+4 use the fifth — subtle tonal lift
+    // that breaks long monotone stretches without abandoning the pedal character.
+    private static func pedalPulseSimple(
+        barStart: Int, root: UInt8, fifth: UInt8?,
+        barInBody: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        // Rest bar: ~15%
+        if rng.nextDouble() < 0.15 { return [] }
+
+        // After 12 bars on same root, occasionally alternate beats 2+4 to the fifth (~20%)
+        let useFifthBeats = barInBody >= 12 && fifth != nil && rng.nextDouble() < 0.20
+
+        let baseVels: [Int] = [100, 88, 95, 88]
+        var events: [MIDIEvent] = []
+
+        // Half-time bar: ~10% — play only beats 1 and 3
+        let halfTime = rng.nextDouble() < 0.10
+        let steps = halfTime ? [0, 8] : [0, 4, 8, 12]
+
+        for (i, step) in steps.enumerated() {
+            let beatIndex   = halfTime ? i * 2 : i   // map back to beat 0-3
+            let isOffBeat   = beatIndex == 1 || beatIndex == 3
+            let note        = useFifthBeats && isOffBeat ? fifth! : root
+            let baseVel     = halfTime ? baseVels[i * 2] : baseVels[i]
+            // Fifth beats play slightly softer — they're colour, not anchor
+            let velBase     = useFifthBeats && isOffBeat ? baseVel - 10 : baseVel
+            let wobble      = rng.nextInt(upperBound: 17) - 8   // ±8
+            let vel         = UInt8(max(50, min(115, velBase + wobble)))
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note,
+                                    velocity: vel, durationSteps: 3))
+        }
+        return events
     }
 
-    // Evolved pedal pulse: adds fifth and minor-third passing tones between beats
+    // Evolved pedal pulse: adds fifth and minor-third passing tones between beats, with velocity wobble.
     private static func pedalPulseEvolved(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, root: UInt8
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, root: UInt8,
+        rng: inout SeededRNG
     ) -> [MIDIEvent] {
         // Compute fifth and minor third via pitch-class (KOS-RULE-06: MIDI 40–55)
         let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
@@ -559,19 +606,23 @@ struct KosmicBassGenerator {
         let fifth = UInt8(fifthMidi)
         let third = UInt8(thirdMidi)
 
+        func wobble(_ base: Int) -> UInt8 {
+            UInt8(max(50, min(115, base + rng.nextInt(upperBound: 13) - 6)))
+        }
+
         return [
             // Beat 1: root anchor
-            MIDIEvent(stepIndex: barStart,      note: root,  velocity: 100, durationSteps: 3),
+            MIDIEvent(stepIndex: barStart,      note: root,  velocity: wobble(100), durationSteps: 3),
             // Beat 1 off-beat push: fifth syncopation (step 2 = 0.5 beat after beat 1)
-            MIDIEvent(stepIndex: barStart + 2,  note: fifth, velocity: 78,  durationSteps: 2),
+            MIDIEvent(stepIndex: barStart + 2,  note: fifth, velocity: wobble(78),  durationSteps: 2),
             // Beat 2: root
-            MIDIEvent(stepIndex: barStart + 4,  note: root,  velocity: 88,  durationSteps: 3),
+            MIDIEvent(stepIndex: barStart + 4,  note: root,  velocity: wobble(88),  durationSteps: 3),
             // Beat 3: fifth harmonic lift
-            MIDIEvent(stepIndex: barStart + 8,  note: fifth, velocity: 95,  durationSteps: 3),
+            MIDIEvent(stepIndex: barStart + 8,  note: fifth, velocity: wobble(95),  durationSteps: 3),
             // Beat 3 off-beat: minor third passing tone (step 10)
-            MIDIEvent(stepIndex: barStart + 10, note: third, velocity: 72,  durationSteps: 2),
+            MIDIEvent(stepIndex: barStart + 10, note: third, velocity: wobble(72),  durationSteps: 2),
             // Beat 4: root return
-            MIDIEvent(stepIndex: barStart + 12, note: root,  velocity: 88,  durationSteps: 3),
+            MIDIEvent(stepIndex: barStart + 12, note: root,  velocity: wobble(88),  durationSteps: 3),
         ]
     }
 
@@ -818,7 +869,7 @@ struct KosmicBassGenerator {
         default:                          isMajorContext = false
         }
         let third     = UInt8(clamped(Int(root) + (isMajorContext ? 4 : 3), low: 40, high: 55))
-        let flatSeven = isMajorContext ? fifth : UInt8(clamped(Int(root) + 10, low: 40, high: 55))
+        let flatSeven = isMajorContext ? fifth : UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 40, high: 55))
 
         let pitches: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]
         let vels:    [UInt8] = [100,  88,    92,   84,        86,    82,   88,    78  ]
@@ -877,18 +928,60 @@ struct KosmicBassGenerator {
     }
 
     // MARK: - KOS-RULE-23: Pulsating tremolo layer
+    //
+    // Evolves over the course of the body to break long monotone stretches:
+    //   bars 0–11:  standard 16th-note flutter, root only (original character)
+    //   bars 12+:   ~20% chance whole bar plays fifth instead of root (tonal lift)
+    //   bars 12+:   ~30% chance 8th-note density (every 2 steps, no ghost notes) —
+    //               less frantic, creates contrast with the 16th-note bars
+    //   bars 20+:   ~20% chance root/fifth alternation per beat (root on 1+3, fifth on 2+4)
 
     private static func pulsatingTremoloLayer(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        barInBody: Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let root = bassRoot(entry: entry, frame: frame)
+        let root    = bassRoot(entry: entry, frame: frame)
+        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let fifthPC = (rootPC + 7) % 12
+        var fifthMidi = 36 + fifthPC
+        while fifthMidi < 40 { fifthMidi += 12 }
+        while fifthMidi > 55 { fifthMidi -= 12 }
+        let fifth = UInt8(fifthMidi)
+
+        // Choose tonal content for this bar
+        enum ToneMode { case root, fifth, rootFifthAlt }
+        let toneMode: ToneMode
+        if barInBody >= 20 && rng.nextDouble() < 0.20 {
+            toneMode = .rootFifthAlt  // root on beats 1+3, fifth on 2+4
+        } else if barInBody >= 12 && rng.nextDouble() < 0.20 {
+            toneMode = .fifth
+        } else {
+            toneMode = .root
+        }
+
+        // Choose rhythmic density: 16th-note (step=1) or 8th-note (step=2)
+        let stepSize = barInBody >= 12 && rng.nextDouble() < 0.30 ? 2 : 1
+
         var evs: [MIDIEvent] = []
-        // Alternating low/high velocity at 0.25-beat intervals (every step)
         var alternateHigh = true
-        for step in stride(from: 0, to: 16, by: 1) {
-            let vel: UInt8 = alternateHigh ? 85 : 20
-            alternateHigh.toggle()
-            evs.append(MIDIEvent(stepIndex: barStart + step, note: root, velocity: vel, durationSteps: 1))
+        for step in stride(from: 0, to: 16, by: stepSize) {
+            let note: UInt8
+            switch toneMode {
+            case .root:         note = root
+            case .fifth:        note = fifth
+            case .rootFifthAlt: note = (step < 4 || (step >= 8 && step < 12)) ? root : fifth
+            }
+            let vel: UInt8
+            if stepSize == 1 {
+                // 16th-note: classic alternating high/ghost pattern
+                vel = alternateHigh ? 85 : 20
+                alternateHigh.toggle()
+            } else {
+                // 8th-note: all notes are audible, slight velocity variation
+                vel = UInt8(72 + rng.nextInt(upperBound: 16))  // 72–87
+            }
+            evs.append(MIDIEvent(stepIndex: barStart + step, note: note,
+                                 velocity: vel, durationSteps: stepSize))
         }
         return evs
     }

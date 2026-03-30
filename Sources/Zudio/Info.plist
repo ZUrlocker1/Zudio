@@ -7,9 +7,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.zudio.app</string>
     <key>CFBundleVersion</key>
-    <string>94</string>
+    <string>95</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.94</string>
+    <string>0.95</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -22,5 +22,50 @@
     <string>14.0</string>
     <key>CFBundleIconFile</key>
     <string>zudio-icon</string>
+
+    <!-- Custom document type: .zudio song files -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Zudio Song</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>zudio</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>zudio-doc</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.zudio.song</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Declare the UTI so macOS knows com.zudio.song is a real type owned by this app -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.zudio.song</string>
+            <key>UTTypeDescription</key>
+            <string>Zudio Song</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeIconFile</key>
+            <string>zudio-doc</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>zudio</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

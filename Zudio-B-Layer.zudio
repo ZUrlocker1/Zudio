@@ -1,0 +1,53 @@
+=== Zudio Song Analysis Log ===
+Title:          B Layer
+Generated:      2026-03-30 11:14:51
+Zudio Version:  0.95
+Seed:           16354596155851997742
+Style:          Motorik
+Forced Rules:   Lead=MOT-LD1-007
+Key:            B  Ionian
+Tempo:          133 BPM
+Bars:           32
+Mood:           Free
+
+--- Structure ---
+  intro      Bars   1–  2         (2 bars)
+  A          Bars   3– 28         (26 bars)
+  outro      Bars  29– 32         (4 bars)
+
+--- Chord Plan ---
+  Bars   1–  2         root=1  type=minor
+  Bars   3– 28         root=1  type=minor
+  Bars  29– 32         root=1  type=minor
+
+--- Note Counts Per Track ---
+  Lead 1       25 notes
+  Lead 2       0 notes
+  Pads         60 notes
+  Rhythm       139 notes
+  Texture      7 notes
+  Bass         175 notes
+  Drums        561 notes
+
+--- Generation Log ---
+  SONG             B Layer
+  Form             Steady A section
+  Chords           B Ionian  Modal rock: ♭VI - ♭VII - I  Bm
+  MOT-DRUM-001     Classic Motorik Apache beat
+  MOT-BASS-009     Vitamin Hook
+  MOT-PADS-003     Pulsed
+  MOT-LD1-007 *    Vanishing solo
+  MOT-LD2-006      Neu! harmony
+  MOT-RTHM-003     Syncopated Motorik
+  MOT-TEXT-001     Cluster sparse
+  MOT-TEXT-004     Shimmer hold
+  MOT-TEXT-008     Phase slip
+
+--- Playback Annotations ---
+  Bar 001    Intro        2 bar cold start — rock fill
+  Bar 003    Section A    chords Bm
+  Bar 005                 Extended solo  Vanishing solo
+  Bar 007    Texture      stepping back
+  Bar 015    Lead 1       stepping back
+  Bar 029    Outro        4 bar fade
+

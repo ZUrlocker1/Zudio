@@ -45,6 +45,7 @@
 		AA000000000000000000024 /* PatternEvolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000026 /* PatternEvolver.swift */; };
 		AA000000000000000000025 /* DrumVariationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000027 /* DrumVariationEngine.swift */; };
 		AA000000000000000000028 /* assets/zudio-icon.icns in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000028 /* assets/zudio-icon.icns */; };
+		AA000000000000000000029 /* assets/zudio-doc.icns in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000029 /* assets/zudio-doc.icns */; };
 		AA000000000000000000030 /* CosmicMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000030 /* CosmicMusicalFrameGenerator.swift */; };
 		AA000000000000000000031 /* CosmicStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000031 /* CosmicStructureGenerator.swift */; };
 		AA000000000000000000032 /* CosmicArpeggioGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000032 /* CosmicArpeggioGenerator.swift */; };
@@ -109,6 +110,7 @@
 		BB000000000000000000026 /* PatternEvolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternEvolver.swift; sourceTree = "<group>"; };
 		BB000000000000000000027 /* DrumVariationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumVariationEngine.swift; sourceTree = "<group>"; };
 		BB000000000000000000028 /* assets/zudio-icon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = "assets/zudio-icon.icns"; sourceTree = "<group>"; };
+		BB000000000000000000029 /* assets/zudio-doc.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = "assets/zudio-doc.icns"; sourceTree = "<group>"; };
 		BB000000000000000000030 /* CosmicMusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicMusicalFrameGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000031 /* CosmicStructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicStructureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000032 /* CosmicArpeggioGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicArpeggioGenerator.swift; sourceTree = "<group>"; };
@@ -148,6 +150,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000000000000000000028 /* assets/zudio-icon.icns */,
+			BB000000000000000000029 /* assets/zudio-doc.icns */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -367,6 +370,7 @@
 			files = (
 				AA00000000000000000001F /* assets in Resources */,
 				AA000000000000000000028 /* assets/zudio-icon.icns in Resources */,
+			AA000000000000000000029 /* assets/zudio-doc.icns in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

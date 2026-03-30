@@ -13,9 +13,9 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Listen to a sample (Ambient style):** [A-Transformative-Meeting-About-Quarterly-Targets](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.94a/Zudio-0.94a.dmg)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.95/Zudio-0.95.dmg)
 
-Current release: `0.94a (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `0.95 (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 ---
 

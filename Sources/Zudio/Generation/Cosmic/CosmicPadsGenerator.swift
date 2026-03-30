@@ -395,7 +395,7 @@ struct KosmicPadsGenerator {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
         let fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
-        let flat7  = noteInPadsRegister(pc: (rootPC + 10) % 12, targetOct: 2)
+        let flat7  = noteInPadsRegister(pc: (rootPC + frame.mode.nearestInterval(10)) % 12, targetOct: 2)
 
         return [
             MIDIEvent(stepIndex: barStart, note: UInt8(root),   velocity: 65, durationSteps: 14),
