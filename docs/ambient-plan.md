@@ -1623,7 +1623,8 @@ Seven plans to move Ambient from generative texture toward something that feels 
 
 **Rule:** AMB-LEAD-009 (Lead 1, 9%)
 
-Inspired by the freely-played analog lead in "Magnetik" (bars 10–18). Two sparse windows of ~8 bars each, with a gap of at least 8 bars between them. Notes land just past the beat ("after-beat" feel), 2–4 events per bar, 35% rest bars. Soft velocity (38–68), chord-tone biased (60%). Occasional two-note dyad (25%). Register MIDI 62–78.
+Inspired by the freely-played analog lead in "Magnetik" (bars 10–18). Two sparse windows of ~8 bars each, with a gap of at least 8 bars between them. Notes land just past the beat ("after-beat" feel), 2–4 events per bar, 
+% rest bars. Soft velocity (38–68), chord-tone biased (60%). Occasional two-note dyad (25%). Register MIDI 62–78.
 
 ---
 

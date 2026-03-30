@@ -7,13 +7,14 @@ let kTrackPads    = 2
 let kTrackRhythm  = 3
 let kTrackTexture = 4
 let kTrackBass    = 5
-let kTrackDrums   = 6
-let kTrackCount   = 7
+let kTrackDrums      = 6
+let kTrackLeadSynth  = 7   // Kosmic only: silent Fantasia layer doubling Lead 1
+let kTrackCount      = 8
 
-let kTrackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"]
+let kTrackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums", "Lead Synth"]
 
 // MIDI channel per track (Drums must be channel 9 for GM)
-let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9]
+let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9, 6]
 
 // MARK: - Track effects
 
@@ -332,23 +333,25 @@ struct RegisterBounds {
 }
 
 let kRegisterBounds: [Int: RegisterBounds] = [
-    kTrackLead1:   RegisterBounds(low: 60, high: 88),
-    kTrackLead2:   RegisterBounds(low: 55, high: 81),
-    kTrackPads:    RegisterBounds(low: 48, high: 84),
-    kTrackRhythm:  RegisterBounds(low: 45, high: 76),
-    kTrackTexture: RegisterBounds(low: 36, high: 96),
-    kTrackBass:    RegisterBounds(low: 40, high: 64),
-    kTrackDrums:   RegisterBounds(low: 35, high: 81),
+    kTrackLead1:      RegisterBounds(low: 60, high: 88),
+    kTrackLead2:      RegisterBounds(low: 55, high: 81),
+    kTrackPads:       RegisterBounds(low: 48, high: 84),
+    kTrackRhythm:     RegisterBounds(low: 45, high: 76),
+    kTrackTexture:    RegisterBounds(low: 36, high: 96),
+    kTrackBass:       RegisterBounds(low: 40, high: 64),
+    kTrackDrums:      RegisterBounds(low: 35, high: 81),
+    kTrackLeadSynth:  RegisterBounds(low: 60, high: 88),
 ]
 
 // MARK: - GM program numbers per track (v1 defaults)
 
 let kDefaultGMPrograms: [Int: UInt8] = [
-    kTrackLead1:   80,  // Square Lead
-    kTrackLead2:   80,  // Square Lead
-    kTrackPads:    89,  // Warm Pad
-    kTrackRhythm:  28,  // Guitar Pulse
-    kTrackTexture: 95,  // Swell
-    kTrackBass:    39,  // Moog Bass
-    kTrackDrums:   8,   // Rock Kit
+    kTrackLead1:      80,  // Square Lead
+    kTrackLead2:      80,  // Square Lead
+    kTrackPads:       89,  // Warm Pad
+    kTrackRhythm:     28,  // Guitar Pulse
+    kTrackTexture:    95,  // Swell
+    kTrackBass:       39,  // Moog Bass
+    kTrackDrums:      8,   // Rock Kit
+    kTrackLeadSynth:  90,  // Polysynth — Kosmic lead doubling layer
 ]

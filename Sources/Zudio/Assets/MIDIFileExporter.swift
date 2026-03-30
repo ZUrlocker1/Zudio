@@ -55,7 +55,7 @@ struct MIDIFileExporter {
         data.append(tempoTrack(bpm: song.frame.tempo))
 
         // Music tracks
-        for i in 0..<7 {
+        for i in 0..<kTrackCount {
             let events  = song.events(forTrack: i)
             let channel = kTrackMIDIChannels[i]
             let program = kDefaultGMPrograms[i] ?? 0

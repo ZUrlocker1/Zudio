@@ -111,7 +111,7 @@ struct SongGenerator {
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
 
         // Steps 4–9 — Per-track MIDI event generation
-        var trackEvents = [[MIDIEvent]](repeating: [], count: 7)
+        var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
 
         // Each track gets its own deterministically-derived RNG
         var drumRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackDrums))
@@ -263,7 +263,7 @@ struct SongGenerator {
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
 
         // Steps 4–9 — Per-track MIDI event generation (Kosmic generators)
-        var trackEvents = [[MIDIEvent]](repeating: [], count: 7)
+        var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
 
         var drumRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackDrums))
         var bassRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackBass))
@@ -282,6 +282,13 @@ struct SongGenerator {
             rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceRuleID: forceLeadRuleID,
             lead1BaseRule: &lead1BaseRule, xFilesBars: &xFilesBars
         )
+
+        // Lead Synth — Polysynth layer doubling Lead 1 at 55% velocity (thickens without competing)
+        trackEvents[kTrackLeadSynth] = trackEvents[kTrackLead1].map { ev in
+            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                      velocity: UInt8(max(1, Int(ev.velocity) * 55 / 100)),
+                      durationSteps: ev.durationSteps)
+        }
 
         // Arpeggio (rhythm slot) — the heartbeat of Kosmic
         var rhythmRules: Set<String> = []
@@ -427,7 +434,7 @@ struct SongGenerator {
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
 
         // Steps 4–9 — Per-track loops then tile to full song length
-        var trackEvents = [[MIDIEvent]](repeating: [], count: 7)
+        var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
 
         var padsRNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackPads))
         var bassRNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackBass))

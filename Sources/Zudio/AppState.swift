@@ -209,8 +209,8 @@ final class AppState: ObservableObject {
 
     // MARK: - Per-track UI state
 
-    @Published var muteState: [Bool] = Array(repeating: false, count: 7)
-    @Published var soloState: [Bool] = Array(repeating: false, count: 7)
+    @Published var muteState: [Bool] = Array(repeating: false, count: kTrackCount)
+    @Published var soloState: [Bool] = Array(repeating: false, count: kTrackCount)
 
     // MARK: - Live playback feed (Now Playing strip)
 
@@ -552,8 +552,8 @@ final class AppState: ObservableObject {
                 batch.append(contentsOf: logEntries)
                 self.appendToLog(batch)
                 // Reset mute/solo so every new song starts with all parts audible
-                self.muteState = Array(repeating: false, count: 7)
-                self.soloState = Array(repeating: false, count: 7)
+                self.muteState = Array(repeating: false, count: kTrackCount)
+                self.soloState = Array(repeating: false, count: kTrackCount)
                 self.playback.muteState = self.muteState
                 self.playback.soloState = self.soloState
                 // Keep all overrides at Auto after generation — key/mood/tempo are shown in
@@ -859,8 +859,8 @@ final class AppState: ObservableObject {
                 self.instrumentOverrides = [:]
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
-                self.muteState = Array(repeating: false, count: 7)
-                self.soloState = Array(repeating: false, count: 7)
+                self.muteState = Array(repeating: false, count: kTrackCount)
+                self.soloState = Array(repeating: false, count: kTrackCount)
                 self.playback.muteState = self.muteState
                 self.playback.soloState = self.soloState
                 var batch: [GenerationLogEntry] = []

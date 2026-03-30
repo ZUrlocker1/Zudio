@@ -31,39 +31,39 @@ final class PlaybackEngine: ObservableObject {
 
     // Per-track Ambient reverb wet values (cathedral for Lead/Pads/Texture, largeChamber for rest)
     // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums
-    private let ambientReverbWet: [Float]    = [82, 78, 88, 65, 90, 62, 70]
+    private let ambientReverbWet: [Float]    = [82, 78, 88, 65, 90, 62, 70, 82]  // LeadSynth: same as Lead1
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
-    private let ambientDelayWet:      [Float] = [60,  55, -1, 48, 18, -1, 28]
-    private let ambientDelayFeedback: [Float] = [72,  65, -1, 55, 35, -1, 18]
-    private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, 2500, -1, 3000]
+    private let ambientDelayWet:      [Float] = [60,  55, -1, 48, 18, -1, 28, -1]   // -1 = no delay
+    private let ambientDelayFeedback: [Float] = [72,  65, -1, 55, 35, -1, 18,  0]
+    private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, 2500, -1, 3000, -1]
     // Delay times in beats: Lead1=dotted-half(1.5), Lead2=dotted-quarter(0.75),
     //                       Rhythm=dotted-half(1.5), Texture=1-beat, Drums=1-beat
-    private let ambientDelayBeats:   [Double] = [1.5, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0]
+    private let ambientDelayBeats:   [Double] = [1.5, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0, 1.0]
 
     // Per-track base volumes — persisted so applyMuteState restores the right level, not 1.0
-    private var trackBaseVolume = Array(repeating: Float(1.0), count: 7)
+    private var trackBaseVolume = Array(repeating: Float(1.0), count: kTrackCount)
 
     // Static pans applied once at load time (not in the LFO loop).
     // Kosmic: wider lead spread; Motorik: tighter. Rhythm/Texture offset for separation.
     // stopPan() restores to these values when auto-pan LFO is disabled.
-    private var trackStaticPan = Array(repeating: Float(0), count: 7)
+    private var trackStaticPan = Array(repeating: Float(0), count: kTrackCount)
 
     // Tremolo LFO
-    private var tremEnabled   = Array(repeating: false,   count: 7)
-    private var tremPhase     = Array(repeating: Double(0), count: 7)
-    private var tremPhaseInc  = Array(repeating: Double(0.8378), count: 7)  // default 8 Hz at 60fps
-    private var tremDepth     = Array(repeating: Float(0.40),  count: 7)    // default 40% depth
+    private var tremEnabled   = Array(repeating: false,   count: kTrackCount)
+    private var tremPhase     = Array(repeating: Double(0), count: kTrackCount)
+    private var tremPhaseInc  = Array(repeating: Double(0.8378), count: kTrackCount)  // default 8 Hz at 60fps
+    private var tremDepth     = Array(repeating: Float(0.40),  count: kTrackCount)    // default 40% depth
 
     // Sweep LFO (low-pass filter cutoff modulation)
-    private var sweepEnabled = Array(repeating: false, count: 7)
-    private var sweepPhase   = Array(repeating: Double(0), count: 7)
+    private var sweepEnabled = Array(repeating: false, count: kTrackCount)
+    private var sweepPhase   = Array(repeating: Double(0), count: kTrackCount)
 
     // Pan LFO (auto-pan on boost mixer node)
-    private var panEnabled   = Array(repeating: false, count: 7)
-    private var panPhase     = Array(repeating: Double(0), count: 7)
-    private var panPhaseInc  = Array(repeating: Double(0), count: 7)  // per-track hz baked in
+    private var panEnabled   = Array(repeating: false, count: kTrackCount)
+    private var panPhase     = Array(repeating: Double(0), count: kTrackCount)
+    private var panPhaseInc  = Array(repeating: Double(0), count: kTrackCount)  // per-track hz baked in
 
     // Shared LFO timer — replaces per-effect-per-track timers.
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
@@ -151,10 +151,10 @@ final class PlaybackEngine: ObservableObject {
     private var xFilesDelayWasEnabled = false
 
     // Mute/solo state indexed by trackIndex
-    var muteState: [Bool] = Array(repeating: false, count: 7) {
+    var muteState: [Bool] = Array(repeating: false, count: kTrackCount) {
         didSet { applyMuteState() }
     }
-    var soloState: [Bool] = Array(repeating: false, count: 7) {
+    var soloState: [Bool] = Array(repeating: false, count: kTrackCount) {
         didSet { anySoloActive = soloState.contains(true); applyMuteState() }
     }
     private var anySoloActive = false
@@ -191,12 +191,12 @@ final class PlaybackEngine: ObservableObject {
     private func applyStaticPans() {
         // Track order: Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6
         if kosmicStyle {
-            trackStaticPan = [-0.15, 0.15, 0, 0.22, -0.22, 0, 0]
+            trackStaticPan = [-0.15, 0.15, 0, 0.22, -0.22, 0, 0, 0]   // LeadSynth: centre
         } else if motorikStyle {
             // Pads and Rhythm panned for separation; Texture rarely used so stays centre
-            trackStaticPan = [-0.07, 0.07, -0.20, 0.20, 0, 0, 0]
+            trackStaticPan = [-0.07, 0.07, -0.20, 0.20, 0, 0, 0, 0]
         } else {
-            trackStaticPan = [0, 0, 0, 0, 0, 0, 0]   // Ambient: no static spread
+            trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]   // Ambient: no static spread
         }
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
@@ -206,7 +206,7 @@ final class PlaybackEngine: ObservableObject {
     private func buildStepEventMap(state: SongState) {
         var map:    [Int: [(Int, MIDIEvent)]] = [:]
         var offMap: [Int: [(Int, UInt8)]]    = [:]
-        for trackIndex in 0..<7 {
+        for trackIndex in 0..<kTrackCount {
             for ev in state.events(forTrack: trackIndex) {
                 map[ev.stepIndex, default: []].append((trackIndex, ev))
                 offMap[ev.stepIndex + ev.durationSteps, default: []].append((trackIndex, ev.note))
@@ -411,8 +411,8 @@ final class PlaybackEngine: ObservableObject {
     // Cache the currently-loaded program per sampler to skip redundant loadSoundBankInstrument
     // calls. loadSoundBankInstrument is expensive (SF2 parse + audio buffer alloc), and
     // TrackRowView always resets to program index 0 on generate — the same program every time.
-    private var currentProgram: [UInt8] = Array(repeating: 255, count: 7)   // 255 = "not yet loaded"
-    private var currentBankMSB: [UInt8] = Array(repeating: 0,   count: 7)
+    private var currentProgram: [UInt8] = Array(repeating: 255, count: kTrackCount)   // 255 = "not yet loaded"
+    private var currentBankMSB: [UInt8] = Array(repeating: 0,   count: kTrackCount)
     // Cached drum program for nonisolated onStep (written on main actor in setProgram, read from timer thread)
     nonisolated(unsafe) private var cachedDrumProgram: UInt8 = 255
 
@@ -571,7 +571,7 @@ final class PlaybackEngine: ObservableObject {
         let anySolo   = anySoloActive
 
         // Tremolo — 60fps, all active tracks
-        for i in 0..<7 where tremEnabled[i] {
+        for i in 0..<kTrackCount where tremEnabled[i] {
             tremPhase[i] += tremPhaseInc[i]
             let muted = muteState[i] || (anySolo && !soloState[i])
             let tremVol = Float(1.0 - Double(tremDepth[i]) * (1.0 + sin(tremPhase[i])))
@@ -581,14 +581,14 @@ final class PlaybackEngine: ObservableObject {
         guard do20fps else { return }
 
         // Sweep — ~20fps, all active tracks
-        for i in 0..<7 where sweepEnabled[i] {
+        for i in 0..<kTrackCount where sweepEnabled[i] {
             sweepPhase[i] += 0.02199  // 2π × 0.07 Hz / 20 fps
             let cutoff = Float(300 + 1600 * (1 + sin(sweepPhase[i])))
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
         }
 
         // Pan — ~20fps, all active tracks
-        for i in 0..<7 where panEnabled[i] {
+        for i in 0..<kTrackCount where panEnabled[i] {
             panPhase[i] += panPhaseInc[i]
             boosts[i].pan = Float(sin(panPhase[i]))
         }
@@ -631,7 +631,7 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Sweep LFO (0.07 Hz sine, cutoff 300–3500 Hz, slight resonance)
     // Ambient phase offsets: Lead1=0°, Lead2=90°, Pads=180°, Bass=270° — keeps all sweeps
     // permanently out of phase so the texture breathes rather than pumping as a single block.
-    private let ambientSweepOffset: [Double] = [0.0, 1.5708, 3.1416, 0.0, 0.0, 4.7124, 0.0]
+    private let ambientSweepOffset: [Double] = [0.0, 1.5708, 3.1416, 0.0, 0.0, 4.7124, 0.0, 0.0]  // LeadSynth: 0°
 
     private func startSweep(forTrack i: Int) {
         sweepEnabled[i] = true
@@ -991,7 +991,7 @@ final class PlaybackEngine: ObservableObject {
 
         // Identify tracks with no intro events — they're "cold entrants" at the body start.
         var tracksToFade: [Int] = []
-        for i in 0..<7 {
+        for i in 0..<kTrackCount {
             guard i != kTrackBass && i != kTrackPads else { continue }  // drone tracks handled separately
             let hasIntroNotes = state.trackEvents[i].contains { $0.stepIndex < introEndStep }
             if !hasIntroNotes { tracksToFade.append(i) }
@@ -1091,7 +1091,7 @@ final class PlaybackEngine: ObservableObject {
         engine.attach(mixer)
         engine.connect(mixer, to: engine.mainMixerNode, format: nil)
 
-        for i in 0..<7 {
+        for i in 0..<kTrackCount {
             let sampler      = AVAudioUnitSampler()
             let boost        = AVAudioMixerNode()   // outputVolume > 1 = boost; pan = auto-pan
             let sweepFilter  = AVAudioUnitEffect(audioComponentDescription: Self.lpDesc)
@@ -1139,7 +1139,7 @@ final class PlaybackEngine: ObservableObject {
 
             // Reverb: cathedral for atmospheric tracks (Lead1, Lead2, Pads, Texture);
             // large chamber for rhythmic tracks (Rhythm, Bass, Drums)
-            let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture]
+            let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture, kTrackLeadSynth]
             reverb.loadFactoryPreset(atmosphericTracks.contains(i) ? .cathedral : .largeChamber)
             reverb.wetDryMix = 0
             reverb.auAudioUnit.shouldBypassEffect = true
@@ -1179,7 +1179,7 @@ final class PlaybackEngine: ObservableObject {
 
     private func loadGMPrograms() {
         let bankURL = gmDLSSoundBankURL()
-        for i in 0..<7 {
+        for i in 0..<kTrackCount {
             let program = kDefaultGMPrograms[i] ?? 0
             let isDrum  = (i == kTrackDrums)
             // bankMSB: 0x79 = melodic GM, 0x78 = percussion (GM drum channel 10)
@@ -1210,10 +1210,13 @@ final class PlaybackEngine: ObservableObject {
     }
 
     /// Spec §Mute and Solo: set sampler output volume to 0; keep dispatching events for sync.
+    /// Lead Synth (kTrackLeadSynth) is invisible to the user — it always mirrors Lead 1's mute/solo state.
     private func applyMuteState() {
         let anySolo = anySoloActive
         for i in 0..<samplers.count {
-            let muted = muteState[i] || (anySolo && !soloState[i])
+            let effectiveSolo = (i == kTrackLeadSynth) ? soloState[kTrackLead1] : soloState[i]
+            let effectiveMute = (i == kTrackLeadSynth) ? muteState[kTrackLead1] : muteState[i]
+            let muted = effectiveMute || (anySolo && !effectiveSolo)
             samplers[i].volume = muted ? 0.0 : trackBaseVolume[i]
         }
     }

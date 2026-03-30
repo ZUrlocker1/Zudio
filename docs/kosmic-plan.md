@@ -1156,6 +1156,8 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
   bars 21–46. One sustained note per bar, stepwise ascent then descent through scale.
   Occasional diatonic trill ornament. Register MIDI 60–76.
 
+**Lead thickening ✓ DONE:** Lead 1 is silently doubled by a GM Polysynth layer (GM 90) at 55% velocity. Invisible to the user — mirrors Lead 1's mute/solo state automatically. Classic JMJ layering technique.
+
 ---
 
 ## Title Generator
