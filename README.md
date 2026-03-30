@@ -9,9 +9,9 @@ The app includes built-in effects such as reverb, delay, auto-pan and sweep. You
 
 This repository contains the macOS app source, implementation notes, and supporting design documentation all developed using Claude. 
 
-![Zudio screenshot](assets/images/logo/Zudio%20091a%20screenshot.jpg)
+![Zudio screenshot](assets/images/logo/Zudio%20095%20screenshot.jpg)
 
-**Listen to a sample (Ambient style):** [A-Transformative-Meeting-About-Quarterly-Targets](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
+**Listen to a sample (Ambient style):** [The-ChatGPT-Meditations](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.95/Zudio-0.95.dmg)
 

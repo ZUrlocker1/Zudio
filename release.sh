@@ -164,23 +164,20 @@ def write_png(path, pixels):
 pixels = []
 for y in range(H):
     row = []
-    t = y / H
-    # dark blue-grey gradient
-    r = int(28 + t * 10)
-    g = int(28 + t * 10)
-    b = int(38 + t * 14)
+    # light grey background
+    r = g = b = 230
     for x in range(W):
-        # arrow: drawn as a right-pointing chevron centred between the two icons
-        # icons sit at x≈130 and x≈430; arrow centre at x=280, y=H//2
+        # right-pointing chevron centred between icons at x=280, y=H//2
         ax, ay = 280, H // 2
         dx, dy = x - ax, y - ay
-        # chevron shape: two diagonal bars meeting at a point
+        # upper arm: rises left-to-right (dy = -dx * 0.7, dx > 0)
+        # lower arm: falls left-to-right (dy = +dx * 0.7, dx > 0)
         on_arrow = (
-            (abs(dy - dx * 0.7) < 5 and 0 <= dx <= 28 and dy >= 0) or
-            (abs(dy + dx * 0.7) < 5 and 0 <= dx <= 28 and dy <= 0)
+            (abs(dy + dx * 0.7) < 5 and 0 <= dx <= 28 and dy <= 0) or
+            (abs(dy - dx * 0.7) < 5 and 0 <= dx <= 28 and dy >= 0)
         )
         if on_arrow:
-            row.extend([220, 220, 220])
+            row.extend([100, 100, 100])  # dark grey arrow, readable on light bg
         else:
             row.extend([r, g, b])
     pixels.append(row)
