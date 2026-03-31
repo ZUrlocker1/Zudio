@@ -283,10 +283,10 @@ struct SongGenerator {
             lead1BaseRule: &lead1BaseRule, xFilesBars: &xFilesBars
         )
 
-        // Lead Synth — Polysynth layer doubling Lead 1 at 55% velocity (thickens without competing)
+        // Lead Synth — Polysynth layer doubling Lead 1 at 60% velocity (thickens without competing)
         trackEvents[kTrackLeadSynth] = trackEvents[kTrackLead1].map { ev in
             MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                      velocity: UInt8(max(1, Int(ev.velocity) * 55 / 100)),
+                      velocity: UInt8(max(1, Int(ev.velocity) * 60 / 100)),
                       durationSteps: ev.durationSteps)
         }
 

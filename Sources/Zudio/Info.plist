@@ -54,6 +54,7 @@
             <string>Zudio Song</string>
             <key>UTTypeConformsTo</key>
             <array>
+                <string>public.plain-text</string>
                 <string>public.data</string>
             </array>
             <key>UTTypeIconFile</key>
