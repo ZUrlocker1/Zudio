@@ -320,14 +320,21 @@ struct TopBarView: View {
                                     Text("BPM")
                                         .foregroundStyle(.white)
                                         .fixedSize()
-                                    TextField("", value: Binding(
-                                        get: { appState.tempoOverride ?? 120 },
-                                        set: { v in appState.tempoOverride = v == 0 ? nil : max(20, min(200, v)) }
-                                    ), format: .number)
+                                    TextField("Auto", text: Binding(
+                                        get: { appState.tempoOverride.map { String($0) } ?? "" },
+                                        set: { s in
+                                            let t = s.trimmingCharacters(in: .whitespaces)
+                                            if t.isEmpty {
+                                                appState.tempoOverride = nil
+                                            } else if let v = Int(t) {
+                                                appState.tempoOverride = max(20, min(200, v))
+                                            }
+                                        }
+                                    ))
                                     .frame(width: 48)
                                     .textFieldStyle(.roundedBorder)
                                     Stepper("", value: Binding(
-                                        get: { appState.tempoOverride ?? 120 },
+                                        get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120 },
                                         set: { appState.tempoOverride = max(20, min(200, $0)) }
                                     ), in: 20...200)
                                     .labelsHidden()
@@ -367,6 +374,8 @@ struct TopBarView: View {
             .onChange(of: appState.selectedStyle) { _ in
                 // Segmented style picker can shift focus to the BPM text field — clear it immediately
                 DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
+                // Reset tempo override so the new style generates at its own natural tempo range
+                appState.tempoOverride = nil
             }
 
             Divider()
