@@ -285,13 +285,21 @@ struct KosmicStructureGenerator {
         rng: inout SeededRNG
     ) -> [ChordWindow] {
         var plan: [ChordWindow] = []
+        // Track the first A section's chord type so all A sections stay harmonically consistent.
+        // Prevents the return A in A-B-A from picking a different chord type (e.g. sus4 after quartal).
+        var firstAChordType: ChordType? = nil
         for section in sections {
-            plan.append(contentsOf: buildChordWindows(
+            let windows = buildChordWindows(
                 frame: frame,
                 section: section,
                 kosmicProgFamily: kosmicProgFamily,
-                rng: &rng
-            ))
+                rng: &rng,
+                forceChordType: section.label == .A ? firstAChordType : nil
+            )
+            if section.label == .A && firstAChordType == nil {
+                firstAChordType = windows.first?.chordType
+            }
+            plan.append(contentsOf: windows)
         }
         return anchorIntroToBody(plan: plan, frame: frame, sections: sections)
     }
@@ -325,7 +333,8 @@ struct KosmicStructureGenerator {
         frame: GlobalMusicalFrame,
         section: SongSection,
         kosmicProgFamily: KosmicProgressionFamily,
-        rng: inout SeededRNG
+        rng: inout SeededRNG,
+        forceChordType: ChordType? = nil
     ) -> [ChordWindow] {
         let chordCount: Int
         switch section.label {
@@ -367,8 +376,19 @@ struct KosmicStructureGenerator {
             let length = (i == chordCount - 1) ? (section.endBar - bar) : barsEach
             let rawRoot = pickKosmicChordRoot(mode: effectiveMode, progFamily: kosmicProgFamily, rng: &rng)
             let root = (section.label == .intro || section.label == .outro || forceTonic) ? "1" : rawRoot
-            let type = forceTonic ? .minor :
-                pickKosmicChordType(progFamily: kosmicProgFamily, mode: effectiveMode, rng: &rng)
+            // Always call pickKosmicChordType when not forceTonic — this preserves the RNG
+            // consumption sequence so that seeds produce the same title/output when replayed.
+            // forceChordType overrides the picked value but does NOT skip the RNG call.
+            let pickedType = forceTonic ? ChordType.minor
+                : pickKosmicChordType(progFamily: kosmicProgFamily, mode: effectiveMode, rng: &rng)
+            var type: ChordType = (!forceTonic && forceChordType != nil) ? forceChordType! : pickedType
+            // Issue 6: In long songs (> 80 bars) with static drone, B sections get at least
+            // one textural chord shift — replace minor with sus2 or power so there is some
+            // audible harmonic contrast even though the root doesn't move.
+            if frame.totalBars > 80 && kosmicProgFamily == .static_drone
+               && section.label == .B && type == .minor {
+                type = rng.nextDouble() < 0.60 ? .sus2 : .power
+            }
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
@@ -418,15 +438,38 @@ struct KosmicStructureGenerator {
         mode: Mode,
         rng: inout SeededRNG
     ) -> ChordType {
+        let isMinorMode = mode == .Aeolian || mode == .Dorian
+        let isMajorMode = mode == .Ionian
+
         switch progFamily {
         case .static_drone:
-            let types:   [ChordType] = [.minor, .minor, .power, .sus2]
-            let weights: [Double]    = [0.50,   0.25,   0.15,   0.10]
-            return types[rng.weightedPick(weights)]
+            // Clash fix: never assign minor to Ionian/Lydian (their scale has a major 3rd),
+            // never assign major to Aeolian/Dorian/Phrygian (their scale has a minor 3rd).
+            if isMajorMode {
+                let types:   [ChordType] = [.major, .power, .sus2]
+                let weights: [Double]    = [0.65,   0.20,   0.15]
+                return types[rng.weightedPick(weights)]
+            } else if isMinorMode {
+                let types:   [ChordType] = [.minor, .power, .sus2]
+                let weights: [Double]    = [0.75,   0.15,   0.10]
+                return types[rng.weightedPick(weights)]
+            } else {
+                // Mixolydian — major-leaning scale, minor/sus2/power all acceptable
+                let types:   [ChordType] = [.minor, .sus2, .power]
+                let weights: [Double]    = [0.40,   0.35,  0.25]
+                return types[rng.weightedPick(weights)]
+            }
         case .two_chord_pendulum:
-            let types:   [ChordType] = [.minor, .major, .sus2]
-            let weights: [Double]    = [0.50,   0.35,   0.15]
-            return types[rng.weightedPick(weights)]
+            // Clash fix: avoid major chord in minor modes — the major 3rd clashes with scale
+            if isMinorMode {
+                let types:   [ChordType] = [.minor, .sus2]
+                let weights: [Double]    = [0.75,   0.25]
+                return types[rng.weightedPick(weights)]
+            } else {
+                let types:   [ChordType] = [.minor, .major, .sus2]
+                let weights: [Double]    = [0.50,   0.35,   0.15]
+                return types[rng.weightedPick(weights)]
+            }
         case .modal_drift:
             let types:   [ChordType] = [.minor, .minor, .sus2, .power]
             let weights: [Double]    = [0.40,   0.30,   0.20,  0.10]

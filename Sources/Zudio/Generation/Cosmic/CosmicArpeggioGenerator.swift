@@ -191,6 +191,11 @@ struct KosmicArpeggioGenerator {
                                  offset: stepDur, legato: true, bar: bar, rng: &rng, events: &events,
                                  gateProbs: harmonyGate)
                 }
+                // Density cap: max 6 notes per bar (same limit as KOS-RTHM-004).
+                // Harmony voice can push totals above 6 in dense 8th-note passages.
+                if events.count - countBefore > 6 {
+                    events.removeSubrange((countBefore + 6)...)
+                }
                 if isIntroOutro {
                     for i in countBefore..<events.count {
                         let ev = events[i]
@@ -235,6 +240,7 @@ struct KosmicArpeggioGenerator {
                 let ordered   = ascending ? notes : notes.reversed() as [Int]
                 var stepPos = 0
                 var noteIdx = 0
+                var barNoteCount = 0
                 while stepPos + stepDur <= 16 {
                     let note = ordered[noteIdx % ordered.count]
                     noteIdx += 1
@@ -242,6 +248,8 @@ struct KosmicArpeggioGenerator {
                     let vel = UInt8(68 + rng.nextInt(upperBound: 13))  // 68–80
                     events.append(MIDIEvent(stepIndex: barStart + stepPos,
                                             note: UInt8(note), velocity: vel, durationSteps: dur))
+                    barNoteCount += 1
+                    if barNoteCount >= 6 { break }  // density cap: max 6 notes per bar
                     stepPos += stepDur
                 }
                 if isIntroOutro {

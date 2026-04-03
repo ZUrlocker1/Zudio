@@ -63,6 +63,7 @@ struct RhythmGenerator {
 
             // For RHY-004: build a 2-bar riff once per section
             let riffPattern = buildMelodicRiff(rng: &rng)
+            let riffScalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
 
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
@@ -118,17 +119,17 @@ struct RhythmGenerator {
 
                 case 3:
                     // RHY-004: 2-bar melodic riff cycling over the section
+                    // Snap each note to the nearest in-scale MIDI pitch so chord-root offsets
+                    // (e.g. interval 3 from D in B Dorian → F natural) don't leak through.
                     let riffBar = (bar - section.startBar) % 2
                     let riffSlice = riffBar == 0 ? Array(riffPattern.prefix(4))
                                                  : Array(riffPattern.suffix(4))
                     for (i, step) in [0, 4, 8, 12].enumerated() {
                         guard i < riffSlice.count else { continue }
                         guard rng.nextDouble() < density else { continue }
-                        let note = nearestMIDI(
-                            target: Int(pitches.root) + riffSlice[i],
-                            low: 45, high: 76,
-                            prev: prevNote
-                        )
+                        let rawTarget = Int(pitches.root) + riffSlice[i]
+                        let note = nearestScaleMIDI(target: rawTarget, scalePCs: riffScalePCs,
+                                                    low: 45, high: 76)
                         let vel = UInt8(step == 0 ? 85 : 65 + rng.nextInt(upperBound: 12))
                         events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                                 velocity: vel, durationSteps: 3))
@@ -312,8 +313,18 @@ struct RhythmGenerator {
     }
 
     /// Builds a random 8-step (2-bar) melodic riff as semitone intervals from root.
+    /// Notes are snapped to the active scale at the usage site (RHY-004), not here —
+    /// snapping at the interval level is insufficient when the chord root differs from the key root.
     private static func buildMelodicRiff(rng: inout SeededRNG) -> [Int] {
         let pool = [0, 0, 2, 3, 4, 5, 7, 7, 9, 10]
         return (0..<8).map { _ in pool[rng.nextInt(upperBound: pool.count)] }
+    }
+
+    /// Returns the MIDI note in [low, high] whose pitch class is in scalePCs and is
+    /// closest to target. Falls back to unclamped target if no scale note exists in range.
+    private static func nearestScaleMIDI(target: Int, scalePCs: Set<Int>, low: Int, high: Int) -> UInt8 {
+        let candidates = (low...high).filter { scalePCs.contains($0 % 12) }
+        guard !candidates.isEmpty else { return UInt8(clamping: target) }
+        return UInt8(clamping: candidates.min(by: { abs($0 - target) < abs($1 - target) }) ?? low)
     }
 }

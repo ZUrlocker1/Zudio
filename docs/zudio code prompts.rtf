@@ -416,7 +416,7 @@ once that's done write a summary section in the prototype.md doc that identifies
 \
 Great!   \
 did we create any rules or get any ideas from Craven Faults analysis?  I wonder if Craven Faults is the only Cosmic music with slow tempos, maybe our slowest tempo should be higher. I had a song in the 90s temp and it sounded very sluggish.\
-\
+	\
 performance still feels sluggish after a few songs.  The playback is uneven.  I would like you to do another advanced analysis creating a plan that identifies some more high impact optimizations.  If we need to discard song history, or tune some audio features to enable better performance I am ok with that. We cannot have sluggish playback.\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
@@ -924,8 +924,51 @@ double clicking on a Zudio file while Zudio is running still brings up a second 
 \
 if I click on Ambient when first starting Zudio, the focus then seems to go to the BPM selector and it is intercepting hot keys like Enter for generate.  Please don\'92t put the focus on the BPM selector. \
 \
-\
 when you upload to github note V0.95 includes new file handling, new solos and 14% fewer tonal clashes. \
 \
+I have an idea of doubling the lead for Kosmic to thicken the lead  by having the track play a synth as well as whatever the user selected. (No change to user interface, just doing this behind the scenes.  What do you think of this? How would you do it>  which Synth should I use. can you give me your ideas\
 \
-I have an idea of doubling the lead for Kosmic to thicken the lead  by having the track play a synth as well as whatever the user selected. (No change to user interface, just doing this behind the scenes.  What do you think of this? How would you do it>  which Synth should I use. can you give me your ideas}
+
+\f0\b More musical fixes
+\f2\b0 \
+I put 5 new Kosmic songs in the Zudio folder. Please carefully analyse these songs both the MIDI file and the Zudio log file to determine what improvements we can make to the Kosmic song generators, rules, etc. In particular, I want you to check for clashes with the solos, sections that are too crowded (too many instruments playing at the same time), tonal clashes from bass or solo parts, or anything else that can make them more Kosmic in style.  Tell me your plan.\
+\
+I believe the A-B-B-A song structure is a structure that we generate for Kosmic with a low probability. So don't try to change that. But if you can ensure that there are some rhythmic changes the second time through the B, that might help. e.g. change the Rhtyhm, Texture or Pads tracks slightly, especially if we can make a crowded section more sparse, dropping out for some bars.\
+\
+Are there any tonal clashes in these songs for which we should adjust the rules?\
+\
+Fix all of it\
+\
+Add a brief note to the Kosmic plan mentioning these improvements\
+\
+I've also put 5 new Motorik songs in the Zudio folder. Please examine them, like we did for Kosmic, to see if there are tonal clashes in the MIDI file, too many busy parts, too much boring consistency or other things we should change in the rules or the generating functions to make them musically more Motorik like.  Give me your plan\
+\
+Expain more about issue 3. It seemed we had a motorik song with no notes for Lead 1 or Lead 2 and that seems like a bug to me, not just cosmetic.  Is that the same as issue 4?\
+\
+Got it! Yes, please go ahead with all changes.\
+\
+Add a brief note to the Motorik plan mentioning these improvements\
+\
+I have put 5 new Motorik songs. please verify.\
+\
+\
+I put 6 new Ambient songs in the Zudio folder. Please analyze the MIDI files and Zudio log files to look for tonal clashes, or too much tedium or too busy or other problems indicating that they are not fitting with the AMbient style. Let me know your plan. \
+\
+please examine all of the song generation code for Ambient, Motorik, Kosmic to see if there might be some additional hard coded notes or scales not properly handled that we have missed\
+\
+\
+
+\f0\b File Load / Save bugs
+\f2\b0 \
+I think there are some bugs in file save / load.  Sometimes double clicking on a Zudio song does not load it into the Zudio app. Also  I noticed the zudio file sizes are now much larger at 128K. They used ot be 2k when they were text files. Why are they so much larger? is it because we\'92re adding a large icon? Can we make the files smaller?  \
+\
+I also noticed loading the saved file Zudio-Leer-Licht  did not work, it showed a song Maxima instead. A similar error when I tried to load Zudio-Nexione-VII.  Is that because of new rule changes?  or some other problem? \
+\
+File load may still broken on first (best-song) Kosmic song.  When I save the song Zudio-Paradoxe it loads as Zudio-Frozen-Horizon with some discrepenncies, not just the name. Please fix that.  Both files are in the Zudio folder.\
+\
+File load and save is still sometimes broken. Sometimes I see two instances of Zudio loaded. But one has no window.There are two instances shown in the Acitvity Monitor window. I need you to more thoroughly research how double clicking on Zudio document shoudl work. Also note that file load and save still is not working fully.  I save a song  Ewig Himmel and when I load it, it becomes Gross Nebel.  Both are in the Zudio directory.  Please verify this carefully. \
+\
+I think I found a possibel source of the file load problem. I double clicked on a Zudio file with no app running and it brought up the older version of Zudio 0.95.  So is that perhaps causing us some problems?  Do we need to do a full archive - build - sign - distribute process to test properly?  Or can we \'93de-register\'94 the older 0.95 version?  What\'92s a good approach? \
+\
+\
+Update all modified files on github including the DMG, docs files, source code, prompt files etc.  Anything that has been modified.  Note in this release: includes minor bug fixes in file handling and significant reduction in tonal clashes.}

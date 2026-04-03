@@ -41,6 +41,12 @@ struct SongState: Sendable {
     /// Keys: "Bass", "Drums", "Rhythm", "Pads", "Lead", "Tex". Written to the log file so that
     /// Load Song can restore the exact generators used and reproduce the song from the seed.
     let forcedRules: [String: String]
+    /// User-set overrides active when the song was generated. nil = value came from RNG naturally.
+    /// Written to the log file as "Key Override:", "Tempo Override:", "Mood Override:" so that
+    /// Load Song re-applies ONLY these — never the informational Key:/Tempo:/Mood: result fields.
+    let keyOverride:   String?
+    let tempoOverride: Int?
+    let moodOverride:  Mood?
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     let generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
@@ -67,7 +73,10 @@ struct SongState: Sendable {
         ambientLoopLengths: AmbientLoopLengths? = nil,
         ambientXFilesBlockRange: Range<Int>? = nil,
         ambientUseBrushKit: Bool = false,
-        forcedRules: [String: String] = [:]
+        forcedRules: [String: String] = [:],
+        keyOverride:   String? = nil,
+        tempoOverride: Int?    = nil,
+        moodOverride:  Mood?   = nil
     ) {
         self.frame              = frame
         self.structure          = structure
@@ -85,6 +94,9 @@ struct SongState: Sendable {
         self.ambientXFilesBlockRange = ambientXFilesBlockRange
         self.ambientUseBrushKit      = ambientUseBrushKit
         self.forcedRules             = forcedRules
+        self.keyOverride             = keyOverride
+        self.tempoOverride           = tempoOverride
+        self.moodOverride            = moodOverride
         self.generationLog           = generationLog
         self.stepAnnotations    = stepAnnotations
     }
@@ -105,7 +117,8 @@ struct SongState: Sendable {
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
                   ambientXFilesBlockRange: ambientXFilesBlockRange,
-                  ambientUseBrushKit: useBrushKit, forcedRules: forcedRules)
+                  ambientUseBrushKit: useBrushKit, forcedRules: forcedRules,
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
 
     /// Returns a copy of this state with the frame replaced (used for real-time tempo changes).
@@ -117,7 +130,8 @@ struct SongState: Sendable {
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
                   ambientXFilesBlockRange: ambientXFilesBlockRange,
-                  ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules)
+                  ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules,
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -138,7 +152,8 @@ struct SongState: Sendable {
             generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
             ambientXFilesBlockRange: ambientXFilesBlockRange,
-            ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules
+            ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules,
+            keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride
         )
     }
 }

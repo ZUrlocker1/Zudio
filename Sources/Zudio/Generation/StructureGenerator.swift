@@ -178,7 +178,7 @@ struct StructureGenerator {
             // so chord roots and scale tension pools are diatonic to the song's real key.
             let rawRoot = pickChordRoot(mode: frame.mode, rng: &rng)
             let root = (section.label == .intro || section.label == .outro) ? "1" : rawRoot
-            let type = pickChordType(mode: frame.mode, rng: &rng)
+            let type = pickChordType(mode: frame.mode, rootDegree: rawRoot, rng: &rng)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
@@ -196,25 +196,211 @@ struct StructureGenerator {
     }
 
     private static func pickChordRoot(mode: Mode, rng: inout SeededRNG) -> String {
-        // Diatonic degree strings per mode — only degrees whose pitch class is in the scale.
-        // Using a fixed "Aeolian" list for all modes causes borrowed roots in major modes
-        // (e.g. b3=C natural in A Ionian, which has C#) producing severe cross-track clashes.
+        // Only degrees whose perfect-5th lands on a scale note are included.
+        // Degrees whose diatonic triad is diminished (P5 is chromatic) are excluded because
+        // none of our chord types (major/minor/sus2/dom7/min7/power) can represent them
+        // without introducing out-of-scale tones:
+        //   Ionian "7"    — vii dim (e.g. C# in D Ionian: P5=G#, scale has G)
+        //   Dorian "6"    — vi dim  (e.g. D# in F# Dorian: P5=A#, scale has A)
+        //   Mixolydian "3"— iii dim (e.g. G# in E Mixolydian: P5=D#, scale has D)
+        //   Aeolian "2"   — ii dim  (e.g. F# in E Aeolian: P5=C#, scale has C)
         let degrees: [String]
         switch mode {
-        case .Ionian:          degrees = ["1", "2", "3", "4", "5", "6", "7"]
-        case .Dorian:          degrees = ["1", "2", "b3", "4", "5", "6", "b7"]
-        case .Mixolydian:      degrees = ["1", "2", "3", "4", "5", "6", "b7"]
-        case .Aeolian:         degrees = ["1", "2", "b3", "4", "5", "b6", "b7"]
+        case .Ionian:          degrees = ["1", "2", "3", "4", "5", "6"]          // removed "7"
+        case .Dorian:          degrees = ["1", "2", "b3", "4", "5", "b7"]        // removed "6"
+        case .Mixolydian:      degrees = ["1", "2", "4", "5", "6", "b7"]         // removed "3"
+        case .Aeolian:         degrees = ["1", "b3", "4", "5", "b6", "b7"]       // removed "2"
         case .MinorPentatonic: degrees = ["1", "b3", "4", "5", "b7"]
         case .MajorPentatonic: degrees = ["1", "2", "3", "5", "6"]
         }
         return degrees[rng.nextInt(upperBound: degrees.count)]
     }
 
-    private static func pickChordType(mode: Mode, rng: inout SeededRNG) -> ChordType {
-        // Motorik bias: minor and sus2 dominate
-        let weights: [Double] = [0.15, 0.30, 0.25, 0.15, 0.15] // major, minor, sus2, dom7, min7
-        let types: [ChordType] = [.major, .minor, .sus2, .dom7, .min7]
-        return types[rng.weightedPick(weights)]
+    private static func pickChordType(mode: Mode, rootDegree: String,
+                                       rng: inout SeededRNG) -> ChordType {
+        // ─────────────────────────────────────────────────────────────────────────────
+        // EXHAUSTIVE mode × degree matrix — one guard per valid (mode, degree) pair.
+        //
+        // Chord-tone analysis (all intervals are fixed, not scale-relative):
+        //   major  = root + M3 + P5       clashes when scale has b3 instead of M3
+        //   minor  = root + m3 + P5       clashes when scale has M3 instead of m3
+        //   dom7   = root + M3 + P5 + m7  clashes when scale lacks M3 or the m7 pitch
+        //   min7   = root + m3 + P5 + M7  clashes when scale lacks m3
+        //   sus2   = root + M2 + P5       clashes when scale lacks the M2 above that root
+        //   power  = root + P5            always diatonic (P5 is preserved in all modes here)
+        //
+        // Every case below admits only chord types whose tones are ALL in the 7-note scale.
+        // The default case is a safe fallback for pentatonic modes (not reached in practice
+        // from StructureGenerator, which is only called by the Motorik path).
+        //
+        // Exactly one rng.weightedPick call is made — RNG advance count is invariant.
+        // ─────────────────────────────────────────────────────────────────────────────
+
+        // ── IONIAN  (scale: 1 2 3 4 5 6 7  e.g. D E F# G A B C#) ───────────────────
+        if mode == .Ionian {
+            switch rootDegree {
+            case "1":
+                // I major tonic. dom7 adds b7 (C in D Ionian, scale has C#) — clash.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.60, 0.25, 0.15])]
+            case "2":
+                // ii minor. sus2 OK: M2 of 2nd = scale deg 3 (F# in D Ionian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.40, 0.30, 0.20, 0.10])]
+            case "3":
+                // iii minor. sus2 clashes: M2 of 3rd = chromatic (G# not in D Ionian).
+                // dom7 adds b7 of 3rd (C natural not in D Ionian).
+                let t: [ChordType] = [.minor, .min7, .power]
+                return t[rng.weightedPick([0.65, 0.25, 0.10])]
+            case "4":
+                // IV major. dom7 adds b7 of IV = the chromatic leading tone (F in D Ionian,
+                // scale has F#) — clash.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "5":
+                // V major. V7 (dom7) = the diatonic dominant seventh — fully in scale.
+                // sus2 OK: M2 of 5th = scale deg 6 (B in D Ionian ✓).
+                let t: [ChordType] = [.major, .dom7, .sus2, .power]
+                return t[rng.weightedPick([0.40, 0.25, 0.25, 0.10])]
+            case "6":
+                // vi minor. sus2 OK: M2 of 6th = scale deg 7 (C# in D Ionian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.40, 0.30, 0.20, 0.10])]
+            default:
+                let t: [ChordType] = [.minor, .sus2, .power]
+                return t[rng.weightedPick([0.50, 0.30, 0.20])]
+            }
+        }
+
+        // ── DORIAN  (scale: 1 2 b3 4 5 6 b7  e.g. D E F G A B C) ──────────────────
+        if mode == .Dorian {
+            switch rootDegree {
+            case "1":
+                // i minor tonic. major/dom7 need M3 (F# in D Dorian, scale has F) — clash.
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.30, 0.15, 0.10])]
+            case "2":
+                // ii minor. sus2 clashes: M2 of 2nd = chromatic (F# in D Dorian, scale has F).
+                // major/dom7 also need M3 of 2nd (G# not in scale).
+                let t: [ChordType] = [.minor, .min7, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "b3":
+                // bIII major (e.g. F major in D Dorian: F A C — all in scale).
+                // minor adds m3 of bIII (Ab) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "4":
+                // IV major (e.g. G major in D Dorian: G B D — B = Dorian char. 6th ✓).
+                // IV7 = G B D F — all in D Dorian ✓ (the bluesy Dorian IV7).
+                // minor on IV needs m3 (Bb in D Dorian) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .dom7, .power]
+                return t[rng.weightedPick([0.40, 0.30, 0.20, 0.10])]
+            case "5":
+                // v minor (e.g. Am in D Dorian: A C E — all in scale).
+                // major/dom7 need M3 of 5th (C# in D Dorian) — clash.
+                // sus2 OK: M2 of 5th = scale deg 6 (B in D Dorian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.25, 0.20, 0.10])]
+            case "b7":
+                // bVII major (e.g. C major in D Dorian: C E G — all in scale).
+                // dom7 on bVII adds m7 of bVII (Bb in D Dorian) — not in scale.
+                // minor adds m3 of bVII (Eb) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.60, 0.25, 0.15])]
+            default:
+                let t: [ChordType] = [.minor, .sus2, .power]
+                return t[rng.weightedPick([0.50, 0.30, 0.20])]
+            }
+        }
+
+        // ── MIXOLYDIAN  (scale: 1 2 3 4 5 6 b7  e.g. G A B C D E F) ────────────────
+        if mode == .Mixolydian {
+            switch rootDegree {
+            case "1":
+                // I major tonic. dom7 = the defining Mixolydian colour (G7 in G Mixolydian ✓).
+                // minor adds b3 (Bb in G Mixolydian) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .dom7, .power]
+                return t[rng.weightedPick([0.35, 0.30, 0.20, 0.15])]
+            case "2":
+                // ii minor (e.g. Am in G Mixolydian: A C E — all in scale).
+                // major/dom7 need M3 of 2nd (C# in G Mixolydian) — clash.
+                // sus2 OK: M2 of 2nd = scale deg 3 (B in G Mixolydian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.25, 0.20, 0.10])]
+            case "4":
+                // IV major (e.g. C major in G Mixolydian: C E G — all in scale).
+                // dom7 on IV = C7 = C E G Bb — Bb not in G Mixolydian (has F) — clash.
+                // minor adds m3 of IV (Eb) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "5":
+                // v minor (e.g. Dm in G Mixolydian: D F A — all in scale).
+                // major/dom7 need M3 of 5th (F# in G Mixolydian) — clash.
+                // sus2 OK: M2 of 5th = scale deg 6 (E in G Mixolydian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.50, 0.25, 0.15, 0.10])]
+            case "6":
+                // vi minor (e.g. Em in G Mixolydian: E G B — all in scale).
+                // sus2 of 6th needs M2 = the raised 7th (F# in G Mixolydian, scale has F) — clash.
+                let t: [ChordType] = [.minor, .min7, .power]
+                return t[rng.weightedPick([0.60, 0.25, 0.15])]
+            case "b7":
+                // bVII major (e.g. F major in G Mixolydian: F A C — all in scale).
+                // minor/dom7/min7 all add chromatic tones not in Mixolydian.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            default:
+                let t: [ChordType] = [.minor, .sus2, .power]
+                return t[rng.weightedPick([0.50, 0.30, 0.20])]
+            }
+        }
+
+        // ── AEOLIAN  (scale: 1 2 b3 4 5 b6 b7  e.g. E F# G A B C D) ────────────────
+        if mode == .Aeolian {
+            switch rootDegree {
+            case "1":
+                // i minor tonic. major/dom7 need M3 (G# in E Aeolian) — clash.
+                // sus2 OK: M2 of tonic = scale deg 2 (F# in E Aeolian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.30, 0.15, 0.10])]
+            case "b3":
+                // bIII major (e.g. G major in E Aeolian: G B D — all in scale).
+                // dom7 on bIII = G7 = G B D F — F not in E Aeolian (has F#) — clash.
+                // minor adds m3 of bIII (Bb) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "4":
+                // iv minor (e.g. Am in E Aeolian: A C E — all in scale).
+                // major/dom7 need M3 of 4th (C# in E Aeolian) — clash.
+                // sus2 OK: M2 of 4th = scale deg 5 (B in E Aeolian ✓).
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.25, 0.20, 0.10])]
+            case "5":
+                // v minor (e.g. Bm in E Aeolian: B D F# — all in scale).
+                // sus2 clashes: M2 of 5th = C# — scale has C natural — clash.
+                // major/dom7 need the leading tone (D# in E Aeolian) — clash.
+                let t: [ChordType] = [.minor, .min7, .power]
+                return t[rng.weightedPick([0.65, 0.25, 0.10])]
+            case "b6":
+                // bVI major (e.g. C major in E Aeolian: C E G — all in scale).
+                // dom7 on bVI adds m7 of bVI (Bb in E Aeolian) — not in scale.
+                // minor adds m3 of bVI (Eb) — not in scale.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "b7":
+                // bVII major (e.g. D major in E Aeolian: D F# A — all in scale).
+                // bVII7 = D7 = D F# A C — C = b6 of E Aeolian ✓ — fully diatonic.
+                // minor adds m3 of bVII (F in E Aeolian) — scale has F# — clash.
+                let t: [ChordType] = [.major, .dom7, .sus2, .power]
+                return t[rng.weightedPick([0.45, 0.20, 0.25, 0.10])]
+            default:
+                let t: [ChordType] = [.minor, .sus2, .power]
+                return t[rng.weightedPick([0.50, 0.30, 0.20])]
+            }
+        }
+
+        // ── FALLBACK  (MinorPentatonic / MajorPentatonic — not reached from StructureGenerator) ──
+        let t: [ChordType] = [.minor, .sus2, .power]
+        return t[rng.weightedPick([0.50, 0.30, 0.20])]
     }
 }

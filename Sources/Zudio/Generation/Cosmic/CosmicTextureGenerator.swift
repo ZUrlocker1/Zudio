@@ -16,13 +16,21 @@ struct KosmicTextureGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
+        kosmicProgFamily: KosmicProgressionFamily = .static_drone,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil
     ) -> [MIDIEvent] {
 
-        let texRules:   [String] = ["KOS-TEXT-001", "KOS-TEXT-002", "KOS-TEXT-003", "KOS-TEXT-004"]
-        let texWeights: [Double] = [0.45,           0.27,           0.18,           0.10]
+        // Clash fix: KOS-TEXT-003 (Spatial Sweep — chromatic passing) clashes with quartal
+        // and suspended_resolution harmony. Exclude it from the pool for those families.
+        let excludeText003 = (kosmicProgFamily == .quartal_stack || kosmicProgFamily == .suspended_resolution)
+        let texRules:   [String] = excludeText003
+            ? ["KOS-TEXT-001", "KOS-TEXT-002", "KOS-TEXT-004"]
+            : ["KOS-TEXT-001", "KOS-TEXT-002", "KOS-TEXT-003", "KOS-TEXT-004"]
+        let texWeights: [Double] = excludeText003
+            ? [0.50,           0.32,           0.18]
+            : [0.45,           0.27,           0.18,           0.10]
         let primaryRule = forceRuleID ?? texRules[rng.weightedPick(texWeights)]
         usedRuleIDs.insert(primaryRule)
 
@@ -153,6 +161,9 @@ struct KosmicTextureGenerator {
 
                 switch primaryRule {
                 case "KOS-TEXT-001":
+                    // Density gate: fire on 70% of bars to prevent 320–480 note accumulation
+                    // in long songs. Creates natural "in and out" texture breathing.
+                    guard rng.nextDouble() < 0.70 else { break }
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
                                                firstBodyBar: firstBodyBar,
                                                entry: entry, frame: frame, structure: structure, rng: &rng)

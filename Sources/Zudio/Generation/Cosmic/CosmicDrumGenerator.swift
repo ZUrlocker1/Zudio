@@ -103,15 +103,15 @@ struct KosmicDrumGenerator {
 
             let isStripped = strippedBars.contains(bar) && section.label != .outro
 
-            // Closed hat — 8th notes, audible velocity, alternating accent/ghost for swing feel
-            for i in 0..<8 {
-                let step = i * 2
-                // On-beat 8th (steps 0,4,8,12) slightly louder than off-beat (steps 2,6,10,14)
-                let onBeat = (step % 4 == 0)
-                let baseVel = onBeat ? (42 + rng.nextInt(upperBound: 14)) : (30 + rng.nextInt(upperBound: 12))
+            // Closed hat — quarter notes (4 per bar), 75% per-step gate for minimal dub sparseness
+            for i in 0..<4 {
+                let step = i * 4
+                guard rng.nextDouble() < 0.75 else { continue }
+                let onBeat = (step % 8 == 0)
+                let baseVel = onBeat ? (38 + rng.nextInt(upperBound: 12)) : (26 + rng.nextInt(upperBound: 10))
                 let vel = Int(Double(baseVel) * outroScale)
                 events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
-                                        velocity: UInt8(max(20, vel)), durationSteps: 1))
+                                        velocity: UInt8(max(18, vel)), durationSteps: 1))
             }
 
             // Kick beat 1 — always

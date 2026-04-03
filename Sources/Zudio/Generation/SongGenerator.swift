@@ -155,6 +155,16 @@ struct SongGenerator {
         // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed)
 
+        // Step 10.7 — Pads gate: when Lead 1 is on a solo rule (< 30 notes), thin pads outside
+        // the solo window to avoid a dense shimmer wall with nothing cutting through it.
+        if let soloWindow = ld1SoloRange, trackEvents[kTrackLead1].count < 30 {
+            let soloSteps = Set(soloWindow.flatMap { bar in (bar * 16)..<(bar * 16 + 16) })
+            var padGateRNG = SeededRNG(seed: seed &+ 0xE1)
+            trackEvents[kTrackPads] = trackEvents[kTrackPads].filter { ev in
+                soloSteps.contains(ev.stepIndex) || padGateRNG.nextDouble() < 0.70
+            }
+        }
+
         // Step 11 — Harmonic filter: clash guard, register separation, velocity arc
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
@@ -205,7 +215,10 @@ struct SongGenerator {
             kosmicProgFamily: .static_drone,
             generationLog: log,
             stepAnnotations: stepAnnotations,
-            forcedRules: forced
+            forcedRules: forced,
+            keyOverride: keyOverride,
+            tempoOverride: tempoOverride,
+            moodOverride: moodOverride
         )
     }
 
@@ -283,13 +296,6 @@ struct SongGenerator {
             lead1BaseRule: &lead1BaseRule, xFilesBars: &xFilesBars
         )
 
-        // Lead Synth — Polysynth layer doubling Lead 1 at 60% velocity (thickens without competing)
-        trackEvents[kTrackLeadSynth] = trackEvents[kTrackLead1].map { ev in
-            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                      velocity: UInt8(max(1, Int(ev.velocity) * 60 / 100)),
-                      durationSteps: ev.durationSteps)
-        }
-
         // Arpeggio (rhythm slot) — the heartbeat of Kosmic
         var rhythmRules: Set<String> = []
         trackEvents[kTrackRhythm] = KosmicArpeggioGenerator.generate(
@@ -319,6 +325,7 @@ struct SongGenerator {
         var texRules: Set<String> = []
         trackEvents[kTrackTexture] = KosmicTextureGenerator.generate(
             frame: frame, structure: structure, tonalMap: tonalMap,
+            kosmicProgFamily: kosmicProgFamily,
             rng: &texRNG, usedRuleIDs: &texRules, forceRuleID: forceTexRuleID
         )
 
@@ -343,6 +350,53 @@ struct SongGenerator {
         // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Kosmic)
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed)
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+
+        // Kosmic density guard: if Rhythm is more than 2× as dense as Lead 1, thin Rhythm
+        // to 65% retention to prevent it from burying the lead. Downbeats are always kept.
+        let lead1Count  = trackEvents[kTrackLead1].count
+        let rhythmCount = trackEvents[kTrackRhythm].count
+        if lead1Count > 0 && rhythmCount > lead1Count * 2 {
+            var densityRNG = SeededRNG(seed: seed &+ 0xD0)
+            trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { ev in
+                ev.stepIndex % 16 == 0 || densityRNG.nextDouble() < 0.65
+            }
+        }
+
+        // A-B-B-A second-B variation: thin Rhythm (60% retention), drop Texture for first 8 bars,
+        // and reduce Pads velocity for first half — gives the repeat B a stripped-back feel.
+        let bSections = structure.sections.filter { $0.label == .B }
+        if bSections.count >= 2 {
+            let secondB = bSections[1]
+            let halfBar = secondB.startBar + (secondB.endBar - secondB.startBar) / 2
+            var varRNG = SeededRNG(seed: seed &+ 0xBB)
+            trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { ev in
+                let bar = ev.stepIndex / 16
+                guard bar >= secondB.startBar && bar < secondB.endBar else { return true }
+                return ev.stepIndex % 16 == 0 || varRNG.nextDouble() < 0.60
+            }
+            // Texture: silent for first 8 bars of second B
+            let texSilenceEnd = min(secondB.startBar + 8, secondB.endBar)
+            trackEvents[kTrackTexture] = trackEvents[kTrackTexture].filter { ev in
+                let bar = ev.stepIndex / 16
+                return !(bar >= secondB.startBar && bar < texSilenceEnd)
+            }
+            // Pads: reduce velocity by ~15% in first half of second B
+            trackEvents[kTrackPads] = trackEvents[kTrackPads].map { ev in
+                let bar = ev.stepIndex / 16
+                guard bar >= secondB.startBar && bar < halfBar else { return ev }
+                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                 velocity: UInt8(max(10, Int(ev.velocity) * 85 / 100)),
+                                 durationSteps: ev.durationSteps)
+            }
+        }
+
+        // Lead Synth — copy AFTER all filters so it mirrors exactly what Lead 1 plays.
+        // (Bug fix: copying before filters caused Lead Synth to have more notes than Lead 1.)
+        trackEvents[kTrackLeadSynth] = trackEvents[kTrackLead1].map { ev in
+            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                      velocity: UInt8(max(1, Int(ev.velocity) * 60 / 100)),
+                      durationSteps: ev.durationSteps)
+        }
 
         // Title generation — Kosmic uses its own space-themed generator
         let title = KosmicTitleGenerator.generate(frame: frame, rng: &rng)
@@ -394,7 +448,10 @@ struct SongGenerator {
             kosmicProgFamily: kosmicProgFamily,
             generationLog: log,
             stepAnnotations: stepAnnotations,
-            forcedRules: forced
+            forcedRules: forced,
+            keyOverride: keyOverride,
+            tempoOverride: tempoOverride,
+            moodOverride: moodOverride
         )
     }
 
@@ -697,7 +754,10 @@ struct SongGenerator {
             generationLog: log, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: loopLengths,
             ambientXFilesBlockRange: ambientXFilesBlockRange,
-            ambientUseBrushKit: useBrushKit, forcedRules: forced
+            ambientUseBrushKit: useBrushKit, forcedRules: forced,
+            keyOverride: keyOverride,
+            tempoOverride: tempoOverride,
+            moodOverride: moodOverride
         )
     }
 
@@ -1290,12 +1350,14 @@ struct SongGenerator {
     /// Rule IDs introduced recently — shown with a " *" suffix in the status log.
     /// Capped at 6; retire oldest when adding new ones.
     private static let newRuleIDs: Set<String> = [
-        "KOS-LEAD-007",     // TD Skip Sequence — Tangerine Dream ascending run with ghost notes
-        "KOS-LEAD-008",     // Caligari solo — slow lyrical chord-tone lead (from Caligari Drop)
-        "KOS-LEAD-009",     // Dark Sun solo — spacious 70s analog synth lead (from Dark Sun)
-        "MOT-LD1-006",      // Long Arc Solo — ascending/descending line across section
-        "MOT-LD1-007",      // Motorik solo window — lyrical single-section lead
-        "KOS-BASS-012",     // McCartney PBW bass — third/fifth walk
+        "KOS-RTHM-002",     // JMJ Hook — density cap added (max 6 notes/bar)
+        "KOS-RTHM-003",     // Oxygène — density cap added (max 6 notes/bar)
+        "KOS-TEXT-001",     // Orbital Motive — 70% bar gate added (was firing every bar)
+        "KOS-DRUM-002",     // Basic Channel minimal dub — hats reduced 8th→quarter with 75% gate
+        "KOS-PADS-008",     // bIII Colour Chord — density guard added (skips if primary ≥ 4 notes/bar)
+        "KOS-BASS-004",     // Moroder Drift — ghost note added on silent cycle bar
+        "MOT-LD1-007",      // Vanishing solo — pre-echo ghost notes added; body silence except solo window
+        "MOT-LD1-008",      // Visiting solo — pre-echo ghost notes added; body silence except solo window
     ]
 
     private static func ruleTag(_ ruleID: String, testMode: Bool) -> String {
@@ -1362,8 +1424,10 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicLeadRuleDescription(ruleID)))
         }
 
-        // Lead 2
+        // Lead 2 — skip any rule already shown under Lead 1 (same rule = Lead 2 mirrors Lead 1
+        // with a timing offset; logging it twice is redundant and looks like a bug).
         for ruleID in lead2Rules.sorted() {
+            guard !lead1Rules.contains(ruleID) else { continue }
             log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicLeadRuleDescription(ruleID)))
         }
 

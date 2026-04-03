@@ -762,3 +762,21 @@ Lead 2 receives the Lead 1 event array before generating. When Lead 1 picks a sp
 - Pads and Rhythm: > 85%
 - Leads: > 80%
 - Drum fill rate: < 1 fill per 8 bars
+
+---
+
+## Tonal Clash Fix History
+
+**Round 1 (0.96 alpha)** — first pass at `pickChordType` guards based on analysis of 5 Motorik songs (Bewegt-Zeit, Current-2, Dreht-Feld, E-Cycle, Klingt-Welle). Added guards for Mixolydian I/V/VI/bVII, Aeolian V, Dorian bIII, Ionian I/III. Also removed diminished-triad degrees from `pickChordRoot` (Ionian VII, Dorian VI, Mixolydian III, Aeolian II).
+
+**Round 2 (0.96 alpha)** — exhaustive rewrite of `pickChordType` after analysis of 11 further songs revealed many uncovered mode×degree combinations. Previous guards left major/dom7 accessible via the default case for Dorian/Aeolian roots, producing out-of-scale major 3rds. The function now has one explicit case per valid degree for all four modes — nothing falls through to the default for Ionian/Dorian/Mixolydian/Aeolian.
+
+Specific clashes fixed in Round 2:
+- dom7 and major on Dorian root=1 (requires M3, scale has b3)
+- minor and min7 on Dorian root=4 and root=b7 (diatonic chord is major at both positions)
+- sus2 on Dorian root=2 (M2 above the 2nd degree is chromatic in Dorian)
+- dom7 and major on Aeolian root=1 and root=4 (both are minor positions)
+- minor and min7 on Aeolian root=b3, root=b6, root=b7 (diatonic chord is major at all three)
+- sus2 on Aeolian root=5 (M2 above the 5th = raised 6th, not in natural minor)
+- dom7 on Mixolydian root=4 and on Ionian root=4 (the m7 interval lands on a chromatic pitch)
+- Also added new diatonic allowances: IV7 in Dorian (blues colour), bVII7 in Aeolian, V7 in Ionian.

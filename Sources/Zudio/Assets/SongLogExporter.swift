@@ -14,7 +14,9 @@ struct SongLogExporter {
         let logURL = midiURL.deletingPathExtension().appendingPathExtension("zudio")
         guard let data = buildLog(song).data(using: .utf8) else { return }
         try data.write(to: logURL, options: .atomic)
-        setZudioIcon(on: logURL)
+        // Note: do NOT call NSWorkspace.setIcon here — it writes the full icon image into
+        // the resource fork, bloating every .zudio file from ~2 KB to 128 KB.
+        // Finder shows the correct document icon via the UTI registration in Info.plist.
     }
 
     // MARK: - Log construction
@@ -31,7 +33,7 @@ struct SongLogExporter {
             "=== Zudio Song Analysis Log ===",
             col("Title:",          16) + song.title,
             col("Generated:",      16) + dateStr,
-            col("Zudio Version:",  16) + "0.95",
+            col("Zudio Version:",  16) + "0.96 alpha",
             col("Seed:",           16) + "\(song.globalSeed)",
             col("Style:",          16) + song.style.rawValue.capitalized,
         ]
@@ -45,6 +47,11 @@ struct SongLogExporter {
                 .map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
             lines.append(col("Forced Rules:", 16) + forcedStr)
         }
+        // Only write override lines when the user explicitly set a value before generating.
+        // The informational Key:/Tempo:/Mood: fields below are NOT read back on load.
+        if let k = song.keyOverride   { lines.append(col("Key Override:",   16) + k) }
+        if let t = song.tempoOverride { lines.append(col("Tempo Override:", 16) + "\(t)") }
+        if let m = song.moodOverride  { lines.append(col("Mood Override:",  16) + m.rawValue) }
         lines += [
             col("Key:",       16) + "\(song.frame.key)  \(song.frame.mode.rawValue)",
             col("Tempo:",     16) + "\(song.frame.tempo) BPM",
@@ -75,6 +82,7 @@ struct SongLogExporter {
         // ── Note counts ──────────────────────────────────────────────────────────
         lines.append("--- Note Counts Per Track ---")
         for (i, events) in song.trackEvents.enumerated() {
+            guard !events.isEmpty else { continue }  // skip unpopulated tracks (e.g. Lead Synth in Motorik)
             let name = i < kTrackNames.count ? kTrackNames[i] : "Track \(i)"
             lines.append("  \(col(name, 12)) \(events.count) notes")
         }
@@ -117,10 +125,4 @@ struct SongLogExporter {
         String(format: "%3d", bar + 1)
     }
 
-    /// Stamps the Z! document icon onto the saved file so Finder shows it in icon view.
-    private static func setZudioIcon(on url: URL) {
-        guard let iconURL = Bundle.main.url(forResource: "zudio-doc", withExtension: "icns"),
-              let icon = NSImage(contentsOf: iconURL) else { return }
-        NSWorkspace.shared.setIcon(icon, forFile: url.path, options: [])
-    }
 }

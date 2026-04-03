@@ -8,6 +8,11 @@ extension Notification.Name {
     /// Object is the URL. AppState observes this and loads the file into the
     /// existing window rather than opening a second instance.
     static let zudioOpenFile = Notification.Name("zudioOpenFile")
+
+    /// Holds the URL from the most recent file-open request while AppState may still be
+    /// initialising.  AppState clears this on first receipt so the 0.5 s fallback post
+    /// in AppDelegate is a no-op once the URL has been handled.
+    nonisolated(unsafe) static var zudioPendingOpenURL: URL? = nil
 }
 
 // Quit the app when the last window closes (window-close = full exit, not just hide)
@@ -43,16 +48,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Called by macOS when the user double-clicks a .zudio file in Finder, both when Zudio
     /// is already running and when macOS launches it fresh to open the file.
-    /// Routes the URL to the existing window via notification; async dispatch ensures AppState
-    /// has finished initialising before the notification fires on fresh launch.
+    /// On fresh launch, SwiftUI may not have finished creating AppState (and its notification
+    /// observer) by the time this fires.  We therefore:
+    ///   1. Post immediately — handles the already-running case where AppState is ready.
+    ///   2. Store the URL and re-post after 0.5 s — handles fresh launch where SwiftUI's
+    ///      @StateObject init races with this callback.  AppState clears pendingOpenURL on
+    ///      first receipt so the fallback post is a no-op once the URL is handled.
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
-        // Bring the existing window to the front.
         if let window = application.windows.first(where: { $0.isVisible && !($0 is NSPanel) }) {
             window.makeKeyAndOrderFront(nil)
             application.activate(ignoringOtherApps: true)
         }
+        Notification.Name.zudioPendingOpenURL = url
+        // Immediate post — works when app is already running.
         DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .zudioOpenFile, object: url)
+        }
+        // Fallback post — for fresh launch where AppState may not be ready yet.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            guard Notification.Name.zudioPendingOpenURL != nil else { return }
+            Notification.Name.zudioPendingOpenURL = nil
             NotificationCenter.default.post(name: .zudioOpenFile, object: url)
         }
     }

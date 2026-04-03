@@ -12,6 +12,10 @@ final class AppState: ObservableObject {
     @Published var songState: SongState? = nil
     @Published var isGenerating: Bool = false
 
+    /// URL queued for loading if a file-open arrives while generation is in progress.
+    /// Consumed once generation completes.
+    private var pendingLoadURL: URL? = nil
+
     // MARK: - Generation history (SongState tracking for regen/export/playback)
 
     @Published var generationHistory: [SongState] = []
@@ -132,18 +136,21 @@ final class AppState: ObservableObject {
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil,         forceBridge: false, forceBridgeArchetype: nil),
     ]
 
-    // Kosmic 10-slot cycle: exercises new lead rules (005–009) and bass rule 003, with a nil slot.
+    // Kosmic 10-slot cycle: exercises the 3 second-batch modified rules (DRUM-002 hat density,
+    // BASS-004 ghost note, PADS-008 density guard) plus the first-batch rhythm/texture fixes.
+    // DRUM-002 exercised via forcePercussionStyle .sparse (3×); BASS-004 forced directly (3×);
+    // combined DRUM-002+BASS-004 (2×); two free nil slots for natural generation.
     private static let kosmicTestCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-005", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-005", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-003", forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "KOS-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
     ]
 
     private func nextTestConfig() -> TestModeConfig? {
@@ -241,6 +248,9 @@ final class AppState: ObservableObject {
         NotificationCenter.default.addObserver(forName: .zudioOpenFile, object: nil,
                                                queue: .main) { [weak self] note in
             guard let url = note.object as? URL else { return }
+            // Clear the shared pending URL so the 0.5 s fallback post in AppDelegate is
+            // suppressed — prevents a double-load when the immediate post was already handled.
+            Notification.Name.zudioPendingOpenURL = nil
             self?.loadFromLogURL(url)
         }
 
@@ -580,6 +590,8 @@ final class AppState: ObservableObject {
                 if thenPlay || wasPlaying { self.playback.play() }
                 // Resign first responder so BPM TextField doesn't hold focus
                 NSApp.keyWindow?.makeFirstResponder(nil)
+                // If a file-open arrived while we were generating, load it now.
+                self.consumePendingLoad()
             }
         }
     }
@@ -625,6 +637,8 @@ final class AppState: ObservableObject {
                 // Append only the NEW regen entries to the flat status log (at the very bottom)
                 let regenEntries = Array(updated.generationLog.dropFirst(current.generationLog.count))
                 self.appendToLog(regenEntries)
+                // If a file-open arrived while we were regenerating, load it now.
+                self.consumePendingLoad()
             }
         }
     }
@@ -780,7 +794,11 @@ final class AppState: ObservableObject {
     }
 
     func loadFromLogURL(_ url: URL) {
-        guard !isGenerating else { return }
+        // If a generation is in progress, queue the URL and load it when generation finishes.
+        if isGenerating {
+            pendingLoadURL = url
+            return
+        }
         guard let content = try? String(contentsOf: url, encoding: .utf8) else {
             appendToLog([GenerationLogEntry(tag: "FILE", description: "Could not load file -- could not read \(url.lastPathComponent)", isTitle: false)])
             return
@@ -792,6 +810,9 @@ final class AppState: ObservableObject {
         var forcedRules: [String: String] = [:]
         var songTitle: String = ""
         var zudioVersion: String = "0.91a"   // inferred for logs that pre-date version field
+        var loadedKeyOverride:   String? = nil
+        var loadedTempoOverride: Int?    = nil
+        var loadedMoodOverride:  Mood?   = nil
 
         for line in content.components(separatedBy: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -804,6 +825,18 @@ final class AppState: ObservableObject {
             } else if trimmed.hasPrefix("Style:") {
                 let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
                 style = MusicStyle(rawValue: val) ?? .kosmic
+            } else if trimmed.hasPrefix("Key Override:") {
+                // "C#" — user had a key override active at generation time
+                let val = trimmed.dropFirst(13).trimmingCharacters(in: .whitespaces)
+                loadedKeyOverride = val.components(separatedBy: .whitespaces).first
+            } else if trimmed.hasPrefix("Tempo Override:") {
+                // "121" — user had a tempo override active at generation time
+                let val = trimmed.dropFirst(15).trimmingCharacters(in: .whitespaces)
+                loadedTempoOverride = Int(val.components(separatedBy: .whitespaces).first ?? "")
+            } else if trimmed.hasPrefix("Mood Override:") {
+                // "Bright" — user had a mood override active at generation time
+                let val = trimmed.dropFirst(14).trimmingCharacters(in: .whitespaces)
+                loadedMoodOverride = Mood(rawValue: val)
             } else if trimmed.hasPrefix("Track Overrides:") {
                 let val = trimmed.dropFirst(16).trimmingCharacters(in: .whitespaces)
                 for pair in val.components(separatedBy: "  ") {
@@ -828,15 +861,23 @@ final class AppState: ObservableObject {
             return
         }
 
+        // Stop playback immediately so the old song goes silent while the new one loads.
+        playback.stop()
         isGenerating = true
         let overrides     = trackOverrides
         let loadForced    = forcedRules
         let loadTitle     = songTitle
         let loadVersion   = zudioVersion
+        let loadKey       = loadedKeyOverride
+        let loadTempo     = loadedTempoOverride
+        let loadMood      = loadedMoodOverride
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             var state = SongGenerator.generate(
                 seed:             seed,
+                keyOverride:      loadKey,
+                tempoOverride:    loadTempo,
+                moodOverride:     loadMood,
                 style:            style,
                 forceBassRuleID:  loadForced["Bass"],
                 forceDrumRuleID:  loadForced["Drums"],
@@ -850,6 +891,9 @@ final class AppState: ObservableObject {
             }
             await MainActor.run {
                 self.selectedStyle    = style
+                self.keyOverride      = loadKey
+                self.tempoOverride    = loadTempo
+                self.moodOverride     = loadMood
                 self.songState        = state
                 self.generationHistory.append(state)
                 if self.generationHistory.count > 5 { self.generationHistory.removeFirst() }
@@ -881,7 +925,18 @@ final class AppState: ObservableObject {
                 self.defaultsResetToken += 1
                 if wasPlaying { self.playback.play() }
                 NSApp.keyWindow?.makeFirstResponder(nil)
+                // If another file-open arrived while we were loading, load it now.
+                self.consumePendingLoad()
             }
+        }
+    }
+
+    /// Loads any URL that was queued while a generation/load was in progress.
+    /// Must be called on the MainActor immediately after setting isGenerating = false.
+    private func consumePendingLoad() {
+        if let url = pendingLoadURL {
+            pendingLoadURL = nil
+            loadFromLogURL(url)
         }
     }
 

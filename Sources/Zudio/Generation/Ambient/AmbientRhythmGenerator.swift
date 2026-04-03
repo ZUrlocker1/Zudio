@@ -89,9 +89,11 @@ struct AmbientRhythmGenerator {
 
     private static func celestialPhrase(frame: GlobalMusicalFrame, loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         let bounds = kRegisterBounds[kTrackRhythm]!
-        // Major pentatonic (root, M2, M3, P5, M6) — deliberately major-feel, ignores modal context
+        // Use mode-appropriate pentatonic: minor modes get minor pentatonic to avoid tonal clashes
         let rootPC    = frame.keySemitoneValue % 12
-        let pentPCs   = Set([0, 2, 4, 7, 9].map { (rootPC + $0) % 12 })
+        let minorModes: Set<Mode> = [.Aeolian, .Dorian, .MinorPentatonic]
+        let pentIntervals = minorModes.contains(frame.mode) ? [0, 3, 5, 7, 10] : [0, 2, 4, 7, 9]
+        let pentPCs   = Set(pentIntervals.map { (rootPC + $0) % 12 })
         let pentNotes = (bounds.low...bounds.high).compactMap { n -> UInt8? in
             pentPCs.contains(n % 12) ? UInt8(n) : nil
         }

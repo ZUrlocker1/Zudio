@@ -101,7 +101,7 @@ struct TopBarView: View {
                                 .background(Color.orange)
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        Text("V 0.95 alpha")
+                        Text("V 0.96 alpha")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -358,8 +358,11 @@ struct TopBarView: View {
             .padding(.horizontal, 2)
             .background(Color(white: 0.15))
             .onAppear {
-                // Prevent BPM text field from stealing focus on launch so plain keyboard shortcuts work
-                DispatchQueue.main.async { NSApp.keyWindow?.makeFirstResponder(nil) }
+                // Prevent BPM text field from stealing focus on launch so plain keyboard shortcuts work.
+                // asyncAfter gives SwiftUI time to finish its initial focus pass before we clear it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                }
             }
             .onChange(of: appState.selectedStyle) { _ in
                 // Segmented style picker can shift focus to the BPM text field — clear it immediately
@@ -472,7 +475,7 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.95 (alpha)").font(.system(size: 14))
+                Text("Version: 0.96 (alpha)").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk, Neu!, Deluxe, Harmonia, Tangerine Dream, Electric Buddha Band, Loscil, Craven Faults and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments as well as arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass and Dinger beat. There are basic audio effects per track for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))

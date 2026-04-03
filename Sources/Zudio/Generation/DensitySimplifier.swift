@@ -36,8 +36,13 @@ struct DensitySimplifier {
                 events[kTrackLead1] = thin(events[kTrackLead1], startStep: startStep, endStep: endStep, keepRate: 0.6)
             }
 
-            // Lead 2 conflicts with Lead 1 → thin Lead 2
-            if lead2Density > lead1Density * 0.8 {
+            // Lead 2 conflicts with Lead 1 → thin Lead 2.
+            // Two-stage: moderate imbalance → 55% keepRate; severe imbalance → 35%.
+            // Severe case catches sparse Lead 1 rules (Long Arc, Call & Answer) paired with
+            // dense Lead 2 rules (Hallogallo, Rhythmic Counter) — seen at 3× imbalance in practice.
+            if lead2Density > lead1Density * 1.5 {
+                events[kTrackLead2] = thin(events[kTrackLead2], startStep: startStep, endStep: endStep, keepRate: 0.35)
+            } else if lead2Density > lead1Density * 0.6 {
                 events[kTrackLead2] = thin(events[kTrackLead2], startStep: startStep, endStep: endStep, keepRate: 0.55)
             }
         }

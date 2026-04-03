@@ -232,6 +232,8 @@ struct KosmicPadsGenerator {
                 // Fall through — normal pad rule also runs this bar (layered on top)
             }
 
+            let primaryCountBefore = events.count
+
             switch primaryRule {
             case "KOS-PADS-001":
                 events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
@@ -249,13 +251,17 @@ struct KosmicPadsGenerator {
                 events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             }
 
+            // Secondary layers only fire when the primary rule is sparse this bar (< 4 notes).
+            // Prevents crowding when KOS-PADS-002/005/007 already fill the bar.
+            let primaryAddedThisBar = events.count - primaryCountBefore
+
             // KOS-PADS-008: bIII Colour Chord — fires per bar when song-level gate is open
-            if use008 && !section.label.isBridge && rng.nextDouble() < 0.55 {
+            if use008 && !section.label.isBridge && primaryAddedThisBar < 4 && rng.nextDouble() < 0.55 {
                 events += bIIIColourChordBar(barStart: barStart, entry: entry, frame: frame)
             }
 
             // KOS-PADS-006: Shimmer Layer — fires per bar when song-level gate is open
-            if use006 && !section.label.isBridge && rng.nextDouble() < 0.40 {
+            if use006 && !section.label.isBridge && primaryAddedThisBar < 4 && rng.nextDouble() < 0.40 {
                 events += shimmerLayerBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             }
         }

@@ -199,7 +199,7 @@ final class PlaybackEngine: ObservableObject {
             trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]   // Ambient: no static spread
         }
         for i in 0..<boosts.count {
-            boosts[i].pan = trackStaticPan[i]
+                
         }
     }
 

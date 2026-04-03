@@ -243,8 +243,11 @@ def analyze_midi(path):
 
     print(f"\n{'='*72}\n")
 
-for path in [
-    '/Users/urlocker/Downloads/Zudio/Magnetik MIDI.mid',
-    '/Users/urlocker/Downloads/Zudio/Mobyesque MIDI.mid',
-]:
-    analyze_midi(path)
+if __name__ == '__main__':
+    import sys
+    paths = sys.argv[1:] if len(sys.argv) > 1 else []
+    if not paths:
+        print("Usage: python3 analyze_midi_general.py file1.mid [file2.mid ...]")
+        sys.exit(0)
+    for path in paths:
+        analyze_midi(path)

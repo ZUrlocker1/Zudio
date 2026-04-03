@@ -49,9 +49,12 @@ struct AmbientBassGenerator {
 
                     let noteToPlay: Int
                     if useRootFifth && holdIndex % 2 == 1 {
-                        // Odd holds: fifth, with 10% chance of major third instead
+                        // Odd holds: fifth, with 10% chance of third instead.
+                        // Use minor third for minor modes to avoid chromatic clashes.
                         if rng.nextDouble() < 0.10 {
-                            let thirdPC = (rootPC + 4) % 12
+                            let minorModes: Set<Mode> = [.Aeolian, .Dorian, .MinorPentatonic]
+                            let thirdInterval = minorModes.contains(frame.mode) ? 3 : 4
+                            let thirdPC = (rootPC + thirdInterval) % 12
                             noteToPlay  = closestNote(pitchClass: thirdPC, near: rootNote,
                                                       low: bounds.low, high: bounds.high)
                         } else {

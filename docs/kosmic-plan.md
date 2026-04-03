@@ -1156,7 +1156,17 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
   bars 21–46. One sustained note per bar, stepwise ascent then descent through scale.
   Occasional diatonic trill ornament. Register MIDI 60–76.
 
-**Lead thickening ✓ DONE:** Lead 1 is silently doubled by a GM Polysynth layer (GM 90) at 55% velocity. Invisible to the user — mirrors Lead 1's mute/solo state automatically. Classic JMJ layering technique.
+**Lead thickening ✓ DONE:** Lead 1 is silently doubled by a GM Polysynth layer (GM 90) at 60% velocity. Invisible to the user — mirrors Lead 1's mute/solo state automatically. Classic JMJ layering technique. Lead Synth copy now happens after ArrangementFilter and HarmonicFilter so it matches exactly what Lead 1 plays.
+
+**Quality improvements ✓ DONE (v0.95 analysis):**
+- Chord/mode clash fix: major chord type now blocked in Aeolian/Dorian modes; minor chord type blocked in Ionian mode. Prevents G♮ vs G# clashes between scale-based generators (Lead, Pads) and chord-based generators (Arpeggio, Bass).
+- KOS-TEXT-003 (Spatial Sweep) excluded from quartal_stack and suspended_resolution progressions — its chromatic passing notes clash with quartal harmony.
+- KOS-TEXT-001 fires on 70% of bars (was 100%) to prevent 320–480 note accumulation in long songs.
+- KOS-RTHM-002 and KOS-RTHM-003 capped at 6 notes/bar, matching the existing KOS-RTHM-004 guard.
+- Kosmic density pass: if Rhythm note count > 2× Lead 1, Rhythm thinned to 65% retention (downbeats preserved).
+- Static drone + songs > 80 bars: B sections forced to sus2 or power chord type for at least one textural shift.
+- A-B-B-A second B: Rhythm at 60% retention, Texture silent for first 8 bars, Pads at 85% velocity for first half — stripped-back feel before the A return.
+- KOS-LEAD-004 weight reduced 0.16→0.10 (was appearing in 4/5 songs); redistributed to KOS-LEAD-002 and KOS-LEAD-007.
 
 ---
 

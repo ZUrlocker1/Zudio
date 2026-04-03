@@ -1747,3 +1747,30 @@ Bass and pads target >92% harmonic consonance. Leads can run 75–85% but should
 ### AMB-SYNC-009: Pads and bass use the same chord root within any bar
 
 At every bar boundary, the lowest note of the pad voicing must match the bass note (same pitch class, any octave). Bass generator receives the chord plan directly and derives its root from the same object the pad generator reads — no independent root selection.
+
+---
+
+## Tonal Clash Fix History
+
+### Round 1 — April 2026 (6-song analysis: Bb/C/C# Dorian, F# MinorPentatonic, C/D Aeolian)
+
+**AMB-LEAD-003 — Harold Budd pentatonic shimmer hardcoded MajorPentatonic (HIGH)**
+`AmbientLeadGenerator.swift` line 34 used `Mode.MajorPentatonic.intervals` regardless of `frame.mode`.
+Playing D major pentatonic [D E F# A B] in D Aeolian caused 31% clash (B, F# not in scale).
+Playing F# major pentatonic in F# MinorPentatonic caused 49% clash.
+Fix: minor modes (Aeolian, Dorian, MinorPentatonic) now use `[0,3,5,7,10]`; major modes keep `[0,2,4,7,9]`.
+
+**AMB-RTHM-005 — Celestial phrase always used major pentatonic (HIGH)**
+`AmbientRhythmGenerator.swift` `celestialPhrase` hardcoded `[0,2,4,7,9]` ("deliberately major-feel").
+Caused 74% clash in F# MinorPentatonic (A#/D#/G# vs scale F#/A/B/C#/E) and 24% in C Dorian (E natural).
+Fix: same minor/major pentatonic split based on `frame.mode`.
+
+**AMB-BASS-003 — Major third inflection in minor songs (MEDIUM)**
+10% chance of playing major third above chord root (+4 semitones) regardless of mode.
+For C# root this generates E# = F natural, not in C# Dorian. Showed as 12.5% bass clash.
+Fix: minor modes use minor third (+3 semitones) for the inflection note.
+
+**AMB-DRUM-004 — Hand percussion too dense for ambient (HIGH)**
+Shaker ran 8th-note pulse at 70% bar hit rate ≈ 5.6 hits/bar; plus congas (75%), bongos (35%), maracas (25%).
+Total ≈ 7.8 notes/bar — far above ambient target of ≤1.5/bar.
+Fix: shaker → quarter-note at 30% bar/50% step rate (≈0.6/bar); congas 75%→45%; bongos 35%→20%; maracas 25%→15%.

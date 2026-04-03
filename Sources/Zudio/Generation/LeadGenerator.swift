@@ -190,6 +190,27 @@ struct LeadGenerator {
                 continue
             }
 
+            // H-pre: Solo rules — silence body bars outside the solo window.
+            // In the 16 bars before the solo window, fire one ghost note at 8-bar boundaries (35%).
+            // This gives the "soloist drifts in quietly, then steps forward" feel.
+            if isSoloRule, !isIntroOutro, let window = soloWindow {
+                let bodyStart = structure.bodySections.first?.startBar ?? 0
+                if bar < window.lowerBound {
+                    let preEchoStart = max(bodyStart, window.lowerBound - 16)
+                    let atBoundary = bar >= preEchoStart && (bar - preEchoStart) % 8 == 0
+                    if atBoundary && rng.nextDouble() < 0.35 {
+                        let note = pickNoteNearest(entry: entry, frame: frame, trackIndex: kTrackLead1,
+                                                   prevNote: prevNote, rng: &rng)
+                        let dur  = 8 + rng.nextInt(upperBound: 5)  // 8–12 steps
+                        let vel  = UInt8(45 + rng.nextInt(upperBound: 11))  // 45–55
+                        events.append(MIDIEvent(stepIndex: barStart, note: note, velocity: vel, durationSteps: dur))
+                        prevNote = note
+                    }
+                    continue
+                }
+                continue  // post-solo body bars: silent
+            }
+
             switch ruleID {
 
             case "MOT-LD1-001":
@@ -386,7 +407,10 @@ struct LeadGenerator {
     ) -> [MIDIEvent] {
         let ld2Rules:   [String] = ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
         let ld2Weights: [Double] = [0.20,      0.15,      0.10,      0.20,      0.15,      0.20]
-        let ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
+        var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
+        // LD2-006 (Diatonic Shadow) requires Lead 1 notes to harmonize — if Lead 1 is on a solo rule
+        // with a sparse window, Lead 2 would be silent for the whole song. Redirect to Counter Response.
+        if soloRange != nil && ruleID == "MOT-LD2-006" { ruleID = "MOT-LD2-001" }
         usedRuleIDs.insert(ruleID)
 
         let lead1StepSet = Set(lead1Events.map(\.stepIndex))

@@ -60,18 +60,21 @@ struct AmbientDrumGenerator {
         for bar in 0..<frame.totalBars {
             guard structure.section(atBar: bar)?.label == .A else { continue }
 
-            // Shaker: 8th-note pulse (~70% of active bars), velocity 28–48
-            if rng.nextDouble() < 0.70 {
-                for step in stride(from: 0, to: 16, by: 2) {
-                    let vel = UInt8(28 + rng.nextInt(upperBound: 20))  // 28–47
-                    events.append(MIDIEvent(stepIndex: bar * 16 + step,
-                                            note: shaker, velocity: vel, durationSteps: 1))
+            // Shaker: sparse quarter-note pulse (~30% of active bars), velocity 28–47
+            // Ambient target: ~0.5–0.8 shaker hits/bar across the song
+            if rng.nextDouble() < 0.30 {
+                for step in stride(from: 0, to: 16, by: 4) {
+                    if rng.nextDouble() < 0.50 {
+                        let vel = UInt8(28 + rng.nextInt(upperBound: 20))  // 28–47
+                        events.append(MIDIEvent(stepIndex: bar * 16 + step,
+                                                note: shaker, velocity: vel, durationSteps: 1))
+                    }
                 }
             }
 
-            // Congas: 1–3 hits per active bar (~75% chance), syncopated positions
-            if rng.nextDouble() < 0.75 {
-                let numHits = 1 + rng.nextInt(upperBound: 3)
+            // Congas: 1–2 hits per active bar (~45% chance), syncopated positions
+            if rng.nextDouble() < 0.45 {
+                let numHits = 1 + rng.nextInt(upperBound: 2)
                 var positions = conglacyPositions
                 for i in stride(from: positions.count - 1, through: 1, by: -1) {
                     positions.swapAt(i, rng.nextInt(upperBound: i + 1))
@@ -84,8 +87,8 @@ struct AmbientDrumGenerator {
                 }
             }
 
-            // Bongos: accent hit ~35% of bars, on beat 1 or beat 3
-            if rng.nextDouble() < 0.35 {
+            // Bongos: accent hit ~20% of bars, on beat 1 or beat 3
+            if rng.nextDouble() < 0.20 {
                 let beat = (rng.nextDouble() < 0.5) ? 0 : 8
                 let vel  = UInt8(38 + rng.nextInt(upperBound: 24))  // 38–61
                 let note: UInt8 = rng.nextDouble() < 0.6 ? hiBongo : lowBongo
@@ -93,8 +96,8 @@ struct AmbientDrumGenerator {
                                         note: note, velocity: vel, durationSteps: 1))
             }
 
-            // Maracas: light accent ~25% of bars on offbeat step 6 or 10
-            if rng.nextDouble() < 0.25 {
+            // Maracas: light accent ~15% of bars on offbeat step 6 or 10
+            if rng.nextDouble() < 0.15 {
                 let step = (rng.nextDouble() < 0.5) ? 6 : 10
                 let vel  = UInt8(32 + rng.nextInt(upperBound: 16))  // 32–47
                 events.append(MIDIEvent(stepIndex: bar * 16 + step,

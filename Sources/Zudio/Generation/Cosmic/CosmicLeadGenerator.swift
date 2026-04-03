@@ -250,8 +250,9 @@ struct KosmicLeadGenerator {
 
     private static func pickLeadRule(rng: inout SeededRNG) -> String {
         // Lead 1 rule pool — 006 reduced to 15% so other rules get more airtime.
+        // KOS-LEAD-004 reduced 0.16→0.10 (was appearing in 4/5 songs); redistributed to 002 and 007.
         let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007", "KOS-LEAD-008", "KOS-LEAD-009"]
-        let weights: [Double] = [0.12,           0.09,           0.13,           0.16,           0.07,           0.15,           0.11,           0.09,           0.08]
+        let weights: [Double] = [0.12,           0.12,           0.13,           0.10,           0.07,           0.15,           0.14,           0.09,           0.08]
         return rules[rng.weightedPick(weights)]
     }
 

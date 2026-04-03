@@ -66,11 +66,16 @@ struct ArrangementFilter {
             // Choose 1 or 2 spotlight tracks
             let spotlightCount = rng.nextDouble() < 0.55 ? 1 : 2
 
-            // Sort candidates: prefer tracks NOT spotlighted last block, then by density (higher = more prominent)
+            // Sort candidates: prefer tracks NOT spotlighted last block, then by density (higher = more prominent).
+            // Tiebreaker: Lead 1 always beats Lead 2 when freshness is equal — prevents Lead 2
+            // accumulating more notes than Lead 1 via the density sort.
             let sorted = activeTracks.sorted { a, b in
                 let aFresh = !lastSpotlight.contains(a)
                 let bFresh = !lastSpotlight.contains(b)
                 if aFresh != bFresh { return aFresh }
+                if (a == kTrackLead1 && b == kTrackLead2) || (a == kTrackLead2 && b == kTrackLead1) {
+                    return a == kTrackLead1
+                }
                 let aD = densities.first { $0.track == a }?.density ?? 0
                 let bD = densities.first { $0.track == b }?.density ?? 0
                 return aD > bD

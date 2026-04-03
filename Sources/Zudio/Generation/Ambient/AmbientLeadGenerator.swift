@@ -31,7 +31,9 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        let pentaPCs   = Set(Mode.MajorPentatonic.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let minorModes: Set<Mode> = [.Aeolian, .Dorian, .MinorPentatonic]
+        let pentaIntervals = minorModes.contains(frame.mode) ? [0, 3, 5, 7, 10] : Mode.MajorPentatonic.intervals
+        let pentaPCs   = Set(pentaIntervals.map { (frame.keySemitoneValue + $0) % 12 })
         let pentaNotes = notesInRegister(pitchClasses: pentaPCs, low: bounds.low, high: bounds.high)
 
         // If a specific rule is forced (test pool override), skip the random roll

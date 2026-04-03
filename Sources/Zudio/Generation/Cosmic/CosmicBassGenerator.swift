@@ -163,7 +163,9 @@ struct KosmicBassGenerator {
                 let ascending    = section.startBar % 3 != 2
                 let root         = bassRoot(entry: entry, frame: frame)
                 let rootInt      = Int(root)
-                let offsets      = ascending ? [0, 3, 7, 12] : [12, 7, 3, 0]
+                // Use mode-appropriate third: major 3rd in Ionian/Mixolydian, minor 3rd otherwise
+                let thirdOff     = frame.mode.nearestInterval(4)
+                let offsets      = ascending ? [0, thirdOff, 7, 12] : [12, 7, thirdOff, 0]
                 let phaseNote    = UInt8(max(28, min(80, rootInt + offsets[phase])))
                 let velBases     = ascending ? [75, 83, 91, 99] : [99, 91, 83, 75]
                 let baseVel      = velBases[phase]
@@ -593,7 +595,7 @@ struct KosmicBassGenerator {
         // Compute fifth and minor third via pitch-class (KOS-RULE-06: MIDI 40–55)
         let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let fifthPC = (rootPC + 7) % 12
-        let thirdPC = (rootPC + 3) % 12  // minor third (fits Aeolian/Dorian modes)
+        let thirdPC = (rootPC + frame.mode.nearestInterval(4)) % 12  // mode-appropriate third
 
         var fifthMidi = 36 + fifthPC
         while fifthMidi < 40 { fifthMidi += 12 }
@@ -643,7 +645,9 @@ struct KosmicBassGenerator {
         case 0:
             return [MIDIEvent(stepIndex: barStart, note: root, velocity: 100, durationSteps: 30)]
         case 1:
-            return []
+            // Soft ghost pulse — bass should never be silent for a full bar.
+            // Short hold, low velocity — a barely-there presence under the ringing cycle-0 note.
+            return [MIDIEvent(stepIndex: barStart, note: root, velocity: 48, durationSteps: 6)]
         case 2:
             // Short hold — must not bleed into bar 3's chromatic neighbour
             return [MIDIEvent(stepIndex: barStart, note: root, velocity: 100, durationSteps: 14)]
