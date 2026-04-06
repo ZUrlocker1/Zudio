@@ -3,7 +3,7 @@
 }
 {\colortbl;\red255\green255\blue255;}
 {\*\expandedcolortbl;;}
-\margl1440\margr1440\vieww11160\viewh9920\viewkind0
+\margl1440\margr1440\vieww18080\viewh13160\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\b\fs28 \cf0 Zudio Code prompts\
@@ -970,5 +970,220 @@ File load and save is still sometimes broken. Sometimes I see two instances of Z
 \
 I think I found a possibel source of the file load problem. I double clicked on a Zudio file with no app running and it brought up the older version of Zudio 0.95.  So is that perhaps causing us some problems?  Do we need to do a full archive - build - sign - distribute process to test properly?  Or can we \'93de-register\'94 the older 0.95 version?  What\'92s a good approach? \
 \
+Update all modified files on github including the DMG, docs files, source code, prompt files etc.  Anything that has been modified.  Note in this release: includes minor bug fixes in file handling and significant reduction in tonal clashes.\
 \
-Update all modified files on github including the DMG, docs files, source code, prompt files etc.  Anything that has been modified.  Note in this release: includes minor bug fixes in file handling and significant reduction in tonal clashes.}
+My first song Ambeint song came out at 120bpm , so outside the range. the Zudio file log says the tempo was overriden, but that's not the case. I think this is related to the focus problem with the bpm selector.  Please find a way to fix that.  I think it may be an issue for all the initial songs in each style.  find a way to fix this.\
+\
+
+\f0\b New Chill style
+\f2\b0 \
+we're going to create a new music style plan called chill-plan using a similar structure to what we have done for Ambient plan, Kosmic plan, Motoric plan.  Please create a new chill-plan document using a simialr structure. Then we will do a lot of research and you will ask me questions to help fill out all the important information for each section.  The goal is to create a sufficiently detailed implementation plan with this document that we can add this new musical style to the Zudio app.  Chill is also called Chill-out as exemplified by songs like Saint German and The Rebirth of Cool by DJ Cam Quartet and Rose Rouge by St Germain.\
+\
+I'd also like to consider the songs by Moby which are close to this style from the album Play: Porcelain, Why does my heart feel so bad, Natural blues, Down Slow, Inside. Though the songs we generate will be instrumental without vocals.\
+\
+The album Moon Safari by Air is pretty close to the style, particularly the song La Femme D'Argent and Ce Matin La.  \
+We wil also look at songs from Electric Buddha Band: Long Lake Winter, Mobyesque, Five Below Blues, Winter Flight, Bossa Moon. I can share MIDI files of these. They are not "pure" chill, but they are similar in some ways.\
+\
+I have put 5 new MIDI  Electric Buddha Band tracks in the Zudio folder. However, for some songs, you will not have the audio tracks that are important for the song. Note also the tempo in Mobyesque varried a lot to fit the actual analog recorded piano.  That's peculiar to the song and can be ignored. You may also see some tracks that are doubled where volume automation or panning is used to make it sound like one instrument. Ignore those details. Let me know if you have questions on these songs. Be sure to analyze them and consider them as potential sources of rules for our Chill plan. But let me know if any of them seem too radical to fit the style.\
+\
+For each of the speciifc Chill tracks (Lead 1, Lead 2, Pads, Rhyth, Textue, bass, drums) I want to make sure we idnetify specific patterns that will become rules for those tracks. We must come up with at least 6 different rules for each in the style of :\
+CHL- DRUMS-001 - brief expanation \
+CHL-BASS-001 - brief explanation \
+and so on\
+similar to what we did for Motorik, Kosmic etc.\
+\
+In many cases we must identify how the specific RULE tracks wil evolve. For example, are there slight variatiosn in the bass pattern that will occur in different sectios or after so mnay bars. \
+For each track we must also identify the GM Midi instruments that will be in the instrument pool that the user can select.  We must identify the default first instrument for each track. \
+\
+For each of the speciifc Chill tracks (Lead 1, Lead 2, Pads, Rhyth, Textue, bass, drums) I want to make sure we idnetify specific patterns that will become rules for those tracks. We must come up with at least 6 different rules for each in the style of :\
+CHL- DRUMS-001 - brief expanation \
+CHL-BASS-001 - brief explanation \
+and so on\
+similar to what we did for Motorik, Kosmic etc.\
+In many cases we must identify how the specific RULE tracks wil evolve. For example, are there slight variatiosn in the bass pattern that will occur in different sectios or after so mnay bars. \
+For each track we must also identify the GM Midi instruments that will be in the instrument pool that the user can select.  We must identify the default first instrument for each track.\
+\
+Each track also has a clearly marked instrument pool with the default instrument bold-indicated.\
+\
+if any of the rules are derived from specific artists songs, please include that in the description.  If it's a more generalized rule from multiple sources, this is unnecessary, eg.. \
+CHL-LD1-001 St Germain long phrase\
+CHL-LD2-001 Short punch \
+CHL-LD2-001 Blues lead\
+CHL-BASS-001 Mobyessque root sustain\
+CHL-BASS-002 Syncopated groove\
+No more than half the rules should reference a specific artist or song\
+Also avoid referencing specific insturments in the rules (e.g. Sax, trumpet) as the instrument will be picked randomly from the instrument pool for that track or by the user\
+\
+\
+Tell me about the Pads and Rhtyhm tracks.  Are they really distinct? In other styles the Pads track used actual Pad instruments. But that does not appear to be what you're proposing for Chill. Tell me about your thinking on this.\
+\
+please use cleaner architecture consistent with other styles\
+\
+are there any additional rules, contraints or guidelines we should put in place to ensure overall musical coherance for Chill. In particular I want to avoid tonal clashes that caused problems in Motorik, Kosmic resulting from hard-coding of notes, music fragments not snapped to scale properly or other issues as described in eithe the Musical Coherance plan or in the style specific plans Motorik Plan, Kosmic plan \
+\
+\
+please evaluate the chill-plan to determine if there is sufficient detail to begin swift code generation\
+\
+Please try to resolve these. We can use a probabilistic approach where approopriate based on following conventions from the songs we've analyzed.\
+\
+\
+please suggest a set of 3 audio effects for each of the Chill tracks similar to what we have for Kosmic and Ambient.  Identify specific effects (existing or new) that should be applied for each instrument and what the defautls should be. This should be part of the plan similar in structure to the other plans for Kosmic, Motorik etc.  \
+Also define a set of default pans for each track so the music has a suitable stereo spread.  \
+\
+please examine the chill plan compared to motorik and ambient. does the plan have at least 80% consistency in its structure?  Are there any missing sections?  are there any questions you need to ask before we go to code generation?\
+\
+\
+do you have audio samples (rain, cafe, bars, urban, waves on the beach) etc for the Audio textures?  If not can you get some. Or I can do that.\
+\
+how about M4A or MP3 format which would be more compact?\
+\
+I put 7 m4a tracks in the Zudio directory. Please move them to the appropriate place and create the code for playing these randomly as texture  file loops. They could play continuous or fade in and fade out as you decide.\
+\
+What audio effects would be suitable besides boost for the audio effects track?\
+\
+we have used low-pass filter on Motorik, so I'm not sure why this requires a big change.  For audio texture tracks in Chill lets have the effects be:\
+-Boost, Low, Reverb with Low Filter and Reverb on by default. \
+Behind the scenes, please add a subtle slow stereo pan effect. And add a random element of high pass filter or pitch shift on every time so that there are some subtle variations each time an audio track is played so it sounds a bit different.  Is that possible?\
+\
+
+\f0\b Chill bug fixes
+\f2\b0 \
+Some feedback on the rules as reported in the status log:\
+Chords         Two-chord pendulum: Am7 | D | Am7 | D | Am7 | D | Am7 | D | Am7 | D | Am7 | D | Am7 | D | Am7 | D | Am7 | D | Am7\
+Just name the chords once don't repeat the sequence\
+Also:\
+Length         76 bars\
+CHL-BASS-001   CHL-BASS-001\
+CHL-BASS-002   CHL-BASS-002\
+CHL-BASS-006   CHL-BASS-006\
+CHL-DRUM-001   CHL-DRUM-001\
+CHL-LD1-002    CHL-LD1-002\
+CHL-LD2-001    CHL-LD2-001\
+CHL-PAD-001    CHL-PAD-001\
+CHL-RHY-002    CHL-RHY-002\
+don't repeat the rule names, use the text descriptions in the log\
+Also just show Style, Form, Chords lines in the status generation area, consistent with other songs in motorik, Kosmic, Ambient. Do not show Key Tempo Mood Beat Lead Instruments entries in the status text area.  Be consistent with the status updates from other styles. No extra details. \
+\
+\
+When the user cycles through to different audio effects textures in ambient, make sure you switch quickly, in 500 ms or less\
+\
+\
+please verify the regen rules for all chill tracks. It seems we regenerate the same drum track every time.  possibly also for other tracks.\
+\
+what are the different drum rules for Chill?  Are they being randomly selected\
+\
+Actually in all the other song styles when we regenerate, we get a completely new track, not just a variation of what we started with. That's by design for consistency across all styles.  Please ensure all Chill regen works in the same way for all tracks.\
+\
+Note the drum rules should have descriptions that are independent of the drum kit being used but speak to the style of drumming\
+\
+I noticed a bug. Selecting text in the status log area if I use the hotkey CMD-C it doesn't copy it anymore. It used to work.  If I right click and selct Copy it works.  Please make sure CMD-C still works for copy.  I think this is because CMD-C is being used to select Chill style. Use C for Chill mode.\
+\
+I would like you to review the automated quality loop plan. In particular review this plan to see if we can automate the testing of our new Chill generators to be sure that the rules are working, that the music is not clashing, that it's melodic and not boring, that there is sufficient variation in parts, to sound like good chill music.  Please revise the plan and let me what additional detail would need to be specified before we turn it into code. \
+\
+
+\f0\b Back to Music
+\f2\b0 \
+I think for Lead 1 which is usually a horn, we should only have one note at a time play. Please adjust all the solos in Chill so they are monophonic in playing style, no overlapping notes.\
+same for lead 2\
+\
+There's a certain style I'd like to make sure happens in one of the solo rules. That is a short melodic phrase, 5 notes or less, then a gap to the next measure, then repeated a second time, then agap until the next measure, then repeaated a third time but with a slight variation.  Then later the sequence repeats in the same form, or with a new variation.  Where could we use this with the existing AMB-LEAD rules?\
+\
+I don't think the drums and bass are quite capturing the chill vibe I want to get. Particularly, I have not heard anything that really sounds like St Germain.  So I have added one of his songs St Germain - So Flute in MIDI to the Zudio folder. There are several important elements to this song that I want to capture. \
+In particular there's a nice driving vibe to the bass & drums and the piano also.  The drums are on 4 percussion tracks.  Which if any rules in CHL-BASS, CHL-DRUMS and CHL-LEAD and CHL- RHYTHM are closest to being based on some St Germain or similar structure based on your analysis of the MDII file.\
+\
+Lets create a new drum track, bass track, rhythm track and solo track that are inspired by this MIDI file.  (Personally, I think the solo is way too busy and needs to be dramatically reduced in terms of notes.)\
+I also woudl like to have some slight variance to the drums (e.g. a one or two beat drum fill occasionally, going to the ride cymbal for some number of bars,  like we did for Motorik drums, otherwise it's too boring.)  And maybe a similar slight evolution of the bass every 16 bars or at section boundaries, and then eventually evolving back to the original form.  create some new rules to implement this. Let me know what questions you have\
+\
+rename the descriptions to be more like:\
+CHL-DRUM-001 Moby minimal syncopated\
+CHL-DRUM-002 Neo soul ghost note groove\
+omit brush kit or instrument names in general from descriptions because the instrument is set independently\
+\
+for the staccato burst solo CHL-LD1-005    St Germain staccato burst when there is a note sequence the last note in the sequence should never be the shortest. So avoid it being an 8th or 16th note. And probabilistically it should be longer than the other notes 50% of the time.  Feel free to improve a bit on this.\
+\
+max chill intro or outro length should be 8 bars\
+\
+please do some more research on what makes for a musical breakdown or bridge for this style. because right now they are too boring and static with whole note pad chords, 4 note bass notes on the root and nothing interesting on drums.  Please research on the internet at least 3 variatiosn that would make these more interesting. Could be to have some bass pattern playing or maybe a sort of drum solo or something else genre appropriate.\
+\
+The round 4 revisions at the bottom of the the chill plan (breakdown variations) should appear earlier in the plan. These were not a result of automated testing so it should be in the chill plan where we have a section on song structure. Also include a brief note about intro and outros and if appropriate, use of sections.\
+Please revise the chill plan to use the latest default instruments and effects settings. Keep the content brief. No discussion of prior settings.\
+Briefly note musical improvements and rule adjustments from most recent test batch of  10 new songs in the Chill plan\
+Please make sure all sections are numbered properly\
+ 
+\f0\b \
+More bugs in Chill
+\f2\b0 \
+the song Zudio-Low-Cut in your folder should be analyzed. The log shows drum fills but I'm not hearing them.  The drums mostly do not sound like they change. Perhaps its because the fills are being played on top of the existing drums. Please be sure drum fills in chill can be fully heard\
+\
+there is a song Dalston in the Zudio folder. The breakdown \
+Bar 025        Breakdown  8 bars \'97 stop-time solo\
+there is no solo. There are drum, bass and pad hits on the 1 beat, but I think you need a solo here.  Was that a mistake in rules or a bug in generation?\
+Also it says:\
+Forced Rules:   Lead=MOT-LD1-008\
+that seems to be a bug in the log or generation if its reference to a Motorik lead when the style is Chill \
+\
+Lets be more clear about Chill intros and outros.  The intro can either be a \'93fade in\'94 where we use the audio to fade in to full volume) or it can be a \'93cold start.\'94  If we use a \'93fade in\'94 intro please also use a fade out intro.  \
+For a cold start intro the drums play a short 2 or 3 beat drum fill on the last beats of the first bar and then the other instruments (bass, rhythm etc) start on the 1 beat of the next bar. \
+If we have a cold start intro, then it should be a cold stop outro. where all the instruments stop on beat 4, but then there\'92s one more drum fill that ends the song on the 1 beat. (This could be roll, or just a crash cymbal on 1.) \
+ \
+I am seeing messages in the status area:\
+Drum fill      Bar 17\
+Drum fill      Bar 36\
+Drum fill      Bar 62\
+Before the song starts playing!  That's a bug\
+\
+For the status notification\
+Form           Groove \'b7 breakdown (stop-time)\
+don\'92t use a dot, just a dash \
+\
+instead of saying:\
+CHL-PAD-003    Pads absent\
+just say \
+CHL-PAD-003    No pads\
+\
+\
+lets run another test batch of 10 Chill songs. Play close attention to intros, outros and also that the breakdown is good, we don't end up with something that is too boring. In particular if its breakdown (bass ostinato) it can't just be the bass - its too boring. There should be something else going on, either some drums or some rhythm to keep things moving.\
+\
+here's a song Us3 - Cantaloop in the Zudio folder. This is a prototypical 90s chill song, similar in concept to St Germain.  I would like you to analyze the tracks and see what existing Drum, Bass, Rhythm, Lead , Lead 2 rules we have already that migth be close to what is here and then modify those rules. Particularly since this song was noted in the research. Did it inspire any actual rules?  Are there any rules (other than St German) that we should modify to be US3 based rules?  Or do we need new rules.\
+Note it may be that the bass should be raised an octave. I am unclear on that.\
+\
+I have said this a few times, but please remember all instrument selections (drums, leads, etc) are independent of the rules or patterns. SO please never refer to instruments when we are working on patterns. Rule descriptions threfore should not refer to the instrument.  \
+1. yes, widen the register for CHL-LD1-002 adjust the steps, keep velocity variation\
+2. make a new DRUM-005 Hip-hop jazz (no mention of Cantaloop).  Please be sure to have the tambourine play for many bars at sa time, and then occasionally tambourine drops out for some sections or the other drums drop out for a section keeping just tambourine. Continue to use light fills or other variations as in the song \
+3. new CHL-BASS-008 Acid jazz groove, also having some variations after long sections, then revert back to origina form\
+4. make a new CHL-RHY keyboard groove.  Verify if there are rules from Bosa Moon rhythm, drums or bass and if not, please create some.\
+\
+In a song with \
+Bar 045        Breakdown  8 bars \'97 bass ostinato\
+the drums are too quiet and too minimal during this.  They can be quieter and less busy than the main but needs more going on than just low volume high hats.\
+Also breakdown should be 4 or 8 bars maximum. (and mostly 4 if its boring bass ostinato.)\
+Remove Machine Kit from Chill .\
+if we have a Bar 037        Breakdown  8 bars \'97 stop-time solo\
+make sure that the solo fragments are at least 3 notes, otherwise it sounds too sparese. \
+make sure when there's a breakdown that the last 2 beats of the section have a drum fill to act as a pickup to take us back into the main section\
+I heard 3 beat tom cascades in a chill song. That's not an approprite drum fill for Chill, it's too much like a rock fill. \
+I sometimes see messages that the drum is going to the ride but i don't hear it. Then it switches back to hi-hat. It all sounds the same. verify. \
+take a look at two Chill songs zudio Low Drift and Zudio Cool Saint Laurent\
+Do not run a test batch until I tell you to.\
+\
+Turn off comp and Low effects on drums for chill default. Is there another sugestion for effects on bass other than Low filter. That doesn't seem to do much.  Otherwise, just add the Boost off by default. \
+\
+\
+for chill intro and outro bass parts, please base them on the actual bass rule for the main section of the song. They can be simplified versions of those parts, but not just boring single repeated same pitch notes.\
+for Bar 033        Breakdown  4 bars \'97 bass ostinato\
+there needs to be a sense of ongoing momentum from regular high hats or continuation of the rhythn track.\
+\
+Since the Texture track is an audio track there\'92s no MIDI bars displayed. Instead, I\'92d like you to display a graphic representation of the audio loop. Please research how to do this so that it\'92s always visible, similar to how Garage Band or Logic Pro or other audio tools display audio. The color should be blue. \
+\
+there should be a better description for \
+CHL-LD1-007    Open trumpet lead\
+That does not name the instrument since sometimes it's not a trumpet\
+for \
+CHL-LD1-007     CHL-LD1-002   CHL-LD1-004    make sure that are occasionally leave 4 or 8 bar gaps during which there is no Lead 1. \
+make Breakdown stop-time solo 4 or 6 bars maximum\
+\
+I'd like to ensure that the pads on chill are faded in and out like we did for bass and pads on Ambient.  Please take a look at the code for Ambient fading of pads and determine how best to implement it here. \
+\
+ok I think we got confused on how pads should fade.  I meant for each pad note to fade in and out. Not for the track in general to fade in and out.  Let me know if you are unclear\
+\
+}
