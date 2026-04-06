@@ -293,9 +293,8 @@ struct TopBarView: View {
                                 } icon: { Image(systemName: "arrow.counterclockwise") }
                                 .frame(width: 105, alignment: .center)
                             }
-                            .disabled(appState.songState == nil)
                             .keyboardShortcut("r", modifiers: .command)
-                            .help("Reset all instruments and effects to style defaults (⌘R)")
+                            .help("Reset to clean state: clear song, restore defaults, re-detect audio (⌘R)")
                         }
                         .frame(width: 210)
                         .offset(x: 20)

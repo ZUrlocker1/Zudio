@@ -34,6 +34,8 @@ struct PadsGenerator {
         let totalBars = frame.totalBars
         var sustainRunBars = 0   // tracks consecutive whole-note bars for 4-bar break rule
         var prevRootMIDI: Int? = nil  // voice-leading anchor across bar lines
+        // PADS-003 phrase gate: silence a whole 4-bar cycle 30% of the time for breathing room
+        var pads003SilentCycle = false
 
         for bar in 0..<totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
@@ -99,12 +101,18 @@ struct PadsGenerator {
                                             velocity: velocity, durationSteps: 14))
                 }
 
-            // MARK: Pulsed 2-bar
+            // MARK: Pulsed 2-bar with phrase step-out and pattern variation
             case "MOT-PADS-003":
-                if bar % 2 == 0 {
-                    for note in voicing {
+                // Re-roll phrase gate at the start of each 4-bar cycle: 30% full silence.
+                if bar % 4 == 0 { pads003SilentCycle = rng.nextDouble() < 0.30 }
+                if !pads003SilentCycle && bar % 2 == 0 {
+                    // Occasionally use a 4-bar long pulse instead of 2-bar (20% of active hits)
+                    let longPulse = rng.nextDouble() < 0.20
+                    let dur = longPulse ? 62 : 30
+                    let stabNotes = voicing.count >= 2 ? [voicing[0], voicing[voicing.count - 1]] : voicing
+                    for note in stabNotes {
                         events.append(MIDIEvent(stepIndex: stepIdx, note: note,
-                                                velocity: velocity, durationSteps: 30))
+                                                velocity: velocity, durationSteps: dur))
                     }
                 }
 

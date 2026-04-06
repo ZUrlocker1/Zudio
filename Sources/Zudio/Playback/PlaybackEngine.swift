@@ -288,6 +288,20 @@ final class PlaybackEngine: ObservableObject {
         stopAmbientNoteFades()
     }
 
+    /// Stop and restart the AVAudioEngine so macOS re-enumerates the output device.
+    /// Call this when the user connects new headphones or Bluetooth audio.
+    func restartAudio() {
+        allNotesOff()
+        engine.stop()
+        startEngine()
+    }
+
+    /// Reset the playhead to bar 1 without requiring a loaded song.
+    func resetPlayhead() {
+        currentStep = 0
+        currentBar  = 0
+    }
+
     // MARK: - Step callback (called by StepScheduler on a background queue)
 
     nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
@@ -1229,7 +1243,7 @@ final class PlaybackEngine: ObservableObject {
         catch { print("AVAudioEngine start error: \(error)") }
     }
 
-    private func loadGMPrograms() {
+private func loadGMPrograms() {
         let bankURL = gmDLSSoundBankURL()
         for i in 0..<kTrackCount {
             let program = kDefaultGMPrograms[i] ?? 0

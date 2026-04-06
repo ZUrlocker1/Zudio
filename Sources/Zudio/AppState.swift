@@ -3,6 +3,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import MediaPlayer
 import UniformTypeIdentifiers
 
 @MainActor
@@ -44,12 +45,49 @@ final class AppState: ObservableObject {
     // Fired on generateNew() and on the manual Reset button.
     @Published var defaultsResetToken: Int = 0
 
+    /// Full clean-state reset — equivalent to a fresh app launch.
+    /// Resets style, clears song, clears history, restores first-best-song behavior,
+    /// resets all overrides, and re-enumerates the audio output device.
     func resetTrackDefaults() {
+        // Stop playback and audio texture before tearing down state
+        stop()
+        audioTexture.stop()
+
+        // Clear the current song and all history
+        songState         = nil
+        generationHistory = []
+        statusLog         = []
+        statusLogVersion += 1
+        lastEmittedStep   = -1
+        visibleBarOffset  = 0
+        playback.resetPlayhead()
+
+        // Restore first-best-song behavior for all styles
+        stylesWithGeneratedSongs = []
+        songGenerationCount      = 0
+
+        // Reset style to default
+        selectedStyle = .chill
+
+        // Reset all overrides
         instrumentOverrides = [:]
-        songGenerationCount = 0
-        keyOverride   = nil
-        tempoOverride = nil
-        moodOverride  = nil
+        keyOverride         = nil
+        tempoOverride       = nil
+        moodOverride        = nil
+
+        // Reset mute/solo
+        muteState = Array(repeating: false, count: kTrackCount)
+        soloState = Array(repeating: false, count: kTrackCount)
+        playback.muteState = muteState
+        playback.soloState = soloState
+
+        // Restart audio engine so macOS picks up any newly connected output device
+        playback.restartAudio()
+
+        // Clear Now Playing so the system knows no song is loaded
+        nowPlaying.update(song: nil, isPlaying: false, currentStep: 0)
+
+        // Fire token last — signals TrackRowViews to reset their instrument/effect UI
         defaultsResetToken += 1
     }
 
@@ -188,7 +226,7 @@ final class AppState: ObservableObject {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
         case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Halo Pad","New Age Pad","Calliope Lead"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness"]
-        case (kTrackLead1,   _):        return ["Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead"]
+        case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Fifths Lead","Moog Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone"]
         case (kTrackLead2,   .ambient): return ["Vibraphone","Celesta","Glockenspiel","Grand Piano","Warm Pad","Space Voice","FX Atmosphere"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
@@ -196,7 +234,7 @@ final class AppState: ObservableObject {
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
         case (kTrackPads,    .kosmic):  return ["Choir Aahs","Synth Strings","Warm Pad","Space Voice"]
-        case (kTrackPads,    _):        return ["Warm Pad","Halo Pad","Sweep Pad","Bowed Glass","Synth Strings","Organ Drone"]
+        case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings","Organ Drone"]
         case (kTrackRhythm,  .chill):  return ["Rhodes","Wurlitzer","Grand Piano"]
         case (kTrackRhythm,  .ambient): return ["Vibraphone","Marimba","Tubular Bells","Glockenspiel","FX Crystal","FX Echoes","Church Organ"]
         case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Wurlitzer","Church Organ"]
@@ -233,6 +271,7 @@ final class AppState: ObservableObject {
 
     let playback = PlaybackEngine()
     let audioTexture = AudioTexturePlayer()
+    let nowPlaying = NowPlayingController()
 
     private var cancellables = Set<AnyCancellable>()
     private var keyEventMonitor: Any?
@@ -248,6 +287,29 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+
+        // Media key support: update Now Playing info whenever song or play state changes.
+        nowPlaying.configure(appState: self)
+        Publishers.CombineLatest($songState, playback.$isPlaying)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] song, isPlaying in
+                guard let self else { return }
+                self.nowPlaying.update(song: song, isPlaying: isPlaying,
+                                       currentStep: self.playback.currentStep)
+            }
+            .store(in: &cancellables)
+
+        // Claim Now Playing routing whenever Zudio becomes the active app.
+        // AppDelegate posts zudioClaimNowPlaying on applicationDidBecomeActive.
+        // playbackState = .playing is a persistent, browser-tick-proof signal that
+        // displaces any browser Now Playing session. Restores true state after 100 ms.
+        NotificationCenter.default.addObserver(forName: .zudioClaimNowPlaying, object: nil,
+                                               queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.nowPlaying.claimFocus(song: self.songState,
+                                       isPlaying: self.playback.isPlaying,
+                                       currentStep: self.playback.currentStep)
+        }
 
         // Load .zudio files opened from Finder while the app is already running.
         // AppDelegate posts this notification instead of letting SwiftUI open a new window.
@@ -350,8 +412,7 @@ final class AppState: ObservableObject {
                     Task { @MainActor [weak self] in self?.loadFromLog() }
                 case 46: // 'm' — Motorik
                     Task { @MainActor [weak self] in self?.selectedStyle = .motorik }
-                case 15: // 'r' — reset
-                    guard songState != nil else { return event }
+                case 15: // 'r' — reset (always allowed — clears everything)
                     Task { @MainActor [weak self] in self?.resetTrackDefaults() }
                 case 40: // 'k' — Kosmic
                     Task { @MainActor [weak self] in self?.selectedStyle = .kosmic }

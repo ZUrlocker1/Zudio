@@ -786,14 +786,29 @@ struct LeadGenerator {
         }
         var intervals: [Int] = []; var steps: [Int] = []
         var durs:      [Int] = []; var vels:  [Int] = []
-        for step in [0, 4, 8, 12] {
-            guard rng.nextDouble() < 0.75 else { continue }
+        // Long-note mode (25% of cells): 2 notes per bar with quarter-to-half note durations.
+        // Normal mode: up to 4 notes per bar at sixteenth-to-dotted-eighth durations.
+        let longMode = rng.nextDouble() < 0.25
+        let stepPositions: [Int] = longMode
+            ? [0, 8].filter { _ in rng.nextDouble() < 0.90 }   // beat 1 + beat 3, usually both
+            : [0, 4, 8, 12]
+        for step in stepPositions {
+            if !longMode { guard rng.nextDouble() < 0.75 else { continue } }
             steps.append(step)
             intervals.append(pcsOffsets[rng.nextInt(upperBound: pcsOffsets.count)])
-            durs.append([1, 2, 2, 3][rng.nextInt(upperBound: 4)])
+            // Long mode: quarter (4) to half note (8); normal mode: 16th (1) to dotted-8th (3)
+            // with an occasional quarter note (4) — 20% chance
+            let dur: Int
+            if longMode {
+                dur = [4, 6, 6, 8][rng.nextInt(upperBound: 4)]
+            } else {
+                let roll = rng.nextInt(upperBound: 5)
+                dur = [1, 2, 2, 3, 4][roll]
+            }
+            durs.append(dur)
             vels.append(72 + rng.nextInt(upperBound: 18))
         }
-        if steps.isEmpty { steps = [0]; intervals = [0]; durs = [2]; vels = [80] }
+        if steps.isEmpty { steps = [0]; intervals = [0]; durs = [4]; vels = [80] }
         return (intervals, steps, durs, vels)
     }
 

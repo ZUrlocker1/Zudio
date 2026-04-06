@@ -1186,4 +1186,75 @@ I'd like to ensure that the pads on chill are faded in and out like we did for b
 \
 ok I think we got confused on how pads should fade.  I meant for each pad note to fade in and out. Not for the track in general to fade in and out.  Let me know if you are unclear\
 \
+\
+f i wanted to run  an automated qa test loop for motorik add a new section to the plan to do that focusing on what motorik style things we coould test for and improve. but dont run the test until i say so\
+\
+ok run a test batch of 10 songs but give me a report and plan before making any changes to the rules or code\
+\
+\
+\
+**********\
+\
+\
+Here are all tracks with more than 4 instrument choices:\
+\
+Lead 1\
+\
+Ambient: 9 (Flute, Ocarina, Pan Flute, Whistle, Recorder, Brightness, Halo Pad, New Age Pad, Calliope Lead)\
+Motorik (default): 7 (Square Lead, Mono Synth, Synth Brass, Synth Brass 2, Fifths Lead, Moog Lead, Overdrive Gtr)\
+Lead 2\
+\
+Ambient: 7 (Vibraphone, Celesta, Glockenspiel, Grand Piano, Warm Pad, Space Voice, FX Atmosphere)\
+Pads\
+\
+Ambient: 8 (String Ensemble, Choir Aahs, Synth Strings, Bowed Glass, Warm Pad, Halo Pad, New Age Pad, Sweep Pad)\
+Motorik (default): 8 (Warm Pad, Halo Pad, New Age Pad, Sweep Pad, Bowed Glass, Synth Strings, String Pad, Organ Drone)\
+Kosmic: 5 (Choir Aahs, String Ensemble, Synth Strings, Warm Pad, Space Voice)\
+Rhythm\
+\
+Ambient: 7 (Vibraphone, Marimba, Tubular Bells, Glockenspiel, FX Crystal, FX Echoes, Church Organ)\
+Motorik (default): 7 (Guitar Pulse, Wurlitzer, Rock Organ, Clavinet, Rhodes, Muted Guitar, Mono Synth)\
+Kosmic: 5 (FX Crystal, Vibraphone, Wurlitzer, Church Organ, Tremolo Strings)\
+Texture\
+\
+Chill: 7 (None + 6 audio files)\
+Ambient: 7 (String Ensemble 2, Bowed Glass, Choir Aahs, Space Voice, FX Atmosphere, Sweep Pad, Pad 3 Poly)\
+Motorik (default): 6 (Halo Pad, Warm Pad, Space Voice, Swell, FX Atmosphere, FX Echoes)\
+Would you like to trim any of these down?\
+\
+\
+Remove square lead, overdrive guitar from Motorik Lead 1. \
+Remove New age pad, string pad  from Motorik pads.\
+Remove Clavinet, Mono Synth from Motorik Rhythm.\
+Remove Halo pad, Space voice, Swell from Motorik Texture.\
+Remove Caliope lead, Ocarina,  Whistle lead from Kosmic Lead 1 \
+Remove Ocarina from Kosmic Lead 2\
+Remove Tremolo strings from Kosmic Rhythm\
+Remove String ENsemble from Kosmic pads\
+Remove String Ensemble from Ambient pads.\
+Remove String Ensemble, Space Voice from Ambient texture. \
+\
+when rhodes is selected for Chill rhythm increase the volume \
+\
+the MOT-PADS-003   is also very dense.  Please look for ways to have the pads step out for a while and or vary the pattern as with other motorik pads \
+\
+the lead part MOT-LD1-002    Pentatonic cell  often has very short notes. Please have it occasionally play slightly longer notes. it can\'92t be all 16th notes. \
+\
+the slong Klein Bahn in the Zudio folder had a MOT-LD1-008    Visiting solo  but there were no notes!  That\'92s a bug\
+\
+when CHL-LD1-007  Wide interval solo  or CHL-LD1-004    Blues lead is used, for long phrases of more than 7 notes, please drop one or two notes to break it into 2 slightly shorter phrases with a brief reset in between\
+\
+I\'92d like the reset button to make it like we just started the app:\
+-reset to the original default song style (currently Chill) \
+-clear the current song so the MIDI grid area is empty\
+-reset audio so that if I connect a new headphones or bluetooth it picks it up \
+-reset as if we have not played any songs (e.g. so that the first best songs play for each style)\
+is there anything else reset should do to put it in a clean state?\
+\
+what needs to be done for the mac special play / stop, go to end, go to beginning kesy in the keybard to work automatically with Zudio\
+yes go ahead and implement it and verify the code is good\
+make sure it doesn't break any existing hot keys like space, B, Z, the buttons etc\
+\
+remove warm pad from Motorik Pads\
+\
 }

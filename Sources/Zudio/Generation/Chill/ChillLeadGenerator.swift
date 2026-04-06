@@ -432,6 +432,18 @@ struct ChillLeadGenerator {
         }
         _ = prevNote  // suppress unused-variable warning
 
+        // Phrase-split: saxophone and trumpet (wide-interval / blues lead) phrases longer than 7 notes
+        // are broken into two shorter sub-phrases by dropping 1–2 notes near the middle. This creates
+        // a brief rest that makes long lines breathe rather than run continuously.
+        if (leadInstrument == .saxophone || leadInstrument == .trumpet),
+           slots.count > 7 {
+            // Aim for the break at 45–55% through the phrase
+            let breakCenter = Int(Double(slots.count) * (0.45 + rng.nextDouble() * 0.10))
+            let dropCount = rng.nextDouble() < 0.55 ? 2 : 1   // usually drop 2; occasionally just 1
+            let dropStart = Swift.max(1, Swift.min(breakCenter, slots.count - dropCount - 1))
+            slots.removeSubrange(dropStart ..< Swift.min(dropStart + dropCount, slots.count - 1))
+        }
+
         // Phrase-ending note: snap to chord tones (root, 3rd, 5th of the active chord) for ≥85% of phrases.
         // Use phraseEndChord.chordTones when available — more accurate than computing from key root.
         if rng.nextDouble() < 0.85, !slots.isEmpty {

@@ -9,6 +9,10 @@ extension Notification.Name {
     /// existing window rather than opening a second instance.
     static let zudioOpenFile = Notification.Name("zudioOpenFile")
 
+    /// Posted by AppDelegate on applicationDidBecomeActive so AppState can
+    /// re-assert Now Playing routing without AppDelegate needing a reference to AppState.
+    static let zudioClaimNowPlaying = Notification.Name("zudioClaimNowPlaying")
+
     /// Holds the URL from the most recent file-open request while AppState may still be
     /// initialising.  AppState clears this on first receipt so the 0.5 s fallback post
     /// in AppDelegate is a no-op once the URL has been handled.
@@ -35,6 +39,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         // Re-apply removals in case SwiftUI rebuilds menus after activation.
         removeUnwantedMenus()
+        // Re-claim Now Playing routing whenever Zudio comes to front.
+        // Browsers continuously update their playbackState while media is playing;
+        // re-asserting here ensures Zudio owns F8 whenever it is the active app.
+        NotificationCenter.default.post(name: .zudioClaimNowPlaying, object: nil)
     }
 
     /// Prevent a new window from opening when the user clicks the Dock icon

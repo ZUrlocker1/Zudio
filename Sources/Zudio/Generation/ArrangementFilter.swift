@@ -25,7 +25,8 @@ struct ArrangementFilter {
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        seed: UInt64
+        seed: UInt64,
+        lead1SoloRange: Range<Int>? = nil   // bars containing LD1-007/008 solo — never rested
     ) -> [[MIDIEvent]] {
         var events = trackEvents
         // Arrangement-specific sub-seed — differs from all per-track seeds
@@ -84,7 +85,14 @@ struct ArrangementFilter {
             lastSpotlight = spotlight
 
             // Apply rest / reduce to non-spotlight active tracks
+            // Lead 1 solo window is protected: never rest or thin a block containing solo bars.
+            let soloOverlaps: Bool = {
+                guard let sr = lead1SoloRange else { return false }
+                return sr.overlaps(startBar..<endBar)
+            }()
+
             for track in activeTracks where !spotlight.contains(track) {
+                if track == kTrackLead1 && soloOverlaps { continue }
                 let roll = rng.nextDouble()
                 if roll < 0.45 {
                     // Complete rest — remove all notes in this block

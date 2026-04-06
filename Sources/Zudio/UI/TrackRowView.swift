@@ -42,9 +42,8 @@ struct TrackRowView: View {
             if isKosmic {
                 return [.init(name:"Flute",        program:73),  .init(name:"Brightness",     program:100)]
             }
-            return [.init(name:"Mono Synth",       program:81), .init(name:"Synth Brass",     program:63),
-                    .init(name:"Synth Brass 2",    program:62),  .init(name:"Fifths Lead",     program:86),
-                    .init(name:"Moog Lead",        program:39)]
+            return [.init(name:"Mono Synth",       program:81), .init(name:"Soft Brass",      program:62),
+                    .init(name:"Fifths Lead",      program:86),  .init(name:"Moog Lead",       program:39)]
         case kTrackLead2:
             if isChill {
                 return [.init(name:"Vibraphone",   program:11),  .init(name:"Flute",          program:73),
@@ -77,9 +76,9 @@ struct TrackRowView: View {
                 return [.init(name:"Warm Pad",     program:89), .init(name:"Synth Strings", program:50),
                         .init(name:"String Pad",   program:48), .init(name:"Sweep Pad",     program:95)]
             }
-            return [.init(name:"Warm Pad",       program:89), .init(name:"Halo Pad",        program:94),
-                    .init(name:"Sweep Pad",       program:95), .init(name:"Bowed Glass",     program:92),
-                    .init(name:"Synth Strings",   program:50), .init(name:"Organ Drone",     program:16)]
+            return [.init(name:"Halo Pad",        program:94), .init(name:"Sweep Pad",       program:95),
+                    .init(name:"Bowed Glass",     program:92), .init(name:"Synth Strings",   program:50),
+                    .init(name:"Organ Drone",     program:16)]
         case kTrackRhythm:
             if isChill {
                 return [.init(name:"Rhodes",       program:4),  .init(name:"Wurlitzer",   program:5),
