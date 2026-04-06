@@ -491,3 +491,110 @@ Deferred until after round 1 listening review. Target: 4–5 seeds covering Deep
 ### Done Condition (Chill)
 
 Zero `!!` flags across a 10-song batch with the regen variation test passing for all 3 seeds.
+
+---
+
+## Motorik Style QA Loop
+
+Motorik is the original Zudio style and the most structurally constrained. Its identity depends
+on the four-on-the-floor kick, metronomic hihat, and a long, slowly evolving melodic arc. The
+QA loop targets three areas unique to Motorik: rhythmic integrity, melodic arc shape, and
+instrument diversity.
+
+### Running the Motorik Loop
+
+Motorik uses the same infrastructure as the main loop (Component 1–5), restricted to `.motorik`
+style only:
+
+```
+xcodebuild test -scheme Zudio -only-testing:GenerateBatchTests
+python3 tools/batch_analyze.py tools/batch-output/round-N/ --style motorik
+```
+
+Generate at least 20 songs per round (Motorik is fast). The golden corpus should include 5
+fixed seeds covering different lead rule IDs and at least one song with an X-Files whistle
+phrase and one with a bridge.
+
+### Motorik-Specific Checks
+
+**Rhythmic Integrity**
+
+The Neu!/Hallogallo beat is the non-negotiable core of Motorik. Any drift from the four-on-
+the-floor + steady hihat pattern breaks style identity immediately.
+
+- `!! MOT-KICK` — kick (note 36) not present on all four beats of ≥ 90% of body bars
+- `!! MOT-HAT` — closed hihat (note 42) not on ≥ 70% of 8th-note grid positions in body
+- `!! MOT-SNARE` — snare (note 38) absent from beats 2 and 4 in ≥ 80% of body bars
+- `!! MOT-DRUM-DENSE` — drum events/bar > 20 in body sections (fills crowding the pocket)
+- `~~ MOT-CRASH` — crash cymbal (note 49) fires more than once every 8 bars (distracting)
+
+**Melodic Arc**
+
+Motorik melodies are slow-burning. The lead should enter sparsely, build through the body,
+and have a clear sense of register and direction rather than random wandering.
+
+- `!! MOT-ARC-FLAT` — Lead 1 density difference between intro and peak body section < 0.5
+  notes/bar (lead never really arrives)
+- `!! MOT-DRONE` — Lead 1 uses ≤ 3 distinct pitch classes in any 8-bar window of the body
+  (trapped on one note)
+- `!! MOT-REGISTER` — Lead 1 median pitch outside 60–84 MIDI (below middle C or too shrill)
+- `!! MOT-PHRASE-GAP` — Lead 1 has no rest ≥ 2 bars anywhere in the body (never breathes;
+  phrases run together into a wall of sound)
+- `~~ MOT-OCTAVE-JUMP` — more than 20% of consecutive Lead 1 intervals are exactly 12
+  semitones (octave jumping as a crutch)
+
+**Bass Character**
+
+Motorik bass is an ostinato drone, not a walking line. It should mostly sit on the root with
+occasional movement rather than leaping around.
+
+- `!! MOT-BASS-ROOT` — fewer than 70% of body bar-1 bass notes match the active chord root
+- `!! MOT-BASS-LEAP` — more than 15% of consecutive bass intervals exceed a 5th (7 semitones)
+- `!! MOT-BASS-DENSE` — bass > 4.0 notes/bar in body (too busy for the style)
+
+**Rhythm Track (Arp)**
+
+The Motorik rhythm track is a hypnotic repeating figure — not a melody, not random. It should
+be dense, locked to the beat, and harmonically consonant.
+
+- `!! MOT-RTHM-SPARSE` — rhythm track < 2.0 notes/bar in body (inaudible contribution)
+- `!! MOT-RTHM-CLASH` — rhythm pitch clash > 15% (arpeggio notes outside scale + chord)
+- `!! MOT-RTHM-STOP` — rhythm track absent for > 4 consecutive body bars (unexplained gap)
+
+**Song Length and Structure**
+
+Motorik songs should be long. A 3-minute song doesn't have time to hypnotize.
+
+- `!! MOT-SHORT` — total bars < 40 (< ~3 min at 125 BPM)
+- `~~ MOT-NO-BRIDGE` — no bridge/breakdown present (not mandatory but worth noting for
+  variety across a batch; flag only if absent in > 80% of a 20-song batch)
+
+**Instrument Diversity**
+
+With 7 lead instruments and 7 rhythm instruments available, no single instrument should dominate.
+
+- `!! MOT-LEAD-DOMINANT` — any single Lead 1 instrument in > 50% of a 20-song batch
+- `!! MOT-RTHM-DOMINANT` — any single Rhythm instrument in > 50% of a 20-song batch
+
+### Motorik Density Targets (reference)
+
+These are already defined in the main Quality Metrics section and apply unchanged:
+- Lead 1 body: 1.5–4.0 notes/bar
+- Lead 2 body: 1.0–5.0 notes/bar
+- Rhythm body: 2.0–8.0 notes/bar
+- Bass body: 1.0–4.0 notes/bar
+- Drums body: 4.0–16.0 notes/bar
+
+### Motorik Golden Corpus Seeds
+
+Target 5 seeds selected after listening review, covering:
+- One song with X-Files whistle phrase (confirming it isn't flagged as a tonal clash)
+- One song with a bridge present
+- At least two different lead rule IDs (e.g. MOT-LD1-007 and MOT-LD1-008)
+- At least two different modes (e.g. one Dorian, one Mixolydian)
+
+### Done Condition (Motorik)
+
+Zero `!!` flags across a 20-song batch, with the golden corpus showing no regressions from
+the prior round. The `~~ MOT-NO-BRIDGE` warning is acceptable if variety is present in
+other dimensions.
