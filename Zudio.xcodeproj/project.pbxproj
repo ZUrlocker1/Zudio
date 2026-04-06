@@ -80,6 +80,11 @@
 		AA000000000000000000067 /* ChillTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000067 /* ChillTitleGenerator.swift */; };
 		AA000000000000000000068 /* AudioTexturePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000068 /* AudioTexturePlayer.swift */; };
 		AA000000000000000000069 /* Textures in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Textures */; };
+		/* ZudioTests build files */
+		TT000000000000000000001 /* ZudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000001 /* ZudioTests.swift */; };
+		TT000000000000000000002 /* ChillBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000002 /* ChillBatchTests.swift */; };
+		TT000000000000000000003 /* MotorikBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000003 /* MotorikBatchTests.swift */; };
+		TT000000000000000000004 /* Zudio.app in Frameworks */ = {isa = PBXBuildFile; fileRef = BB000000000000000000021 /* Zudio.app */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -158,6 +163,11 @@
 		BB000000000000000000067 /* ChillTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillTitleGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000068 /* AudioTexturePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTexturePlayer.swift; sourceTree = "<group>"; };
 		BB000000000000000000069 /* Textures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Sources/Zudio/Resources/Textures"; sourceTree = "<group>"; };
+		/* ZudioTests file references */
+		UU000000000000000000001 /* ZudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioTests.swift; sourceTree = "<group>"; };
+		UU000000000000000000002 /* ChillBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillBatchTests.swift; sourceTree = "<group>"; };
+		UU000000000000000000003 /* MotorikBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorikBatchTests.swift; sourceTree = "<group>"; };
+		UU000000000000000000004 /* ZudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +176,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA00000000000000000001E /* AVFoundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC000000000000000000010 /* Frameworks (ZudioTests) */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,8 +202,27 @@
 			isa = PBXGroup;
 			children = (
 				BB000000000000000000021 /* Zudio.app */,
+				UU000000000000000000004 /* ZudioTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000013 /* ZudioTests */ = {
+			isa = PBXGroup;
+			children = (
+				UU000000000000000000001 /* ZudioTests.swift */,
+				UU000000000000000000002 /* ChillBatchTests.swift */,
+				UU000000000000000000003 /* MotorikBatchTests.swift */,
+			);
+			path = ZudioTests;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000014 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				DD000000000000000000013 /* ZudioTests */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 		DD000000000000000000002 /* Frameworks */ = {
@@ -301,6 +337,7 @@
 			isa = PBXGroup;
 			children = (
 				DD000000000000000000009 /* Sources */,
+				DD000000000000000000014 /* Tests */,
 				BB00000000000000000001F /* assets */,
 				BB000000000000000000069 /* Textures */,
 				DD000000000000000000001 /* Products */,
@@ -375,7 +412,42 @@
 			productReference = BB000000000000000000021 /* Zudio.app */;
 			productType = "com.apple.product-type.application";
 		};
+		EE000000000000000000003 /* ZudioTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF000000000000000000003 /* Build configuration list for PBXNativeTarget "ZudioTests" */;
+			buildPhases = (
+				CC000000000000000000011 /* Sources (ZudioTests) */,
+				CC000000000000000000010 /* Frameworks (ZudioTests) */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				VV000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = ZudioTests;
+			productName = ZudioTests;
+			productReference = UU000000000000000000004 /* ZudioTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		VV000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EE000000000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EE000000000000000000001;
+			remoteInfo = Zudio;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		VV000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EE000000000000000000001 /* Zudio */;
+			targetProxy = VV000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		EE000000000000000000002 /* Project object */ = {
@@ -387,6 +459,10 @@
 				TargetAttributes = {
 					EE000000000000000000001 = {
 						CreatedOnToolsVersion = 15.0;
+					};
+					EE000000000000000000003 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = EE000000000000000000001;
 					};
 				};
 			};
@@ -404,6 +480,7 @@
 			projectRoot = "";
 			targets = (
 				EE000000000000000000001 /* Zudio */,
+				EE000000000000000000003 /* ZudioTests */,
 			);
 		};
 /* End PBXProject section */
@@ -494,6 +571,16 @@
 				AA000000000000000000066 /* ChillRhythmGenerator.swift in Sources */,
 				AA000000000000000000067 /* ChillTitleGenerator.swift in Sources */,
 				AA000000000000000000068 /* AudioTexturePlayer.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC000000000000000000011 /* Sources (ZudioTests) */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TT000000000000000000001 /* ZudioTests.swift in Sources */,
+				TT000000000000000000002 /* ChillBatchTests.swift in Sources */,
+				TT000000000000000000003 /* MotorikBatchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -668,6 +755,50 @@
 			};
 			name = Release;
 		};
+		GG000000000000000000005 /* Debug (ZudioTests) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = K66MA9TR8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.tests;
+				PRODUCT_NAME = ZudioTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Zudio.app/Contents/MacOS/Zudio";
+			};
+			name = Debug;
+		};
+		GG000000000000000000006 /* Release (ZudioTests) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = K66MA9TR8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.tests;
+				PRODUCT_NAME = ZudioTests;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Zudio.app/Contents/MacOS/Zudio";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -685,6 +816,15 @@
 			buildConfigurations = (
 				GG000000000000000000003 /* Debug */,
 				GG000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF000000000000000000003 /* Build configuration list for PBXNativeTarget "ZudioTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				GG000000000000000000005 /* Debug */,
+				GG000000000000000000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

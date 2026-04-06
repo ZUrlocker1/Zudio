@@ -113,7 +113,7 @@ struct LeadGenerator {
 
         // E: Delayed body entry — Lead 1 hard-silent for first 8 or 16 bars of A section
         let aStart   = structure.sections.first(where: { $0.label == .A })?.startBar ?? 0
-        let entryBar = aStart + (rng.nextDouble() < 0.5 ? 8 : 16)
+        let entryBar = aStart + (rng.nextDouble() < 0.7 ? 8 : 16)  // 70% enter after 8 bars, 30% after 16
 
         // C: Select one v2 starter phrase for LD1-001
         let phraseIdx    = rng.nextInt(upperBound: v2Phrases.count)
@@ -229,9 +229,9 @@ struct LeadGenerator {
                     let phraseStepBase = cycleBar * 16
                     let bounds        = kRegisterBounds[kTrackLead1]!
                     let keyRoot       = 60 + keySemitone(frame.key)
-                    // G: Decide sparse mode at the start of each 4-bar cycle (35% chance).
+                    // G: Decide sparse mode at the start of each 4-bar cycle (20% chance).
                     // Sparse mode thins the phrase to ~45% of notes, giving 4–6 from a 10–13 note phrase.
-                    if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.35 }
+                    if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.20 }
                     let gateProb: Double = phraseSparseCycle ? 0.45 : 1.0
                     for evt in currentPhrase where evt.step >= phraseStepBase && evt.step < phraseStepBase + 16 {
                         guard rng.nextDouble() < gateProb else { continue }   // G: sparse gate
@@ -297,8 +297,8 @@ struct LeadGenerator {
                         motifVels  = newVels
                         motifRhythmMutationBar += 8
                     }
-                    // 15% rest bar — breathing room between repetitions
-                    if rng.nextDouble() >= 0.15 {
+                    // 8% rest bar — breathing room between repetitions
+                    if rng.nextDouble() >= 0.08 {
                         barEvents = replayPentatonicCell(
                             intervals: motifIntervals, steps: motifSteps, durs: motifDurs, vels: motifVels,
                             barStart: barStart, entry: entry, frame: frame,

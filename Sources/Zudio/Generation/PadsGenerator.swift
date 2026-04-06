@@ -108,26 +108,28 @@ struct PadsGenerator {
                     }
                 }
 
-            // MARK: Chord stabs (beat 1 + sometimes beat 3)
+            // MARK: Chord stabs (beat 1 + sometimes beat 3) — 2-note sparse voicing
             case "MOT-PADS-004":
-                for note in voicing {
+                let stabNotes = voicing.count >= 2 ? [voicing[0], voicing[voicing.count - 1]] : voicing
+                for note in stabNotes {
                     events.append(MIDIEvent(stepIndex: stepIdx, note: note,
                                             velocity: velocity, durationSteps: 4))
                 }
-                if rng.nextDouble() < 0.5 {
+                if rng.nextDouble() < 0.35 {
                     let vel2 = UInt8(max(40, Int(velocity) - 12))
-                    for note in voicing {
+                    for note in stabNotes {
                         events.append(MIDIEvent(stepIndex: stepIdx + 8, note: note,
                                                 velocity: vel2, durationSteps: 4))
                     }
                 }
 
             // MARK: Charleston / 3+3+2
-            // Hits at steps 0, 6, 12 — dotted-quarter, dotted-quarter, quarter
+            // Hits at steps 0, 9 — dotted-quarter + dotted-quarter (2 hits, more space)
             case "MOT-PADS-005":
                 sustainRunBars = 0
-                for (offset, dur) in [(0, 5), (6, 5), (12, 4)] {
-                    for note in voicing {
+                let charlNotes = voicing.count >= 2 ? [voicing[0], voicing[voicing.count - 1]] : voicing
+                for (offset, dur) in [(0, 7), (9, 6)] {
+                    for note in charlNotes {
                         events.append(MIDIEvent(stepIndex: stepIdx + offset, note: note,
                                                 velocity: velocity, durationSteps: dur))
                     }

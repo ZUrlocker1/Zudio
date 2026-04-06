@@ -38,7 +38,7 @@ final class AppState: ObservableObject {
 
     // MARK: - Style selector
 
-    @Published var selectedStyle: MusicStyle = .kosmic
+    @Published var selectedStyle: MusicStyle = .chill
 
     // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
     // Fired on generateNew() and on the manual Reset button.
@@ -187,24 +187,24 @@ final class AppState: ObservableObject {
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
         case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Halo Pad","New Age Pad","Calliope Lead"]
-        case (kTrackLead1,   .kosmic):  return ["Ocarina","Flute","Whistle","Calliope Lead"]
-        case (kTrackLead1,   _):        return ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr"]
+        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness"]
+        case (kTrackLead1,   _):        return ["Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone"]
         case (kTrackLead2,   .ambient): return ["Vibraphone","Celesta","Glockenspiel","Grand Piano","Warm Pad","Space Voice","FX Atmosphere"]
-        case (kTrackLead2,   .kosmic):  return ["Brightness","Warm Pad","Halo Pad","New Age Pad","Ocarina"]
+        case (kTrackLead2,   .kosmic):  return ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
         case (kTrackLead2,   _):        return ["Brightness","Vibraphone","Bell/Pluck"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
-        case (kTrackPads,    .ambient): return ["String Ensemble","Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
-        case (kTrackPads,    .kosmic):  return ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
-        case (kTrackPads,    _):        return ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]
+        case (kTrackPads,    .ambient): return ["Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
+        case (kTrackPads,    .kosmic):  return ["Choir Aahs","Synth Strings","Warm Pad","Space Voice"]
+        case (kTrackPads,    _):        return ["Warm Pad","Halo Pad","Sweep Pad","Bowed Glass","Synth Strings","Organ Drone"]
         case (kTrackRhythm,  .chill):  return ["Rhodes","Wurlitzer","Grand Piano"]
         case (kTrackRhythm,  .ambient): return ["Vibraphone","Marimba","Tubular Bells","Glockenspiel","FX Crystal","FX Echoes","Church Organ"]
-        case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Wurlitzer","Church Organ","Tremolo Strings"]
-        case (kTrackRhythm,  _):        return ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Rhodes","Muted Guitar","Mono Synth"]
+        case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Wurlitzer","Church Organ"]
+        case (kTrackRhythm,  _):        return ["Guitar Pulse","Wurlitzer","Rock Organ","Rhodes","Muted Guitar"]
         case (kTrackTexture, .chill):   return ["None","Bar sounds","City at night","Light rain","Ocean waves","Urban rain","Vinyl crackle"]
-        case (kTrackTexture, .ambient): return ["String Ensemble 2","Bowed Glass","Choir Aahs","Space Voice","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
+        case (kTrackTexture, .ambient): return ["String Ensemble 2","Bowed Glass","Choir Aahs","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
-        case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
+        case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .ambient): return ["Cello","Contrabass","Moog Bass","Synth Bass 1","Fretless Bass"]
         case (kTrackBass,    .kosmic):  return ["Moog Bass","Synth Bass 1","Fretless Bass"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]

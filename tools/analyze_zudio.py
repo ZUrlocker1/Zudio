@@ -160,6 +160,12 @@ def analyze(midi_path):
         rule_str = '  '.join(f"{k}={v[:20]}" for k, v in log['rules'].items())
         print(f"  Rules: {rule_str}")
 
+    # Track names that use GM drum note numbers — exclude from pitch clash analysis entirely.
+    # GM drums (channel 10) use fixed note numbers for kick/snare/hihat, not pitched content.
+    # Texture uses intentional chromatic passing tones (TEXT-003, TEXT-008) — raise clash threshold.
+    DRUM_TRACKS    = {'Drums', 'drums', 'Drum', 'drum'}
+    TEXTURE_TRACKS = {'Texture', 'texture'}
+
     print()
     issues = []
     for t in tracks:
@@ -179,9 +185,11 @@ def analyze(midi_path):
         npb = len(notes) / max(1.0, approx_bars)
 
         avg_dur_b = (sum(durs) / len(durs)) / tpq / 4
-        max_dur_b = max(durs) / tpq / 4
 
-        if has_log and scale:
+        is_drums   = t['name'] in DRUM_TRACKS or 'Drum' in t['name']
+        is_texture = t['name'] in TEXTURE_TRACKS or 'Texture' in t['name']
+
+        if has_log and scale and not is_drums:
             oos = [p for p in pitches if p % 12 not in scale]
             pct = 100 * len(oos) / len(pitches)
             oos_names = sorted(set(note_name(p) for p in oos))[:8]
@@ -189,18 +197,26 @@ def analyze(midi_path):
             pct = 0.0
             oos_names = []
 
+        # Drums: never flag clash (GM drum note numbers are not pitched content)
+        # Texture: intentional chromatic passing tones — flag only above 35%
+        clash_threshold = 35 if is_texture else 20
+        minor_threshold = 10 if is_texture else 5
+
         flag = ''
-        if has_log and pct >= 20:
-            flag = ' !!CLASH'
-            issues.append(f"{t['name']}: {pct:.0f}% out-of-scale")
-        elif has_log and pct >= 5:
-            flag = ' !clash'
+        if is_drums:
+            clash_str = 'clash=n/a (drums)'
+        else:
+            clash_str = f"clash={pct:5.1f}%" if has_log else ""
+            if has_log and pct >= clash_threshold:
+                flag = ' !!CLASH'
+                issues.append(f"{t['name']}: {pct:.0f}% out-of-scale")
+            elif has_log and pct >= minor_threshold:
+                flag = ' !clash'
         if npb > 5:
             flag += ' !!DENSE'
             issues.append(f"{t['name']}: {npb:.1f} notes/bar")
 
-        clash_str = f"clash={pct:5.1f}%" if has_log else ""
-        oos_str   = f"oos={oos_names}" if oos_names else ""
+        oos_str = f"oos={oos_names}" if oos_names else ""
         print(f"  [{t['name'][:26]:26s}] n={len(notes):4d}  n/bar={npb:4.1f}"
               f"  vel={min(vels):3d}-{max(vels):3d}"
               f"  dur avg={avg_dur_b:.2f}b"
