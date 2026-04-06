@@ -287,36 +287,91 @@ struct AmbientLeadGenerator {
         return events
     }
 
-    /// AMB-LEAD-008: Returning motif — a 2–3 note phrase that recurs every 8–14 bars with ±2 step jitter.
-    /// The same pitches return at semi-regular intervals; spacing is irregular enough to feel unscheduled.
+    /// AMB-LEAD-008: Returning motif — statement / bar gap / statement / bar gap / variation, cycle repeats.
+    /// A short melodic phrase (2–5 notes) is stated twice unchanged, then varied on the third repetition
+    /// (transposed, a note substituted, or rhythmically shifted by 2 steps). A 2–4 bar rest follows
+    /// before the cycle repeats, either with the same phrase or a new variation.
+    /// All repetitions are bar-aligned: each statement begins on a bar boundary.
     private static func returningMotif(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         guard notes.count >= 3 else { return [] }
-        // Pick 2–3 notes from the lower half of the register
-        let motifLen  = 2 + rng.nextInt(upperBound: 2)           // 2–3 notes
-        let maxStart  = Swift.max(1, notes.count / 2)
-        let startIdx  = rng.nextInt(upperBound: maxStart)
-        let motif     = Array(notes[startIdx..<Swift.min(startIdx + motifLen, notes.count)])
-        let holdSteps = 8 + rng.nextInt(upperBound: 5)           // 8–12 steps per note
-        let baseVel   = UInt8(45 + rng.nextInt(upperBound: 16))  // 45–60
-        let returnInterval = (8 + rng.nextInt(upperBound: 7)) * 16  // 8–14 bars
-        var events: [MIDIEvent] = []
-        var cursor = rng.nextInt(upperBound: 16)
-        while cursor < loopSteps {
-            let jitter     = rng.nextInt(upperBound: 5) - 2      // ±2 steps
-            var noteCursor = Swift.max(0, cursor + jitter)
-            for note in motif {
-                guard noteCursor < loopSteps else { break }
-                let dur = Swift.min(holdSteps, loopSteps - noteCursor)
-                if dur >= 4 {
-                    let vel = UInt8(Swift.min(100, Int(baseVel) + rng.nextInt(upperBound: 8) - 4))
-                    events.append(MIDIEvent(stepIndex: noteCursor, note: note,
-                                           velocity: vel, durationSteps: dur))
-                }
-                noteCursor += holdSteps + 2   // 2-step gap between motif notes
-            }
-            cursor += returnInterval
+
+        // Build a short stepwise motif in the lower-mid register
+        let motifLen = 2 + rng.nextInt(upperBound: 4)              // 2–5 notes
+        let maxStart = Swift.max(1, notes.count / 2)
+        var idx      = rng.nextInt(upperBound: maxStart)
+        var motifIndices = [Int]()
+        for _ in 0..<motifLen {
+            motifIndices.append(Swift.min(idx, notes.count - 1))
+            let delta = rng.nextDouble() < 0.65 ? 1 : -1
+            idx = Swift.max(0, Swift.min(notes.count - 1, idx + delta))
         }
-        return events
+
+        let noteDur    = 4 + rng.nextInt(upperBound: 4)            // 4–7 steps per note
+        let noteGap    = 1 + rng.nextInt(upperBound: 2)            // 1–2 step gap within phrase
+        let noteStride = noteDur + noteGap
+        let phraseSpan = motifLen * noteStride                      // steps the phrase occupies
+        let baseVel    = 45 + rng.nextInt(upperBound: 20)          // 45–64
+
+        // Advance to start of next bar boundary
+        func nextBar(after step: Int) -> Int { ((step / 16) + 1) * 16 }
+
+        // Emit one statement; velBoost applied on top of baseVel
+        func emit(at start: Int, indices: [Int], velBoost: Int) -> [MIDIEvent] {
+            var evts: [MIDIEvent] = []
+            for (i, noteIdx) in indices.enumerated() {
+                let step = start + i * noteStride
+                guard step < loopSteps else { break }
+                let dur = Swift.min(noteDur, loopSteps - step)
+                guard dur >= 2 else { break }
+                let vel = UInt8(Swift.max(25, Swift.min(100, baseVel + velBoost + rng.nextInt(upperBound: 8) - 4)))
+                evts.append(MIDIEvent(stepIndex: step, note: notes[noteIdx],
+                                      velocity: vel, durationSteps: dur))
+            }
+            return evts
+        }
+
+        var events: [MIDIEvent] = []
+        var cursor = rng.nextInt(upperBound: 8)   // slight random offset before first cycle
+
+        while cursor + phraseSpan < loopSteps {
+            // --- Statement 1: plain ---
+            events += emit(at: cursor, indices: motifIndices, velBoost: 0)
+            cursor = nextBar(after: cursor + phraseSpan)
+            guard cursor + phraseSpan < loopSteps else { break }
+
+            // --- Statement 2: same phrase, slightly louder (confirmation) ---
+            events += emit(at: cursor, indices: motifIndices, velBoost: 3)
+            cursor = nextBar(after: cursor + phraseSpan)
+            guard cursor + phraseSpan < loopSteps else { break }
+
+            // --- Statement 3: variation ---
+            let varType = rng.nextInt(upperBound: 3)
+            var varIndices = motifIndices
+            var rhythmShift = 0
+
+            switch varType {
+            case 0:
+                // Transpose: shift all indices ±1 scale step
+                let shift = rng.nextDouble() < 0.5 ? 1 : -1
+                varIndices = motifIndices.map { Swift.max(0, Swift.min(notes.count - 1, $0 + shift)) }
+            case 1:
+                // Substitute: replace one note with a scale-step neighbor (+2 or −2 positions)
+                let pos   = rng.nextInt(upperBound: varIndices.count)
+                let delta = rng.nextDouble() < 0.5 ? 2 : -2
+                varIndices[pos] = Swift.max(0, Swift.min(notes.count - 1, varIndices[pos] + delta))
+            default:
+                // Rhythmic shift: same pitches, phrase starts 2 steps later
+                rhythmShift = 2
+            }
+
+            events += emit(at: cursor + rhythmShift, indices: varIndices, velBoost: 6)
+            cursor = nextBar(after: cursor + rhythmShift + phraseSpan)
+
+            // Long rest before next cycle: 2–4 bars
+            cursor += (2 + rng.nextInt(upperBound: 3)) * 16
+        }
+
+        return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
     // MARK: - AMB-LEAD-009: Magnetik solo

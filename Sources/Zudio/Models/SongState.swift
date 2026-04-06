@@ -20,7 +20,7 @@ struct SongState: Sendable {
     let globalSeed: UInt64
     /// Per-track override seeds set by per-track Regenerate. Key = trackIndex.
     var trackOverrides: [Int: UInt64]
-    let title: String
+    var title: String
     let form: SongForm
     let style: MusicStyle
     /// Kosmic-only: percussion pattern selected at generation time. `.absent` for Motorik.
@@ -37,6 +37,18 @@ struct SongState: Sendable {
     /// Ambient-only: true when Brush Kit (program 40) was selected at generation time.
     /// Stored so per-track drum regen can reproduce the same note substitutions.
     let ambientUseBrushKit: Bool
+    /// Chill-only: progression family selected at generation time.
+    let chillProgFamily: ChillProgressionFamily
+    /// Chill-only: lead instrument assigned at frame generation time (same for entire song).
+    let chillLeadInstrument: ChillLeadInstrument
+    /// Chill-only: drum/beat style assigned at frame generation time.
+    let chillBeatStyle: ChillBeatStyle
+    /// Chill-only: breakdown texture style selected at generation time.
+    let chillBreakdownStyle: ChillBreakdownStyle
+    /// Chill-only: true when swing feel is applied (Bright/Free moods).
+    let chillSwingFeel: Bool
+    /// Chill-only: audio texture filename selected at generation time (nil = no texture).
+    let chillAudioTexture: String?
     /// Force-rule IDs passed to generators at generation time (e.g. best-song path, test mode).
     /// Keys: "Bass", "Drums", "Rhythm", "Pads", "Lead", "Tex". Written to the log file so that
     /// Load Song can restore the exact generators used and reproduce the song from the seed.
@@ -73,6 +85,12 @@ struct SongState: Sendable {
         ambientLoopLengths: AmbientLoopLengths? = nil,
         ambientXFilesBlockRange: Range<Int>? = nil,
         ambientUseBrushKit: Bool = false,
+        chillProgFamily: ChillProgressionFamily = .static_groove,
+        chillLeadInstrument: ChillLeadInstrument = .flute,
+        chillBeatStyle: ChillBeatStyle = .electronic,
+        chillBreakdownStyle: ChillBreakdownStyle = .bassOstinato,
+        chillSwingFeel: Bool = false,
+        chillAudioTexture: String? = nil,
         forcedRules: [String: String] = [:],
         keyOverride:   String? = nil,
         tempoOverride: Int?    = nil,
@@ -93,6 +111,12 @@ struct SongState: Sendable {
         self.ambientLoopLengths      = ambientLoopLengths
         self.ambientXFilesBlockRange = ambientXFilesBlockRange
         self.ambientUseBrushKit      = ambientUseBrushKit
+        self.chillProgFamily         = chillProgFamily
+        self.chillLeadInstrument     = chillLeadInstrument
+        self.chillBeatStyle          = chillBeatStyle
+        self.chillBreakdownStyle     = chillBreakdownStyle
+        self.chillSwingFeel          = chillSwingFeel
+        self.chillAudioTexture       = chillAudioTexture
         self.forcedRules             = forcedRules
         self.keyOverride             = keyOverride
         self.tempoOverride           = tempoOverride
@@ -117,7 +141,11 @@ struct SongState: Sendable {
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
                   ambientXFilesBlockRange: ambientXFilesBlockRange,
-                  ambientUseBrushKit: useBrushKit, forcedRules: forcedRules,
+                  ambientUseBrushKit: useBrushKit,
+                  chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
+                  chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillAudioTexture: chillAudioTexture,
+                  forcedRules: forcedRules,
                   keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
 
@@ -130,7 +158,28 @@ struct SongState: Sendable {
                   generationLog: generationLog, stepAnnotations: stepAnnotations,
                   ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
                   ambientXFilesBlockRange: ambientXFilesBlockRange,
-                  ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules,
+                  ambientUseBrushKit: ambientUseBrushKit,
+                  chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
+                  chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillAudioTexture: chillAudioTexture,
+                  forcedRules: forcedRules,
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+    }
+
+    /// Returns a copy of this state with the audio texture filename updated (user selection).
+    func withChillAudioTexture(_ texture: String?) -> SongState {
+        SongState(frame: frame, structure: structure, tonalMap: tonalMap,
+                  trackEvents: trackEvents, globalSeed: globalSeed,
+                  trackOverrides: trackOverrides, title: title, form: form, style: style,
+                  percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
+                  generationLog: generationLog, stepAnnotations: stepAnnotations,
+                  ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
+                  ambientXFilesBlockRange: ambientXFilesBlockRange,
+                  ambientUseBrushKit: ambientUseBrushKit,
+                  chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
+                  chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillAudioTexture: texture,
+                  forcedRules: forcedRules,
                   keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
 
@@ -152,7 +201,10 @@ struct SongState: Sendable {
             generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
             ambientXFilesBlockRange: ambientXFilesBlockRange,
-            ambientUseBrushKit: ambientUseBrushKit, forcedRules: forcedRules,
+            ambientUseBrushKit: ambientUseBrushKit,
+            chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
+            chillBeatStyle: chillBeatStyle, chillSwingFeel: chillSwingFeel,
+            forcedRules: forcedRules,
             keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride
         )
     }

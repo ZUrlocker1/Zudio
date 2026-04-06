@@ -31,7 +31,7 @@ set -euo pipefail
 SCHEME="Zudio"
 BUNDLE_ID="com.zudio.app"
 TEAM_ID="K66MA9TR8Z"
-VERSION="0.96"
+VERSION="0.97"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
 NOTARYTOOL_PROFILE="AC_PASSWORD"          # keychain profile name set up with xcrun notarytool store-credentials
 ENTITLEMENTS="$(pwd)/Zudio.entitlements"

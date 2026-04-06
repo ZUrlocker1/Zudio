@@ -2,7 +2,7 @@
 
 Zudio is a generative music app for macOS. It generates complete multi-track songs in one click using human-curated musical rules derived from analyzing real artists rather than machine learning.
 
-It supports three styles: **Motorik** (Neu!, Kraftwerk, Harmonia), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Vangelis, Electric Buddha Band), and **Ambient** (Brian Eno, Loscil, Craven Faults). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation. Sometimes it even sounds like music!
+It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk, Harmonia). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation. Sometimes it even sounds like music!
 
 Rules were developed by analyzing tracks from artists across those styles. The resulting songs were analyzed by AI to spot generation errors, tone clashes etc and then further improve the rules. 
 The app includes built-in effects such as reverb, delay, auto-pan and sweep. You can export both MIDI and M4A audio.
@@ -13,9 +13,9 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Listen to a sample (Ambient style):** [The-ChatGPT-Meditations](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.96/Zudio-0.96.dmg)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.97/Zudio-0.97.dmg)
 
-Current release: `0.96 (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `0.97 (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 ---
 
@@ -35,10 +35,12 @@ Current release: `0.96 (alpha)`. Universal binary — runs natively on both Appl
 - [motorik-plan.md](docs/motorik-plan.md) — Motorik style: genre research, song analysis, universal rules, and complete implemented specification (drums, bass, pads, leads, voicings).
 - [kosmic-plan.md](docs/kosmic-plan.md) — Kosmic style: genre research, artist-by-artist analysis, universal rules, MIDI analysis findings, and complete implemented specification.
 - [ambient-plan.md](docs/ambient-plan.md) — Ambient style: genre research, artist-by-artist analysis, universal rules, generator design, and MIDI analysis.
+- [chill-plan.md](docs/chill-plan.md) — Chill style: genre research, artist-by-artist analysis (St Germain, Moby, Air, DJ Cam Quartet, Electric Buddha Band), universal rules, generator design, and MIDI analysis.
 
 ### Analysis and quality
 
 - [musical-coherence-plan.md](docs/musical-coherence-plan.md) — Methods and findings from analyzing generated output for musical coherence; derived rule improvements.
+- [automated-quality-loop-plan.md](docs/automated-quality-loop-plan.md) — Design for an automated batch generation and analysis pipeline for Chill: tonal clash detection, density targets, beat style verification, phrase structure, and regen variation testing.
 - [optimization-plan.md](docs/optimization-plan.md) — Performance engineering research and CPU optimization techniques.
 - [comps.md](docs/comps.md) — Comparable generative music applications: feature analysis and product notes.
 

@@ -15,7 +15,7 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Audio graph
 
     private let engine   = AVAudioEngine()
-    // nonisolated(unsafe): built once in setupEngine() (main actor, before playback).
+    // nonisolated(unsafe): buonce in setupEngine() (main actor, before playback).
     // Read from background timer thread in onStep() — AVAudioUnitSampler is thread-safe.
     nonisolated(unsafe) private var samplers = [AVAudioUnitSampler]()
     private var boosts      = [AVAudioMixerNode]()     // outputVolume > 1 = clean gain boost; also carries pan
@@ -28,6 +28,9 @@ final class PlaybackEngine: ObservableObject {
 
     // Ambient mode — set before defaultsResetToken fires so setEffect uses Ambient values
     var ambientMode: Bool = false
+
+    // Chill pads mode — per-note audio fade-in/fade-out on kTrackPads boost node (same mechanism as Ambient)
+    nonisolated(unsafe) var chillPadsMode: Bool = false
 
     // Per-track Ambient reverb wet values (cathedral for Lead/Pads/Texture, largeChamber for rest)
     // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums
@@ -78,6 +81,7 @@ final class PlaybackEngine: ObservableObject {
 
     // Motorik fade (intro 0→1, outro 1→0 on engine.mainMixerNode — all tracks together)
     var motorikStyle: Bool = false
+    var chillFade: Bool = false
     private var motorikFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
 
     // Ambient per-note attack/decay fades on boosts[kTrackBass] and boosts[kTrackPads].
@@ -245,7 +249,7 @@ final class PlaybackEngine: ObservableObject {
                 sched.start()
                 self.startKosmicDroneFades(state: state)
             }
-        } else if motorikStyle && currentStep == 0 && state.structure.introSection != nil {
+        } else if (motorikStyle || chillFade) && currentStep == 0 && state.structure.introSection != nil {
             // Same pop-prevention as Kosmic: zero master before first note fires.
             engine.mainMixerNode.outputVolume = 0.0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
@@ -261,11 +265,15 @@ final class PlaybackEngine: ObservableObject {
                 boosts[kTrackBass].outputVolume = 0.0
                 boosts[kTrackPads].outputVolume = 0.0
             }
+            // Chill pads: same — start silent so the first pad note fades in rather than snapping on.
+            if chillPadsMode && currentStep == 0 {
+                boosts[kTrackPads].outputVolume = 0.0
+            }
             let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: schedulerID)
             scheduler = sched
             sched.start()
-            if kosmicStyle  { startKosmicDroneFades(state: state) }
-            if motorikStyle { startMotorikFades(state: state) }
+            if kosmicStyle              { startKosmicDroneFades(state: state) }
+            if motorikStyle || chillFade { startMotorikFades(state: state) }
         }
     }
 
@@ -285,7 +293,10 @@ final class PlaybackEngine: ObservableObject {
     nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
         guard currentSchedulerID == schedulerID else { return }
         // Fire note-offs first — pre-computed at load time, no asyncAfter allocations.
+        // Chill Pads note-offs are deferred: stopNote fires after the boost fade-out completes
+        // (see main.async block below), so the audio has time to fade before the note cuts.
         for (trackIndex, note) in noteOffMap[step] ?? [] {
+            if chillPadsMode && trackIndex == kTrackPads { continue }
             samplers[trackIndex].stopNote(note, onChannel: gmChannel(trackIndex))
         }
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
@@ -324,6 +335,36 @@ final class PlaybackEngine: ObservableObject {
                         let idx      = trackIndex == kTrackBass ? 0 : 1
                         let fadeSecs = self.ambientNoteFadeDuration[idx]
                         self.startAmbientBoostFade(trackIndex: trackIndex, toVolume: 0.0, duration: fadeSecs)
+                    }
+                }
+            }
+            // Chill per-note pads fade: same boost-node ramp as Ambient, Pads track only.
+            // Also resets sweep phase to bottom of cycle (filter fully closed) on each note-on,
+            // so every chord starts dark and sweeps upward — then back down before it ends.
+            if self.chillPadsMode {
+                let sps = self.songState?.frame.secondsPerStep ?? 0.1
+                for (trackIndex, ev) in self.stepEventMap[step] ?? [] {
+                    if trackIndex == kTrackPads {
+                        let noteSecs = Double(ev.durationSteps) * sps
+                        let fadeSecs = min(1.0, max(0.1, noteSecs / 4.0))
+                        self.ambientNoteFadeDuration[1] = fadeSecs
+                        self.startAmbientBoostFade(trackIndex: kTrackPads, toVolume: 1.0, duration: fadeSecs)
+                        // Sync sweep to chord: reset phase to -π/2 so filter starts at 300 Hz (fully closed)
+                        // and sweeps open naturally over the chord duration.
+                        if self.sweepEnabled[kTrackPads] {
+                            self.sweepPhase[kTrackPads] = -1.5708
+                        }
+                    }
+                }
+                for (trackIndex, note) in self.noteOffMap[step] ?? [] {
+                    if trackIndex == kTrackPads {
+                        let fadeSecs = self.ambientNoteFadeDuration[1]
+                        self.startAmbientBoostFade(trackIndex: kTrackPads, toVolume: 0.0, duration: fadeSecs)
+                        // Defer stopNote until after the fade completes so the audio fades rather than cuts.
+                        let channel = self.gmChannel(kTrackPads)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + fadeSecs) { [weak self] in
+                            self?.samplers[kTrackPads].stopNote(note, onChannel: channel)
+                        }
                     }
                 }
             }
@@ -380,8 +421,8 @@ final class PlaybackEngine: ObservableObject {
             let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
             scheduler = sched
             sched.start()
-            if kosmicStyle  { startKosmicDroneFades(state: state) }
-            if motorikStyle { startMotorikFades(state: state) }
+            if kosmicStyle               { startKosmicDroneFades(state: state) }
+            if motorikStyle || chillFade { startMotorikFades(state: state) }
         } else {
             currentStep = clampedStep
             currentBar  = clampedStep / 16
@@ -485,6 +526,15 @@ final class PlaybackEngine: ObservableObject {
         let hpfTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackTexture]
         for i in 0..<lowEQs.count {
             lowEQs[i].bands[1].bypass = !hpfTracks.contains(i)
+        }
+    }
+
+    /// Set Chill pads mode — enables per-note audio fade-in/fade-out on the Pads boost node.
+    /// Call before defaultsResetToken fires, same as setAmbientMode.
+    func setChillMode(_ enabled: Bool) {
+        chillPadsMode = enabled
+        if !enabled {
+            stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
         }
     }
 
@@ -609,7 +659,7 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Tremolo LFO (6 Hz sine, 50% depth, main-queue timer)
 
     private func startTremolo(forTrack i: Int) {
-        if ambientMode && i == kTrackPads {
+        if (ambientMode || chillPadsMode) && i == kTrackPads {
             tremPhaseInc[i] = 0.015708   // 2π × 0.15 Hz / 60 fps — one swell per ~6.5 seconds
             tremDepth[i]    = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
         } else {

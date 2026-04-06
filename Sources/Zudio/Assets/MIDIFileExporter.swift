@@ -16,6 +16,11 @@ struct MIDIFileExporter {
         return url
     }
 
+    /// Write MIDI data to a caller-specified URL (used by batch test generator).
+    static func export(_ song: SongState, to url: URL) throws {
+        try buildMIDIFile(song).write(to: url)
+    }
+
     // MARK: - File naming
 
     private static func zudioDocumentsDir() -> URL {

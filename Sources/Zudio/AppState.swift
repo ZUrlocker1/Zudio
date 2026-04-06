@@ -185,18 +185,23 @@ final class AppState: ObservableObject {
 
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
         switch (trackIndex, style) {
+        case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
         case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Halo Pad","New Age Pad","Calliope Lead"]
         case (kTrackLead1,   .kosmic):  return ["Ocarina","Flute","Whistle","Calliope Lead"]
         case (kTrackLead1,   _):        return ["Square Lead","Mono Synth","Synth Brass","Synth Brass 2","Fifths Lead","Moog Lead","Overdrive Gtr"]
+        case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone"]
         case (kTrackLead2,   .ambient): return ["Vibraphone","Celesta","Glockenspiel","Grand Piano","Warm Pad","Space Voice","FX Atmosphere"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Warm Pad","Halo Pad","New Age Pad","Ocarina"]
         case (kTrackLead2,   _):        return ["Brightness","Vibraphone","Bell/Pluck"]
+        case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["String Ensemble","Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
         case (kTrackPads,    .kosmic):  return ["Choir Aahs","String Ensemble","Synth Strings","Warm Pad","Space Voice"]
         case (kTrackPads,    _):        return ["Warm Pad","Halo Pad","New Age Pad","Sweep Pad","Bowed Glass","Synth Strings","String Pad","Organ Drone"]
+        case (kTrackRhythm,  .chill):  return ["Rhodes","Wurlitzer","Grand Piano"]
         case (kTrackRhythm,  .ambient): return ["Vibraphone","Marimba","Tubular Bells","Glockenspiel","FX Crystal","FX Echoes","Church Organ"]
-        case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Elec Piano 2","Church Organ","Tremolo Strings"]
-        case (kTrackRhythm,  _):        return ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Electric Piano","Muted Guitar","Mono Synth"]
+        case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Wurlitzer","Church Organ","Tremolo Strings"]
+        case (kTrackRhythm,  _):        return ["Guitar Pulse","Wurlitzer","Rock Organ","Clavinet","Rhodes","Muted Guitar","Mono Synth"]
+        case (kTrackTexture, .chill):   return ["None","Bar sounds","City at night","Light rain","Ocean waves","Urban rain","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["String Ensemble 2","Bowed Glass","Choir Aahs","Space Voice","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
         case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","Space Voice","Swell","FX Atmosphere","FX Echoes"]
@@ -227,6 +232,7 @@ final class AppState: ObservableObject {
     // MARK: - Playback engine
 
     let playback = PlaybackEngine()
+    let audioTexture = AudioTexturePlayer()
 
     private var cancellables = Set<AnyCancellable>()
     private var keyEventMonitor: Any?
@@ -353,6 +359,8 @@ final class AppState: ObservableObject {
                     Task { @MainActor [weak self] in self?.triggerShowHelp.toggle() }
                 case 0:  // 'a' — Ambient
                     Task { @MainActor [weak self] in self?.selectedStyle = .ambient }
+                case 8:  // 'c' — Chill
+                    Task { @MainActor [weak self] in self?.selectedStyle = .chill }
                 case 11: // 'b' — beginning
                     guard songState != nil else { return event }
                     Task { @MainActor [weak self] in self?.seekToStart() }
@@ -466,6 +474,7 @@ final class AppState: ObservableObject {
             let bestDrum: String?
             let bestArp:  String?
             let bestLead: String?
+            let bestTex:  String?
             let bestPerc: PercussionStyle?
             let bestBridge: Bool
             switch style {
@@ -474,6 +483,7 @@ final class AppState: ObservableObject {
                 bestDrum   = "MOT-DRUM-001"
                 bestArp    = "MOT-RTHM-001"
                 bestLead   = nil
+                bestTex    = nil
                 bestPerc   = nil
                 bestBridge = false
             case .kosmic:
@@ -481,6 +491,7 @@ final class AppState: ObservableObject {
                 bestDrum   = nil
                 bestArp    = "KOS-RTHM-002"
                 bestLead   = nil
+                bestTex    = nil
                 bestPerc   = .motorikGrid   // → KOS-DRUM-004 Electric Buddha groove
                 bestBridge = true
             case .ambient:
@@ -488,7 +499,19 @@ final class AppState: ObservableObject {
                 bestDrum   = nil
                 bestArp    = nil
                 bestLead   = "AMB-LEAD-003"
+                bestTex    = nil
                 bestPerc   = .handPercussion  // → AMB-DRUM-004 hand percussion
+                bestBridge = false
+            case .chill:
+                // First Chill song: St Germain four-on-the-floor groove.
+                // forceDrumRuleID "CHL-DRUM-004" maps to .stGermain beat style, which also
+                // biases tempo into the upper range (108–124 BPM) and auto-selects CHL-BASS-007.
+                bestBass   = nil            // implied by stGermain beat style (CHL-BASS-007)
+                bestDrum   = "CHL-DRUM-004" // stGermain groove → upper-range tempo
+                bestArp    = nil
+                bestLead   = "CHL-LD1-004" // saxophone / blues lead
+                bestTex    = "forced"       // guarantee a texture on the first song
+                bestPerc   = nil
                 bestBridge = false
             }
             let useBest = isFirstForStyle
@@ -503,7 +526,7 @@ final class AppState: ObservableObject {
                 forceArpRuleID:       testConfig?.forceArpRuleID       ?? (useBest ? bestArp    : nil),
                 forcePadsRuleID:      testConfig?.forcePadsRuleID,
                 forceLeadRuleID:      testConfig?.forceLeadRuleID      ?? (useBest ? bestLead   : nil),
-                forceTexRuleID:       testConfig?.forceTexRuleID,
+                forceTexRuleID:       testConfig?.forceTexRuleID       ?? (useBest ? bestTex    : nil),
                 forcePercussionStyle: testConfig?.forcePercussionStyle ?? (useBest ? bestPerc   : nil),
                 forceBridge:          testConfig?.forceBridge ?? (useBest ? bestBridge : false),
                 forceBridgeArchetype: testConfig?.forceBridgeArchetype,
@@ -520,9 +543,10 @@ final class AppState: ObservableObject {
                 // Instrument randomization: first song uses all defaults (index 0).
                 // From the second song onwards, pick 2 random non-drums tracks and assign
                 // each a random non-default instrument, so users hear the instrument variety.
+                // kTrackTexture is excluded for Chill — the generator already chose the texture.
                 var instrumentLogDesc: String? = nil
                 if self.songGenerationCount > 0 {
-                    var eligible = Self.randomizableTrackIndices
+                    var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
                     var picks: [(trackIndex: Int, instIndex: Int, name: String)] = []
                     var rng = SystemRandomNumberGenerator()
                     while picks.count < 2, !eligible.isEmpty {
@@ -542,6 +566,11 @@ final class AppState: ObservableObject {
                 } else {
                     self.instrumentOverrides = [:]
                 }
+                // Chill texture: always applied last so randomization can't overwrite it.
+                if style == .chill {
+                    let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
+                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                }
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
 
@@ -551,7 +580,7 @@ final class AppState: ObservableObject {
                     batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
                 }
                 var logEntries = state.generationLog
-                if let desc = instrumentLogDesc {
+                if let desc = instrumentLogDesc, style != .chill {
                     let entry = GenerationLogEntry(tag: "Instruments", description: desc, isTitle: false)
                     if let firstIdx = logEntries.firstIndex(where: { $0.tag == "Intro" || $0.tag == "Outro" }) {
                         logEntries.insert(entry, at: firstIdx)
@@ -579,11 +608,16 @@ final class AppState: ObservableObject {
                 self.playback.stop()
                 self.playback.kosmicStyle  = self.selectedStyle == .kosmic
                 self.playback.motorikStyle = self.selectedStyle == .motorik
+                self.playback.chillFade = state.style == .chill && {
+                    if case .alreadyPlaying = state.structure.introStyle { return true }
+                    return false
+                }()
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 // Configure ambient mode before defaultsResetToken fires so setEffect
                 // uses the correct Ambient reverb/delay values from the start.
                 self.playback.setAmbientMode(self.selectedStyle == .ambient)
+                self.playback.setChillMode(self.selectedStyle == .chill)
                 // Reset instruments + effects BEFORE play so setProgram() doesn't race
                 // against the first note firing.
                 self.defaultsResetToken += 1
@@ -657,13 +691,21 @@ final class AppState: ObservableObject {
             }
             playback.kosmicStyle  = selectedStyle == .kosmic
             playback.motorikStyle = selectedStyle == .motorik
+            if let song = songState {
+                playback.chillFade = song.style == .chill && {
+                    if case .alreadyPlaying = song.structure.introStyle { return true }
+                    return false
+                }()
+            }
             playback.play()
+            audioTexture.start(style: selectedStyle, texture: songState?.chillAudioTexture)
         }
     }
 
     func stop() {
         NSApp.activate(ignoringOtherApps: true)
         playback.stop()
+        audioTexture.stop()
     }
 
     // MARK: - Seek
@@ -862,7 +904,10 @@ final class AppState: ObservableObject {
         }
 
         // Stop playback immediately so the old song goes silent while the new one loads.
+        // Also stop the audio texture immediately (switchTexture(nil) → stopImmediate) so
+        // the new song's texture can start cleanly when the user presses Play.
         playback.stop()
+        audioTexture.switchTexture(nil)
         isGenerating = true
         let overrides     = trackOverrides
         let loadForced    = forcedRules
@@ -894,6 +939,7 @@ final class AppState: ObservableObject {
                 self.keyOverride      = loadKey
                 self.tempoOverride    = loadTempo
                 self.moodOverride     = loadMood
+                if !loadTitle.isEmpty { state.title = loadTitle }
                 self.songState        = state
                 self.generationHistory.append(state)
                 if self.generationHistory.count > 5 { self.generationHistory.removeFirst() }
@@ -901,6 +947,11 @@ final class AppState: ObservableObject {
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
                 self.instrumentOverrides = [:]
+                // Restore the Chill texture picker to reflect the loaded song's texture.
+                if style == .chill {
+                    let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
+                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                }
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
                 self.muteState = Array(repeating: false, count: kTrackCount)
@@ -919,9 +970,14 @@ final class AppState: ObservableObject {
                 self.playback.stop()
                 self.playback.kosmicStyle  = style == .kosmic
                 self.playback.motorikStyle = style == .motorik
+                self.playback.chillFade = style == .chill && {
+                    if case .alreadyPlaying = state.structure.introStyle { return true }
+                    return false
+                }()
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 self.playback.setAmbientMode(style == .ambient)
+                self.playback.setChillMode(style == .chill)
                 self.defaultsResetToken += 1
                 if wasPlaying { self.playback.play() }
                 NSApp.keyWindow?.makeFirstResponder(nil)
@@ -999,10 +1055,60 @@ final class AppState: ObservableObject {
     // MARK: - Instrument
 
     func setProgram(_ program: UInt8, forTrack trackIndex: Int) {
+        // Chill texture track uses pseudo-programs 240–247 that map to M4A filenames.
+        if trackIndex == kTrackTexture && selectedStyle == .chill {
+            let filename = Self.chillTextureFilename(forProgram: program)
+            songState = songState?.withChillAudioTexture(filename)
+            if playback.isPlaying {
+                audioTexture.switchTexture(filename)
+            }
+            return
+        }
         playback.setProgram(program, forTrack: trackIndex)
     }
 
+    /// Maps a Chill texture pseudo-program (240–250) to an M4A filename.
+    static func chillTextureFilename(forProgram program: UInt8) -> String? {
+        switch program {
+        case 240: return nil
+        case 241: return "another_bar.m4a"
+        case 242: return "bar_sounds.m4a"
+        case 243: return "city_at_night.m4a"
+        case 244: return nil  // removed
+        case 245: return "harbor.m4a"
+        case 246: return "light_rain.m4a"
+        case 247: return "ocean_waves.m4a"
+        case 248: return "urban_rain.m4a"
+        case 249: return nil  // removed
+        case 250: return "vinyl_crackle.m4a"
+        default:  return nil
+        }
+    }
+
+    /// Maps a Chill audio texture filename to its pseudo-program number for the instrument picker.
+    static func chillTextureProgram(forFilename filename: String?) -> UInt8 {
+        switch filename {
+        case nil:                   return 240
+        case "another_bar.m4a":    return 241
+        case "bar_sounds.m4a":     return 242
+        case "city_at_night.m4a":  return 243
+        // 244 removed (city_sounds)
+        case "harbor.m4a":         return 245
+        case "light_rain.m4a":     return 246
+        case "ocean_waves.m4a":    return 247
+        case "urban_rain.m4a":     return 248
+        // 249 removed (urban_sounds)
+        case "vinyl_crackle.m4a":  return 250
+        default:                    return 240
+        }
+    }
+
     func setEffect(_ effect: TrackEffect, enabled: Bool, forTrack trackIndex: Int) {
+        // Chill texture track effects are routed to AudioTexturePlayer's own effect chain.
+        if trackIndex == kTrackTexture && selectedStyle == .chill {
+            audioTexture.setEffect(effect, enabled: enabled)
+            return
+        }
         playback.setEffect(effect, enabled: enabled, forTrack: trackIndex)
     }
 

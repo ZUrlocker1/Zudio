@@ -88,7 +88,8 @@ struct DrumVariationEngine {
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        seed: UInt64
+        seed: UInt64,
+        chillMode: Bool = false
     ) -> [[MIDIEvent]] {
         var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
         var drumEvents = trackEvents[kTrackDrums]
@@ -96,7 +97,7 @@ struct DrumVariationEngine {
 
         // MARK: Step 1 — Identify fill bars
 
-        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure)
+        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure, chillMode: chillMode)
 
         // MARK: Step 2 — Apply fills to drums, collecting fill type info
 
@@ -105,10 +106,13 @@ struct DrumVariationEngine {
         for fillBar in fillBars.sorted() {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
-            // 70% 1-beat, 25% 2-beat, 5% 3-beat
-            let fillLength = rng.weightedPick([0.70, 0.25, 0.05])
+            // Chill: no 3-beat fills (tom cascades are rock-style, inappropriate for jazz chill)
+            // Chill weights: 80% 1-beat, 20% 2-beat, 0% 3-beat
+            let fillLength = chillMode
+                ? rng.weightedPick([0.80, 0.20, 0.00])
+                : rng.weightedPick([0.70, 0.25, 0.05])
             drumEvents = applyFill(to: drumEvents, bar: fillBar, fillLength: fillLength,
-                                   frame: frame, structure: structure, rng: &rng)
+                                   frame: frame, structure: structure, chillMode: chillMode, rng: &rng)
             fillInfos.append(FillBarInfo(bar: fillBar, fillLength: fillLength))
         }
 
@@ -145,7 +149,7 @@ struct DrumVariationEngine {
     ) -> [[MIDIEvent]] {
         var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
 
-        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure)
+        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure, chillMode: false)
 
         var fillInfos: [FillBarInfo] = []
         for fillBar in fillBars.sorted() {
@@ -174,7 +178,8 @@ struct DrumVariationEngine {
     private static func computeFillBars(
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
-        structure: SongStructure
+        structure: SongStructure,
+        chillMode: Bool = false
     ) -> Set<Int> {
         var fillBars = Set<Int>()
 
@@ -195,32 +200,48 @@ struct DrumVariationEngine {
         }
 
         // Instrument entrance fills: non-drum track comes in after ≥2 silent bars.
-        for trackIdx in 0..<kTrackDrums {
-            let tEvents = trackEvents[trackIdx]
-            let presence: [Bool] = (0..<frame.totalBars).map { bar in
-                let bs = bar * 16
-                return tEvents.contains { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
-            }
-            for bar in 2..<frame.totalBars {
-                guard presence[bar] && !presence[bar - 1] && !presence[bar - 2] else { continue }
-                let fillBar = bar - 1
-                guard let sec = structure.section(atBar: fillBar),
-                      sec.label != .intro && sec.label != .outro else { continue }
-                fillBars.insert(fillBar)
+        // Skipped in chillMode — jazz/chill doesn't drum-fanfare every instrument entry.
+        if !chillMode {
+            for trackIdx in 0..<kTrackDrums {
+                let tEvents = trackEvents[trackIdx]
+                let presence: [Bool] = (0..<frame.totalBars).map { bar in
+                    let bs = bar * 16
+                    return tEvents.contains { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
+                }
+                for bar in 2..<frame.totalBars {
+                    guard presence[bar] && !presence[bar - 1] && !presence[bar - 2] else { continue }
+                    let fillBar = bar - 1
+                    guard let sec = structure.section(atBar: fillBar),
+                          sec.label != .intro && sec.label != .outro else { continue }
+                    fillBars.insert(fillBar)
+                }
             }
         }
 
-        // Periodic body fills: fire on bars 7, 15, 23 … within each body section
-        // (one bar before each 8-bar phrase boundary). Halved from 4-bar to 8-bar period
-        // to reduce fill density while preserving the phrase-anchor feel.
-        // Skip bars already tagged to avoid double-fills.
-        for bar in 0..<frame.totalBars {
-            guard let sec = structure.section(atBar: bar),
-                  sec.label != .intro && sec.label != .outro else { continue }
-            let barInSection = bar - sec.startBar
-            guard (barInSection + 1) % 8 == 0 else { continue }
-            guard !fillBars.contains(bar) else { continue }
-            fillBars.insert(bar)
+        // Periodic body fills: fire on bars 7, 15, 23 … within each body section.
+        // Suppressed in chillMode — fills only at structural boundaries (section transitions above).
+        if !chillMode {
+            for bar in 0..<frame.totalBars {
+                guard let sec = structure.section(atBar: bar),
+                      sec.label != .intro && sec.label != .outro else { continue }
+                let barInSection = bar - sec.startBar
+                guard (barInSection + 1) % 8 == 0 else { continue }
+                guard !fillBars.contains(bar) else { continue }
+                fillBars.insert(bar)
+            }
+        }
+
+        // Chill: enforce a 16-bar minimum gap between any two fills to prevent fill clustering.
+        if chillMode && fillBars.count > 1 {
+            var spaced = Set<Int>()
+            var lastFill = -16
+            for bar in fillBars.sorted() {
+                if bar - lastFill >= 16 {
+                    spaced.insert(bar)
+                    lastFill = bar
+                }
+            }
+            return spaced
         }
 
         return fillBars
@@ -307,6 +328,7 @@ struct DrumVariationEngine {
         bar: Int, fillLength: Int,
         frame: GlobalMusicalFrame,
         structure: SongStructure,
+        chillMode: Bool = false,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let barStart = bar * 16
@@ -315,18 +337,30 @@ struct DrumVariationEngine {
         switch fillLength {
         case 0:  data = oneBeatFill(barStart: barStart, variation: rng.nextInt(upperBound: 6))
         case 2:  data = threeBeatFill(barStart: barStart, variation: rng.nextInt(upperBound: 3))
-        default: data = twoBeatFill(barStart: barStart, variation: rng.nextInt(upperBound: 4))
+        default:
+            // Chill: restrict to snare-only variants (v2=double-time roll, v3=funk cross-pattern)
+            // to avoid rock-style tom fills. Standard: all 4 variants available.
+            let v = chillMode ? 2 + rng.nextInt(upperBound: 2) : rng.nextInt(upperBound: 4)
+            data = twoBeatFill(barStart: barStart, variation: v)
         }
 
-        // Strip cymbals from the fill region (subtle fills have stripFrom == barStart+16 = no strip)
-        let cymbalNotes: Set<UInt8> = [
+        // Strip drum notes from the fill region.
+        // Subtle 1-beat fills (stripFrom == barStart+16) do no stripping at all.
+        // For 1-beat fills that do strip (steps 12-15) and all 2- and 3-beat fills:
+        // clear ALL percussion — cymbals, snare, AND kick — so the fill can be heard
+        // clearly rather than playing on top of the continuing groove pattern.
+        // Beat 1 (step 0) is always before stripFrom and is never removed.
+        let notesToStrip: Set<UInt8> = [
             GMDrum.closedHat.rawValue, GMDrum.openHat.rawValue,
             GMDrum.pedalHat.rawValue,  GMDrum.ride.rawValue,
-            GMDrum.rideBell.rawValue
+            GMDrum.rideBell.rawValue,
+            GMDrum.kick.rawValue,
+            GMDrum.snare.rawValue,     GMDrum.snare2.rawValue,
+            GMDrum.sidestick.rawValue,
         ]
         var filtered = events.filter { ev in
             guard ev.stepIndex >= data.stripFrom && ev.stepIndex < barStart + 16 else { return true }
-            return !cymbalNotes.contains(ev.note)
+            return !notesToStrip.contains(ev.note)
         }
 
         filtered += data.notes

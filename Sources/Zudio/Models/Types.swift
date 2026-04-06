@@ -27,7 +27,7 @@ enum TrackEffect: String, CaseIterable {
     case lowShelf    = "Low"
     case sweep       = "Sweep"   // LFO-driven low-pass filter sweep
     case pan         = "Pan"     // LFO-driven auto-pan
-    case space       = "Space"   // Cathedral reverb (Pads-specific label)
+    case space       = "Hall"    // Hall/chamber reverb (large acoustic space)
 }
 
 // MARK: - Musical enumerations
@@ -141,6 +141,46 @@ enum MusicStyle: String, CaseIterable, Codable, Sendable {
     case motorik = "Motorik"
     case kosmic  = "Kosmic"
     case ambient = "Ambient"
+    case chill   = "Chill"
+}
+
+// MARK: - Chill progression families
+
+enum ChillProgressionFamily: String, Codable, Sendable {
+    case static_groove       // One chord throughout (35%)
+    case two_chord_pendulum  // Two chords alternating every 4–8 bars (30%)
+    case minor_blues         // 12-bar blues tile in groove sections (20%)
+    case modal_drift         // 2–3 slow chord changes over the full song (15%)
+}
+
+// MARK: - Chill lead instrument
+
+enum ChillLeadInstrument: String, Codable, Sendable {
+    case flute         // GM 73 — Bright/Free; Lead 2 default
+    case mutedTrumpet  // GM 59 — Deep/Dream primary
+    case vibraphone    // GM 11 — Lead 2 default
+    case saxophone     // GM 65 — Deep/Dream secondary
+    case sopranoSax    // GM 64 — brighter reed; Lead 1
+    case trumpet       // GM 56 — open horn; brighter than muted; Lead 1
+    case trombone      // GM 57 — warm low brass; Lead 2
+}
+
+// MARK: - Chill beat style
+
+enum ChillBeatStyle: String, Codable, Sendable {
+    case electronic   // 808 kit, syncopated hip-hop feel (Deep/Dream)
+    case neoSoul      // programmed but warm, ghost notes (Bright/Free)
+    case brushKit     // acoustic brushed jazz kit (Bright/Free)
+    case stGermain    // four-on-the-floor kick + 8th-note ride, St Germain style (Bright/Free)
+    case hipHopJazz   // CHL-DRUM-005: kick 1+3, snare 2+4, steady 8th hat, tambourine texture
+}
+
+// MARK: - Chill breakdown style
+
+enum ChillBreakdownStyle: String, Codable, Sendable {
+    case stopTime       // Unison stabs on beat 1 of every other bar; lead plays freely in the gaps
+    case bassOstinato   // Syncopated bass riff only; drums and harmonic instruments silent
+    case harmonicDrone  // Beat continues at full density; bass simplifies to root pulse; lead plays over drone
 }
 
 // MARK: - Percussion style (Kosmic + future Ambient)
@@ -320,6 +360,7 @@ enum GMDrum: UInt8 {
     case crash1        = 49
     case ride          = 51
     case rideBell      = 53
+    case tambourine    = 54
     case crash2        = 57
 }
 

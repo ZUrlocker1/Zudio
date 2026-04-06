@@ -33,11 +33,14 @@
 		AA000000000000000000018 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000018 /* ContentView.swift */; };
 		AA000000000000000000019 /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000019 /* TrackRowView.swift */; };
 		AA00000000000000000001A /* MIDILaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001A /* MIDILaneView.swift */; };
+		AA00000000000000000006A /* AudioWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006A /* AudioWaveformView.swift */; };
 		AA00000000000000000001B /* StatusBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001B /* StatusBoxView.swift */; };
 		AA00000000000000000001C /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001C /* TopBarView.swift */; };
 		AA00000000000000000001D /* AssetLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001D /* AssetLoader.swift */; };
 		AA00000000000000000001E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
 		AA00000000000000000001F /* assets in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001F /* assets */; };
+		AA00000000000000000006C /* GeneralUser_GS_v1.471.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006C /* GeneralUser_GS_v1.471.sf2 */; };
+		AA00000000000000000006D /* zudio-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006D /* zudio-logo.png */; };
 		AA000000000000000000020 /* MIDIFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000022 /* MIDIFileExporter.swift */; };
 		AA000000000000000000021 /* FirstMouseFix.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000023 /* FirstMouseFix.swift */; };
 		AA000000000000000000022 /* ArrangementFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000024 /* ArrangementFilter.swift */; };
@@ -67,6 +70,16 @@
 		AA000000000000000000056 /* AmbientLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000056 /* AmbientLeadGenerator.swift */; };
 		AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000057 /* AmbientRhythmGenerator.swift */; };
 		AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000058 /* AmbientTextureGenerator.swift */; };
+		AA000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */; };
+		AA000000000000000000061 /* ChillStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000061 /* ChillStructureGenerator.swift */; };
+		AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
+		AA000000000000000000063 /* ChillBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000063 /* ChillBassGenerator.swift */; };
+		AA000000000000000000064 /* ChillPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000064 /* ChillPadsGenerator.swift */; };
+		AA000000000000000000065 /* ChillLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000065 /* ChillLeadGenerator.swift */; };
+		AA000000000000000000066 /* ChillRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000066 /* ChillRhythmGenerator.swift */; };
+		AA000000000000000000067 /* ChillTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000067 /* ChillTitleGenerator.swift */; };
+		AA000000000000000000068 /* AudioTexturePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000068 /* AudioTexturePlayer.swift */; };
+		AA000000000000000000069 /* Textures in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Textures */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -96,11 +109,14 @@
 		BB000000000000000000018 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		BB000000000000000000019 /* TrackRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackRowView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001A /* MIDILaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDILaneView.swift; sourceTree = "<group>"; };
+		BB00000000000000000006A /* AudioWaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001B /* StatusBoxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBoxView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001C /* TopBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopBarView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001D /* AssetLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLoader.swift; sourceTree = "<group>"; };
 		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		BB00000000000000000001F /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
+		BB00000000000000000006C /* GeneralUser_GS_v1.471.sf2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "assets/GeneralUser_GS_v1.471.sf2"; sourceTree = "<group>"; };
+		BB00000000000000000006D /* zudio-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "assets/zudio-logo.png"; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BB000000000000000000021 /* Zudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB000000000000000000022 /* MIDIFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIFileExporter.swift; sourceTree = "<group>"; };
@@ -132,6 +148,16 @@
 		BB000000000000000000056 /* AmbientLeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLeadGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000057 /* AmbientRhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientRhythmGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000058 /* AmbientTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientTextureGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillMusicalFrameGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000061 /* ChillStructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillStructureGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000062 /* ChillDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillDrumGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000063 /* ChillBassGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillBassGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000064 /* ChillPadsGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillPadsGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000065 /* ChillLeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillLeadGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000066 /* ChillRhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillRhythmGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000067 /* ChillTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillTitleGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000068 /* AudioTexturePlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioTexturePlayer.swift; sourceTree = "<group>"; };
+		BB000000000000000000069 /* Textures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Sources/Zudio/Resources/Textures"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -208,6 +234,7 @@
 				BB000000000000000000015 /* RhythmGenerator.swift */,
 				DD000000000000000000010 /* Cosmic */,
 				DD000000000000000000011 /* Ambient */,
+				DD000000000000000000012 /* Chill */,
 			);
 			path = Generation;
 			sourceTree = "<group>";
@@ -217,6 +244,7 @@
 			children = (
 				BB000000000000000000016 /* StepScheduler.swift */,
 				BB000000000000000000017 /* PlaybackEngine.swift */,
+				BB000000000000000000068 /* AudioTexturePlayer.swift */,
 			);
 			path = Playback;
 			sourceTree = "<group>";
@@ -227,6 +255,7 @@
 				BB000000000000000000018 /* ContentView.swift */,
 				BB000000000000000000019 /* TrackRowView.swift */,
 				BB00000000000000000001A /* MIDILaneView.swift */,
+				BB00000000000000000006A /* AudioWaveformView.swift */,
 				BB00000000000000000001B /* StatusBoxView.swift */,
 				BB00000000000000000001C /* TopBarView.swift */,
 				BB000000000000000000023 /* FirstMouseFix.swift */,
@@ -273,6 +302,7 @@
 			children = (
 				DD000000000000000000009 /* Sources */,
 				BB00000000000000000001F /* assets */,
+				BB000000000000000000069 /* Textures */,
 				DD000000000000000000001 /* Products */,
 				DD000000000000000000002 /* Frameworks */,
 				A0561CE32F76C96B00C4D537 /* Recovered References */,
@@ -308,6 +338,21 @@
 				BB000000000000000000058 /* AmbientTextureGenerator.swift */,
 			);
 			path = Ambient;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000012 /* Chill */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */,
+				BB000000000000000000061 /* ChillStructureGenerator.swift */,
+				BB000000000000000000062 /* ChillDrumGenerator.swift */,
+				BB000000000000000000063 /* ChillBassGenerator.swift */,
+				BB000000000000000000064 /* ChillPadsGenerator.swift */,
+				BB000000000000000000065 /* ChillLeadGenerator.swift */,
+				BB000000000000000000066 /* ChillRhythmGenerator.swift */,
+				BB000000000000000000067 /* ChillTitleGenerator.swift */,
+			);
+			path = Chill;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -368,9 +413,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA00000000000000000001F /* assets in Resources */,
+				AA00000000000000000006C /* GeneralUser_GS_v1.471.sf2 in Resources */,
+				AA00000000000000000006D /* zudio-logo.png in Resources */,
 				AA000000000000000000028 /* assets/zudio-icon.icns in Resources */,
-			AA000000000000000000029 /* assets/zudio-doc.icns in Resources */,
+				AA000000000000000000029 /* assets/zudio-doc.icns in Resources */,
+				AA000000000000000000069 /* Textures in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +460,7 @@
 				AA000000000000000000018 /* ContentView.swift in Sources */,
 				AA000000000000000000019 /* TrackRowView.swift in Sources */,
 				AA00000000000000000001A /* MIDILaneView.swift in Sources */,
+				AA00000000000000000006A /* AudioWaveformView.swift in Sources */,
 				AA00000000000000000001B /* StatusBoxView.swift in Sources */,
 				AA00000000000000000001C /* TopBarView.swift in Sources */,
 				AA00000000000000000001D /* AssetLoader.swift in Sources */,
@@ -437,6 +485,15 @@
 				AA000000000000000000056 /* AmbientLeadGenerator.swift in Sources */,
 				AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */,
 				AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */,
+				AA000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */,
+				AA000000000000000000061 /* ChillStructureGenerator.swift in Sources */,
+				AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */,
+				AA000000000000000000063 /* ChillBassGenerator.swift in Sources */,
+				AA000000000000000000064 /* ChillPadsGenerator.swift in Sources */,
+				AA000000000000000000065 /* ChillLeadGenerator.swift in Sources */,
+				AA000000000000000000066 /* ChillRhythmGenerator.swift in Sources */,
+				AA000000000000000000067 /* ChillTitleGenerator.swift in Sources */,
+				AA000000000000000000068 /* AudioTexturePlayer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

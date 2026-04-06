@@ -77,6 +77,15 @@ struct SongGenerator {
                                    forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
                                    forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype,
                                    useBrushKit: useBrushKit)
+        case .chill:
+            return generateChill(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
+                                 moodOverride: moodOverride, testMode: testMode,
+                                 forceBassRuleID: forceBassRuleID,
+                                 forceDrumRuleID: forceDrumRuleID,
+                                 forcePadsRuleID: forcePadsRuleID,
+                                 forceLeadRuleID: forceLeadRuleID,
+                                 forceRhythmRuleID: forceArpRuleID,
+                                 forceTexRuleID: forceTexRuleID)
         }
     }
 
@@ -773,6 +782,7 @@ struct SongGenerator {
         let events: [MIDIEvent]
         let isKosmic  = songState.style == .kosmic
         let isAmbient = songState.style == .ambient
+        let isChill   = songState.style == .chill
         let ambLoopLengths = songState.ambientLoopLengths
         switch trackIndex {
         case kTrackDrums:
@@ -784,14 +794,19 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules,
                     useBrushKit: songState.ambientUseBrushKit)
             } else if isKosmic {
-                // Re-pick percussionStyle so regen can change drum character, not just notes.
-                // Using the same tempo-weighted distribution as initial generation.
                 let regenPercStyle = KosmicMusicalFrameGenerator.pickPercussionStyle(
                     tempo: songState.frame.tempo, rng: &rng)
                 events = KosmicDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     percussionStyle: regenPercStyle,
                     rng: &rng, usedRuleIDs: &usedRules)
+            } else if isChill {
+                var ignoredFills: [Int] = []
+                events = ChillDrumGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    beatStyle: songState.chillBeatStyle,
+                    breakdownStyle: songState.chillBreakdownStyle,
+                    rng: &rng, usedRuleIDs: &usedRules, fillBars: &ignoredFills)
             } else {
                 let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules)
                 var scratch = songState.trackEvents
@@ -809,6 +824,13 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     bassEvolutionBars: &ignored)
+            } else if isChill {
+                events = ChillBassGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    chillProgFamily: songState.chillProgFamily,
+                    beatStyle: songState.chillBeatStyle,
+                    breakdownStyle: songState.chillBreakdownStyle,
+                    rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
                 var scratch = songState.trackEvents
@@ -828,6 +850,11 @@ struct SongGenerator {
                 events = KosmicPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, kosmicProgFamily: songState.kosmicProgFamily,
+                    rng: &rng, usedRuleIDs: &usedRules)
+            } else if isChill {
+                events = ChillPadsGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    breakdownStyle: songState.chillBreakdownStyle,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
@@ -851,6 +878,13 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     lead1BaseRule: &discardedBaseRule, xFilesBars: &discardedXFiles)
+            } else if isChill {
+                (events, _) = ChillLeadGenerator.generateLead1(
+                    frame: songState.frame, structure: songState.structure,
+                    leadInstrument: songState.chillLeadInstrument,
+                    beatStyle: songState.chillBeatStyle,
+                    breakdownStyle: songState.chillBreakdownStyle,
+                    rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
@@ -868,6 +902,27 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1],
                     rng: &rng, usedRuleIDs: &usedRules)
+            } else if isChill {
+                // Derive lead1Onsets from current Lead 1 events so Lead 2 avoids overlapping
+                let lead1Evts = songState.trackEvents[kTrackLead1]
+                let barsWithLead1 = Set(lead1Evts.map { $0.stepIndex / 16 }).sorted()
+                var lead1Onsets: [(startBar: Int, endBar: Int)] = []
+                var onsetStart: Int? = nil
+                var onsetPrev  = -2
+                for bar in barsWithLead1 {
+                    if bar == onsetPrev + 1 {
+                        onsetPrev = bar
+                    } else {
+                        if let s = onsetStart { lead1Onsets.append((s, onsetPrev + 1)) }
+                        onsetStart = bar; onsetPrev = bar
+                    }
+                }
+                if let s = onsetStart { lead1Onsets.append((s, onsetPrev + 1)) }
+                events = ChillLeadGenerator.generateLead2(
+                    frame: songState.frame, structure: songState.structure,
+                    lead1Instrument: songState.chillLeadInstrument,
+                    lead1Onsets: lead1Onsets,
+                    rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
             }
@@ -882,6 +937,13 @@ struct SongGenerator {
                 events = KosmicArpeggioGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            } else if isChill {
+                events = ChillRhythmGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    mood: songState.frame.mood,
+                    beatStyle: songState.chillBeatStyle,
+                    breakdownStyle: songState.chillBreakdownStyle,
+                    rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
@@ -896,6 +958,9 @@ struct SongGenerator {
                 events = KosmicTextureGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+            } else if isChill {
+                // Chill texture is audio-only; regen is a no-op for the MIDI track.
+                events = []
             } else {
                 events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
@@ -927,6 +992,7 @@ struct SongGenerator {
     private static func ruleDescription(_ ruleID: String, trackIndex: Int) -> String {
         if ruleID.hasPrefix("AMB-") { return ambientRuleDescription(ruleID) }
         if ruleID.hasPrefix("KOS-RTHM-") { return kosmicRthmRuleDescription(ruleID) }
+        if ruleID.hasPrefix("CHL-") { return chillRuleDescription(ruleID) }
         switch trackIndex {
         case kTrackDrums:   return drumRuleDescription(ruleID)
         case kTrackBass:    return bassRuleDescription(ruleID)
@@ -1627,7 +1693,9 @@ struct SongGenerator {
         isAmbient: Bool = false,
         includeDrumFills: Bool = true,
         soloRange: Range<Int>? = nil,
-        soloRuleID: String? = nil
+        soloRuleID: String? = nil,
+        chillBreakdownStyle: ChillBreakdownStyle? = nil,
+        chillDrumFillBars: [Int] = []
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -1730,7 +1798,10 @@ struct SongGenerator {
         func hatCount(bar: Int, fromStep: Int, toStep: Int) -> Int {
             guard kTrackDrums < trackEvents.count else { return 0 }
             let bs = bar * 16
-            let hatNotes: Set<UInt8> = [GMDrum.closedHat.rawValue, GMDrum.pedalHat.rawValue, GMDrum.openHat.rawValue]
+            // Include ride: ride-based patterns (CHL-DRUM-004) strip ride in the fill region,
+            // so ride absence = fill, just like hat absence for hat-based patterns.
+            let hatNotes: Set<UInt8> = [GMDrum.closedHat.rawValue, GMDrum.pedalHat.rawValue,
+                                        GMDrum.openHat.rawValue, GMDrum.ride.rawValue]
             return trackEvents[kTrackDrums].filter {
                 $0.stepIndex >= bs + fromStep && $0.stepIndex < bs + toStep && hatNotes.contains($0.note)
             }.count
@@ -1851,9 +1922,7 @@ struct SongGenerator {
             case .intro:
                 let introDesc: String
                 if case .coldStart(_) = structure.introStyle {
-                    let lastIntroBar = section.endBar - 1
-                    let fillLabel = coldStartFillName(bar: lastIntroBar)
-                    introDesc = "\(section.lengthBars) bar cold start — \(fillLabel)"
+                    introDesc = "\(section.lengthBars) bar cold start"
                 } else {
                     introDesc = "\(section.lengthBars) bar \(introStyleLabel(structure.introStyle))"
                 }
@@ -1861,15 +1930,20 @@ struct SongGenerator {
             case .A:
                 if !isAmbient {
                     let chords = chordsLabel(for: section)
-                    if seenLabels.contains(.A) {
+                    if seenLabels.contains(.A) && chillBreakdownStyle != nil && seenLabels.contains(.bridge) {
+                        fireBar(bar, tag: "Groove A", desc: "Groove returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                    } else if seenLabels.contains(.A) {
                         fireBar(bar, tag: "Form", desc: "Return to A section" + (chords.isEmpty ? "" : " — \(chords)"))
                     } else {
-                        fireBar(bar, tag: "Section A", desc: chords.isEmpty ? "\(section.lengthBars) bars" : "chords \(chords)")
+                        fireBar(bar, tag: "Section A", desc: "\(section.lengthBars) bars")
                     }
                 }
             case .B:
                 let chords = chordsLabel(for: section)
-                if seenLabels.contains(.B) {
+                if chillBreakdownStyle != nil && seenLabels.contains(.bridge) {
+                    // Chill: B section is always the groove return after breakdown
+                    fireBar(bar, tag: "Groove B", desc: "Groove returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                } else if seenLabels.contains(.B) {
                     fireBar(bar, tag: "Form", desc: "Enter B section again" + (chords.isEmpty ? "" : " — \(chords)"))
                 } else {
                     fireBar(bar, tag: "Form", desc: "Enter B section" + (chords.isEmpty ? "" : " — \(chords)"))
@@ -1877,7 +1951,17 @@ struct SongGenerator {
             case .outro:
                 fireBar(bar, tag: "Outro", desc: "\(section.lengthBars) bar \(outroStyleLabel(structure.outroStyle))")
             case .bridge:
-                fireBar(bar, tag: "Form", desc: "Ascending bridge")
+                if let bds = chillBreakdownStyle {
+                    let styleLabel: String
+                    switch bds {
+                    case .stopTime:      styleLabel = "stop-time solo"
+                    case .bassOstinato:  styleLabel = "bass ostinato"
+                    case .harmonicDrone: styleLabel = "harmonic drone"
+                    }
+                    fireBar(bar, tag: "Breakdown", desc: "\(section.lengthBars) bars — \(styleLabel)")
+                } else {
+                    fireBar(bar, tag: "Form", desc: "Ascending bridge")
+                }
             case .bridgeAlt:
                 fireBar(bar, tag: "Form", desc: "Call and response bridge")
             case .bridgeMelody:
@@ -1913,12 +1997,20 @@ struct SongGenerator {
             fire(fillBar * 16 + max(0, fillRegionOffset - 4), tag: "Drum fill", desc: desc)
         }
 
+        // 2b. Chill snare-roll fills — fired 1 beat (4 steps) before bar end so the text
+        //     appears slightly ahead of the roll climax. Only fires in groove sections.
+        for bar in chillDrumFillBars.sorted() where bar < outroStartBar {
+            guard let sec = structure.section(atBar: bar),
+                  sec.label == .A || sec.label == .B else { continue }
+            fire(bar * 16 + 8, tag: "Drum fill", desc: "snare roll")
+        }
+
         // 3. Drum cymbal variations — Kosmic/Motorik only; Ambient drums are too sparse for this.
         // DRM-003 (Ride Groove) uses ride as its baseline — skip ride annotations for it
         // since the generation log already documents this. For all other drum rules, track
         // the cymbal mode across the whole song (no reset between sections) so a transition
         // back to ride after a non-body section doesn't re-trigger.
-        let isRideGroove = drumRules.contains("MOT-DRUM-003")
+        let isRideGroove = drumRules.contains("MOT-DRUM-003") || drumRules.contains("CHL-DRUM-004")
         if includeDrumFills && kTrackDrums < trackEvents.count {
             let drumEvs = trackEvents[kTrackDrums]
             var prevCymbalMode: String? = nil
@@ -2172,6 +2264,319 @@ struct SongGenerator {
         }
 
         return out
+    }
+
+    // MARK: - Chill generation path
+
+    private static func generateChill(
+        seed: UInt64,
+        keyOverride: String? = nil,
+        tempoOverride: Int? = nil,
+        moodOverride: Mood? = nil,
+        testMode: Bool = false,
+        forceBassRuleID:    String? = nil,
+        forceDrumRuleID:    String? = nil,
+        forcePadsRuleID:    String? = nil,
+        forceLeadRuleID:    String? = nil,
+        forceRhythmRuleID:  String? = nil,
+        forceTexRuleID:     String? = nil
+    ) -> SongState {
+        var rng = SeededRNG(seed: seed)
+
+        // Derive forced beat style and lead instrument from rule IDs (best-first-song / load path).
+        // CHL-DRUM-004 = stGermain four-on-the-floor; forcing the beat style also biases
+        // the tempo into the stGermain upper range (108–124 BPM) and routes the bass to
+        // CHL-BASS-007 (stGermainOstinato) automatically.
+        let forceBeatStyle: ChillBeatStyle? = forceDrumRuleID == "CHL-DRUM-004" ? .stGermain : nil
+        let forceLeadInstrument: ChillLeadInstrument? = {
+            switch forceLeadRuleID {
+            case "CHL-LD1-001": return .flute
+            case "CHL-LD1-002": return .mutedTrumpet
+            case "CHL-LD1-003": return .vibraphone
+            case "CHL-LD1-004": return .saxophone
+            case "CHL-LD1-006": return .sopranoSax
+            case "CHL-LD1-007": return .trumpet
+            default:            return nil
+            }
+        }()
+
+        // Step 1 — Chill musical frame
+        let (frame, chillProgFamily, pickedLeadInstrument, chillBeatStyle, chillSwingFeel) =
+            ChillMusicalFrameGenerator.generate(
+                rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
+                moodOverride: moodOverride, testMode: testMode, forceBeatStyle: forceBeatStyle
+            )
+        let chillLeadInstrument = forceLeadInstrument ?? pickedLeadInstrument
+
+        // Pick breakdown style first — needed to set breakdown length in the structure.
+        // hasBreakdown is optimistically true; if the structure uses simple form (no bridge),
+        // the style value is unused.
+        let chillBreakdownStyle: ChillBreakdownStyle = pickChillBreakdownStyle(
+            beatStyle: chillBeatStyle, hasBreakdown: true, rng: &rng
+        )
+
+        // Step 2 — Structure (INTRO / GROOVE-A / BREAKDOWN / GROOVE-B / OUTRO)
+        let structure = ChillStructureGenerator.generate(
+            frame: frame, chillProgFamily: chillProgFamily,
+            mood: frame.mood, breakdownStyle: chillBreakdownStyle, rng: &rng
+        )
+
+        // Step 3 — Tonal governance map
+        let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
+
+        var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
+
+        var drumRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackDrums))
+        var bassRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackBass))
+        var padsRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackPads))
+        var rhythmRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackRhythm))
+        var lead1RNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackLead1))
+        var lead2RNG  = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackLead2))
+
+        // Step 3 — Drums
+        var drumRules: Set<String> = []
+        var drumFillBars: [Int] = []
+        trackEvents[kTrackDrums] = ChillDrumGenerator.generate(
+            frame: frame, structure: structure, beatStyle: chillBeatStyle,
+            breakdownStyle: chillBreakdownStyle,
+            rng: &drumRNG, usedRuleIDs: &drumRules, fillBars: &drumFillBars
+        )
+
+        // Step 4 — Bass
+        var bassRules: Set<String> = []
+        trackEvents[kTrackBass] = ChillBassGenerator.generate(
+            frame: frame, structure: structure, chillProgFamily: chillProgFamily,
+            beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
+            rng: &bassRNG, usedRuleIDs: &bassRules
+        )
+
+        // Step 5 — Pads (sustained harmonic layer)
+        var padRules: Set<String> = []
+        trackEvents[kTrackPads] = ChillPadsGenerator.generate(
+            frame: frame, structure: structure, breakdownStyle: chillBreakdownStyle,
+            rng: &padsRNG, usedRuleIDs: &padRules
+        )
+
+        // Step 6 — Lead 1 (primary solo) and Lead 2 (call-and-response)
+        var lead1Rules: Set<String> = []
+        let (lead1Events, lead1Onsets) = ChillLeadGenerator.generateLead1(
+            frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
+            beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
+            forceRuleID: forceLeadRuleID,
+            rng: &lead1RNG, usedRuleIDs: &lead1Rules
+        )
+        trackEvents[kTrackLead1] = lead1Events
+
+        var lead2Rules: Set<String> = []
+        trackEvents[kTrackLead2] = ChillLeadGenerator.generateLead2(
+            frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
+            lead1Onsets: lead1Onsets, rng: &lead2RNG, usedRuleIDs: &lead2Rules
+        )
+
+        // Step 7 — Rhythm (Rhodes active comping)
+        var rhythmRules: Set<String> = []
+        trackEvents[kTrackRhythm] = ChillRhythmGenerator.generate(
+            frame: frame, structure: structure, mood: frame.mood,
+            beatStyle: chillBeatStyle,
+            breakdownStyle: chillBreakdownStyle,
+            rng: &rhythmRNG, usedRuleIDs: &rhythmRules
+        )
+
+        // Texture track: audio-only — no MIDI events generated here.
+        trackEvents[kTrackTexture] = []
+
+        // Post-processing: harmonic filter
+        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+
+        // Post-processing: drum fills + cymbal variation.
+        // Only stGermain (CHL-DRUM-004) is four-on-the-floor like Motorik; other Chill
+        // beat styles are sparse by design and must not have tom cascades added.
+        // hipHopJazz (CHL-DRUM-005) has its own internal variation via tambourine scheduling.
+        if chillBeatStyle == .stGermain {
+            trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, chillMode: true)
+        }
+
+        // Audio texture: 70% chance of selecting one of the bundled M4A files.
+        // High-tempo songs (≥100 BPM) skip calm nature textures; low-tempo songs
+        // (≤82 BPM) skip busy city textures that clash with the slower mood.
+        var chillTextureFiles = ["another_bar.m4a", "bar_sounds.m4a",
+                                  "city_at_night.m4a", "harbor.m4a",
+                                  "light_rain.m4a", "ocean_waves.m4a", "urban_rain.m4a",
+                                  "vinyl_crackle.m4a"]
+        if frame.tempo >= 100 {
+            chillTextureFiles.removeAll { $0 == "ocean_waves.m4a" || $0 == "harbor.m4a" }
+        }
+        if frame.tempo <= 82 {
+            chillTextureFiles.removeAll { $0 == "city_at_night.m4a" }
+        }
+        // forceTexRuleID "forced" guarantees a texture is selected (used by best-first-song).
+        let chillAudioTexture: String? = (forceTexRuleID == "forced" || rng.nextDouble() < 0.60)
+            ? chillTextureFiles[rng.weightedPick(Array(repeating: 1.0 / Double(chillTextureFiles.count),
+                                                       count: chillTextureFiles.count))]
+            : nil
+
+        // Title
+        let title = ChillTitleGenerator.generate(frame: frame, rng: &rng)
+
+        // Log
+        let log = buildChillLog(
+            title: title, frame: frame, structure: structure,
+            chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
+            chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle,
+            chillSwingFeel: chillSwingFeel, chillAudioTexture: chillAudioTexture,
+            drumRules: drumRules, bassRules: bassRules, padRules: padRules,
+            lead1Rules: lead1Rules, lead2Rules: lead2Rules, rhythmRules: rhythmRules,
+            drumFillBars: drumFillBars, testMode: testMode
+        )
+
+        let stepAnnotations = buildStepAnnotations(
+            structure: structure, trackEvents: trackEvents, frame: frame,
+            xFilesBars: [], breathSilenceBar: nil, breathSilenceLenBars: 0,
+            isAmbient: false, includeDrumFills: true,
+            chillBreakdownStyle: chillBreakdownStyle,
+            chillDrumFillBars: drumFillBars
+        )
+
+        var forced: [String: String] = [:]
+        if let r = forceBassRuleID   { forced["Bass"]   = r }
+        if let r = forceDrumRuleID   { forced["Drums"]  = r }
+        if let r = forcePadsRuleID   { forced["Pads"]   = r }
+        // Only persist lead rule if it belongs to Chill — discard stale Motorik/Kosmic IDs
+        if let r = forceLeadRuleID, r.hasPrefix("CHL-") { forced["Lead"] = r }
+        if let r = forceRhythmRuleID { forced["Rhythm"] = r }
+
+        return SongState(
+            frame: frame, structure: structure, tonalMap: tonalMap,
+            trackEvents: trackEvents, globalSeed: seed, trackOverrides: [:],
+            title: title, form: .singleA, style: .chill,
+            percussionStyle: .absent, kosmicProgFamily: .static_drone,
+            generationLog: log, stepAnnotations: stepAnnotations,
+            chillProgFamily: chillProgFamily,
+            chillLeadInstrument: chillLeadInstrument,
+            chillBeatStyle: chillBeatStyle,
+            chillBreakdownStyle: chillBreakdownStyle,
+            chillSwingFeel: chillSwingFeel,
+            chillAudioTexture: chillAudioTexture,
+            forcedRules: forced,
+            keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride
+        )
+    }
+
+    // MARK: - Chill breakdown style picker
+
+    private static func pickChillBreakdownStyle(
+        beatStyle: ChillBeatStyle, hasBreakdown: Bool, rng: inout SeededRNG
+    ) -> ChillBreakdownStyle {
+        guard hasBreakdown else { return .bassOstinato }  // no breakdown section — value unused
+        // Breakdown style is independent of drum beat style (instruments are set separately).
+        // stopTime 35%, bassOstinato 35%, harmonicDrone 30%
+        let r = rng.nextDouble()
+        if r < 0.35 { return .stopTime }
+        if r < 0.70 { return .bassOstinato }
+        return .harmonicDrone
+    }
+
+    // MARK: - Chill log builder
+
+    private static func buildChillLog(
+        title: String,
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        chillProgFamily: ChillProgressionFamily,
+        chillLeadInstrument: ChillLeadInstrument,
+        chillBeatStyle: ChillBeatStyle,
+        chillBreakdownStyle: ChillBreakdownStyle,
+        chillSwingFeel: Bool,
+        chillAudioTexture: String?,
+        drumRules: Set<String>,
+        bassRules: Set<String>,
+        padRules: Set<String>,
+        lead1Rules: Set<String>,
+        lead2Rules: Set<String>,
+        rhythmRules: Set<String>,
+        drumFillBars: [Int],
+        testMode: Bool
+    ) -> [GenerationLogEntry] {
+        var log: [GenerationLogEntry] = []
+        log.append(GenerationLogEntry(tag: "SONG",  description: title, isTitle: true))
+        log.append(GenerationLogEntry(tag: "Style", description: "Chill"))
+
+        // Form — simple label matching the style of other generators
+        let hasBreakdown = structure.sections.contains { $0.label == .bridge }
+        let breakdownLabel: String
+        switch chillBreakdownStyle {
+        case .stopTime:      breakdownLabel = "stop-time"
+        case .bassOstinato:  breakdownLabel = "bass ostinato"
+        case .harmonicDrone: breakdownLabel = "harmonic drone"
+        }
+        let formDesc = hasBreakdown ? "Groove - breakdown (\(breakdownLabel))" : "Groove"
+        log.append(GenerationLogEntry(tag: "Form", description: formDesc))
+
+        // Chords — key/mode + family + unique chord names (order of first appearance)
+        let allChordNames = structure.chordPlan
+            .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
+        var seen = Set<String>()
+        let uniqueChordNames = allChordNames.filter { seen.insert($0).inserted }
+        let familyLabel: String
+        switch chillProgFamily {
+        case .static_groove:      familyLabel = "Static groove"
+        case .two_chord_pendulum: familyLabel = "Two-chord pendulum"
+        case .minor_blues:        familyLabel = "Minor blues"
+        case .modal_drift:        familyLabel = "Modal drift"
+        }
+        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(familyLabel)" +
+            (uniqueChordNames.isEmpty ? "" : "  \(uniqueChordNames.joined(separator: " | "))")
+        log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
+
+        // Audio texture
+        let textureDesc = chillAudioTexture.map { name in
+            name.replacingOccurrences(of: ".m4a", with: "").replacingOccurrences(of: "_", with: " ")
+        } ?? "none"
+        log.append(GenerationLogEntry(tag: "Texture", description: textureDesc))
+
+        // Per-track rules with descriptions
+        for ruleID in (drumRules.union(bassRules).union(padRules)
+                        .union(lead1Rules).union(lead2Rules).union(rhythmRules)).sorted() {
+            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode),
+                                          description: chillRuleDescription(ruleID)))
+        }
+
+        return log
+    }
+
+    private static func chillRuleDescription(_ ruleID: String) -> String {
+        switch ruleID {
+        case "CHL-DRUM-001": return "Moby minimal syncopated"
+        case "CHL-DRUM-002": return "Neo soul ghost note groove"
+        case "CHL-DRUM-003": return "Jazz quarter-note pulse"
+        case "CHL-DRUM-004": return "St Germain four-on-the-floor"
+        case "CHL-DRUM-005": return "Hip-hop jazz pulse"
+        case "CHL-BASS-001": return "Moby root sustain"
+        case "CHL-BASS-002": return "Syncopated groove"
+        case "CHL-BASS-003": return "Walking approach"
+        case "CHL-BASS-004": return "Air ostinato"
+        case "CHL-BASS-005": return "Breakdown root drone"
+        case "CHL-BASS-006": return "Moby bass statement"
+        case "CHL-BASS-007": return "St Germain 8th-note ostinato"
+        case "CHL-BASS-008": return "Acid jazz chord-tone groove"
+        case "CHL-PAD-001":  return "Chord sustain"
+        case "CHL-PAD-002":  return "Staggered entry"
+        case "CHL-PAD-003":  return "No pads"
+        case "CHL-LD1-001":  return "Long phrase"
+        case "CHL-LD1-002":  return "Short punch"
+        case "CHL-LD1-003":  return "Sparse melodic solo"
+        case "CHL-LD1-004":  return "Blues lead"
+        case "CHL-LD1-005":  return "St Germain staccato burst"
+        case "CHL-LD1-006":  return "Soprano sax lead"
+        case "CHL-LD1-007":  return "Wide interval solo"
+        case "CHL-LD2-001":  return "Counter-melody"
+        case "CHL-LD2-002":  return "Trombone counter-melody"
+        case "CHL-RHY-001":  return "St Germain beat 1 + and-of-2"
+        case "CHL-RHY-002":  return "Moby backbeat beats 2+4"
+        case "CHL-RHY-003":  return "Bosa Moon broken chord"
+        case "CHL-RHY-004":  return "Acid jazz off-beat stab"
+        default:             return ruleID
+        }
     }
 }
 

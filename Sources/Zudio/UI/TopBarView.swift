@@ -101,7 +101,7 @@ struct TopBarView: View {
                                 .background(Color.orange)
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        Text("V 0.96 alpha")
+                        Text("V 0.97 alpha")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -122,6 +122,8 @@ struct TopBarView: View {
                             .keyboardShortcut("k", modifiers: .command)
                         Button("") { appState.selectedStyle = .ambient }
                             .keyboardShortcut("a", modifiers: .command)
+                        Button("") { appState.selectedStyle = .chill }
+                            .keyboardShortcut("c", modifiers: [])
                         Button("") { appState.seekToStart() }
                             .keyboardShortcut("b", modifiers: .command)
                             .disabled(appState.songState == nil)
@@ -216,7 +218,7 @@ struct TopBarView: View {
 
                 // Flex gap between transport and action buttons — expands up to 48pt on wide displays,
                 // collapses to 0 on compact windows so the small-screen layout is unchanged.
-                Spacer(minLength: 0).frame(maxWidth: 48)
+                Spacer(minLength: 0).frame(maxWidth: 0)
 
                 // Generate / Save Song / Export Audio stacked left; selectors + Reset right.
                 HStack(alignment: .center, spacing: 14) {
@@ -275,12 +277,14 @@ struct TopBarView: View {
                         VStack(alignment: .center, spacing: 6) {
                             Picker("", selection: $appState.selectedStyle) {
                                 (Text("A").underline() + Text("mbient")).tag(MusicStyle.ambient)
+                                (Text("C").underline() + Text("hill")).tag(MusicStyle.chill)
                                 (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
                                 (Text("M").underline() + Text("otorik")).tag(MusicStyle.motorik)
                             }
                             .pickerStyle(.segmented)
                             .tint(Color(NSColor.systemGray))
-                            .frame(width: 210)
+                            .font(.system(size: 11))
+                            .frame(width: 230)
 
                             Button(action: { appState.resetTrackDefaults() }) {
                                 Label {
@@ -294,6 +298,7 @@ struct TopBarView: View {
                             .help("Reset all instruments and effects to style defaults (⌘R)")
                         }
                         .frame(width: 210)
+                        .offset(x: 20)
 
                         // Right column: Mood centered above Key + BPM
                         VStack(alignment: .center, spacing: 4) {
@@ -345,6 +350,7 @@ struct TopBarView: View {
                 }
                 .font(.callout)
                 .padding(.vertical, 5)
+                .offset(x: -25)
 
                 Spacer()
 
@@ -390,16 +396,6 @@ struct TopBarView: View {
 // MARK: - Logo loader
 
 private func loadLogoImage() -> NSImage? {
-    let paths: [String] = [
-        "assets/images/logo/zudio-logo.png",
-        "Resources/assets/images/logo/zudio-logo.png",
-    ]
-    if let base = Bundle.main.resourceURL {
-        for path in paths {
-            let url = base.appendingPathComponent(path)
-            if let img = NSImage(contentsOf: url) { return img }
-        }
-    }
     if let url = Bundle.main.url(forResource: "zudio-logo", withExtension: "png"),
        let img = NSImage(contentsOf: url) { return img }
     return nil
@@ -484,10 +480,10 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.96 (alpha)").font(.system(size: 14))
-                Text("Built by analyzing classic Ambient, Kosmic and Motorik artists including Brian Eno,Jean Michel Jarre, Kraftwerk, Neu!, Deluxe, Harmonia, Tangerine Dream, Electric Buddha Band, Loscil, Craven Faults and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
+                Text("Version: 0.97 (alpha)").font(.system(size: 14))
+                Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more. A set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1.0 uses GS MIDI instruments as well as arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass and Dinger beat. There are basic audio effects per track for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
+                Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Continuous playback, improved sound and an iPad version coming soon. Maybe.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)

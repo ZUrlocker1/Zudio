@@ -33,7 +33,7 @@ struct SongLogExporter {
             "=== Zudio Song Analysis Log ===",
             col("Title:",          16) + song.title,
             col("Generated:",      16) + dateStr,
-            col("Zudio Version:",  16) + "0.96 alpha",
+            col("Zudio Version:",  16) + "0.97 alpha",
             col("Seed:",           16) + "\(song.globalSeed)",
             col("Style:",          16) + song.style.rawValue.capitalized,
         ]
