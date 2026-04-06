@@ -569,6 +569,20 @@ Motorik songs should be long. A 3-minute song doesn't have time to hypnotize.
 - `~~ MOT-NO-BRIDGE` — no bridge/breakdown present (not mandatory but worth noting for
   variety across a batch; flag only if absent in > 80% of a 20-song batch)
 
+**Tonal Clashes**
+
+Uses the same pitch-clash metric as the main loop (note pitch class not in active scale AND
+not in active chord tones), with Motorik-specific thresholds. The long chord windows and
+ostinato nature of Motorik mean clashes are more audible and more persistent than in other
+styles.
+
+- `!! MOT-CLASH-BASS` — bass consonance < 95% in body sections
+- `!! MOT-CLASH-RHYTHM` — rhythm track consonance < 85% in body sections
+- `!! MOT-CLASH-LEAD1` — Lead 1 consonance < 80% in body sections
+- `!! MOT-CLASH-LEAD2` — Lead 2 consonance < 80% in body sections
+- `!! MOT-CLASH-PADS` — pads consonance < 90% in body sections
+- X-Files whistle phrase excluded by bar range (annotated in .zudio log)
+
 **Instrument Diversity**
 
 With 7 lead instruments and 7 rhythm instruments available, no single instrument should dominate.
