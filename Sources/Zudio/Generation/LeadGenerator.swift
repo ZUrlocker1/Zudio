@@ -1,10 +1,10 @@
 // LeadGenerator.swift — generation step 7
 // LD1-001: Phrase-first — v2 starter phrases (4 bars, 8 phrases), cycling with directional mutation
 // LD1-002: Pentatonic Cell — short driving cell, locked 16 bars then one-interval mutation
-// LD1-003: Long Breath — sparse, long sustained notes with lots of rests
+// LD1-003: Punch Solo — 3–4 note melodic bursts, pentatonic, 4–8 bar silence between solos
 // LD1-004: Stepwise Sequence — descending 5→4→2→1 (bar A), shifted b7→5→4→2 (bar B)
 // LD1-005: Statement-Answer — bar A ascends 1→2→b3→5, bar B silent then answers 4→b3
-// LD1-006: Long Arc Solo — single note per bar, ascending or descending through register across section
+// LD1-006: Long Arc Solo — quarter-note backbone, ascending/descending through register; 8th runs fill bar
 // LD1-007: Vanishing Solo — 10-bar pentatonic guitar-style solo; Lead 2 silenced during solo
 // LD1-008: Visiting Solo — 9-bar Dorian moog-style solo with octave arpeggios; Lead 2 silenced
 // LD2-001: Counter-response — density ≤55% of Lead 1, attacks offset by half-beat for call-and-response
@@ -102,7 +102,7 @@ struct LeadGenerator {
         let pickedA        = pickLd1Rule(rng: &rng)
         let bRuleCandidate = pickLd1Rule(rng: &rng)
         let aRule: String  = forceLeadRuleID.flatMap { $0.hasPrefix("MOT-LD1-") ? $0 : nil } ?? pickedA
-        // Technique D: LD1-003 Long Breath is too passive for B sections; escalate to an active rule.
+        // Technique D: LD1-003 Punch Solo handles its own silence via punchNextSoloBar; escalate to an active rule for B sections.
         let bRule: String
         if aRule == "MOT-LD1-003" {
             bRule = (rng.nextDouble() < 0.60) ? "MOT-LD1-001" : "MOT-LD1-004"
@@ -128,6 +128,8 @@ struct LeadGenerator {
         var motifBuilt                 = false
         var motifMutationBar           = entryBar + 4    // pitch shifts every 4 bars
         var motifRhythmMutationBar     = entryBar + 8    // rhythm grid refreshes every 8 bars
+        var motifRepeatCount           = 0               // consecutive bars with same first note
+        var motifPrevFirstNote: UInt8? = nil             // first note of the previous bar's replay
 
         // D: Previous note for octave-smooth voice leading across bars
         var prevNote: UInt8? = nil
@@ -147,6 +149,17 @@ struct LeadGenerator {
             return notes.sorted()
         }()
         var arcScaleIdx = arcAscending ? 0 : max(0, arcScale.count - 1)
+        var arcDescendRunLen = 0   // F2: consecutive descending steps (triggers upward correction after 4)
+        var arcAscendRunLen  = 0   // F2: consecutive ascending steps (triggers downward correction after 4)
+
+        // LD1-003: Short Punch — next bar at which a punch solo is allowed to start
+        var punchNextSoloBar = entryBar   // initially at section start
+
+        // LD1-004: Stepwise Sequence — run-length tracker for forced gap
+        // After 3 full sequences (~6 bars) or 14 notes, mandates ≥1 bar silence.
+        var ld4RunBars  = 0   // consecutive bars that produced notes
+        var ld4RunNotes = 0   // notes produced in current active run
+        var ld4RestUntil = -1 // bar index at which forced rest ends
 
         // G: Sparse-phrase gate for LD1-001 — 35% of 4-bar cycles thin to ~45% note density
         var phraseSparseCycle = false
@@ -158,6 +171,32 @@ struct LeadGenerator {
             ? pickSoloStartBar(structure: structure, soloLength: soloLen, rng: &rng, testMode: testMode)
             : nil
         let soloRange: Range<Int>? = soloWindow
+
+        // I: Pre-computed rest windows for LD1-002 and LD1-006 — 1 or 2 deliberate 4–8 bar
+        // silent stretches per rule in body sections. Decided from seed so silences are
+        // structural and repeatable, not per-bar noise.
+        func buildRestBars(entryBar: Int, totalBars: Int, rng: inout SeededRNG) -> Set<Int> {
+            var restBars = Set<Int>()
+            let bodyStart = entryBar
+            let bodyEnd   = max(bodyStart, totalBars - 8)
+            let bodyLen   = bodyEnd - bodyStart
+            guard bodyLen >= 8 else { return restBars }
+            let numWindows = 1 + rng.nextInt(upperBound: 2)  // 1 or 2 rest windows
+            for _ in 0..<numWindows {
+                let restLen   = 4 + rng.nextInt(upperBound: 5)   // 4–8 bars
+                let maxStart  = max(bodyStart, bodyEnd - restLen)
+                let restStart = bodyStart + rng.nextInt(upperBound: max(1, maxStart - bodyStart))
+                for rb in restStart..<min(restStart + restLen, bodyEnd) {
+                    restBars.insert(rb)
+                }
+            }
+            return restBars
+        }
+        // I: General Lead 1 rest windows — applies to all non-solo rules.
+        // Solo rules (007/008) manage their own silence via soloWindow; skip them.
+        let ld1RestBars: Set<Int> = !isSoloRule
+            ? buildRestBars(entryBar: entryBar, totalBars: frame.totalBars, rng: &rng)
+            : []
 
         var events: [MIDIEvent] = []
 
@@ -209,6 +248,12 @@ struct LeadGenerator {
                     continue
                 }
                 continue  // post-solo body bars: silent
+            }
+
+            // I: Structured rest window — silent for pre-computed 4–8 bar stretches (all non-solo rules)
+            if !isIntroOutro && ld1RestBars.contains(bar) {
+                prevNote = nil
+                continue
             }
 
             switch ruleID {
@@ -297,28 +342,62 @@ struct LeadGenerator {
                         motifVels  = newVels
                         motifRhythmMutationBar += 8
                     }
+                    // Repetition guard: if the same first note has fired 2 bars in a row,
+                    // force an early pitch mutation so we never hear 3 identical bars.
+                    if motifRepeatCount >= 2 {
+                        motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
+                        motifRepeatCount = 0
+                    }
+
                     // 8% rest bar — breathing room between repetitions
                     if rng.nextDouble() >= 0.08 {
                         barEvents = replayPentatonicCell(
                             intervals: motifIntervals, steps: motifSteps, durs: motifDurs, vels: motifVels,
                             barStart: barStart, entry: entry, frame: frame,
                             intensity: intensity, prevNote: prevNote)
+                        // Track first note of this bar to detect repetition next bar
+                        let thisFirstNote = barEvents.min(by: { $0.stepIndex < $1.stepIndex })?.note
+                        if let cur = thisFirstNote, cur == motifPrevFirstNote {
+                            motifRepeatCount += 1
+                        } else {
+                            motifRepeatCount = 0
+                        }
+                        motifPrevFirstNote = thisFirstNote
+                    } else {
+                        motifRepeatCount = 0
+                        motifPrevFirstNote = nil
                     }
                 }
 
             case "MOT-LD1-003":
-                barEvents = lead1LongBreath(barStart: barStart, entry: entry, frame: frame,
-                    intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
+                barEvents = lead1ShortPunch(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    intensity: intensity, isIntroOutro: isIntroOutro, rng: &rng,
+                    punchNextSoloBar: &punchNextSoloBar)
 
             case "MOT-LD1-004":
                 if !isIntroOutro {
+                    // Forced gap: after 3 full sequences (~6 bars) or 14 notes, rest ≥1 bar.
+                    let inForcedRest = bar < ld4RestUntil
+                    if !inForcedRest && (ld4RunBars >= 6 || ld4RunNotes >= 14) {
+                        ld4RestUntil = bar + 1 + rng.nextInt(upperBound: 3)  // 1–3 bar rest
+                        ld4RunBars  = 0
+                        ld4RunNotes = 0
+                    }
+
                     // Phrase gate: 25% of 4-bar cycles are completely silent (Motorik breathing room).
                     // Bar gate: 15% of individual bars in active phrases are also silent.
                     let cycleBar = (bar - entryBar) % 4
                     if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.25 }
-                    if !phraseSparseCycle && rng.nextDouble() >= 0.15 {
+                    let willPlay = !inForcedRest && bar >= ld4RestUntil
+                                  && !phraseSparseCycle && rng.nextDouble() >= 0.15
+                    if willPlay {
                         barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
                             intensity: intensity, isIntroOutro: false, prevNote: prevNote, rng: &rng)
+                        ld4RunBars  += 1
+                        ld4RunNotes += barEvents.count
+                    } else if !willPlay && barEvents.isEmpty {
+                        // Any silent bar resets the run counters (but not the restUntil guard)
+                        if bar >= ld4RestUntil { ld4RunBars = 0; ld4RunNotes = 0 }
                     }
                 } else {
                     barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
@@ -348,32 +427,120 @@ struct LeadGenerator {
                 }
 
             case "MOT-LD1-006":
-                // F: One held note per bar, stepping through mode scale.
-                // Reverses direction at register boundaries so it doesn't clamp on one note.
-                // Variable duration and occasional rests add rhythmic variety.
+                // F: Arc solo stepping through mode scale; quarter notes are the backbone.
+                // Bar modes: single quarter (hit + space), two quarters, three quarters,
+                // eighth-note run (fills bar fully, no trailing rest), or rare half note.
+                // Multi-note bars walk adjacent scale steps in the arc direction.
+                // F2: After 4 consecutive steps in same direction, jump the other way.
                 if !isIntroOutro && !arcScale.isEmpty {
-                    // 15% chance of a rest bar — creates breathing space in the arc
-                    if rng.nextDouble() > 0.15 {
-                        let note = UInt8(arcScale[max(0, min(arcScale.count - 1, arcScaleIdx))])
-                        let vel  = velocityForIntensity(intensity, rng: &rng)
-                        // Variable duration: short (8), normal (12), or held (16 steps)
-                        let durRoll = rng.nextDouble()
-                        let dur = durRoll < 0.20 ? 8 : durRoll < 0.35 ? 16 : 12
-                        barEvents = [MIDIEvent(stepIndex: barStart, note: note, velocity: vel, durationSteps: dur)]
-                    }
-                    // Advance arc 1–2 scale steps; reverse direction at register boundaries
-                    let step = 1 + rng.nextInt(upperBound: 2)
-                    if arcAscending {
-                        arcScaleIdx += step
-                        if arcScaleIdx >= arcScale.count - 1 {
-                            arcScaleIdx = arcScale.count - 1
-                            arcAscending = false   // reverse at top
+                    // 12% chance of a rest bar — breathing space
+                    if rng.nextDouble() > 0.12 {
+                        let idx = max(0, min(arcScale.count - 1, arcScaleIdx))
+                        // Chord-aware snap helper: returns nearest chord-compatible MIDI note
+                        let (ct006, st006, _) = NotePoolBuilder.build(
+                            chordRootDegree: entry.chordWindow.chordRoot,
+                            chordType:       entry.chordWindow.chordType,
+                            key:             frame.key, mode: frame.mode)
+                        let allowed006 = ct006.union(st006)
+                        let snapArc: (Int) -> UInt8 = { rawIdx in
+                            let candidate = arcScale[max(0, min(arcScale.count - 1, rawIdx))]
+                            if allowed006.contains(candidate % 12) { return UInt8(candidate) }
+                            let snapped = arcScale.filter { allowed006.contains($0 % 12) }
+                                                  .min(by: { abs($0 - candidate) < abs($1 - candidate) })
+                            return UInt8(snapped ?? candidate)
                         }
+                        let mainNote = snapArc(idx)
+                        let vel = velocityForIntensity(intensity, rng: &rng)
+                        let dir = arcAscending ? 1 : -1   // direction for passing tones
+
+                        let modeRoll = rng.nextDouble()
+                        if modeRoll < 0.12 {
+                            // Half note — rare longer hold for variety
+                            barEvents = [MIDIEvent(stepIndex: barStart, note: mainNote, velocity: vel, durationSteps: 8)]
+                        } else if modeRoll < 0.40 {
+                            // Single quarter at beat 1 — hit and space
+                            barEvents = [MIDIEvent(stepIndex: barStart, note: mainNote, velocity: vel, durationSteps: 4)]
+                        } else if modeRoll < 0.62 {
+                            // Two quarter notes — varied beat placement
+                            let n2 = snapArc(idx + dir)
+                            let subRoll = rng.nextDouble()
+                            if subRoll < 0.40 {
+                                // beats 1+2 (steps 0, 4)
+                                barEvents = [
+                                    MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
+                                    MIDIEvent(stepIndex: barStart + 4, note: n2,       velocity: vel - 5, durationSteps: 4)
+                                ]
+                            } else if subRoll < 0.75 {
+                                // beats 1+3 (steps 0, 8)
+                                barEvents = [
+                                    MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
+                                    MIDIEvent(stepIndex: barStart + 8, note: n2,       velocity: vel - 5, durationSteps: 4)
+                                ]
+                            } else {
+                                // beats 2+4 (steps 4, 12)
+                                barEvents = [
+                                    MIDIEvent(stepIndex: barStart + 4,  note: mainNote, velocity: vel,     durationSteps: 4),
+                                    MIDIEvent(stepIndex: barStart + 12, note: n2,       velocity: vel - 5, durationSteps: 4)
+                                ]
+                            }
+                        } else if modeRoll < 0.82 {
+                            // Three quarter notes — beats 1, 2, 3 (steps 0, 4, 8)
+                            let n2 = snapArc(idx + dir)
+                            let n3 = snapArc(idx + dir * 2)
+                            barEvents = [
+                                MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
+                                MIDIEvent(stepIndex: barStart + 4, note: n2,       velocity: vel - 3, durationSteps: 4),
+                                MIDIEvent(stepIndex: barStart + 8, note: n3,       velocity: vel - 5, durationSteps: 4)
+                            ]
+                        } else {
+                            // Eighth-note run — 8 notes × 2 steps, fills bar completely, no rest
+                            var runEvents: [MIDIEvent] = []
+                            var runIdx = idx
+                            var runDir = dir
+                            for i in 0..<8 {
+                                let ni = snapArc(runIdx)
+                                let v  = UInt8(i == 0 ? Int(vel) : max(50, Int(vel) - 4 + rng.nextInt(upperBound: 5)))
+                                runEvents.append(MIDIEvent(stepIndex: barStart + i * 2, note: ni, velocity: v, durationSteps: 2))
+                                runIdx += runDir
+                                if runIdx >= arcScale.count { runIdx = arcScale.count - 2; runDir = -runDir }
+                                else if runIdx < 0          { runIdx = 1;                  runDir = -runDir }
+                            }
+                            barEvents = runEvents
+                        }
+                    }
+                    // F2: After 4 steps in the same direction, jump the other way instead.
+                    // Prevents a monotone ascending or descending run across the section.
+                    if arcAscending && arcAscendRunLen >= 4 {
+                        let jumpDown = 3 + rng.nextInt(upperBound: 3)   // 3–5 scale steps down
+                        arcScaleIdx  = max(0, arcScaleIdx - jumpDown)
+                        arcAscending = false
+                        arcAscendRunLen = 0
+                    } else if !arcAscending && arcDescendRunLen >= 4 {
+                        let jumpUp   = 3 + rng.nextInt(upperBound: 3)   // 3–5 scale steps up
+                        arcScaleIdx  = min(arcScale.count - 1, arcScaleIdx + jumpUp)
+                        arcAscending = true
+                        arcDescendRunLen = 0
                     } else {
-                        arcScaleIdx -= step
-                        if arcScaleIdx <= 0 {
-                            arcScaleIdx = 0
-                            arcAscending = true    // reverse at bottom
+                        // Normal advance: 1–2 scale steps; reverse direction at register boundaries
+                        let step = 1 + rng.nextInt(upperBound: 2)
+                        if arcAscending {
+                            arcDescendRunLen = 0
+                            arcAscendRunLen += 1
+                            arcScaleIdx += step
+                            if arcScaleIdx >= arcScale.count - 1 {
+                                arcScaleIdx = arcScale.count - 1
+                                arcAscending = false
+                                arcAscendRunLen = 0
+                            }
+                        } else {
+                            arcAscendRunLen = 0
+                            arcDescendRunLen += 1
+                            arcScaleIdx -= step
+                            if arcScaleIdx <= 0 {
+                                arcScaleIdx = 0
+                                arcAscending = true
+                                arcDescendRunLen = 0
+                            }
                         }
                     }
                 }
@@ -406,7 +573,7 @@ struct LeadGenerator {
         soloRange: Range<Int>? = nil
     ) -> [MIDIEvent] {
         let ld2Rules:   [String] = ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
-        let ld2Weights: [Double] = [0.20,      0.15,      0.10,      0.20,      0.15,      0.20]
+        let ld2Weights: [Double] = [0.20,      0.20,      0.10,      0.10,      0.20,      0.20]
         var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
         // LD2-006 (Diatonic Shadow) requires Lead 1 notes to harmonize — if Lead 1 is on a solo rule
         // with a sparse window, Lead 2 would be silent for the whole song. Redirect to Counter Response.
@@ -416,6 +583,13 @@ struct LeadGenerator {
         let lead1StepSet = Set(lead1Events.map(\.stepIndex))
         var lead1LastNote: UInt8? = nil   // tracks last Lead 1 pitch for LD2 harmonization
         var events: [MIDIEvent] = []
+
+        // LD2-006: pre-compute which 4-bar blocks are active — sits out ~35% of blocks entirely.
+        // Decided once per song so the silences are structural, not bar-by-bar random.
+        let ld2006BlockCount = (frame.totalBars + 3) / 4
+        let ld2006ActiveBlocks: Set<Int> = ruleID == "MOT-LD2-006"
+            ? Set((0..<ld2006BlockCount).filter { _ in rng.nextDouble() < 0.65 })
+            : Set()
 
         for bar in 0..<frame.totalBars {
             // Silence Lead 2 during the Lead 1 extended solo window
@@ -434,6 +608,12 @@ struct LeadGenerator {
                 lead1LastNote = l1Last.note
             }
 
+            // A — Bar-level silencing: if Lead 1 is active this bar, Lead 2 rests 50% of the time.
+            // Intro/outro exempt (already sparse); LD2-006 exempt (shadow needs L1 to work).
+            if !isIntroOutro && !barL1.isEmpty && ruleID != "MOT-LD2-006" {
+                if rng.nextDouble() < 0.50 { continue }
+            }
+
             switch ruleID {
             case "MOT-LD2-002":
                 events += lead2SustainedDrone(barStart: barStart, entry: entry, frame: frame,
@@ -443,11 +623,12 @@ struct LeadGenerator {
                     intensity: intensity, isIntroOutro: isIntroOutro, lead1StepSet: lead1StepSet, rng: &rng)
             case "MOT-LD2-004":
                 events += lead2HallogalloCounter(barStart: barStart, entry: entry, frame: frame,
-                    isIntroOutro: isIntroOutro, rng: &rng)
+                    isIntroOutro: isIntroOutro, lead1StepSet: lead1StepSet, rng: &rng)
             case "MOT-LD2-005":
                 events += lead2DescendingLine(barStart: barStart, bar: bar, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, rng: &rng)
             case "MOT-LD2-006":
+                guard ld2006ActiveBlocks.contains(bar / 4) else { break }
                 events += lead2DiatonicShadow(barStart: barStart, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, lead1Events: lead1Events, rng: &rng)
             default:
@@ -487,21 +668,77 @@ struct LeadGenerator {
         return events
     }
 
-    // MARK: - LD1-003: long breath — sparse, sustained
+    // MARK: - LD1-003: Punch Solo — melodic burst, Chill trumpet style
+    // Inspired by CHL-LD1-002 (muted trumpet): 3–4 notes drawn from the mode pentatonic,
+    // with 4–8 bars of complete silence between solos.
+    // 4-note burst: inner dur=3 (dotted-eighth) + 1 gap — 4 steps each, fits from step 0 or 2.
+    // 3-note burst: inner dur=4 (quarter) + 1 gap — 5 steps each, fits from step 0, 2, or 4.
+    // Final note always held (half or dotted-half) so the phrase lands and resonates.
+    // Intro/outro: always silent. Body: fires only when bar >= punchNextSoloBar.
 
-    private static func lead1LongBreath(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        intensity: SectionIntensity, isIntroOutro: Bool, prevNote: UInt8?, rng: inout SeededRNG
+    private static func lead1ShortPunch(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity, isIntroOutro: Bool,
+        rng: inout SeededRNG, punchNextSoloBar: inout Int
     ) -> [MIDIEvent] {
+        guard !isIntroOutro, bar >= punchNextSoloBar else { return [] }
+
+        // Build note pool using NotePoolBuilder — chord-tone and scale-tension pitch classes
+        // only, with avoid tones excluded. This ensures no tritone clashes against the active
+        // chord root regardless of which chord is active in the tonal governance map.
+        let (chordTones, scaleTensions, _) = NotePoolBuilder.build(
+            chordRootDegree: entry.chordWindow.chordRoot,
+            chordType:       entry.chordWindow.chordType,
+            key:             frame.key,
+            mode:            frame.mode
+        )
+        let allowedPCs = chordTones.union(scaleTensions)
+        var pool: [Int] = []
+        for midi in 60...84 where allowedPCs.contains(midi % 12) {
+            pool.append(midi)
+        }
+        guard pool.count >= 3 else { return [] }
+
+        // Mostly 3–4 notes. 4-note bursts use shorter inner dur so they fit in the bar.
+        let noteCount  = rng.nextDouble() < 0.55 ? 4 : 3
+        let innerDur   = noteCount == 4 ? 3 : 4   // dotted-eighth for 4-note, quarter for 3-note
+        // 4-note bursts need tighter start to fit; 3-note bursts allow step 4 too
+        let startStep  = noteCount == 4
+            ? [0, 2][rng.nextInt(upperBound: 2)]
+            : [0, 2, 4][rng.nextInt(upperBound: 3)]
         var events: [MIDIEvent] = []
-        let prob: Double = isIntroOutro ? 0.10 : (intensity == .high ? 0.40 : 0.22)
-        guard rng.nextDouble() < prob else { return events }
-        let step = [0, 4, 8][rng.nextInt(upperBound: 3)]
-        let note = pickNoteNearest(entry: entry, frame: frame, trackIndex: kTrackLead1,
-                                   prevNote: prevNote, rng: &rng)
-        let dur  = [6, 8, 10, 12][rng.nextInt(upperBound: 4)]
-        events.append(MIDIEvent(stepIndex: barStart + step, note: note,
-            velocity: velocityForIntensity(intensity, rng: &rng), durationSteps: dur))
+        var cursor  = startStep
+        var prevIdx = rng.nextInt(upperBound: pool.count)
+
+        for i in 0..<noteCount {
+            guard cursor < 16 else { break }
+            // Melodic motion: small interval steps, slight downward bias (jazz descend tendency)
+            let delta = (rng.nextDouble() < 0.60) ? 1 : (rng.nextDouble() < 0.50 ? 2 : 3)
+            let goUp  = (i == 0) ? (rng.nextDouble() < 0.50) : (rng.nextDouble() < 0.40)
+            prevIdx   = goUp ? min(pool.count - 1, prevIdx + delta)
+                             : max(0,              prevIdx - delta)
+            let note  = UInt8(pool[prevIdx])
+
+            let isLast = (i == noteCount - 1)
+            let dur: Int
+            if isLast {
+                // Final note: half note (8) or dotted-half (12) — phrase lands and rings out
+                dur = rng.nextDouble() < 0.55 ? 8 : 12
+            } else {
+                dur = innerDur
+            }
+
+            let baseVel: Int
+            switch intensity { case .low: baseVel = 65; case .medium: baseVel = 75; case .high: baseVel = 85 }
+            let vel = UInt8(max(55, min(100, baseVel + rng.nextInt(upperBound: 16) - 8)))
+            events.append(MIDIEvent(stepIndex: barStart + cursor, note: note,
+                                    velocity: vel, durationSteps: dur))
+            if isLast { break }
+            cursor += dur + 1   // 1-step gap between inner notes
+        }
+
+        // Schedule next solo 4–8 bars from now
+        punchNextSoloBar = bar + 4 + rng.nextInt(upperBound: 5)
         return events
     }
 
@@ -594,7 +831,7 @@ struct LeadGenerator {
         // call-and-response feel: Lead 1 speaks on the beat, Lead 2 answers a half-beat later.
         for step in [2, 6, 10, 14] {
             let conflicts = lead1StepSet.contains(barStart + step)
-            guard rng.nextDouble() < density && (!conflicts || rng.nextDouble() < 0.15) else { continue }
+            guard rng.nextDouble() < density && (!conflicts || rng.nextDouble() < 0.03) else { continue }
             let note = pickNoteHarmonized(entry: entry, frame: frame, trackIndex: kTrackLead2,
                                          lead1LastNote: lead1LastNote, rng: &rng)
             let dur  = [2, 4, 6][rng.nextInt(upperBound: 3)]
@@ -623,6 +860,8 @@ struct LeadGenerator {
 
         var localPrev: UInt8? = nil
         for e1 in barL1 {
+            // C — Shadow only ~55% of Lead 1 notes to thin the parallel harmony texture
+            guard rng.nextDouble() < 0.55 else { continue }
             let lead1PC = Int(e1.note) % 12
             // 75%: diatonic 3rd below; 25%: diatonic 4th above — for occasional open-interval color
             let shadowPC = (rng.nextDouble() < 0.75)
@@ -680,7 +919,7 @@ struct LeadGenerator {
 
     private static func lead2HallogalloCounter(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        isIntroOutro: Bool, rng: inout SeededRNG
+        isIntroOutro: Bool, lead1StepSet: Set<Int>, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         if isIntroOutro { return events }
@@ -694,7 +933,9 @@ struct LeadGenerator {
         let vels: [UInt8]      = [84, 82, 82, 80,  84, 82, 80, 76]
 
         for (i, step) in steps.enumerated() {
-            guard rng.nextDouble() < 0.55 else { continue }
+            // Skip steps where Lead 1 is active — no simultaneous attacks
+            if lead1StepSet.contains(barStart + step) { continue }
+            guard rng.nextDouble() < 0.38 else { continue }
             let pc   = (rootPC + noteOffsets[i]) % 12
             let note = nearestMIDI(pc: pc, bounds: bounds, prevNote: nil)
             events.append(MIDIEvent(stepIndex: barStart + step, note: note,
@@ -795,7 +1036,13 @@ struct LeadGenerator {
         for step in stepPositions {
             if !longMode { guard rng.nextDouble() < 0.75 else { continue } }
             steps.append(step)
-            intervals.append(pcsOffsets[rng.nextInt(upperBound: pcsOffsets.count)])
+            // Pick an interval that differs from the previous one — prevents all-root cells
+            var candidate = pcsOffsets[rng.nextInt(upperBound: pcsOffsets.count)]
+            if let prev = intervals.last, candidate == prev, pcsOffsets.count > 1 {
+                let others = pcsOffsets.filter { $0 != prev }
+                candidate = others[rng.nextInt(upperBound: others.count)]
+            }
+            intervals.append(candidate)
             // Long mode: quarter (4) to half note (8); normal mode: 16th (1) to dotted-8th (3)
             // with an occasional quarter note (4) — 20% chance
             let dur: Int

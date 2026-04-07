@@ -125,29 +125,28 @@ final class AppState: ObservableObject {
         testCycleIndex = 0
     }
 
-    // Motorik 10-slot cycle: all slots force the two new extended solos (007/008) alternating.
-    // Old Motorik rules (001–006), old bass rules, and Kosmic rules removed from rotation.
-    // Slot 0: MOT-LD1-007* lead   [Vanishing solo]
-    // Slot 1: MOT-LD1-008* lead   [Visiting solo]
-    // Slot 2: MOT-LD1-007* lead   [Vanishing solo]
-    // Slot 3: MOT-LD1-008* lead   [Visiting solo]
-    // Slot 4: MOT-LD1-007* lead   [Vanishing solo]
-    // Slot 5: MOT-LD1-008* lead   [Visiting solo]
-    // Slot 6: MOT-LD1-007* lead   [Vanishing solo]
-    // Slot 7: MOT-LD1-008* lead   [Visiting solo]
-    // Slot 8: MOT-LD1-007* lead   [Vanishing solo]
-    // Slot 9: MOT-LD1-008* lead   [Visiting solo]
+    // Motorik 10-slot cycle: alternates MOT-LD1-003 (Punch Solo) and MOT-LD1-006 (Long Arc).
+    // Slot 0: MOT-LD1-003* lead   [Punch solo]
+    // Slot 1: MOT-LD1-006* lead   [Long arc solo]
+    // Slot 2: MOT-LD1-003* lead   [Punch solo]
+    // Slot 3: MOT-LD1-006* lead   [Long arc solo]
+    // Slot 4: MOT-LD1-003* lead   [Punch solo]
+    // Slot 5: MOT-LD1-006* lead   [Long arc solo]
+    // Slot 6: MOT-LD1-003* lead   [Punch solo]
+    // Slot 7: MOT-LD1-006* lead   [Long arc solo]
+    // Slot 8: MOT-LD1-003* lead   [Punch solo]
+    // Slot 9: MOT-LD1-006* lead   [Long arc solo]
     private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-007", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-008", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
     ]
 
     // Ambient 12-slot cycle: exercises all lead rules, bass rules, and rhythm rules.
@@ -601,12 +600,12 @@ final class AppState: ObservableObject {
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
 
-                // Instrument randomization: first song uses all defaults (index 0).
+                // Instrument randomization: first song per style uses all defaults (index 0).
                 // From the second song onwards, pick 2 random non-drums tracks and assign
                 // each a random non-default instrument, so users hear the instrument variety.
                 // kTrackTexture is excluded for Chill — the generator already chose the texture.
                 var instrumentLogDesc: String? = nil
-                if self.songGenerationCount > 0 {
+                if !isFirstForStyle {
                     var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
                     var picks: [(trackIndex: Int, instIndex: Int, name: String)] = []
                     var rng = SystemRandomNumberGenerator()

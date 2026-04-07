@@ -49,11 +49,11 @@ struct ChillStructureGenerator {
             // Short: always 4 bars (bass alone is sparse; longer is boring)
             breakdownBars = 4
         case .stopTime:
-            // 4 or 8 bars: stop-time needs room for solo fragments (pairs of bars: hit + response)
-            breakdownBars = rng.nextDouble() < 0.50 ? 4 : 8
+            // Mostly 4 bars; occasionally 6 (pairs of bars: hit + response)
+            breakdownBars = rng.nextDouble() < 0.75 ? 4 : 6
         case .harmonicDrone:
-            // 4 or 8 bars: drone can sustain longer but keep it focused
-            breakdownBars = rng.nextDouble() < 0.50 ? 4 : 8
+            // Always 4 bars: absence-then-reentry arc needs exactly 4 bars to breathe
+            breakdownBars = 4
         }
         let grooveTotal   = Swift.max(20, total - introBars - outroBars - breakdownBars)
         // Split groove total across A and B; B slightly longer (more active)

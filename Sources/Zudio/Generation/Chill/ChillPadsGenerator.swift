@@ -179,14 +179,37 @@ struct ChillPadsGenerator {
 
             switch breakdownStyle {
             case .stopTime:
-                // Staccato stab on beat 1 of every other bar (synchronized with drums/bass hit)
-                // Velocity kept below groove ceiling (55–70) — breakdown is stripped, so stabs
-                // should be firm but not louder than the full-texture sections.
                 if breakdownBar % 2 == 0 {
+                    // Even bars: staccato stab on beat 1 synchronized with the drum/bass hit
                     for note in voiceNotes {
-                        let vel = UInt8(42 + rng.nextInt(upperBound: 10))  // 42–51
+                        let vel = UInt8(52 + rng.nextInt(upperBound: 10))  // slightly raised
                         events.append(MIDIEvent(stepIndex: base, note: UInt8(note),
                                                 velocity: vel, durationSteps: 4))
+                    }
+                } else {
+                    // Odd (silence) bars: sustained chord reveal — notes enter bottom to top on
+                    // beats 2, 3, 4 and each sustains to beat 1 of the next bar, so the full
+                    // voicing accumulates and is already ringing when the hit lands.
+                    let sorted = voiceNotes.sorted()
+                    let n = sorted.count
+                    // Step offsets: 4 (beat 2), 8 (beat 3), 12 (beat 4)
+                    // Duration: sustain to step 16 from bar start, i.e. 16 - stepOffset
+                    if n >= 1 {
+                        let vel = UInt8(48 + rng.nextInt(upperBound: 10))
+                        events.append(MIDIEvent(stepIndex: base + 4,  note: UInt8(sorted[0]),
+                                                velocity: vel, durationSteps: 12))
+                    }
+                    if n >= 2 {
+                        let vel = UInt8(55 + rng.nextInt(upperBound: 10))
+                        events.append(MIDIEvent(stepIndex: base + 8,  note: UInt8(sorted[1]),
+                                                velocity: vel, durationSteps: 8))
+                    }
+                    if n >= 3 {
+                        let vel = UInt8(62 + rng.nextInt(upperBound: 10))
+                        for note in sorted.suffix(n > 3 ? 2 : 1) {
+                            events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(note),
+                                                    velocity: vel, durationSteps: 4))
+                        }
                     }
                 }
             case .bassOstinato:

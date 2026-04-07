@@ -109,6 +109,7 @@ struct ChillDrumGenerator {
         let kick  = GMDrum.kick.rawValue
         let snare = GMDrum.snare.rawValue
         let hat   = GMDrum.closedHat.rawValue
+        let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -139,40 +140,41 @@ struct ChillDrumGenerator {
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
+                let sectionLen   = section?.lengthBars ?? 4
+                let isLastBDBar  = (breakdownBar == sectionLen - 1)
                 switch breakdownStyle {
                 case .stopTime:
-                    // Even bars: unison hit on beat 1 (kick + snare crack); odd bars: silence
+                    // Even bars: unison hit on beat 1; odd bars: 2–3 beat fill
                     if breakdownBar % 2 == 0 {
                         events.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 90, durationSteps: 1))
                         events.append(MIDIEvent(stepIndex: base, note: snare, velocity: 85, durationSteps: 1))
+                    } else {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     }
                 case .bassOstinato:
-                    // Steady 8th-note hat pulse maintains momentum while the bass carries the groove.
-                    let sectionLen  = section?.lengthBars ?? 4
-                    let isLastBDBar = (breakdownBar == sectionLen - 1)
                     if isLastBDBar {
-                        // Pickup fill into groove: escalating snare roll, steps 8–15
-                        events.append(MIDIEvent(stepIndex: base,     note: kick,  velocity: 60, durationSteps: 1))
-                        for (i, step) in [8, 10, 12, 13, 14, 15].enumerated() {
-                            let vel = UInt8(45 + i * 10)
-                            events.append(MIDIEvent(stepIndex: base + step, note: snare, velocity: vel, durationSteps: 1))
-                        }
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     } else {
-                        // Kick on beat 1
                         events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(55 + rng.nextInt(upperBound: 11)), durationSteps: 1))
-                        // Steady 8th-note hat on every 8th position — keeps the pulse going
                         for step in stride(from: 0, to: 16, by: 2) {
                             let vel = UInt8(32 + rng.nextInt(upperBound: 12))
                             events.append(MIDIEvent(stepIndex: base + step, note: hat, velocity: vel, durationSteps: 1))
                         }
-                        // Occasional snare ghost on beat 3 (40%)
                         if rng.nextDouble() < 0.40 {
                             events.append(MIDIEvent(stepIndex: base + 8, note: snare, velocity: UInt8(35 + rng.nextInt(upperBound: 15)), durationSteps: 1))
                         }
                     }
                 case .harmonicDrone:
-                    // Sparse: kick on bar 1, whisper hat from bar 3 onward
-                    if breakdownBar < 2 {
+                    if isLastBDBar {
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    } else if breakdownBar < 2 {
                         events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 55, durationSteps: 1))
                     } else if rng.nextDouble() < 0.40 {
                         let vel = UInt8(30 + rng.nextInt(upperBound: 15))
@@ -228,6 +230,7 @@ struct ChillDrumGenerator {
         let ghost   = GMDrum.snare.rawValue    // acoustic snare for ghost notes
         let hat16   = GMDrum.closedHat.rawValue
         let crash   = GMDrum.crash1.rawValue
+        let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
 
         // Track section-start bars for crash
         let sectionStartBars = Set(structure.sections.map { $0.startBar })
@@ -260,24 +263,23 @@ struct ChillDrumGenerator {
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
+                let sectionLen   = section?.lengthBars ?? 4
+                let isLastBDBar  = (breakdownBar == sectionLen - 1)
                 switch breakdownStyle {
                 case .stopTime:
                     if breakdownBar % 2 == 0 {
                         events.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 90, durationSteps: 1))
                         events.append(MIDIEvent(stepIndex: base, note: snare, velocity: 85, durationSteps: 1))
+                    } else {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat16, rng: &rng)
                     }
                 case .bassOstinato:
-                    let sectionLen  = section?.lengthBars ?? 4
-                    let isLastBDBar = (breakdownBar == sectionLen - 1)
                     if isLastBDBar {
-                        // Pickup fill: kick on beat 1 + snare roll steps 8–15
-                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 65, durationSteps: 1))
-                        for (i, step) in [8, 10, 12, 13, 14, 15].enumerated() {
-                            let vel = UInt8(48 + i * 10)
-                            events.append(MIDIEvent(stepIndex: base + step, note: ghost, velocity: vel, durationSteps: 1))
-                        }
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat16, rng: &rng)
                     } else {
-                        // Kick on beat 1 + steady 8th-note hat for ongoing momentum
                         events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(58 + rng.nextInt(upperBound: 12)), durationSteps: 1))
                         for step in stride(from: 0, to: 16, by: 2) {
                             let vel = UInt8(32 + rng.nextInt(upperBound: 12))
@@ -288,7 +290,11 @@ struct ChillDrumGenerator {
                         }
                     }
                 case .harmonicDrone:
-                    if breakdownBar < 2 {
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat16, rng: &rng)
+                    } else if breakdownBar < 2 {
                         events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 60, durationSteps: 1))
                     } else if rng.nextDouble() < 0.50 {
                         let vel = UInt8(40 + rng.nextInt(upperBound: 20))
@@ -389,6 +395,7 @@ struct ChillDrumGenerator {
         // Find the bar where the first groove section starts (for velocity ramp-in)
         let grooveStartBar = structure.sections.first { $0.label == .A || $0.label == .B }?.startBar ?? 0
         let rampBars = 4  // ramp velocities up over this many bars after intro ends
+        let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
 
         for bar in 0..<frame.totalBars {
             let section     = structure.section(atBar: bar)
@@ -428,36 +435,44 @@ struct ChillDrumGenerator {
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
+                let sectionLen   = section?.lengthBars ?? 4
+                let isLastBDBar  = (breakdownBar == sectionLen - 1)
                 switch breakdownStyle {
                 case .harmonicDrone:
-                    // Beat continues at full density, slightly reduced velocity — lead plays over it
-                    let dVel = UInt8(62 + rng.nextInt(upperBound: 12))
-                    for step in [0, 4, 8, 12] {
-                        events.append(MIDIEvent(stepIndex: base + step, note: kick, velocity: dVel, durationSteps: 1))
-                    }
-                    let snareVel = UInt8(55 + rng.nextInt(upperBound: 10))
-                    events.append(MIDIEvent(stepIndex: base + 4,  note: snare, velocity: snareVel, durationSteps: 1))
-                    events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: snareVel, durationSteps: 1))
-                    let rideVel = UInt8(45 + rng.nextInt(upperBound: 12))
-                    for step in stride(from: 0, to: 16, by: 2) {
-                        events.append(MIDIEvent(stepIndex: base + step, note: ride, velocity: rideVel, durationSteps: 1))
+                    if isLastBDBar {
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    } else {
+                        // Beat continues at full density, slightly reduced velocity — lead plays over it
+                        let dVel = UInt8(62 + rng.nextInt(upperBound: 12))
+                        for step in [0, 4, 8, 12] {
+                            events.append(MIDIEvent(stepIndex: base + step, note: kick, velocity: dVel, durationSteps: 1))
+                        }
+                        let snareVel = UInt8(55 + rng.nextInt(upperBound: 10))
+                        events.append(MIDIEvent(stepIndex: base + 4,  note: snare, velocity: snareVel, durationSteps: 1))
+                        events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: snareVel, durationSteps: 1))
+                        let rideVel = UInt8(45 + rng.nextInt(upperBound: 12))
+                        for step in stride(from: 0, to: 16, by: 2) {
+                            events.append(MIDIEvent(stepIndex: base + step, note: ride, velocity: rideVel, durationSteps: 1))
+                        }
                     }
                 case .stopTime:
-                    // Even bars: unison kick+snare hit on beat 1; odd bars: silence
+                    // Even bars: unison kick+snare hit on beat 1; odd bars: momentum fill
                     if breakdownBar % 2 == 0 {
                         events.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 92, durationSteps: 1))
                         events.append(MIDIEvent(stepIndex: base, note: snare, velocity: 88, durationSteps: 1))
+                    } else {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     }
                 case .bassOstinato:
-                    let sectionLen  = section?.lengthBars ?? 4
-                    let isLastBDBar = (breakdownBar == sectionLen - 1)
                     if isLastBDBar {
-                        // Pickup fill: kick on beat 1 + escalating snare roll into groove
-                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 62, durationSteps: 1))
-                        for (i, step) in [8, 10, 12, 13, 14, 15].enumerated() {
-                            let vel = UInt8(48 + i * 10)
-                            events.append(MIDIEvent(stepIndex: base + step, note: snare, velocity: vel, durationSteps: 1))
-                        }
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     } else {
                         // Ride on all 4 beats (time reference) + kick on beat 1 + snare on beat 3 (50%)
                         events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(55 + rng.nextInt(upperBound: 12)), durationSteps: 1))
@@ -565,6 +580,7 @@ struct ChillDrumGenerator {
         let snare = GMDrum.snare.rawValue   // brush snare
         let kick  = GMDrum.kick.rawValue
         let hat   = GMDrum.closedHat.rawValue
+        let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -594,23 +610,24 @@ struct ChillDrumGenerator {
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
+                let sectionLen   = section?.lengthBars ?? 4
+                let isLastBDBar  = (breakdownBar == sectionLen - 1)
                 switch breakdownStyle {
                 case .stopTime:
-                    // Even bars: rim shot + kick crack (the "hit"); odd bars: silence
+                    // Even bars: kick + snare hit; odd bars: momentum fill
                     if breakdownBar % 2 == 0 {
                         events.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 85, durationSteps: 1))
                         events.append(MIDIEvent(stepIndex: base, note: snare, velocity: 80, durationSteps: 1))
+                    } else {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     }
                 case .bassOstinato:
-                    let sectionLen  = section?.lengthBars ?? 4
-                    let isLastBDBar = (breakdownBar == sectionLen - 1)
                     if isLastBDBar {
-                        // Pickup fill into groove: kick + escalating snare roll steps 8–15
-                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 58, durationSteps: 1))
-                        for (i, step) in [8, 10, 12, 13, 14, 15].enumerated() {
-                            let vel = UInt8(42 + i * 9)
-                            events.append(MIDIEvent(stepIndex: base + step, note: snare, velocity: vel, durationSteps: 1))
-                        }
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     } else {
                         // Ride on all 4 beats (steady pulse) + kick on beat 1 + snare brush on beat 3 (40%)
                         events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(52 + rng.nextInt(upperBound: 12)), durationSteps: 1))
@@ -623,10 +640,17 @@ struct ChillDrumGenerator {
                         }
                     }
                 case .harmonicDrone:
-                    // Light ride pulse continues; beat doesn't fully stop
-                    if breakdownBar >= 2 || rng.nextDouble() < 0.60 {
-                        let vel = UInt8(30 + rng.nextInt(upperBound: 18))
-                        events.append(MIDIEvent(stepIndex: base, note: ride, velocity: vel, durationSteps: 1))
+                    if isLastBDBar {
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    } else {
+                        // Light ride pulse continues; beat doesn't fully stop
+                        if breakdownBar >= 2 || rng.nextDouble() < 0.60 {
+                            let vel = UInt8(30 + rng.nextInt(upperBound: 18))
+                            events.append(MIDIEvent(stepIndex: base, note: ride, velocity: vel, durationSteps: 1))
+                        }
                     }
                 }
                 continue
@@ -704,6 +728,7 @@ struct ChillDrumGenerator {
         let cycle      = tambOnLen + tambOffLen
         // grooveDropout: within a tambourine-on run, occasionally 1–2 bars play tambourine only
         // (groove drops out). Happens ~once per 10 bars on average.
+        let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -732,23 +757,42 @@ struct ChillDrumGenerator {
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
+                let sectionLen   = section?.lengthBars ?? 4
+                let isLastBDBar  = (breakdownBar == sectionLen - 1)
                 switch breakdownStyle {
                 case .stopTime:
                     if breakdownBar % 2 == 0 {
                         events.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 88, durationSteps: 1))
                         events.append(MIDIEvent(stepIndex: base, note: snare, velocity: 82, durationSteps: 1))
+                    } else {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     }
                 case .bassOstinato:
-                    // Quarter-note tambourine pulse — light time reference (4 events/bar)
-                    for step in [0, 4, 8, 12] {
-                        let vel = UInt8(30 + rng.nextInt(upperBound: 14))
-                        events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
+                    if isLastBDBar {
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    } else {
+                        // Quarter-note tambourine pulse — light time reference (4 events/bar)
+                        for step in [0, 4, 8, 12] {
+                            let vel = UInt8(30 + rng.nextInt(upperBound: 14))
+                            events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
+                        }
                     }
                 case .harmonicDrone:
-                    // 8th-note tambourine — slightly more active than bass-ostinato, beat still minimal
-                    for step in stride(from: 0, to: 16, by: 2) {
-                        let vel = UInt8(28 + rng.nextInt(upperBound: 12))
-                        events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
+                    if isLastBDBar {
+                        // Last bar: kick on beat 1 then 3-beat momentum fill into groove return
+                        events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 70, durationSteps: 1))
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    } else {
+                        // 8th-note tambourine — slightly more active than bass-ostinato, beat still minimal
+                        for step in stride(from: 0, to: 16, by: 2) {
+                            let vel = UInt8(28 + rng.nextInt(upperBound: 12))
+                            events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
+                        }
                     }
                 }
                 continue
@@ -805,5 +849,47 @@ struct ChillDrumGenerator {
             }
         }
         return events
+    }
+
+    // MARK: - Stop-time fill helper (shared across all drum styles)
+
+    /// 2–3 beat momentum fill for stop-time silence bars, building into the next unison hit.
+    /// Fires on beats 2–4 (steps 4–15) of each odd breakdown bar.
+    /// option 0 = snare escalation, 1 = kick stutter + snare crack, 2 = hat cascade + snare crack.
+    /// Same option used for all fills within a breakdown (picked once per song).
+    private static func stopTimeFill(
+        barStart: Int, option: Int,
+        kick: UInt8, snare: UInt8, hat: UInt8,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var ev: [MIDIEvent] = []
+        switch option {
+        case 0:  // Snare escalation: ghost on beat 2, pair on beat 3, 4-note roll on beat 4
+            ev.append(MIDIEvent(stepIndex: barStart + 4,  note: snare,
+                                velocity: UInt8(35 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            ev.append(MIDIEvent(stepIndex: barStart + 8,  note: snare,
+                                velocity: UInt8(50 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            ev.append(MIDIEvent(stepIndex: barStart + 10, note: snare,
+                                velocity: UInt8(58 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            for (i, step) in [12, 13, 14, 15].enumerated() {
+                ev.append(MIDIEvent(stepIndex: barStart + step, note: snare,
+                                    velocity: UInt8(63 + i * 9), durationSteps: 1))
+            }
+        case 1:  // Kick stutter + snare crack: sparse and heavy
+            ev.append(MIDIEvent(stepIndex: barStart + 10, note: kick,
+                                velocity: UInt8(60 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            ev.append(MIDIEvent(stepIndex: barStart + 14, note: kick,
+                                velocity: UInt8(70 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            ev.append(MIDIEvent(stepIndex: barStart + 15, note: snare,
+                                velocity: UInt8(80 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+        default: // Hat cascade + snare crack: pulsing 8th-note build
+            for (i, step) in [8, 10, 12, 14].enumerated() {
+                ev.append(MIDIEvent(stepIndex: barStart + step, note: hat,
+                                    velocity: UInt8(35 + i * 10), durationSteps: 1))
+            }
+            ev.append(MIDIEvent(stepIndex: barStart + 15, note: snare,
+                                velocity: UInt8(72 + rng.nextInt(upperBound: 12)), durationSteps: 1))
+        }
+        return ev
     }
 }

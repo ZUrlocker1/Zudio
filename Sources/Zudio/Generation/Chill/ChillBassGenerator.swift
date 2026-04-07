@@ -78,25 +78,67 @@ struct ChillBassGenerator {
                                                 velocity: 88, durationSteps: 4))
                     }
                 case .bassOstinato:
-                    // Syncopated 2-bar riff — root + 5th with funk articulation
-                    let root   = clampBass(chordRoot)
-                    let fifth  = clampBass(snapToScale(chordRoot + 7, scale: scale))
-                    let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))  // snapped chromatic approach
-                    // step 0: root (3 steps), step 6: 5th (2 steps), step 9: root (2 steps),
-                    // step 13: approach tone (2 steps — leads back to root)
-                    events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),     velocity: 90, durationSteps: 3))
-                    events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(fifth),    velocity: 78, durationSteps: 2))
-                    events.append(MIDIEvent(stepIndex: base + 9,  note: UInt8(root),     velocity: 84, durationSteps: 2))
-                    if bar < frame.totalBars - 1 {
-                        events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(approach), velocity: 72, durationSteps: 2))
+                    // Progressive embellishment arc — ostinato "corrupts" toward resolution.
+                    // Bar 0: bare root riff; bar 1: adds 5th; bar 2: adds chromatic neighbor;
+                    // bar 3 (last): quarter-note chromatic walk into groove root.
+                    let root     = clampBass(chordRoot)
+                    let fifth    = clampBass(snapToScale(chordRoot + 7, scale: scale))
+                    let neighbor = clampBass(chordRoot + 1)  // half-step above root — mild dissonance
+                    let grooveRoot = clampBass(nextChordRootNote(bar: bar, frame: frame, structure: structure))
+                    let sectionLen   = section?.lengthBars ?? 4
+                    let isLastBDBar  = (breakdownBar == sectionLen - 1)
+
+                    if isLastBDBar {
+                        // Last bar: chromatic quarter-note walk toward groove chord root
+                        let walkTarget = grooveRoot
+                        let walkStart  = root
+                        let diff = walkTarget - walkStart
+                        let step = diff == 0 ? 0 : (diff > 0 ? 1 : -1)
+                        var walkNote = walkStart
+                        for (i, s) in [0, 4, 8, 12].enumerated() {
+                            let vel = UInt8(72 + i * 6)  // rising: 72, 78, 84, 90
+                            events.append(MIDIEvent(stepIndex: base + s, note: UInt8(clampBass(walkNote)),
+                                                    velocity: vel, durationSteps: 3))
+                            walkNote = clampBass(walkNote + step)
+                        }
+                    } else {
+                        // Base riff: root (3 steps) → 5th (2 steps) → root (2 steps) → approach (2 steps)
+                        let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
+                        events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),  velocity: 90, durationSteps: 3))
+                        if breakdownBar >= 1 {
+                            // Bar 1+: add 5th
+                            events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(fifth), velocity: 78, durationSteps: 2))
+                        } else {
+                            events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(root),  velocity: 76, durationSteps: 2))
+                        }
+                        events.append(MIDIEvent(stepIndex: base + 9,  note: UInt8(root),  velocity: 84, durationSteps: 2))
+                        if breakdownBar >= 2 {
+                            // Bar 2+: swap approach for chromatic neighbor (tension note)
+                            events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(neighbor), velocity: 74, durationSteps: 2))
+                        } else {
+                            events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(approach), velocity: 72, durationSteps: 2))
+                        }
                     }
                 case .harmonicDrone:
-                    // Root quarter-note pulse on all 4 beats — simple, grounding
+                    // Absence → reentry arc: bars 1-2 silent (tension from void);
+                    // bar 3: whisper root reentry; bar 4: rising velocity into drum fill + groove.
+                    let sectionLen  = section?.lengthBars ?? 4
+                    let isLastBDBar = (breakdownBar == sectionLen - 1)
                     let root = clampBass(chordRoot)
-                    for step in [0, 4, 8, 12] {
-                        events.append(MIDIEvent(stepIndex: base + step, note: UInt8(root),
-                                                velocity: 78, durationSteps: 2))
+                    if isLastBDBar {
+                        // Bar 4: bass returns at full voice, rising velocity — groove is coming
+                        let fifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
+                        events.append(MIDIEvent(stepIndex: base,     note: UInt8(root),  velocity: 80, durationSteps: 4))
+                        events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(fifth), velocity: 85, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),  velocity: 88, durationSteps: 2))
+                        // Chromatic approach into groove on beat 4
+                        let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
+                        events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach), velocity: 92, durationSteps: 3))
+                    } else if breakdownBar == sectionLen - 2 {
+                        // Bar 3: whisper root reentry — barely there, tension peaking
+                        events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 45, durationSteps: 12))
                     }
+                    // Bars 1-2 (breakdownBar 0-1): bass silent — pad holds the void alone
                 }
 
             case .intro:

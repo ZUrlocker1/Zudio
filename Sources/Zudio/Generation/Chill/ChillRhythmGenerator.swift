@@ -86,12 +86,36 @@ struct ChillRhythmGenerator {
             // Intro and outro: silent
             if label == .intro || label == .outro { continue }
 
-            // Breakdown: silent except bass ostinato — one beat-2 chord keeps harmonic context
+            // Breakdown handling
             if label == .bridge {
-                if breakdownStyle == .bassOstinato {
-                    let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                let breakdownBar = bar - (section?.startBar ?? bar)
+                let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                let base    = bar * 16
+
+                if breakdownStyle == .stopTime && breakdownBar % 2 == 1 {
+                    // Odd (silence) bars: chord reveal — play voicing bottom to top on beats 2, 3, 4.
+                    // Tonal buildup that converges on the full chord hit in the next bar.
+                    let sorted = buildVoicing(frame: frame, chord: chord, baseRegister: 52).sorted()
+                    let n = sorted.count
+                    if n >= 1 {
+                        events.append(MIDIEvent(stepIndex: base + 4,  note: UInt8(sorted[0]),
+                                                velocity: UInt8(60 + rng.nextInt(upperBound: 10)), durationSteps: 3))
+                    }
+                    if n >= 2 {
+                        events.append(MIDIEvent(stepIndex: base + 8,  note: UInt8(sorted[1]),
+                                                velocity: UInt8(70 + rng.nextInt(upperBound: 10)), durationSteps: 3))
+                    }
+                    if n >= 3 {
+                        let vel = UInt8(80 + rng.nextInt(upperBound: 10))
+                        // Top one or two notes on beat 4
+                        for note in sorted.suffix(n > 3 ? 2 : 1) {
+                            events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(note),
+                                                    velocity: vel, durationSteps: 3))
+                        }
+                    }
+                } else if breakdownStyle == .bassOstinato {
+                    // Bass ostinato: one beat-2 chord stab keeps harmonic context
                     let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52)
-                    let base    = bar * 16
                     let vel     = UInt8(42 + rng.nextInt(upperBound: 12))
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: vel, durationSteps: 4))
@@ -108,7 +132,7 @@ struct ChillRhythmGenerator {
             case .stGermainSyncopated:
                 events += stGermainSyncopated(base: base, voicing: voicing, rng: &rng)
             case .mobyBackbeat:
-                events += mobyBackbeat(base: base, voicing: voicing, rng: &rng)
+                events += mobyBackbeat(base: base, voicing: voicing, bar: bar, rng: &rng)
             case .bosaMoonArpeggiated:
                 events += bosaMoonArpeggiated(base: base, voicing: voicing, frame: frame,
                                                chord: chord, rng: &rng)
@@ -150,27 +174,95 @@ struct ChillRhythmGenerator {
 
     // MARK: - CHL-RHY-002: Moby Backbeat
 
-    /// Chord strikes on beats 2 (step 4) and 4 (step 12) only.
-    /// Shell voicing [root, 5th, 7th]. 30% chance only one strike fires per bar.
-    private static func mobyBackbeat(base: Int, voicing: [Int],
+    /// Chord strikes on beats 2 and 4, with bar-by-bar variation so no 8 bars sound identical.
+    ///
+    /// Four patterns cycle every 4 bars (bar % 4), giving each 4-bar phrase a distinct texture:
+    ///   0 — standard shell: beats 2+4, 2-note shell voicing
+    ///   1 — add AND-of-3: beats 2+4 shell + soft ghost hit at step 10 (AND of beat 3)
+    ///   2 — inversion: beats 2+4, full 3-note voicing in second inversion (top note dropped)
+    ///   3 — shifted beat 2: beat 2 anticipates to step 2 (AND of beat 1); beat 4 normal
+    ///
+    /// Additionally, 15% chance either beat fires alone (unchanged), and a 20% chance of
+    /// an extra staccato fill on step 6 (AND of beat 2) at very low velocity — subtle syncopation.
+    private static func mobyBackbeat(base: Int, voicing: [Int], bar: Int,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
+        guard !voicing.isEmpty else { return events }
+
         let onlyBeat2 = rng.nextDouble() < 0.15
         let onlyBeat4 = !onlyBeat2 && rng.nextDouble() < 0.15
-        let shellVoicing = voicing.count >= 2 ? Array(voicing.prefix(2)) : voicing  // shell: 2 notes
+
+        // Pattern variant driven by bar position — changes every 4 bars
+        let variant = bar % 4
+
+        // Voicing selection by variant
+        let shellVoicing   = voicing.count >= 2 ? Array(voicing.prefix(2)) : voicing
+        let fullVoicing    = voicing
+        // Second inversion: rotate so highest note comes first (drop it down one octave conceptually —
+        // achieved here by reversing the sorted list to put the upper note first, giving a different
+        // density feel when sustained notes overlap)
+        let invertVoicing  = voicing.count >= 3 ? Array(voicing.dropFirst()) : shellVoicing
+
+        let beat2Voicing: [Int]
+        let beat4Voicing: [Int]
+        let beat2Step: Int
+        let beat4Step: Int = 12
+
+        switch variant {
+        case 1:
+            // Add AND-of-3 ghost hit (step 10) at low velocity
+            beat2Voicing = shellVoicing
+            beat4Voicing = shellVoicing
+            beat2Step    = 4
+        case 2:
+            // Full inversion on both beats — different density
+            beat2Voicing = invertVoicing
+            beat4Voicing = fullVoicing
+            beat2Step    = 4
+        case 3:
+            // Anticipate beat 2 to AND of beat 1 (step 2) — creates forward lean
+            beat2Voicing = shellVoicing
+            beat4Voicing = shellVoicing
+            beat2Step    = 2
+        default:
+            // Variant 0: standard shell
+            beat2Voicing = shellVoicing
+            beat4Voicing = shellVoicing
+            beat2Step    = 4
+        }
 
         if !onlyBeat4 {
             let vel = UInt8(65 + rng.nextInt(upperBound: 11))
-            for note in shellVoicing {
-                events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: vel, durationSteps: 5))
+            for note in beat2Voicing {
+                events.append(MIDIEvent(stepIndex: base + beat2Step, note: UInt8(note),
+                                        velocity: vel, durationSteps: 5))
             }
         }
         if !onlyBeat2 {
             let vel = UInt8(60 + rng.nextInt(upperBound: 11))
-            for note in shellVoicing {
-                events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(note), velocity: vel, durationSteps: 4))
+            for note in beat4Voicing {
+                events.append(MIDIEvent(stepIndex: base + beat4Step, note: UInt8(note),
+                                        velocity: vel, durationSteps: 4))
             }
         }
+
+        // Variant 1: AND-of-3 ghost hit at step 10 (very soft)
+        if variant == 1 && !onlyBeat2 && !onlyBeat4 {
+            let ghostVel = UInt8(40 + rng.nextInt(upperBound: 10))
+            for note in shellVoicing {
+                events.append(MIDIEvent(stepIndex: base + 10, note: UInt8(note),
+                                        velocity: ghostVel, durationSteps: 2))
+            }
+        }
+
+        // 20% chance: extra syncopated fill at step 6 (AND of beat 2), very quiet
+        if rng.nextDouble() < 0.20 && !onlyBeat2 && !onlyBeat4 {
+            let fillVel = UInt8(38 + rng.nextInt(upperBound: 10))
+            let fillNote = shellVoicing.first ?? voicing[0]
+            events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(fillNote),
+                                    velocity: fillVel, durationSteps: 2))
+        }
+
         return events
     }
 

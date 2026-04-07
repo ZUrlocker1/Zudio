@@ -1246,7 +1246,7 @@ struct SongGenerator {
         switch ruleID {
         case "MOT-LD1-001": return "Neu! motif first"
         case "MOT-LD1-002": return "Pentatonic cell"
-        case "MOT-LD1-003": return "Long Breath"
+        case "MOT-LD1-003": return "Punch solo"
         case "MOT-LD1-004": return "Stepwise sequence"
         case "MOT-LD1-005": return "Call and answer"
         case "MOT-LD1-006": return "Long arc solo"

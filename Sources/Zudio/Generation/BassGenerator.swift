@@ -159,7 +159,7 @@ struct BassGenerator {
             return simpleRuleVariationBar(barStart: barStart, bar: bar, ruleID: ruleID, entry: entry, frame: frame)
         }
         switch ruleID {
-        case "MOT-BASS-002": return motorikDriveBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-002": return motorikDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-003": return crawlingWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-004": return hallogalloLockBar(barStart: barStart, entry: entry, frame: frame)
         case "MOT-BASS-005":
@@ -496,17 +496,43 @@ struct BassGenerator {
     }
 
     // MARK: - BAS-002: Motorik Drive — steady quarter pulse, velocity-accented
+    // Cycles through 3 micro-variants every 8 bars so A sections never go more than
+    // 8 bars with the same pattern before a subtle change appears.
+    //   Cycle 0 (bars 0–7 of any 8-bar window):  4 root quarters (standard)
+    //   Cycle 1 (bars 8–15):  root–fifth–root–root  (fifth on beat 2)
+    //   Cycle 2 (bars 16–23): root (half)–root (half)  (half-time, 2 notes only)
+    // The existing simpleRuleVariationBar (B sections) applies on top of this and
+    // takes precedence when useVariation is true.
 
     private static func motorikDriveBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
-        let rootNote = chordRootNote(entry: entry, frame: frame)
-        let velocities: [UInt8] = [96, 70, 88, 68]
-        let durations:  [Int]   = [3,  2,  3,  2]
-        for beat in 0..<4 {
-            events.append(MIDIEvent(stepIndex: barStart + beat * 4, note: rootNote,
-                                    velocity: velocities[beat], durationSteps: durations[beat]))
+        let root = chordRootNote(entry: entry, frame: frame)
+        let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
+
+        switch (bar / 8) % 3 {
+        case 1:
+            // Cycle 1: root–fifth–root–root (fifth on beat 2 — one colour note per bar)
+            let pitches: [UInt8] = [root, fifth, root, root]
+            let vels:    [UInt8] = [96,   78,    88,   68  ]
+            let durs:    [Int]   = [3,    2,     3,    2   ]
+            for beat in 0..<4 {
+                events.append(MIDIEvent(stepIndex: barStart + beat * 4, note: pitches[beat],
+                                        velocity: vels[beat], durationSteps: durs[beat]))
+            }
+        case 2:
+            // Cycle 2: half-time feel — root on beat 1 (long) and beat 3 (long), beats 2+4 silent
+            events.append(MIDIEvent(stepIndex: barStart,      note: root, velocity: 94, durationSteps: 7))
+            events.append(MIDIEvent(stepIndex: barStart + 8,  note: root, velocity: 80, durationSteps: 6))
+        default:
+            // Cycle 0: standard 4 root quarters
+            let velocities: [UInt8] = [96, 70, 88, 68]
+            let durations:  [Int]   = [3,  2,  3,  2]
+            for beat in 0..<4 {
+                events.append(MIDIEvent(stepIndex: barStart + beat * 4, note: root,
+                                        velocity: velocities[beat], durationSteps: durations[beat]))
+            }
         }
         return events
     }
@@ -592,7 +618,7 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let rootNote      = chordRootNote(entry: entry, frame: frame)
-        let upperNeighbor = UInt8(clamped(Int(rootNote) + 1, low: 28, high: 52))
+        let upperNeighbor = nearestScaleNote(to: Int(rootNote) + 1, frame: frame, low: 28, high: 52)
         events.append(MIDIEvent(stepIndex: barStart,      note: rootNote,      velocity: 90, durationSteps: 11))
         events.append(MIDIEvent(stepIndex: barStart + 12, note: rootNote,      velocity: 76, durationSteps: 1))
         events.append(MIDIEvent(stepIndex: barStart + 13, note: upperNeighbor, velocity: 68, durationSteps: 1))
@@ -684,7 +710,7 @@ struct BassGenerator {
         var events: [MIDIEvent] = []
         let root       = chordRootNote(entry: entry, frame: frame)
         let fifth      = UInt8(clamped(Int(root) + 7,  low: 28, high: 56))
-        let octave     = UInt8(clamped(Int(root) + 12, low: 28, high: 56))  // wide range for arpeggio
+        let octave     = nearestScaleNote(to: Int(root) + 12, frame: frame, low: 28, high: 56)  // scale-snapped octave
         let minorThird = nearestScaleNote(to: Int(root) + 3, frame: frame, low: 28, high: 56)  // mode 3rd colour
         let tritPass   = nearestScaleNote(to: Int(root) + 6, frame: frame, low: 28, high: 56)  // scale passing tone
         let upperNeigh = nearestScaleNote(to: Int(root) + 8, frame: frame, low: 28, high: 56)  // scale upper neighbour

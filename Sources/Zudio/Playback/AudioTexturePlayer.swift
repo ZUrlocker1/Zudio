@@ -117,10 +117,10 @@ final class AudioTexturePlayer {
         switch filename {
         case "light_rain.m4a":    return 0.12   // rain reads loud; keep subtle
         case "urban_rain.m4a":    return 0.12   // urban rain also reads loud
-        case "harbor.m4a":        return 0.12   // harbor ambience reads loud
-        case "vinyl_crackle.m4a": return 0.30   // crackle sits low in recordings; needs a boost
-        case "city_at_night.m4a": return 0.36   // city ambience is quiet; raise further
-        case "bar_sounds.m4a":    return 0.28   // bar ambience sits quiet; raise to match feel
+        case "harbor.m4a":        return 0.22   // raised: harbor was too quiet
+        case "vinyl_crackle.m4a": return 0.45   // raised: crackle needs more presence
+        case "city_at_night.m4a": return 0.50   // raised: city at night was too faint
+        case "bar_sounds.m4a":    return 0.42   // raised: bar ambience needs more presence
         case "ocean_waves.m4a":   return 0.10   // waves are already loud; pull back
         default:                  return 0.18
         }

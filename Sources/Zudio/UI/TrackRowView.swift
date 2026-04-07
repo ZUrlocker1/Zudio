@@ -43,7 +43,7 @@ struct TrackRowView: View {
                 return [.init(name:"Flute",        program:73),  .init(name:"Brightness",     program:100)]
             }
             return [.init(name:"Mono Synth",       program:81), .init(name:"Soft Brass",      program:62),
-                    .init(name:"Fifths Lead",      program:86),  .init(name:"Moog Lead",       program:39)]
+                    .init(name:"Fifths Lead",      program:86)]
         case kTrackLead2:
             if isChill {
                 return [.init(name:"Vibraphone",   program:11),  .init(name:"Flute",          program:73),
@@ -94,9 +94,9 @@ struct TrackRowView: View {
                 return [.init(name:"FX Crystal",   program:98), .init(name:"Vibraphone",  program:11),
                         .init(name:"Wurlitzer",    program:5),   .init(name:"Church Organ",program:19)]
             }
-            return [.init(name:"Guitar Pulse",  program:28), .init(name:"Wurlitzer",   program:5),
-                    .init(name:"Rock Organ",    program:18),  .init(name:"Rhodes",      program:4),
-                    .init(name:"Muted Guitar",  program:29)]
+            return [.init(name:"Guitar Pulse",  program:28), .init(name:"Moog Lead",   program:39),
+                    .init(name:"Wurlitzer",    program:5),   .init(name:"Rhodes",      program:4),
+                    .init(name:"Muted Guitar", program:29)]
         case kTrackTexture:
             if isChill {
                 // Pseudo-programs 240–250 map to audio texture files (intercepted in AppState.setProgram).

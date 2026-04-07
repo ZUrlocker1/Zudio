@@ -1,10 +1,10 @@
 // ChillTitleGenerator.swift — Chill generation step 8
 // Urban/nocturnal/cosmopolitan title vocabulary.
-// Seven pools: French words, English two-word, city districts, adj+noun (generative),
-// time-of-day phrases, single jazz first names, and location phrases (modifier + place).
-// Location phrases appear 20–30% of the time; e.g. "Late Night Baie d'Urfé", "Cool Cut Montreal".
-// Pool weights are mood-shaded: Deep/Dream favor French words and city districts;
-// Bright/Free favor English compounds and generative adj+noun.
+// Five pools: city+modifier (50%), French word, English two-word, adj+noun, time-of-day.
+// City combinations use a modifier drawn from time-of-day phrases, two-word phrases,
+// or directional/atmospheric words — all produce "Modifier City" style titles.
+// Mood-shaded: Deep/Dream favor French words; Bright/Free favor English and adj+noun.
+// No accents in any word.
 
 import Foundation
 
@@ -13,35 +13,91 @@ struct ChillTitleGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
         let roll = rng.nextDouble()
 
-        // Mood-shaded cutoffs (cumulative):
-        //   Deep/Dream:  Location 25%, French 25%, English 20%, City 10%, AdjNoun 10%, Time 5%, JazzName 5%
-        //   Bright/Free: Location 25%, French 10%, English 28%, City 10%, AdjNoun 20%, Time 4%, JazzName 3%
-        let (location, french, english, city, adjNoun, time): (Double, Double, Double, Double, Double, Double)
+        // City+modifier is always 50%. The remaining 50% is mood-shaded:
+        //   Deep/Dream:  French 25%, English 10%, AdjNoun 8%, Time 7%
+        //   Bright/Free: French 8%,  English 20%, AdjNoun 18%, Time 4%
+        let (french, english, adjNoun): (Double, Double, Double)
         switch frame.mood {
         case .Deep, .Dream:
-            (location, french, english, city, adjNoun, time) = (0.25, 0.50, 0.70, 0.80, 0.90, 0.95)
+            (french, english, adjNoun) = (0.75, 0.85, 0.93)   // time = remainder
         case .Bright, .Free:
-            (location, french, english, city, adjNoun, time) = (0.25, 0.35, 0.63, 0.73, 0.93, 0.97)
+            (french, english, adjNoun) = (0.58, 0.78, 0.96)   // time = remainder
         }
 
-        if roll < location { return locationPhrase(rng: &rng) }
-        if roll < french   { return frenchWord(rng: &rng) }
-        if roll < english  { return englishTwoWord(rng: &rng) }
-        if roll < city     { return cityDistrict(rng: &rng) }
-        if roll < adjNoun  { return coolAdjectiveNoun(rng: &rng) }
-        if roll < time     { return timeOfDay(rng: &rng) }
-        return jazzName(rng: &rng)
+        if roll < 0.50    { return cityPhrase(rng: &rng) }
+        if roll < french  { return frenchWord(rng: &rng) }
+        if roll < english { return englishTwoWord(rng: &rng) }
+        if roll < adjNoun { return coolAdjectiveNoun(rng: &rng) }
+        return timeOfDay(rng: &rng)
     }
 
-    // MARK: - Title pools
+    // MARK: - City + modifier (50%)
+
+    private static func cityPhrase(rng: inout SeededRNG) -> String {
+        let modifiers = [
+            // Time-of-day
+            "Late Night", "After Dark", "After Midnight", "Before Dawn",
+            "Three AM", "Blue Hour", "Last Light", "After Hours",
+            "Midnight", "Early",
+            // Atmospheric two-word
+            "Low Light", "Still Water", "Quiet", "Cool",
+            "Slow Burn", "Soft Focus", "Deep", "Open Air",
+            "Warm", "Pale Sun",
+            // Directional / geographic feel
+            "West End", "East Side", "North Shore", "South",
+            "Upper", "Old", "Inner", "Winter",
+        ]
+        let cities = [
+            // Montreal neighborhoods
+            "Montreal", "Plateau", "Mile End", "Rosemont", "Verdun",
+            "Outremont", "Westmount", "Hochelaga", "Villeray", "Ahuntsic",
+            "Cote-des-Neiges", "Lachine", "LaSalle", "Longueuil", "NDG",
+            "Saint-Laurent", "Pointe-Saint-Charles", "Griffintown",
+            // West Island / South Shore
+            "Baie d'Urfe", "Dorval", "Pointe-Claire", "Sainte-Anne",
+            "Beaconsfield", "Kirkland", "Dollard", "Vaudreuil",
+            // Quebec City
+            "Vieux-Quebec", "Saint-Roch", "Limoilou", "Montcalm",
+            "Saint-Sauveur", "Beauport", "Charlesbourg", "Sainte-Foy",
+            // Quebec cities
+            "Sherbrooke", "Trois-Rivieres", "Gatineau", "Saguenay",
+            "Rimouski", "Chicoutimi", "Jonquiere", "Riviere-du-Loup",
+            "Magog", "Granby", "Saint-Hyacinthe", "Drummondville",
+            "Shawinigan", "Victoriaville", "Val-d'Or", "Rouyn-Noranda",
+            "Sept-Iles", "Alma", "Joliette", "Sorel",
+            // Quebec regions
+            "Laurentides", "Charlevoix", "Gaspesie", "Abitibi",
+            "Beauce", "Lanaudiere", "Brome",
+            // Other North America
+            "Traverse City", "Detroit", "Brooklyn", "Harlem",
+            "Bed-Stuy", "Crown Heights", "Oakland", "Logan Square",
+        ]
+        let mod  = modifiers[rng.nextInt(upperBound: modifiers.count)]
+        let city = cities[rng.nextInt(upperBound: cities.count)]
+        return "\(mod) \(city)"
+    }
+
+    // MARK: - French word + modifier
 
     private static func frenchWord(rng: inout SeededRNG) -> String {
         let words = ["Velours", "Sablier", "Solstice", "Brume", "Toile",
-                     "Azur", "Nuit", "Soirée", "Douceur", "Crépuscule",
+                     "Azur", "Nuit", "Soiree", "Douceur", "Crepuscule",
                      "Lune", "Reflet", "Silence", "Calme", "Nuage",
-                     "Nocturne", "Étude", "Reverie", "Minuit", "Lumière"]
-        return words[rng.nextInt(upperBound: words.count)]
+                     "Nocturne", "Etude", "Reverie", "Minuit", "Lumiere"]
+        let modifiers = [
+            // Time-of-day
+            "Late Night", "After Dark", "After Midnight", "Before Dawn",
+            "Three AM", "Blue Hour", "Last Light", "Midnight",
+            // Directional / atmospheric
+            "Upper", "Old", "Inner", "West End", "East Side", "North Shore",
+            "Deep", "Quiet", "Cool", "Warm", "Low Light", "Still",
+        ]
+        let word = words[rng.nextInt(upperBound: words.count)]
+        let mod  = modifiers[rng.nextInt(upperBound: modifiers.count)]
+        return "\(mod) \(word)"
     }
+
+    // MARK: - English two-word
 
     private static func englishTwoWord(rng: inout SeededRNG) -> String {
         let combos = ["Blue Hour", "Glass City", "Slow Burn", "Night Tide",
@@ -52,17 +108,7 @@ struct ChillTitleGenerator {
         return combos[rng.nextInt(upperBound: combos.count)]
     }
 
-    private static func cityDistrict(rng: inout SeededRNG) -> String {
-        let districts = ["Marais", "Belleville", "Lafayette", "Brixton", "Stoke",
-                         "Pigalle", "Montmartre", "Shoreditch", "Brooklyn", "Clichy",
-                         "Oberkampf", "Dalston", "Hackney", "Battersea", "Notting Hill",
-                         "Saint-Germain", "Bastille", "République", "Amsterdam",
-                         "Ladbroke Grove", "Lisbon",
-                         "Baie d'Urfé", "Montreal", "Dorval", "Pointe-Claire",
-                         "Sainte-Anne-de-Bellevue", "Saint-Laurent",
-                         "Traverse City", "Detroit"]
-        return districts[rng.nextInt(upperBound: districts.count)]
-    }
+    // MARK: - Adj + noun generative
 
     private static func coolAdjectiveNoun(rng: inout SeededRNG) -> String {
         let adjectives = ["Quiet", "Still", "Low", "Deep", "Soft",
@@ -76,32 +122,12 @@ struct ChillTitleGenerator {
         return "\(adj) \(noun)"
     }
 
+    // MARK: - Time of day
+
     private static func timeOfDay(rng: inout SeededRNG) -> String {
         let times = ["After Midnight", "Three AM", "Last Set", "Before Dawn",
                      "Late Hour", "After Two", "Last Light", "After Hours",
                      "Midnight Minus One", "Before Blue"]
         return times[rng.nextInt(upperBound: times.count)]
-    }
-
-    private static func jazzName(rng: inout SeededRNG) -> String {
-        let names = ["Chet", "Miles", "Bill", "Monk", "Gil",
-                     "Lee", "Wes", "Hank", "Art", "Bud"]
-        return names[rng.nextInt(upperBound: names.count)]
-    }
-
-    // MARK: - Location phrase: modifier + place (20–25% of titles)
-
-    private static func locationPhrase(rng: inout SeededRNG) -> String {
-        let modifiers = ["Late Night", "After Dark", "Cool", "Still",
-                         "Low Light", "West End", "East Side", "North Shore",
-                         "Early", "Quiet", "Winter", "Summer Night"]
-        let places = ["Baie d'Urfé", "Montreal", "Dorval", "Pointe-Claire",
-                      "Saint-Laurent", "Sainte-Anne", "Traverse City",
-                      "Saint-Germain", "Marais", "Belleville", "Montmartre",
-                      "Shoreditch", "Brixton", "Hackney", "Lisbon",
-                      "Brooklyn", "Detroit", "Amsterdam", "Oberkampf"]
-        let mod   = modifiers[rng.nextInt(upperBound: modifiers.count)]
-        let place = places[rng.nextInt(upperBound: places.count)]
-        return "\(mod) \(place)"
     }
 }

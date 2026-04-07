@@ -244,8 +244,10 @@ struct ChillLeadGenerator {
             guard label == .A || label == .B else { bar += 1; continue }
             // Skip bars where Lead 1 is playing
             guard !lead1BarSet.contains(bar) else { bar += 1; continue }
-            // 80% chance to respond in any available gap
-            guard rng.nextDouble() < 0.80 else { bar += 1; continue }
+            // Section A: sparse (40%) — space for the groove to breathe in the first half.
+            // Section B: dense (80%) — Lead 2 most active in the second half (CHL-RULE-06 rebuild arc).
+            let responseProb: Double = label == .A ? 0.40 : 0.80
+            guard rng.nextDouble() < responseProb else { bar += 1; continue }
 
             let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars
             // 2-bar phrases for Lead 2
