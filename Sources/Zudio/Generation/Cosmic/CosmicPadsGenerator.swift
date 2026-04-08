@@ -489,9 +489,11 @@ struct KosmicPadsGenerator {
             }
             return b7raw
         }()
-        var root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        var fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
-        var flat7  = noteInPadsRegister(pc: b7pc, targetOct: 2)
+        // Fourth above chord root may also be outside scale for non-tonic roots; snap it.
+        let fourthPC = snapToScale((rootPC + 5) % 12, scalePCs: scalePCs)
+        var root   = noteInPadsRegister(pc: rootPC,   targetOct: 2)
+        var fourth = noteInPadsRegister(pc: fourthPC, targetOct: 2)
+        var flat7  = noteInPadsRegister(pc: b7pc,     targetOct: 2)
 
         // Spread any note pair that lands within 2 semitones — the scale-snapped b7 can
         // produce a near-unison with the root (e.g. Db→D in F Ionian, giving D2 and Eb2
@@ -587,10 +589,7 @@ struct KosmicPadsGenerator {
         let semitones = [0, 7, 12]  // root, fifth, octave
         for i in 0..<noteCount {
             let st = semitones[i % semitones.count]
-            let base = 60 + rootPC + st
-            var midi = base
-            while midi < 60 { midi += 12 }
-            while midi > 84 { midi -= 12 }
+            let midi = clampToRegister(60 + rootPC + st, low: 60, high: 84)
 
             // Velocity ramp 52→72 over 4–8 beats
             let dur = 4 * (1 + rng.nextInt(upperBound: 2))  // 4 or 8 steps
@@ -606,23 +605,6 @@ struct KosmicPadsGenerator {
     // MARK: - Register helper: put pitch class in pads register (MIDI 36–72)
 
     private static func noteInPadsRegister(pc: Int, targetOct: Int) -> Int {
-        var midi = targetOct * 12 + pc
-        while midi < 48 { midi += 12 }   // floor raised to C3 — notes below this are muddy on pad synths
-        while midi > 72 { midi -= 12 }
-        return midi
-    }
-
-    // MARK: - Scale snap helper
-    // Snaps a pitch class to the nearest pitch class present in the song's scale.
-    // Used throughout this generator to ensure notes stay diatonic when the active
-    // chord root is a non-tonic scale degree (Modal Drift etc.)
-    private static func snapToScale(_ rawPC: Int, scalePCs: Set<Int>) -> Int {
-        let pc = (rawPC % 12 + 12) % 12
-        if scalePCs.contains(pc) { return pc }
-        for d in 1...6 {
-            if scalePCs.contains((pc + d) % 12) { return (pc + d) % 12 }
-            if scalePCs.contains((pc - d + 12) % 12) { return (pc - d + 12) % 12 }
-        }
-        return pc
+        clampToRegister(targetOct * 12 + pc, low: 48, high: 72)  // floor: C3 — notes below this are muddy on pad synths
     }
 }

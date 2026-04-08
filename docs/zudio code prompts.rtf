@@ -1313,8 +1313,7 @@ I'd like to look at some of the ideas you suggested earlier towards having less 
 \
 replace Kosmic Rhythm Vibraphone with Moog Lead\
 \
-\
-pleasse update the autoamted QA plan with instructions on how to create and run theste tests so that when we do a test later on for Ambient, we can get it working the first time.\
+pleasse update the automated QA plan with instructions on how to create and run theste tests so that when we do a test later on for Ambient, we can get it working the first time.\
 \
 For issue 1, would it make sense to just not have Lead 1 and Lead 2 play at the same time?  This is the technique we used in Chill and Motorik.  So the leads are not overlapping at the same time.  Can you look at how we do that for Motorik and suggest a similar approach here for Kosmic?\
  It's also fine if they have slightly overlapping MIDI ranges, though perhaps Lead 2 can skew a bit lower. But I am more concerned with overlapping ranges across Rhtyhm, Textures, Bass. \
@@ -1354,10 +1353,8 @@ renove RX Crystal from Kosmic Rhythm.  Add Mogo Bass and Moog lead. \
 \
 I would like to come up with a new KOS-TEXT-002    different from what we have as "EB Shimmer Hold" which has long notes and I feel muddies up the sound. Give me a suggestion on a new type of texture that would be a short note pattern followed by a gap of many bars and then maybe a variatio of the pattern  more empty bars, then another variation and so on. What ideas do you have?\
 \
-\
 the KOS-TEXT-004   Loscil aquatic shimmer\
 is also pretty overpowering.   Lets vary it so that the full chord is played only occsionaly.  In most instances lets play just 1 or 2 notes from the chord in a simple sequence, e.g. a chord reveal in ascending, or in descending with 2 or 3 notes only. give me a plan. \
-\
 \
 The song Zudio-Weit-Aether  has a Lead 1 solo KOS-LEAD-006   Jean Michel Jarre evolving phrase that seems to occupy all the bars\
 examine the MIDI and the Zudio log file and determine if this is a bug or a desing issue, but we shoudl fix it. Its too dense and unreleanting. There needs to be some gaps in the lead 1 and possibly some variation in the pattern over time. \
@@ -1365,4 +1362,21 @@ Similarly the bass and Pads \
 KOS-BASS-012   McCartney melodic drive\
 KOS-PADS-001   Eno long drone\
 never seemed to change in this song. \
-We must force some change occasionally otherwise its completely monotonous and repetitive.  Give me your ideas. 	}
+We must force some change occasionally otherwise its completely monotonous and repetitive.  Give me your ideas. 	\
+please examine the code for kosmic and see if there's any code that can be simplified, cleaned up or refactored.\
+\
+please see if there's any simplification or refactoring that could be done for motorik also\
+\
+analyze midi and log for Zudio-Solaxe-III  It seems there\'92s a clash in bar 57 with the lead 1 solo?  also possibly with the texture fills at bar 80 and elswwhere. \
+similar issues with the song Zudio-Proxima bars 29-30.  examine the song Zudio-Still-Hauch also to see if there are tonal clashes. Maybe there\'92s a generalized problem. \
+\
+
+\f0\b UX changes
+\f2\b0 \
+if we were to add a small bar indicator in the UX that shows the current bar where the play head is where would you put it?\
+\
+if the BPM selector has the focus, then if I click anywhere else in the grey area that is the top part of the screen or in fact anywhere else in the screen (the midi grid, the song title area, the status text log area) I want the BPM selector to lose the focus. That is, without me having to click an actual button.\
+\
+There is a weird bug. I can reproduce it but it\'92s hard to explain. When I do a reset (with the reset button), if I generate a Kosmic song, the firs ttime the song generates fine. It uses Brush kit drums. But the playback of the Brush kit drums is muffled, Some notes (possibly the snare) sound very distorted.  if I change the kit to a different one and then back to Brush kit its fixed and playing properly.  The same thing happens with Chill which also starts with Brush kit. In the case of chill sometimes all the tracks are muffled. Until I change the instrument for a track (and change it back) it is muffled.  I wonder if this is related to some of the default effects on these tracks. \
+\
+give me a plan based on the existing optimization-plan to optimize generation code and playback code to eliminate any O(n) code or any inner loop code that can be improved or removed from the loop. The goal is to reduce CPU demand.}

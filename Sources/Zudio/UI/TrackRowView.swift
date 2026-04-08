@@ -109,7 +109,7 @@ struct TrackRowView: View {
                         .init(name:"Vinyl crackle",  program:250)]
             }
             if isAmbient {
-                return [.init(name:"String Ensemble 2",program:49), .init(name:"Bowed Glass",  program:92),
+                return [.init(name:"Strings",program:49), .init(name:"Bowed Glass",  program:92),
                         .init(name:"Choir Aahs",    program:52), .init(name:"FX Atmosphere",   program:99),
                         .init(name:"Sweep Pad",     program:95), .init(name:"Pad 3 Poly",      program:90)]
             }

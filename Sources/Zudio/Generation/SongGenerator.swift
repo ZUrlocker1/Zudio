@@ -268,7 +268,7 @@ struct SongGenerator {
                 return rng.nextDouble() < 0.50 ? .ab : .aba
             }
             let forms:   [KosmicSongForm] = [.single_evolving, .ab,  .aba, .abab, .abba]
-            let weights: [Double]         = [0.30,             0.20, 0.25, 0.15,  0.10 ]
+            let weights: [Double]         = [0.15,             0.25, 0.30, 0.18,  0.12 ]
             return forms[rng.weightedPick(weights)]
         }()
         let structure = KosmicStructureGenerator.generate(
@@ -1714,6 +1714,24 @@ struct SongGenerator {
             return present
         }
 
+        // Bar-indexed event tables: one pass each, O(totalEvents).
+        // Replaces repeated O(totalEvents) filter scans in hatCount/bassLocked/fillName
+        // and the per-bar drum cymbal loop — all become O(eventsInThatBar) lookups.
+        var drumByBar = [Int: [MIDIEvent]]()
+        if kTrackDrums < trackEvents.count {
+            for ev in trackEvents[kTrackDrums] {
+                let b = ev.stepIndex / 16
+                if b >= 0 && b < totalBars { drumByBar[b, default: []].append(ev) }
+            }
+        }
+        var bassByBar = [Int: [MIDIEvent]]()
+        if kTrackBass < trackEvents.count {
+            for ev in trackEvents[kTrackBass] {
+                let b = ev.stepIndex / 16
+                if b >= 0 && b < totalBars { bassByBar[b, default: []].append(ev) }
+            }
+        }
+
         // fire: fires at the given absolute step index
         func fire(_ step: Int, tag: String, desc: String) {
             out[max(0, step), default: []].append(GenerationLogEntry(tag: tag, description: desc))
@@ -1797,13 +1815,12 @@ struct SongGenerator {
 
         // Helper: hat-event count in a step range within a bar
         func hatCount(bar: Int, fromStep: Int, toStep: Int) -> Int {
-            guard kTrackDrums < trackEvents.count else { return 0 }
             let bs = bar * 16
             // Include ride: ride-based patterns (CHL-DRUM-004) strip ride in the fill region,
             // so ride absence = fill, just like hat absence for hat-based patterns.
             let hatNotes: Set<UInt8> = [GMDrum.closedHat.rawValue, GMDrum.pedalHat.rawValue,
                                         GMDrum.openHat.rawValue, GMDrum.ride.rawValue]
-            return trackEvents[kTrackDrums].filter {
+            return (drumByBar[bar] ?? []).filter {
                 $0.stepIndex >= bs + fromStep && $0.stepIndex < bs + toStep && hatNotes.contains($0.note)
             }.count
         }
@@ -1815,18 +1832,15 @@ struct SongGenerator {
             return 1
         }
 
-        // Helper: bass locked = ≤1 note in back 12 steps of bar
+        // Helper: bass locked = no notes in back 12 steps of bar
         func bassLocked(bar: Int) -> Bool {
-            guard kTrackBass < trackEvents.count else { return false }
             let bs = bar * 16
-            return trackEvents[kTrackBass].filter { $0.stepIndex >= bs + 4 && $0.stepIndex < bs + 16 }.isEmpty
+            return (bassByBar[bar] ?? []).allSatisfy { $0.stepIndex < bs + 4 }
         }
 
         // Helper: identify cold start pickup fill name by examining drum notes in the last intro bar
         func coldStartFillName(bar: Int) -> String {
-            guard kTrackDrums < trackEvents.count else { return "drum fill" }
-            let bs = bar * 16
-            let evs = trackEvents[kTrackDrums].filter { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
+            let evs = drumByBar[bar] ?? []
             guard !evs.isEmpty else { return "drum fill" }
             let notes = Set(evs.map { $0.note })
             // Ride-based: Manchester atmospheric (Kosmic v3)
@@ -1850,10 +1864,9 @@ struct SongGenerator {
 
         // Helper: identify fill name by examining drum notes in the fill region
         func fillName(bar: Int, beats: Int) -> String {
-            guard kTrackDrums < trackEvents.count else { return "drum fill" }
             let bs = bar * 16
             let regionStart = bs + (beats == 3 ? 4 : beats == 2 ? 8 : 12)
-            let evs = trackEvents[kTrackDrums].filter { $0.stepIndex >= regionStart && $0.stepIndex < bs + 16 }
+            let evs = (drumByBar[bar] ?? []).filter { $0.stepIndex >= regionStart && $0.stepIndex < bs + 16 }
             let notes = Set(evs.map { $0.note })
             switch beats {
             case 1:
@@ -2013,14 +2026,13 @@ struct SongGenerator {
         // back to ride after a non-body section doesn't re-trigger.
         let isRideGroove = drumRules.contains("MOT-DRUM-003") || drumRules.contains("CHL-DRUM-004")
         if includeDrumFills && kTrackDrums < trackEvents.count {
-            let drumEvs = trackEvents[kTrackDrums]
             var prevCymbalMode: String? = nil
             for bar in 0..<totalBars {
                 guard !allFillBars.contains(bar),
                       let sec = structure.section(atBar: bar),
                       sec.label == .A || sec.label == .B else { continue }
                 let bs = bar * 16
-                let barEvs = drumEvs.filter { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
+                let barEvs = drumByBar[bar] ?? []
                 let hasRide       = barEvs.contains { $0.note == GMDrum.ride.rawValue }
                 let hasClosedHat  = barEvs.contains { $0.note == GMDrum.closedHat.rawValue }
                 let hasCrashBeat1 = barEvs.contains { $0.stepIndex == bs     && $0.note == GMDrum.crash1.rawValue }
@@ -2071,11 +2083,9 @@ struct SongGenerator {
         ]
         for (trackIdx, trackName, entranceDesc) in spotlightTracks {
             guard trackIdx < trackEvents.count else { continue }
-            var barHasNotes = [Bool](repeating: false, count: totalBars)
-            for ev in trackEvents[trackIdx] {
-                let b = ev.stepIndex / 16
-                if b < totalBars { barHasNotes[b] = true }
-            }
+            // trackBars[trackIdx] is already exactly this — no need to rebuild.
+            let barHasNotes = trackIdx < trackBars.count ? trackBars[trackIdx]
+                                                         : [Bool](repeating: false, count: totalBars)
             // Scan for silence blocks: find start and end of each contiguous silent run.
             // Thresholds are intentionally high — only flag tracks that are genuinely absent,
             // not sparse instruments with natural gaps between phrases.
@@ -2128,16 +2138,18 @@ struct SongGenerator {
                 // Path B: fingerprint inference (Motorik and patterns without explicit tracking)
                 // Fires at most once per body section — oscillating patterns like KOS-BASS-002
                 // (root ↔ fifth every 4 bars) would otherwise trigger on every window change.
-                let bassEvents = trackEvents[kTrackBass]
-                func bassFP(fromBar: Int) -> Set<UInt8> {
+                // Single-pass window: uses bassByBar so the 4-bar accumulation is O(eventsInWindow).
+                func bassWindow(fromBar: Int) -> (fp: Set<UInt8>, count: Int) {
                     let windowEnd = min(fromBar + 4, totalBars)
-                    return Set(bassEvents
-                        .filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }
-                        .map { $0.note % 12 })
-                }
-                func bassCount(fromBar: Int) -> Int {
-                    let windowEnd = min(fromBar + 4, totalBars)
-                    return bassEvents.filter { let b = $0.stepIndex / 16; return b >= fromBar && b < windowEnd }.count
+                    var pitchClasses = Set<UInt8>()
+                    var count = 0
+                    for b in fromBar..<windowEnd {
+                        for ev in bassByBar[b] ?? [] {
+                            pitchClasses.insert(ev.note % 12)
+                            count += 1
+                        }
+                    }
+                    return (pitchClasses, count)
                 }
                 var prevFP: Set<UInt8>? = nil
                 var prevCount: Int = 0
@@ -2145,8 +2157,7 @@ struct SongGenerator {
                 for bar in stride(from: 0, to: outroStartBar, by: 4) {
                     guard let sec = structure.section(atBar: bar),
                           sec.label == .A || sec.label == .B else { continue }
-                    let fp = bassFP(fromBar: bar)
-                    let count = bassCount(fromBar: bar)
+                    let (fp, count) = bassWindow(fromBar: bar)
                     if let prev = prevFP, !fp.isEmpty, !prev.isEmpty,
                        (bar - lastEvolvedBar) >= 8 {
                         let union = fp.union(prev).count

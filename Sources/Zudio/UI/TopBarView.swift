@@ -438,7 +438,7 @@ struct HelpView: View {
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
                 helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to /Downloads. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
-                helpLine("Reset (⌘R)", "Reset all instruments and effects to style defaults.")
+                helpLine("Reset (⌘R)", "Reset audio, and all tracks and settings to initial state.")
                 helpLine("◀ Name ▶", "Cycle through GM instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates only that track's notes. Structure and key are preserved.")
                 helpLine("M / S", "Mute or Solo a track. Click again to toggle off.")

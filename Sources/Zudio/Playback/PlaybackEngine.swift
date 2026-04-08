@@ -297,6 +297,12 @@ final class PlaybackEngine: ObservableObject {
         allNotesOff()
         engine.stop()
         startEngine()
+        // AVAudioUnitSampler can lose its loaded soundbank when the engine stops.
+        // Clear the program cache so the next setProgram() calls force a reload
+        // instead of hitting the "already loaded" early-return guard.
+        currentProgram = Array(repeating: 255, count: kTrackCount)
+        currentBankMSB = Array(repeating: 0,   count: kTrackCount)
+        cachedDrumProgram = 255
     }
 
     /// Reset the playhead to bar 1 without requiring a loaded song.
@@ -309,15 +315,18 @@ final class PlaybackEngine: ObservableObject {
 
     nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
         guard currentSchedulerID == schedulerID else { return }
+        // Bind both maps once — eliminates 4 redundant re-lookups in the main.async block.
+        let noteOffs = noteOffMap[step]   ?? []
+        let noteOns  = stepEventMap[step] ?? []
         // Fire note-offs first — pre-computed at load time, no asyncAfter allocations.
         // Chill Pads note-offs are deferred: stopNote fires after the boost fade-out completes
         // (see main.async block below), so the audio has time to fade before the note cuts.
-        for (trackIndex, note) in noteOffMap[step] ?? [] {
+        for (trackIndex, note) in noteOffs {
             if chillPadsMode && trackIndex == kTrackPads { continue }
             samplers[trackIndex].stopNote(note, onChannel: gmChannel(trackIndex))
         }
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
-        for (trackIndex, ev) in stepEventMap[step] ?? [] {
+        for (trackIndex, ev) in noteOns {
             let channel = gmChannel(trackIndex)
             // Machine Kit (GM program 24) has harsh kick/snare at full velocity — scale down
             let fireVelocity: UInt8
@@ -329,16 +338,19 @@ final class PlaybackEngine: ObservableObject {
             samplers[trackIndex].startNote(ev.note, withVelocity: fireVelocity, onChannel: channel)
         }
         // Minimal main-actor hop: update @Published playhead and handle X-Files delay mute.
+        // Ambient fade loops are skipped on silent steps (~75% of steps have no events).
+        let hasEvents = !noteOffs.isEmpty || !noteOns.isEmpty
         DispatchQueue.main.async { [weak self] in
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             self.currentBar  = bar
+            // sps is constant for the life of a song — compute once for both mode blocks.
+            let sps = self.songState?.frame.secondsPerStep ?? 0.1
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
             // The chosen duration is stored per-track and reused for the matching note-off.
-            if self.ambientMode {
-                let sps = self.songState?.frame.secondsPerStep ?? 0.1
-                for (trackIndex, ev) in self.stepEventMap[step] ?? [] {
+            if hasEvents, self.ambientMode {
+                for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackBass || trackIndex == kTrackPads {
                         let noteSecs  = Double(ev.durationSteps) * sps
                         let fadeSecs  = min(0.5, max(0.03, noteSecs / 3.0))
@@ -347,7 +359,7 @@ final class PlaybackEngine: ObservableObject {
                         self.startAmbientBoostFade(trackIndex: trackIndex, toVolume: 1.0, duration: fadeSecs)
                     }
                 }
-                for (trackIndex, _) in self.noteOffMap[step] ?? [] {
+                for (trackIndex, _) in noteOffs {
                     if trackIndex == kTrackBass || trackIndex == kTrackPads {
                         let idx      = trackIndex == kTrackBass ? 0 : 1
                         let fadeSecs = self.ambientNoteFadeDuration[idx]
@@ -359,8 +371,7 @@ final class PlaybackEngine: ObservableObject {
             // Also resets sweep phase to bottom of cycle (filter fully closed) on each note-on,
             // so every chord starts dark and sweeps upward — then back down before it ends.
             if self.chillPadsMode {
-                let sps = self.songState?.frame.secondsPerStep ?? 0.1
-                for (trackIndex, ev) in self.stepEventMap[step] ?? [] {
+                for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackPads {
                         let noteSecs = Double(ev.durationSteps) * sps
                         let fadeSecs = min(1.0, max(0.1, noteSecs / 4.0))
@@ -373,7 +384,7 @@ final class PlaybackEngine: ObservableObject {
                         }
                     }
                 }
-                for (trackIndex, note) in self.noteOffMap[step] ?? [] {
+                for (trackIndex, note) in noteOffs {
                     if trackIndex == kTrackPads {
                         let fadeSecs = self.ambientNoteFadeDuration[1]
                         self.startAmbientBoostFade(trackIndex: kTrackPads, toVolume: 0.0, duration: fadeSecs)

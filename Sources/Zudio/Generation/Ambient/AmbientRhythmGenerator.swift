@@ -22,7 +22,7 @@ struct AmbientRhythmGenerator {
         let bounds    = kRegisterBounds[kTrackRhythm]!  // low:45, high:76
         let loopSteps = loopBars * 16
         let scalePCs  = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
-        let scaleNotes = notes(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
+        let scaleNotes = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !scaleNotes.isEmpty else { return [] }
 
         // Resolve rule — forced overrides random roll
@@ -45,7 +45,7 @@ struct AmbientRhythmGenerator {
         case "AMB-RTHM-001": return singleTonePulse(notes: scaleNotes, loopSteps: loopSteps, rng: &rng)
         case "AMB-RTHM-002":
             let chordPCs   = tonalMap.entry(atBar: 0)?.chordWindow.chordTones ?? scalePCs
-            let chordNotes = notes(pitchClasses: chordPCs, low: bounds.low, high: bounds.high)
+            let chordNotes = notesInRegister(pitchClasses: chordPCs, low: bounds.low, high: bounds.high)
             return sparseArpeggio(notes: chordNotes.isEmpty ? scaleNotes : chordNotes,
                                    loopSteps: loopSteps, rng: &rng)
         case "AMB-RTHM-003": return stochasticPhrase(notes: scaleNotes, loopSteps: loopSteps, rng: &rng)
@@ -94,9 +94,7 @@ struct AmbientRhythmGenerator {
         let minorModes: Set<Mode> = [.Aeolian, .Dorian, .MinorPentatonic]
         let pentIntervals = minorModes.contains(frame.mode) ? [0, 3, 5, 7, 10] : [0, 2, 4, 7, 9]
         let pentPCs   = Set(pentIntervals.map { (rootPC + $0) % 12 })
-        let pentNotes = (bounds.low...bounds.high).compactMap { n -> UInt8? in
-            pentPCs.contains(n % 12) ? UInt8(n) : nil
-        }
+        let pentNotes = notesInRegister(pitchClasses: pentPCs, low: bounds.low, high: bounds.high)
         guard pentNotes.count >= 4 else { return [] }
 
         let noteCount = 4 + rng.nextInt(upperBound: 2)             // 4 or 5 notes
@@ -175,10 +173,4 @@ struct AmbientRhythmGenerator {
         return events
     }
 
-    // MARK: - Helper
-
-    private static func notes(pitchClasses: Set<Int>, low: Int, high: Int) -> [UInt8] {
-        guard low <= high else { return [] }
-        return (low...high).compactMap { n in pitchClasses.contains(n % 12) ? UInt8(n) : nil }
-    }
 }

@@ -483,11 +483,7 @@ struct KosmicArpeggioGenerator {
         let third    = mode.nearestInterval(3)
 
         func place(_ semitones: Int) -> Int {
-            let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
-            var m = 60 + snapped
-            while m > 76 { m -= 12 }
-            while m < 58 { m += 12 }
-            return m
+            clampToRegister(60 + snapToScale(rootPC + semitones, scalePCs: scalePCs), low: 58, high: 76)
         }
         let r = place(0); let t = place(third); let f = place(7)
 
@@ -575,11 +571,7 @@ struct KosmicArpeggioGenerator {
             let third    = mode.nearestInterval(3)
 
             func place(_ semitones: Int) -> Int {
-                let snapped = snapToScale(rootPC + semitones + transposeInterval, scalePCs: scalePCs)
-                var m = 60 + snapped
-                while m > 80 { m -= 12 }
-                while m < 56 { m += 12 }
-                return m
+                clampToRegister(60 + snapToScale(rootPC + semitones + transposeInterval, scalePCs: scalePCs), low: 56, high: 80)
             }
 
             // 4-step quarter-note sequence: root → third → fifth → root
@@ -626,9 +618,7 @@ struct KosmicArpeggioGenerator {
                 let snapped = pc == 12 || pc == 12 + third || pc == 12 + 7
                     ? snapToScale(rootPC + (pc % 12), scalePCs: scalePCs)
                     : snapToScale(rootPC + pc, scalePCs: scalePCs)
-                var m = 60 + snapped
-                while m > 82 { m -= 12 }
-                while m < 58 { m += 12 }
+                let m = clampToRegister(60 + snapped, low: 58, high: 82)
                 if !pool.contains(m) { pool.append(m) }
             }
             pool.sort()
@@ -686,10 +676,7 @@ struct KosmicArpeggioGenerator {
                 // Place a pitch class in the mid register (MIDI 60–72)
                 func place(_ semitones: Int) -> Int {
                     let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
-                    var m = 60 + snapped
-                    while m > 72 { m -= 12 }
-                    while m < 60 { m += 12 }
-                    return m
+                    return clampToRegister(60 + snapped, low: 60, high: 72)
                 }
 
                 let lo = place(0)        // root in register
@@ -708,21 +695,21 @@ struct KosmicArpeggioGenerator {
                     case 0:
                         // 2 anchor hits: beats 1 and 3
                         for step in [0, 8] {
-                            let vel = UInt8(max(20, min(127, 52 + rng.nextInt(upperBound: 8) - 4)))
+                            let vel = jitteredVelocity(52, range: 8, rng: &rng)
                             events.append(MIDIEvent(stepIndex: barStart + step,
                                                     note: UInt8(anchor), velocity: vel, durationSteps: 6))
                         }
                     case 1:
                         // 2-note step: beats 1+2
                         for (i, note) in walk2.enumerated() {
-                            let vel = UInt8(max(20, min(127, 58 + rng.nextInt(upperBound: 8) - 4)))
+                            let vel = jitteredVelocity(58, range: 8, rng: &rng)
                             events.append(MIDIEvent(stepIndex: barStart + i * 4,
                                                     note: UInt8(note), velocity: vel, durationSteps: 5))
                         }
                     case 2:
                         // 4-note walk, one per beat
                         for (i, note) in walk4.enumerated() {
-                            let vel = UInt8(max(20, min(127, 64 + rng.nextInt(upperBound: 10) - 5)))
+                            let vel = jitteredVelocity(64, range: 10, rng: &rng)
                             events.append(MIDIEvent(stepIndex: barStart + i * 4,
                                                     note: UInt8(note), velocity: vel, durationSteps: 4))
                         }
@@ -730,7 +717,7 @@ struct KosmicArpeggioGenerator {
                         // Phase 3: reverse direction — arrival signal before B section
                         let arrival = walk4.reversed()
                         for (i, note) in arrival.enumerated() {
-                            let vel = UInt8(max(20, min(127, 72 + rng.nextInt(upperBound: 10) - 5)))
+                            let vel = jitteredVelocity(72, range: 10, rng: &rng)
                             events.append(MIDIEvent(stepIndex: barStart + i * 4,
                                                     note: UInt8(note), velocity: vel, durationSteps: 3))
                         }
@@ -771,11 +758,7 @@ struct KosmicArpeggioGenerator {
                     let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                     let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
                     func placeC(_ semitones: Int) -> Int {
-                        let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
-                        var m = 60 + snapped
-                        while m > 72 { m -= 12 }
-                        while m < 60 { m += 12 }
-                        return m
+                        clampToRegister(60 + snapToScale(rootPC + semitones, scalePCs: scalePCs), low: 60, high: 72)
                     }
                     let vel = UInt8(48 + rng.nextInt(upperBound: 12))  // 48–59, background
                     events.append(MIDIEvent(stepIndex: bar * 16 + 4, note: UInt8(placeC(0)),
@@ -790,20 +773,14 @@ struct KosmicArpeggioGenerator {
                 let third    = mode.nearestInterval(3)
 
                 func place(_ semitones: Int) -> Int {
-                    let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
-                    var m = 60 + snapped
-                    while m > 72 { m -= 12 }
-                    while m < 60 { m += 12 }
-                    return m
+                    clampToRegister(60 + snapToScale(rootPC + semitones, scalePCs: scalePCs), low: 60, high: 72)
                 }
                 let lo = place(0)
                 let md = place(third)
                 let hi = place(7)
-                var hiRoot = rootPC + 72
-                while hiRoot > 84 { hiRoot -= 12 }
-                while hiRoot < 60 { hiRoot += 12 }
+                let hiRoot = clampToRegister(rootPC + 72, low: 60, high: 84)
 
-                func vel(_ base: Int) -> UInt8 { UInt8(max(20, min(127, base + rng.nextInt(upperBound: 14) - 7))) }
+                func vel(_ base: Int) -> UInt8 { jitteredVelocity(base, range: 14, rng: &rng) }
                 let barStart = bar * 16
 
                 switch mainVariant {
@@ -868,10 +845,7 @@ struct KosmicArpeggioGenerator {
         var phrase: [Int] = []
         for iv in intervals {
             let snapped = iv == 12 ? rootPC : snapToScale(rootPC + iv, scalePCs: scalePCs)
-            var midi = 60 + snapped
-            while midi > 79 { midi -= 12 }
-            while midi < 60 { midi += 12 }
-            phrase.append(midi)
+            phrase.append(clampToRegister(60 + snapped, low: 60, high: 79))
         }
 
         // Spread notes across the hint window — one note roughly every 4-6 steps,
@@ -902,10 +876,7 @@ struct KosmicArpeggioGenerator {
         var notes: [Int] = []
         for st in [0, third, 7, flat7, 12] {
             let snapped = st == 12 ? rootPC : snapToScale(rootPC + st, scalePCs: scalePCs)
-            var midi = 60 + snapped
-            while midi > 72 { midi -= 12 }
-            while midi < 55 { midi += 12 }
-            notes.append(midi)
+            notes.append(clampToRegister(60 + snapped, low: 55, high: 72))
         }
         return notes
     }
@@ -927,10 +898,7 @@ struct KosmicArpeggioGenerator {
 
         func place(_ semitones: Int) -> Int {
             let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
-            var m = 60 + snapped
-            while m > 80 { m -= 12 }
-            while m < 60 { m += 12 }
-            return m
+            return clampToRegister(60 + snapped, low: 60, high: 80)
         }
         switch shape {
         case 0:  return [place(0), place(third), place(fifth), place(third)]   // pendulum
@@ -954,10 +922,7 @@ struct KosmicArpeggioGenerator {
         let octave = 12
         func place(_ semitones: Int) -> Int {
             let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
-            var m = 60 + snapped
-            while m > 78 { m -= 12 }
-            while m < 58 { m += 12 }
-            return m
+            return clampToRegister(60 + snapped, low: 58, high: 78)
         }
         return [place(0), place(third), place(fifth), place(octave)]
     }
@@ -975,10 +940,7 @@ struct KosmicArpeggioGenerator {
         let fourth = mode.nearestInterval(5)
         let sixth  = mode.nearestInterval(9)
         func place(_ pc: Int) -> Int {
-            var m = 60 + rootPC + pc
-            while m > 76 { m -= 12 }
-            while m < 58 { m += 12 }
-            return m
+            clampToRegister(60 + rootPC + pc, low: 58, high: 76)
         }
         return [place(0), place(third), place(fourth), place(7), place(sixth)]
     }
@@ -991,10 +953,7 @@ struct KosmicArpeggioGenerator {
         let third  = mode.nearestInterval(3)
         let flat7  = mode.nearestInterval(10)
         func place(_ pc: Int) -> Int {
-            var m = 60 + rootPC + pc
-            while m > 80 { m -= 12 }
-            while m < 60 { m += 12 }
-            return m
+            clampToRegister(60 + rootPC + pc, low: 60, high: 80)
         }
         return [place(0), place(third), place(7), place(flat7)]
     }
@@ -1146,19 +1105,18 @@ struct KosmicArpeggioGenerator {
                 if isOutro && bar >= section.startBar + 2 { continue }
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let third  = mode.nearestInterval(3)
-                let second = mode.nearestInterval(2)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let keyST    = keySemitone(frame.key)
+                let scalePCs = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+                let secondPC = snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
+                let thirdPC  = snapToScale((rootPC + 3) % 12, scalePCs: scalePCs)
+                let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
 
-                // Build 5-note cell: root, 2nd, 3rd, 5th, 3rd (modal texture, not a scale run)
+                // Build 5-note cell: root, 2nd, 3rd, 5th, 3rd — all snapped to scale
                 func place(_ pc: Int) -> Int {
-                    var m = 60 + rootPC + pc
-                    while m > 75 { m -= 12 }
-                    while m < 58 { m += 12 }
-                    return m
+                    clampToRegister(60 + pc, low: 58, high: 75)
                 }
-                let cell = [place(0), place(second), place(third), place(7), place(third)]
+                let cell = [place(rootPC), place(secondPC), place(thirdPC), place(fifthPC), place(thirdPC)]
 
                 // Starting note drifts +1 per bar over a 5-bar cycle
                 let startNote = bar % 5
@@ -1217,11 +1175,7 @@ struct KosmicArpeggioGenerator {
                 // Snap each note to the scale to prevent out-of-scale pitches when the chord
                 // root is a non-tonic scale degree (e.g. B in F# Dorian → D natural would clash).
                 func place(_ semitones: Int) -> Int {
-                    let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
-                    var m = 36 + snapped
-                    while m < lo { m += 12 }
-                    while m > hi { m -= 12 }
-                    return m
+                    clampToRegister(36 + snapToScale(rootPC + semitones, scalePCs: scalePCs), low: lo, high: hi)
                 }
                 let cell = [place(0), place(third), place(7), place(flat7),
                              place(7), place(third), place(second)]
@@ -1251,19 +1205,5 @@ struct KosmicArpeggioGenerator {
             }
         }
         return events
-    }
-
-    // MARK: - Scale snap helper
-    // Snaps a pitch class to the nearest pitch class present in the song's scale.
-    // Used by place() closures throughout this generator to prevent out-of-scale notes
-    // when the active chord root is a non-tonic scale degree.
-    private static func snapToScale(_ rawPC: Int, scalePCs: Set<Int>) -> Int {
-        let pc = (rawPC % 12 + 12) % 12
-        if scalePCs.contains(pc) { return pc }
-        for d in 1...6 {
-            if scalePCs.contains((pc + d) % 12) { return (pc + d) % 12 }
-            if scalePCs.contains((pc - d + 12) % 12) { return (pc - d + 12) % 12 }
-        }
-        return pc
     }
 }

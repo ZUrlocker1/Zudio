@@ -1001,11 +1001,17 @@ struct KosmicLeadGenerator {
                 }
                 let note = scale[Swift.min(scaleIdx, scale.count - 1)]
 
-                // Chromatic trill ornament (20%, not on first bar)
+                // Diatonic trill ornament (20%, not on first bar)
                 var mainOffset = 0
                 if i > 0 && rng.nextDouble() < 0.20 {
-                    let ornStart = 2 + rng.nextInt(upperBound: 3)  // start at step 2–4
-                    let upper    = note + 1                         // semitone up
+                    let ornStart  = 2 + rng.nextInt(upperBound: 3)  // start at step 2–4
+                    // Snap the upper trill note to the nearest scale tone above the main note
+                    let keyST2    = keySemitone(frame.key)
+                    let scalePCs2 = Set(entry.sectionMode.intervals.map { (keyST2 + $0) % 12 })
+                    let snapPC    = snapToScale((note + 1) % 12, scalePCs: scalePCs2)
+                    let baseOct   = (note / 12) * 12
+                    var upper     = baseOct + snapPC
+                    if upper <= note { upper += 12 }  // ensure upper > note
                     for j in 0..<4 {
                         let ornStep = ornStart + j
                         guard ornStep < 14 else { break }
@@ -1030,55 +1036,9 @@ struct KosmicLeadGenerator {
 
     // MARK: - Helpers
 
-    /// Picks `windowCount` non-overlapping solo windows of `soloLength` bars from body sections,
-    /// with at least `minGap` bars between the end of one window and the start of the next.
-    /// Each window start is chosen randomly from the first half of remaining valid candidates
-    /// so the repeats feel spread across the song rather than clustered at the start.
-    private static func pickSoloWindows(
-        structure: SongStructure,
-        soloLength: Int,
-        windowCount: Int,
-        minGap: Int,
-        rng: inout SeededRNG
-    ) -> [Range<Int>] {
-        // Collect all body bars (non-intro, non-outro, non-bridge)
-        var bodyBarSet = Set<Int>()
-        for section in structure.sections {
-            guard section.label != .intro && section.label != .outro else { continue }
-            guard !section.label.isBridge && section.label != .bridgeMelody else { continue }
-            for b in section.startBar..<section.endBar { bodyBarSet.insert(b) }
-        }
-        // A window start is valid if every bar in [start, start+soloLength) is a body bar
-        let validStarts = bodyBarSet.sorted().filter { start in
-            (start..<(start + soloLength)).allSatisfy { bodyBarSet.contains($0) }
-        }
-        guard !validStarts.isEmpty else { return [] }
-
-        var windows: [Range<Int>] = []
-        var earliestNext = validStarts[0]
-        for _ in 0..<windowCount {
-            let available = validStarts.filter { $0 >= earliestNext }
-            guard !available.isEmpty else { break }
-            // Pick from the first half of available starts so repeats spread across the song
-            let pickFrom = Swift.max(1, available.count / 2)
-            let chosenStart = available[rng.nextInt(upperBound: pickFrom)]
-            windows.append(chosenStart..<(chosenStart + soloLength))
-            earliestNext = chosenStart + soloLength + minGap
-        }
-        return windows
-    }
-
     /// Pitch class of the current chord root (0–11).
     private static func chordRootPC(frame: GlobalMusicalFrame, entry: TonalGovernanceEntry) -> Int {
         (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-    }
-
-    /// Transposes `midi` by octaves until it sits within [low, high].
-    private static func clampToRegister(_ midi: Int, low: Int, high: Int) -> Int {
-        var m = midi
-        while m > high { m -= 12 }
-        while m < low  { m += 12 }
-        return m
     }
 
     /// Scale notes for KOS-LEAD-006 phrase loop: MIDI 65–84 (upper-mid solo register)
@@ -1186,9 +1146,7 @@ struct KosmicLeadGenerator {
                 }
             } else {
                 // Default: single sustained 5th for the full bridge
-                var note = 72 + rootPC + 7
-                while note > 84 { note -= 12 }
-                while note < 72 { note += 12 }
+                let note = clampToRegister(72 + rootPC + 7, low: 72, high: 84)
                 let vel = UInt8(58 + rng.nextInt(upperBound: 12))
                 let durationSteps = section.lengthBars * 16
                 events.append(MIDIEvent(stepIndex: section.startBar * 16,

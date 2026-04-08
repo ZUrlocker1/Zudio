@@ -694,9 +694,8 @@ struct KosmicDrumGenerator {
     private static func kosmicTransitionFill(
         barStart: Int, variant: Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        func jitter(_ vel: Int) -> UInt8 { UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 9) - 4))) }
         func ev(_ step: Int, _ note: GMDrum, _ vel: Int) -> MIDIEvent {
-            MIDIEvent(stepIndex: barStart + step, note: note.rawValue, velocity: jitter(vel), durationSteps: 1)
+            MIDIEvent(stepIndex: barStart + step, note: note.rawValue, velocity: jitteredVelocity(vel, range: 9, rng: &rng), durationSteps: 1)
         }
         switch variant {
         case 0: // Hat strip
@@ -721,25 +720,24 @@ struct KosmicDrumGenerator {
         let bridgeLen   = max(1, section.endBar - section.startBar)
         let barInBridge = bar - section.startBar
         let phase       = min(3, barInBridge * 4 / bridgeLen)
-        func j(_ vel: Int) -> UInt8 { UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 7) - 3))) }
         var evs: [MIDIEvent] = []
         switch phase {
         case 0:
             break  // no fills — main groove alone
         case 1:
             // Ghost snares on "and of 2" (step 6) and "and of 4" (step 14)
-            evs.append(MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.snare.rawValue, velocity: j(44), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: j(48), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.snare.rawValue, velocity: jitteredVelocity(44, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: jitteredVelocity(48, range: 7, rng: &rng), durationSteps: 1))
         case 2:
             // Snare roll build: steps 8, 10, 12 — ascending velocity
-            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: j(58), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: j(66), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: j(74), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: jitteredVelocity(58, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: jitteredVelocity(66, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: jitteredVelocity(74, range: 7, rng: &rng), durationSteps: 1))
         default:  // phase 3: tom cascade + full crash climax
-            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.hiMidTom.rawValue,    velocity: j(82), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.lowFloorTom.rawValue,  velocity: j(88), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue,        velocity: j(96), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue,         velocity: j(100), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.hiMidTom.rawValue,    velocity: jitteredVelocity(82,  range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.lowFloorTom.rawValue,  velocity: jitteredVelocity(88,  range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue,        velocity: jitteredVelocity(96,  range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue,         velocity: jitteredVelocity(100, range: 7, rng: &rng), durationSteps: 1))
             evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.crash1.rawValue,       velocity: 100,   durationSteps: 4))
         }
         return evs
@@ -753,21 +751,20 @@ struct KosmicDrumGenerator {
         barStart: Int, bar: Int, section: SongSection, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let barInBridge = bar - section.startBar
-        func j(_ vel: Int) -> UInt8 { UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 7) - 3))) }
         var evs: [MIDIEvent] = []
         if barInBridge % 2 == 0 {
             // Call bar: synchronized hit (kick), hats on off-beats, snare beat 3
-            evs.append(MIDIEvent(stepIndex: barStart,      note: GMDrum.kick.rawValue,      velocity: j(100), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.closedHat.rawValue, velocity: j(60),  durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue,     velocity: j(82),  durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.closedHat.rawValue, velocity: j(64),  durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.closedHat.rawValue, velocity: j(58),  durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart,      note: GMDrum.kick.rawValue,      velocity: jitteredVelocity(100, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.closedHat.rawValue, velocity: jitteredVelocity(60,  range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue,     velocity: jitteredVelocity(82,  range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.closedHat.rawValue, velocity: jitteredVelocity(64,  range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.closedHat.rawValue, velocity: jitteredVelocity(58,  range: 7, rng: &rng), durationSteps: 1))
         } else {
             // Response bar: ascending snare pickup roll building back to the next call
-            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: j(46), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: j(56), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: j(66), durationSteps: 1))
-            evs.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: j(76), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: jitteredVelocity(46, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: jitteredVelocity(56, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: jitteredVelocity(66, range: 7, rng: &rng), durationSteps: 1))
+            evs.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: jitteredVelocity(76, range: 7, rng: &rng), durationSteps: 1))
         }
         return evs
     }
@@ -914,7 +911,7 @@ struct KosmicDrumGenerator {
         var events: [MIDIEvent] = []
         for (step, note, vel) in pattern {
             guard step >= fromStep else { continue }
-            let finalVel = UInt8(max(20, min(127, vel + rng.nextInt(upperBound: 11) - 5)))
+            let finalVel = jitteredVelocity(vel, range: 11, rng: &rng)
             events.append(MIDIEvent(stepIndex: barStart + step, note: note,
                                     velocity: finalVel, durationSteps: 1))
         }

@@ -59,6 +59,7 @@
 		AA000000000000000000035 /* CosmicBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000035 /* CosmicBassGenerator.swift */; };
 		AA000000000000000000036 /* CosmicDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000036 /* CosmicDrumGenerator.swift */; };
 		AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000037 /* CosmicTextureGenerator.swift */; };
+		AA00000000000000000007C /* CosmicHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007C /* CosmicHelpers.swift */; };
 		AA000000000000000000038 /* CosmicTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000038 /* CosmicTitleGenerator.swift */; };
 		AA000000000000000000039 /* AudioFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000039 /* AudioFileExporter.swift */; };
 		AA000000000000000000040 /* SongLogExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000040 /* SongLogExporter.swift */; };
@@ -72,6 +73,7 @@
 		AA000000000000000000056 /* AmbientLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000056 /* AmbientLeadGenerator.swift */; };
 		AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000057 /* AmbientRhythmGenerator.swift */; };
 		AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000058 /* AmbientTextureGenerator.swift */; };
+		AA000000000000000000059 /* AmbientHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000059 /* AmbientHelpers.swift */; };
 		AA000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */; };
 		AA000000000000000000061 /* ChillStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000061 /* ChillStructureGenerator.swift */; };
 		AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
@@ -145,6 +147,7 @@
 		BB000000000000000000035 /* CosmicBassGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicBassGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000036 /* CosmicDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicDrumGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000037 /* CosmicTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTextureGenerator.swift; sourceTree = "<group>"; };
+		BB00000000000000000007C /* CosmicHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicHelpers.swift; sourceTree = "<group>"; };
 		BB000000000000000000038 /* CosmicTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTitleGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000039 /* AudioFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000040 /* SongLogExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongLogExporter.swift; sourceTree = "<group>"; };
@@ -158,6 +161,7 @@
 		BB000000000000000000056 /* AmbientLeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientLeadGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000057 /* AmbientRhythmGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientRhythmGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000058 /* AmbientTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientTextureGenerator.swift; sourceTree = "<group>"; };
+		BB000000000000000000059 /* AmbientHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientHelpers.swift; sourceTree = "<group>"; };
 		BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillMusicalFrameGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000061 /* ChillStructureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillStructureGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000062 /* ChillDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillDrumGenerator.swift; sourceTree = "<group>"; };
@@ -367,6 +371,7 @@
 				BB000000000000000000035 /* CosmicBassGenerator.swift */,
 				BB000000000000000000036 /* CosmicDrumGenerator.swift */,
 				BB000000000000000000037 /* CosmicTextureGenerator.swift */,
+				BB00000000000000000007C /* CosmicHelpers.swift */,
 			);
 			path = Cosmic;
 			sourceTree = "<group>";
@@ -383,6 +388,7 @@
 				BB000000000000000000056 /* AmbientLeadGenerator.swift */,
 				BB000000000000000000057 /* AmbientRhythmGenerator.swift */,
 				BB000000000000000000058 /* AmbientTextureGenerator.swift */,
+				BB000000000000000000059 /* AmbientHelpers.swift */,
 			);
 			path = Ambient;
 			sourceTree = "<group>";
@@ -561,6 +567,7 @@
 				AA000000000000000000035 /* CosmicBassGenerator.swift in Sources */,
 				AA000000000000000000036 /* CosmicDrumGenerator.swift in Sources */,
 				AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */,
+				AA00000000000000000007C /* CosmicHelpers.swift in Sources */,
 				AA000000000000000000039 /* AudioFileExporter.swift in Sources */,
 				AA000000000000000000040 /* SongLogExporter.swift in Sources */,
 				AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
@@ -572,6 +579,7 @@
 				AA000000000000000000056 /* AmbientLeadGenerator.swift in Sources */,
 				AA000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */,
 				AA000000000000000000058 /* AmbientTextureGenerator.swift in Sources */,
+				AA000000000000000000059 /* AmbientHelpers.swift in Sources */,
 				AA000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */,
 				AA000000000000000000061 /* ChillStructureGenerator.swift in Sources */,
 				AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */,

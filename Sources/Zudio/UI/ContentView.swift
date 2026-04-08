@@ -35,6 +35,7 @@ struct ContentView: View {
                     infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)")
                     infoChip("BPM",    "\(song.frame.tempo)")
                     infoChip("Length", songLength(song))
+                    infoChip("Bar", String(format: "%03d", appState.playback.currentBar + 1))
                 } else if !appState.isGenerating {
                     Text("No song — press Generate or Play")
                         .foregroundStyle(Color.white.opacity(0.45))

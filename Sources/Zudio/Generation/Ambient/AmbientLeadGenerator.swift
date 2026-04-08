@@ -5,7 +5,7 @@
 //               AMB-LEAD-009 Magnetik solo (9%), AMB-LEAD-010 Oxygenerator solo (7%)
 // AMB-LEAD-009 and AMB-LEAD-010 are section-level solos: they bypass the loop tiler and
 // return full-song events (require structure != nil; degrade gracefully to silence if absent).
-// Lead 2: AMB-SYNC-003 — fills Lead 1 silent windows (absent if no windows).
+// Lead 2: AMB-SYNC-001 (ghost echo, 40%), AMB-LEAD-005 (fill silent windows), AMB-LEAD-006 (absent).
 // AMB-RULE-02 enforced: rest ≥ 2× note duration after each note event.
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
 
@@ -112,10 +112,10 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        // AMB-LEAD-004 (40%): ghost echo — delay Lead 1 notes by 4–8 steps at 60–65% velocity.
+        // AMB-SYNC-001 (40%): ghost echo — delay Lead 1 notes by 4–8 steps at 60–65% velocity.
         // Creates a natural echo/shadow effect; only fires when Lead 1 has content.
         if !lead1Events.isEmpty && rng.nextDouble() < 0.40 {
-            usedRuleIDs.insert("AMB-LEAD-004")
+            usedRuleIDs.insert("AMB-SYNC-001")
             var echoEvents: [MIDIEvent] = []
             for ev in lead1Events where ev.stepIndex < loopSteps {
                 let offset = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
@@ -384,8 +384,8 @@ struct AmbientLeadGenerator {
         frame: GlobalMusicalFrame, structure: SongStructure,
         tonalMap: TonalGovernanceMap, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let windows = pickAmbSoloWindows(structure: structure, soloLength: 8, windowCount: 2,
-                                         minGap: 12, rng: &rng)
+        let windows = pickSoloWindows(structure: structure, soloLength: 8, windowCount: 2,
+                                      minGap: 12, rng: &rng)
         guard !windows.isEmpty else { return [] }
 
         let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
@@ -444,8 +444,8 @@ struct AmbientLeadGenerator {
         frame: GlobalMusicalFrame, structure: SongStructure,
         tonalMap: TonalGovernanceMap, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let windows = pickAmbSoloWindows(structure: structure, soloLength: 9, windowCount: 2,
-                                         minGap: 12, rng: &rng)
+        let windows = pickSoloWindows(structure: structure, soloLength: 9, windowCount: 2,
+                                      minGap: 12, rng: &rng)
         guard !windows.isEmpty else { return [] }
 
         let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
@@ -522,52 +522,4 @@ struct AmbientLeadGenerator {
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
-    // MARK: - Solo window picker (mirrors KosmicLeadGenerator.pickSoloWindows)
-    // Picks exactly `windowCount` non-overlapping windows of `soloLength` bars from body sections.
-    // Enforces `minGap` between window end and next window start.
-    // Picks from the first half of remaining valid starts so repeats spread across the song.
-
-    private static func pickAmbSoloWindows(
-        structure: SongStructure,
-        soloLength: Int,
-        windowCount: Int,
-        minGap: Int,
-        rng: inout SeededRNG
-    ) -> [Range<Int>] {
-        var bodyBarSet = Set<Int>()
-        for section in structure.sections {
-            guard section.label != .intro && section.label != .outro else { continue }
-            guard !section.label.isBridge && section.label != .bridgeMelody else { continue }
-            for b in section.startBar..<section.endBar { bodyBarSet.insert(b) }
-        }
-        let validStarts = bodyBarSet.sorted().filter { start in
-            (start..<(start + soloLength)).allSatisfy { bodyBarSet.contains($0) }
-        }
-        guard !validStarts.isEmpty else { return [] }
-
-        // Reduce gap if the body is too short to fit windowCount windows at the requested minGap.
-        let minNeeded    = soloLength * windowCount + minGap * (windowCount - 1)
-        let effectiveGap = bodyBarSet.count >= minNeeded
-            ? minGap
-            : Swift.max(4, (bodyBarSet.count - soloLength * windowCount) / Swift.max(1, windowCount - 1))
-
-        var windows: [Range<Int>] = []
-        var earliestNext = validStarts[0]
-        for _ in 0..<windowCount {
-            let available = validStarts.filter { $0 >= earliestNext }
-            guard !available.isEmpty else { break }
-            let pickFrom    = Swift.max(1, available.count / 2)
-            let chosenStart = available[rng.nextInt(upperBound: pickFrom)]
-            windows.append(chosenStart..<(chosenStart + soloLength))
-            earliestNext = chosenStart + soloLength + effectiveGap
-        }
-        return windows
-    }
-
-    // MARK: - Shared utility
-
-    static func notesInRegister(pitchClasses: Set<Int>, low: Int, high: Int) -> [UInt8] {
-        guard low <= high else { return [] }
-        return (low...high).compactMap { n in pitchClasses.contains(n % 12) ? UInt8(n) : nil }
-    }
 }

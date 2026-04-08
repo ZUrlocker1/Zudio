@@ -42,7 +42,7 @@ struct AmbientTextureGenerator {
     /// Slowly cycling high notes — sparse, velocity 18–39.
     private static func orbitalShimmer(scalePCs: Set<Int>, bounds: RegisterBounds,
                                         loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
-        let highNotes = notes(pitchClasses: scalePCs, low: Swift.max(bounds.low, 72), high: bounds.high)
+        let highNotes = notesInRegister(pitchClasses: scalePCs, low: Swift.max(bounds.low, 72), high: bounds.high)
         guard !highNotes.isEmpty else { return [] }
         var events: [MIDIEvent] = []
         var step = rng.nextInt(upperBound: 12)
@@ -63,7 +63,7 @@ struct AmbientTextureGenerator {
     /// Very low velocity long-held tone — 1–2 per loop.
     private static func ghostTone(chordPCs: Set<Int>, bounds: RegisterBounds,
                                    loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
-        let pool = notes(pitchClasses: chordPCs, low: bounds.low, high: bounds.high)
+        let pool = notesInRegister(pitchClasses: chordPCs, low: bounds.low, high: bounds.high)
         guard !pool.isEmpty else { return [] }
         var events: [MIDIEvent] = []
         let count = 1 + rng.nextInt(upperBound: 2)
@@ -84,7 +84,7 @@ struct AmbientTextureGenerator {
     /// Sparse scatter of 2–5 short notes at random positions.
     private static func chimeScatter(scalePCs: Set<Int>, bounds: RegisterBounds,
                                       loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
-        let pool = notes(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
+        let pool = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !pool.isEmpty else { return [] }
         let count = 2 + rng.nextInt(upperBound: 4)  // 2–5
         var events: [MIDIEvent] = []
@@ -97,10 +97,4 @@ struct AmbientTextureGenerator {
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
-    // MARK: - Helper
-
-    private static func notes(pitchClasses: Set<Int>, low: Int, high: Int) -> [UInt8] {
-        guard low <= high else { return [] }
-        return (low...high).compactMap { n in pitchClasses.contains(n % 12) ? UInt8(n) : nil }
-    }
 }

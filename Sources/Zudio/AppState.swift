@@ -248,7 +248,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Bar sounds","City at night","Light rain","Ocean waves","Urban rain","Vinyl crackle"]
-        case (kTrackTexture, .ambient): return ["String Ensemble 2","Bowed Glass","Choir Aahs","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
+        case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Fifths Lead"]
         case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .ambient): return ["Cello","Contrabass","Fretless Bass"]
@@ -291,6 +291,15 @@ final class AppState: ObservableObject {
         // MIDILaneView now observes PlaybackEngine directly (injected as EnvironmentObject),
         // so per-step redraws are scoped to the 7 Canvas views only.
         playback.$isPlaying
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        // Forward currentBar changes (once per bar boundary, not per step) so the bar
+        // indicator in ContentView updates during playback without triggering per-step redraws.
+        playback.$currentBar
+            .removeDuplicates()
             .dropFirst()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
@@ -675,6 +684,9 @@ final class AppState: ObservableObject {
                 // during the brief window between load() and seek(), which caused desync.
                 let wasPlaying = self.playback.isPlaying
                 self.playback.stop()
+                // Stop the audio texture immediately so a Chill texture never bleeds into
+                // a newly-generated song of any style. play() will restart it if needed.
+                self.audioTexture.switchTexture(nil)
                 self.playback.kosmicStyle  = self.selectedStyle == .kosmic
                 self.playback.motorikStyle = self.selectedStyle == .motorik
                 self.playback.chillFade = state.style == .chill && {

@@ -60,9 +60,7 @@ struct KosmicTextureGenerator {
                 let ascPCs  = [0, third, 7, 12]
                 let descPCs = [12, 7, third, 0]
                 let pc  = (ascending ? ascPCs : descPCs)[phase]
-                var note = rootPC + pc + 36
-                while note < 33 { note += 12 }
-                while note > 59 { note -= 12 }
+                let note = clampToRegister(rootPC + pc + 36, low: 33, high: 59)
                 let vel  = UInt8(max(14, min(60, 28 + phase * 6 + rng.nextInt(upperBound: 8) - 4)))
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 20))
             }
@@ -83,9 +81,7 @@ struct KosmicTextureGenerator {
                 let isSecondHalf = barInBridge >= halfLen
                 // Root in first half (stable); fifth in second half (brightens as melody climbs)
                 let pc = isSecondHalf ? 7 : 0
-                var note = rootPC + pc + 36
-                while note < 33 { note += 12 }
-                while note > 59 { note -= 12 }
+                let note = clampToRegister(rootPC + pc + 36, low: 33, high: 59)
                 let vel = UInt8(isSecondHalf ? 22 : 16)
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 10))
             }
@@ -102,9 +98,7 @@ struct KosmicTextureGenerator {
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 // root or fifth only — avoid thirds that conflict with arpeggio phrase
                 let pc = rng.nextDouble() < 0.6 ? 0 : 7
-                var note = rootPC + pc + 36
-                while note < 33 { note += 12 }
-                while note > 59 { note -= 12 }
+                let note = clampToRegister(rootPC + pc + 36, low: 33, high: 59)
                 let vel = UInt8(max(14, min(35, 20 + rng.nextInt(upperBound: 12) - 4)))
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 10))
             }
@@ -310,10 +304,15 @@ struct KosmicTextureGenerator {
         default: stepOffsets = [0, 4, 8, 12]     // all four beats
         }
 
+        // Build the ordered scale PC list from the frame key (not chord root) so all
+        // picked PCs are guaranteed diatonic regardless of the current chord root degree.
+        let keyST    = keySemitone(frame.key)
+        let scalePCsOrdered = frame.mode.intervals.map { (keyST + $0) % 12 }
+
         var evs: [MIDIEvent] = []
         for (i, stepOff) in stepOffsets.enumerated() {
-            let degIdx = (degreeOffset + i) % intervals.count
-            let pc     = (rootPC + intervals[degIdx]) % 12
+            let degIdx = (degreeOffset + i) % scalePCsOrdered.count
+            let pc     = scalePCsOrdered[degIdx]
             let note   = texRegisterNote(pc: pc, targetOct: oct)
             let vel    = UInt8(68 + rng.nextInt(upperBound: 17))  // 68–84 — softer than KOS-TEXT-001
             evs.append(MIDIEvent(stepIndex: barStart + stepOff, note: UInt8(note),
@@ -334,28 +333,29 @@ struct KosmicTextureGenerator {
         let keyST  = keySemitone(frame.key)
         let mode   = entry.sectionMode
 
-        // Pick two adjacent scale tones and place chromatic pass between them
+        // Pick two adjacent scale tones and place a diatonic pass between them
         let intervals = mode.intervals
+        let scalePCs  = Set(intervals.map { (keyST + $0) % 12 })
         let idx = rng.nextInt(upperBound: intervals.count - 1)
         let fromST = keyST + intervals[idx]
         let toST   = keyST + intervals[idx + 1]
 
-        // Place chromatic pass in MIDI 33–59 register
-        var fromMIDI = 36 + (fromST % 12)
-        while fromMIDI < 33 { fromMIDI += 12 }
-        while fromMIDI > 55 { fromMIDI -= 12 }
+        // Place pass note in MIDI 33–59 register — snap to scale so it's always diatonic
+        let fromMIDI = clampToRegister(36 + (fromST % 12), low: 33, high: 55)
+        let toMIDI   = clampToRegister(36 + (toST % 12),   low: 33, high: 59)
+        let passPC   = snapToScale((fromMIDI + 1) % 12, scalePCs: scalePCs)
+        let passNote = clampToRegister(36 + passPC,         low: 33, high: 59)
 
-        var chromPass = fromMIDI + 1
-        while chromPass < 33 { chromPass += 12 }
-        while chromPass > 59 { chromPass -= 12 }
-
-        var toMIDI = 36 + (toST % 12)
-        while toMIDI < 33 { toMIDI += 12 }
-        while toMIDI > 59 { toMIDI -= 12 }
-
+        // Only emit the pass note if it's distinct from both endpoints
+        guard passNote != fromMIDI && passNote != toMIDI else {
+            return [
+                MIDIEvent(stepIndex: barStart,     note: UInt8(fromMIDI), velocity: 89, durationSteps: 8),
+                MIDIEvent(stepIndex: barStart + 8, note: UInt8(toMIDI),   velocity: 89, durationSteps: 8),
+            ]
+        }
         return [
             MIDIEvent(stepIndex: barStart,     note: UInt8(fromMIDI), velocity: 89, durationSteps: 4),
-            MIDIEvent(stepIndex: barStart + 4, note: UInt8(chromPass), velocity: 89, durationSteps: 4),
+            MIDIEvent(stepIndex: barStart + 4, note: UInt8(passNote),  velocity: 89, durationSteps: 4),
             MIDIEvent(stepIndex: barStart + 8, note: UInt8(toMIDI),    velocity: 89, durationSteps: 4),
         ]
     }
@@ -398,17 +398,15 @@ struct KosmicTextureGenerator {
         guard barInBody == cursor else { return [] }  // only fire on phrase-start bars
 
         // Compute the tight cluster notes (root, 2nd, 3rd) in deep low register MIDI 21–47
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let mode   = entry.sectionMode
-        let second = mode.nearestInterval(2)
-        let third  = mode.nearestInterval(3)
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let keyST2   = keySemitone(frame.key)
+        let scalePCs = Set(frame.mode.intervals.map { (keyST2 + $0) % 12 })
+        let secondPC = snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
+        let thirdPC  = snapToScale((rootPC + 3) % 12, scalePCs: scalePCs)
 
-        var n0 = 36 + rootPC
-        var n1 = 36 + rootPC + second
-        var n2 = 36 + rootPC + third
-        while n0 < 21 { n0 += 12 }; while n0 > 47 { n0 -= 12 }
-        while n1 < 21 { n1 += 12 }; while n1 > 47 { n1 -= 12 }
-        while n2 < 21 { n2 += 12 }; while n2 > 47 { n2 -= 12 }
+        let n0 = clampToRegister(36 + rootPC,   low: 21, high: 47)
+        let n1 = clampToRegister(36 + secondPC, low: 21, high: 47)
+        let n2 = clampToRegister(36 + thirdPC,  low: 21, high: 47)
 
         // 14-slot rotation: all modes reachable within ~7 phrases (typical song body)
         // D appears at slot 5 and 13; E appears at slot 10
@@ -480,9 +478,6 @@ struct KosmicTextureGenerator {
     // MARK: - Register helper: place pitch class in texture register MIDI 33–59
 
     private static func texRegisterNote(pc: Int, targetOct: Int) -> Int {
-        var midi = targetOct * 12 + pc
-        while midi < 36 { midi += 12 }   // floor: C2 — bluebird register below Rhythm (55–72)
-        while midi > 71 { midi -= 12 }   // ceiling: B4 — enables octave lift in B sections
-        return midi
+        clampToRegister(targetOct * 12 + pc, low: 36, high: 71)  // floor: C2; ceiling: B4
     }
 }

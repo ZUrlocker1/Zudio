@@ -259,114 +259,24 @@ struct LeadGenerator {
             switch ruleID {
 
             case "MOT-LD1-001":
-                if isIntroOutro {
-                    // Fallback: sparse random during intro/outro
-                    barEvents = lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
-                        intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
-                } else {
-                    // C: Mutate phrase every 16 bars
-                    if bar >= nextPhraseBar {
-                        currentPhrase = mutatePhraseOnce(currentPhrase, mode: frame.mode, rng: &rng)
-                        nextPhraseBar += 16
-                    }
-                    // Which 16-step window within the 4-bar phrase cycle?
-                    let cycleBar      = (bar - entryBar) % 4
-                    let phraseStepBase = cycleBar * 16
-                    let bounds        = kRegisterBounds[kTrackLead1]!
-                    let keyRoot       = 60 + keySemitone(frame.key)
-                    // G: Decide sparse mode at the start of each 4-bar cycle (20% chance).
-                    // Sparse mode thins the phrase to ~45% of notes, giving 4–6 from a 10–13 note phrase.
-                    if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.20 }
-                    let gateProb: Double = phraseSparseCycle ? 0.45 : 1.0
-                    for evt in currentPhrase where evt.step >= phraseStepBase && evt.step < phraseStepBase + 16 {
-                        guard rng.nextDouble() < gateProb else { continue }   // G: sparse gate
-                        let localStep = evt.step - phraseStepBase
-                        // Mode-snap deg to current mode's nearest interval — fixes out-of-scale notes
-                        // when the same phrase is replayed in a different mode (e.g. deg:9 in Aeolian).
-                        let modeDeg = frame.mode.nearestInterval((evt.deg % 12 + 12) % 12)
-                        let rawMIDI   = bounds.clamp(keyRoot + modeDeg + evt.oct * 12)
-                        let velAdj: Int
-                        switch intensity { case .low: velAdj = -15; case .medium: velAdj = -5; case .high: velAdj = 5 }
-                        let vel = UInt8(max(50, min(110, evt.vel + velAdj)))
-                        barEvents.append(MIDIEvent(stepIndex: barStart + localStep, note: UInt8(rawMIDI),
-                                                   velocity: vel, durationSteps: evt.dur))
-                    }
-                    // Legato fill: extend each note toward the next attack so phrases breathe
-                    // rather than chopping at the raw dur:2 (8th note) stored in the JSON data.
-                    barEvents.sort { $0.stepIndex < $1.stepIndex }
-                    for i in 0 ..< Swift.max(0, barEvents.count - 1) {
-                        let gap    = barEvents[i + 1].stepIndex - barEvents[i].stepIndex
-                        let newDur = max(barEvents[i].durationSteps, min(gap - 1, 12))
-                        barEvents[i] = MIDIEvent(stepIndex: barEvents[i].stepIndex,
-                                                 note: barEvents[i].note,
-                                                 velocity: barEvents[i].velocity,
-                                                 durationSteps: newDur)
-                    }
-                    // Last note in bar: minimum quarter note (4 steps)
-                    if !barEvents.isEmpty {
-                        let i = barEvents.count - 1
-                        let newDur = max(barEvents[i].durationSteps, 4)
-                        barEvents[i] = MIDIEvent(stepIndex: barEvents[i].stepIndex,
-                                                 note: barEvents[i].note,
-                                                 velocity: barEvents[i].velocity,
-                                                 durationSteps: newDur)
-                    }
-                }
+                barEvents = lead1PhraseReplay(
+                    barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    intensity: intensity, isIntroOutro: isIntroOutro,
+                    currentPhrase: &currentPhrase, nextPhraseBar: &nextPhraseBar,
+                    entryBar: entryBar, phraseSparseCycle: &phraseSparseCycle,
+                    prevNote: prevNote, rng: &rng)
 
             case "MOT-LD1-002":
                 if !isIntroOutro {
-                    // B: Build motif on first body bar; pitch mutates every 4 bars, rhythm every 8.
-                    if !motifBuilt {
-                        (motifIntervals, motifSteps, motifDurs, motifVels) =
-                            buildPentatonicCell(frame: frame, rng: &rng)
-                        motifBuilt = true
-                    }
-                    // Pitch mutation: shift one interval (30% chance: two intervals) every 4 bars
-                    if bar >= motifMutationBar {
-                        motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
-                        if rng.nextDouble() < 0.30 {
-                            motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
-                        }
-                        motifMutationBar += 4
-                    }
-                    // Rhythm mutation: rebuild step grid every 8 bars; keeps pitch, refreshes rhythm.
-                    // Resize motifIntervals to match the new step count (cycling existing pitches)
-                    // so replayPentatonicCell never indexes out of bounds.
-                    if bar >= motifRhythmMutationBar {
-                        let (_, newSteps, newDurs, newVels) = buildPentatonicCell(frame: frame, rng: &rng)
-                        if !motifIntervals.isEmpty {
-                            motifIntervals = (0..<newSteps.count).map { motifIntervals[$0 % motifIntervals.count] }
-                        }
-                        motifSteps = newSteps
-                        motifDurs  = newDurs
-                        motifVels  = newVels
-                        motifRhythmMutationBar += 8
-                    }
-                    // Repetition guard: if the same first note has fired 2 bars in a row,
-                    // force an early pitch mutation so we never hear 3 identical bars.
-                    if motifRepeatCount >= 2 {
-                        motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
-                        motifRepeatCount = 0
-                    }
-
-                    // 8% rest bar — breathing room between repetitions
-                    if rng.nextDouble() >= 0.08 {
-                        barEvents = replayPentatonicCell(
-                            intervals: motifIntervals, steps: motifSteps, durs: motifDurs, vels: motifVels,
-                            barStart: barStart, entry: entry, frame: frame,
-                            intensity: intensity, prevNote: prevNote)
-                        // Track first note of this bar to detect repetition next bar
-                        let thisFirstNote = barEvents.min(by: { $0.stepIndex < $1.stepIndex })?.note
-                        if let cur = thisFirstNote, cur == motifPrevFirstNote {
-                            motifRepeatCount += 1
-                        } else {
-                            motifRepeatCount = 0
-                        }
-                        motifPrevFirstNote = thisFirstNote
-                    } else {
-                        motifRepeatCount = 0
-                        motifPrevFirstNote = nil
-                    }
+                    barEvents = lead1PentatonicMotif(
+                        barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity,
+                        motifIntervals: &motifIntervals, motifSteps: &motifSteps,
+                        motifDurs: &motifDurs, motifVels: &motifVels,
+                        motifBuilt: &motifBuilt, motifMutationBar: &motifMutationBar,
+                        motifRhythmMutationBar: &motifRhythmMutationBar, motifRepeatCount: &motifRepeatCount,
+                        motifPrevFirstNote: &motifPrevFirstNote,
+                        prevNote: prevNote, rng: &rng)
                 }
 
             case "MOT-LD1-003":
@@ -427,123 +337,12 @@ struct LeadGenerator {
                 }
 
             case "MOT-LD1-006":
-                // F: Arc solo stepping through mode scale; quarter notes are the backbone.
-                // Bar modes: single quarter (hit + space), two quarters, three quarters,
-                // eighth-note run (fills bar fully, no trailing rest), or rare half note.
-                // Multi-note bars walk adjacent scale steps in the arc direction.
-                // F2: After 4 consecutive steps in same direction, jump the other way.
-                if !isIntroOutro && !arcScale.isEmpty {
-                    // 12% chance of a rest bar — breathing space
-                    if rng.nextDouble() > 0.12 {
-                        let idx = max(0, min(arcScale.count - 1, arcScaleIdx))
-                        // Chord-aware snap helper: returns nearest chord-compatible MIDI note
-                        let (ct006, st006, _) = NotePoolBuilder.build(
-                            chordRootDegree: entry.chordWindow.chordRoot,
-                            chordType:       entry.chordWindow.chordType,
-                            key:             frame.key, mode: frame.mode)
-                        let allowed006 = ct006.union(st006)
-                        let snapArc: (Int) -> UInt8 = { rawIdx in
-                            let candidate = arcScale[max(0, min(arcScale.count - 1, rawIdx))]
-                            if allowed006.contains(candidate % 12) { return UInt8(candidate) }
-                            let snapped = arcScale.filter { allowed006.contains($0 % 12) }
-                                                  .min(by: { abs($0 - candidate) < abs($1 - candidate) })
-                            return UInt8(snapped ?? candidate)
-                        }
-                        let mainNote = snapArc(idx)
-                        let vel = velocityForIntensity(intensity, rng: &rng)
-                        let dir = arcAscending ? 1 : -1   // direction for passing tones
-
-                        let modeRoll = rng.nextDouble()
-                        if modeRoll < 0.12 {
-                            // Half note — rare longer hold for variety
-                            barEvents = [MIDIEvent(stepIndex: barStart, note: mainNote, velocity: vel, durationSteps: 8)]
-                        } else if modeRoll < 0.40 {
-                            // Single quarter at beat 1 — hit and space
-                            barEvents = [MIDIEvent(stepIndex: barStart, note: mainNote, velocity: vel, durationSteps: 4)]
-                        } else if modeRoll < 0.62 {
-                            // Two quarter notes — varied beat placement
-                            let n2 = snapArc(idx + dir)
-                            let subRoll = rng.nextDouble()
-                            if subRoll < 0.40 {
-                                // beats 1+2 (steps 0, 4)
-                                barEvents = [
-                                    MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
-                                    MIDIEvent(stepIndex: barStart + 4, note: n2,       velocity: vel - 5, durationSteps: 4)
-                                ]
-                            } else if subRoll < 0.75 {
-                                // beats 1+3 (steps 0, 8)
-                                barEvents = [
-                                    MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
-                                    MIDIEvent(stepIndex: barStart + 8, note: n2,       velocity: vel - 5, durationSteps: 4)
-                                ]
-                            } else {
-                                // beats 2+4 (steps 4, 12)
-                                barEvents = [
-                                    MIDIEvent(stepIndex: barStart + 4,  note: mainNote, velocity: vel,     durationSteps: 4),
-                                    MIDIEvent(stepIndex: barStart + 12, note: n2,       velocity: vel - 5, durationSteps: 4)
-                                ]
-                            }
-                        } else if modeRoll < 0.82 {
-                            // Three quarter notes — beats 1, 2, 3 (steps 0, 4, 8)
-                            let n2 = snapArc(idx + dir)
-                            let n3 = snapArc(idx + dir * 2)
-                            barEvents = [
-                                MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
-                                MIDIEvent(stepIndex: barStart + 4, note: n2,       velocity: vel - 3, durationSteps: 4),
-                                MIDIEvent(stepIndex: barStart + 8, note: n3,       velocity: vel - 5, durationSteps: 4)
-                            ]
-                        } else {
-                            // Eighth-note run — 8 notes × 2 steps, fills bar completely, no rest
-                            var runEvents: [MIDIEvent] = []
-                            var runIdx = idx
-                            var runDir = dir
-                            for i in 0..<8 {
-                                let ni = snapArc(runIdx)
-                                let v  = UInt8(i == 0 ? Int(vel) : max(50, Int(vel) - 4 + rng.nextInt(upperBound: 5)))
-                                runEvents.append(MIDIEvent(stepIndex: barStart + i * 2, note: ni, velocity: v, durationSteps: 2))
-                                runIdx += runDir
-                                if runIdx >= arcScale.count { runIdx = arcScale.count - 2; runDir = -runDir }
-                                else if runIdx < 0          { runIdx = 1;                  runDir = -runDir }
-                            }
-                            barEvents = runEvents
-                        }
-                    }
-                    // F2: After 4 steps in the same direction, jump the other way instead.
-                    // Prevents a monotone ascending or descending run across the section.
-                    if arcAscending && arcAscendRunLen >= 4 {
-                        let jumpDown = 3 + rng.nextInt(upperBound: 3)   // 3–5 scale steps down
-                        arcScaleIdx  = max(0, arcScaleIdx - jumpDown)
-                        arcAscending = false
-                        arcAscendRunLen = 0
-                    } else if !arcAscending && arcDescendRunLen >= 4 {
-                        let jumpUp   = 3 + rng.nextInt(upperBound: 3)   // 3–5 scale steps up
-                        arcScaleIdx  = min(arcScale.count - 1, arcScaleIdx + jumpUp)
-                        arcAscending = true
-                        arcDescendRunLen = 0
-                    } else {
-                        // Normal advance: 1–2 scale steps; reverse direction at register boundaries
-                        let step = 1 + rng.nextInt(upperBound: 2)
-                        if arcAscending {
-                            arcDescendRunLen = 0
-                            arcAscendRunLen += 1
-                            arcScaleIdx += step
-                            if arcScaleIdx >= arcScale.count - 1 {
-                                arcScaleIdx = arcScale.count - 1
-                                arcAscending = false
-                                arcAscendRunLen = 0
-                            }
-                        } else {
-                            arcAscendRunLen = 0
-                            arcDescendRunLen += 1
-                            arcScaleIdx -= step
-                            if arcScaleIdx <= 0 {
-                                arcScaleIdx = 0
-                                arcAscending = true
-                                arcDescendRunLen = 0
-                            }
-                        }
-                    }
-                }
+                barEvents = lead1ArcSolo(
+                    barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    intensity: intensity, isIntroOutro: isIntroOutro,
+                    arcScale: arcScale, arcScaleIdx: &arcScaleIdx, arcAscending: &arcAscending,
+                    arcDescendRunLen: &arcDescendRunLen, arcAscendRunLen: &arcAscendRunLen,
+                    rng: &rng)
 
             default:
                 barEvents = lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
@@ -816,6 +615,268 @@ struct LeadGenerator {
             }
         }
         return events
+    }
+
+    // MARK: - LD1-001: Phrase Replay
+
+    private static func lead1PhraseReplay(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity, isIntroOutro: Bool,
+        currentPhrase: inout Ph, nextPhraseBar: inout Int,
+        entryBar: Int, phraseSparseCycle: inout Bool,
+        prevNote: UInt8?, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        if isIntroOutro {
+            // Fallback: sparse random during intro/outro
+            return lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
+                intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
+        }
+        // C: Mutate phrase every 16 bars
+        if bar >= nextPhraseBar {
+            currentPhrase = mutatePhraseOnce(currentPhrase, mode: frame.mode, rng: &rng)
+            nextPhraseBar += 16
+        }
+        // Which 16-step window within the 4-bar phrase cycle?
+        let cycleBar      = (bar - entryBar) % 4
+        let phraseStepBase = cycleBar * 16
+        let bounds        = kRegisterBounds[kTrackLead1]!
+        let keyRoot       = 60 + keySemitone(frame.key)
+        // G: Decide sparse mode at the start of each 4-bar cycle (20% chance).
+        // Sparse mode thins the phrase to ~45% of notes, giving 4–6 from a 10–13 note phrase.
+        if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.20 }
+        let gateProb: Double = phraseSparseCycle ? 0.45 : 1.0
+        var barEvents: [MIDIEvent] = []
+        for evt in currentPhrase where evt.step >= phraseStepBase && evt.step < phraseStepBase + 16 {
+            guard rng.nextDouble() < gateProb else { continue }   // G: sparse gate
+            let localStep = evt.step - phraseStepBase
+            // Mode-snap deg to current mode's nearest interval — fixes out-of-scale notes
+            // when the same phrase is replayed in a different mode (e.g. deg:9 in Aeolian).
+            let modeDeg = frame.mode.nearestInterval((evt.deg % 12 + 12) % 12)
+            let rawMIDI   = bounds.clamp(keyRoot + modeDeg + evt.oct * 12)
+            let velAdj: Int
+            switch intensity { case .low: velAdj = -15; case .medium: velAdj = -5; case .high: velAdj = 5 }
+            let vel = UInt8(max(50, min(110, evt.vel + velAdj)))
+            barEvents.append(MIDIEvent(stepIndex: barStart + localStep, note: UInt8(rawMIDI),
+                                       velocity: vel, durationSteps: evt.dur))
+        }
+        // Legato fill: extend each note toward the next attack so phrases breathe
+        // rather than chopping at the raw dur:2 (8th note) stored in the JSON data.
+        barEvents.sort { $0.stepIndex < $1.stepIndex }
+        for i in 0 ..< Swift.max(0, barEvents.count - 1) {
+            let gap    = barEvents[i + 1].stepIndex - barEvents[i].stepIndex
+            let newDur = max(barEvents[i].durationSteps, min(gap - 1, 12))
+            barEvents[i] = MIDIEvent(stepIndex: barEvents[i].stepIndex,
+                                     note: barEvents[i].note,
+                                     velocity: barEvents[i].velocity,
+                                     durationSteps: newDur)
+        }
+        // Last note in bar: minimum quarter note (4 steps)
+        if !barEvents.isEmpty {
+            let i = barEvents.count - 1
+            let newDur = max(barEvents[i].durationSteps, 4)
+            barEvents[i] = MIDIEvent(stepIndex: barEvents[i].stepIndex,
+                                     note: barEvents[i].note,
+                                     velocity: barEvents[i].velocity,
+                                     durationSteps: newDur)
+        }
+        return barEvents
+    }
+
+    // MARK: - LD1-002: Pentatonic Motif
+
+    private static func lead1PentatonicMotif(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity,
+        motifIntervals: inout [Int], motifSteps: inout [Int],
+        motifDurs: inout [Int], motifVels: inout [Int],
+        motifBuilt: inout Bool, motifMutationBar: inout Int,
+        motifRhythmMutationBar: inout Int, motifRepeatCount: inout Int,
+        motifPrevFirstNote: inout UInt8?,
+        prevNote: UInt8?, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        // B: Build motif on first body bar; pitch mutates every 4 bars, rhythm every 8.
+        if !motifBuilt {
+            (motifIntervals, motifSteps, motifDurs, motifVels) =
+                buildPentatonicCell(frame: frame, rng: &rng)
+            motifBuilt = true
+        }
+        // Pitch mutation: shift one interval (30% chance: two intervals) every 4 bars
+        if bar >= motifMutationBar {
+            motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
+            if rng.nextDouble() < 0.30 {
+                motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
+            }
+            motifMutationBar += 4
+        }
+        // Rhythm mutation: rebuild step grid every 8 bars; keeps pitch, refreshes rhythm.
+        // Resize motifIntervals to match the new step count (cycling existing pitches)
+        // so replayPentatonicCell never indexes out of bounds.
+        if bar >= motifRhythmMutationBar {
+            let (_, newSteps, newDurs, newVels) = buildPentatonicCell(frame: frame, rng: &rng)
+            if !motifIntervals.isEmpty {
+                motifIntervals = (0..<newSteps.count).map { motifIntervals[$0 % motifIntervals.count] }
+            }
+            motifSteps = newSteps
+            motifDurs  = newDurs
+            motifVels  = newVels
+            motifRhythmMutationBar += 8
+        }
+        // Repetition guard: if the same first note has fired 2 bars in a row,
+        // force an early pitch mutation so we never hear 3 identical bars.
+        if motifRepeatCount >= 2 {
+            motifIntervals = shiftOneInterval(motifIntervals, mode: frame.mode, rng: &rng)
+            motifRepeatCount = 0
+        }
+
+        var barEvents: [MIDIEvent] = []
+        // 8% rest bar — breathing room between repetitions
+        if rng.nextDouble() >= 0.08 {
+            barEvents = replayPentatonicCell(
+                intervals: motifIntervals, steps: motifSteps, durs: motifDurs, vels: motifVels,
+                barStart: barStart, entry: entry, frame: frame,
+                intensity: intensity, prevNote: prevNote)
+            // Track first note of this bar to detect repetition next bar
+            let thisFirstNote = barEvents.min(by: { $0.stepIndex < $1.stepIndex })?.note
+            if let cur = thisFirstNote, cur == motifPrevFirstNote {
+                motifRepeatCount += 1
+            } else {
+                motifRepeatCount = 0
+            }
+            motifPrevFirstNote = thisFirstNote
+        } else {
+            motifRepeatCount = 0
+            motifPrevFirstNote = nil
+        }
+        return barEvents
+    }
+
+    // MARK: - LD1-006: Arc Solo
+
+    private static func lead1ArcSolo(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity, isIntroOutro: Bool,
+        arcScale: [Int], arcScaleIdx: inout Int, arcAscending: inout Bool,
+        arcDescendRunLen: inout Int, arcAscendRunLen: inout Int,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        // F: Arc solo stepping through mode scale; quarter notes are the backbone.
+        // Bar modes: single quarter (hit + space), two quarters, three quarters,
+        // eighth-note run (fills bar fully, no trailing rest), or rare half note.
+        // Multi-note bars walk adjacent scale steps in the arc direction.
+        // F2: After 4 consecutive steps in same direction, jump the other way.
+        guard !isIntroOutro && !arcScale.isEmpty else { return [] }
+        var barEvents: [MIDIEvent] = []
+        // 12% chance of a rest bar — breathing space
+        if rng.nextDouble() > 0.12 {
+            let idx = max(0, min(arcScale.count - 1, arcScaleIdx))
+            // Chord-aware snap helper: returns nearest chord-compatible MIDI note
+            let (ct006, st006, _) = NotePoolBuilder.build(
+                chordRootDegree: entry.chordWindow.chordRoot,
+                chordType:       entry.chordWindow.chordType,
+                key:             frame.key, mode: frame.mode)
+            let allowed006 = ct006.union(st006)
+            let snapArc: (Int) -> UInt8 = { rawIdx in
+                let candidate = arcScale[max(0, min(arcScale.count - 1, rawIdx))]
+                if allowed006.contains(candidate % 12) { return UInt8(candidate) }
+                let snapped = arcScale.filter { allowed006.contains($0 % 12) }
+                                      .min(by: { abs($0 - candidate) < abs($1 - candidate) })
+                return UInt8(snapped ?? candidate)
+            }
+            let mainNote = snapArc(idx)
+            let vel = velocityForIntensity(intensity, rng: &rng)
+            let dir = arcAscending ? 1 : -1   // direction for passing tones
+
+            let modeRoll = rng.nextDouble()
+            if modeRoll < 0.12 {
+                // Half note — rare longer hold for variety
+                barEvents = [MIDIEvent(stepIndex: barStart, note: mainNote, velocity: vel, durationSteps: 8)]
+            } else if modeRoll < 0.40 {
+                // Single quarter at beat 1 — hit and space
+                barEvents = [MIDIEvent(stepIndex: barStart, note: mainNote, velocity: vel, durationSteps: 4)]
+            } else if modeRoll < 0.62 {
+                // Two quarter notes — varied beat placement
+                let n2 = snapArc(idx + dir)
+                let subRoll = rng.nextDouble()
+                if subRoll < 0.40 {
+                    // beats 1+2 (steps 0, 4)
+                    barEvents = [
+                        MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart + 4, note: n2,       velocity: vel - 5, durationSteps: 4)
+                    ]
+                } else if subRoll < 0.75 {
+                    // beats 1+3 (steps 0, 8)
+                    barEvents = [
+                        MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart + 8, note: n2,       velocity: vel - 5, durationSteps: 4)
+                    ]
+                } else {
+                    // beats 2+4 (steps 4, 12)
+                    barEvents = [
+                        MIDIEvent(stepIndex: barStart + 4,  note: mainNote, velocity: vel,     durationSteps: 4),
+                        MIDIEvent(stepIndex: barStart + 12, note: n2,       velocity: vel - 5, durationSteps: 4)
+                    ]
+                }
+            } else if modeRoll < 0.82 {
+                // Three quarter notes — beats 1, 2, 3 (steps 0, 4, 8)
+                let n2 = snapArc(idx + dir)
+                let n3 = snapArc(idx + dir * 2)
+                barEvents = [
+                    MIDIEvent(stepIndex: barStart,     note: mainNote, velocity: vel,     durationSteps: 4),
+                    MIDIEvent(stepIndex: barStart + 4, note: n2,       velocity: vel - 3, durationSteps: 4),
+                    MIDIEvent(stepIndex: barStart + 8, note: n3,       velocity: vel - 5, durationSteps: 4)
+                ]
+            } else {
+                // Eighth-note run — 8 notes × 2 steps, fills bar completely, no rest
+                var runEvents: [MIDIEvent] = []
+                var runIdx = idx
+                var runDir = dir
+                for i in 0..<8 {
+                    let ni = snapArc(runIdx)
+                    let v  = UInt8(i == 0 ? Int(vel) : max(50, Int(vel) - 4 + rng.nextInt(upperBound: 5)))
+                    runEvents.append(MIDIEvent(stepIndex: barStart + i * 2, note: ni, velocity: v, durationSteps: 2))
+                    runIdx += runDir
+                    if runIdx >= arcScale.count { runIdx = arcScale.count - 2; runDir = -runDir }
+                    else if runIdx < 0          { runIdx = 1;                  runDir = -runDir }
+                }
+                barEvents = runEvents
+            }
+        }
+        // F2: After 4 steps in the same direction, jump the other way instead.
+        // Prevents a monotone ascending or descending run across the section.
+        if arcAscending && arcAscendRunLen >= 4 {
+            let jumpDown = 3 + rng.nextInt(upperBound: 3)   // 3–5 scale steps down
+            arcScaleIdx  = max(0, arcScaleIdx - jumpDown)
+            arcAscending = false
+            arcAscendRunLen = 0
+        } else if !arcAscending && arcDescendRunLen >= 4 {
+            let jumpUp   = 3 + rng.nextInt(upperBound: 3)   // 3–5 scale steps up
+            arcScaleIdx  = min(arcScale.count - 1, arcScaleIdx + jumpUp)
+            arcAscending = true
+            arcDescendRunLen = 0
+        } else {
+            // Normal advance: 1–2 scale steps; reverse direction at register boundaries
+            let step = 1 + rng.nextInt(upperBound: 2)
+            if arcAscending {
+                arcDescendRunLen = 0
+                arcAscendRunLen += 1
+                arcScaleIdx += step
+                if arcScaleIdx >= arcScale.count - 1 {
+                    arcScaleIdx = arcScale.count - 1
+                    arcAscending = false
+                    arcAscendRunLen = 0
+                }
+            } else {
+                arcAscendRunLen = 0
+                arcDescendRunLen += 1
+                arcScaleIdx -= step
+                if arcScaleIdx <= 0 {
+                    arcScaleIdx = 0
+                    arcAscending = true
+                    arcDescendRunLen = 0
+                }
+            }
+        }
+        return barEvents
     }
 
     // MARK: - LD2-001: counter-response

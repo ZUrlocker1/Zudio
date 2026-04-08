@@ -108,11 +108,6 @@ struct AmbientPadsGenerator {
 
     // MARK: - Helpers
 
-    private static func notesInRegister(pitchClasses: Set<Int>, low: Int, high: Int) -> [UInt8] {
-        guard low <= high else { return [] }
-        return (low...high).compactMap { n in pitchClasses.contains(n % 12) ? UInt8(n) : nil }
-    }
-
     /// Returns `count` notes spread across `notes`, starting from `invOffset` for inversion rotation.
     private static func spreadNotesInverted(from notes: [UInt8], count: Int, invOffset: Int) -> [UInt8] {
         guard notes.count >= 2 else { return notes }
