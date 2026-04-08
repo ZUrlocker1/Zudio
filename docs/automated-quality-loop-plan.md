@@ -405,6 +405,125 @@ These checks use the drum/rhythm MIDI directly and check structural expectations
 - Tempo check: verify generated tempo is within the ambient range (62–110 BPM) using
   the tempo field from the .zudio log. Flag if outside range (catches BPM override bugs).
 
+---
+
+## Ambient-Specific Quality Checks
+
+These checks are implemented in `tools/ambient_analyze.py` and run automatically via
+`bash tools/run_loop.sh ambient`. They are genre-specific — the thresholds and check
+types reflect what makes Ambient sound like Ambient (sparse, phasing, sustained, textural)
+rather than generic "is this well-formed music" checks.
+
+### Silence Distribution
+
+For each body bar, check whether all pitched tracks (Lead 1, Lead 2, Rhythm, Pads, Bass,
+Texture) together have zero notes. Report fully-silent bar counts and Lead 1 gap runs.
+
+Flags:
+- `!!HOLLOW` — fully silent bars exceed 40% of body bars. Every pitched layer is quiet
+  at once for nearly half the song; the piece loses coherence.
+- `!!LEAD-DEADZONE` — Lead 1 has notes somewhere in the song but has a run of more than
+  20 consecutive body bars with no lead note at all. A long gap is musically interesting;
+  this length crosses into "the lead has disappeared."
+
+### Register Collision
+
+Extract the MIDI pitch range (min note, max note) for each track across the full song.
+Check all meaningful cross-track pairs including Texture.
+
+Flags:
+- `!!REGISTER-CLASH` — Bass max pitch is greater than or equal to Lead 1 min pitch.
+  The bass is reaching up into the lead register; the two tracks are competing for the
+  same register. By rule, bass should stay below MIDI ~55 and lead should start above ~60.
+- `!!TEXTURE-CLASH` — Texture range fully contains or nearly equals another track's
+  range. Threshold: overlap exceeds 75% of the smaller track's range. Texture should
+  occupy its own register niche (often mid-high or high), not blanket the same band as
+  Pads or Lead.
+
+### Simultaneous Voices
+
+Bucket all note-on events by MIDI tick. For each tick that has events, count how many
+distinct tracks fire simultaneously. Report the maximum and flag if extreme.
+
+Flags:
+- `!!BUSY` — maximum simultaneous tracks at any tick exceeds 5. All layers colliding
+  at once destroys the sparse Ambient feel.
+
+### Loop Length Health
+
+Parse the `Loop lengths (bars):` block from the `.zudio` log (Ambient only; only active
+tracks appear). Check two things:
+
+**Duplicate loop lengths** — any two active tracks sharing the same loop length will
+perfectly re-sync, eliminating the Eno-style phase-shifting effect that makes Ambient
+texture evolve.
+
+Flags:
+- `!!LOOP-DUPLICATE` — any two active tracks share the same loop length. Both track
+  names are printed. Expected to never fire since the generator assigns independent primes
+  from {5, 7, 11, 13, 17, 19, 23}; presence indicates a regression.
+
+**Short-song phase coverage** — if any loop is so long relative to the song that it
+doesn't complete at least 3 full cycles, the phase-shifting effect never fully develops
+and the texture sounds static.
+
+Flags:
+- `!!LOOP-UNDERCYCLE` — any active loop length exceeds total_bars / 3. The loop doesn't
+  complete 3 cycles across the song. May fire legitimately for very short test-mode songs
+  (60–90s); should not fire for full-length songs (180–315s).
+
+### Ghost Echo Health (AMB-SYNC-001)
+
+If the log shows AMB-SYNC-001 was used and Lead 1 has notes:
+- Verify Lead 2 has at least one note.
+- Verify every Lead 2 note falls within +16 steps of some Lead 1 note (no rogue echoes).
+
+Flags:
+- `!!ECHO-ABSENT` — Lead 2 has zero notes despite AMB-SYNC-001 being active.
+
+### 4-Bar Density Crowding
+
+Divide the song body into non-overlapping 4-bar windows. For each window, record which
+non-drum pitched tracks have at least one note.
+
+**All-instruments crowding** — any 4-bar window where every active non-drum track fires
+simultaneously. In Ambient, no track should be resting and the sparse feel collapses
+into a wall of sound.
+
+Flags:
+- `!!CROWDED` — at least one 4-bar window has all active non-drum pitched tracks firing
+  at once. Includes the worst window (bar range) in the report.
+
+**Never-resting track** — any non-drum track that has notes in every single 4-bar window
+across the body. Ambient instruments should breathe; constant presence sounds mechanical.
+
+Flags:
+- `!!RELENTLESS` — a non-drum track is active in 100% of body 4-bar windows. Drums are
+  the only exemption. Pads, Bass, Texture, and Lead tracks all can and should have at
+  least one 4-bar gap somewhere in the song.
+
+### Exact Repetition and Monotone Detection
+
+For each non-drum pitched track, compute a per-bar fingerprint (set of step-offset-within-bar,
+pitch, duration tuples). Check two things:
+
+**Full-song monotone** — does the track have only 1 distinct fingerprint across every bar
+of the entire song? This catches a tiled loop so simple it sounds identical throughout —
+for example, a texture playing one held note, a rhythm playing the same hit every bar,
+or a bass droning the same pattern with zero variation.
+
+Flags:
+- `!!MONOTONE` — a non-empty track has only 1 distinct bar fingerprint across the entire
+  song body. Drums are the only exemption. Pads and Bass are not exempt — even a pad layer
+  should produce at least two distinct bar patterns (e.g. different chord voicings).
+
+**Pitch variety** — count distinct MIDI pitch values used by the track across the full song.
+A track playing only 1 pitch for the entire song is almost certainly broken or degenerate.
+
+Flags:
+- `!!SINGLE-PITCH` — a non-drum track uses only 1 distinct pitch across the entire song.
+  Drums are the only exemption.
+
 **Kosmic:**
 - Arpeggio density: if the arp track is present, verify it is active in body sections
   at ≥ 1.0 notes/bar. Below that the arpeggio adds no movement.

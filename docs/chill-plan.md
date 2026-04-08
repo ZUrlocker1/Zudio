@@ -669,10 +669,10 @@ static (single chord or bass pedal point). It creates the tension that makes the
 return feel satisfying.
 
 **CHILL-RULE-12 — Instrument register separation**
-Lead 1 (primary solo voice) sits in mid-high register: flute 65–85 MIDI, trumpet 55–75,
-vibraphone 60–80, saxophone 50–70. Lead 2 (counter-melody or comping) sits at least 5
-semitones lower than Lead 1's median pitch. The Rhodes comps in mid register (48–72).
-Bass is always below 45 MIDI.
+Lead 1 (primary solo voice) instrument registers: flute 65–85, muted trumpet 53–80,
+trumpet 55–79, vibraphone 60–80, saxophone 50–70, soprano sax 58–80, trombone 45–65.
+Lead 2 (counter-melody or comping) sits at least 5 semitones below Lead 1 minimum.
+The Rhodes comps in mid register (48–72). Bass stays in kTrackBass bounds (MIDI 40–64).
 
 ---
 
@@ -1056,14 +1056,18 @@ Song length: 68–116 bars ≈ 3:00–5:00 min
 ## Part 6: Instrument Presets
 
 Lead 1 (ChillLead1, primary solo):
-- Flute (program 73) — Bright/Free primary
-- Muted Trumpet (program 59) — Deep/Dream primary; NEW to palette
-- Alto Sax (program 65) — Deep/Dream secondary; NEW to palette
-- Vibraphone (program 11) — all moods tertiary
+- Flute (program 73) — Bright/Free primary; register 65–85
+- Muted Trumpet (program 59) — Deep/Dream primary; register 53–80
+- Trumpet (program 56) — Deep/Dream alternate; register 55–79
+- Alto Sax (program 65) — Deep/Dream secondary; register 50–70
+- Soprano Sax (program 64) — alternate; register 58–80
+- Vibraphone (program 11) — all moods; register 60–80
+- Trombone (program 57) — Lead 2 counter-melody register; register 45–65
 
 Lead 2 (ChillLead2, counter-melody):
 - Vibraphone (program 11) — default when Lead 1 is not vibraphone
 - Flute (program 73) — when Lead 1 is trumpet or saxophone
+- Trombone (program 57) — low counter-melody voice
 
 Pads (sustained harmonic layer):
 - Warm Pad (program 89) — default
@@ -1124,86 +1128,6 @@ Note density per bar by section:
 - Pads (sustained): ≤1 re-attack per 2 bars; bridge: ≤1.5 notes/bar (sparse sus4 sustain)
 
 ---
-
-## Part 8: Implementation Roadmap
-
-Stage 1 — Type system:
-- Add `case chill = "Chill"` to `MusicStyle` enum in Types.swift
-- Add `ChillProgressionFamily` enum: static_groove, two_chord_pendulum, minor_blues, modal_drift
-- Add `ChillLeadInstrument` enum: flute, mutedTrumpet, vibraphone, saxophone
-- Add `ChillBeatStyle` enum: electronic, neoSoul, brushKit
-- Add Chill-specific fields to SongState (chillProgFamily, chillLeadInstrument, chillBeatStyle,
-  chillAudioTexture: String?)
-- Add Chill to UI style picker in TopBarView.swift
-
-Stage 2 — Musical frame generator:
-- Create ChillMusicalFrameGenerator.swift (tempo, mode, mood, key, progression family,
-  lead instrument, beat style)
-
-Stage 3 — Structure generator:
-- Create ChillStructureGenerator.swift (INTRO/GROOVE-A/BREAKDOWN/GROOVE-B/OUTRO form;
-  alternate INTRO/BODY/OUTRO form for 30% of Deep/Dream songs; section length distributions)
-
-Stage 4 — Drum and bass generators (groove foundation):
-- Create ChillDrumGenerator.swift (electronic / neo soul / brush kit modes; section-aware)
-- Create ChillBassGenerator.swift (Patterns A/B/C/D; bass statement moments; breakdown)
-
-Stage 5 — Pads generator:
-- Create ChillPadsGenerator.swift (sustained pad/string layer: Long Lake Winter Strings,
-  Air Staggered Entry, Mobyesque Pad Anchor, Absent; Breakdown Sustain always active)
-
-Stage 6 — Lead generators:
-- Create ChillLeadGenerator.swift (Lead 1: instrument-specific phrase behavior; Lead 2:
-  call-and-response including Harmonic Shadow at phrase level; section activity by section type)
-
-Stage 7 — Rhythm and texture:
-- Create ChillRhythmGenerator.swift (active Rhodes comping: St Germain Syncopated,
-  Moby Backbeat, Bosa Moon Broken Chord, Deep Sustain; Space Rule; jazz voicings)
-- Create ChillTextureGenerator.swift (audio mode: clip selection and AVAudioPlayerNode;
-  Absent mode: no events)
-- Create AudioTexturePlayer.swift (AVAudioPlayerNode wrapper; seamless WAV loop playback)
-- Source and bundle 8 ambient WAV files in Resources/Textures/ (royalty-free CC0 sources)
-
-Stage 8 — Title generator:
-- Create ChillTitleGenerator.swift or extend existing TitleGenerator
-- Urban/nocturnal word pools (French, English)
-
-Stage 9 — SongGenerator integration:
-
-**10-step generation sequence for `generateChill(frame, rng)` in SongGenerator.swift:**
-1. `frame` = ChillMusicalFrameGenerator.generate(rng) — tempo, mode, mood, key, prog family,
-   lead instrument, beat style, swing feel, audio texture clip or nil
-2. `structure` = ChillStructureGenerator.buildStructure(frame, rng) — [SongSection] + ChordPlan;
-   CHL-SYNC-002, CHL-SYNC-003, CHL-SYNC-010, CHL-SYNC-013 enforced here
-3. `drumNotes` = ChillDrumGenerator.generate(frame, structure, rng)
-4. `bassNotes` = ChillBassGenerator.generate(frame, structure, rng)
-5. `padNotes` = ChillPadsGenerator.generate(frame, structure, rng)
-6. `rhythmNotes` = ChillRhythmGenerator.generate(frame, structure, rng) — Rhodes comping
-7. `(lead1Notes, lead1Onsets)` = ChillLeadGenerator.generateLead1(frame, structure, rng)
-8. `lead2Notes` = ChillLeadGenerator.generateLead2(frame, structure, rng, lead1Onsets)
-   CHL-SYNC-007 enforced here (Lead 2 receives lead1Onsets; respects gaps)
-9. `audioTexture` = frame.chillAudioTexture — clip name or nil (selected in step 1)
-10. `title` = ChillTitleGenerator.generate(frame, rng); log all ruleIDs + audioTexture to .zudio
-
-**Where coherence rules fire:**
-- Inside each generator (steps 3–8): CHL-SYNC-001, CHL-SYNC-004, CHL-SYNC-005,
-  CHL-SYNC-008, CHL-SYNC-009, CHL-SYNC-011, CHL-SYNC-012
-- Inside structure generator (step 2): CHL-SYNC-002, CHL-SYNC-003, CHL-SYNC-010, CHL-SYNC-013
-- Lead 2 generator (step 8): CHL-SYNC-007
-- Post-step-10 cleanup: CHL-SYNC-006 (clear overrides)
-
-**New GM programs in TrackRowView:**
-- Muted Trumpet (59) and Alto Sax (65) are standard GM programs; add to the same
-  InstrumentGroup as Flute (73) and Oboe (68) in TrackRowView's instrument picker array,
-  following the existing pattern for wind/solo instruments. Available to all styles.
-- Add `isChillStyle` helpers alongside existing `isKosmic`, `isAmbient` checks
-
-Stage 10 — Coherence analysis:
-- Generate 10 songs per mood (40 songs total)
-- Run batch_analyze.py to verify consonance and density targets
-- Adjust generator weights based on findings
-- Human listening review across all four lead instrument types
-- Verify swing feel is audible but not overwhelming in Bright/Free songs
 
 ---
 
@@ -1278,38 +1202,6 @@ Chord root degree parsing in analyzer:
   '6'→9, 'b7'→10, '7'→11. Extend this table if new chord root labels are added.
 
 ---
-
-## Files to Create / Modify
-
-New source files:
-- `Sources/Zudio/Generation/Chill/ChillMusicalFrameGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillStructureGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillBassGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillDrumGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillLeadGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillPadsGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillRhythmGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillTextureGenerator.swift`
-- `Sources/Zudio/Generation/Chill/ChillTitleGenerator.swift`
-- `Sources/Zudio/Audio/AudioTexturePlayer.swift` — AVAudioPlayerNode wrapper for looping WAV textures
-
-New resource files:
-- `Resources/Textures/rain_soft.wav`
-- `Resources/Textures/cafe_murmur.wav`
-- `Resources/Textures/vinyl_crackle.wav`
-- `Resources/Textures/city_night.wav`
-- `Resources/Textures/tape_hiss.wav`
-- `Resources/Textures/cocktail_hour.wav`
-- `Resources/Textures/distant_thunder.wav`
-- `Resources/Textures/jazz_club_bleed.wav`
-
-Modified source files:
-- `Sources/Zudio/Models/Types.swift` — MusicStyle.chill; new Chill enums
-- `Sources/Zudio/Models/SongState.swift` — Chill-specific fields; chillAudioTexture: String?
-- `Sources/Zudio/Generation/SongGenerator.swift` — .chill case + generateChill()
-- `Sources/Zudio/UI/TopBarView.swift` — style picker; isChillStyle helpers
-- `Sources/Zudio/UI/TrackRowView.swift` — instrument presets for Chill tracks;
-  add Muted Trumpet (59) and Alto Sax (65) to picker
 
 ---
 
@@ -1824,7 +1716,7 @@ the call-and-response role instead).
 **Bass writing rules (all rules):**
 - Beat 1 always has a bass note in active sections; only Breakdown allows beat-1 silence
 - Approach tone (semitone below root) fires only on step 15 (AND of beat 4) max once per bar
-- Register: MIDI 28–52 (deep; center 36–48); never above MIDI 55 except bass statement moments
+- Register: MIDI 40–64 (kTrackBass bounds; center 44–56); bass statement moments may use wider range within bounds
 - Velocity accent: step 1 always 5–10 velocity points above other steps in same bar
 - Drum-bass lock: step 1 of bass aligns with kick drum in all patterns; avoid snare beats
   (steps 5 and 13) for sustained notes

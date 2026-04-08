@@ -64,10 +64,9 @@ struct TrackRowView: View {
                     .init(name:"Minimoog",    program:39),  .init(name:"Elec Guitar", program:30)]
         case kTrackPads:
             if isAmbient {
-                return [.init(name:"Choir Aahs",   program:52), .init(name:"Synth Strings", program:50),
-                        .init(name:"Bowed Glass",  program:92), .init(name:"Warm Pad",      program:89),
-                        .init(name:"Halo Pad",     program:94), .init(name:"New Age Pad",   program:88),
-                        .init(name:"Sweep Pad",    program:95)]
+                return [.init(name:"Sweep Pad",    program:95), .init(name:"Synth Strings",program:50),
+                        .init(name:"Warm Pad",     program:89), .init(name:"Halo Pad",     program:94),
+                        .init(name:"New Age Pad",  program:88)]
             }
             if isKosmic {
                 return [.init(name:"Sweep Pad",    program:95), .init(name:"Synth Strings", program:50),
@@ -109,9 +108,9 @@ struct TrackRowView: View {
                         .init(name:"Vinyl crackle",  program:250)]
             }
             if isAmbient {
-                return [.init(name:"Strings",program:49), .init(name:"Bowed Glass",  program:92),
-                        .init(name:"Choir Aahs",    program:52), .init(name:"FX Atmosphere",   program:99),
-                        .init(name:"Sweep Pad",     program:95), .init(name:"Pad 3 Poly",      program:90)]
+                return [.init(name:"Strings",       program:49), .init(name:"Bowed Glass",    program:92),
+                        .init(name:"Choir Aahs",    program:52), .init(name:"FX Atmosphere",  program:99),
+                        .init(name:"Pad 3 Poly",    program:90)]
             }
             if isKosmic {
                 return [.init(name:"FX Atmosphere", program:99), .init(name:"Pad 3 Poly",    program:90),
@@ -125,8 +124,8 @@ struct TrackRowView: View {
                         .init(name:"Elec Bass",      program:33)]
             }
             if isAmbient {
-                return [.init(name:"Cello",        program:42),  .init(name:"Contrabass",     program:43),
-                        .init(name:"Fretless Bass",program:35)]
+                return [.init(name:"Cello",        program:42),  .init(name:"French Horn",    program:60),
+                        .init(name:"Contrabass",   program:43),  .init(name:"Fretless Bass",  program:35)]
             }
             if isKosmic {
                 return [.init(name:"Moog Bass",    program:39), .init(name:"Fretless Bass",  program:35),

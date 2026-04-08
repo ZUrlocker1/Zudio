@@ -441,7 +441,7 @@ through qualifying section(s) only — alternates every other A section after ba
 
 - Phrase length: 1–2 bars; repetition target: 70–90% repeated cells per 16 bars
 - Passing tones: max 1–2 per bar, weak-beat biased, resolve within ≤1 bar
-- Register: MIDI 28–64 (center 40–56)
+- Register: MIDI 40–64 (center 48–56)
 - Strong-beat targets: root 60–75%, fifth 15–30%, other chord tones 5–15%
 - Drum-bass lock: 75–90% of bass onsets align to kick grid; avoid snare backbeats (beats 2/4)
   except intentional accents

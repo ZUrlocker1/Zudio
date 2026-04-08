@@ -5,7 +5,10 @@
 struct AmbientLoopTiler {
     /// Tiles `events` (covering [0, loopBars×16) steps) across [0, totalBars×16).
     /// Partial final tiles are included (notes starting within range are kept).
-    static func tile(events: [MIDIEvent], loopBars: Int, totalBars: Int) -> [MIDIEvent] {
+    /// `silentBars` — absolute bar indices (step/16) where note-ons are suppressed.
+    /// Used by the dropout-zone coordinator to guarantee per-track rests.
+    static func tile(events: [MIDIEvent], loopBars: Int, totalBars: Int,
+                     silentBars: Set<Int> = []) -> [MIDIEvent] {
         guard loopBars > 0, totalBars > 0, !events.isEmpty else { return [] }
         let loopSteps  = loopBars * 16
         let totalSteps = totalBars * 16
@@ -15,6 +18,7 @@ struct AmbientLoopTiler {
             for ev in events {
                 let newStep = tileStart + ev.stepIndex
                 guard newStep < totalSteps else { continue }
+                if !silentBars.isEmpty && silentBars.contains(newStep / 16) { continue }
                 result.append(MIDIEvent(stepIndex: newStep, note: ev.note,
                                         velocity: ev.velocity, durationSteps: ev.durationSteps))
             }

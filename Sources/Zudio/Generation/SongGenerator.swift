@@ -510,6 +510,34 @@ struct SongGenerator {
         var rythmRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackRhythm))
         var texRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackTexture))
 
+        // Dropout zone coordinator (Option C) — one 8-bar rest zone per pitched track, staggered
+        // across the body so no two tracks drop out at the same time. Guarantees no track is
+        // active in 100% of 4-bar windows (RELENTLESS) regardless of loop density.
+        let bodyStart  = structure.introSection?.endBar   ?? 0
+        let bodyEnd    = structure.outroSection?.startBar ?? frame.totalBars
+        let bodyLength = bodyEnd - bodyStart
+        var dropoutZones: [Int: Set<Int>] = [:]
+        if bodyLength >= 40 {
+            var dropRNG   = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 98))
+            let zoneLen   = 8   // bars — always 8 for predictable analysis
+            let nTracks   = 5
+            let segment   = Swift.max(zoneLen + 4, bodyLength / nTracks)
+            // Shuffle order so dropout positions rotate across different songs
+            var order = [kTrackPads, kTrackBass, kTrackLead1, kTrackRhythm, kTrackTexture]
+            for i in stride(from: order.count - 1, through: 1, by: -1) {
+                order.swapAt(i, dropRNG.nextInt(upperBound: i + 1))
+            }
+            for (i, trackIdx) in order.enumerated() {
+                let segStart  = bodyStart + i * segment
+                let segEnd    = Swift.min(segStart + segment, bodyEnd - zoneLen)
+                guard segEnd > segStart else { continue }
+                let rawStart  = segStart + dropRNG.nextInt(upperBound: Swift.max(1, segEnd - segStart))
+                let zoneStart = (rawStart / 4) * 4   // snap to 4-bar boundary
+                let zoneEnd   = Swift.min(zoneStart + zoneLen, bodyEnd)
+                dropoutZones[trackIdx] = Set(zoneStart..<zoneEnd)
+            }
+        }
+
         // Pads
         var padRules: Set<String> = []
         let padLoop = AmbientPadsGenerator.generate(frame: frame, tonalMap: tonalMap,
@@ -517,14 +545,17 @@ struct SongGenerator {
                                                      usedRuleIDs: &padRules)
         trackEvents[kTrackPads] = AmbientLoopTiler.tile(events: padLoop,
                                                          loopBars: loopLengths.pads,
-                                                         totalBars: frame.totalBars)
+                                                         totalBars: frame.totalBars,
+                                                         silentBars: dropoutZones[kTrackPads] ?? [])
 
-        // Bass — full-song chord-following (no tiling)
+        // Bass — rhythm template tiled at loopLengths.bass; pitch resolved from tonal map per note
         var bassRules: Set<String> = []
         trackEvents[kTrackBass] = AmbientBassGenerator.generate(frame: frame, tonalMap: tonalMap,
                                                                   rng: &bassRNG,
+                                                                  loopBars: loopLengths.bass,
                                                                   usedRuleIDs: &bassRules,
-                                                                  forceRuleID: forceBassRuleID)
+                                                                  forceRuleID: forceBassRuleID,
+                                                                  silentBars: dropoutZones[kTrackBass] ?? [])
 
         // Drums (stochastic full-song — no tiling)
         var drumRules: Set<String> = []
@@ -549,11 +580,29 @@ struct SongGenerator {
                                                             structure: structure)
         }
         // AMB-LEAD-009 and AMB-LEAD-010 return full-song events — skip the loop tiler for those.
+        // Section solos are already sparse by design so dropout zones don't apply to them.
+        // AMB-LEAD-001 (floating tone) and AMB-LEAD-002 (echo phrase) are minimalist by design
+        // (1–3 notes per loop). Applying an 8-bar dropout zone on top makes them nearly inaudible;
+        // skip the dropout zone for these rules so their intended sparsity is preserved intact.
         let isAmbSectionSolo = lead1Rules.contains("AMB-LEAD-009") || lead1Rules.contains("AMB-LEAD-010")
-        trackEvents[kTrackLead1] = isAmbSectionSolo ? lead1Loop
-            : AmbientLoopTiler.tile(events: lead1Loop, loopBars: loopLengths.lead1, totalBars: frame.totalBars)
+        let isMinimalistLead = lead1Rules.contains("AMB-LEAD-001") || lead1Rules.contains("AMB-LEAD-002")
+        if isAmbSectionSolo {
+            // Section solos return full-song events — skip the loop tiler entirely.
+            trackEvents[kTrackLead1] = lead1Loop
+        } else if isMinimalistLead {
+            // Floating tone / echo phrase are already very sparse — skip the dropout zone
+            // so the handful of notes they produce aren't further suppressed.
+            trackEvents[kTrackLead1] = AmbientLoopTiler.tile(events: lead1Loop,
+                                                              loopBars: loopLengths.lead1,
+                                                              totalBars: frame.totalBars)
+        } else {
+            trackEvents[kTrackLead1] = AmbientLoopTiler.tile(events: lead1Loop,
+                                                              loopBars: loopLengths.lead1,
+                                                              totalBars: frame.totalBars,
+                                                              silentBars: dropoutZones[kTrackLead1] ?? [])
+        }
 
-        // Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows)
+        // Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows) — no dropout zone; it fills gaps already
         var lead2Rules: Set<String> = []
         let lead2Loop = AmbientLeadGenerator.generateLead2(frame: frame, tonalMap: tonalMap,
                                                             lead1Events: lead1Loop,
@@ -571,7 +620,8 @@ struct SongGenerator {
                                                          forceRuleID: forceArpRuleID)
         trackEvents[kTrackRhythm] = AmbientLoopTiler.tile(events: rythmLoop,
                                                             loopBars: loopLengths.rhythm,
-                                                            totalBars: frame.totalBars)
+                                                            totalBars: frame.totalBars,
+                                                            silentBars: dropoutZones[kTrackRhythm] ?? [])
 
         // Texture
         var texRules: Set<String> = []
@@ -580,23 +630,42 @@ struct SongGenerator {
                                                         usedRuleIDs: &texRules)
         trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoop,
                                                              loopBars: loopLengths.texture,
-                                                             totalBars: frame.totalBars)
+                                                             totalBars: frame.totalBars,
+                                                             silentBars: dropoutZones[kTrackTexture] ?? [])
 
-        // Guard: if rhythm, texture, bass, and drums are all empty, force a non-silent texture pass.
-        let allAccompEmpty = trackEvents[kTrackRhythm].isEmpty
-                          && trackEvents[kTrackTexture].isEmpty
-                          && trackEvents[kTrackBass].isEmpty
-                          && trackEvents[kTrackDrums].isEmpty
-        if allAccompEmpty {
-            var texRules2: Set<String> = []
-            let texLoop2 = AmbientTextureGenerator.generate(frame: frame, tonalMap: tonalMap,
+        // Hollow guard A: if bass, rhythm, and texture are all absent, the song will sound hollow —
+        // pads re-attack every 2–4 bars, leaving long empty stretches in between.
+        // Force texture non-silent to provide movement regardless of drum presence.
+        if trackEvents[kTrackBass].isEmpty
+            && trackEvents[kTrackRhythm].isEmpty
+            && trackEvents[kTrackTexture].isEmpty {
+            var texRulesH: Set<String> = []
+            let texLoopH = AmbientTextureGenerator.generate(frame: frame, tonalMap: tonalMap,
                                                              loopBars: loopLengths.texture, rng: &texRNG,
-                                                             usedRuleIDs: &texRules2,
+                                                             usedRuleIDs: &texRulesH,
                                                              forceNonSilent: true)
-            trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoop2,
+            trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoopH,
                                                                 loopBars: loopLengths.texture,
-                                                                totalBars: frame.totalBars)
-            texRules = texRules2
+                                                                totalBars: frame.totalBars,
+                                                                silentBars: dropoutZones[kTrackTexture] ?? [])
+            texRules.formUnion(texRulesH)
+        }
+
+        // Hollow guard B: section solos (009/010) only play in two narrow 8-bar windows —
+        // the rest of the song is nearly silent without rhythmic support.
+        // If bass and rhythm are both absent and the lead is a section solo, force sparse arpeggio.
+        if isAmbSectionSolo
+            && trackEvents[kTrackBass].isEmpty
+            && trackEvents[kTrackRhythm].isEmpty {
+            rhythmRules.removeAll()
+            let rythmLoopH = AmbientRhythmGenerator.generate(frame: frame, tonalMap: tonalMap,
+                                                               loopBars: loopLengths.rhythm, rng: &rythmRNG,
+                                                               usedRuleIDs: &rhythmRules,
+                                                               forceRuleID: "AMB-RTHM-002")
+            trackEvents[kTrackRhythm] = AmbientLoopTiler.tile(events: rythmLoopH,
+                                                                loopBars: loopLengths.rhythm,
+                                                                totalBars: frame.totalBars,
+                                                                silentBars: dropoutZones[kTrackRhythm] ?? [])
         }
 
         // Plan J: Strip Rhythm and Texture events from intro and outro bars.
@@ -612,6 +681,33 @@ struct SongGenerator {
             trackEvents[kTrackTexture] = trackEvents[kTrackTexture].filter { $0.stepIndex < outroStartStep }
         }
 
+        // Staggered entry/exit: when Bass, Pads, and Rhythm are all active, silence one of them
+        // for the first 12 and last 12 bars of the song. The chosen instrument enters late and
+        // exits early, creating a natural arrangement swell and avoiding a wall-of-sound opening.
+        if frame.totalBars >= 32,
+           !trackEvents[kTrackBass].isEmpty,
+           !trackEvents[kTrackPads].isEmpty,
+           !trackEvents[kTrackRhythm].isEmpty {
+            var arrangeRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 97))
+            let candidates  = [kTrackBass, kTrackPads, kTrackRhythm]
+            let chosen      = candidates[arrangeRNG.nextInt(upperBound: candidates.count)]
+            let headEndStep  = 12 * 16
+            let tailStartStep = (frame.totalBars - 12) * 16
+            trackEvents[chosen] = trackEvents[chosen].filter {
+                $0.stepIndex >= headEndStep && $0.stepIndex < tailStartStep
+            }
+        }
+
+        // Texture always enters at bar 16 and exits 16 bars before the end.
+        // Creates a slow reveal — texture emerges from the sonic field rather than being present from the start.
+        if frame.totalBars >= 40, !trackEvents[kTrackTexture].isEmpty {
+            let texHeadEnd   = 16 * 16
+            let texTailStart = (frame.totalBars - 16) * 16
+            trackEvents[kTrackTexture] = trackEvents[kTrackTexture].filter {
+                $0.stepIndex >= texHeadEnd && $0.stepIndex < texTailStart
+            }
+        }
+
         // Plan H: Coordinated breath silence — 2–4 bars of stillness in Pads + Lead 1 mid-body (40% chance).
         // Bass and texture continue through it. Creates a moment of arrival when pads return.
         var breathSilenceBar: Int? = nil
@@ -624,22 +720,13 @@ struct SongGenerator {
                 let silenceBar       = safeStart + rng.nextInt(upperBound: safeEnd - safeStart)
                 let silenceStartStep = silenceBar * 16
                 let silenceEndStep   = silenceStartStep + silenceLenBars * 16
-                func clearBreath(_ evs: [MIDIEvent]) -> [MIDIEvent] {
-                    evs.compactMap { ev in
-                        if ev.stepIndex >= silenceStartStep && ev.stepIndex < silenceEndStep { return nil }
-                        if ev.stepIndex < silenceStartStep {
-                            let bleed = ev.stepIndex + ev.durationSteps - silenceStartStep
-                            if bleed > 0 {
-                                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                                 velocity: ev.velocity,
-                                                 durationSteps: ev.durationSteps - bleed)
-                            }
-                        }
-                        return ev
-                    }
+                trackEvents[kTrackPads]  = clearStepRange(trackEvents[kTrackPads],
+                                                           from: silenceStartStep, to: silenceEndStep)
+                // Section solos (009/010) play in fixed windows — never suppress them mid-song.
+                if !isAmbSectionSolo {
+                    trackEvents[kTrackLead1] = clearStepRange(trackEvents[kTrackLead1],
+                                                               from: silenceStartStep, to: silenceEndStep)
                 }
-                trackEvents[kTrackPads]  = clearBreath(trackEvents[kTrackPads])
-                trackEvents[kTrackLead1] = clearBreath(trackEvents[kTrackLead1])
                 breathSilenceBar     = silenceBar
                 breathSilenceLenBars = silenceLenBars
             }
@@ -688,27 +775,11 @@ struct SongGenerator {
                 let blockStart     = candidates[lead1RNG.nextInt(upperBound: candidates.count)]
                 let blockStartStep = blockStart * 16
                 let blockEndStep   = blockStartStep + 64   // 4 bars × 16 steps
-                // Clear Lead 1 and Lead 2 in the 4-bar block.
-                // Also truncate any note that starts before the block but bleeds into it.
-                func clearBlock(_ evs: [MIDIEvent]) -> [MIDIEvent] {
-                    evs.compactMap { ev in
-                        if ev.stepIndex >= blockStartStep && ev.stepIndex < blockEndStep {
-                            return nil   // starts inside block — remove
-                        }
-                        if ev.stepIndex < blockStartStep {
-                            let bleed = ev.stepIndex + ev.durationSteps - blockStartStep
-                            if bleed > 0 {
-                                // Truncate to end exactly at block start
-                                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                                 velocity: ev.velocity,
-                                                 durationSteps: ev.durationSteps - bleed)
-                            }
-                        }
-                        return ev
-                    }
-                }
-                trackEvents[kTrackLead1] = clearBlock(trackEvents[kTrackLead1])
-                trackEvents[kTrackLead2] = clearBlock(trackEvents[kTrackLead2])
+                // Clear Lead 1 and Lead 2 in the 4-bar block, truncating any bleed-in notes.
+                trackEvents[kTrackLead1] = clearStepRange(trackEvents[kTrackLead1],
+                                                           from: blockStartStep, to: blockEndStep)
+                trackEvents[kTrackLead2] = clearStepRange(trackEvents[kTrackLead2],
+                                                           from: blockStartStep, to: blockEndStep)
                 // Play whistle once starting at bar 2 of the block — phrase naturally spills into bar 3.
                 let whistleEvents = KosmicLeadGenerator.xFilesWhistleBar(
                     bar: blockStart + 1, frame: frame, tonalMap: tonalMap, rng: &lead1RNG)
@@ -716,6 +787,55 @@ struct SongGenerator {
                     .sorted { $0.stepIndex < $1.stepIndex }
                 // Annotate only the first whistle bar at runtime
                 ambientXFilesBars = [blockStart + 1]
+            }
+        }
+
+        // Void guard: prevent extended stretches with no pitched instruments.
+        // After all processing, scan body bars for runs of consecutive bars where no pitched
+        // track has any note-on. Fill each void with a soft Pads reattack at the midpoint.
+        // Threshold: 4+ bars when drums are absent (every silence is audible),
+        //            6+ bars when drums are present (drums provide rhythmic continuity).
+        if !trackEvents[kTrackPads].isEmpty {
+            let vBodyStart    = structure.introSection?.endBar   ?? 0
+            let vBodyEnd      = structure.outroSection?.startBar ?? frame.totalBars
+            let drumsActive   = !trackEvents[kTrackDrums].isEmpty
+            let voidThreshold = drumsActive ? 3 : 2
+            let pitchedTracks = [kTrackLead1, kTrackLead2, kTrackPads,
+                                  kTrackBass, kTrackRhythm, kTrackTexture]
+            var barsWithPitch = Set<Int>()
+            for track in pitchedTracks {
+                for ev in trackEvents[track] {
+                    let bar = ev.stepIndex / 16
+                    if bar >= vBodyStart && bar < vBodyEnd { barsWithPitch.insert(bar) }
+                }
+            }
+            var runStart: Int? = nil
+            var voids: [(start: Int, length: Int)] = []
+            for bar in vBodyStart..<vBodyEnd {
+                if !barsWithPitch.contains(bar) {
+                    if runStart == nil { runStart = bar }
+                } else if let rs = runStart {
+                    if bar - rs >= voidThreshold { voids.append((rs, bar - rs)) }
+                    runStart = nil
+                }
+            }
+            if let rs = runStart, vBodyEnd - rs >= voidThreshold { voids.append((rs, vBodyEnd - rs)) }
+
+            for void in voids {
+                let fillBar  = void.start + void.length / 2
+                let fillStep = fillBar * 16
+                guard let entry = tonalMap.entry(atBar: fillBar) else { continue }
+                let pool = notesInRegister(pitchClasses: entry.chordWindow.chordTones,
+                                           low: kRegisterBounds[kTrackPads]!.low,
+                                           high: kRegisterBounds[kTrackPads]!.high)
+                guard !pool.isEmpty else { continue }
+                // Prefer a pitch already used by Pads nearby for tonal continuity
+                let refNote = trackEvents[kTrackPads]
+                    .min(by: { abs($0.stepIndex - fillStep) < abs($1.stepIndex - fillStep) })
+                    .map { $0.note } ?? pool[pool.count / 2]
+                trackEvents[kTrackPads].append(
+                    MIDIEvent(stepIndex: fillStep, note: refNote, velocity: 40, durationSteps: 20))
+                trackEvents[kTrackPads].sort { $0.stepIndex < $1.stepIndex }
             }
         }
 
@@ -817,7 +937,8 @@ struct SongGenerator {
             if isAmbient {
                 events = AmbientBassGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, loopBars: songState.ambientLoopLengths?.bass ?? 11,
+                    usedRuleIDs: &usedRules)
             } else if isKosmic {
                 var ignored: [Int] = []
                 events = KosmicBassGenerator.generate(
@@ -1264,6 +1385,10 @@ struct SongGenerator {
         case "MOT-LD2-004": return "Neu! counter melody"
         case "MOT-LD2-005": return "Descending line"
         case "MOT-LD2-006": return "Neu! harmony"
+        // Ambient Lead 2 rules
+        case "AMB-SYNC-001": return "Ghost echo lead"
+        case "AMB-LEAD-005": return "Silent-window fill lead"
+        case "AMB-LEAD-006": return "No lead 2"
         default:            return ruleID
         }
     }
@@ -1533,6 +1658,23 @@ struct SongGenerator {
         }
     }
 
+    /// Removes events that start inside [from, to) and truncates any event that starts before
+    /// `from` but whose duration bleeds into the range. Used by breath silence and X-Files block.
+    private static func clearStepRange(_ events: [MIDIEvent], from: Int, to: Int) -> [MIDIEvent] {
+        events.compactMap { ev in
+            if ev.stepIndex >= from && ev.stepIndex < to { return nil }
+            if ev.stepIndex < from {
+                let bleed = ev.stepIndex + ev.durationSteps - from
+                if bleed > 0 {
+                    return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                     velocity: ev.velocity,
+                                     durationSteps: ev.durationSteps - bleed)
+                }
+            }
+            return ev
+        }
+    }
+
     private static func buildAmbientLog(
         title: String,
         frame: GlobalMusicalFrame,
@@ -1649,6 +1791,7 @@ struct SongGenerator {
         case "AMB-LEAD-009":  return "Magnetik solo"
         case "AMB-LEAD-010":  return "Oxygenerator solo"
         // Lead 2
+        case "AMB-SYNC-001":     return "Ghost echo lead"
         case "AMB-LEAD-005":     return "Silent-window fill"
         case "AMB-LEAD-006":     return "No lead 2"
         case "AMB-LEAD-004":    return "Echo lead phrase"

@@ -42,7 +42,12 @@ struct AmbientRhythmGenerator {
 
         switch ruleID {
         case "AMB-RTHM-004": return []
-        case "AMB-RTHM-001": return singleTonePulse(notes: scaleNotes, loopSteps: loopSteps, rng: &rng)
+        case "AMB-RTHM-001":
+            let chordPCs1   = tonalMap.entry(atBar: 0)?.chordWindow.chordTones ?? scalePCs
+            let chordNotes1 = notesInRegister(pitchClasses: chordPCs1, low: bounds.low, high: bounds.high)
+            return singleTonePulse(scaleNotes: scaleNotes,
+                                   chordNotes: chordNotes1.isEmpty ? scaleNotes : chordNotes1,
+                                   loopSteps: loopSteps, rng: &rng)
         case "AMB-RTHM-002":
             let chordPCs   = tonalMap.entry(atBar: 0)?.chordWindow.chordTones ?? scalePCs
             let chordNotes = notesInRegister(pitchClasses: chordPCs, low: bounds.low, high: bounds.high)
@@ -56,13 +61,29 @@ struct AmbientRhythmGenerator {
 
     // MARK: - Rules
 
-    private static func singleTonePulse(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
-        let note     = notes[rng.nextInt(upperBound: notes.count)]
-        let interval = 12 + rng.nextInt(upperBound: 13)   // every 12–24 steps (3–6 beats)
+    private static func singleTonePulse(scaleNotes: [UInt8], chordNotes: [UInt8],
+                                         loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        // Anchor pitch: choose from chord tones so the primary tone is always harmonically solid.
+        let anchorIdx = rng.nextInt(upperBound: chordNotes.count)
+        let anchor    = chordNotes[anchorIdx]
+        let interval  = 12 + rng.nextInt(upperBound: 13)   // every 12–24 steps (3–6 beats)
+
+        // Build a small pool of nearby chord tones for occasional colour shifts.
+        // Neighbours must be within 5 semitones of anchor and in chordNotes — keeps changes subtle.
+        let neighbours = chordNotes.filter { abs(Int($0) - Int(anchor)) > 0 &&
+                                             abs(Int($0) - Int(anchor)) <= 5 }
+
         var events: [MIDIEvent] = []
         var step = rng.nextInt(upperBound: interval)
         while step < loopSteps {
             if rng.nextDouble() < 0.40 {   // ~40% hit rate — most potential positions are silent
+                // ~12% chance of a one-off colour note from a nearby chord tone
+                let note: UInt8
+                if !neighbours.isEmpty && rng.nextDouble() < 0.12 {
+                    note = neighbours[rng.nextInt(upperBound: neighbours.count)]
+                } else {
+                    note = anchor
+                }
                 let vel = UInt8(28 + rng.nextInt(upperBound: 25))  // 28–52
                 events.append(MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: 2))
             }

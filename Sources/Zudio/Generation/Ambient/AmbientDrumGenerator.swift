@@ -14,12 +14,12 @@ struct AmbientDrumGenerator {
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        useBrushKit: Bool = false
+        useBrushKit: Bool = false   // reserved for future use — not applied internally
     ) -> [MIDIEvent] {
         switch percussionStyle {
         case .handPercussion:
             usedRuleIDs.insert("AMB-DRUM-004")
-            return handPercussion(frame: frame, structure: structure, rng: &rng, useBrushKit: useBrushKit)
+            return handPercussion(frame: frame, structure: structure, rng: &rng)
         case .textural:
             usedRuleIDs.insert("AMB-DRUM-001")
             return textural(frame: frame, structure: structure, rng: &rng)
@@ -40,7 +40,7 @@ struct AmbientDrumGenerator {
     /// Shaker runs a quiet 8th-note pulse on active bars (gives a breathing texture).
     /// Congas and bongos land stochastically on syncopated positions.
     private static func handPercussion(frame: GlobalMusicalFrame, structure: SongStructure,
-                                       rng: inout SeededRNG, useBrushKit: Bool = false) -> [MIDIEvent] {
+                                       rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
         // GM note numbers for hand percussion (not in GMDrum enum)
@@ -49,10 +49,9 @@ struct AmbientDrumGenerator {
         let lowConga: UInt8  = 64  // Low Conga
         let hiBongo: UInt8   = 60  // Hi Bongo
         let lowBongo: UInt8  = 61  // Low Bongo
-        // Brush Kit substitutions: Maracas replaces Shaker; Open Triangle replaces Claves
-        let shaker: UInt8    = useBrushKit ? 70 : 82  // 70=Maracas, 82=Shaker
-        let maracas: UInt8   = 70
-        let claves: UInt8    = useBrushKit ? 81 : 75  // 81=Open Triangle, 75=Claves
+        let shaker: UInt8    = 82  // Shaker
+        let maracas: UInt8   = 70  // Maracas
+        let claves: UInt8    = 75  // Claves
 
         // Step offsets for syncopated conga/bongo placements (16th-note grid)
         let conglacyPositions = [2, 4, 6, 8, 10, 12, 14]  // off-beats within a bar

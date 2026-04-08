@@ -40,7 +40,7 @@ case "$STYLE" in
   ambient)
     TEST_SUITE="ZudioTests/AmbientBatchTests"
     BATCH_DIR="$SCRIPT_DIR/batch-output/ambient"
-    ANALYZER="$SCRIPT_DIR/analyze_zudio.py"
+    ANALYZER="$SCRIPT_DIR/ambient_analyze.py"
     ;;
   *)
     echo "Unknown style: $STYLE"

@@ -69,6 +69,24 @@ struct SongLogExporter {
             let len   = "(\(s.lengthBars) bars)"
             lines.append("  \(label) \(col(range, 20)) \(len)")
         }
+        // Ambient-only: log co-prime loop lengths so QA can check for duplicate assignments.
+        // Only show a track's loop length if it produced events — silent tracks (e.g. AMB-BASS-002,
+        // AMB-RTHM-004) are omitted so the log isn't misleading.
+        if let loops = song.ambientLoopLengths {
+            let te = song.trackEvents
+            var loopLines: [String] = []
+            if te.indices.contains(kTrackLead1),  !te[kTrackLead1].isEmpty  { loopLines.append("    Lead 1:  \(loops.lead1)") }
+            if te.indices.contains(kTrackLead2),  !te[kTrackLead2].isEmpty  { loopLines.append("    Lead 2:  \(loops.lead2)") }
+            if te.indices.contains(kTrackPads),   !te[kTrackPads].isEmpty   { loopLines.append("    Pads:    \(loops.pads)") }
+            if te.indices.contains(kTrackBass),   !te[kTrackBass].isEmpty   { loopLines.append("    Bass:    \(loops.bass)") }
+            if te.indices.contains(kTrackRhythm), !te[kTrackRhythm].isEmpty { loopLines.append("    Rhythm:  \(loops.rhythm)") }
+            if te.indices.contains(kTrackTexture),!te[kTrackTexture].isEmpty { loopLines.append("    Texture: \(loops.texture)") }
+            if !loopLines.isEmpty {
+                lines.append("")
+                lines.append("  Loop lengths (bars):")
+                lines.append(contentsOf: loopLines)
+            }
+        }
         lines.append("")
 
         // ── Chord plan ───────────────────────────────────────────────────────────

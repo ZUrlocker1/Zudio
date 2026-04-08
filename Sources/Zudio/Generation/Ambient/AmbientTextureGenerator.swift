@@ -61,21 +61,28 @@ struct AmbientTextureGenerator {
     }
 
     /// Very low velocity long-held tone — 1–2 per loop.
+    /// When generating 2 notes, the second is guaranteed to differ from the first
+    /// (chord-tone pool, so both are always tonally safe).
     private static func ghostTone(chordPCs: Set<Int>, bounds: RegisterBounds,
                                    loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         let pool = notesInRegister(pitchClasses: chordPCs, low: bounds.low, high: bounds.high)
         guard !pool.isEmpty else { return [] }
         var events: [MIDIEvent] = []
-        let count = 1 + rng.nextInt(upperBound: 2)
-        let slot  = Swift.max(8, loopSteps / count)
+        let count   = 1 + rng.nextInt(upperBound: 2)
+        let slot    = Swift.max(8, loopSteps / count)
+        var lastIdx = -1
         for i in 0..<count {
             let start = slot * i + rng.nextInt(upperBound: Swift.max(1, slot / 2))
             if start >= loopSteps { break }
             let dur = Swift.min(slot - 4, loopSteps - start)
             if dur >= 8 {
-                let note = pool[rng.nextInt(upperBound: pool.count)]
+                var idx = rng.nextInt(upperBound: pool.count)
+                if pool.count >= 2 && idx == lastIdx {
+                    idx = (idx + 1 + rng.nextInt(upperBound: pool.count - 1)) % pool.count
+                }
+                lastIdx = idx
                 let vel  = UInt8(12 + rng.nextInt(upperBound: 18))  // 12–29
-                events.append(MIDIEvent(stepIndex: start, note: note, velocity: vel, durationSteps: dur))
+                events.append(MIDIEvent(stepIndex: start, note: pool[idx], velocity: vel, durationSteps: dur))
             }
         }
         return events

@@ -176,13 +176,22 @@ struct AmbientLeadGenerator {
     // MARK: - Lead 1 rule implementations
 
     /// AMB-LEAD-001: Floating tone — 1–3 sustained notes, long rests between them.
+    /// Each note is guaranteed to differ from the previous one (when the pool has ≥ 2 notes),
+    /// so tiled loops never sound like a single repeated pitch.
     private static func floatingTone(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
-        let count  = 1 + rng.nextInt(upperBound: 3)   // 1–3 notes
-        var cursor = rng.nextInt(upperBound: 8)
+        let count   = 1 + rng.nextInt(upperBound: 3)   // 1–3 notes
+        var cursor  = rng.nextInt(upperBound: 8)
+        var lastIdx = -1
         for _ in 0..<count {
             guard cursor < loopSteps else { break }
-            let note    = notes[rng.nextInt(upperBound: notes.count)]
+            // Pick an index that differs from the previous one when the pool allows it.
+            var idx = rng.nextInt(upperBound: notes.count)
+            if notes.count >= 2 && idx == lastIdx {
+                idx = (idx + 1 + rng.nextInt(upperBound: notes.count - 1)) % notes.count
+            }
+            lastIdx = idx
+            let note    = notes[idx]
             let dur     = 8 + rng.nextInt(upperBound: 17)   // 8–24 steps
             let safeDur = Swift.min(dur, loopSteps - cursor)
             if safeDur >= 4 {

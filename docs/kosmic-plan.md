@@ -379,7 +379,7 @@ Bass in Kosmic is more drone-like than the driving Motorik bass patterns.
 
 **KOS-BAS-005: Absent Bass** (sparse sections only) — no bass events for 4–8 bar stretches, then KOS-BAS-001 re-enters. This is the Roach approach: bass as punctuation, not foundation.
 
-**Register:** MIDI 28–52 (same as Motorik — low register is the same regardless of style)
+**Register:** MIDI 40–64 (kTrackBass bounds)
 
 ---
 
@@ -435,73 +435,19 @@ The Zudio generator architecture is well-suited to extension. All of these work 
 
 ---
 
-## Part 7: New Files Required
-
-When implementation begins, create:
-
-- `Sources/Zudio/Generation/Kosmic/CosmicMusicalFrameGenerator.swift` — tempo/key/mode/progression distributions
-- `Sources/Zudio/Generation/Kosmic/CosmicStructureGenerator.swift` — song form, section lengths, intro/outro styles
-- `Sources/Zudio/Generation/Kosmic/CosmicArpeggioGenerator.swift` — the core of the style; 4–8 note patterns, skip logic, phasing
-- `Sources/Zudio/Generation/Kosmic/CosmicPadsGenerator.swift` — drone, swell, unsync-layer, sus/quartal rules
-- `Sources/Zudio/Generation/Kosmic/CosmicLeadGenerator.swift` — sparse slow-arc, floating tones, echo melody
-- `Sources/Zudio/Generation/Kosmic/CosmicBassGenerator.swift` — drone root, slow walk, pedal pulse
-- `Sources/Zudio/Generation/Kosmic/CosmicDrumGenerator.swift` — absent/sparse/minimal percussion logic
-- `Sources/Zudio/Generation/Kosmic/CosmicTextureGenerator.swift` — orbital motives, shimmer holds
-
-**Modify:**
-- `Sources/Zudio/Generation/SongGenerator.swift` — add `style: MusicStyle` parameter, branch to Kosmic generators
-- `Sources/Zudio/Models/Types.swift` — add `MusicStyle` enum, new `PercussionStyle` enum, new progression families
-- `Sources/Zudio/UI/TopBarView.swift` — add style dial (Motorik / Kosmic)
-- `Sources/Zudio/UI/TrackRowView.swift` — Kosmic instrument presets for each track
-- `Sources/Zudio/AppState.swift` — add `selectedStyle: MusicStyle` published property
-
----
-
-## Part 8: UI — Style Dial
-
-Replace the `Text("Style: Motorik")` static label in TopBarView with an interactive control.
-
-**Design: Segmented picker (macOS `.segmented` style)**
-
-```swift
-Picker("Style", selection: $appState.selectedStyle) {
-    Text("Motorik").tag(MusicStyle.motorik)
-    Text("Kosmic").tag(MusicStyle.kosmic)
-}
-.pickerStyle(.segmented)
-.frame(width: 140)
-```
-
-This is the cleanest macOS control for 2–3 choices. When Ambient is added, it becomes a 3-segment picker. No dial rotation needed — segmented control is instantly readable and matches macOS HIG.
-
-**`MusicStyle` enum (add to Types.swift):**
-
-```swift
-enum MusicStyle: String, CaseIterable, Codable {
-    case motorik = "Motorik"
-    case kosmic  = "Kosmic"
-    // case ambient = "Ambient"  // future
-}
-```
-
-**Behavior:**
-- Changing style takes effect on the next Generate (not the current song)
-- The Generate button triggers regeneration using the selected style's generators
-- Style selection persists across sessions (saved in AppState/UserDefaults)
-- Track instrument presets change per style (Kosmic gets new instrument lists in TrackRowView)
-
 ---
 
 ## Part 9: Kosmic Instrument Presets (TrackRowView)
 
-The existing GM program assignments will need a Kosmic variant per track:
+Track assignments per kTrack index:
 
-- **Lead 1 (Kosmic):** Square Lead → Brightness (100), Vibraphone (11), Ocarina (79), Flute (73), Whistle (78) — lighter, more celestial than Motorik leads
-- **Lead 2 (Kosmic):** Warm Pad (89), Halo Pad (94), New Age Pad (88) — pads acting as secondary melody
-- **Pads (Kosmic):** Choir Aahs (52), String Ensemble (48), Synth Strings (50), Warm Pad (89), Space Voice (91)
-- **Arpeggio/Rhythm (Kosmic):** Square Lead (80) for JMJ-style sequences, Vibraphone (11), Marimba (12), Kalimba (108)
-- **Bass (Kosmic):** Moog Bass (39), Synth Bass 1 (38), Pad (89) at low register for drone effect
-- **Drums (Kosmic):** Brush Kit (40) for sparse percussion, or absent
+- **kTrackLead1 (Lead 1):** Brightness (100), Vibraphone (11), Ocarina (79), Flute (73), Whistle (78) — celestial, sparse
+- **kTrackLead2 (Lead 2):** Warm Pad (89), Halo Pad (94), New Age Pad (88) — pads acting as secondary melody
+- **kTrackPads (Pads):** Choir Aahs (52), String Ensemble (48), Synth Strings (50), Warm Pad (89), Space Voice (91)
+- **kTrackRhythm (Rhythm/Arpeggio):** Square Lead (80) for JMJ-style sequences, Vibraphone (11), Marimba (12), Kalimba (108); register MIDI 45–76
+- **kTrackTexture (Texture):** FX Crystal (98), FX Echoes (102), Space Voice (91), Sweep Pad (95) — orbital motives, shimmer holds
+- **kTrackBass (Bass):** Moog Bass (39), Synth Bass 1 (38) — drone root, narrow register MIDI 40–64
+- **kTrackDrums (Drums):** Brush Kit (40) for sparse percussion, or absent (pitched synth percussion on root/fifth per KOS-RULE-08)
 
 ---
 
@@ -531,7 +477,7 @@ Drawing on all research, the key rules that prevent Kosmic from being "noise":
 2. **The arpeggio pattern must be a recognizable shape** — not random note order; use one of the 5 interval vocabularies in §5.3
 3. **Harmonic changes must be prepared** — change chord only on a bar boundary, and only to a chord that shares ≥4 pitch classes with the previous chord
 4. **The bass must anticipate or confirm the chord** — bass moves to new root 1 step before or on the chord change bar
-5. **Layers must not compete in the same register** — arpeggio (MIDI 60–84), pads (MIDI 36–72), lead (MIDI 72–96), bass (MIDI 28–52) must not overlap more than 4 semitones
+5. **Layers must not compete in the same register** — arpeggio/rhythm (MIDI 45–76), pads (MIDI 48–84), lead (MIDI 60–88), bass (MIDI 40–64) must not overlap more than 4 semitones
 6. **Velocity hierarchy:** Lead = 45–72, Arpeggio = 60–80, Pads = 35–60, Bass = 55–75, Texture = 20–45
 7. **Silence is valid** — notes should not fill every step; rests ARE music in Kosmic style
 8. **Skip logic creates the groove** — 1–2 skipped steps in an 8-step arpeggio pattern creates syncopation without complexity
@@ -546,7 +492,7 @@ Drawing on all research, the key rules that prevent Kosmic from being "noise":
 4. Arpeggio track present in all songs, 4–8 note patterns diatonic to key
 5. Harmonic changes should occur no more than once per 8 bars
 6. Subjective test: does it sound like ambient/kosmische music? Would Tangerine Dream fan recognize the genre?
-7. Style selector switches between Motorik and Kosmic — both styles generate correctly from the same Generate button
+7. Style selector shows Motorik | Kosmic | Ambient | Chill — all generate correctly from the same Generate button
 8. Test Mode (Cmd-T) works in Kosmic style — generates 1-minute songs for rapid audition
 
 ---

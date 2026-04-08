@@ -62,33 +62,81 @@ struct AmbientStructureGenerator {
         switch ambientProgFamily {
 
         case .droneSingle:
-            let single = makeWindow(root: "1", type: .minor, start: 0, length: totalBars, key: key, mode: mode)
+            let single = makeWindow(root: "1", type: tonicType(for: mode), start: 0, length: totalBars, key: key, mode: mode)
             return injectMidShift(tonic: single, key: key, mode: mode, totalBars: totalBars, rng: &rng)
 
         case .suspendedDrone:
+            // sus2 has no 3rd, so it's mode-neutral — works for all modes
             let single = makeWindow(root: "1", type: .sus2, start: 0, length: totalBars, key: key, mode: mode)
             return injectMidShift(tonic: single, key: key, mode: mode, totalBars: totalBars, rng: &rng)
 
         case .dissonantHaze:
-            let single = makeWindow(root: "1", type: .min7, start: 0, length: totalBars, key: key, mode: mode)
+            let single = makeWindow(root: "1", type: hazeType(for: mode), start: 0, length: totalBars, key: key, mode: mode)
             return injectMidShift(tonic: single, key: key, mode: mode, totalBars: totalBars, rng: &rng)
 
         case .droneTwo:
             let half   = Swift.max(4, (totalBars / 2 / 4) * 4)
             let second = Swift.max(4, totalBars - half)
+            let (deg2, type2) = secondChord(for: mode)
             return [
-                makeWindow(root: "1",  type: .minor, start: 0,    length: half,   key: key, mode: mode),
-                makeWindow(root: "b7", type: .major, start: half,  length: second, key: key, mode: mode),
+                makeWindow(root: "1",  type: tonicType(for: mode), start: 0,    length: half,   key: key, mode: mode),
+                makeWindow(root: deg2, type: type2,                 start: half, length: second, key: key, mode: mode),
             ]
 
         case .modalDrift:
             let third = Swift.max(4, (totalBars / 3 / 4) * 4)
             let rem   = Swift.max(4, totalBars - third * 2)
+            let (deg2, type2) = secondChord(for: mode)
+            let (deg3, type3) = thirdChord(for: mode)
             return [
-                makeWindow(root: "1",  type: .minor, start: 0,        length: third, key: key, mode: mode),
-                makeWindow(root: "b7", type: .major, start: third,     length: third, key: key, mode: mode),
-                makeWindow(root: "b6", type: .major, start: third * 2, length: rem,   key: key, mode: mode),
+                makeWindow(root: "1",  type: tonicType(for: mode), start: 0,         length: third, key: key, mode: mode),
+                makeWindow(root: deg2, type: type2,                 start: third,      length: third, key: key, mode: mode),
+                makeWindow(root: deg3, type: type3,                 start: third * 2,  length: rem,   key: key, mode: mode),
             ]
+        }
+    }
+
+    // MARK: - Mode-appropriate chord type helpers
+
+    /// Tonic chord type: major modes use major triad, minor modes use minor triad.
+    private static func tonicType(for mode: Mode) -> ChordType {
+        switch mode {
+        case .Ionian, .Mixolydian: return .major
+        default:                   return .minor
+        }
+    }
+
+    /// Dissonant haze tonic — adds colour without chromatic notes.
+    /// Mixolydian: dom7 (G B D F in G Mixolydian — F is the natural b7, fully diatonic).
+    /// Ionian:     add9 (all four notes stay in the scale).
+    /// Minor modes: min7 (all four notes in Dorian/Aeolian scale).
+    private static func hazeType(for mode: Mode) -> ChordType {
+        switch mode {
+        case .Mixolydian: return .dom7
+        case .Ionian:     return .add9
+        default:          return .min7
+        }
+    }
+
+    /// Second chord (for droneTwo and modalDrift).
+    /// Every returned (degree, type) pair is fully diatonic to its mode.
+    private static func secondChord(for mode: Mode) -> (String, ChordType) {
+        switch mode {
+        case .Ionian:          return ("4", .major)   // IV — C E G fully in G Ionian
+        case .MinorPentatonic: return ("b3", .major)  // bIII — C E G fully in A MinorPentatonic
+        default:               return ("b7", .major)  // bVII — fully diatonic in Mixolydian/Dorian/Aeolian
+        }
+    }
+
+    /// Third chord (for modalDrift only).
+    /// Every returned (degree, type) pair is fully diatonic to its mode.
+    private static func thirdChord(for mode: Mode) -> (String, ChordType) {
+        switch mode {
+        case .Ionian:          return ("5", .major)   // V — D F# A fully in G Ionian
+        case .Mixolydian:      return ("4", .major)   // IV — C E G fully in G Mixolydian
+        case .Aeolian:         return ("b6", .major)  // bVI — F A C fully in A Aeolian
+        case .MinorPentatonic: return ("4", .sus2)    // IV sus2 — D E A fully in A MinorPentatonic
+        default:               return ("4", .major)   // IV — G B D fully in D Dorian
         }
     }
 
@@ -105,9 +153,11 @@ struct AmbientStructureGenerator {
         // Mode-appropriate shift chord
         let (shiftDegree, shiftType): (String, ChordType) = {
             switch mode {
-            case .Ionian:     return ("4", .major)        // IV — classic major pivot
-            case .Mixolydian: return ("b7", .major)       // bVII — Mixolydian's signature chord
-            default:          return (rng.nextDouble() < 0.65 ? "b7" : "b6", .major)  // Dorian/Aeolian
+            case .Ionian:          return ("4", .major)   // IV — classic major pivot
+            case .Mixolydian:      return ("b7", .major)  // bVII — Mixolydian's signature chord
+            case .Dorian:          return ("b7", .major)  // bVII — diatonic in Dorian (b6 is not)
+            case .MinorPentatonic: return ("b3", .major)  // bIII — only fully-diatonic major choice
+            default:               return (rng.nextDouble() < 0.65 ? "b7" : "b6", .major)  // Aeolian
             }
         }()
 

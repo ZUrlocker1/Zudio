@@ -1,6 +1,6 @@
 // AmbientMusicalFrameGenerator.swift — Ambient generation step 1
 // Produces a GlobalMusicalFrame tuned for Eno/Loscil/Craven Faults style.
-// Tempo: beatless 62–78 (60%), slowPulse 72–92 (35%), midPulse 95–110 (5%).
+// Tempo: beatless 62–78 (50%), slowPulse 72–92 (35%), midPulse 95–110 (15%).
 // Song length: triangular min=180s, peak=240s, max=315s/5:15 (test mode 60–120s).
 
 import Foundation
@@ -37,16 +37,16 @@ struct AmbientMusicalFrameGenerator {
     private static func pickKey(rng: inout SeededRNG) -> String {
         // D 15%, G 12%, C 12%, Ab 8%, F 7%, Eb 6%, A 10%, D 8%, E 7%, others 15%
         let keys:    [String] = ["D",  "G",  "C",  "Ab", "F",  "Eb", "A",  "E",  "B",  "F#", "Bb", "C#"]
-        let weights: [Double] = [0.15, 0.12, 0.12, 0.08, 0.07, 0.06, 0.10, 0.07, 0.04, 0.06, 0.05, 0.08]
+        let weights: [Double] = [0.13, 0.12, 0.12, 0.08, 0.07, 0.06, 0.12, 0.07, 0.04, 0.06, 0.05, 0.08]
         return keys[rng.weightedPick(weights)]
     }
 
     private static func pickTempo(rng: inout SeededRNG) -> Int {
         let roll = rng.nextDouble()
         let (minT, peakT, maxT): (Double, Double, Double)
-        if roll < 0.60 {
+        if roll < 0.50 {
             (minT, peakT, maxT) = (62.0, 70.0, 78.0)    // beatless
-        } else if roll < 0.95 {
+        } else if roll < 0.85 {
             (minT, peakT, maxT) = (72.0, 82.0, 92.0)    // slowPulse
         } else {
             (minT, peakT, maxT) = (95.0, 103.0, 110.0)  // midPulse
@@ -56,7 +56,7 @@ struct AmbientMusicalFrameGenerator {
 
     private static func pickMood(rng: inout SeededRNG) -> Mood {
         let moods:   [Mood]   = [.Dream, .Deep, .Free, .Bright]
-        let weights: [Double] = [0.40,   0.35,  0.15,  0.10]
+        let weights: [Double] = [0.35,   0.30,  0.20,  0.15]
         return moods[rng.weightedPick(weights)]
     }
 
@@ -74,24 +74,26 @@ struct AmbientMusicalFrameGenerator {
 
     private static func pickAmbientProgressionFamily(rng: inout SeededRNG) -> AmbientProgressionFamily {
         let families: [AmbientProgressionFamily] = [.droneSingle, .droneTwo, .modalDrift, .suspendedDrone, .dissonantHaze]
-        let weights:  [Double]                   = [0.30,         0.25,      0.20,        0.15,            0.10]
+        let weights:  [Double]                   = [0.25,         0.30,      0.20,        0.15,            0.10]
         return families[rng.weightedPick(weights)]
     }
 
     /// Co-prime loop length assignment from {5, 7, 11, 13, 17, 19, 23}.
-    /// Pads gets one of the largest (17/19/23), Rhythm one of the smallest (5/7), Bass = Pads.
+    /// Pads gets one of the largest (17/19/23), Rhythm one of the smallest (5/7).
+    /// Bass, Lead 1, Lead 2, Texture each get an independent prime from the remainder
+    /// (one of the 5 remaining primes is left unused so all 6 tracks differ).
     static func pickLoopLengths(rng: inout SeededRNG) -> AmbientLoopLengths {
         let primes = [5, 7, 11, 13, 17, 19, 23]
         let pads   = primes[4 + rng.nextInt(upperBound: 3)]  // 17, 19, or 23
         let rhythm = primes[rng.nextInt(upperBound: 2)]       // 5 or 7
-        let bass   = pads                                      // AMB-RULE-18: bass shares pads prime
-        // Shuffle remaining for lead1, lead2, texture
+        // Shuffle the 5 remaining primes; bass/lead1/lead2/texture each take one (one left unused)
         var remaining = primes.filter { $0 != pads && $0 != rhythm }
         for i in stride(from: remaining.count - 1, through: 1, by: -1) {
             remaining.swapAt(i, rng.nextInt(upperBound: i + 1))
         }
         return AmbientLoopLengths(lead1: remaining[0], lead2: remaining[1],
-                                   pads: pads, rhythm: rhythm, texture: remaining[2], bass: bass)
+                                   pads: pads, rhythm: rhythm,
+                                   texture: remaining[3], bass: remaining[2])
     }
 
     private static func pickTotalBars(tempo: Int, rng: inout SeededRNG, testMode: Bool) -> Int {
