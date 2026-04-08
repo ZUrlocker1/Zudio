@@ -24,6 +24,11 @@ final class AudioTexturePlayer {
     private let fadeDuration: Double = 3.0
     private let fadeInterval: Double = 0.05
 
+    /// Filename that is currently scheduled/playing, so start() can detect a change.
+    private var currentFilename: String? = nil
+    /// True while a stop()-initiated fade-out is running (don't treat as "playing normally").
+    private var isFadingOut: Bool = false
+
     init() {
         setupEngine()
     }
@@ -31,27 +36,47 @@ final class AudioTexturePlayer {
     // MARK: - Public
 
     /// Call when playback starts. `texture` is a filename (e.g. "light_rain.m4a") or nil for silence.
-    func start(style: MusicStyle, texture: String?) {
+    func start(style: MusicStyle, texture: String?, offsetSeconds: Int = 0) {
         guard style == .chill, let filename = texture else { stopImmediate(); return }
-        if playerNode.isPlaying { return }
-        startFile(filename: filename)
+        // Skip restart only if already playing this exact file at the same offset with no fade in progress.
+        if playerNode.isPlaying && !isFadingOut && currentFilename == filename { return }
+        // Cancel any in-progress fade (stop or fast-fade) so we don't kill the new playback.
+        cancelFade()
+        isFadingOut = false
+        if playerNode.isPlaying { playerNode.stop() }
+        startFile(filename: filename, offsetSeconds: offsetSeconds)
     }
 
     /// Call when playback stops — fades out then releases.
     func stop() {
+        isFadingOut = true
         fadeOut {
+            self.isFadingOut = false
+            self.currentFilename = nil
             self.playerNode.stop()
             self.stopPan()
         }
     }
 
     /// Live swap to a different texture (e.g. user cycling picker): fast crossfade ≤500 ms.
-    func switchTexture(_ filename: String?) {
+    func switchTexture(_ filename: String?, offsetSeconds: Int = 0) {
         guard let filename else { stopImmediate(); return }
         fastFadeOut { [weak self] in
             guard let self else { return }
             self.playerNode.stop()
-            self.startFile(filename: filename, fastFadeIn: true)
+            self.startFile(filename: filename, fastFadeIn: true, offsetSeconds: offsetSeconds)
+        }
+    }
+
+    /// Called when solo state changes. Instantly silences (or restores) the texture without
+    /// a full fade — preserves position in the file so unsoloing resumes cleanly.
+    func setSoloMuted(_ muted: Bool) {
+        guard playerNode.isPlaying else { return }
+        if muted {
+            playerNode.volume = 0.0
+        } else {
+            // Restore to the target volume the texture was playing at
+            fadeIn(duration: 0.15)
         }
     }
 
@@ -128,19 +153,39 @@ final class AudioTexturePlayer {
 
     // MARK: - File playback
 
-    private func startFile(filename: String, fastFadeIn: Bool = false) {
+    private func startFile(filename: String, fastFadeIn: Bool = false, offsetSeconds: Int = 0) {
         guard let url = textureURL(filename: filename) else { return }
+        currentFilename = filename
         currentTargetVolume = volumeForTexture(filename)
         applyRandomVariation()
         if !engine.isRunning { try? engine.start() }
         do {
-            let file     = try AVAudioFile(forReading: url)
-            let capacity = AVAudioFrameCount(file.length)
-            guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-                                                frameCapacity: capacity) else { return }
-            try file.read(into: buffer)
+            let file        = try AVAudioFile(forReading: url)
+            let sampleRate  = file.processingFormat.sampleRate
+            let totalFrames = AVAudioFrameCount(file.length)
+
+            // Clamp offset to valid range (0 ... fileLength-1)
+            let rawOffset   = AVAudioFramePosition(Double(offsetSeconds) * sampleRate)
+            let offsetFrame = min(rawOffset, AVAudioFramePosition(totalFrames) - 1)
+
+            // Read tail: from offsetFrame to end of file (scheduled once, no loop)
+            file.framePosition = offsetFrame
+            let tailFrames = AVAudioFrameCount(Int64(totalFrames) - offsetFrame)
+            guard tailFrames > 0,
+                  let tailBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                                    frameCapacity: tailFrames) else { return }
+            try file.read(into: tailBuffer)
+
+            // Read full file for seamless looping from the start
+            file.framePosition = 0
+            guard let loopBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                                    frameCapacity: totalFrames) else { return }
+            try file.read(into: loopBuffer)
+
             playerNode.volume = 0.0
-            playerNode.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+            // Play the tail once (offsetFrame → end), then loop the full file forever
+            playerNode.scheduleBuffer(tailBuffer, at: nil, completionHandler: nil)
+            playerNode.scheduleBuffer(loopBuffer, at: nil, options: .loops, completionHandler: nil)
             playerNode.play()
             fadeIn(duration: fastFadeIn ? 0.20 : fadeDuration)
             startPan()
@@ -234,6 +279,8 @@ final class AudioTexturePlayer {
 
     private func stopImmediate() {
         cancelFade()
+        isFadingOut = false
+        currentFilename = nil
         stopPan()
         playerNode.stop()
     }

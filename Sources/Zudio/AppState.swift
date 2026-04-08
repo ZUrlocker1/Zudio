@@ -173,21 +173,29 @@ final class AppState: ObservableObject {
         TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil,         forceBridge: false, forceBridgeArchetype: nil),
     ]
 
-    // Kosmic 10-slot cycle: exercises the 3 second-batch modified rules (DRUM-002 hat density,
-    // BASS-004 ghost note, PADS-008 density guard) plus the first-batch rhythm/texture fixes.
-    // DRUM-002 exercised via forcePercussionStyle .sparse (3×); BASS-004 forced directly (3×);
-    // combined DRUM-002+BASS-004 (2×); two free nil slots for natural generation.
+    // Kosmic 10-slot cycle: high rotation on the two new texture rules only. All other
+    // fields free (nil) so the generator picks leads, bass, arp, drums naturally.
+    // Slot 0: KOS-TEXT-002*  [Distant Pulse]
+    // Slot 1: KOS-TEXT-004*  [Loscil Drip]
+    // Slot 2: KOS-TEXT-002*  [Distant Pulse]
+    // Slot 3: KOS-TEXT-004*  [Loscil Drip]
+    // Slot 4: KOS-TEXT-002*  [Distant Pulse]
+    // Slot 5: KOS-TEXT-004*  [Loscil Drip]
+    // Slot 6: KOS-TEXT-002*  [Distant Pulse]
+    // Slot 7: KOS-TEXT-004*  [Loscil Drip]
+    // Slot 8: KOS-TEXT-002*  [Distant Pulse]
+    // Slot 9: KOS-TEXT-004*  [Loscil Drip]
     private static let kosmicTestCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: "KOS-BASS-004",  forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: .sparse,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil,             forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: nil, forcePercussionStyle: nil,      forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
+        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
     ]
 
     private func nextTestConfig() -> TestModeConfig? {
@@ -224,27 +232,28 @@ final class AppState: ObservableObject {
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
         case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Halo Pad","New Age Pad","Calliope Lead"]
-        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness"]
+        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Fifths Lead","Moog Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone"]
         case (kTrackLead2,   .ambient): return ["Vibraphone","Celesta","Glockenspiel","Grand Piano","Warm Pad","Space Voice","FX Atmosphere"]
-        case (kTrackLead2,   .kosmic):  return ["Brightness","Warm Pad","Halo Pad","New Age Pad"]
-        case (kTrackLead2,   _):        return ["Brightness","Vibraphone","Bell/Pluck"]
+        case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo"]
+        case (kTrackLead2,   _):        return ["Brightness","Polysynth","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
-        case (kTrackPads,    .kosmic):  return ["Choir Aahs","Synth Strings","Warm Pad","Space Voice"]
-        case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings","Organ Drone"]
-        case (kTrackRhythm,  .chill):  return ["Rhodes","Wurlitzer","Grand Piano"]
-        case (kTrackRhythm,  .ambient): return ["Vibraphone","Marimba","Tubular Bells","Glockenspiel","FX Crystal","FX Echoes","Church Organ"]
-        case (kTrackRhythm,  .kosmic):  return ["FX Crystal","Vibraphone","Wurlitzer","Church Organ"]
-        case (kTrackRhythm,  _):        return ["Guitar Pulse","Wurlitzer","Rock Organ","Rhodes","Muted Guitar"]
+        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
+        case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
+        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ"]
+        case (kTrackRhythm,  .ambient):  return ["Vibraphone","Marimba","Tubular Bells","Glockenspiel","FX Crystal","FX Echoes"]
+        case (kTrackRhythm,  .kosmic):   return ["Moog Lead","Wurlitzer","Rock Organ"]
+        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
+        case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Bar sounds","City at night","Light rain","Ocean waves","Urban rain","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["String Ensemble 2","Bowed Glass","Choir Aahs","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
-        case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Sweep Pad"]
+        case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Fifths Lead"]
         case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
-        case (kTrackBass,    .ambient): return ["Cello","Contrabass","Moog Bass","Synth Bass 1","Fretless Bass"]
-        case (kTrackBass,    .kosmic):  return ["Moog Bass","Synth Bass 1","Fretless Bass"]
-        case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Analog Bass","Electric Bass"]
+        case (kTrackBass,    .ambient): return ["Cello","Contrabass","Fretless Bass"]
+        case (kTrackBass,    .kosmic):  return ["Moog Bass","Fretless Bass","Lead Bass","Mono Synth"]
+        case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
         case (kTrackDrums,   .kosmic):  return ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
         case (kTrackDrums,   _):        return ["Rock Kit","808 Kit","Brush Kit"]
@@ -723,7 +732,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.songState    = updated
                 self.isGenerating = false
-                if self.playback.isPlaying { self.playback.load(updated) }
+                self.playback.load(updated)  // always rebuild stepEventMap — regen while paused left stale events
                 // Keep generationHistory in sync for SongState tracking
                 if !self.generationHistory.isEmpty {
                     self.generationHistory[self.generationHistory.count - 1] = updated
@@ -758,7 +767,8 @@ final class AppState: ObservableObject {
                 }()
             }
             playback.play()
-            audioTexture.start(style: selectedStyle, texture: songState?.chillAudioTexture)
+            audioTexture.start(style: selectedStyle, texture: songState?.chillAudioTexture,
+                               offsetSeconds: songState?.chillAudioTextureOffset ?? 0)
         }
     }
 
@@ -1120,7 +1130,7 @@ final class AppState: ObservableObject {
             let filename = Self.chillTextureFilename(forProgram: program)
             songState = songState?.withChillAudioTexture(filename)
             if playback.isPlaying {
-                audioTexture.switchTexture(filename)
+                audioTexture.switchTexture(filename, offsetSeconds: songState?.chillAudioTextureOffset ?? 0)
             }
             return
         }
@@ -1182,6 +1192,10 @@ final class AppState: ObservableObject {
     func toggleSolo(_ trackIndex: Int) {
         soloState[trackIndex].toggle()
         playback.soloState = soloState
+        // AudioTexturePlayer is outside PlaybackEngine's mute graph — update its volume manually.
+        // Mute it when any solo is active and kTrackTexture is NOT one of the soloed tracks.
+        let textureSoloed = !isAnySolo || soloState[kTrackTexture]
+        audioTexture.setSoloMuted(!textureSoloed)
     }
 
     // MARK: - Solo visual helper

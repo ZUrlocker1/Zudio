@@ -278,6 +278,7 @@ struct KosmicBassGenerator {
             }
 
             events += primaryBassBar(ruleID: ruleID, barStart: barStart, bar: bar,
+                                     sectionStartBar: section.startBar,
                                      entry: entry, frame: frame, rng: &rng,
                                      totalBars: frame.totalBars, isBody: isBody,
                                      structure: structure, useVariation: useVariation,
@@ -346,7 +347,7 @@ struct KosmicBassGenerator {
     // MARK: - Primary bass (Sub-layer A)
 
     private static func primaryBassBar(
-        ruleID: String, barStart: Int, bar: Int,
+        ruleID: String, barStart: Int, bar: Int, sectionStartBar: Int = 0,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG, totalBars: Int, isBody: Bool,
         structure: SongStructure, useVariation: Bool = false,
@@ -369,8 +370,10 @@ struct KosmicBassGenerator {
         case "KOS-BASS-011": return kraftwerkAutobahnBar(barStart: barStart, bar: bar, entry: entry,
                                                           frame: frame, useVariation: useVariation,
                                                           subVariant: kos011Variant)
-        case "KOS-BASS-012": return mccartneyPBWBar(barStart: barStart, entry: entry, frame: frame,
-                                                     useVariation: useVariation)
+        case "KOS-BASS-012": return mccartneyPBWBar(barStart: barStart, bar: bar,
+                                                     sectionStartBar: sectionStartBar,
+                                                     entry: entry, frame: frame,
+                                                     useVariation: useVariation, rng: &rng)
         case "KOS-BASS-013": return loscilSubBassPulseBar(barStart: barStart, bar: bar, entry: entry,
                                                            frame: frame, useVariation: useVariation,
                                                            rng: &rng)
@@ -430,12 +433,26 @@ struct KosmicBassGenerator {
         // Only attack on even bars of the cycle
         guard cycle % 2 == 0 else { return [] }
 
-        let root    = bassRoot(entry: entry, frame: frame)
+        let rootPC_rfw = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let sPCs_rfw   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        func bassPC_rfw(_ interval: Int) -> UInt8 {
+            let raw = (rootPC_rfw + interval) % 12
+            let pc  = sPCs_rfw.contains(raw) ? raw : {
+                for d in 1...6 {
+                    if sPCs_rfw.contains((raw + d) % 12) { return (raw + d) % 12 }
+                    if sPCs_rfw.contains((raw - d + 12) % 12) { return (raw - d + 12) % 12 }
+                }
+                return raw
+            }()
+            var m = 36 + pc
+            while m < 40 { m += 12 }
+            while m > 55 { m -= 12 }
+            return UInt8(m)
+        }
+        let root    = bassPC_rfw(0)
         // 20% chance use b7 instead of fifth — more modal, suits Dorian well
         let useB7   = rng.nextDouble() < 0.20
-        let upper   = useB7
-            ? UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 40, high: 55))
-            : UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
+        let upper   = useB7 ? bassPC_rfw(10) : bassPC_rfw(7)
         let note    = cycle < 4 ? root : upper
 
         // Articulation: staccato (12 steps), medium (22 steps), full hold (30 steps)
@@ -748,11 +765,22 @@ struct KosmicBassGenerator {
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         useVariation: Bool = false, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let fifthPC = (rootPC + 7) % 12
-        let b7PC    = (rootPC + 10) % 12
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let fifthPC  = (rootPC + 7) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        // b7 above the chord root may be outside the song's scale when chord is non-tonic.
+        // Snap to nearest scale PC to prevent out-of-scale bass notes.
+        let b7raw    = (rootPC + 10) % 12
+        let b7PC     = scalePCs.contains(b7raw) ? b7raw : {
+            for d in 1...6 {
+                if scalePCs.contains((b7raw + d) % 12) { return (b7raw + d) % 12 }
+                if scalePCs.contains((b7raw - d + 12) % 12) { return (b7raw - d + 12) % 12 }
+            }
+            return b7raw
+        }()
         // M6 (9 semitones) gives a diatonic 6th in Dorian/Aeolian — distinct from b7
-        let m6PC    = (rootPC + 9) % 12
+        let m6raw    = (rootPC + 9) % 12
+        let m6PC     = scalePCs.contains(m6raw) ? m6raw : b7PC  // fallback to snapped b7
 
         func midiInRange(_ pc: Int) -> UInt8 {
             var m = 36 + pc
@@ -797,12 +825,27 @@ struct KosmicBassGenerator {
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         useVariation: Bool = false, subVariant: Int = 0
     ) -> [MIDIEvent] {
-        let root   = bassRoot(entry: entry, frame: frame)
-        let octave = UInt8(clamped(Int(root) + 12, low: 48, high: 67))
-        let fourth = UInt8(clamped(Int(root) + 5,  low: 40, high: 55))
-        let fifth  = UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
-        let b7Interval = frame.mode.nearestInterval(10)
-        let b7     = UInt8(clamped(Int(root) + b7Interval, low: 40, high: 58))
+        let rootPC_kw  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let sPCs_kw    = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        func bassPC_kw(_ interval: Int, lo: Int, hi: Int) -> UInt8 {
+            let raw = (rootPC_kw + interval) % 12
+            let pc  = sPCs_kw.contains(raw) ? raw : {
+                for d in 1...6 {
+                    if sPCs_kw.contains((raw + d) % 12) { return (raw + d) % 12 }
+                    if sPCs_kw.contains((raw - d + 12) % 12) { return (raw - d + 12) % 12 }
+                }
+                return raw
+            }()
+            var m = 36 + pc
+            while m < lo { m += 12 }
+            while m > hi { m -= 12 }
+            return UInt8(m)
+        }
+        let root   = bassPC_kw(0, lo: 40, hi: 55)
+        let octave = UInt8(clamped(Int(root) + 12, low: 48, high: 67))  // octave: +12 is same PC, safe
+        let fourth = bassPC_kw(5,  lo: 40, hi: 55)
+        let fifth  = bassPC_kw(7,  lo: 40, hi: 55)
+        let b7     = bassPC_kw(10, lo: 40, hi: 58)
 
         // Lock bar: root + octave only — sparse, motor-like (all patterns)
         if bar % 8 == 7 {
@@ -858,11 +901,30 @@ struct KosmicBassGenerator {
     // The riff cycles identically each bar — becomes hypnotic at slower Kosmic tempos.
 
     private static func mccartneyPBWBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        useVariation: Bool = false
+        barStart: Int, bar: Int, sectionStartBar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        useVariation: Bool = false, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let root  = bassRoot(entry: entry, frame: frame)
-        let fifth = UInt8(clamped(Int(root) + 7,  low: 40, high: 55))
+        // Use pitch-class arithmetic (not naive note+interval clamping) so that the
+        // fifth and b7 always fall on the correct pitch class regardless of octave.
+        // e.g. Eb root=51: naive +7=58 clamps to 55=G (wrong); PC approach gives Bb=46.
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        func bassPC(_ interval: Int) -> UInt8 {
+            let raw = (rootPC + interval) % 12
+            let pc  = scalePCs.contains(raw) ? raw : {
+                for d in 1...6 {
+                    if scalePCs.contains((raw + d) % 12) { return (raw + d) % 12 }
+                    if scalePCs.contains((raw - d + 12) % 12) { return (raw - d + 12) % 12 }
+                }
+                return raw
+            }()
+            var m = 36 + pc
+            while m < 40 { m += 12 }
+            while m > 55 { m -= 12 }
+            return UInt8(m)
+        }
+        let root  = bassPC(0)
 
         // Use chord type (not song mode) to determine the third quality.
         // frame.mode.nearestInterval would give minor third in Dorian even when the
@@ -872,13 +934,23 @@ struct KosmicBassGenerator {
         case .major, .sus2, .sus4, .add9: isMajorContext = true
         default:                          isMajorContext = false
         }
-        let third     = UInt8(clamped(Int(root) + (isMajorContext ? 4 : 3), low: 40, high: 55))
-        let flatSeven = isMajorContext ? fifth : UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 40, high: 55))
+        let fifth     = bassPC(7)
+        let third     = bassPC(isMajorContext ? 4 : 3)
+        let flatSeven = isMajorContext ? fifth : bassPC(10)
 
         let pitches: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]
         let vels:    [UInt8] = [100,  88,    92,   84,        86,    82,   88,    78  ]
 
-        var evs = pitches.enumerated().map { i, note in
+        let posInSection = bar - sectionStartBar
+
+        // After 16 bars: ~20% of bars drop to root-only — the bass briefly breathes
+        if posInSection >= 16 && rng.nextDouble() < 0.20 {
+            return [MIDIEvent(stepIndex: barStart, note: root, velocity: 85, durationSteps: 4)]
+        }
+
+        // First 16 bars: play only the first 4 notes — pattern builds gradually
+        let activeCount = posInSection < 16 ? 4 : pitches.count
+        var evs = pitches.prefix(activeCount).enumerated().map { i, note in
             MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: vels[i], durationSteps: 2)
         }
 
@@ -906,11 +978,19 @@ struct KosmicBassGenerator {
     ) -> [MIDIEvent] {
         let root = bassRoot(entry: entry, frame: frame)
 
-        // Compute fifth correctly via pitch-class to avoid range-clamping wrong notes.
-        // e.g. Dm in G Aeolian: root=D(50), naive +7 clamps to G instead of A.
-        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let fifthPC = (rootPC + 7) % 12
-        var fifthMidi = 36 + fifthPC
+        // Compute fifth via pitch-class to avoid range-clamping wrong notes.
+        // Scale-snap: if the raw fifth PC is non-diatonic, move to nearest in-scale PC.
+        let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawFifthPC = (rootPC + 7) % 12
+        var bestFifthPC = rawFifthPC
+        if !scalePCs.contains(rawFifthPC) {
+            for d in 1...6 {
+                if scalePCs.contains((rawFifthPC + d) % 12) { bestFifthPC = (rawFifthPC + d) % 12; break }
+                if scalePCs.contains((rawFifthPC - d + 12) % 12) { bestFifthPC = (rawFifthPC - d + 12) % 12; break }
+            }
+        }
+        var fifthMidi = 36 + bestFifthPC
         while fifthMidi < 40 { fifthMidi += 12 }
         while fifthMidi > 55 { fifthMidi -= 12 }
         let fifth = UInt8(fifthMidi)
@@ -944,10 +1024,19 @@ struct KosmicBassGenerator {
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         barInBody: Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let root    = bassRoot(entry: entry, frame: frame)
-        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let fifthPC = (rootPC + 7) % 12
-        var fifthMidi = 36 + fifthPC
+        let root       = bassRoot(entry: entry, frame: frame)
+        let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        // Scale-snap: if the raw fifth PC is non-diatonic, move to nearest in-scale PC.
+        let scalePCs   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawFifthPC = (rootPC + 7) % 12
+        var bestFifthPC = rawFifthPC
+        if !scalePCs.contains(rawFifthPC) {
+            for d in 1...6 {
+                if scalePCs.contains((rawFifthPC + d) % 12) { bestFifthPC = (rawFifthPC + d) % 12; break }
+                if scalePCs.contains((rawFifthPC - d + 12) % 12) { bestFifthPC = (rawFifthPC - d + 12) % 12; break }
+            }
+        }
+        var fifthMidi = 36 + bestFifthPC
         while fifthMidi < 40 { fifthMidi += 12 }
         while fifthMidi > 55 { fifthMidi -= 12 }
         let fifth = UInt8(fifthMidi)
@@ -1032,7 +1121,21 @@ struct KosmicBassGenerator {
     }
 
     static func bassRoot(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> UInt8 {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rawPC    = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        // Scale-snap: if the chord root is a borrowed/non-diatonic PC, move to the nearest
+        // in-scale PC. Prevents clashes when the chord plan uses modal-mixture chord roots.
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rootPC: Int
+        if scalePCs.contains(rawPC) {
+            rootPC = rawPC
+        } else {
+            var best = rawPC
+            for d in 1...6 {
+                if scalePCs.contains((rawPC + d) % 12) { best = (rawPC + d) % 12; break }
+                if scalePCs.contains((rawPC - d + 12) % 12) { best = (rawPC - d + 12) % 12; break }
+            }
+            rootPC = best
+        }
         // KOS-RULE-06: bass in MIDI 40–55
         var midi = 36 + rootPC  // start in octave 2
         while midi < 40 { midi += 12 }

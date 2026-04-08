@@ -163,6 +163,11 @@ struct KosmicLeadGenerator {
         let rule = pickLeadRule2(rng: &rng)
         usedRuleIDs.insert(rule)
 
+        // Technique D equivalent for Lead 2: if the rule is sparse and we're in a B section,
+        // escalate to KOS-LEAD-004 (Echo Melody) which has more phrase activity.
+        let lead2SparseRules: Set<String> = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003"]
+        let lead2BRule: String = lead2SparseRules.contains(rule) ? "KOS-LEAD-004" : rule
+
         // If both leads share the same JMJ rule, generate sparse version for Lead 2.
         // suppressXFiles=true so Lead 2 never independently plays the X-Files whistle.
         // bridgeAlt is handled separately below via generateBridgeAltLead2.
@@ -196,25 +201,45 @@ struct KosmicLeadGenerator {
             // Lead 2 silent in A-1 and melody bridges; bridgeAlt handled above
             guard section.label != .bridge && section.label != .bridgeMelody else { continue }
             guard section.label != .bridgeAlt else { continue }
+            // Technique D: use escalated rule in B sections; narrower register in .low A sections
+            let activeRule = (section.label == .B) ? lead2BRule : rule
             for bar in section.startBar..<section.endBar {
                 // Same-rule fixup: skip leading bars per lag, then offset virtualBar
                 if sameRule && bar < section.startBar + sameRuleLag { continue }
                 let virtualBar = sameRule ? bar - sameRuleLag : bar
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
+                // In .low sections constrain Lead 2 to lower half (55–67) leaving 67–80 for Lead 1
+                let lead2High = section.intensity == .low ? 67 : 80
                 var scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
-                                                      low: 55, high: 80)
+                                                      low: 55, high: lead2High)
                 // KOS-LEAD-005 dual-same-rule: offset pitch by +2 scale positions (diatonic 3rd)
                 if sameRule005 && scaleNotes.count > 2 {
                     scaleNotes = Array(scaleNotes.dropFirst(2)) + Array(scaleNotes.prefix(2))
                 }
-                events += emitLeadBar(rule: rule, barStart: barStart, bar: virtualBar,
+                events += emitLeadBar(rule: activeRule, barStart: barStart, bar: virtualBar,
                                       scaleNotes: scaleNotes, entry: entry, frame: frame,
                                       useWideInterval: false, rng: &rng)
             }
         }
 
-        // Phase 2 — Simultaneous-silence safety net:
+        // Phase 2 — Step-level avoidance: if a Lead 2 note attacks on the exact same step
+        // as a Lead 1 note, shift it forward by 2 steps (the "and" of the beat) rather than
+        // removing it. This keeps Lead 2 audible as a staggered response voice even when
+        // Lead 1 is dense (e.g. KOS-LEAD-006 which fires at step 0 of every bar).
+        let lead1StepSet = Set(lead1Events.map(\.stepIndex))
+        events = events.map { ev -> MIDIEvent in
+            guard lead1StepSet.contains(ev.stepIndex) else { return ev }
+            let barStart  = (ev.stepIndex / 16) * 16
+            let barEnd    = barStart + 16
+            let shifted   = ev.stepIndex + 2
+            // Only shift if the new position is still within the same bar and not also occupied
+            guard shifted < barEnd, !lead1StepSet.contains(shifted) else { return ev }
+            return MIDIEvent(stepIndex: shifted, note: ev.note,
+                             velocity: ev.velocity, durationSteps: max(1, ev.durationSteps - 2))
+        }
+
+        // Phase 3 — Simultaneous-silence safety net:
         // Scan body sections in 4-bar windows. If both Lead 1 and Lead 2 are completely
         // silent in a window, inject a single held tone in Lead 2 at the window start.
         let lead1ActiveBars = Set(lead1Events.map { $0.stepIndex / 16 })
@@ -555,7 +580,10 @@ struct KosmicLeadGenerator {
         let note    = penta[noteIdx]
         let vel     = UInt8(48 + rng.nextInt(upperBound: 20))  // 48–67
 
-        return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 28)]
+        // Attack at step 2 (the "and" of beat 1) rather than beat 1 itself.
+        // This makes the drift feel like it answers after the downbeat — more call-and-response —
+        // and naturally avoids colliding with rules (like KOS-LEAD-006) that fire on step 0.
+        return [MIDIEvent(stepIndex: barStart + 2, note: UInt8(note), velocity: vel, durationSteps: 26)]
     }
 
     // MARK: - KOS-LD-004: Echo Melody
@@ -823,11 +851,18 @@ struct KosmicLeadGenerator {
                 return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift2))]
             }()
 
+            // 8-bar-on / 8-bar-rest breathing cycle — prevents relentless unbroken output.
+            // Per-section RNG offset (0–3) staggers the rest window so it doesn't always
+            // align with the section boundary.
+            let restOffset = sparseMode ? 0 : rng.nextInt(upperBound: 4)
+
             for bar in section.startBar..<section.endBar {
                 let posInSection = bar - section.startBar
                 // Sparse mode (Lead 2 doubling JMJ): skip first bar of section; 40% gate elsewhere
                 if sparseMode && posInSection == 0 { continue }
                 if sparseMode && rng.nextDouble() > 0.40 { continue }
+                // Normal mode: 8 bars active, 8 bars silence in each 16-bar window
+                if !sparseMode && (posInSection + restOffset) % 16 >= 8 { continue }
 
                 let posInBlock   = posInSection % 8  // 8-bar phrase block
 

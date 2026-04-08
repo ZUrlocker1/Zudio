@@ -11,7 +11,7 @@ let kTrackDrums      = 6
 let kTrackLeadSynth  = 7   // Kosmic only: silent Fantasia layer doubling Lead 1
 let kTrackCount      = 8
 
-let kTrackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums", "Lead Synth"]
+let kTrackNames = ["Lead 1", "Lead Solo Vox", "Pads", "Rhythm", "Texture", "Bass", "Drums", "Lead Synth"]
 
 // MIDI channel per track (Drums must be channel 9 for GM)
 let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9, 6]

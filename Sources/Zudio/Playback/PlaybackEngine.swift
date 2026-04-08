@@ -190,6 +190,9 @@ final class PlaybackEngine: ObservableObject {
             xFilesDelayWasEnabled = false
         }
         xFilesDelayBlockRange = state.ambientXFilesBlockRange
+        // Re-apply mute/solo: the explicit bass/pads volume resets above would undo any
+        // active solo state. Must come last so it wins over all the resets above.
+        applyMuteState()
     }
 
     private func applyStaticPans() {
@@ -486,16 +489,30 @@ final class PlaybackEngine: ObservableObject {
         // Per-track default volumes; tremolo overrides this via LFO
         if !tremEnabled[trackIndex] {
             let vol: Float
-            if trackIndex == kTrackBass && program == 87 {
+            if trackIndex == kTrackBass && kosmicStyle && program == 87 {
+                vol = 0.40   // Lead Bass runs hot on Kosmic bass — pull back further
+            } else if trackIndex == kTrackBass && program == 87 {
                 vol = 0.56   // Lead Bass runs hot
             } else if trackIndex == kTrackLead2 && program == 0 {
                 vol = 1.8    // Grand Piano runs soft in GM
+            } else if trackIndex == kTrackTexture && (program == 90 || program == 86) {
+                vol = 0.85   // Pad 3 Poly (90) and Fifths Lead (86) run loud — pull back
             } else if trackIndex == kTrackTexture {
                 vol = 1.4    // Texture pads are quiet
             } else if trackIndex == kTrackDrums && ambientMode {
                 vol = 2.2    // Drums sit under heavy Ambient reverb — boost so they're audible
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 4 {
                 vol = 1.6    // Rhodes runs soft in GM — boost for Chill rhythm presence
+            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 5 {
+                vol = 0.75   // Wurlitzer runs hot on Chill rhythm — pull back
+            } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
+                vol = 0.48   // Mono Synth runs hot on Kosmic bass — pull back more
+            } else if trackIndex == kTrackLead2 && motorikStyle && program == 39 {
+                vol = 1.8    // Minimoog runs soft on Lead 2 — boost
+            } else if trackIndex == kTrackRhythm && motorikStyle && program == 29 {
+                vol = 0.75   // Fuzz Guitar runs hot on Motorik rhythm — pull back
+            } else if trackIndex == kTrackRhythm && kosmicStyle && program == 5 {
+                vol = 0.55   // Wurlitzer runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle {
                 vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — pull back
             } else {

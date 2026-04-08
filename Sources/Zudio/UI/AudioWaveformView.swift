@@ -14,6 +14,7 @@ struct AudioWaveformView: View {
     let tempo: Double
     let visibleBars: Int
     let barOffset: Int
+    var offsetSeconds: Int = 0
     var onSeek: ((Int) -> Void)? = nil
 
     @State private var samples: [Float] = []
@@ -30,7 +31,8 @@ struct AudioWaveformView: View {
                 audioDurationBars: audioDurationBars,
                 visibleBars: visibleBars,
                 barOffset: barOffset,
-                totalBars: totalBars
+                totalBars: totalBars,
+                offsetBars: tempo > 0 ? Double(offsetSeconds) / (240.0 / max(tempo, 1)) : 0
             )
             .equatable()
 
@@ -98,9 +100,11 @@ struct AudioWaveformView: View {
               (try? file.read(into: buffer)) != nil,
               let channelData = buffer.floatChannelData else { return }
 
-        // Use channel 0 — works for both mono and stereo files
-        let frameLength = Int(buffer.frameLength)
-        let raw = UnsafeBufferPointer(start: channelData[0], count: frameLength)
+        // Use max across all channels so stereo files with uneven content display correctly.
+        // Max (not average) preserves the louder channel's peaks without reducing ocean-like
+        // files where both channels are nearly identical.
+        let frameLength  = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
 
         // Downsample to 1024 peak buckets
         let bucketCount = 1024
@@ -111,8 +115,10 @@ struct AudioWaveformView: View {
             let end   = min(start + bucketSize, frameLength)
             var peak: Float = 0
             for j in start..<end {
-                let v = abs(raw[j])
-                if v > peak { peak = v }
+                for ch in 0..<channelCount {
+                    let v = abs(channelData[ch][j])
+                    if v > peak { peak = v }
+                }
             }
             peaks[i] = peak
         }
@@ -124,8 +130,10 @@ struct AudioWaveformView: View {
         }
 
         // How many song bars does this audio file span before looping?
+        // Use buffer.frameLength (actual decoded frames) not file.length, which may differ
+        // from decoded frame count when there are priming/remainder frames or sample-rate conversion.
         let sampleRate     = file.processingFormat.sampleRate
-        let durationSec    = Double(file.length) / sampleRate
+        let durationSec    = Double(frameLength) / sampleRate
         let barDurationSec = 240.0 / max(tempo, 1)
         let durationBars   = durationSec / barDurationSec
 
@@ -161,13 +169,15 @@ private struct WaveformLayerView: View, Equatable {
     let visibleBars: Int
     let barOffset: Int
     let totalBars: Int
+    var offsetBars: Double = 0
 
     static func == (lhs: WaveformLayerView, rhs: WaveformLayerView) -> Bool {
-        lhs.samples.count    == rhs.samples.count    &&
+        lhs.samples.count     == rhs.samples.count     &&
         lhs.audioDurationBars == rhs.audioDurationBars &&
-        lhs.visibleBars      == rhs.visibleBars      &&
-        lhs.barOffset        == rhs.barOffset        &&
-        lhs.totalBars        == rhs.totalBars
+        lhs.visibleBars       == rhs.visibleBars       &&
+        lhs.barOffset         == rhs.barOffset         &&
+        lhs.totalBars         == rhs.totalBars         &&
+        lhs.offsetBars        == rhs.offsetBars
     }
 
     var body: some View {
@@ -209,9 +219,9 @@ private struct WaveformLayerView: View, Equatable {
         for px in 0..<pixelCount {
             let fraction    = Double(px) / Double(pixelCount)
             let absoluteBar = Double(clampedOffset) + fraction * Double(clampedVisible)
-            // Wrap into the audio loop
+            // Shift by offset then wrap into the audio loop — matches AudioTexturePlayer's tail+loop scheduling
             let loopedBar   = audioDurationBars > 0
-                ? absoluteBar.truncatingRemainder(dividingBy: audioDurationBars)
+                ? (absoluteBar + offsetBars).truncatingRemainder(dividingBy: audioDurationBars)
                 : 0
             let sampleIdx   = min(samples.count - 1,
                                   Int(loopedBar / audioDurationBars * Double(samples.count)))

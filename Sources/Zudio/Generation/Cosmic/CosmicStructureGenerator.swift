@@ -358,16 +358,12 @@ struct KosmicStructureGenerator {
                           section.label == .bridgeMelody ||
                           section.label == .preRamp || section.label == .postRamp)
 
-        // Use frame.mode (actual key mode) for A sections — section.mode is hardcoded Dorian
-        // for all A sections regardless of the song key. B sections carry a meaningful mode
-        // (Aeolian or Mixolydian) so section.mode is correct there.
-        let effectiveMode: Mode
-        switch section.label {
-        case .A, .intro, .outro, .bridge, .bridgeAlt, .bridgeMelody, .preRamp, .postRamp:
-            effectiveMode = frame.mode
-        default:
-            effectiveMode = section.mode
-        }
+        // Always use frame.mode (the song's actual key) for chord selection.
+        // section.mode for B sections (Aeolian/Mixolydian) is a melodic flavor hint, not an
+        // independent harmonic key — using it for chord roots allowed bVI chords whose tones
+        // (e.g. B natural in G#m) clash with the Dorian scale's Bb. Generators all draw from
+        // frame.mode so chords must also be within that mode.
+        let effectiveMode = frame.mode
 
         let barsEach = Swift.max(8, section.lengthBars / chordCount)
         var windows: [ChordWindow] = []

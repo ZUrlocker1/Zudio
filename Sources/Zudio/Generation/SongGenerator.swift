@@ -879,7 +879,7 @@ struct SongGenerator {
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     lead1BaseRule: &discardedBaseRule, xFilesBars: &discardedXFiles)
             } else if isChill {
-                (events, _) = ChillLeadGenerator.generateLead1(
+                (events, _, _) = ChillLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
                     leadInstrument: songState.chillLeadInstrument,
                     beatStyle: songState.chillBeatStyle,
@@ -1305,8 +1305,9 @@ struct SongGenerator {
         case "MOT-TEXT-008": return "Phase slip"
         // Kosmic texture rules
         case "KOS-TEXT-001": return "Orbital looping motif"
-        case "KOS-TEXT-002": return "EB Shimmer Hold"
+        case "KOS-TEXT-002": return "Distant Pulse"
         case "KOS-TEXT-003": return "Spatial Sweep"
+        case "KOS-TEXT-004": return "Loscil Drip"
         default:             return ruleID
         }
     }
@@ -1394,9 +1395,9 @@ struct SongGenerator {
     private static func kosmicTexRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         case "KOS-TEXT-001": return "Orbital looping motif"
-        case "KOS-TEXT-002": return "Electric Buddha shimmer hold"
+        case "KOS-TEXT-002": return "Distant Pulse"
         case "KOS-TEXT-003": return "Spatial Sweep — chromatic passing"
-        case "KOS-TEXT-004": return "Loscil aquatic shimmer"
+        case "KOS-TEXT-004": return "Loscil Drip"
         default:             return ruleID
         }
     }
@@ -2359,7 +2360,7 @@ struct SongGenerator {
 
         // Step 6 — Lead 1 (primary solo) and Lead 2 (call-and-response)
         var lead1Rules: Set<String> = []
-        let (lead1Events, lead1Onsets) = ChillLeadGenerator.generateLead1(
+        let (lead1Events, lead1Onsets, lead1HandoffBars) = ChillLeadGenerator.generateLead1(
             frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
             forceRuleID: forceLeadRuleID,
@@ -2370,7 +2371,8 @@ struct SongGenerator {
         var lead2Rules: Set<String> = []
         trackEvents[kTrackLead2] = ChillLeadGenerator.generateLead2(
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
-            lead1Onsets: lead1Onsets, rng: &lead2RNG, usedRuleIDs: &lead2Rules
+            lead1Onsets: lead1Onsets, handoffBars: lead1HandoffBars,
+            rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
 
         // Step 7 — Rhythm (Rhodes active comping)
@@ -2414,6 +2416,8 @@ struct SongGenerator {
             ? chillTextureFiles[rng.weightedPick(Array(repeating: 1.0 / Double(chillTextureFiles.count),
                                                        count: chillTextureFiles.count))]
             : nil
+        // Random start offset: 0, 15, 30, or 45 seconds into the audio file.
+        let chillAudioTextureOffset = chillAudioTexture != nil ? [0, 15, 30, 45][rng.nextInt(upperBound: 4)] : 0
 
         // Title
         let title = ChillTitleGenerator.generate(frame: frame, rng: &rng)
@@ -2457,6 +2461,7 @@ struct SongGenerator {
             chillBreakdownStyle: chillBreakdownStyle,
             chillSwingFeel: chillSwingFeel,
             chillAudioTexture: chillAudioTexture,
+            chillAudioTextureOffset: chillAudioTextureOffset,
             forcedRules: forced,
             keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride
         )

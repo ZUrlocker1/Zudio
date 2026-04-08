@@ -5,8 +5,8 @@
 //
 // KOS-TEXT-001 variation: every 24 body bars (from bar 24 onward), motif lifts one octave
 // for 8 bars then returns. Same pitches, same loop phase, purely a register shift.
-// KOS-TEXT-004: Loscil aquatic shimmer — 3 closely-voiced scale tones, staggered 1-step,
-// attacks, bluebird register, every 4 bars, very quiet (vel 16–30), long hold (dur 62).
+// KOS-TEXT-004: Loscil Drip — deep low register MIDI 21–47, phrase modes A/B/C/D/E,
+// minimum 2 notes per phrase, vel 48–66 for quiet modes, vel 44–124 for full shimmer (D).
 
 import Foundation
 
@@ -159,21 +159,45 @@ struct KosmicTextureGenerator {
                     continue
                 }
 
+                // posInBody used for 8-bar gate (TEXT-001 and TEXT-003 only).
+                // TEXT-002 and TEXT-004 already have sparse phrase cycles — gating them produces
+                // near-inaudible tracks (96-97% silent); no gate needed.
+                let posInBody = bar - firstBodyBar
+                let inWindowGap = posInBody >= 0 && (posInBody / 8) % 3 == 2
+
+                // Bar-fire probability scales with section intensity — sparse in A, full in B/high
+                let sectionIntensity = structure.section(atBar: bar)?.intensity ?? .medium
+                let textureFireProb: Double
+                switch sectionIntensity {
+                case .low:    textureFireProb = 0.35
+                case .medium: textureFireProb = 0.55
+                case .high:   textureFireProb = 0.80
+                }
+
                 switch primaryRule {
                 case "KOS-TEXT-001":
-                    // Density gate: fire on 70% of bars to prevent 320–480 note accumulation
-                    // in long songs. Creates natural "in and out" texture breathing.
-                    guard rng.nextDouble() < 0.70 else { break }
+                    // 8-bar window rest: every 3rd window silent (prevents NO-GAPS)
+                    guard !inWindowGap else { break }
+                    guard rng.nextDouble() < textureFireProb else { break }
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
                                                firstBodyBar: firstBodyBar,
                                                entry: entry, frame: frame, structure: structure, rng: &rng)
                 case "KOS-TEXT-002":
-                    events += shimmerHoldBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
+                    guard rng.nextDouble() < textureFireProb else { break }
+                    events += distantPulseBar(barStart: barStart, bar: bar, firstBodyBar: firstBodyBar,
+                                              entry: entry, frame: frame, structure: structure, rng: &rng)
                 case "KOS-TEXT-003":
+                    // 8-bar window rest: every 3rd window silent (prevents NO-GAPS)
+                    guard !inWindowGap else { break }
+                    guard rng.nextDouble() < textureFireProb else { break }
                     events += spatialSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
                 case "KOS-TEXT-004":
-                    events += loscilShimmerBar(barStart: barStart, bar: bar, entry: entry, frame: frame, rng: &rng)
+                    guard rng.nextDouble() < textureFireProb else { break }
+                    events += loscilShimmerBar(barStart: barStart, bar: bar, firstBodyBar: firstBodyBar,
+                                               entry: entry, frame: frame, rng: &rng)
                 default:
+                    guard !inWindowGap else { break }
+                    guard rng.nextDouble() < textureFireProb else { break }
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
                                                firstBodyBar: firstBodyBar,
                                                entry: entry, frame: frame, structure: structure, rng: &rng)
@@ -205,7 +229,7 @@ struct KosmicTextureGenerator {
         } else {
             inLiftWindow = barInBody >= 24 && barInBody % 24 < 8
         }
-        let oct = inLiftWindow ? 3 : 2
+        let oct = inLiftWindow ? 5 : 4  // oct=4 → MIDI 48–59 (C3–B3); oct=5 → 60–71 (C4–B4)
 
         // Place in MIDI 33–55 register (KOS-RULE-11: Bluebird register) or one octave up
         let root   = texRegisterNote(pc: rootPC,              targetOct: oct)
@@ -213,9 +237,10 @@ struct KosmicTextureGenerator {
         let octave = texRegisterNote(pc: rootPC,              targetOct: oct + 1)
         let motif  = [root, fifth, octave]
 
-        // Loop position based on bar and loopLen
-        // loopLen is in steps (not bars); we pick which part of the loop falls in this bar
-        let loopPosition = (bar * 16) % loopLen
+        // Loop position: advances by 1 per bar so the motif cycles through different starting
+        // positions, creating variety in which pitch/beat combination appears each bar.
+        // (was `(bar * 16) % loopLen` which collapsed to 0 for loopLen=16 — all bars identical)
+        let loopPosition = bar % loopLen
         var evs: [MIDIEvent] = []
 
         // Quarter-note durations (KOS-RULE-11): emit on beats, cycling through motif
@@ -230,22 +255,71 @@ struct KosmicTextureGenerator {
         return evs
     }
 
-    // MARK: - KOS-TEX-002: Shimmer Hold
-    // Single note held quietly (velocity 72–84) for 4+ bars
+    // MARK: - KOS-TEX-002: Distant Pulse
+    // A short melodic figure (2–4 notes) fires in bar 0 of each phrase cycle,
+    // then silence for 7–11 bars before the next phrase. Cycle length and note
+    // count rotate through fixed arrays so the timing feels irregular but is
+    // deterministic and reproducible. Notes drawn from mode scale degrees, cycling
+    // through different degrees per phrase so the signal drifts harmonically.
+    // Octave lifts in B sections (same logic as KOS-TEXT-001).
 
-    private static func shimmerHoldBar(
-        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+    private static func distantPulseBar(
+        barStart: Int, bar: Int, firstBodyBar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        structure: SongStructure,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        // Only attack every 4 bars
-        guard bar % 4 == 0 else { return [] }
+        let barInBody = bar - firstBodyBar
+        guard barInBody >= 0 else { return [] }
 
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let note   = texRegisterNote(pc: rootPC, targetOct: 2)
-        let vel    = UInt8(86 + rng.nextInt(upperBound: 13))  // 86–98
+        // Cycle lengths (bars): phrase fires in bar 0, silent for the rest.
+        // Varied to feel organic rather than metronomic.
+        let cycleLens:  [Int] = [8, 9, 8, 11, 10, 8, 9, 11, 8, 10]
+        // Note counts: 3 most frequent, 2 and 4 occasional
+        let noteCounts: [Int] = [3, 2, 3, 4, 3, 3, 2, 4, 3, 3, 3, 2, 3, 3, 4, 3, 2, 3, 3, 4]
 
-        // Hold for 4+ bars = 64+ steps; emit as a very long note
-        return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 62)]
+        // Walk cycle boundaries to find current phrase index and bar-within-cycle
+        var cursor      = 0
+        var phraseIndex = 0
+        while cursor + cycleLens[phraseIndex % cycleLens.count] <= barInBody {
+            cursor      += cycleLens[phraseIndex % cycleLens.count]
+            phraseIndex += 1
+        }
+        let barInCycle = barInBody - cursor
+        guard barInCycle == 0 else { return [] }  // silent for all but phrase-start bars
+
+        // Octave lift in B sections (matches KOS-TEXT-001 behaviour)
+        let inLiftWindow: Bool
+        if structure.hasBSection {
+            inLiftWindow = structure.inBSection(atBar: bar)
+        } else {
+            inLiftWindow = barInBody >= 24 && barInBody % 24 < 8
+        }
+        let oct = inLiftWindow ? 5 : 4   // oct=4 → MIDI 48–59; oct=5 → 60–71
+
+        let noteCount  = noteCounts[phraseIndex % noteCounts.count]
+        let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let intervals  = entry.sectionMode.intervals
+        let degreeOffset = phraseIndex % intervals.count  // rotates through scale tones per phrase
+
+        // Step positions within a bar (16 steps = 1 bar)
+        let stepOffsets: [Int]
+        switch noteCount {
+        case 2:  stepOffsets = [0, 8]           // beats 1 and 3
+        case 3:  stepOffsets = [0, 6, 12]        // beats 1, 2.5, 3.5 — slightly offset feel
+        default: stepOffsets = [0, 4, 8, 12]     // all four beats
+        }
+
+        var evs: [MIDIEvent] = []
+        for (i, stepOff) in stepOffsets.enumerated() {
+            let degIdx = (degreeOffset + i) % intervals.count
+            let pc     = (rootPC + intervals[degIdx]) % 12
+            let note   = texRegisterNote(pc: pc, targetOct: oct)
+            let vel    = UInt8(68 + rng.nextInt(upperBound: 17))  // 68–84 — softer than KOS-TEXT-001
+            evs.append(MIDIEvent(stepIndex: barStart + stepOff, note: UInt8(note),
+                                 velocity: vel, durationSteps: 3))
+        }
+        return evs
     }
 
     // MARK: - KOS-TEX-003: Spatial Sweep
@@ -255,7 +329,7 @@ struct KosmicTextureGenerator {
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        guard bar % 4 == 0 else { return [] }
+        guard bar % 8 == 0 else { return [] }  // every 8 bars (was 4) — wider gaps prevent NO-GAPS
 
         let keyST  = keySemitone(frame.key)
         let mode   = entry.sectionMode
@@ -286,23 +360,49 @@ struct KosmicTextureGenerator {
         ]
     }
 
-    // MARK: - KOS-TEX-004: Loscil Aquatic Shimmer
-    // 3 closely-voiced scale tones with staggered 1-step attacks — dissolving into each other.
-    // Fires every 4 bars. Long hold (62 steps) creates the blurred, underwater quality.
-    // Very quiet (vel 16–30) so it sits beneath everything else as pure atmosphere.
+    // MARK: - KOS-TEX-004: Loscil Drip
+    // The tight root/2nd/3rd cluster reveals itself slowly across the song.
+    // Most phrases surface only 1–2 notes (long-held, barely audible).
+    // The full staggered cluster (Mode D) fires at most 1–2 times in a typical song.
+    //
+    // Five phrase modes (14-slot rotation — all modes reachable within ~7 phrases):
+    //   A: drip pair — root then 3rd, 10 steps apart, held 4–6 bars, vel 48–62
+    //   B: rising pair  root→2nd, 8 steps apart, held 3–4 bars, vel 52–66
+    //   C: falling pair 3rd→root, 8 steps apart, held 3–4 bars, vel 52–66
+    //   D: full shimmer — original staggered 3-note cluster, envelope vel 44–124
+    //   E: slow triple — all 3 notes spaced 16 steps apart, held 3 bars, vel 50–64
+    // Rotation: [A,B,A,C,B,D,A,C,B,A,E,C,B,D] — Mode D at phrase 5, E at phrase 10.
+    //
+    // Register: MIDI 21–47 (deep low) — distinct from Distant Pulse's MIDI 48–71.
+    // Cycle lengths [8,9,8,10,9,8,9,8,10,9]: avg ~8.8 bars → ~7 phrases in 60-bar body.
 
     private static func loscilShimmerBar(
-        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        barStart: Int, bar: Int,
+        firstBodyBar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        guard bar % 4 == 0 else { return [] }
+        let barInBody = bar - firstBodyBar
+        guard barInBody >= 0 else { return [] }
 
+        // Variable cycle lengths — shorter so all modes are reachable in a typical song
+        let cycleLens: [Int] = [8, 9, 8, 10, 9, 8, 9, 8, 10, 9]
+
+        // Walk cycle boundaries to find phrase index and position within cycle
+        var cursor      = 0
+        var phraseIndex = 0
+        while cursor + cycleLens[phraseIndex % cycleLens.count] <= barInBody {
+            cursor      += cycleLens[phraseIndex % cycleLens.count]
+            phraseIndex += 1
+        }
+        guard barInBody == cursor else { return [] }  // only fire on phrase-start bars
+
+        // Compute the tight cluster notes (root, 2nd, 3rd) in deep low register MIDI 21–47
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let mode   = entry.sectionMode
         let second = mode.nearestInterval(2)
         let third  = mode.nearestInterval(3)
 
-        // 3 closely-voiced tones: root, 2nd, 3rd — one octave below bluebird (MIDI 21–47)
         var n0 = 36 + rootPC
         var n1 = 36 + rootPC + second
         var n2 = 36 + rootPC + third
@@ -310,30 +410,79 @@ struct KosmicTextureGenerator {
         while n1 < 21 { n1 += 12 }; while n1 > 47 { n1 -= 12 }
         while n2 < 21 { n2 += 12 }; while n2 > 47 { n2 -= 12 }
 
-        // 16-bar volume cycle: 8 bars ascending (40%→100%), 8 bars descending (100%→40%).
-        // Rule fires every 4 bars, so the audible steps in the cycle are at positions 0, 4, 8, 12.
-        let cyclePos = bar % 16
-        let t: Double = cyclePos < 8
-            ? Double(cyclePos) / 7.0          // 0.0 → 1.0 over bars 0–7
-            : Double(15 - cyclePos) / 7.0     // 1.0 → 0.0 over bars 8–15
-        let envelopeScale = 0.40 + 0.60 * t   // 40% at trough, 100% at peak
+        // 14-slot rotation: all modes reachable within ~7 phrases (typical song body)
+        // D appears at slot 5 and 13; E appears at slot 10
+        let modeSlots: [Character] =
+            ["A","B","A","C","B","D","A","C","B","A","E","C","B","D"]
+        let phraseMode = modeSlots[phraseIndex % modeSlots.count]
 
-        // Stagger attacks by 1 step each — creates slow-motion cluster dissolve
-        let peakVel = 110 + rng.nextInt(upperBound: 15)  // 110–124
-        let baseVel = max(1, min(127, Int(Double(peakVel) * envelopeScale)))
-        return [
-            MIDIEvent(stepIndex: barStart,     note: UInt8(n0), velocity: UInt8(baseVel),      durationSteps: 62),
-            MIDIEvent(stepIndex: barStart + 1, note: UInt8(n1), velocity: UInt8(max(1, baseVel - 10)), durationSteps: 62),
-            MIDIEvent(stepIndex: barStart + 2, note: UInt8(n2), velocity: UInt8(max(1, baseVel - 20)), durationSteps: 62),
-        ]
+        switch phraseMode {
+
+        case "A":
+            // Drip pair: root then 3rd, 10 steps apart — always 2 notes, minimum
+            let dur0 = [16, 24, 32][phraseIndex % 3]              // 4, 6, or 8 bars
+            let dur1 = dur0 - 4                                    // second note slightly shorter
+            let vel0 = UInt8(48 + rng.nextInt(upperBound: 15))    // 48–62
+            let vel1 = UInt8(max(1, Int(vel0) - 6))
+            return [
+                MIDIEvent(stepIndex: barStart,      note: UInt8(n0), velocity: vel0, durationSteps: dur0),
+                MIDIEvent(stepIndex: barStart + 10, note: UInt8(n2), velocity: vel1, durationSteps: max(4, dur1)),
+            ]
+
+        case "B":
+            // Rising pair: root then 2nd, spaced 8 steps (2 bars) apart
+            let vel0 = UInt8(52 + rng.nextInt(upperBound: 15))  // 52–66
+            let vel1 = UInt8(max(1, Int(vel0) - 6))
+            let dur  = 14 + rng.nextInt(upperBound: 5)           // 14–18 steps
+            return [
+                MIDIEvent(stepIndex: barStart,     note: UInt8(n0), velocity: vel0, durationSteps: dur),
+                MIDIEvent(stepIndex: barStart + 8, note: UInt8(n1), velocity: vel1, durationSteps: dur),
+            ]
+
+        case "C":
+            // Falling pair: 3rd then root, spaced 8 steps (2 bars) apart
+            let vel0 = UInt8(52 + rng.nextInt(upperBound: 15))  // 52–66
+            let vel1 = UInt8(max(1, Int(vel0) - 6))
+            let dur  = 14 + rng.nextInt(upperBound: 5)           // 14–18 steps
+            return [
+                MIDIEvent(stepIndex: barStart,     note: UInt8(n2), velocity: vel0, durationSteps: dur),
+                MIDIEvent(stepIndex: barStart + 8, note: UInt8(n0), velocity: vel1, durationSteps: dur),
+            ]
+
+        case "D":
+            // Full shimmer — original staggered cluster with 16-bar volume envelope.
+            // Floor raised to 0.60 (was 0.40) so the quietest point stays audible in the deep low register.
+            let cyclePos = bar % 16
+            let t: Double = cyclePos < 8
+                ? Double(cyclePos) / 7.0
+                : Double(15 - cyclePos) / 7.0
+            let envelopeScale = 0.60 + 0.40 * t
+            let peakVel = 110 + rng.nextInt(upperBound: 15)  // 110–124
+            let baseVel = max(66, min(127, Int(Double(peakVel) * envelopeScale)))
+            return [
+                MIDIEvent(stepIndex: barStart,     note: UInt8(n0), velocity: UInt8(baseVel),               durationSteps: 62),
+                MIDIEvent(stepIndex: barStart + 1, note: UInt8(n1), velocity: UInt8(max(1, baseVel - 8)),   durationSteps: 62),
+                MIDIEvent(stepIndex: barStart + 2, note: UInt8(n2), velocity: UInt8(max(1, baseVel - 15)),  durationSteps: 62),
+            ]
+
+        default: // "E"
+            // Slow triple: all 3 notes spaced 16 steps (4 bars) apart — a wide slow arpeggio
+            let vel = UInt8(50 + rng.nextInt(upperBound: 15))  // 50–64
+            let dur = 10 + rng.nextInt(upperBound: 5)           // 10–14 steps
+            return [
+                MIDIEvent(stepIndex: barStart,      note: UInt8(n0), velocity: vel,                          durationSteps: dur),
+                MIDIEvent(stepIndex: barStart + 16, note: UInt8(n1), velocity: UInt8(max(1, Int(vel) - 4)),  durationSteps: dur),
+                MIDIEvent(stepIndex: barStart + 32, note: UInt8(n2), velocity: UInt8(max(1, Int(vel) - 8)),  durationSteps: dur),
+            ]
+        }
     }
 
     // MARK: - Register helper: place pitch class in texture register MIDI 33–59
 
     private static func texRegisterNote(pc: Int, targetOct: Int) -> Int {
         var midi = targetOct * 12 + pc
-        while midi < 33 { midi += 12 }
-        while midi > 59 { midi -= 12 }
+        while midi < 36 { midi += 12 }   // floor: C2 — bluebird register below Rhythm (55–72)
+        while midi > 71 { midi -= 12 }   // ceiling: B4 — enables octave lift in B sections
         return midi
     }
 }

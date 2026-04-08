@@ -14,7 +14,7 @@ struct TonalGovernanceBuilder {
                     let entry = TonalGovernanceEntry(
                         chordWindow: cw,
                         sectionLabel: section.label,
-                        sectionMode: section.mode
+                        sectionMode: frame.mode
                     )
                     // Avoid duplicating the same chord window entry
                     if map.last?.chordWindow != cw {

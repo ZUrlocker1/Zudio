@@ -38,7 +38,8 @@ struct KosmicPadsGenerator {
         // Secondary layers: decide once per song whether each is active.
         // Per-bar probability compounds across many bars — a 40% per-bar rate fires in >99% of songs.
         // A single song-level gate keeps these as genuine occasional colour, not guaranteed fixtures.
-        let use008 = rng.nextDouble() < 0.40   // KOS-PADS-008: bIII Colour Chord
+        // bIII is a minor-mode colour — suppress in major modes where flat-3 clashes
+        let use008 = frame.mode != .Ionian && frame.mode != .Mixolydian && rng.nextDouble() < 0.40
         let use006 = rng.nextDouble() < 0.30   // KOS-PADS-006: Shimmer Layer
         if use008 { usedRuleIDs.insert("KOS-PADS-008") }
         if use006 { usedRuleIDs.insert("KOS-PADS-006") }
@@ -59,11 +60,19 @@ struct KosmicPadsGenerator {
                 guard bar == section.startBar else { continue }
                 let introSteps = (section.endBar - section.startBar) * 16
                 let introLen   = section.endBar - section.startBar
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let thirdRaw = (rootPC + entry.sectionMode.intervals[2]) % 12
+                let thirdPC  = scalePCs.contains(thirdRaw) ? thirdRaw : {
+                    for d in 1...6 {
+                        if scalePCs.contains((thirdRaw + d) % 12) { return (thirdRaw + d) % 12 }
+                        if scalePCs.contains((thirdRaw - d + 12) % 12) { return (thirdRaw - d + 12) % 12 }
+                    }
+                    return thirdRaw
+                }()
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-                let thirdPC = (rootPC + entry.sectionMode.intervals[2]) % 12
-                let third   = noteInPadsRegister(pc: thirdPC, targetOct: 2)
+                let third  = noteInPadsRegister(pc: thirdPC, targetOct: 2)
                 let dur = introSteps - 1
                 events += [
                     MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 40, durationSteps: dur),
@@ -108,12 +117,21 @@ struct KosmicPadsGenerator {
                 let barInBridge = bar - section.startBar
                 let phase       = min(3, barInBridge * 4 / bridgeLen)
                 let ascending   = section.startBar % 3 != 2
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let root   = noteInPadsRegister(pc: rootPC,                                   targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12,                        targetOct: 2)
-                let octave = noteInPadsRegister(pc: rootPC,                                   targetOct: 3)
-                let third  = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let mode     = entry.sectionMode
+                let m3raw    = (rootPC + mode.nearestInterval(3)) % 12
+                let m3pc     = scalePCs.contains(m3raw) ? m3raw : {
+                    for d in 1...6 {
+                        if scalePCs.contains((m3raw + d) % 12) { return (m3raw + d) % 12 }
+                        if scalePCs.contains((m3raw - d + 12) % 12) { return (m3raw - d + 12) % 12 }
+                    }
+                    return m3raw
+                }()
+                let root   = noteInPadsRegister(pc: rootPC,            targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let octave = noteInPadsRegister(pc: rootPC,            targetOct: 3)
+                let third  = noteInPadsRegister(pc: m3pc,              targetOct: 2)
                 let dur = 12
                 // Ascending phases add voices; descending phases remove them
                 let ascPhase = ascending ? phase : (3 - phase)
@@ -137,9 +155,11 @@ struct KosmicPadsGenerator {
             if section.label == .bridgeAlt {
                 let bridgeBar = bar - section.startBar
                 let rootPC    = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
                 let mode      = entry.sectionMode
                 let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let third     = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
+                let third     = noteInPadsRegister(
+                    pc: snapToScale(rootPC + mode.nearestInterval(3), scalePCs: scalePCs), targetOct: 2)
                 let fifth     = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
                 if bridgeBar % 2 == 0 {
                     // Call bar: sharp hit beat 1, quieter echo beat 3
@@ -171,12 +191,14 @@ struct KosmicPadsGenerator {
                 let bridgeLen   = section.endBar - section.startBar
                 let barInBridge = bar - section.startBar
                 let halfLen     = max(1, bridgeLen / 2)
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-                let third  = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
-                let fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let mode     = entry.sectionMode
+                let root     = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth    = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let third    = noteInPadsRegister(
+                    pc: snapToScale(rootPC + mode.nearestInterval(3), scalePCs: scalePCs), targetOct: 2)
+                let fourth   = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
 
                 if bridgeLen <= 4 {
                     // Short bridge: one long hold for the full duration
@@ -232,36 +254,51 @@ struct KosmicPadsGenerator {
                 // Fall through — normal pad rule also runs this bar (layered on top)
             }
 
+            let sectionIntensity = section.intensity
             let primaryCountBefore = events.count
 
             switch primaryRule {
             case "KOS-PADS-001":
-                events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+                events += longDroneBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
             case "KOS-PADS-002":
-                events += swellChordBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
+                events += swellChordBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame, rng: &rng)
             case "KOS-PADS-003":
                 events += unsyncLayersBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             case "KOS-PADS-004":
                 events += suspendedResolutionBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             case "KOS-PADS-005":
-                events += quartalStackBar(barStart: barStart, entry: entry, frame: frame)
+                events += quartalStackBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
             case "KOS-PADS-007":
-                events += gatedChordPulseBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
+                events += gatedChordPulseBar(barStart: barStart, entry: entry, frame: frame, intensity: sectionIntensity, rng: &rng)
             default:
-                events += longDroneBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+                events += longDroneBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
             }
 
             // Secondary layers only fire when the primary rule is sparse this bar (< 4 notes).
             // Prevents crowding when KOS-PADS-002/005/007 already fill the bar.
             let primaryAddedThisBar = events.count - primaryCountBefore
 
-            // KOS-PADS-008: bIII Colour Chord — fires per bar when song-level gate is open
-            if use008 && !section.label.isBridge && primaryAddedThisBar < 4 && rng.nextDouble() < 0.55 {
+            // Secondary layer probabilities scale with section intensity — sparse in A, full in B
+
+            // KOS-PADS-008: bIII Colour Chord — suppressed in .low; reduced in .medium
+            let colourProb: Double
+            switch sectionIntensity {
+            case .low:    colourProb = 0.00   // suppress entirely in A sections
+            case .medium: colourProb = 0.25
+            case .high:   colourProb = 0.55
+            }
+            if use008 && !section.label.isBridge && primaryAddedThisBar < 4 && rng.nextDouble() < colourProb {
                 events += bIIIColourChordBar(barStart: barStart, entry: entry, frame: frame)
             }
 
-            // KOS-PADS-006: Shimmer Layer — fires per bar when song-level gate is open
-            if use006 && !section.label.isBridge && primaryAddedThisBar < 4 && rng.nextDouble() < 0.40 {
+            // KOS-PADS-006: Shimmer Layer — reduced probability in low/medium sections
+            let shimmerProb: Double
+            switch sectionIntensity {
+            case .low:    shimmerProb = 0.10
+            case .medium: shimmerProb = 0.25
+            case .high:   shimmerProb = 0.40
+            }
+            if use006 && !section.label.isBridge && primaryAddedThisBar < 4 && rng.nextDouble() < shimmerProb {
                 events += shimmerLayerBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
             }
         }
@@ -274,28 +311,54 @@ struct KosmicPadsGenerator {
     // voicing: root+5th+octave+(3rd at octave up), velocity 40–55
 
     private static func longDroneBar(
-        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, bar: Int, sectionStartBar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         // Only re-attack every 2 bars to simulate held notes
         guard bar % 2 == 0 else { return [] }
 
-        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root    = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fifth   = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-        let octave  = noteInPadsRegister(pc: rootPC, targetOct: 3)
-        let mode = frame.mode
-        let thirdInterval = mode.nearestInterval(4)  // major or minor 3rd
-        let thirdHigh = noteInPadsRegister(pc: (rootPC + thirdInterval) % 12, targetOct: 3)
+        let posInSection = bar - sectionStartBar
+
+        // Silence every 8th 2-bar trigger (~12.5% gap) — drone breathes briefly every 16 bars
+        let triggerIndex = (posInSection / 2) % 8
+        if triggerIndex == 7 { return [] }
+
+        // 32-bar sinusoidal velocity swell — drone swells from quiet (38) to full (66) and back
+        let swellFrac = sin(Double.pi * Double(posInSection % 32) / 32.0)
+        let vel       = UInt8(38 + Int(28.0 * swellFrac))
+
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        // Scale-snap root to avoid out-of-scale notes from borrowed chord roots
+        let rootPC    = scalePCs.contains(rawRootPC) ? rawRootPC : snapToScale(rawRootPC, scalePCs: scalePCs)
+        // Snap third to scale — avoids out-of-scale notes when chord is non-tonic.
+        let mode          = frame.mode
+        let thirdRaw      = (rootPC + mode.nearestInterval(4)) % 12
+        let thirdPC       = scalePCs.contains(thirdRaw) ? thirdRaw : {
+            for d in 1...6 {
+                if scalePCs.contains((thirdRaw + d) % 12) { return (thirdRaw + d) % 12 }
+                if scalePCs.contains((thirdRaw - d + 12) % 12) { return (thirdRaw - d + 12) % 12 }
+            }
+            return thirdRaw
+        }()
+        let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+        let fifth     = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+        let octave    = noteInPadsRegister(pc: rootPC, targetOct: 3)
+        let thirdHigh = noteInPadsRegister(pc: thirdPC, targetOct: 3)
 
         // Hold for 32 steps (2 bars) — slightly less than 32 for visual gap
         let dur = 30
-        let vel = UInt8(50 + Int.random(in: 0...10))
+
+        // Voicing rotation every 8 bars: shift the third note's attack position (beat 1 vs beat 3)
+        // so the per-bar fingerprint (step_position, pitch_class) changes every 8 bars,
+        // breaking long identical-bar runs (REP-LONG) without changing the harmony.
+        let thirdStep = (posInSection % 16 < 8) ? 0 : 8
 
         return [
-            MIDIEvent(stepIndex: barStart, note: UInt8(root),      velocity: vel,       durationSteps: dur),
-            MIDIEvent(stepIndex: barStart, note: UInt8(fifth),     velocity: vel - 5,   durationSteps: dur),
-            MIDIEvent(stepIndex: barStart, note: UInt8(octave),    velocity: vel - 3,   durationSteps: dur),
-            MIDIEvent(stepIndex: barStart, note: UInt8(thirdHigh), velocity: vel - 8,   durationSteps: dur),
+            MIDIEvent(stepIndex: barStart,           note: UInt8(root),      velocity: vel,                        durationSteps: dur),
+            MIDIEvent(stepIndex: barStart,           note: UInt8(fifth),     velocity: UInt8(max(1, Int(vel) - 5)), durationSteps: dur),
+            MIDIEvent(stepIndex: barStart,           note: UInt8(octave),    velocity: UInt8(max(1, Int(vel) - 3)), durationSteps: dur),
+            MIDIEvent(stepIndex: barStart + thirdStep, note: UInt8(thirdHigh), velocity: UInt8(max(1, Int(vel) - 8)), durationSteps: dur),
         ]
     }
 
@@ -303,21 +366,27 @@ struct KosmicPadsGenerator {
     // Velocity ramps 20→80 over the bar (Vangelis brass swell)
 
     private static func swellChordBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
+        barStart: Int, bar: Int, sectionStartBar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
         let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
 
-        // Simulate velocity ramp with sub-events at different velocities
-        // Attack at 20, mid at 50, sustain at 75
+        // Rotate attack step every 8 bars to break identical fingerprint runs.
+        // Shifts the swell onset by 0, 2, 4, or 6 steps across consecutive 8-bar windows.
+        let posInSection = bar - sectionStartBar
+        let stepShift    = ((posInSection / 8) % 4) * 2   // 0, 2, 4, 6
+        let s0 = stepShift
+        let s4 = stepShift + 4
+        let s8 = (stepShift + 8) % 16
+
         return [
-            MIDIEvent(stepIndex: barStart,      note: UInt8(root),  velocity: 35, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + 4,  note: UInt8(root),  velocity: 55, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + 8,  note: UInt8(root),  velocity: 70, durationSteps: 8),
-            MIDIEvent(stepIndex: barStart,      note: UInt8(fifth), velocity: 30, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + 4,  note: UInt8(fifth), velocity: 45, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + 8,  note: UInt8(fifth), velocity: 60, durationSteps: 8),
+            MIDIEvent(stepIndex: barStart + s0, note: UInt8(root),  velocity: 35, durationSteps: 6),
+            MIDIEvent(stepIndex: barStart + s4, note: UInt8(root),  velocity: 55, durationSteps: 6),
+            MIDIEvent(stepIndex: barStart + s8, note: UInt8(root),  velocity: 70, durationSteps: 8),
+            MIDIEvent(stepIndex: barStart + s0, note: UInt8(fifth), velocity: 30, durationSteps: 6),
+            MIDIEvent(stepIndex: barStart + s4, note: UInt8(fifth), velocity: 45, durationSteps: 6),
+            MIDIEvent(stepIndex: barStart + s8, note: UInt8(fifth), velocity: 60, durationSteps: 8),
         ]
     }
 
@@ -342,9 +411,11 @@ struct KosmicPadsGenerator {
 
         // Voice 2: 10-bar loop — different voicing
         if bar % 10 == 0 {
-            let oct = noteInPadsRegister(pc: rootPC, targetOct: 3)
-            let mode = frame.mode
-            let thirdHigh = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(4)) % 12, targetOct: 3)
+            let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+            let oct       = noteInPadsRegister(pc: rootPC, targetOct: 3)
+            let mode      = frame.mode
+            let thirdHigh = noteInPadsRegister(
+                pc: snapToScale(rootPC + mode.nearestInterval(4), scalePCs: scalePCs), targetOct: 3)
             evs += [
                 MIDIEvent(stepIndex: barStart, note: UInt8(oct),      velocity: 45, durationSteps: 14 * 10),
                 MIDIEvent(stepIndex: barStart, note: UInt8(thirdHigh), velocity: 42, durationSteps: 14 * 10),
@@ -380,9 +451,18 @@ struct KosmicPadsGenerator {
                 MIDIEvent(stepIndex: barStart, note: UInt8(fifth),   velocity: 48, durationSteps: 14),
             ]
         } else {
-            // minor resolution: root + minor third + fifth
-            let mode = frame.mode
-            let minor3rd = noteInPadsRegister(pc: (rootPC + mode.nearestInterval(3)) % 12, targetOct: 2)
+            // minor resolution: root + minor third + fifth (snap third to scale)
+            let mode     = frame.mode
+            let scalePCs = Set(mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+            let m3raw    = (rootPC + mode.nearestInterval(3)) % 12
+            let m3pc     = scalePCs.contains(m3raw) ? m3raw : {
+                for d in 1...6 {
+                    if scalePCs.contains((m3raw + d) % 12) { return (m3raw + d) % 12 }
+                    if scalePCs.contains((m3raw - d + 12) % 12) { return (m3raw - d + 12) % 12 }
+                }
+                return m3raw
+            }()
+            let minor3rd = noteInPadsRegister(pc: m3pc, targetOct: 2)
             let fifth    = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
             return [
                 MIDIEvent(stepIndex: barStart, note: UInt8(root),     velocity: 55, durationSteps: 14),
@@ -396,17 +476,42 @@ struct KosmicPadsGenerator {
     // Stacked fourths: 0, 5, 10 semitones (very spacious)
 
     private static func quartalStackBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, bar: Int, sectionStartBar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
-        let flat7  = noteInPadsRegister(pc: (rootPC + frame.mode.nearestInterval(10)) % 12, targetOct: 2)
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        // b7 above chord root may be outside scale when chord is non-tonic; snap to scale.
+        let b7raw    = (rootPC + 10) % 12
+        let b7pc     = scalePCs.contains(b7raw) ? b7raw : {
+            for d in 1...6 {
+                if scalePCs.contains((b7raw + d) % 12) { return (b7raw + d) % 12 }
+                if scalePCs.contains((b7raw - d + 12) % 12) { return (b7raw - d + 12) % 12 }
+            }
+            return b7raw
+        }()
+        var root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
+        var fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
+        var flat7  = noteInPadsRegister(pc: b7pc, targetOct: 2)
+
+        // Spread any note pair that lands within 2 semitones — the scale-snapped b7 can
+        // produce a near-unison with the root (e.g. Db→D in F Ionian, giving D2 and Eb2
+        // as a grinding minor second). Move the lower of the colliding pair up an octave.
+        var notes = [root, fourth, flat7].sorted()
+        if notes[1] - notes[0] <= 2 { notes[0] += 12 }
+        if notes[2] - notes[1] <= 2 { notes[1] += 12 }
+        // Re-sort after spreading and clamp to ceiling
+        notes = notes.sorted().map { min($0, 72) }
+        (root, fourth, flat7) = (notes[0], notes[1], notes[2])
+
+        // Rotate attack step every 8 bars to break identical fingerprint runs.
+        // Shifts the chord onset by 0, 4, 8, or 12 steps (quarter-note offsets).
+        let posInSection = bar - sectionStartBar
+        let stepShift    = ((posInSection / 8) % 4) * 4   // 0, 4, 8, 12
 
         return [
-            MIDIEvent(stepIndex: barStart, note: UInt8(root),   velocity: 65, durationSteps: 14),
-            MIDIEvent(stepIndex: barStart, note: UInt8(fourth), velocity: 60, durationSteps: 14),
-            MIDIEvent(stepIndex: barStart, note: UInt8(flat7),  velocity: 57, durationSteps: 14),
+            MIDIEvent(stepIndex: barStart + stepShift, note: UInt8(root),   velocity: 65, durationSteps: 14),
+            MIDIEvent(stepIndex: barStart + stepShift, note: UInt8(fourth), velocity: 60, durationSteps: 14),
+            MIDIEvent(stepIndex: barStart + stepShift, note: UInt8(flat7),  velocity: 57, durationSteps: 14),
         ]
     }
 
@@ -416,14 +521,22 @@ struct KosmicPadsGenerator {
     // (Équinoxe, Stratosfear) rather than a static drone.
 
     private static func gatedChordPulseBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity = .high, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
         let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
 
-        // Downbeats (1, 3) fire more reliably than upbeats (2, 4)
-        let beatProbs: [Double] = [0.95, 0.72, 0.82, 0.65]
+        // Downbeats (1, 3) fire more reliably than upbeats (2, 4).
+        // Scale by intensity: .low sections are ~55% of full density, .medium ~80%.
+        let intensityMult: Double
+        switch intensity {
+        case .low:    intensityMult = 0.55
+        case .medium: intensityMult = 0.80
+        case .high:   intensityMult = 1.00
+        }
+        let beatProbs: [Double] = [0.95, 0.72, 0.82, 0.65].map { $0 * intensityMult }
         let beatSteps            = [0, 4, 8, 12]
         var evs: [MIDIEvent] = []
         for (i, step) in beatSteps.enumerated() {
@@ -442,9 +555,12 @@ struct KosmicPadsGenerator {
     private static func bIIIColourChordBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        // bIII = flat minor 3rd up from root
-        let bIIIpc = (rootPC + 3) % 12
+        // bIII is computed from the TONIC (not the active chord root) so that the colour
+        // chord always relates to the song's key center rather than a drifted chord root.
+        // e.g. in D Dorian with chord on C (b7), using the chord root gives Eb (bIII of C),
+        // which is outside D Dorian. Using the tonic gives F (bIII of D), which is diatonic.
+        let tonicPC = keySemitone(frame.key)
+        let bIIIpc  = (tonicPC + 3) % 12
         let bIIIroot = noteInPadsRegister(pc: bIIIpc, targetOct: 2)
         let bIIIfifth = noteInPadsRegister(pc: (bIIIpc + 7) % 12, targetOct: 2)
 
@@ -491,8 +607,22 @@ struct KosmicPadsGenerator {
 
     private static func noteInPadsRegister(pc: Int, targetOct: Int) -> Int {
         var midi = targetOct * 12 + pc
-        while midi < 36 { midi += 12 }
+        while midi < 48 { midi += 12 }   // floor raised to C3 — notes below this are muddy on pad synths
         while midi > 72 { midi -= 12 }
         return midi
+    }
+
+    // MARK: - Scale snap helper
+    // Snaps a pitch class to the nearest pitch class present in the song's scale.
+    // Used throughout this generator to ensure notes stay diatonic when the active
+    // chord root is a non-tonic scale degree (Modal Drift etc.)
+    private static func snapToScale(_ rawPC: Int, scalePCs: Set<Int>) -> Int {
+        let pc = (rawPC % 12 + 12) % 12
+        if scalePCs.contains(pc) { return pc }
+        for d in 1...6 {
+            if scalePCs.contains((pc + d) % 12) { return (pc + d) % 12 }
+            if scalePCs.contains((pc - d + 12) % 12) { return (pc - d + 12) % 12 }
+        }
+        return pc
     }
 }

@@ -86,6 +86,7 @@
 		TT000000000000000000001 /* ZudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000001 /* ZudioTests.swift */; };
 		TT000000000000000000002 /* ChillBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000002 /* ChillBatchTests.swift */; };
 		TT000000000000000000003 /* MotorikBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000003 /* MotorikBatchTests.swift */; };
+		TT000000000000000000009 /* KosmicBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000005 /* KosmicBatchTests.swift */; };
 		TT000000000000000000004 /* Zudio.app in Frameworks */ = {isa = PBXBuildFile; fileRef = BB000000000000000000021 /* Zudio.app */; };
 /* End PBXBuildFile section */
 
@@ -171,6 +172,7 @@
 		UU000000000000000000001 /* ZudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioTests.swift; sourceTree = "<group>"; };
 		UU000000000000000000002 /* ChillBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillBatchTests.swift; sourceTree = "<group>"; };
 		UU000000000000000000003 /* MotorikBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotorikBatchTests.swift; sourceTree = "<group>"; };
+		UU000000000000000000005 /* KosmicBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KosmicBatchTests.swift; sourceTree = "<group>"; };
 		UU000000000000000000004 /* ZudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -218,6 +220,7 @@
 				UU000000000000000000001 /* ZudioTests.swift */,
 				UU000000000000000000002 /* ChillBatchTests.swift */,
 				UU000000000000000000003 /* MotorikBatchTests.swift */,
+				UU000000000000000000005 /* KosmicBatchTests.swift */,
 			);
 			path = ZudioTests;
 			sourceTree = "<group>";
@@ -589,6 +592,7 @@
 				TT000000000000000000001 /* ZudioTests.swift in Sources */,
 				TT000000000000000000002 /* ChillBatchTests.swift in Sources */,
 				TT000000000000000000003 /* MotorikBatchTests.swift in Sources */,
+				TT000000000000000000009 /* KosmicBatchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

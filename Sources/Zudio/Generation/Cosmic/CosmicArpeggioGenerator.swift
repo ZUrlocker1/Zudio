@@ -64,6 +64,28 @@ struct KosmicArpeggioGenerator {
         case "KOS-RTHM-010": events = generateCravenFaultsGrit(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         default:             events = generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         }
+
+        // Rest windows: every 16 body bars, bars 12–15 are silent (4-bar rest per cycle).
+        // Gives the Rhythm track breathing space and prevents BREATHLESS across all rules.
+        // KOS-RTHM-008 (8-bar arc) is already very sparse — rest windows still apply but rarely hit.
+        let firstBodyBar = structure.sections
+            .first(where: { $0.label != .intro && $0.label != .outro && !$0.label.isBridge })?.startBar ?? 0
+        // Last body section (before outro) for fade-out detection
+        let lastBodySection = structure.sections
+            .last(where: { $0.label != .intro && $0.label != .outro && !$0.label.isBridge })
+        let arpRestOffset = rng.nextInt(upperBound: 4)
+        events = events.filter { ev in
+            let bar = ev.stepIndex / 16
+            guard let sec = structure.section(atBar: bar) else { return true }
+            guard sec.label != .intro && sec.label != .outro && !sec.label.isBridge else { return true }
+            // Stagger: Rhythm is silent for first 8 bars of body (Bass/Pads establish first)
+            if bar < firstBodyBar + 8 { return false }
+            // Fade-out: Rhythm drops 12 bars before outro for gradual strip-back
+            if let lastSec = lastBodySection, bar >= lastSec.endBar - 12 { return false }
+            let posInSection = bar - sec.startBar
+            return (posInSection + arpRestOffset) % 16 < 12
+        }
+
         // Bridge A-1 (.bridge): arpeggio re-enters with ascending/descending phase walk
         events += generateBridgeA1Arp(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         // Bridge A-2 (.bridgeAlt call+response): melodic response phrase on non-hit bars
@@ -111,8 +133,14 @@ struct KosmicArpeggioGenerator {
                 let modNotes    = glacialModulate(notes: notes5, bar: bar, rng: &rng)
                 let pattern     = buildArpPattern(notes: modNotes, shape: arpShape, patternLen: patternLen, bar: bar)
                 let countBefore = events.count
-                // Single voice during intro/outro — full voices in body
-                let voicesToUse = isIntroOutro ? Array(voiceOffsets.prefix(1)) : voiceOffsets
+                // Single voice during intro/outro; in body, cap voices by section intensity
+                let maxBodyVoices: Int
+                switch section.intensity {
+                case .low:    maxBodyVoices = 2
+                case .medium: maxBodyVoices = 3
+                case .high:   maxBodyVoices = voiceOffsets.count
+                }
+                let voicesToUse = isIntroOutro ? Array(voiceOffsets.prefix(1)) : Array(voiceOffsets.prefix(maxBodyVoices))
                 for (voiceIdx, offset) in voicesToUse.enumerated() {
                     let voicePattern = shufflePattern(pattern, seed: voiceIdx, rng: &rng)
                     emitTDVoice(pattern: voicePattern, skipPositions: skipPositions,
@@ -171,14 +199,22 @@ struct KosmicArpeggioGenerator {
                 // Gate probabilities replace the coarse whole-bar silence: the anchor note
                 // plays reliably while later hook notes thin out progressively, so bars breathe
                 // naturally rather than block-silencing every 4th bar.
-                let melodyGate:  [Double] = isIntroOutro ? [] : [0.95, 0.78, 0.72, 0.65]
-                let harmonyGate: [Double] = isIntroOutro ? [] : [0.88, 0.70, 0.65, 0.58]
+                // Scale gate probabilities by section intensity — denser in B, sparser in A
+                let densityMult: Double = isIntroOutro ? 1.0 : {
+                    switch section.intensity {
+                    case .low:    return 0.55
+                    case .medium: return 0.80
+                    case .high:   return 1.00
+                    }
+                }()
+                let melodyGate:  [Double] = isIntroOutro ? [] : [0.95, 0.78, 0.72, 0.65].map { $0 * densityMult }
+                let harmonyGate: [Double] = isIntroOutro ? [] : [0.88, 0.70, 0.65, 0.58].map { $0 * densityMult }
 
                 emitJMJVoice(notes: notes, barStart: barStart, stepDur: stepDur,
                              offset: 0, legato: true, bar: bar, rng: &rng, events: &events,
                              gateProbs: melodyGate)
-                // No harmony voice during intro/outro — keep it minimal
-                if addHarmony && !isIntroOutro {
+                // No harmony voice during intro/outro or low-intensity sections
+                if addHarmony && !isIntroOutro && section.intensity != .low {
                     let keyPC     = keySemitone(frame.key)
                     let harmNotes = notes.map { note -> Int in
                         // Diatonic third: scale degree +2 above each melody note.
@@ -304,8 +340,16 @@ struct KosmicArpeggioGenerator {
                 // Cap: max 6 notes per bar total (anchor + 5 groove); prevents over-dense
                 // bars from KOS-RTHM-004 (Study 02 found up to 13.9 notes/bar in Flexure).
                 if !isIntroOutro {
+                    // Intensity gating: fewer voices and higher skip rate in sparse sections
+                    let skipRate: Double
+                    switch section.intensity {
+                    case .low:    skipRate = 0.55
+                    case .medium: skipRate = 0.45
+                    case .high:   skipRate = 0.35
+                    }
+                    let activeVoiceCount = section.intensity == .low ? min(voiceCount, 1) : voiceCount
                     let grooveSteps = [2, 3, 5, 6, 9, 10, 13, 14]
-                    grooveLoop: for vIdx in 0..<voiceCount {
+                    grooveLoop: for vIdx in 0..<activeVoiceCount {
                         let noteOffset = vIdx % pentNotes.count
                         let note       = pentNotes[(noteOffset + vIdx) % pentNotes.count]
                         let stepShift  = voiceStepOffsets[vIdx % voiceStepOffsets.count]
@@ -313,7 +357,7 @@ struct KosmicArpeggioGenerator {
                             guard events.count - countBefore < 6 else { break grooveLoop }
                             let s = gs + stepShift
                             guard s < 16 else { continue }
-                            if rng.nextDouble() < 0.35 { continue }
+                            if rng.nextDouble() < skipRate { continue }
                             let vel = UInt8(78 + rng.nextInt(upperBound: 15))
                             events.append(MIDIEvent(stepIndex: barStart + s, note: UInt8(note),
                                                     velocity: vel, durationSteps: 1))
@@ -364,11 +408,21 @@ struct KosmicArpeggioGenerator {
                 let notesB    = notesA.reversed() as [Int]
                 let countBefore = events.count
 
+                // Scale gate probabilities by section intensity
+                let dualDensityMult: Double = isIntroOutro ? 1.0 : {
+                    switch section.intensity {
+                    case .low:    return 0.55
+                    case .medium: return 0.80
+                    case .high:   return 1.00
+                    }
+                }()
+
                 // Voice A: 8th-note rate — melodic, gated per step in body sections
                 var stepPos = 0
                 var noteIdx = 0
                 while stepPos < 16 {
-                    let prob = isIntroOutro ? 1.0 : (noteIdx < gateA.count ? gateA[noteIdx] : gateA.last!)
+                    let baseProb = isIntroOutro ? 1.0 : (noteIdx < gateA.count ? gateA[noteIdx] : gateA.last!)
+                    let prob = baseProb * dualDensityMult
                     if rng.nextDouble() < prob {
                         let note = notesA[noteIdx % notesA.count]
                         let vel  = UInt8(74 + rng.nextInt(upperBound: 15))  // 74–88
@@ -380,12 +434,12 @@ struct KosmicArpeggioGenerator {
                     stepPos += 2
                 }
 
-                // Voice B: quarter-note rate — quieter harmonic anchor; body only
-                if !isIntroOutro {
+                // Voice B: quarter-note rate — quieter harmonic anchor; body only; suppressed in .low
+                if !isIntroOutro && section.intensity != .low {
                     stepPos = 0
                     noteIdx = 0
                     while stepPos < 16 {
-                        let prob = noteIdx < gateB.count ? gateB[noteIdx] : gateB.last!
+                        let prob = (noteIdx < gateB.count ? gateB[noteIdx] : gateB.last!) * dualDensityMult
                         if rng.nextDouble() < prob {
                             let note = notesB[noteIdx % notesB.count]
                             let vel  = UInt8(62 + rng.nextInt(upperBound: 13))  // 62–74
@@ -423,12 +477,14 @@ struct KosmicArpeggioGenerator {
         let firstBodyBar = bodySections.first?.startBar ?? 0
         guard let firstEntry = tonalMap.entry(atBar: firstBodyBar) else { return [] }
 
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(firstEntry.chordWindow.chordRoot)) % 12
-        let mode   = firstEntry.sectionMode
-        let third  = mode.nearestInterval(3)
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(firstEntry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let mode     = firstEntry.sectionMode
+        let third    = mode.nearestInterval(3)
 
-        func place(_ pc: Int) -> Int {
-            var m = 60 + rootPC + pc
+        func place(_ semitones: Int) -> Int {
+            let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
+            var m = 60 + snapped
             while m > 76 { m -= 12 }
             while m < 58 { m += 12 }
             return m
@@ -455,6 +511,9 @@ struct KosmicArpeggioGenerator {
             guard let section = structure.section(atBar: bar) else { continue }
             guard section.label != .intro && section.label != .outro else { continue }
             guard !section.label.isBridge else { continue }
+            // Intensity gating: skip every other bar in .low; 20% skip in .medium
+            if section.intensity == .low  && bar % 2 != 0 { continue }
+            if section.intensity == .medium && rng.nextDouble() < 0.20 { continue }
             let barStart   = bar * 16
             let barInBody  = bar - firstBodyBar
 
@@ -511,11 +570,13 @@ struct KosmicArpeggioGenerator {
             }
             let transposeInterval = scale[transposeDeg % scale.count]
 
-            let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-            let third  = mode.nearestInterval(3)
+            let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+            let third    = mode.nearestInterval(3)
 
-            func place(_ pc: Int) -> Int {
-                var m = 60 + rootPC + pc + transposeInterval
+            func place(_ semitones: Int) -> Int {
+                let snapped = snapToScale(rootPC + semitones + transposeInterval, scalePCs: scalePCs)
+                var m = 60 + snapped
                 while m > 80 { m -= 12 }
                 while m < 56 { m += 12 }
                 return m
@@ -554,6 +615,7 @@ struct KosmicArpeggioGenerator {
             let ascending  = (bar / 8) % 2 == 0
             let noteCount  = 5 + rng.nextInt(upperBound: 3)  // 5–7 notes
             let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let scalePCs   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
             let mode       = entry.sectionMode
             let third      = mode.nearestInterval(3)
             let flat7      = mode.nearestInterval(10)
@@ -561,7 +623,10 @@ struct KosmicArpeggioGenerator {
             // Build a 2-octave scale pool in MIDI 58–82
             var pool: [Int] = []
             for pc in [0, 2, third, 5, 7, flat7, 12, 12 + third, 12 + 7] {
-                var m = 60 + rootPC + pc
+                let snapped = pc == 12 || pc == 12 + third || pc == 12 + 7
+                    ? snapToScale(rootPC + (pc % 12), scalePCs: scalePCs)
+                    : snapToScale(rootPC + pc, scalePCs: scalePCs)
+                var m = 60 + snapped
                 while m > 82 { m -= 12 }
                 while m < 58 { m += 12 }
                 if !pool.contains(m) { pool.append(m) }
@@ -613,13 +678,15 @@ struct KosmicArpeggioGenerator {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barInBridge = bar - section.startBar
                 let phase       = min(3, barInBridge * 4 / bridgeLen)
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let third  = mode.nearestInterval(3)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let mode     = entry.sectionMode
+                let third    = mode.nearestInterval(3)
 
                 // Place a pitch class in the mid register (MIDI 60–72)
-                func place(_ pc: Int) -> Int {
-                    var m = 60 + rootPC + pc
+                func place(_ semitones: Int) -> Int {
+                    let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
+                    var m = 60 + snapped
                     while m > 72 { m -= 12 }
                     while m < 60 { m += 12 }
                     return m
@@ -701,9 +768,11 @@ struct KosmicArpeggioGenerator {
 
                 // Call bars (even): always held root — clean space before the response.
                 if bridgeBar % 2 == 0 {
-                    let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                    func placeC(_ pc: Int) -> Int {
-                        var m = 60 + rootPC + pc
+                    let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                    let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                    func placeC(_ semitones: Int) -> Int {
+                        let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
+                        var m = 60 + snapped
                         while m > 72 { m -= 12 }
                         while m < 60 { m += 12 }
                         return m
@@ -715,12 +784,14 @@ struct KosmicArpeggioGenerator {
                 }
 
                 // Response bars (odd): melodic phrase variant
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let third  = mode.nearestInterval(3)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let mode     = entry.sectionMode
+                let third    = mode.nearestInterval(3)
 
-                func place(_ pc: Int) -> Int {
-                    var m = 60 + rootPC + pc
+                func place(_ semitones: Int) -> Int {
+                    let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
+                    var m = 60 + snapped
                     while m > 72 { m -= 12 }
                     while m < 60 { m += 12 }
                     return m
@@ -787,15 +858,17 @@ struct KosmicArpeggioGenerator {
         let hintEnd   = intro.endBar - 2                // spin-up begins here
 
         guard let entry = tonalMap.entry(atBar: hintStart) else { return [] }
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let mode   = entry.sectionMode
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let mode     = entry.sectionMode
 
         // Build a short ascending scale fragment: root, 3rd, 5th, octave (4 notes max)
         // Register: mid-upper (MIDI 60–79) to sit above bass but below spin-up texture
         let intervals = [0, mode.nearestInterval(3), 7, 12]
         var phrase: [Int] = []
         for iv in intervals {
-            var midi = 60 + rootPC + iv
+            let snapped = iv == 12 ? rootPC : snapToScale(rootPC + iv, scalePCs: scalePCs)
+            var midi = 60 + snapped
             while midi > 79 { midi -= 12 }
             while midi < 60 { midi += 12 }
             phrase.append(midi)
@@ -821,13 +894,15 @@ struct KosmicArpeggioGenerator {
     }
 
     private static func fiveNoteSubset(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let mode   = entry.sectionMode
-        let third  = mode.nearestInterval(3)
-        let flat7  = mode.nearestInterval(10)
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let mode     = entry.sectionMode
+        let third    = mode.nearestInterval(3)
+        let flat7    = mode.nearestInterval(10)
         var notes: [Int] = []
         for st in [0, third, 7, flat7, 12] {
-            var midi = 60 + rootPC + st
+            let snapped = st == 12 ? rootPC : snapToScale(rootPC + st, scalePCs: scalePCs)
+            var midi = 60 + snapped
             while midi > 72 { midi -= 12 }
             while midi < 55 { midi += 12 }
             notes.append(midi)
@@ -837,7 +912,8 @@ struct KosmicArpeggioGenerator {
 
     /// JMJ hook note set: 4 notes in MIDI 60–80, scale degrees depend on shape
     private static func jmjHookNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, shape: Int) -> [Int] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
         // Use chord type (not song mode) for third quality — avoids C natural against a major chord
         // in a Dorian/Aeolian song (mode.nearestInterval gives minor third regardless of chord type).
         let isMajorChord: Bool
@@ -849,8 +925,9 @@ struct KosmicArpeggioGenerator {
         let fifth  = 7
         let octave = 12
 
-        func place(_ pc: Int) -> Int {
-            var m = 60 + rootPC + pc
+        func place(_ semitones: Int) -> Int {
+            let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
+            var m = 60 + snapped
             while m > 80 { m -= 12 }
             while m < 60 { m += 12 }
             return m
@@ -864,7 +941,8 @@ struct KosmicArpeggioGenerator {
 
     /// JMJ Oxygène 4-note set, quarter-note register MIDI 58–78
     private static func jmjOxygeneNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
         // Use chord type (not song mode) — same fix as jmjHookNotes
         let isMajorChord: Bool
         switch entry.chordWindow.chordType {
@@ -874,8 +952,9 @@ struct KosmicArpeggioGenerator {
         let third  = isMajorChord ? 4 : 3
         let fifth  = 7
         let octave = 12
-        func place(_ pc: Int) -> Int {
-            var m = 60 + rootPC + pc
+        func place(_ semitones: Int) -> Int {
+            let snapped = semitones == 12 ? rootPC : snapToScale(rootPC + semitones, scalePCs: scalePCs)
+            var m = 60 + snapped
             while m > 78 { m -= 12 }
             while m < 58 { m += 12 }
             return m
@@ -1127,17 +1206,21 @@ struct KosmicArpeggioGenerator {
                 if isOutro && bar >= section.startBar + 2 { continue }
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let mode   = entry.sectionMode
-                let third  = mode.nearestInterval(3)
-                let second = mode.nearestInterval(2)
-                let flat7  = mode.nearestInterval(10)
+                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let mode     = entry.sectionMode
+                let third    = mode.nearestInterval(3)
+                let second   = mode.nearestInterval(2)
+                let flat7    = mode.nearestInterval(10)
 
                 // Build 7-note cell: root, 3rd, 5th, flat-7, 5th, 3rd, 2nd — symmetrical arch
-                func place(_ pc: Int) -> Int {
-                    var m = 60 + rootPC + pc
-                    while m > hi { m -= 12 }
+                // Snap each note to the scale to prevent out-of-scale pitches when the chord
+                // root is a non-tonic scale degree (e.g. B in F# Dorian → D natural would clash).
+                func place(_ semitones: Int) -> Int {
+                    let snapped = snapToScale(rootPC + semitones, scalePCs: scalePCs)
+                    var m = 36 + snapped
                     while m < lo { m += 12 }
+                    while m > hi { m -= 12 }
                     return m
                 }
                 let cell = [place(0), place(third), place(7), place(flat7),
@@ -1168,5 +1251,19 @@ struct KosmicArpeggioGenerator {
             }
         }
         return events
+    }
+
+    // MARK: - Scale snap helper
+    // Snaps a pitch class to the nearest pitch class present in the song's scale.
+    // Used by place() closures throughout this generator to prevent out-of-scale notes
+    // when the active chord root is a non-tonic scale degree.
+    private static func snapToScale(_ rawPC: Int, scalePCs: Set<Int>) -> Int {
+        let pc = (rawPC % 12 + 12) % 12
+        if scalePCs.contains(pc) { return pc }
+        for d in 1...6 {
+            if scalePCs.contains((pc + d) % 12) { return (pc + d) % 12 }
+            if scalePCs.contains((pc - d + 12) % 12) { return (pc - d + 12) % 12 }
+        }
+        return pc
     }
 }

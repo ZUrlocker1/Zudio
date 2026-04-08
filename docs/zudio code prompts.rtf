@@ -1267,6 +1267,7 @@ Then lets imoprove \
 MOT-LD1-006    Long arc as follows. It\'92s too boring, so whenever it has more than 4 descending notes generated in a row use some different notes to go back.  \
 then lets create a completely new MOT-LD1-003 using ideas from Chilll. This should be new code, not reusing any existing code, just the ideas.  I want something that works like CHL-LD1-002    Short punch  but with a maximum of 6 notes.  Very long gaps 4 to 8 bars in between different solos.  Adjust the scale as appropriate. \
 \
+the song Zudio-Ewig-Schein seems to have some clashes. please investigate the soure. \
 \
 the song Zudio-Bud in the zudio folder has \
 CHL-RHY-002    Moby backbeat beats 2+4\
@@ -1287,4 +1288,81 @@ And instead of having the Pads play on the hit, I want the pads to play in a rhy
 \
 what idea do you have to create more musical tension in the bass ostinato breakdown and harmonic drone breakdown. it can't be 4 bars of root bass quarter notes. THat's too boring. For sure add the drum build up to the harmonic drone. What ideas do you have?\
 \
-}
+
+\f0\b Modifying Chill Texture Audio file playback \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 \
+when we play an audio texture track for Chill, instead of starting at the beginning of the track, I would like to randomly start at either the beginning, 15 seconds, 30 seconds or 45 seconds into the audio and then loop continiously from there.  Make sure that the display matches the starting point. Layout the plan for this. Any questions?\
+\
+there's avisualization of the wave form of the file that is generated. but that visiualization until now has started at the beginning. Now the visualizaiton needs to be adjusted to the changed playback starting point.\
+\
+please verify that the code for determining a new starting point of the chill texture audio file matches the logic for what is displayed. I don't think it's in sync.  The large waves in the visualization don't seem to match the Louder volume segments,  If you start, say, at 30 seconds, then the visualization should also start at 30 seconds into the wave representation. I think you're still using the visualization starting at 0 seconds, regardless of where playback starts.  Let me know if you're not clear on this.  \
+\
+use the same offset for playing the audio track as for displaying it, e.g. 0, 15, 30 or 45 seconds into the audio track\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 Improving Kosmic
+\f2\b0 \
+\
+I think kosmic is too chaotic and muddy with too much going on, too many patterns, possibly indistinct groupoings of instruments (pads in lead 2) give me some suggestions on how to make the music less chaotic and more clear, but still distinctly Kosmic style. Just ideas no changes yet.\
+\
+I'd like to look at some of the ideas you suggested earlier towards having less density across rhythm, pads, texture, bass. I am cocnernted that they are all playing at the same time and for pads, rhythm, textura and bass often a similar sequence or arpeggio.  So I want to make the tracks a bit more distinct and then also have some build ups so A section is less crowded, and maybe there's more happening in B section.  How would you like to address this?  Do you want to examine the code or would it be better ot just do a test batch of songs? what is a good plan for addressing this?\
+\
+replace Kosmic Rhythm Vibraphone with Moog Lead\
+\
+\
+pleasse update the autoamted QA plan with instructions on how to create and run theste tests so that when we do a test later on for Ambient, we can get it working the first time.\
+\
+For issue 1, would it make sense to just not have Lead 1 and Lead 2 play at the same time?  This is the technique we used in Chill and Motorik.  So the leads are not overlapping at the same time.  Can you look at how we do that for Motorik and suggest a similar approach here for Kosmic?\
+ It's also fine if they have slightly overlapping MIDI ranges, though perhaps Lead 2 can skew a bit lower. But I am more concerned with overlapping ranges across Rhtyhm, Textures, Bass. \
+2. fix the clashes. Look for hard coded notes or not being snapped to scale.  \
+I'd like more detailed plans for the other items before addressing those.\
+\
+lets get the clash issues identifed and fixed. Please investigate which bass part was involved and figure out if its the bass or another instrument causing the clash. You did a lot of this kind of anlaysis previously looking at the MIDI and ZUdio files.\
+\
+\
+a song Zudio-Solaxe was created with \
+KOS-LEAD-006   Jean Michel Jarre evolving phrase\
+KOS-LEAD-003   Pentatonic Drift \'97 slow 5-note move\
+but there's no notes played by Lead 2\
+in bars 72-87 the Rhythm part\
+KOS-RTHM-007   Tangerine Dream pitch drift\
+seems to fill in for the lead, but maybe this was a lucky accident\
+\
+\
+Note a song Zudio-Solaxe was created with \
+KOS-LEAD-006   Jean Michel Jarre evolving phrase\
+KOS-LEAD-003   Pentatonic Drift \'97 slow 5-note move\
+but there's no notes played by Lead 2\
+in bars 72-87 the Rhythm part\
+KOS-RTHM-007   Tangerine Dream pitch drift\
+seems to fill in for the lead, but maybe this was a lucky accident\
+\
+I told you Lead 2 was silent the entire time. You can detect this by looking at the MIDI file also. When I point this out I want you to analyze the songs and then consider what changes do we need to make to rules to make things more musical.  Earlier you said you would implement some new logic so that lead 1 and lead 2 don't overlap. Is it possible you introduce a bug with that?\
+\
+examine the song Zudio-Ancient-Perihelion  the pads sound awful especially bars 20 - 35. it sounds like machinery scraping.  What has gone wrong with this? examine the Zudio and midi file. Is it clashing or just too low register?\
+\
+ok I want to go back to the items you identifed previously:\
+   Detailed Plans for the Other Issues (observation only for now)\
+please show me a detailed plan to address them.\
+\
+call Kosmic Lead 2 voice lead solo vox which sounds cooler \
+renove RX Crystal from Kosmic Rhythm.  Add Mogo Bass and Moog lead. \
+\
+I would like to come up with a new KOS-TEXT-002    different from what we have as "EB Shimmer Hold" which has long notes and I feel muddies up the sound. Give me a suggestion on a new type of texture that would be a short note pattern followed by a gap of many bars and then maybe a variatio of the pattern  more empty bars, then another variation and so on. What ideas do you have?\
+\
+\
+the KOS-TEXT-004   Loscil aquatic shimmer\
+is also pretty overpowering.   Lets vary it so that the full chord is played only occsionaly.  In most instances lets play just 1 or 2 notes from the chord in a simple sequence, e.g. a chord reveal in ascending, or in descending with 2 or 3 notes only. give me a plan. \
+\
+\
+The song Zudio-Weit-Aether  has a Lead 1 solo KOS-LEAD-006   Jean Michel Jarre evolving phrase that seems to occupy all the bars\
+examine the MIDI and the Zudio log file and determine if this is a bug or a desing issue, but we shoudl fix it. Its too dense and unreleanting. There needs to be some gaps in the lead 1 and possibly some variation in the pattern over time. \
+Similarly the bass and Pads \
+KOS-BASS-012   McCartney melodic drive\
+KOS-PADS-001   Eno long drone\
+never seemed to change in this song. \
+We must force some change occasionally otherwise its completely monotonous and repetitive.  Give me your ideas. 	}

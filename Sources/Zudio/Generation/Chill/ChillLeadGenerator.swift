@@ -20,7 +20,7 @@ struct ChillLeadGenerator {
         forceRuleID: String? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
-    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)]) {
+    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
         // CHL-LD1-005: St Germain staccato style — short bursts in active periods, long silences.
         // Used when beat style is stGermain (strongly) or occasionally for other styles.
         // Suppressed when a different rule is explicitly forced (best-first-song path).
@@ -32,7 +32,7 @@ struct ChillLeadGenerator {
                                            breakdownStyle: breakdownStyle, rng: &rng)
             // Build phraseOnsets from the events for Lead 2 call-and-response awareness
             let onsets = eventsToOnsets(events: events, totalBars: frame.totalBars)
-            return (events, onsets)
+            return (events, onsets, [])   // staccato already has long silences; no extra handoff
         }
 
         let ruleID = lead1RuleID(for: leadInstrument)
@@ -45,6 +45,29 @@ struct ChillLeadGenerator {
         let pentatonic  = pentatonicNotes(frame: frame)
         let blueNote    = blueNotePC(frame: frame)
         let (regLow, regHigh) = register(for: leadInstrument)
+
+        // Pre-compute handoff windows: 1–2 blocks of 4–6 bars in groove sections where LD1
+        // is forced silent so LD2 can take over. Placed in the middle portion of each section
+        // so they don't collide with section entrances or exits.
+        var handoffBarSet = Set<Int>()
+        let grooveSections = structure.sections.filter { $0.label == .A || $0.label == .B }
+        let windowCount = 1 + rng.nextInt(upperBound: 2)   // 1 or 2 windows
+        var sectionsUsed = Set<Int>()
+        for _ in 0..<windowCount {
+            let available = grooveSections.indices.filter { !sectionsUsed.contains($0) }
+            guard !available.isEmpty else { break }
+            let idx = available[rng.nextInt(upperBound: available.count)]
+            sectionsUsed.insert(idx)
+            let sec = grooveSections[idx]
+            let winLen = 4 + rng.nextInt(upperBound: 3)    // 4–6 bars
+            guard sec.lengthBars >= winLen + 6 else { continue }   // need room to breathe
+            // Place in the middle half of the section — avoid first and last quarters
+            let earliest = sec.startBar + sec.lengthBars / 4
+            let latest   = sec.endBar   - winLen - sec.lengthBars / 4
+            guard latest > earliest else { continue }
+            let winStart = earliest + rng.nextInt(upperBound: latest - earliest)
+            for b in winStart..<(winStart + winLen) { handoffBarSet.insert(b) }
+        }
 
         // Stop-time breakdown: cap solo bars at 4 or 6 to leave some odd bars silent
         let stopTimeSoloMax = rng.nextDouble() < 0.50 ? 4 : 6
@@ -111,6 +134,9 @@ struct ChillLeadGenerator {
                     break  // fall through to normal phrase generation
                 }
             }
+
+            // Handoff window: LD1 forced silent so LD2 can take the melody
+            if handoffBarSet.contains(bar) { bar += 1; continue }
 
             // Brass and blues leads occasionally "lay out" for a full 4 or 8 bars — jazz breathing room
             if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone),
@@ -182,7 +208,7 @@ struct ChillLeadGenerator {
             // Mandatory rest after phrase (CHL-RULE-06); Groove B rests capped at 1 bar to stay dense
             bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
         }
-        return (events, phraseOnsets)
+        return (events, phraseOnsets, handoffBarSet)
     }
 
     // MARK: - Lead 2
@@ -192,6 +218,7 @@ struct ChillLeadGenerator {
         structure: SongStructure,
         lead1Instrument: ChillLeadInstrument,
         lead1Onsets: [(startBar: Int, endBar: Int)],
+        handoffBars: Set<Int> = [],
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
@@ -244,9 +271,10 @@ struct ChillLeadGenerator {
             guard label == .A || label == .B else { bar += 1; continue }
             // Skip bars where Lead 1 is playing
             guard !lead1BarSet.contains(bar) else { bar += 1; continue }
-            // Section A: sparse (40%) — space for the groove to breathe in the first half.
-            // Section B: dense (80%) — Lead 2 most active in the second half (CHL-RULE-06 rebuild arc).
-            let responseProb: Double = label == .A ? 0.40 : 0.80
+            // Handoff window: LD2 strongly encouraged to fill bars LD1 was forced to skip.
+            // Normal: 40% in A (sparse), 80% in B (dense).
+            let responseProb: Double = handoffBars.contains(bar) ? 0.90
+                : (label == .A ? 0.40 : 0.80)
             guard rng.nextDouble() < responseProb else { bar += 1; continue }
 
             let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars

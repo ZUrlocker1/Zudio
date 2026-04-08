@@ -139,6 +139,118 @@ Steps:
 
 ---
 
+## Adding a New Style Batch Test (step-by-step)
+
+Use this checklist when adding a new style's batch test for the first time (e.g. Ambient).
+Learned the hard way with Kosmic — do all four steps before running anything.
+
+### Step 1 — Create the Swift test file
+
+Copy the closest existing batch test file as a template:
+
+```
+cp Tests/ZudioTests/KosmicBatchTests.swift Tests/ZudioTests/AmbientBatchTests.swift
+```
+
+Edit `AmbientBatchTests.swift`:
+- Rename the struct to `AmbientBatchTests`
+- Change `style: .kosmic` to `style: .ambient`
+- Change the output subdirectory to `batch-output/ambient`
+- Change the print header and `✓ Done` line to reference "Ambient"
+- Update the generation log tag prefix in the rule-ID print line (e.g. `AMB-LEAD`, `AMB-DRUM`)
+- Remove any style-specific fields that don't apply (e.g. Kosmic's `forceLeadRuleID` rotation)
+
+### Step 2 — Register the file in the Xcode project
+
+`xcodebuild` will silently compile only the files listed in `Zudio.xcodeproj/project.pbxproj`.
+A file that exists on disk but is not in the project will never be compiled or discovered.
+
+Open `Zudio.xcodeproj/project.pbxproj` and add three entries. Use IDs that are not already
+in the file (search for your chosen ID first to confirm it is free):
+
+**a) PBXBuildFile block** (around line 88, near the other batch test build file entries):
+```
+TT000000000000000000010 /* AmbientBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000010 /* AmbientBatchTests.swift */; };
+```
+
+**b) PBXFileReference block** (around line 174, near the other batch test file references):
+```
+UU000000000000000000010 /* AmbientBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBatchTests.swift; sourceTree = "<group>"; };
+```
+
+**c) PBXGroup children list** (around line 220, the `ZudioTests` group `children` array):
+```
+UU000000000000000000010 /* AmbientBatchTests.swift */,
+```
+
+**d) PBXSourcesBuildPhase files list** (around line 589, the `Sources (ZudioTests)` build phase `files` array):
+```
+TT000000000000000000010 /* AmbientBatchTests.swift in Sources */,
+```
+
+**ID collision warning:** `TT000000000000000000004` is already taken by `Zudio.app in Frameworks`.
+Always grep for your chosen ID before using it:
+```
+grep "TT000000000000000000010" Zudio.xcodeproj/project.pbxproj  # should return nothing
+```
+
+Current safe IDs to use (confirmed unused as of 2026-04-07):
+- File reference: `UU000000000000000000010`
+- Build file: `TT000000000000000000010`
+
+### Step 3 — Create the analyzer script
+
+Copy the most relevant analyzer as a template:
+```
+cp tools/kosmic_analyze.py tools/ambient_analyze.py
+```
+
+Update the thresholds, track names, and section logic for the new style.
+Update `tools/run_loop.sh` to add the new style case.
+
+### Step 4 — Verify before running
+
+```bash
+# Confirm the file is in the project (should print 3 lines)
+grep "AmbientBatchTests" Zudio.xcodeproj/project.pbxproj
+
+# Confirm no Zudio app is running (LSMultipleInstancesProhibited blocks the test runner)
+pgrep -la Zudio  # should return nothing
+
+# Build only first — confirms compilation succeeds before running
+xcodebuild build-for-testing -scheme Zudio -destination 'platform=macOS,arch=arm64' 2>&1 | tail -3
+
+# Confirm the suite was compiled into the binary
+nm ~/Library/Developer/Xcode/DerivedData/Zudio-*/Build/Products/Debug/Zudio.app/Contents/PlugIns/ZudioTests.xctest/Contents/MacOS/ZudioTests | grep -i "Ambient"
+# Should print multiple symbols — if empty, the file was not compiled (check step 2)
+
+# Run the batch
+xcodebuild test -scheme Zudio -destination 'platform=macOS,arch=arm64' \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  -only-testing:ZudioTests/AmbientBatchTests \
+  2>&1 | grep -E "=== Gen|ambient_| [0-9]+\.|BPM|passed|FAILED"
+```
+
+### Known gotchas
+
+- **`-only-testing` with 0 tests:** If xcodebuild says "Executed 0 tests" and SUCCEEDED, the
+  suite was not compiled into the binary. Go back to Step 2 and verify all four entries were
+  added and that the IDs are not duplicates of existing entries.
+
+- **LaunchServices error -1712:** Zudio.app is already running. The app has
+  `LSMultipleInstancesProhibited = true` so the test runner cannot launch a second instance.
+  Quit the app before running tests.
+
+- **Suite-level filter only:** Use `-only-testing:ZudioTests/AmbientBatchTests` (suite name
+  only, no slash after). Adding the test function name (e.g. `/generateAmbientBatch`) silently
+  drops all tests — a known limitation of Swift Testing `@Test` with xcodebuild's filter.
+
+- **Don't run from Xcode IDE during Claude sessions:** If Claude has accidentally launched
+  Zudio.app as a subprocess (e.g. during diagnostics), the process may be unkillable from
+  within Claude's sandbox. Use `pgrep Zudio` to check and `kill <PID>` from your own terminal.
+
+---
+
 ## Quality Metrics
 
 ### Tonal Clash (existing, extended)
@@ -507,10 +619,16 @@ A dedicated test target (ZudioTests) was added to the Xcode project in Round 1. 
 
 ```
 xcodebuild test -scheme Zudio -only-testing:ZudioTests/MotorikBatchTests
-python3 tools/analyze_zudio.py tools/batch-output/motorik/
+cd tools/batch-output/motorik && python3 ../../analyze_zudio.py *.MID
 ```
 
+Or use the orchestration script: `bash tools/run_loop.sh motorik`
+
 Output goes to `tools/batch-output/motorik/`. The test generates 10 songs by default.
+
+**Note:** `LSMultipleInstancesProhibited` is set in the app's Info.plist. If the Zudio app
+is running when you invoke xcodebuild test, the test runner will fail with LaunchServices
+error -1712. Quit the app first.
 
 Generate at least 20 songs per round (Motorik is fast). The golden corpus should include 5
 fixed seeds covering different lead rule IDs and at least one song with an X-Files whistle
@@ -649,3 +767,95 @@ unflagged with 35% threshold. **No code changes.**
 Zero `!!` flags across a 20-song batch, with the golden corpus showing no regressions from
 the prior round. The `~~ MOT-NO-BRIDGE` warning is acceptable if variety is present in
 other dimensions.
+
+---
+
+## Kosmic Style QA Loop
+
+Kosmic (Berlin School) is the most harmonically complex Zudio style. Its signature is long,
+evolving synth textures with slow chord movement and multiple overlapping layers. The QA loop
+targets three known problem areas: tonal clashes from mode confusion, register overlap between
+dense layers, and simultaneous density (too many tracks playing at full strength at once).
+
+### Running the Kosmic Loop
+
+```
+xcodebuild test -scheme Zudio -only-testing:ZudioTests/KosmicBatchTests
+cd tools/batch-output/kosmic && python3 ../../kosmic_analyze.py *.MID
+```
+
+Or use the orchestration script: `bash tools/run_loop.sh kosmic`
+
+Output goes to `tools/batch-output/kosmic/`. The test generates 10 songs by default.
+The `kosmic_analyze.py` script is at `tools/kosmic_analyze.py`.
+
+### Kosmic-Specific Checks
+
+**Tonal Clash (tighter thresholds than other styles)**
+
+Kosmic layers are long sustained notes — a single wrong pitch class rings for many bars.
+Thresholds are tighter than the default because errors are more audible:
+
+- `!! KOS-BASS-CLASH` — Bass clash > 5% (root-anchored; should be very clean)
+- `!! KOS-PADS-CLASH` — Pads clash > 8% (sustained chords; wrong notes are very obvious)
+- `!! KOS-RTHM-CLASH` — Rhythm clash > 12% (arpeggios; some passing tones OK)
+- `!! KOS-LEAD-CLASH` — Lead 1 / Lead 2 clash > 15% (modal solos; some blue notes OK)
+- `!! KOS-TEXT-CLASH` — Texture clash > 25% (intentional chromatic content allowed)
+
+Known fixed bugs (do not flag these):
+- B-section bVI chord clash: fixed 2026-04-07. Root cause was `section.mode` (could be
+  Aeolian) used for chord selection instead of `frame.mode`. Fix: always use `frame.mode`.
+
+**Register Overlap**
+
+Expected register ranges per track (MIDI note numbers):
+- Bass: 40–55 (E2–G3)
+- Texture: 33–59 (A1–B3)
+- Rhythm (Arpeggio): 55–72 (G3–C5)
+- Pads: 36–72 (C2–C5)
+- Lead 1 / Lead 2: 60–96 (C4–C7)
+
+Flag `!! KOS-REGISTER-CLASH` if two non-bass tracks share > 70% of their actual note range.
+Checked for pairs: Rhythm/Pads, Rhythm/Texture, Pads/Bass, Texture/Bass, Lead2/Lead1.
+
+**Simultaneous Density**
+
+Kosmic songs feel muddy when too many tracks play at full density simultaneously.
+At each MIDI tick, count how many tracks have a note currently sounding:
+
+- `!! KOS-DENSE-BAR` — any bar has > 4 tracks simultaneously active for > 50% of its duration
+- `!! KOS-DENSE-PEAK` — max simultaneous note count (all tracks combined) exceeds 12 at any tick
+- Report: max simultaneous tracks, average simultaneous tracks per bar
+
+**Section Arc**
+
+B sections should be denser than A sections (the song should have a build):
+- `!! KOS-NO-BUILDUP` — B-section total notes/bar ≤ A-section total notes/bar (no arc)
+- Report notes/bar per track broken down by A vs B section
+
+### Kosmic Density Targets (reference)
+
+Body sections, notes/bar:
+- Lead 1: 1.5–5.0 notes/bar
+- Lead 2: 0.5–4.0 notes/bar
+- Rhythm: 1.0–6.0 notes/bar
+- Bass: 0.5–3.0 notes/bar
+- Pads: 0.3–2.0 notes/bar (sustained voicings, low event count)
+- Texture: 0.1–1.5 notes/bar (very sparse; mostly atmosphere)
+
+### Kosmic Golden Corpus Seeds
+
+Target 5 seeds selected after listening review, covering:
+- At least two different modes (Dorian and Aeolian minimum)
+- At least one song with a bridge section
+- At least two different Lead 1 rule IDs
+
+### Round 1 — to run
+
+Run the batch, analyze with `kosmic_analyze.py`, and listen to all 10 songs.
+Focus: tonal clashes, muddy texture, register overlap.
+
+### Done Condition (Kosmic)
+
+Zero `!!` flags in the tonal clash section; register overlap below threshold in ≥ 8/10
+songs; simultaneous density ≤ 4 tracks in all body bars.
