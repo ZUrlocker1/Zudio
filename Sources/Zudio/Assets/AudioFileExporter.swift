@@ -99,7 +99,7 @@ struct AudioFileExporter {
     // Must run on main thread (NSImage/NSGraphicsContext are main-thread-only).
     @MainActor
     private static func appIconPNGData() -> Data? {
-        let paths = ["assets/zudio-icon.icns", "Resources/assets/zudio-icon.icns"]
+        let paths = ["assets/images/zudio-icon.icns", "Resources/assets/images/zudio-icon.icns"]
         var img: NSImage?
         if let base = Bundle.main.resourceURL {
             for p in paths {

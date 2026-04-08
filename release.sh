@@ -69,13 +69,13 @@ xcodebuild \
 # ---------------------------------------------------------------------------
 echo ""
 echo "==> [2/7] Fixing icon path in bundle..."
-ICON_SRC="${APP_SRC}/Contents/Resources/assets/zudio-icon.icns"
+ICON_SRC="${APP_SRC}/Contents/Resources/assets/images/zudio-icon.icns"
 ICON_DST="${APP_SRC}/Contents/Resources/zudio-icon.icns"
 if [ -f "${ICON_SRC}" ] && [ ! -f "${ICON_DST}" ]; then
     cp "${ICON_SRC}" "${ICON_DST}"
 fi
 
-DOC_ICON_SRC="${APP_SRC}/Contents/Resources/assets/zudio-doc.icns"
+DOC_ICON_SRC="${APP_SRC}/Contents/Resources/assets/images/zudio-doc.icns"
 DOC_ICON_DST="${APP_SRC}/Contents/Resources/zudio-doc.icns"
 if [ -f "${DOC_ICON_SRC}" ] && [ ! -f "${DOC_ICON_DST}" ]; then
     cp "${DOC_ICON_SRC}" "${DOC_ICON_DST}"

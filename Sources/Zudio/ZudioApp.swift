@@ -107,7 +107,7 @@ struct ZudioApp: App {
             NSApp.activate(ignoringOtherApps: true)
             // Set dock icon from bundled assets (works for both Xcode and make run)
             if let url = Bundle.main.resourceURL?
-                .appendingPathComponent("assets/images/icon/zudio-icon.icns"),
+                .appendingPathComponent("assets/images/zudio-icon.icns"),
                let icon = NSImage(contentsOf: url) {
                 NSApp.applicationIconImage = icon
             }

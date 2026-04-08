@@ -73,6 +73,12 @@ final class PlaybackEngine: ObservableObject {
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
 
+    // Endless mode callbacks — set by AppState.init(); both called on main actor.
+    var onApproachingEnd:   (() -> Void)? = nil
+    var onSongEndNaturally: (() -> Void)? = nil
+    // Set to true once the approaching-end callback fires; reset on load() and seek().
+    private var approachingEndFired = false
+
     // Kosmic drone fade (intro 0→1, outro 1→0 on boosts[bass] and boosts[pads])
     var kosmicStyle: Bool = false
     private var droneFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
@@ -174,6 +180,7 @@ final class PlaybackEngine: ObservableObject {
 
     func load(_ state: SongState) {
         songState = state
+        approachingEndFired = false
         buildStepEventMap(state: state)
         // Cancel any in-progress note fades before restoring volumes.
         stopAmbientNoteFades()
@@ -410,6 +417,18 @@ final class PlaybackEngine: ObservableObject {
                     }
                 }
             }
+            // Endless: fire approaching-end 8 bars before Outro starts (or immediately for short songs).
+            // approachingEndFired resets on load() and seek() so it fires exactly once per song.
+            if let cb = self.onApproachingEnd, !self.approachingEndFired,
+               let state = self.songState {
+                let totalBars  = state.frame.totalBars
+                let outroStart = state.structure.outroSection?.startBar ?? totalBars
+                let triggerStep = max(0, outroStart * 16 - 192)  // 12 bars = 192 steps
+                if step >= triggerStep || (step == 0 && totalBars < 16) {
+                    self.approachingEndFired = true
+                    cb()
+                }
+            }
         }
     }
 
@@ -427,6 +446,7 @@ final class PlaybackEngine: ObservableObject {
             self.stopKosmicDroneFades()
             self.stopMotorikFades()
             self.stopAmbientNoteFades()
+            self.onSongEndNaturally?()
         }
     }
 
@@ -436,6 +456,7 @@ final class PlaybackEngine: ObservableObject {
         guard let state = songState else { return }
         let totalSteps = state.frame.totalBars * 16
         let clampedStep = max(0, min(newStep, totalSteps - 1))
+        approachingEndFired = false
         if isPlaying {
             scheduler?.stop()
             scheduler = nil

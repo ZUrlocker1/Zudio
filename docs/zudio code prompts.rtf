@@ -1168,7 +1168,6 @@ Do not run a test batch until I tell you to.\
 \
 Turn off comp and Low effects on drums for chill default. Is there another sugestion for effects on bass other than Low filter. That doesn't seem to do much.  Otherwise, just add the Boost off by default. \
 \
-\
 for chill intro and outro bass parts, please base them on the actual bass rule for the main section of the song. They can be simplified versions of those parts, but not just boring single repeated same pitch notes.\
 for Bar 033        Breakdown  4 bars \'97 bass ostinato\
 there needs to be a sense of ongoing momentum from regular high hats or continuation of the rhythn track.\
@@ -1191,38 +1190,11 @@ f i wanted to run  an automated qa test loop for motorik add a new section to th
 \
 ok run a test batch of 10 songs but give me a report and plan before making any changes to the rules or code\
 \
-\
-\
-**********\
-\
-\
-Here are all tracks with more than 4 instrument choices:\
-\
-Lead 1\
-\
-Ambient: 9 (Flute, Ocarina, Pan Flute, Whistle, Recorder, Brightness, Halo Pad, New Age Pad, Calliope Lead)\
-Motorik (default): 7 (Square Lead, Mono Synth, Synth Brass, Synth Brass 2, Fifths Lead, Moog Lead, Overdrive Gtr)\
-Lead 2\
-\
-Ambient: 7 (Vibraphone, Celesta, Glockenspiel, Grand Piano, Warm Pad, Space Voice, FX Atmosphere)\
-Pads\
-\
-Ambient: 8 (String Ensemble, Choir Aahs, Synth Strings, Bowed Glass, Warm Pad, Halo Pad, New Age Pad, Sweep Pad)\
-Motorik (default): 8 (Warm Pad, Halo Pad, New Age Pad, Sweep Pad, Bowed Glass, Synth Strings, String Pad, Organ Drone)\
-Kosmic: 5 (Choir Aahs, String Ensemble, Synth Strings, Warm Pad, Space Voice)\
-Rhythm\
-\
-Ambient: 7 (Vibraphone, Marimba, Tubular Bells, Glockenspiel, FX Crystal, FX Echoes, Church Organ)\
-Motorik (default): 7 (Guitar Pulse, Wurlitzer, Rock Organ, Clavinet, Rhodes, Muted Guitar, Mono Synth)\
-Kosmic: 5 (FX Crystal, Vibraphone, Wurlitzer, Church Organ, Tremolo Strings)\
-Texture\
-\
-Chill: 7 (None + 6 audio files)\
-Ambient: 7 (String Ensemble 2, Bowed Glass, Choir Aahs, Space Voice, FX Atmosphere, Sweep Pad, Pad 3 Poly)\
-Motorik (default): 6 (Halo Pad, Warm Pad, Space Voice, Swell, FX Atmosphere, FX Echoes)\
-Would you like to trim any of these down?\
-\
-\
+
+\f0\b Instrument updates\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 \
 Remove square lead, overdrive guitar from Motorik Lead 1. \
 Remove New age pad, string pad  from Motorik pads.\
 Remove Clavinet, Mono Synth from Motorik Rhythm.\
@@ -1233,9 +1205,16 @@ Remove Tremolo strings from Kosmic Rhythm\
 Remove String ENsemble from Kosmic pads\
 Remove String Ensemble from Ambient pads.\
 Remove String Ensemble, Space Voice from Ambient texture. \
-\
 when rhodes is selected for Chill rhythm increase the volume \
+remove warm pad from Motorik Pads\
+Make Guitar pulse  the first default instrument for Motorik Rhythm\
+Remove Moog lead from Motorik Lead 1. \
+Remove rock organ from Motorik Rhtyhm.  Add Moog lead to Motorik Rhythm. \
 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 Back to Music
+\f2\b0 \
 the MOT-PADS-003   is also very dense.  Please look for ways to have the pads step out for a while and or vary the pattern as with other motorik pads \
 \
 the lead part MOT-LD1-002    Pentatonic cell  often has very short notes. Please have it occasionally play slightly longer notes. it can\'92t be all 16th notes. \
@@ -1244,25 +1223,8 @@ the slong Klein Bahn in the Zudio folder had a MOT-LD1-008    Visiting solo  but
 \
 when CHL-LD1-007  Wide interval solo  or CHL-LD1-004    Blues lead is used, for long phrases of more than 7 notes, please drop one or two notes to break it into 2 slightly shorter phrases with a brief reset in between\
 \
-I\'92d like the reset button to make it like we just started the app:\
--reset to the original default song style (currently Chill) \
--clear the current song so the MIDI grid area is empty\
--reset audio so that if I connect a new headphones or bluetooth it picks it up \
--reset as if we have not played any songs (e.g. so that the first best songs play for each style)\
-is there anything else reset should do to put it in a clean state?\
-\
-what needs to be done for the mac special play / stop, go to end, go to beginning kesy in the keybard to work automatically with Zudio\
-yes go ahead and implement it and verify the code is good\
-make sure it doesn't break any existing hot keys like space, B, Z, the buttons etc\
-\
-remove warm pad from Motorik Pads\
-\
 list all the Motorik Lead 1 rules with their descriptions and percentage.  Which of these seems the leeast effective in terms of melody that we could consider replacing with a new more melodic rule like from Chill. \
 \
-Make Guitar pulse  the first default instrument for Motorik Rhythm\
-\
-Remove Moog lead from Motorik Lead 1. \
-Remove rock organ from Motorik Rhtyhm.  Add Moog lead to Motorik Rhythm. \
 Then lets imoprove \
 MOT-LD1-006    Long arc as follows. It\'92s too boring, so whenever it has more than 4 descending notes generated in a row use some different notes to go back.  \
 then lets create a completely new MOT-LD1-003 using ideas from Chilll. This should be new code, not reusing any existing code, just the ideas.  I want something that works like CHL-LD1-002    Short punch  but with a maximum of 6 notes.  Very long gaps 4 to 8 bars in between different solos.  Adjust the scale as appropriate. \
@@ -1301,7 +1263,6 @@ please verify that the code for determining a new starting point of the chill te
 \
 use the same offset for playing the audio track as for displaying it, e.g. 0, 15, 30 or 45 seconds into the audio track\
 \
-\
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\b \cf0 Improving Kosmic
@@ -1322,7 +1283,6 @@ I'd like more detailed plans for the other items before addressing those.\
 \
 lets get the clash issues identifed and fixed. Please investigate which bass part was involved and figure out if its the bass or another instrument causing the clash. You did a lot of this kind of anlaysis previously looking at the MIDI and ZUdio files.\
 \
-\
 a song Zudio-Solaxe was created with \
 KOS-LEAD-006   Jean Michel Jarre evolving phrase\
 KOS-LEAD-003   Pentatonic Drift \'97 slow 5-note move\
@@ -1330,7 +1290,6 @@ but there's no notes played by Lead 2\
 in bars 72-87 the Rhythm part\
 KOS-RTHM-007   Tangerine Dream pitch drift\
 seems to fill in for the lead, but maybe this was a lucky accident\
-\
 \
 Note a song Zudio-Solaxe was created with \
 KOS-LEAD-006   Jean Michel Jarre evolving phrase\
@@ -1379,4 +1338,130 @@ if the BPM selector has the focus, then if I click anywhere else in the grey are
 \
 There is a weird bug. I can reproduce it but it\'92s hard to explain. When I do a reset (with the reset button), if I generate a Kosmic song, the firs ttime the song generates fine. It uses Brush kit drums. But the playback of the Brush kit drums is muffled, Some notes (possibly the snare) sound very distorted.  if I change the kit to a different one and then back to Brush kit its fixed and playing properly.  The same thing happens with Chill which also starts with Brush kit. In the case of chill sometimes all the tracks are muffled. Until I change the instrument for a track (and change it back) it is muffled.  I wonder if this is related to some of the default effects on these tracks. \
 \
-give me a plan based on the existing optimization-plan to optimize generation code and playback code to eliminate any O(n) code or any inner loop code that can be improved or removed from the loop. The goal is to reduce CPU demand.}
+I\'92d like the reset button to make it like we just started the app:\
+-reset to the original default song style (currently Chill) \
+-clear the current song so the MIDI grid area is empty\
+-reset audio so that if I connect a new headphones or bluetooth it picks it up \
+-reset as if we have not played any songs (e.g. so that the first best songs play for each style)\
+is there anything else reset should do to put it in a clean state?\
+\
+what needs to be done for the mac special play / stop, go to end, go to beginning kesy in the keybard to work automatically with Zudio\
+yes go ahead and implement it and verify the code is good\
+make sure it doesn't break any existing hot keys like space, B, Z, the buttons etc\
+\
+give me a plan based on the existing optimization-plan to optimize generation code and playback code to eliminate any O(n) code or any inner loop code that can be improved or removed from the loop. The goal is to reduce CPU demand.\
+\
+\
+
+\f0\b Ambient improvements
+\f2\b0 \
+if we wanted to run a test loop for ambient what would we look for besides tonal clashes? the normal rules of density or reptition might not make sens efor this style. Give me your ideas.\
+\
+yes build a plan. be sure you know how to run it automatically and registered the functions in the project etc\
+\
+tell me about the different random scale and keys for ambient\
+\
+so is d 23% that seems too much. please make it more even across D G C A.  \
+For mood reduce Dream and Deep a bit to add more to Free and Bright.\
+Make Drone two 30% and Drone single 25%\
+Make mid pulse  15% and Beatless 50%\
+\
+list the instruments for ambient pads and textures identifying duplicates in bold. we may want to eliminate some duplicates.\
+\
+what are the loop lengths for each of the tracks in ambient\
+\
+although this is peculiar only to Ambient, I think it would be good to record in the Zudio file for Ambient what are the actual loop lengths that have been selected and write that in the structure section eg. \
+--- Structure ---\
+  A          Bars   1\'96 56         (56 bars)\
+ Lead 1 loop: 5\
+ Lead 2 loop: 7\
+ Pads loop: 11\
+ Rhythm loop: 13 \
+and so on. \
+That way we can analyze this in the qa test automated loop.   I am concerned that several tracks might have the same loop length resulting in a lack of variation.\
+\
+Its not a good idea that pads match bass loop length since they lock in. can you identify why that decision was made?  I would think they should be independent.\
+\
+This is a bit unclear. Yes, we want bass to follow (or define) the chord progression.  But within that constraint it should still have a distinct loop length.  As long as the chord change happens somewhere in the vicinity of the section change its ok. Can you figure out a good solution?\
+\
+be sure the test plan looks at the loop lengths to identify problems\
+\
+lets make sure the plan checks if any part repeats exactly for the entire duration, eg, a single note in texture or similar\
+\
+lets also look for density problems where density for ambient means all instruments (ignore drums) fire during a 4 bar sequence. Or where an instrument plays in every 4 bar sequence\
+\
+ok lets run the qa test loop on 20 ambient songs. run it automatically and make sure everything runs. check the instructions on how to run in the automated qa loop document\
+\
+make sure the essential elements of the ambient QA quality tests (in terms of genre specific rules and testing) are cpatured in the automated quality loop doc\
+\
+lets first fix all tonal clashes whether pads, bass, rhythm or elsewhere. Then we will pursue ech of the other items.\
+\
+give me your ideas on how to fix the relentless issue. I am open to suggestions. but don't code it until I say so.\
+\
+ok lets follow your recommendation. implement it and then I will test it.  \
+But before coidng, consider this: I was thinking is that when an Ambient song starts, if it has active (not absent) parts for pads, bass, rhythm, then we should just delay the start of one of those to no sooner than bar 12  and also have that same instrument drop out for the last 12 bars.  Is that idea necessary if we implement your recommendation or is it overkill?\
+\
+yes that's working.  now lets implement an additional thing. When we have bass, pads, rhythm all active (none absent) please arbitrarily choose one of the instruments is silent for the first 12 and last 12 bars.   \
+\
+\
+examine the song Zudio-Tears-of-a-First-Time-Angel-Investor. There are occasions where there are no instruments (other than drums) playing.  e.g. bars 9-14 33-40. We need to prevent that. This is a side effect of our recent changes to have instruments drop out I think.\
+\
+there is a similar issue with Zudio-The-Load-Bearing-Capacity-of-a-Lukewarm-Radiator bars 20-23\
+\
+add a check in the qa test loop automation for ambient to detect any silent bars. More than 1 bar of silence (no instruments) is a problem \
+\
+lets fix 1 total silence first\
+fix the lead deadzone issue especially make sure that AMB-LEAD-009 and 010 play in their entirety and are never suppressed.\
+\
+please review each of the style specific plans for Ambient, Chill, Kosmic, Motorik.  if they reference the instruments for the tracks (Lead, bass, rhythm etc) please be sure these use the latest up-to-date values.  Delete anything out of date.  Minimal details\
+\
+\
+
+\f0\b Continuous Play mode
+\f2\b0 \
+lets look at the continuous play doc.  I want to phase the implementation into 2 parts. The first part is to build the "Endless" mode of playing songs.  Then later, if it works, we may optionally build the evolution mode.\
+\
+make sure it includes all 4 music styles.  We can move between styles along a continuum. e.g. Ambient <-> Chill -> Kosmic <- > Motorik \
+In endless mode,  I want to randomly determien the style of the next song. We can play no more than 3 songs in a given style.  but randomly we can move "to the left" one style or "to the right" one style. Ambient can only move to Chill though.  And Motorik can only move to Kosmic.  Revise the plan so this is clear and unambiguous.\
+\
+note that we want a Mode selector with 2 choices Song and Endless. Put icons to the left of the words.  Make the selector similar to the style selector so its grey default even on OS 26.  Put the Mode selector below the transport controls and centered horizontally\
+\
+if we are at the beginning of a song and the user presses the back button, reload the previous song if there is one. Therefore be sure to keep note of the seed so it can be regenerated if necessary.  YOu'll need to keep track of all the generated seeds. But we can put a hard limit of just remembering the last 10 songs. Add this to the document. Any questions on that ?\
+\
+A couple of adjustments.  if the playhead is anywhere in the first bar, have go back relaod the previous song. (Not just at bar zero.)\
+ALso the play mode selectro (Song, Endless) should appear immediately below the Transport controls in that Hstack.\
+\
+if the user changes the player mode from Endless to Song while a song is playing, be sure to stop when the song ends. Do not generate a new song or play it. \
+\
+If the user changes the player mode from Song to Endless while a song is playing, be sure to generate a new song and cue it up to play automatically when the current song ends. \
+\
+can you put icons in the Play mode selector for Song and Endless to the left of the words?\
+\
+lI'm not seeing the icons.  Also, in endless mode, genrate the new song when you are 12 bars from the end and update the status at that time\
+\
+make the new mode selector use the same font size and height as the Reset button. Also use a blue color that matches the effects buttons.\
+\
+The blue color doesn't seem to match the blue from the effects buttons which is slightly darker. \
+Lets change the status messages from:\
+Endless        Up next: Chill song Slow Exposure\
+Endless        Rewind: back to Chill song Three AM Etude\
+to \
+Up next       Chill - Slow Explosure \
+Rewind        Chill - Three Am Etude\
+and so on.\
+There's also an issue where I get the message \
+Endless        Up next: Chill song Dark Honey\
+very early like in Bar 1 rather than waiting until we are 12 bars from the end\
+\
+if I hit the next track button while playing, be sure to immediatley show the approopriate Up next message in the status text area\
+\
+I'm thinking there might be a chance that we get stuck at either continuum with too much Ambient and Chill or too much Kosmic and Motorik.  So I suggest we add a bit of an escape valve. What do you think of introducing a 15% probability from Ambient that we go to Kosmic. And a 15% probability that we go from Motorik to Chill?  \
+\
+note that I don't want the Play mode selector (Song, Endless) to use the System blue (which is very bright) I want it to use the exact shade of blue used for the Effects buttons such as Reverb and Delay when they are on.\
+\
+I notice with the Play mode selector I need to click exactly on the text for Song or Endless.  So sometimes I click in the grey area that is part of the button but there's no text and it doesnt register as a click. Is there a way to make sure even if I click outside the text it still registers as a click to change the mode?\
+\
+lets make the up next and rewind messages consistent with the SONG messages in the status bar area, e.g. White text and Yellow for the song title.\
+\
+\
+}

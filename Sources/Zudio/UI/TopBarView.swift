@@ -101,7 +101,7 @@ struct TopBarView: View {
                                 .background(Color.orange)
                                 .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
-                        Text("V 0.98 alpha")
+                        Text("V 0.99 alpha")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                     }
@@ -133,7 +133,8 @@ struct TopBarView: View {
 
                 Divider()
 
-                // Transport — ⏮ ◀ ▶ ■ ▶ ⏭
+                // Transport — ⏮ ◀ ▶ ■ ▶ ⏭ + mode selector below
+                VStack(spacing: 0) {
                 HStack(spacing: 4) {
                     // Jump to start
                     Button(action: { appState.seekToStart() }) {
@@ -202,17 +203,64 @@ struct TopBarView: View {
                         )
                         .help("Forward 1 bar (hold: forward 2 bars repeatedly)")
 
-                    // Jump to end
-                    Button(action: { appState.seekToEnd() }) {
+                    // Jump to end (Song mode) / Skip to next song (Endless mode)
+                    Button(action: {
+                        if appState.playMode == .endless {
+                            appState.skipToNextSong()
+                        } else {
+                            appState.seekToEnd()
+                        }
+                    }) {
                         Image(systemName: "forward.end.fill")
                             .foregroundStyle(.primary)
                     }
                     .disabled(appState.songState == nil)
-                    .help("Go to end (stops playback)")
+                    .help(appState.playMode == .endless ? "Skip to next song" : "Go to end (stops playback)")
                 }
                 .font(.callout)
                 .padding(.vertical, 8)
                 .background(FirstMouseFix())
+
+                // Mode selector: Song / Endless — font/height matches Reset button; blue active = effects buttons
+                HStack(spacing: 0) {
+                    Button { appState.playMode = .song } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "music.note")
+                            Text("Song").fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 22)
+                        .background(appState.playMode == .song ? Color(red: 0.18, green: 0.42, blue: 0.78) : Color.clear)
+                        .foregroundStyle(appState.playMode == .song ? Color.white : Color.primary)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Rectangle()
+                        .fill(Color(NSColor.separatorColor))
+                        .frame(width: 0.5, height: 22)
+                    Button { appState.playMode = .endless } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "infinity")
+                            Text("Endless").fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 22)
+                        .background(appState.playMode == .endless ? Color(red: 0.18, green: 0.42, blue: 0.78) : Color.clear)
+                        .foregroundStyle(appState.playMode == .endless ? Color.white : Color.primary)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .font(.callout)
+                .frame(width: 200)
+                .background(Color(NSColor.controlColor))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5))
+                .padding(.bottom, 5)
+                .onChange(of: appState.playMode) { _ in
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                }
+                } // end VStack (transport + mode selector)
 
                 Divider()
 
@@ -285,6 +333,8 @@ struct TopBarView: View {
                             .tint(Color(NSColor.systemGray))
                             .font(.system(size: 11))
                             .frame(width: 230)
+                            .disabled(appState.playMode == .endless)
+                            .opacity(appState.playMode == .endless ? 0.5 : 1.0)
 
                             Button(action: { appState.resetTrackDefaults() }) {
                                 Label {
@@ -401,7 +451,7 @@ private func loadLogoImage() -> NSImage? {
 }
 
 private func loadAppIcon() -> NSImage? {
-    let paths = ["assets/zudio-icon.icns", "Resources/assets/zudio-icon.icns"]
+    let paths = ["assets/images/zudio-icon.icns", "Resources/assets/images/zudio-icon.icns"]
     if let base = Bundle.main.resourceURL {
         for path in paths {
             let url = base.appendingPathComponent(path)
@@ -433,7 +483,7 @@ struct HelpView: View {
                 Text("Zudio generates Ambient, Chill, Kosmic and Motorik inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Mood, Key, and BPM to shape the result.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use endless mode to play continuously.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
@@ -479,12 +529,12 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
             Divider()
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.98 (alpha)").font(.system(size: 14))
+                Text("Version: 0.99 (alpha)").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Continuous playback, improved sound and an iPad version coming soon. Maybe.").font(.system(size: 14))
+                Text("iPad version and improved sound coming soon. Maybe.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()

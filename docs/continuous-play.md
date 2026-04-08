@@ -1,225 +1,149 @@
 
 # Continuous Play Mode
 
-## Context
+## Phasing
 
-Zudio normally generates one song at a time. Continuous play adds two automatic modes that keep music flowing: **Evolve** (continuous within one style, with songs that gradually mutate) and **Endless** (automatic style shifts, Zudio chooses what comes next). The original "continuous play" design covering crossfade mechanics and the macro evolution schedule is now Mode 2 (Evolve) in this three-mode system.
-
----
-
-## Three Modes
-
-- **Song** — existing behaviour, unchanged. One song at a time, manual generation.
-- **Evolve** — continuous play within one style. Songs evolve across transitions; style selector sets starting style and locks during play.
-- **Endless** — continuous play with automatic style shifts. Zudio moves between styles using its own logic; style selector becomes a read-only indicator showing the current style.
-
-A segmented control **Song / Evolve / Endless** sits in the top bar near the existing style selector.
+- **Phase 1 — Endless**: automatic back-to-back play with style shifts. Each song is fully fresh. ✅ Built.
+- **Phase 2 — Evolve** (deferred): within-song evolution passes and between-song track copying/mutation. Only if Phase 1 works well.
 
 ---
 
-## Research Background
+## Phase 1: Endless Mode
 
-**Brian Eno (Music for Airports):** The key insight is *constrained non-repetition* — elements loop at different lengths so their intersections never repeat. Applied here: don't change everything at once across transitions; change different things at different rates so the listener can never predict the next state.
+### What it does
 
-**Jean-Michel Jarre (EON):** Decomposes music into modular elements (beats, bass, melody, texture) that recombine continuously. Layers evolve independently at different rates — the beat may stay stable for many cycles while melodies change every cycle. This is exactly what the evolution schedule below implements.
+Zudio plays songs one after another without stopping. After each song it picks the next style automatically, pre-generates the next song in the background, and transitions through the natural Outro/Intro of adjacent songs.
 
-**Motorik and electronic music evolution:** Gradual parametric mutation — drum patterns evolve via syncopation, ghost-note density, fill placement rather than wholesale replacement. The existing `DrumVariationEngine` and `PatternEvolver` already do this within a song; the challenge is across songs.
+Every transition is **full fresh** — no track copying, no evolution. Tempo and key reset to style defaults each time.
 
----
+### Mode selector
 
-## Mode 2: Evolve
+A two-segment control placed **immediately below the transport controls**.
 
-Two-tier evolution: **within-song** (micro) and **song-to-song** (macro).
+Segments (icon left of label):
+- 🎵 **Song** — existing behaviour, unchanged
+- ∞ **Endless** — continuous automatic play
 
-### Micro: within-song evolution passes
+Uses a custom button-pair control (not SwiftUI Picker) so SF Symbol icons render correctly on macOS. Blue active color matches the track effects buttons. Font and height match the Reset button.
 
-The main body of the song plays in full — whatever structure the style uses (Motorik and Ambient are mostly a single A section; Kosmic uses a variety: Evolving A, A-B, A-B-B-A, A-B-Bridge, etc.). Instead of playing the Outro, the song evolves by replaying the main body sections with:
-- **Regenerated**: Lead 1, Lead 2, Pads, Rhythm, Texture (new MIDI, same instrument palette)
-- **Locked**: Drums, Bass (identical — continuity anchor)
-- Tempo and key unchanged
+When **Endless** is active, the style selector becomes a read-only indicator showing the currently playing style. It dims and ignores taps.
 
-This repeats 2–3 times (randomly chosen per session). After the final evolution pass, the Outro plays and the song transitions to the next.
+### Style continuum
 
-**Evolution pass length — aim for roughly half the original song:**
-- Single-form songs (Motorik A-only, Ambient A-only): play the main body at half the original bar count. Drums and bass tile to the shorter length via `adaptEvents`.
-- Multi-section Kosmic songs (A-B, A-B-B-A, A-B-Bridge, etc.): randomly omit one section to reach approximately half the total length. Prefer dropping B or Bridge over dropping A — the pass should always start from the beginning of the main material, not mid-song. If the song is A-only or A-B (no Bridge), use half-length of what remains rather than stripping further.
-- Minimum floor: never shorten an evolution pass below 16 bars (~30 seconds), regardless of the rule above.
+The four styles sit on a fixed linear axis:
 
-**Entry breath**: On the last bar before each evolution pass, fade melodic tracks slightly so the new content enters cleanly on the downbeat. Drums and bass carry through uninterrupted.
+```
+Ambient  ←→  Chill  ←→  Kosmic  ←→  Motorik
+```
 
-**Track drop**: On each evolution pass, randomly omit one melodic track (e.g. Lead 2 or Rhythm sits out entirely). Restore it — or choose a different omission — on the next pass. This creates a strip-down/build-up arc across evolution passes, a classic technique in Krautrock and ambient music.
+Movement is normally ±1 step. The endpoints have a **25% escape valve** to prevent ping-pong traps:
 
-**Implementation approach**: Re-run the generator for melodic tracks mid-playback with drums/bass frozen, then resume normal song flow from the Outro section. No new playback infrastructure needed — a partial re-generation inserted into the existing song structure.
+- **Ambient**: 75% → Chill, 25% → Kosmic (two-step jump)
+- **Chill**: 50% → Ambient, 50% → Kosmic
+- **Kosmic**: 50% → Chill, 50% → Motorik
+- **Motorik**: 75% → Kosmic, 25% → Chill (two-step jump)
 
-### Macro: song-to-song transition
+### When style shifts happen
 
-**Timing:**
-- 8 bars before Outro begins — pre-generate next song on a background thread (~14 seconds of buffer at 138 BPM; generation takes ~0.1–0.5s)
-- Outgoing song plays its natural Outro
+No more than 3 consecutive songs in any one style. After the 3rd song, a shift is mandatory. A shift may also happen after the 1st or 2nd song (30% after song 1, 50% after song 2, 100% after song 3).
+
+### Pre-generation timing
+
+12 bars before the current song's Outro begins, pre-generate the next song on a background thread. The status log shows **"Up next: Style - Title"** at this moment — not at the transition. If the song is too short (< 16 bars), pre-generation triggers at playback start.
+
+If the pre-gen wasn't ready when the song ends, a fallback generates synchronously with a brief gap and logs "Loading next song..." followed by "Up next" when ready.
+
+### Transition
+
+- Outgoing song plays its natural Outro to completion
 - Incoming song plays its natural Intro
-- If both fade, overlap them during the natural fade region — FM radio style, no custom crossfade engineering needed
 
-**Between-song evolution schedule** (inspired by Eno's prime-length loop principle):
+### Song history (both modes)
+
+Zudio keeps a history of the last 10 generated songs. Each entry stores the seed, style, and title — enough to fully regenerate an identical song deterministically.
+
+```swift
+struct SongHistoryEntry {
+    let seed:  UInt64
+    let style: MusicStyle
+    let title: String
+}
+private var songHistory: [SongHistoryEntry] = []   // index 0 = oldest, last = current
+private let songHistoryLimit = 10
+```
+
+### ⏮ back button behaviour (both modes)
+
+- **In bars 1 or 2** (currentBar < 2): if there is a previous entry in the history stack, pop it, regenerate that song from its seed and style, and begin playback from bar 1.
+- **Past bar 2**: seek to bar 1 of the current song.
+- If the history stack has no previous entry, do nothing.
+
+### Transport controls in Endless mode
+
+- **Generate**: restarts the stream fresh from the current style; resets history and style counters
+- **Play / Stop**: normal
+- **⏭ (skip)**: triggers next song transition immediately
+- **⏮**: seeks to bar 1 if past bar 2; loads previous song if already in bars 1–2
+- **⏩ / ⏪**: normal scrub
+
+### Mode switching while playing
+
+- **Endless → Song**: style selector unlocks; current song finishes normally; no new song generated.
+- **Song → Endless**: style axis syncs to the currently playing style; pre-gen starts immediately in the background; stream continues when current song ends.
+
+### Status log
+
+- `Up next     Kosmic - The Chromatic Elevator`  (logged ~12 bars before transition)
+- `Rewind      Ambient - Weightless Drifting Shore`  (logged on ⏮ back)
+- `Endless     Loading next song...`  (fallback only, when pre-gen wasn't ready in time)
+
+---
+
+## Implementation
+
+### Files modified
+
+- `Sources/Zudio/AppState.swift` — `PlayMode` enum; `SongHistoryEntry`; style-shift logic; pre-generation; ⏮ two-press behavior; mode-switch handling
+- `Sources/Zudio/Playback/PlaybackEngine.swift` — `onApproachingEnd` callback (12-bar trigger); `onSongEndNaturally` callback
+- `Sources/Zudio/UI/TopBarView.swift` — mode selector; style selector lock; ⏭ skip behavior
+
+### Key design notes
+
+- `preGenerateNextSong()` is always silent. The "Up next" log is only emitted by `onApproachingEnd` — either immediately if the next song is already ready, or when generation completes if it was still in progress.
+- `shouldLogNextUpWhenReady` flag bridges the case where the approaching-end trigger fires before pre-gen finishes.
+- `decideNextStyle()` is called at pre-gen time, advancing the style counter correctly before generation starts.
+
+---
+
+## Phase 2: Evolve (deferred)
+
+Full spec preserved below for future reference. Do not implement until Phase 1 is stable.
+
+### Within-song evolution passes
+
+Instead of playing the Outro, replay the main body 2–3 times with melodic tracks regenerated and drums/bass locked. After the final pass, play the Outro and transition.
+
+- **Regenerated per pass**: Lead 1, Lead 2, Pads, Rhythm, Texture (new MIDI, same instruments)
+- **Locked**: Drums, Bass (continuity anchor)
+- **Track drop**: one melodic track randomly omitted per pass; restored or rotated next pass
+- **Pass length**: roughly half the original body; minimum 16 bars
+
+### Between-song evolution schedule (macro)
+
 - Transition 1: Drums=Copy, Bass=Copy, melodic=Fresh
 - Transition 2: Drums=Copy, Bass=Fresh, melodic=Fresh
 - Transition 3: Drums=Copy, Bass=Copy, melodic=Fresh
 - Transition 4: Drums=Fresh, Bass=Fresh, melodic=Fresh
 - (repeats with period 4)
 
-Melodic tracks (Lead 1, Lead 2, Pads, Rhythm, Texture) are always regenerated fresh — the fast evolvers. Bass alternates copy/fresh every 2 transitions (one cycle ≈ 6–8 minutes). Drums copy for 3 transitions then regenerate on the 4th (every ~12–16 minutes) — the slowest, most stable anchor.
+### Musical evolution levers
 
-**"Fresh"** means call `SongGenerator.generate()` with the same tempo and key constraints; the track generator picks a new pattern.
+- **Mood** — shifts subtly each transition
+- **Key** — advances along circle-of-fourths every 4–5 transitions; always coincides with fresh-bass
+- **Tempo** — drifts ±2–4 BPM at drum-cycle boundaries; mean-reverts toward style centre
 
-**"Copy"** means take `trackEvents[trackIndex]` from the departing song and call `adaptEvents()` to fit the new song's bar count (tile if longer, trim if shorter).
+### Additional UI (Phase 2)
 
-**Musical evolution — three levers across transitions:**
-
-- **Mood** (every transition — subtle): no override passed to `SongGenerator.generate()`; mode shifts slightly (Dorian ↔ Aeolian ↔ Mixolydian)
-- **Key** (every 4–5 transitions — moderate): advances along circle-of-fourths chain `["E", "A", "D", "G", "B", "C", "F#"]`; key changes always coincide with a fresh-bass transition; drums are pitch-agnostic (GM channel 9) and can be copied across key changes safely
-- **Tempo** (drifts ±2–4 BPM every drum cycle — subtle but cumulative): nudged at drum-cycle boundaries, clamped to style range, mean-reverting toward the style centre; over ~1 hour, tempo might swing through a 12 BPM range
-
----
-
-## Mode 3: Endless
-
-### Transition approach
-
-Same FM radio approach as Evolve: each song plays its natural Outro, the next song plays its natural Intro, and if both fade they overlap. No custom crossfade engineering.
-
-### Within-style behaviour
-
-When Endless stays in the same style across a transition, it uses the same micro-evolution and macro-evolution schedule as Evolve. On a style-shift transition, everything is always "full fresh" (no track copying, tempo and key reset to fresh values for the new style).
-
-### Style transition graph
-
-Zudio chooses the next style automatically using a weighted nearest-neighbour triangle:
-- Ambient → Motorik (70%) or Kosmic (30%)
-- Motorik → Kosmic (60%) or Ambient (40%)
-- Kosmic → Ambient (55%) or Motorik (45%)
-
-### When style shifts happen
-
-Every N song-to-song transitions, N chosen randomly from {4, 5, 6}. Always coincides with a "full fresh" transition. At roughly 4 minutes per song, this means a style change every 16–24 minutes — approximately 2–4 style changes per hour.
-
-### Tempo across style boundaries
-
-No BPM carry-over across style boundaries. Ambient (66–92), Motorik (126–154), and Kosmic (90–130) ranges are incompatible. Each style generates its own tempo fresh. The natural intro/outro of each song provides the sonic bridge.
-
----
-
-## UI Design
-
-### Mode selector
-
-A segmented control **Song / Evolve / Endless** added to the top bar, near the existing Motorik/Kosmic/Ambient style selector.
-
-### Style selector behaviour by mode
-
-- **Song** — works normally (pick style before generating)
-- **Evolve** — dims and locks during play; sets starting style
-- **Endless** — becomes a read-only indicator showing the current playing style (e.g. "Motorik"); user cannot change it mid-session
-
-### Transport control behaviour by mode
-
-Generate:
-- Song: generates a new song
-- Evolve: restarts the stream fresh
-- Endless: restarts from the current style fresh
-
-Play:
-- Song: plays current song
-- Evolve / Endless: resumes or starts the continuous stream
-
-Stop:
-- All modes: stops playback; mode setting stays
-
-⏭ (jump to outro):
-- Song: seeks to T-4 bars
-- Evolve: skips the current evolution pass and jumps to the Outro now
-- Endless: triggers the next song transition now
-
-⏮ (go to start):
-- All modes: bar 1 of the current song
-
-⏩ / ⏪:
-- All modes: normal scrub behaviour
-
-### Status log additions
-
-- "Evolve: Song 3 — next transition in ~2 min"
-- "Evolve: Evolution pass 2 of 3 — drums locked, Lead 2 dropped"
-- "Endless: Motorik → Kosmic (style shift at next transition)"
-- "Transition 5 — drums fresh, bass copy"
-
-### Save MIDI / Export Audio
-
-Always saves the currently loaded song. The seed in the log file lets the user reload any song they heard.
-
----
-
-## Implementation Plan
-
-### Files to modify
-
-- `Sources/Zudio/AppState.swift` — playMode enum (song/evolve/endless); transition logic; micro-evolution state (pass count, track-drop selection); style-shift graph for Endless
-- `Sources/Zudio/Playback/PlaybackEngine.swift` — song-end callback; fade infrastructure; overlap logic for matching fade outros/intros
-- `Sources/Zudio/UI/TopBarView.swift` — mode selector (Song/Evolve/Endless); style selector locking/indicator behaviour; ⏭ skip-pass behaviour in Evolve
-- `Sources/Zudio/Generation/SongGenerator.swift` — style override parameter for Endless style shifts; partial re-generation (melodic-only) for micro-evolution passes
-
-### Key existing code to reuse
-
-- `SongGenerator.generate(keyOverride:tempoOverride:moodOverride:)` — constraints already supported
-- `SongState.replacingEvents(_:forTrack:)` — already exists for track substitution
-- `DispatchSourceTimer` pattern — identical to tremolo/sweep/pan LFO timers
-- `mixer.outputVolume` — master AVAudioMixerNode already in graph
-- `playback.$currentStep` subscriber — already exists, just extended
-
-### AppState state additions
-
-```swift
-enum PlayMode { case song, evolve, endless }
-@Published var playMode: PlayMode = .song
-@Published var testModeEnabled: Bool = false
-private var nextSong: SongState? = nil
-private var isPreGenerating: Bool = false
-private var transitionCount: Int = 0
-private var evolutionPassCount: Int = 0         // passes within current song
-private var evolutionPassesPlanned: Int = 2      // 2 or 3, chosen randomly
-private var droppedTrackIndex: Int? = nil        // which melodic track sits out this pass
-private var currentKeyIndex: Int = 0
-private var currentTempo: Int = 138
-private let keyEvolutionChain = ["E", "A", "D", "G", "B", "C", "F#"]
-private var transitionsUntilStyleShift: Int = 4  // Endless only: {4,5,6}
-private var currentEndlessStyle: String = "Motorik"
-```
-
-### PlaybackEngine additions
-
-- `var onSongEndNaturally: (() -> Void)? = nil`
-- `func startFadeOut(overBars:)` — 30fps timer, equal-power curve (`sqrt(1-t)`)
-- `func startFadeIn(overBars:)` — equal-power curve (`sqrt(t)`)
-- `func cancelFade()` — cancel timer, reset `mixer.outputVolume = 1.0`
-- Modify `onSongEnd()`: if `onSongEndNaturally != nil`, call it and skip `allNotesOff()` so reverb/delay tails ring
-- Modify `stop()`: cancel fade, reset volume, call `allNotesOff()`
-
-### Edge cases
-
-- Stop during fade: cancel fade, reset `mixer.outputVolume = 1.0`, call `allNotesOff()`
-- Manual Generate during continuous play: reset `transitionCount = 0`, `evolutionPassCount = 0`, clear `nextSong`
-- Song too short for 8-bar pre-gen trigger (< 16 bars): also trigger `preGenerateNextSong()` on `play()` when mode is active and `nextSong == nil`
-- Pre-gen not ready when song ends: fall back to `generateNew(thenPlay: true)` with a brief gap, log a "gap" entry
-
----
-
-## Verification
-
-1. Build: `xcodebuild -scheme Zudio -configuration Debug build`
-2. Enable test mode (Cmd-T), generate a song — confirm it runs ~1 minute
-3. Enable Evolve on a Motorik song — confirm evolution pass is ~half the original length with new melodic content and locked drums/bass
-4. Enable Evolve on a Kosmic A-B-Bridge song — confirm one section is omitted per pass, pass always starts from A
-5. Confirm track-drop: one melodic track absent per evolution pass, different track next pass
-5. After 2–3 passes, confirm Outro plays and crossfade to new song occurs
-6. Let 4 songs play in Evolve — verify drums lock for 3 macro-transitions then refresh, bass alternates
-7. Switch to Endless, let 4–6 songs play — verify style shift fires and style indicator updates
-8. Stop during fade — clean silent stop, `mixer.outputVolume` restored to 1.0
-9. In Evolve, press ⏭ during an evolution pass — confirm it skips to Outro immediately
+- Three-state selector: **Song / Evolve / Endless**
+- Status log: "Evolve: pass 2 of 3 — drums locked, Lead 2 dropped"
+- ⏭ in Evolve: skips current evolution pass, jumps to Outro

@@ -2,20 +2,22 @@
 
 Zudio is a generative music app for macOS. It generates complete multi-track songs in one click using human-curated musical rules derived from analyzing real artists rather than machine learning.
 
-It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk, Harmonia). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation. Sometimes it even sounds like music!
+It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk, Harmonia). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation. Sometimes it even sounds like music! 
+
+You can generate a song at a time, or use Endless mode for continuous listening. Songs can be saved and reloaded. Related MIDI files can be loaded into any DAW for further editing. 
 
 Rules were developed by analyzing tracks from artists across those styles. The resulting songs were analyzed by AI to spot generation errors, tone clashes etc and then further improve the rules. 
 The app includes built-in effects such as reverb, delay, auto-pan and sweep. You can export both MIDI and M4A audio.
 
 This repository contains the macOS app source, implementation notes, and supporting design documentation all developed using Claude. 
 
-![Zudio screenshot](assets/images/logo/Zudio%20097%20screenshot.jpg)
+![Zudio screenshot](assets/images/Zudio%20099%20screenshot.jpg)
 
 **Listen to a sample (Ambient style):** [The-ChatGPT-Meditations](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.98/Zudio-0.98.dmg)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.99/Zudio-0.99.dmg)
 
-Current release: `0.98 (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `0.99 (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 ---
 
@@ -47,8 +49,8 @@ Current release: `0.98 (alpha)`. Universal binary — runs natively on both Appl
 ### Feature plans
 
 - [save-as-audio-plan.md](docs/save-as-audio-plan.md) — Audio export (M4A) feature design. (Done)
-- [continuous-play.md](docs/continuous-play.md) — Continuous play and song evolution mode design.
-- [distribution-plan.md](docs/distribution-plan.md) — macOS distribution and release plan.
+- [continuous-play.md](docs/continuous-play.md) — Continuous play and song evolution mode design. (Done)
+- [distribution-plan.md](docs/distribution-plan.md) — macOS distribution and release plan. (Done)
 
 
 ### Future platform

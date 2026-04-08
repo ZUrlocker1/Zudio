@@ -6,6 +6,12 @@ import Combine
 import MediaPlayer
 import UniformTypeIdentifiers
 
+// MARK: - Play mode
+
+enum PlayMode: String, Hashable { case song, endless }
+
+// MARK: - AppState
+
 @MainActor
 final class AppState: ObservableObject {
     // MARK: - Song state
@@ -41,6 +47,54 @@ final class AppState: ObservableObject {
 
     @Published var selectedStyle: MusicStyle = .chill
 
+    // MARK: - Play mode (Song / Endless)
+
+    @Published var playMode: PlayMode = .song {
+        didSet {
+            guard playMode != oldValue else { return }
+            if playMode == .song {
+                // Cancel pending pre-gen; song end callback is guarded and will no-op
+                nextSongState            = nil
+                isPreGenerating          = false
+                shouldLogNextUpWhenReady = false
+                upNextLogged             = false
+            } else {
+                // Sync style axis to the currently playing style so shifts are relative to it
+                songsInCurrentStyle = 1
+                if let idx = endlessStyleAxis.firstIndex(of: selectedStyle) {
+                    endlessStyleIndex = idx
+                }
+                // Kick off pre-gen immediately — covers the case where the 8-bar trigger
+                // already fired while in Song mode (approachingEndFired=true, skipped then)
+                preGenerateNextSong()
+            }
+        }
+    }
+
+    // Song history — last 10 seeds, populated in both modes, used by ⏮ back navigation
+    struct SongHistoryEntry {
+        let seed:  UInt64
+        let style: MusicStyle
+        let title: String
+    }
+    private var songHistory:      [SongHistoryEntry] = []
+    private let songHistoryLimit = 10
+
+    // Endless style continuum: fixed axis, movement ±1 only
+    private let endlessStyleAxis: [MusicStyle] = [.ambient, .chill, .kosmic, .motorik]
+    private var endlessStyleIndex: Int = 1    // start at Chill
+    private var songsInCurrentStyle: Int = 0
+
+    // Pre-generated next song for seamless Endless transitions
+    private var nextSongState:         SongState? = nil
+    private var isPreGenerating:       Bool       = false
+    // Set by onApproachingEnd so preGenerateNextSong() logs "Up next" when it finishes.
+    // Kept false for silent pre-gen calls (generateNew, startEndlessSong).
+    private var shouldLogNextUpWhenReady = false
+    // Tracks whether "Up next" has been logged for the current pre-genned song,
+    // so skipToNextSong() can log it immediately without duplicating.
+    private var upNextLogged = false
+
     // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
     // Fired on generateNew() and on the manual Reset button.
     @Published var defaultsResetToken: Int = 0
@@ -65,6 +119,14 @@ final class AppState: ObservableObject {
         // Restore first-best-song behavior for all styles
         stylesWithGeneratedSongs = []
         songGenerationCount      = 0
+
+        // Reset Endless mode state
+        playMode             = .song
+        songHistory          = []
+        nextSongState        = nil
+        isPreGenerating      = false
+        songsInCurrentStyle  = 0
+        endlessStyleIndex    = 1
 
         // Reset style to default
         selectedStyle = .chill
@@ -481,6 +543,22 @@ final class AppState: ObservableObject {
                 self.emitStepAnnotations(upTo: step)
             }
             .store(in: &cancellables)
+
+        // Endless mode: wire PlaybackEngine callbacks (called on main actor)
+        playback.onApproachingEnd = { [weak self] in
+            guard let self, self.playMode == .endless else { return }
+            if let next = self.nextSongState {
+                // Already pre-genned — log "Up next" now, at the 12-bar mark
+                self.appendToLog([GenerationLogEntry(tag: "Up next",
+                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+                self.upNextLogged = true
+            } else {
+                // Not ready yet — set flag so preGenerateNextSong() logs when it finishes
+                self.shouldLogNextUpWhenReady = true
+                self.preGenerateNextSong()
+            }
+        }
+        playback.onSongEndNaturally = { [weak self] in self?.handleSongEndedNaturally() }
     }
 
     // MARK: - Log append helper
@@ -617,6 +695,18 @@ final class AppState: ObservableObject {
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
+                // Track song history for ⏮ back navigation
+                self.appendSongHistory(from: state)
+                // Endless: reset stream counters to current style; start pre-gen for song after next
+                if self.playMode == .endless {
+                    self.songsInCurrentStyle = 1
+                    if let idx = self.endlessStyleAxis.firstIndex(of: style) {
+                        self.endlessStyleIndex = idx
+                    }
+                    self.nextSongState   = nil
+                    self.isPreGenerating = false
+                    self.preGenerateNextSong()
+                }
 
                 // Instrument randomization: first song per style uses all defaults (index 0).
                 // From the second song onwards, pick 2 random non-drums tracks and assign
@@ -807,10 +897,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Rewind to bar 1. Keeps current play state.
+    /// Rewind to bar 1. Already in bars 1–2: load previous song from history if available.
     func seekToStart() {
-        seekTo(step: 0)
-        visibleBarOffset = 0
+        if playback.currentBar < 2 {
+            goToPreviousSong()
+        } else {
+            seekTo(step: 0)
+            visibleBarOffset = 0
+        }
     }
 
     /// Jump to the last bar and stop playback.
@@ -822,6 +916,173 @@ final class AppState: ObservableObject {
         // Show the final window of bars
         visibleBarOffset = max(0, totalBars - visibleBars)
         playback.seek(toStep: lastStep)
+    }
+
+    // MARK: - Song history helpers
+
+    private func appendSongHistory(from state: SongState) {
+        songHistory.append(SongHistoryEntry(seed: state.globalSeed, style: state.style, title: state.title))
+        if songHistory.count > songHistoryLimit { songHistory.removeFirst() }
+    }
+
+    private func goToPreviousSong() {
+        guard songHistory.count >= 2 else { return }
+        songHistory.removeLast()   // drop current song entry
+        let prev = songHistory.last!
+        appendToLog([GenerationLogEntry(tag: "Rewind",
+            description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
+        let wasPlaying = playback.isPlaying
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let state = SongGenerator.generate(seed: prev.seed, style: prev.style, testMode: false)
+            await MainActor.run {
+                self.selectedStyle = state.style
+                self.finishLoadingSong(state, thenPlay: wasPlaying)
+            }
+        }
+    }
+
+    // MARK: - Endless mode helpers
+
+    private func decideNextStyle() -> MusicStyle {
+        let atLeft  = endlessStyleIndex == 0
+        let atRight = endlessStyleIndex == endlessStyleAxis.count - 1
+        let shiftNow: Bool
+        switch songsInCurrentStyle {
+        case 1:  shiftNow = Double.random(in: 0..<1) < 0.30
+        case 2:  shiftNow = Double.random(in: 0..<1) < 0.50
+        default: shiftNow = true
+        }
+        if !shiftNow {
+            songsInCurrentStyle += 1
+            return endlessStyleAxis[endlessStyleIndex]
+        }
+        // Normal walls force the adjacent step, but a 25% escape valve jumps two steps
+        // so Ambient can leap to Kosmic and Motorik can leap to Chill — breaks ping-pong traps.
+        let step: Int
+        if atLeft {
+            step = Double.random(in: 0..<1) < 0.25 ? 2 : 1   // Ambient: 75%→Chill, 25%→Kosmic
+        } else if atRight {
+            step = Double.random(in: 0..<1) < 0.25 ? -2 : -1  // Motorik: 75%→Kosmic, 25%→Chill
+        } else {
+            step = Bool.random() ? 1 : -1
+        }
+        endlessStyleIndex   = max(0, min(endlessStyleAxis.count - 1, endlessStyleIndex + step))
+        songsInCurrentStyle = 1
+        return endlessStyleAxis[endlessStyleIndex]
+    }
+
+    private func preGenerateNextSong() {
+        guard playMode == .endless, !isPreGenerating, nextSongState == nil else { return }
+        isPreGenerating = true
+        let nextStyle = decideNextStyle()
+        Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+            let state = SongGenerator.generate(style: nextStyle, testMode: false)
+            await MainActor.run {
+                guard self.playMode == .endless else { return }
+                self.nextSongState   = state
+                self.isPreGenerating = false
+                // Only log "Up next" if the approaching-end trigger requested it
+                if self.shouldLogNextUpWhenReady {
+                    self.shouldLogNextUpWhenReady = false
+                    self.upNextLogged = true
+                    self.appendToLog([GenerationLogEntry(tag: "Up next",
+                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
+                }
+            }
+        }
+    }
+
+    private func handleSongEndedNaturally() {
+        guard playMode == .endless else { return }
+        if let next = nextSongState {
+            // "Up next" was already logged when pre-gen completed
+            nextSongState   = nil
+            isPreGenerating = false
+            startEndlessSong(next)
+        } else {
+            // Pre-gen wasn't ready; generate now and log when known
+            appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
+            let nextStyle = decideNextStyle()
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                let state = SongGenerator.generate(style: nextStyle, testMode: false)
+                await MainActor.run {
+                    self.appendToLog([GenerationLogEntry(tag: "Up next",
+                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
+                    self.startEndlessSong(state)
+                }
+            }
+        }
+    }
+
+    private func startEndlessSong(_ state: SongState) {
+        appendSongHistory(from: state)
+        selectedStyle            = state.style
+        shouldLogNextUpWhenReady = false   // reset — next pre-gen is silent until trigger fires
+        upNextLogged             = false
+        finishLoadingSong(state, thenPlay: true)
+        nextSongState   = nil
+        isPreGenerating = false
+        preGenerateNextSong()   // silently pre-gen the song after next
+    }
+
+    /// Skip immediately to the next song (Endless mode ⏭ button).
+    func skipToNextSong() {
+        guard playMode == .endless else { return }
+        if let next = nextSongState {
+            // Log "Up next" now if the 12-bar trigger hadn't fired yet
+            if !upNextLogged {
+                appendToLog([GenerationLogEntry(tag: "Up next",
+                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+            }
+            nextSongState   = nil
+            isPreGenerating = false
+            startEndlessSong(next)
+        } else {
+            appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
+            let nextStyle = decideNextStyle()
+            Task.detached(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                let state = SongGenerator.generate(style: nextStyle, testMode: false)
+                await MainActor.run {
+                    self.appendToLog([GenerationLogEntry(tag: "Up next",
+                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
+                    self.startEndlessSong(state)
+                }
+            }
+        }
+    }
+
+    /// Shared song-loading kernel for Endless transitions and ⏮ rewind.
+    /// Stops current playback, loads `state`, and plays if `thenPlay` is true.
+    private func finishLoadingSong(_ state: SongState, thenPlay: Bool) {
+        playback.stop()
+        audioTexture.stop()
+        songState = state
+        generationHistory.append(state)
+        if generationHistory.count > 5 { generationHistory.removeFirst() }
+        visibleBarOffset = 0
+        lastEmittedStep  = -1
+        muteState = Array(repeating: false, count: kTrackCount)
+        soloState = Array(repeating: false, count: kTrackCount)
+        playback.muteState = muteState
+        playback.soloState = soloState
+        playback.kosmicStyle  = state.style == .kosmic
+        playback.motorikStyle = state.style == .motorik
+        playback.chillFade    = false
+        playback.setAmbientMode(state.style == .ambient)
+        playback.setChillMode(state.style == .chill)
+        playback.load(state)
+        playback.seek(toStep: 0)
+        defaultsResetToken += 1
+        if thenPlay {
+            playback.play()
+            audioTexture.start(style: state.style, texture: state.chillAudioTexture,
+                               offsetSeconds: state.chillAudioTextureOffset)
+        }
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     /// Step back one bar. Clamps at bar 0.
