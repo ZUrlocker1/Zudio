@@ -1,7 +1,7 @@
 // AmbientTextureGenerator.swift — Ambient texture generation
 // AMB-TEXT-004 (40%): silent
-// AMB-TEXT-001 (30%): orbital shimmer — sparse high notes, velocity 18–39
-// AMB-TEXT-002 (20%): ghost tone — 1–2 very low-velocity long-held notes
+// AMB-TEXT-001 (30%): orbital shimmer — sparse high notes, velocity 42–62
+// AMB-TEXT-002 (20%): ghost tone — 1–2 long-held notes, velocity 38–58
 // AMB-TEXT-003 (10%): chime scatter — 2–5 staccato notes at random positions
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
 
@@ -39,7 +39,7 @@ struct AmbientTextureGenerator {
 
     // MARK: - Rules
 
-    /// Slowly cycling high notes — sparse, velocity 18–39.
+    /// Slowly cycling high notes — sparse, velocity 42–62.
     private static func orbitalShimmer(scalePCs: Set<Int>, bounds: RegisterBounds,
                                         loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         let highNotes = notesInRegister(pitchClasses: scalePCs, low: Swift.max(bounds.low, 72), high: bounds.high)
@@ -49,7 +49,7 @@ struct AmbientTextureGenerator {
         while step < loopSteps {
             if rng.nextDouble() < 0.45 {
                 let note = highNotes[rng.nextInt(upperBound: highNotes.count)]
-                let vel  = UInt8(18 + rng.nextInt(upperBound: 22))  // 18–39
+                let vel  = UInt8(42 + rng.nextInt(upperBound: 21))  // 42–62
                 let dur  = Swift.min(6 + rng.nextInt(upperBound: 11), loopSteps - step)  // 6–16
                 if dur >= 2 {
                     events.append(MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: dur))
@@ -60,7 +60,7 @@ struct AmbientTextureGenerator {
         return events
     }
 
-    /// Very low velocity long-held tone — 1–2 per loop.
+    /// Long-held tone — 1–2 per loop, velocity 38–58.
     /// When generating 2 notes, the second is guaranteed to differ from the first
     /// (chord-tone pool, so both are always tonally safe).
     private static func ghostTone(chordPCs: Set<Int>, bounds: RegisterBounds,
@@ -81,7 +81,7 @@ struct AmbientTextureGenerator {
                     idx = (idx + 1 + rng.nextInt(upperBound: pool.count - 1)) % pool.count
                 }
                 lastIdx = idx
-                let vel  = UInt8(12 + rng.nextInt(upperBound: 18))  // 12–29
+                let vel  = UInt8(38 + rng.nextInt(upperBound: 21))  // 38–58
                 events.append(MIDIEvent(stepIndex: start, note: pool[idx], velocity: vel, durationSteps: dur))
             }
         }
@@ -98,7 +98,7 @@ struct AmbientTextureGenerator {
         for _ in 0..<count {
             let step = rng.nextInt(upperBound: loopSteps)
             let note = pool[rng.nextInt(upperBound: pool.count)]
-            let vel  = UInt8(25 + rng.nextInt(upperBound: 30))  // 25–54
+            let vel  = UInt8(48 + rng.nextInt(upperBound: 25))  // 48–72
             events.append(MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: 3))
         }
         return events.sorted { $0.stepIndex < $1.stepIndex }

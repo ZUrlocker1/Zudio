@@ -73,7 +73,6 @@ struct BassGenerator {
         var variationBars = Set<Int>()
         if simpleRules.contains(ruleID) {
             var aToggle = false
-            var seenSection: SectionLabel? = nil
             for bar in 0..<frame.totalBars {
                 guard let sec = structure.section(atBar: bar),
                       sec.label != .intro && sec.label != .outro else { continue }
@@ -84,15 +83,10 @@ struct BassGenerator {
                     aToggle.toggle()
                     if aToggle { for b in sec.startBar..<sec.endBar { variationBars.insert(b) } }
                 }
-                seenSection = sec.label
             }
-            _ = seenSection  // suppress unused warning
         }
 
         var events: [MIDIEvent] = []
-        var variationLogged = false   // emit "BASS-EVOL" rule once when first variation bar fires
-        var devolveLogged   = false   // emit "BASS-DEVOL" rule once when first revert bar fires
-        var wasInVariation  = false   // tracks previous body bar's variation state
 
         // MOT-BASS-015: sub-pattern rotation (same 3 variants as KOS-BASS-011)
         var mot015Variant    = 0
@@ -113,9 +107,6 @@ struct BassGenerator {
                                    mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
             } else {
                 let useVariation = variationBars.contains(bar)
-                if useVariation { variationLogged = true }
-                if !useVariation && wasInVariation { devolveLogged = true }
-                wasInVariation = useVariation
 
                 // MOT-BASS-015: rotate sub-pattern at section boundaries and every 16 bars
                 // Weights: D=15%, E=35%, C=50% — C (continuous trill) suits high-tempo Motorik best
@@ -134,13 +125,6 @@ struct BassGenerator {
                                   useVariation: useVariation, mot015Variant: mot015Variant)
             }
         }
-
-        // variationLogged / devolveLogged are retained for potential future use
-        // but BASS-EVOL / BASS-DEVOL are intentionally NOT inserted into usedRuleIDs.
-        // "Evolving pattern" is a live playback annotation (step annotations) — it should
-        // not appear in the static generation log shown at song-load time.
-        _ = variationLogged
-        _ = devolveLogged
 
         return events
     }
@@ -190,7 +174,7 @@ struct BassGenerator {
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         let root  = chordRootNote(entry: entry, frame: frame)
-        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+        let third = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 56)  // mode 3rd
         let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
 
         switch ruleID {
@@ -235,12 +219,9 @@ struct BassGenerator {
             // McCartney PBW B-section: all-drive, no breathe bar.
             // Base alternates drive (8 notes) / breathe (3 notes) → density ~22 per 4 bars.
             // This plays the full riff every bar → density 32 per 4 bars — density detector fires.
-            let isMajorCtx: Bool
-            switch entry.chordWindow.chordType {
-            case .major, .sus2, .sus4, .add9: isMajorCtx = true
-            default:                          isMajorCtx = false
-            }
-            let flatSeven = isMajorCtx ? fifth : UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 28, high: 52))
+            let flatSeven = entry.chordWindow.chordType.isMajorContext
+                ? fifth
+                : nearestScaleNote(to: Int(root) + 10, frame: frame, low: 28, high: 52)
             let pitches14: [UInt8] = [root, fifth, root, flatSeven, fifth, root, third, root]
             let vels14:    [UInt8] = [94,   84,    88,   80,        82,    78,   84,    74  ]
             var evs14: [MIDIEvent] = []
@@ -325,8 +306,8 @@ struct BassGenerator {
 
         case "MOT-BASS-003":   // Crawling Walk (simple) → ascending quarter notes root→2nd→3rd→5th
             // Body has root/fifth/approach; intro hints at more by climbing the scale.
-            let second3 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 28, high: 56))
-            let third3  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+            let second3 = nearestScaleNote(to: Int(root) + 2, frame: frame, low: 28, high: 56)
+            let third3  = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 56)
             return [
                 MIDIEvent(stepIndex: barStart,      note: root,    velocity: 82, durationSteps: 4),
                 MIDIEvent(stepIndex: barStart + 4,  note: second3, velocity: 80, durationSteps: 4),
@@ -336,8 +317,8 @@ struct BassGenerator {
 
         case "MOT-BASS-004":   // Hallogallo Lock (simple) → 8th-note scale walk root→2nd→3rd, lands on 5th
             // Body is just root+fifth; intro builds anticipation by walking up to that fifth.
-            let second4 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 28, high: 56))
-            let third4  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+            let second4 = nearestScaleNote(to: Int(root) + 2, frame: frame, low: 28, high: 56)
+            let third4  = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 56)
             return [
                 MIDIEvent(stepIndex: barStart,      note: root,    velocity: 84, durationSteps: 2),
                 MIDIEvent(stepIndex: barStart + 2,  note: second4, velocity: 80, durationSteps: 2),
@@ -347,12 +328,17 @@ struct BassGenerator {
 
         case "MOT-BASS-005":   // McCartney Drive → breathe bar: root sustain + low fifth + approach
             let lowerFifth = UInt8(clamped(Int(root) - 5, low: 28, high: 52))
+            let approachPC5    = (Int(root) - 2 + 12) % 12
+            let approachInScale5 = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 }).contains(approachPC5)
             let approach   = UInt8(clamped(Int(root) - 2, low: 28, high: 52))
-            return [
-                MIDIEvent(stepIndex: barStart,      note: root,       velocity: 84, durationSteps: 7),
-                MIDIEvent(stepIndex: barStart + 8,  note: lowerFifth, velocity: 74, durationSteps: 5),
-                MIDIEvent(stepIndex: barStart + 14, note: approach,   velocity: 60, durationSteps: 2),
+            var introEvs5: [MIDIEvent] = [
+                MIDIEvent(stepIndex: barStart,     note: root,       velocity: 84, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8, note: lowerFifth, velocity: 74, durationSteps: approachInScale5 ? 5 : 8),
             ]
+            if approachInScale5 {
+                introEvs5.append(MIDIEvent(stepIndex: barStart + 14, note: approach, velocity: 60, durationSteps: 2))
+            }
+            return introEvs5
 
         case "MOT-BASS-006":   // LA Woman → root whole-bar, no shimmer
             return [MIDIEvent(stepIndex: barStart, note: root, velocity: 86, durationSteps: 14)]
@@ -408,7 +394,7 @@ struct BassGenerator {
             ]
 
         case "MOT-BASS-010", "MOT-BASS-011":   // Quo Arc / Quo Drive → root–third alternating 8ths
-            let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 62))
+            let third = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 62)
             let quoNotes: [UInt8] = [root, third, root, third, root, third, root, third]
             let quoVels:  [UInt8] = [90,   76,    86,   72,    88,   74,    84,   70  ]
             var evsQuo: [MIDIEvent] = []
@@ -420,7 +406,7 @@ struct BassGenerator {
 
         default:   // BAS-001 Root Anchor (simple) → quarter-note chord arpeggio: root→3rd→5th→root
             // Body alternates just two notes; intro hints at the full chord with a short arpeggio.
-            let third1 = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+            let third1 = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 56)
             return [
                 MIDIEvent(stepIndex: barStart,      note: root,   velocity: 86, durationSteps: 4),
                 MIDIEvent(stepIndex: barStart + 4,  note: third1, velocity: 80, durationSteps: 4),
@@ -589,9 +575,11 @@ struct BassGenerator {
         var events: [MIDIEvent] = []
         let rootNote   = chordRootNote(entry: entry, frame: frame)
         // lowerThird: 3rd interval going down — tracks mode (major 3rd=4 in Ionian, minor 3rd=3 in Aeolian/Dorian)
-        let lowerThird = UInt8(clamped(Int(rootNote) - frame.mode.nearestInterval(4), low: 28, high: 52))
+        let lowerThird = nearestScaleNote(to: Int(rootNote) - 4, frame: frame, low: 28, high: 52)  // mode 3rd below root
         let lowerFifth = UInt8(clamped(Int(rootNote) - 5, low: 28, high: 52))  // P5 down, always mode-neutral
-        let approach   = UInt8(clamped(Int(rootNote) - 2, low: 28, high: 52))  // chromatic approach, intentional
+        let approachPC = (Int(rootNote) - 2 + 12) % 12
+        let approachInScale = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 }).contains(approachPC)
+        let approach   = UInt8(clamped(Int(rootNote) - 2, low: 28, high: 52))
 
         // allDrive: bass "sits on" the descent groove for 4 bars straight (1/3 of phrases).
         // Normal alternation: drive on even bars, breathe on odd bars.
@@ -605,8 +593,10 @@ struct BassGenerator {
             }
         } else {
             events.append(MIDIEvent(stepIndex: barStart,      note: rootNote,   velocity: 92, durationSteps: 7))
-            events.append(MIDIEvent(stepIndex: barStart + 8,  note: lowerFifth, velocity: 82, durationSteps: 5))
-            events.append(MIDIEvent(stepIndex: barStart + 14, note: approach,   velocity: 65, durationSteps: 2))
+            events.append(MIDIEvent(stepIndex: barStart + 8,  note: lowerFifth, velocity: 82, durationSteps: approachInScale ? 5 : 8))
+            if approachInScale {
+                events.append(MIDIEvent(stepIndex: barStart + 14, note: approach, velocity: 65, durationSteps: 2))
+            }
         }
         return events
     }
@@ -637,9 +627,9 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let root   = chordRootNote(entry: entry, frame: frame)
-        let third  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 36, high: 60))  // mode 3rd
-        let second = UInt8(clamped(Int(root) + frame.mode.nearestInterval(2), low: 36, high: 60))  // mode 2nd
-        let sixth  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(9), low: 36, high: 60))  // mode 6th
+        let third  = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 36, high: 60)  // mode 3rd
+        let second = nearestScaleNote(to: Int(root) + 2, frame: frame, low: 36, high: 60)  // mode 2nd
+        let sixth  = nearestScaleNote(to: Int(root) + 9, frame: frame, low: 36, high: 60)  // mode 6th
 
         if bar % 2 == 0 {
             // Drive bar: six M3 hits, step down to M2, return to M3 (descending tail)
@@ -674,12 +664,9 @@ struct BassGenerator {
         let root  = chordRootNote(entry: entry, frame: frame)
         let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 52))
         // b7 only in minor/Dorian/Mixolydian chord contexts; stay on root in pure major
-        let isMajorContext: Bool
-        switch entry.chordWindow.chordType {
-        case .major, .sus2, .sus4, .add9: isMajorContext = true
-        default:                          isMajorContext = false
-        }
-        let flatSeven = isMajorContext ? root : UInt8(clamped(Int(root) + 10, low: 28, high: 52))
+        let flatSeven = entry.chordWindow.chordType.isMajorContext
+            ? root
+            : nearestScaleNote(to: Int(root) + 10, frame: frame, low: 28, high: 52)
 
         let pitches: [UInt8] = [root, root, fifth, fifth, flatSeven, flatSeven, root, root]
         let vels:    [UInt8] = [92,   80,   84,    78,    84,        78,        82,   76  ]
@@ -750,10 +737,10 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let root  = chordRootNote(entry: entry, frame: frame)
-        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 62))  // mode 3rd
-        let fifth = UInt8(clamped(Int(root) + 7,  low: 28, high: 62))  // P5, mode-neutral
-        let sixth = UInt8(clamped(Int(root) + frame.mode.nearestInterval(9), low: 28, high: 62))  // mode 6th
-        let flatSeven = UInt8(clamped(Int(root) + 10, low: 28, high: 62))  // b7 boogie apex — intentional chromatic
+        let third     = nearestScaleNote(to: Int(root) + 4,  frame: frame, low: 28, high: 62)  // mode 3rd
+        let fifth     = UInt8(clamped(Int(root) + 7,  low: 28, high: 62))  // P5, mode-neutral
+        let sixth     = nearestScaleNote(to: Int(root) + 9,  frame: frame, low: 28, high: 62)  // mode 6th
+        let flatSeven = nearestScaleNote(to: Int(root) + 10, frame: frame, low: 28, high: 62)  // b7 (snapped to scale)
 
         if bar % 2 == 0 {
             // Ascent bar: 1-1-3-3-5-5-6-b7 (paired doubles, solo b7 at beat 4)
@@ -789,10 +776,10 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let root      = chordRootNote(entry: entry, frame: frame)
-        let third     = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 62))  // mode 3rd
+        let third     = nearestScaleNote(to: Int(root) + 4,  frame: frame, low: 28, high: 62)  // mode 3rd
         let fifth     = UInt8(clamped(Int(root) + 7,  low: 28, high: 62))  // P5, mode-neutral
-        let sixth     = UInt8(clamped(Int(root) + frame.mode.nearestInterval(9), low: 28, high: 62))  // mode 6th
-        let flatSeven = UInt8(clamped(Int(root) + 10, low: 28, high: 62))  // b7 boogie apex — intentional chromatic
+        let sixth     = nearestScaleNote(to: Int(root) + 9,  frame: frame, low: 28, high: 62)  // mode 6th
+        let flatSeven = nearestScaleNote(to: Int(root) + 10, frame: frame, low: 28, high: 62)  // b7 (snapped to scale)
 
         let pitches: [UInt8]
         let vels:    [UInt8]
@@ -831,7 +818,7 @@ struct BassGenerator {
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         let root  = chordRootNote(entry: entry, frame: frame)
-        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 52))
+        let third = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 52)  // mode 3rd
         let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 52))
 
         // Even bars: full chase (root–third–fifth–root); odd bars: simplified (root–root–fifth–root)
@@ -878,7 +865,7 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         let root   = chordRootNote(entry: entry, frame: frame)
         let octave = UInt8(clamped(Int(root) + 12, low: 28, high: 64))
-        let third  = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 56))
+        let third  = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 56)  // mode 3rd
         let fifth  = UInt8(clamped(Int(root) + 7, low: 28, high: 56))
 
         // Every 8 bars: one "lock" bar — root-only quarter notes, no octave jump
@@ -924,14 +911,11 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         let root  = chordRootNote(entry: entry, frame: frame)
         let fifth = UInt8(clamped(Int(root) + 7,  low: 28, high: 52))
-        let third = UInt8(clamped(Int(root) + frame.mode.nearestInterval(4), low: 28, high: 52))
+        let third = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 52)  // mode 3rd
 
-        let isMajorContext: Bool
-        switch entry.chordWindow.chordType {
-        case .major, .sus2, .sus4, .add9: isMajorContext = true
-        default:                          isMajorContext = false
-        }
-        let flatSeven = isMajorContext ? fifth : UInt8(clamped(Int(root) + 10, low: 28, high: 52))
+        let flatSeven = entry.chordWindow.chordType.isMajorContext
+            ? fifth
+            : nearestScaleNote(to: Int(root) + 10, frame: frame, low: 28, high: 52)
 
         if bar % 2 == 0 {
             // Drive bar: full riff — root–fifth–root–b7–fifth–root–mode3rd–root
@@ -971,9 +955,9 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         let root   = chordRootNote(entry: entry, frame: frame)
         let octave = UInt8(clamped(Int(root) + 12, low: 40, high: 64))
-        let fourth = UInt8(clamped(Int(root) + 5,  low: 28, high: 52))
+        let fourth = nearestScaleNote(to: Int(root) + 5, frame: frame, low: 28, high: 52)
         let fifth  = UInt8(clamped(Int(root) + 7,  low: 28, high: 52))
-        let b7     = UInt8(clamped(Int(root) + frame.mode.nearestInterval(10), low: 28, high: 55))
+        let b7     = nearestScaleNote(to: Int(root) + 10, frame: frame, low: 28, high: 55)  // b7 snapped to scale
 
         switch subVariant {
         case 1:

@@ -4,7 +4,7 @@
 //   xcodebuild test -scheme Zudio -only-testing:ZudioTests/MotorikBatchTests
 //
 // Output: ~/Downloads/Zudio/tools/batch-output/motorik/
-//   *.MID + *.zudio   — 10 freshly generated Motorik songs
+//   *.MID + *.zudio   — 40 freshly generated Motorik songs (all 8 lead rules, 5 each, shuffled)
 
 import Testing
 import Foundation
@@ -17,11 +17,10 @@ struct MotorikBatchTests {
             .appendingPathComponent("Downloads/Zudio/tools/batch-output/motorik")
     }
 
-    // Lead rule rotation — exclusively MOT-LD1-003 (Punch Solo) and MOT-LD1-006 (Long Arc),
-    // 5 songs each, so both revised rules can be evaluated side by side.
-    private static let leadRuleRotation: [String?] = [
-        "MOT-LD1-003", "MOT-LD1-003", "MOT-LD1-003", "MOT-LD1-003", "MOT-LD1-003",
-        "MOT-LD1-006", "MOT-LD1-006", "MOT-LD1-006", "MOT-LD1-006", "MOT-LD1-006",
+    // All 8 lead rules, 5 songs each = 40 songs total, shuffled for random order
+    private static let allLeadRules: [String] = [
+        "MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004",
+        "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008",
     ]
 
     @Test func generateMotorikBatch() throws {
@@ -35,13 +34,17 @@ struct MotorikBatchTests {
             try? fm.removeItem(at: url)
         }
 
-        print("\n=== Generating 10 Motorik songs ===")
-        print("  5× MOT-LD1-003 (Punch Solo)   5× MOT-LD1-006 (Long Arc)")
+        // Build shuffled rotation: 5 songs × 8 rules = 40, randomly ordered
+        var rotation: [String] = []
+        for rule in Self.allLeadRules { for _ in 1...5 { rotation.append(rule) } }
+        rotation.shuffle()
+
+        print("\n=== Generating 40 Motorik songs (all 8 lead rules, 5 each) ===")
         print("Output: \(dir.path)\n")
 
-        for i in 1...10 {
+        for i in 1...40 {
             let seed     = UInt64.random(in: .min ... .max)
-            let ruleID   = Self.leadRuleRotation[i - 1]
+            let ruleID   = rotation[i - 1]
             let song     = SongGenerator.generate(seed: seed, style: .motorik,
                                                   testMode: false, forceLeadRuleID: ruleID)
 

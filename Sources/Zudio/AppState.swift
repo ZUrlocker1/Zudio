@@ -103,14 +103,21 @@ final class AppState: ObservableObject {
     private enum EvolvePhase { case inactive, original, pass1, pass2, outro }
     private var evolvePhase:           EvolvePhase = .inactive
     private var evolveAnchorState:     SongState?  = nil
-    private var evolveMoodAnchor:      Mood?       = nil
+    private var evolveMoodAnchor:      Mood?       = nil   // mood override for the next song; nil = free choice
     private var evolveTempoAnchor:     Int         = 0
     private var evolvePass1Bars:       Int         = 0
     private var evolvePass2Bars:       Int         = 0
     private var evolvePass1State:      SongState?  = nil
     private var evolvePass2State:      SongState?  = nil
-    private var evolveNextSongState:   SongState?  = nil
-    private var evolveIsPreGenerating: Bool        = false
+    private var evolveNextSongState:       SongState?  = nil
+    private var evolveIsPreGenerating:     Bool        = false
+    private var evolveNextSongShouldLog:   Bool        = false  // set at 12-bar mark; tells preGen to log when ready
+    private var evolveNextSongLogged:      Bool        = false  // prevents duplicate "Up next" at transition
+    // Incremented on each evolve phase switch so the scrollbar recreates itself even when
+    // totalBars hasn't changed (e.g. preGeneratePassContent(pass: 2) already extended songState).
+    @Published var evolvePhaseToken: Int = 0
+    // Incremented by switchEvolveInstruments so TrackRowView refreshes the instrument name display.
+    @Published var instrumentChangeToken: Int = 0
 
     // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
     // Fired on generateNew() and on the manual Reset button.
@@ -313,11 +320,11 @@ final class AppState: ObservableObject {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
         case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Halo Pad","New Age Pad","Calliope Lead"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
-        case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Fifths Lead","Moog Lead"]
+        case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Square Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone"]
         case (kTrackLead2,   .ambient): return ["Vibraphone","Celesta","Glockenspiel","Grand Piano","Warm Pad","Space Voice","FX Atmosphere"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo"]
-        case (kTrackLead2,   _):        return ["Brightness","Polysynth","Minimoog","Elec Guitar"]
+        case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Choir Aahs","Synth Strings","Bowed Glass","Warm Pad","Halo Pad","New Age Pad","Sweep Pad"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
@@ -330,7 +337,7 @@ final class AppState: ObservableObject {
         case (kTrackTexture, .chill):   return ["None","Bar sounds","City at night","Light rain","Ocean waves","Urban rain","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Sweep Pad","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Fifths Lead"]
-        case (kTrackTexture, _):        return ["Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
+        case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .ambient): return ["Cello","Contrabass","Fretless Bass"]
         case (kTrackBass,    .kosmic):  return ["Moog Bass","Fretless Bass","Lead Bass","Mono Synth"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
@@ -338,6 +345,30 @@ final class AppState: ObservableObject {
         case (kTrackDrums,   .kosmic):  return ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
         case (kTrackDrums,   _):        return ["Rock Kit","808 Kit","Brush Kit"]
         default:                        return []
+        }
+    }
+
+    /// MIDI program numbers for each slot in instrumentPoolNames — same order, same count.
+    /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
+    static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
+        switch (trackIndex, style) {
+        case (kTrackLead1, .chill):   return [59, 66, 65, 56]
+        case (kTrackLead1, .ambient): return [73, 79, 75, 78, 74, 100, 94, 88, 82]
+        case (kTrackLead1, .kosmic):  return [73, 100, 68, 74]
+        case (kTrackLead1, _):        return [81, 62, 90, 80]
+        case (kTrackLead2, .chill):   return [11, 73, 64, 57]
+        case (kTrackLead2, .ambient): return [11, 8, 9, 0, 89, 91, 99]
+        case (kTrackLead2, .kosmic):  return [100, 70, 84, 85]
+        case (kTrackLead2, _):        return [90, 100, 39, 30]
+        case (kTrackPads, .ambient):  return [95, 50, 89, 94, 88]
+        case (kTrackPads, .kosmic):   return [95, 50, 89, 91]
+        case (kTrackPads, .chill):    return [89, 50, 48, 95]
+        case (kTrackPads, _):         return [94, 95, 92, 50]
+        case (kTrackRhythm, .ambient): return [11, 12, 14, 9, 98, 102]
+        case (kTrackRhythm, .chill):   return [4, 5, 17]
+        case (kTrackRhythm, .kosmic):  return [39, 5, 18]
+        case (kTrackRhythm, _):        return [28, 39, 29]
+        default: return []
         }
     }
 
@@ -592,8 +623,19 @@ final class AppState: ObservableObject {
             }
         }
         playback.onOutroStart = { [weak self] in
-            guard let self, self.playMode == .evolve, self.evolvePhase == .original else { return }
-            self.handleEvolveOutroStart()
+            guard let self, self.playMode == .evolve else { return }
+            switch self.evolvePhase {
+            case .original:
+                self.handleEvolveOutroStart()
+            case .pass2:
+                // Outro is baked into the extended state — its step annotation streams the
+                // "Bar NNN  Outro  N bar cold stop / fade / dissolve" message automatically.
+                self.evolvePhase      = .outro
+                self.evolvePhaseToken += 1
+                self.preGenerateEvolveNextSong()
+            default:
+                break
+            }
         }
     }
 
@@ -1043,18 +1085,7 @@ final class AppState: ObservableObject {
             isPreGenerating = false
             startEndlessSong(next)
         } else {
-            // Pre-gen wasn't ready; generate now and log when known
-            appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
-            let nextStyle = decideNextStyle()
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
-                let state = SongGenerator.generate(style: nextStyle, testMode: false)
-                await MainActor.run {
-                    self.appendToLog([GenerationLogEntry(tag: "Up next",
-                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
-                    self.startEndlessSong(state)
-                }
-            }
+            generateAndStartNextSong()
         }
     }
 
@@ -1067,6 +1098,20 @@ final class AppState: ObservableObject {
         nextSongState   = nil
         isPreGenerating = false
         preGenerateNextSong()   // silently pre-gen the song after next
+    }
+
+    private func generateAndStartNextSong() {
+        appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
+        let nextStyle = decideNextStyle()
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let state = SongGenerator.generate(style: nextStyle, testMode: false)
+            await MainActor.run {
+                self.appendToLog([GenerationLogEntry(tag: "Up next",
+                    description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
+                self.startEndlessSong(state)
+            }
+        }
     }
 
     /// Skip immediately to the next song (Endless mode ⏭ button).
@@ -1082,17 +1127,7 @@ final class AppState: ObservableObject {
             isPreGenerating = false
             startEndlessSong(next)
         } else {
-            appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
-            let nextStyle = decideNextStyle()
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
-                let state = SongGenerator.generate(style: nextStyle, testMode: false)
-                await MainActor.run {
-                    self.appendToLog([GenerationLogEntry(tag: "Up next",
-                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
-                    self.startEndlessSong(state)
-                }
-            }
+            generateAndStartNextSong()
         }
     }
 
@@ -1107,31 +1142,57 @@ final class AppState: ObservableObject {
         evolvePass2Bars       = 0
         evolvePass1State      = nil
         evolvePass2State      = nil
-        evolveNextSongState   = nil
-        evolveIsPreGenerating = false
+        evolveNextSongState      = nil
+        evolveIsPreGenerating    = false
+        evolveNextSongShouldLog  = false
+        evolveNextSongLogged     = false
+        evolvePhaseToken        += 1   // ensure scrollbar recreates even if next song has same totalBars
     }
 
-    private func startEvolveMode(from song: SongState) {
+    /// Picks a different instrument for each fresh track and sends a program change immediately.
+    private func switchEvolveInstruments(freshTracks: [Int]) {
+        guard let anchor = evolveAnchorState else { return }
+        let style = anchor.style
+        var rng = SystemRandomNumberGenerator()
+        for trackIndex in freshTracks {
+            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+            guard programs.count > 1 else { continue }
+            let currentIdx = instrumentOverrides[trackIndex] ?? 0
+            var newIdx = currentIdx
+            var attempts = 0
+            repeat {
+                newIdx = Int.random(in: 0..<programs.count, using: &rng)
+                attempts += 1
+            } while newIdx == currentIdx && attempts < 16
+            guard newIdx != currentIdx else { continue }
+            instrumentOverrides[trackIndex] = newIdx
+            setProgram(programs[newIdx], forTrack: trackIndex)
+        }
+        instrumentChangeToken += 1
+    }
+
+    private func startEvolveMode(from song: SongState, lockMoodToSong: Bool = true) {
+        // lockMoodToSong: true = next generated song matches this song's mood (used for song 1→2).
+        //                false = next generated song picks mood freely (used for song 2→3 onward).
+        let moodOverride: Mood? = lockMoodToSong ? song.frame.mood : nil
         // If already in or past the Outro, let it finish; pre-gen the next song
         if let outroBar = song.structure.outroSection?.startBar,
            playback.currentBar >= outroBar {
             evolveAnchorState  = song
-            evolveMoodAnchor   = song.frame.mood
+            evolveMoodAnchor   = moodOverride
             evolveTempoAnchor  = song.frame.tempo
             evolvePhase        = .outro
             preGenerateEvolveNextSong()
             return
         }
         evolveAnchorState  = song
-        evolveMoodAnchor   = song.frame.mood
+        evolveMoodAnchor   = moodOverride
         evolveTempoAnchor  = song.frame.tempo
         evolvePhase        = .original
         let aBars          = aSectionBars(of: song)
-        evolvePass1Bars    = max(32, aBars / 2)
+        evolvePass1Bars    = min(40, max(32, aBars / 2))
         evolvePass2Bars    = max(16, evolvePass1Bars / 2)
-        appendToLog([GenerationLogEntry(tag: "Evolve",
-            description: "Extending song with \(evolvePass1Bars) + \(evolvePass2Bars) bar evolution")])
-        preGeneratePass1Content()
+        preGeneratePassContent(pass: 1)
     }
 
     private func aSectionBars(of song: SongState) -> Int {
@@ -1146,97 +1207,171 @@ final class AppState: ObservableObject {
     // passBars; all other tracks copy the first passBars of anchor events. nonisolated so it can
     // be called safely from Task.detached without capturing `self`.
     private nonisolated static func buildPassState(anchor: SongState, freshTracks: [Int], passBars: Int) -> SongState {
+        // Identifies tags that are rule IDs (e.g. "AMB-LEAD-003"), not prose labels like "Key" or "⚡ REGEN"
+        func isRuleID(_ tag: String) -> Bool {
+            !tag.isEmpty && tag.contains("-") &&
+            tag.allSatisfy { $0.isUppercase || $0.isNumber || $0 == "-" }
+        }
+        let anchorRuleIDs = Set(anchor.generationLog.map(\.tag).filter(isRuleID))
+        let baseLogCount  = anchor.generationLog.count
         let cutoff = passBars * 16
-        var events = anchor.trackEvents.map { $0.filter { $0.stepIndex < cutoff } }
+        // Non-fresh tracks are copied from the anchor's body start (not step 0) so that the
+        // anchor's intro silence (e.g. 7 silent drum bars) is not replayed at the beginning
+        // of each evolution pass when it lands in the extended timeline mid-song.
+        let bodyStartStep = (anchor.structure.introSection?.endBar ?? 0) * 16
+        var events = anchor.trackEvents.map { track -> [MIDIEvent] in
+            track
+                .filter { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
+                .map { MIDIEvent(stepIndex: $0.stepIndex - bodyStartStep, note: $0.note,
+                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
+        }
+        var regenLog: [GenerationLogEntry] = []
         for idx in freshTracks {
-            let regen = SongGenerator.regenerateTrack(idx, songState: anchor)
-            events[idx] = regen.trackEvents[idx].filter { $0.stepIndex < cutoff }
+            let anchorHadContent = !anchor.trackEvents[idx].isEmpty
+            var regen      = SongGenerator.regenerateTrack(idx, songState: anchor, passBodyBars: passBars)
+            var newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
+            // Retry until: (a) new rule differs from every rule used in the anchor AND
+            //              (b) there are body events (not just intro motif) within the pass window.
+            //              Solo rules (MOT-LD1-007/008) are completely silent in body bars outside
+            //              their solo window. passBodyBars constrains the solo to land within the
+            //              pass window, but we still retry if only intro motif notes exist.
+            var attempts = 1
+            while attempts < 12 {
+                let newRuleIDs = Set(newEntries.map(\.tag).filter(isRuleID))
+                let eventsEmpty = anchorHadContent &&
+                    regen.trackEvents[idx].filter({ $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }).isEmpty
+                if newRuleIDs.isDisjoint(with: anchorRuleIDs) && !eventsEmpty { break }
+                regen      = SongGenerator.regenerateTrack(idx, songState: anchor, passBodyBars: passBars)
+                newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
+                attempts  += 1
+            }
+            events[idx] = regen.trackEvents[idx]
+                .filter { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
+                .map { MIDIEvent(stepIndex: $0.stepIndex - bodyStartStep, note: $0.note,
+                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
+            regenLog.append(contentsOf: newEntries)
         }
         let passFrame = anchor.frame.withTotalBars(passBars)
         let minStruct = SongStructure(sections: [], chordPlan: [],
                                       introStyle: anchor.structure.introStyle,
                                       outroStyle: anchor.structure.outroStyle)
-        return SongState(frame: passFrame, structure: minStruct, tonalMap: anchor.tonalMap,
-                         trackEvents: events, globalSeed: anchor.globalSeed,
-                         trackOverrides: [:], title: anchor.title, form: anchor.form,
-                         style: anchor.style, percussionStyle: anchor.percussionStyle,
-                         kosmicProgFamily: anchor.kosmicProgFamily,
-                         generationLog: [], stepAnnotations: [:],
-                         ambientProgFamily: anchor.ambientProgFamily,
-                         ambientLoopLengths: anchor.ambientLoopLengths,
-                         ambientUseBrushKit: anchor.ambientUseBrushKit,
-                         chillProgFamily: anchor.chillProgFamily,
-                         chillLeadInstrument: anchor.chillLeadInstrument,
-                         chillBeatStyle: anchor.chillBeatStyle,
-                         chillBreakdownStyle: anchor.chillBreakdownStyle,
-                         chillSwingFeel: anchor.chillSwingFeel,
-                         chillAudioTexture: anchor.chillAudioTexture,
-                         chillAudioTextureOffset: anchor.chillAudioTextureOffset)
+        return SongState(frame: passFrame, structure: minStruct,
+                         trackEvents: events, generationLog: regenLog, stepAnnotations: [:],
+                         copyingStyleFieldsFrom: anchor)
     }
 
-    // Builds an outro-only SongState from the anchor (shifted to start at step 0).
-    private nonisolated static func buildOutroState(anchor: SongState) -> SongState? {
-        guard let outroSection = anchor.structure.outroSection else { return nil }
-        let outroStartStep = outroSection.startBar * 16
-        let outroBars      = outroSection.lengthBars
-        let shifted = anchor.trackEvents.map { track in
-            track.filter { $0.stepIndex >= outroStartStep }
-                 .map { ev in MIDIEvent(stepIndex: ev.stepIndex - outroStartStep,
-                                        note: ev.note, velocity: ev.velocity,
-                                        durationSteps: ev.durationSteps) }
+    // Builds an extended SongState by appending pass events (and optionally the original Outro)
+    // after the anchor body. pass1Events and pass2Events are 0-indexed within their own pass lengths;
+    // they are shifted into the correct absolute position in the extended timeline.
+    private nonisolated static func buildExtendedState(
+        anchor: SongState,
+        outroStartBar: Int,
+        pass1Events: [[MIDIEvent]],
+        pass1Bars: Int,
+        pass2Events: [[MIDIEvent]]? = nil,
+        pass2Bars: Int = 0,
+        includeOutro: Bool = false
+    ) -> SongState {
+        let outroStartStep = outroStartBar * 16
+        let p1Offset       = outroStartStep
+        let p2Offset       = (outroStartBar + pass1Bars) * 16
+        let outroShift     = (pass1Bars + pass2Bars) * 16
+
+        var tracks: [[MIDIEvent]] = []
+        for t in 0..<kTrackCount {
+            var events: [MIDIEvent] = []
+            // Anchor body (before Outro start)
+            events.append(contentsOf: anchor.trackEvents[t].filter { $0.stepIndex < outroStartStep })
+            // Pass 1 events shifted to start at outroStartBar
+            events.append(contentsOf: pass1Events[t].map {
+                MIDIEvent(stepIndex: $0.stepIndex + p1Offset, note: $0.note,
+                          velocity: $0.velocity, durationSteps: $0.durationSteps)
+            })
+            // Pass 2 events shifted to start at (outroStartBar + pass1Bars)
+            if let p2 = pass2Events {
+                events.append(contentsOf: p2[t].map {
+                    MIDIEvent(stepIndex: $0.stepIndex + p2Offset, note: $0.note,
+                              velocity: $0.velocity, durationSteps: $0.durationSteps)
+                })
+            }
+            // Original Outro events shifted to play after all passes
+            if includeOutro {
+                events.append(contentsOf: anchor.trackEvents[t]
+                    .filter { $0.stepIndex >= outroStartStep }
+                    .map { MIDIEvent(stepIndex: $0.stepIndex + outroShift, note: $0.note,
+                                     velocity: $0.velocity, durationSteps: $0.durationSteps) })
+            }
+            tracks.append(events)
         }
-        let outroFrame = anchor.frame.withTotalBars(outroBars)
-        let minStruct  = SongStructure(sections: [], chordPlan: [],
-                                       introStyle: anchor.structure.introStyle,
-                                       outroStyle: anchor.structure.outroStyle)
-        return SongState(frame: outroFrame, structure: minStruct, tonalMap: anchor.tonalMap,
-                         trackEvents: shifted, globalSeed: anchor.globalSeed,
-                         trackOverrides: [:], title: anchor.title, form: anchor.form,
-                         style: anchor.style, percussionStyle: anchor.percussionStyle,
-                         kosmicProgFamily: anchor.kosmicProgFamily,
-                         generationLog: [], stepAnnotations: [:],
-                         ambientProgFamily: anchor.ambientProgFamily,
-                         ambientLoopLengths: anchor.ambientLoopLengths,
-                         ambientUseBrushKit: anchor.ambientUseBrushKit,
-                         chillProgFamily: anchor.chillProgFamily,
-                         chillLeadInstrument: anchor.chillLeadInstrument,
-                         chillBeatStyle: anchor.chillBeatStyle,
-                         chillBreakdownStyle: anchor.chillBreakdownStyle,
-                         chillSwingFeel: anchor.chillSwingFeel,
-                         chillAudioTexture: anchor.chillAudioTexture,
-                         chillAudioTextureOffset: anchor.chillAudioTextureOffset)
-    }
 
-    private func preGeneratePass1Content() {
-        guard let anchor = evolveAnchorState, !evolveIsPreGenerating,
-              evolvePass1State == nil else { return }
-        evolveIsPreGenerating = true
-        let passBars = evolvePass1Bars
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let state = Self.buildPassState(anchor: anchor, freshTracks: [kTrackLead1, kTrackLead2],
-                                            passBars: passBars)
-            await MainActor.run {
-                guard self.playMode == .evolve else { return }
-                self.evolvePass1State      = state
-                self.evolveIsPreGenerating = false
+        let outroBars  = includeOutro ? (anchor.frame.totalBars - outroStartBar) : 0
+        let totalBars  = outroStartBar + pass1Bars + pass2Bars + outroBars
+        let extFrame   = anchor.frame.withTotalBars(totalBars)
+        // Include the outro section in the structure so PlaybackEngine can schedule the audio fade.
+        // Also carry the anchor's outro step annotations (shifted) so the normal bar-annotation
+        // feed shows e.g. "Bar 165  Outro  4 bar cold stop — drum fill ending" at the right time.
+        var extSections: [SongSection] = []
+        var extAnnotations: [Int: [GenerationLogEntry]] = [:]
+        if includeOutro, let anchorOutro = anchor.structure.outroSection {
+            let extOutroStart = outroStartBar + pass1Bars + pass2Bars
+            extSections = [SongSection(startBar: extOutroStart,
+                                       lengthBars: anchorOutro.lengthBars,
+                                       label: .outro,
+                                       intensity: anchorOutro.intensity,
+                                       mode: anchorOutro.mode)]
+            // Shift every annotation that belongs to the outro section.
+            for (step, entries) in anchor.stepAnnotations where step >= outroStartStep {
+                extAnnotations[step + outroShift] = entries
             }
         }
+        let minStruct  = SongStructure(sections: extSections, chordPlan: [],
+                                       introStyle: anchor.structure.introStyle,
+                                       outroStyle: anchor.structure.outroStyle)
+        return SongState(frame: extFrame, structure: minStruct,
+                         trackEvents: tracks, generationLog: [], stepAnnotations: extAnnotations,
+                         copyingStyleFieldsFrom: anchor)
     }
 
-    private func preGeneratePass2Content() {
-        guard let anchor = evolveAnchorState, !evolveIsPreGenerating,
-              evolvePass2State == nil else { return }
+    private func preGeneratePassContent(pass: Int) {
+        guard let anchor = evolveAnchorState, !evolveIsPreGenerating else { return }
+        let freshTracks: [Int]
+        let passBars: Int
+        switch pass {
+        case 1:
+            guard evolvePass1State == nil else { return }
+            freshTracks = [kTrackLead1, kTrackLead2]
+            passBars    = evolvePass1Bars
+        case 2:
+            guard evolvePass2State == nil else { return }
+            freshTracks = [kTrackPads, kTrackRhythm]
+            passBars    = evolvePass2Bars
+        default: return
+        }
         evolveIsPreGenerating = true
-        let passBars = evolvePass2Bars
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let state = Self.buildPassState(anchor: anchor, freshTracks: [kTrackPads, kTrackRhythm],
-                                            passBars: passBars)
+            let state = Self.buildPassState(anchor: anchor, freshTracks: freshTracks, passBars: passBars)
             await MainActor.run {
                 guard self.playMode == .evolve else { return }
-                self.evolvePass2State      = state
+                if pass == 1 {
+                    self.evolvePass1State = state
+                } else {
+                    self.evolvePass2State = state
+                }
                 self.evolveIsPreGenerating = false
+                // Pass-2 only: update display immediately (12-bar early look-ahead)
+                if pass == 2, self.evolvePhase == .pass1,
+                   let pass1 = self.evolvePass1State {
+                    let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+                    let extended = Self.buildExtendedState(
+                        anchor: anchor, outroStartBar: outroStartBar,
+                        pass1Events: pass1.trackEvents, pass1Bars: self.evolvePass1Bars,
+                        pass2Events: state.trackEvents, pass2Bars: passBars)
+                    self.songState = extended
+                    self.appendToLog([GenerationLogEntry(tag: "Upcoming",
+                        description: "Evolving section \(passBars) bars with new pads, rhythm",
+                        isTitle: false)])
+                }
             }
         }
     }
@@ -1258,7 +1393,9 @@ final class AppState: ObservableObject {
                 guard self.playMode == .evolve else { return }
                 self.evolveNextSongState   = state
                 self.evolveIsPreGenerating = false
-                if self.evolvePhase == .pass2 {
+                if self.evolveNextSongShouldLog && !self.evolveNextSongLogged {
+                    self.evolveNextSongShouldLog = false
+                    self.evolveNextSongLogged    = true
                     self.appendToLog([GenerationLogEntry(tag: "Up next",
                         description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
                 }
@@ -1287,31 +1424,75 @@ final class AppState: ObservableObject {
     }
 
     private func doSwitchToEvolvePass1(_ pass1: SongState) {
-        evolvePhase      = .pass1
-        evolvePass1State = nil
-        songState        = pass1
-        visibleBarOffset = 0
-        lastEmittedStep  = -1
-        playback.switchToPass(pass1)
-        appendToLog([GenerationLogEntry(tag: "Evolve", description: "Evolution Pass 1", isTitle: true)])
+        guard let anchor = evolveAnchorState else { return }
+        evolvePhase       = .pass1
+        evolvePhaseToken += 1
+        // Keep evolvePass1State for building extendedState2 later
+        evolvePass1State = pass1
+
+        let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+        let extended = Self.buildExtendedState(anchor: anchor, outroStartBar: outroStartBar,
+                                               pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars)
+        songState        = extended
+        lastEmittedStep  = outroStartBar * 16 - 1
+        visibleBarOffset = max(0, outroStartBar - Int(Double(visibleBars) * 0.15))
+        switchEvolveInstruments(freshTracks: [kTrackLead1, kTrackLead2])
+        appendToLog(pass1.generationLog)
+        playback.loadAndPlay(state: extended, fromStep: outroStartBar * 16)
     }
 
     private func doSwitchToEvolvePass2(_ pass2: SongState) {
-        evolvePhase      = .pass2
-        evolvePass2State = nil
-        songState        = pass2
-        visibleBarOffset = 0
-        lastEmittedStep  = -1
-        playback.switchToPass(pass2)
-        appendToLog([GenerationLogEntry(tag: "Evolve", description: "Evolution Pass 2", isTitle: true)])
-        preGenerateEvolveNextSong()
+        guard let anchor = evolveAnchorState, let pass1 = evolvePass1State else { return }
+        evolvePhase       = .pass2
+        evolvePhaseToken += 1
+        // Keep evolvePass2State for building extendedStateWithOutro later
+        evolvePass2State = pass2
+
+        let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+        let extended = Self.buildExtendedState(anchor: anchor, outroStartBar: outroStartBar,
+                                               pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars,
+                                               pass2Events: pass2.trackEvents, pass2Bars: evolvePass2Bars,
+                                               includeOutro: true)
+        let pass2StartBar = outroStartBar + evolvePass1Bars
+        songState        = extended
+        lastEmittedStep  = pass2StartBar * 16 - 1
+        visibleBarOffset = max(0, pass2StartBar - Int(Double(visibleBars) * 0.15))
+        switchEvolveInstruments(freshTracks: [kTrackPads, kTrackRhythm])
+        appendToLog(pass2.generationLog)
+        playback.loadAndPlay(state: extended, fromStep: pass2StartBar * 16)
     }
 
     private func handleEvolveApproachingEnd() {
         switch evolvePhase {
-        case .pass1: preGeneratePass2Content()
-        case .pass2: preGenerateEvolveNextSong()
-        default: break
+        case .original:
+            // 12 bars before Outro: if pass1 is ready, show the extended bars now and log (once only)
+            guard let pass1 = evolvePass1State, let anchor = evolveAnchorState,
+                  (songState?.frame.totalBars ?? 0) <= anchor.frame.totalBars else { break }
+            let outroStartBar = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
+            let extended = Self.buildExtendedState(anchor: anchor, outroStartBar: outroStartBar,
+                                                   pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars)
+            songState = extended
+            appendToLog([GenerationLogEntry(tag: "Upcoming",
+                description: "Evolving section \(evolvePass1Bars) bars with new leads",
+                isTitle: false)])
+        case .pass1:
+            preGeneratePassContent(pass: 2)
+            preGenerateEvolveNextSong()   // start next-song gen early so it's ready at the 12-bar mark
+        case .pass2, .outro:
+            // onApproachingEnd fires 12 bars before the outro of the extended state while
+            // evolvePhase is still .pass2 (onOutroStart hasn't fired yet). This is the right
+            // moment to show "Up next" — same timing as Endless mode.
+            // The .outro branch is a fallback — normally unreachable because onApproachingEnd
+            // fires exactly once per loadAndPlay and the .pass2 case handles it first.
+            if let next = evolveNextSongState, !evolveNextSongLogged {
+                evolveNextSongLogged = true
+                appendToLog([GenerationLogEntry(tag: "Up next",
+                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+            } else if !evolveNextSongLogged {
+                evolveNextSongShouldLog = true
+                preGenerateEvolveNextSong()
+            }
+        case .inactive: break
         }
     }
 
@@ -1337,37 +1518,20 @@ final class AppState: ObservableObject {
                     }
                 }
             }
-        case .pass2:
-            playEvolveOutro()
-        case .outro:
+        case .pass2, .outro:
             transitionToEvolveNextSong()
         case .inactive:
             break
         }
     }
 
-    private func playEvolveOutro() {
-        guard let anchor = evolveAnchorState else {
-            transitionToEvolveNextSong()
-            return
-        }
-        if let outroState = Self.buildOutroState(anchor: anchor) {
-            evolvePhase      = .outro
-            songState        = outroState
-            visibleBarOffset = 0
-            lastEmittedStep  = -1
-            playback.switchToPass(outroState)
-            appendToLog([GenerationLogEntry(tag: "Evolve", description: "Outro", isTitle: true)])
-        } else {
-            transitionToEvolveNextSong()
-        }
-    }
-
     private func transitionToEvolveNextSong() {
         if let next = evolveNextSongState {
             evolveNextSongState = nil
-            appendToLog([GenerationLogEntry(tag: "Up next",
-                description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+            if !evolveNextSongLogged {
+                appendToLog([GenerationLogEntry(tag: "Up next",
+                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+            }
             finishLoadingEvolveSong(next)
         } else {
             appendToLog([GenerationLogEntry(tag: "Evolve", description: "Loading next song...", isTitle: false)])
@@ -1383,8 +1547,10 @@ final class AppState: ObservableObject {
                                                    style: style, testMode: false)
                 await MainActor.run {
                     guard self.playMode == .evolve else { return }
-                    self.appendToLog([GenerationLogEntry(tag: "Up next",
-                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
+                    if !self.evolveNextSongLogged {
+                        self.appendToLog([GenerationLogEntry(tag: "Up next",
+                            description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
+                    }
                     self.finishLoadingEvolveSong(state)
                 }
             }
@@ -1392,11 +1558,21 @@ final class AppState: ObservableObject {
     }
 
     private func finishLoadingEvolveSong(_ state: SongState) {
-        tearDownEvolve()
+        tearDownEvolve()           // resets evolveMoodAnchor to nil
         appendSongHistory(from: state)
         selectedStyle = state.style
         finishLoadingSong(state, thenPlay: true)
-        startEvolveMode(from: state)
+        // Append the full generation log (title, key, mode, rules) for the new song,
+        // same as generateNew does — so the status area shows all the song details.
+        var batch: [GenerationLogEntry] = []
+        if !statusLog.isEmpty {
+            batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
+        }
+        batch.append(contentsOf: state.generationLog)
+        appendToLog(batch)
+        // Song 2 already matched song 1's mood (enforced at pre-gen time via evolveMoodAnchor).
+        // From song 3 onward, lockMoodToSong: false so mood is picked freely each time.
+        startEvolveMode(from: state, lockMoodToSong: false)
     }
 
     /// Skip to the next evolution pass immediately (Evolve mode ⏭ button).
@@ -1405,7 +1581,7 @@ final class AppState: ObservableObject {
         switch evolvePhase {
         case .original: handleEvolveOutroStart()
         case .pass1:    handleEvolvePhaseEnded()
-        case .pass2:    playEvolveOutro()
+        case .pass2:    transitionToEvolveNextSong()
         case .outro:    transitionToEvolveNextSong()
         case .inactive: break
         }

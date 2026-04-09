@@ -30,17 +30,9 @@ struct RhythmGenerator {
         let arpDirection = rng.nextInt(upperBound: 5)
 
         // Forced pattern index (nil = pick randomly per section as normal)
-        let forcedPatternType: Int? = forceRuleID.flatMap { id in
-            switch id {
-            case "MOT-RTHM-001": return 0
-            case "MOT-RTHM-002": return 1
-            case "MOT-RTHM-003": return 2
-            case "MOT-RTHM-004": return 3
-            case "MOT-RTHM-005": return 4
-            case "MOT-RTHM-006": return 5
-            default: return nil
-            }
-        }
+        let ruleIDs = ["MOT-RTHM-001", "MOT-RTHM-002", "MOT-RTHM-003",
+                       "MOT-RTHM-004", "MOT-RTHM-005", "MOT-RTHM-006"]
+        let forcedPatternType: Int? = forceRuleID.flatMap { ruleIDs.firstIndex(of: $0) }
 
         for section in structure.sections {
             // Rhythm is silent in intro/outro
@@ -49,14 +41,7 @@ struct RhythmGenerator {
             // Pick pattern type once per section (or use forced value for all sections)
             let patternWeights: [Double] = [0.30, 0.17, 0.17, 0.13, 0.08, 0.15]
             let patternType = forcedPatternType ?? rng.weightedPick(patternWeights)
-            switch patternType {
-            case 0:  usedRuleIDs.insert("MOT-RTHM-001")
-            case 1:  usedRuleIDs.insert("MOT-RTHM-002")
-            case 2:  usedRuleIDs.insert("MOT-RTHM-003")
-            case 3:  usedRuleIDs.insert("MOT-RTHM-004")
-            case 4:  usedRuleIDs.insert("MOT-RTHM-005")
-            default: usedRuleIDs.insert("MOT-RTHM-006")
-            }
+            usedRuleIDs.insert(ruleIDs[min(patternType, ruleIDs.count - 1)])
 
             // prevNote for smooth octave transitions across bar lines
             var prevNote: UInt8? = nil
@@ -200,15 +185,14 @@ struct RhythmGenerator {
                            entry.chordWindow.chordType == .add9  ||
                            entry.chordWindow.chordType == .sus4  ||
                            entry.chordWindow.chordType == .power
-        let thirdPC = (rootPC + (isMajorThird ? 4 : 3)) % 12
         let fifthPC = (rootPC + 7) % 12
-        // Snap flat-7 to nearest in-scale pitch class to prevent Modal Drift on non-tonic chord roots.
+        // Snap third and flat-7 to nearest in-scale pitch class to prevent chromatic leakage
+        // when the chord root is non-tonic (e.g. Bbsus2 in G Dorian: raw minor-3rd = C# OOS).
+        let scalePCsSet = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawThird = (rootPC + (isMajorThird ? 4 : 3)) % 12
+        let thirdPC  = nearestScalePitchClass(rawThird, in: scalePCsSet)
         let rawFlat7 = (rootPC + 10) % 12
-        let scalePCs = frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 }
-        let flat7PC  = scalePCs.min(by: {
-            min(($0 - rawFlat7 + 12) % 12, (rawFlat7 - $0 + 12) % 12) <
-            min(($1 - rawFlat7 + 12) % 12, (rawFlat7 - $1 + 12) % 12)
-        }) ?? rawFlat7
+        let flat7PC  = nearestScalePitchClass(rawFlat7, in: scalePCsSet)
 
         let root  = nearestMIDI(target: findMIDI(pc: rootPC,  ref: 57), low: 45, high: 72, prev: prevNote)
         let fifth = nearestMIDI(target: findMIDI(pc: fifthPC, ref: 57), low: 48, high: 76, prev: prevNote)

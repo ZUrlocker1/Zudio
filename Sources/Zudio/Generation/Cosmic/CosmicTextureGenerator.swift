@@ -61,7 +61,7 @@ struct KosmicTextureGenerator {
                 let descPCs = [12, 7, third, 0]
                 let pc  = (ascending ? ascPCs : descPCs)[phase]
                 let note = clampToRegister(rootPC + pc + 36, low: 33, high: 59)
-                let vel  = UInt8(max(14, min(60, 28 + phase * 6 + rng.nextInt(upperBound: 8) - 4)))
+                let vel  = UInt8(max(32, min(72, 42 + phase * 6 + rng.nextInt(upperBound: 8) - 4)))
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 20))
             }
         }
@@ -82,7 +82,7 @@ struct KosmicTextureGenerator {
                 // Root in first half (stable); fifth in second half (brightens as melody climbs)
                 let pc = isSecondHalf ? 7 : 0
                 let note = clampToRegister(rootPC + pc + 36, low: 33, high: 59)
-                let vel = UInt8(isSecondHalf ? 22 : 16)
+                let vel = UInt8(isSecondHalf ? 45 : 35)
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 10))
             }
         }
@@ -99,7 +99,7 @@ struct KosmicTextureGenerator {
                 // root or fifth only — avoid thirds that conflict with arpeggio phrase
                 let pc = rng.nextDouble() < 0.6 ? 0 : 7
                 let note = clampToRegister(rootPC + pc + 36, low: 33, high: 59)
-                let vel = UInt8(max(14, min(35, 20 + rng.nextInt(upperBound: 12) - 4)))
+                let vel = UInt8(max(32, min(55, 38 + rng.nextInt(upperBound: 12) - 4)))
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note), velocity: vel, durationSteps: 10))
             }
         }

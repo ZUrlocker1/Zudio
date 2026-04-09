@@ -60,8 +60,9 @@ struct KosmicPadsGenerator {
                 guard bar == section.startBar else { continue }
                 let introSteps = (section.endBar - section.startBar) * 16
                 let introLen   = section.endBar - section.startBar
-                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
                 let thirdRaw = (rootPC + entry.sectionMode.intervals[2]) % 12
                 let thirdPC  = scalePCs.contains(thirdRaw) ? thirdRaw : {
                     for d in 1...6 {
@@ -71,7 +72,7 @@ struct KosmicPadsGenerator {
                     return thirdRaw
                 }()
                 let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 let third  = noteInPadsRegister(pc: thirdPC, targetOct: 2)
                 let dur = introSteps - 1
                 events += [
@@ -96,10 +97,12 @@ struct KosmicPadsGenerator {
             // Outro: same principle — velocity matches body so the fade-out is perceptually linear.
             if section.label == .outro {
                 guard bar == section.startBar else { continue }
-                let dur    = max(1, (section.endBar - section.startBar) * 16 - 1)
-                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let dur      = max(1, (section.endBar - section.startBar) * 16 - 1)
+                let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
+                let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 events += [
                     MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 65, durationSteps: dur),
                     MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 58, durationSteps: dur),
@@ -128,9 +131,9 @@ struct KosmicPadsGenerator {
                     }
                     return m3raw
                 }()
-                let root   = noteInPadsRegister(pc: rootPC,            targetOct: 2)
-                let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
-                let octave = noteInPadsRegister(pc: rootPC,            targetOct: 3)
+                let root   = noteInPadsRegister(pc: rootPC,                                              targetOct: 2)
+                let fifth  = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
+                let octave = noteInPadsRegister(pc: rootPC,                                              targetOct: 3)
                 let third  = noteInPadsRegister(pc: m3pc,              targetOct: 2)
                 let dur = 12
                 // Ascending phases add voices; descending phases remove them
@@ -160,7 +163,7 @@ struct KosmicPadsGenerator {
                 let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
                 let third     = noteInPadsRegister(
                     pc: snapToScale(rootPC + mode.nearestInterval(3), scalePCs: scalePCs), targetOct: 2)
-                let fifth     = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 if bridgeBar % 2 == 0 {
                     // Call bar: sharp hit beat 1, quieter echo beat 3
                     events += [
@@ -195,10 +198,10 @@ struct KosmicPadsGenerator {
                 let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
                 let mode     = entry.sectionMode
                 let root     = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth    = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let fifth    = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 let third    = noteInPadsRegister(
                     pc: snapToScale(rootPC + mode.nearestInterval(3), scalePCs: scalePCs), targetOct: 2)
-                let fourth   = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
+                let fourth   = noteInPadsRegister(pc: snapToScale((rootPC + 5) % 12, scalePCs: scalePCs), targetOct: 2)
 
                 if bridgeLen <= 4 {
                     // Short bridge: one long hold for the full duration
@@ -244,9 +247,11 @@ struct KosmicPadsGenerator {
             if section.label == .B && bar == section.startBar && rng.nextDouble() < 0.50 {
                 let holdBars = 8 + rng.nextInt(upperBound: 5)  // 8–12 bars
                 let holdDur  = min(holdBars * 16 - 1, (section.endBar - bar) * 16 - 1)
-                let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let root     = noteInPadsRegister(pc: rootPC, targetOct: 2)
-                let fifth    = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+                let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
+                let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+                let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
                 events += [
                     MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 68, durationSteps: holdDur),
                     MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 62, durationSteps: holdDur),
@@ -342,7 +347,7 @@ struct KosmicPadsGenerator {
             return thirdRaw
         }()
         let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fifth     = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+        let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
         let octave    = noteInPadsRegister(pc: rootPC, targetOct: 3)
         let thirdHigh = noteInPadsRegister(pc: thirdPC, targetOct: 3)
 
@@ -368,9 +373,11 @@ struct KosmicPadsGenerator {
     private static func swellChordBar(
         barStart: Int, bar: Int, sectionStartBar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
+        let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+        let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
 
         // Rotate attack step every 8 bars to break identical fingerprint runs.
         // Shifts the swell onset by 0, 2, 4, or 6 steps across consecutive 8-bar windows.
@@ -397,12 +404,14 @@ struct KosmicPadsGenerator {
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         var evs: [MIDIEvent] = []
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
 
         // Voice 1: 8-bar loop — root voicing
         if bar % 8 == 0 {
             let root = noteInPadsRegister(pc: rootPC, targetOct: 2)
-            let fifth = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+            let fifth = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
             evs += [
                 MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: 50, durationSteps: 14 * 8),
                 MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: 45, durationSteps: 14 * 8),
@@ -411,7 +420,6 @@ struct KosmicPadsGenerator {
 
         // Voice 2: 10-bar loop — different voicing
         if bar % 10 == 0 {
-            let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
             let oct       = noteInPadsRegister(pc: rootPC, targetOct: 3)
             let mode      = frame.mode
             let thirdHigh = noteInPadsRegister(
@@ -437,24 +445,26 @@ struct KosmicPadsGenerator {
     private static func suspendedResolutionBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let cycle  = bar % 4
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)  // snap borrowed/chromatic roots
+        let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+        let cycle     = bar % 4
 
         if cycle < 3 {
-            // sus4: root + fourth + fifth
-            let fourth = noteInPadsRegister(pc: (rootPC + 5) % 12, targetOct: 2)
-            let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+            // sus4: root + fourth + fifth (snap all intervals to scale)
+            let fourthPC = snapToScale((rootPC + 5) % 12, scalePCs: scalePCs)
+            let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
+            let fourth   = noteInPadsRegister(pc: fourthPC, targetOct: 2)
+            let fifth    = noteInPadsRegister(pc: fifthPC,  targetOct: 2)
             return [
                 MIDIEvent(stepIndex: barStart, note: UInt8(root),   velocity: 50, durationSteps: 14),
                 MIDIEvent(stepIndex: barStart, note: UInt8(fourth),  velocity: 45, durationSteps: 14),
                 MIDIEvent(stepIndex: barStart, note: UInt8(fifth),   velocity: 48, durationSteps: 14),
             ]
         } else {
-            // minor resolution: root + minor third + fifth (snap third to scale)
-            let mode     = frame.mode
-            let scalePCs = Set(mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
-            let m3raw    = (rootPC + mode.nearestInterval(3)) % 12
+            // minor resolution: root + minor third + fifth (snap all intervals to scale)
+            let m3raw    = (rootPC + frame.mode.nearestInterval(3)) % 12
             let m3pc     = scalePCs.contains(m3raw) ? m3raw : {
                 for d in 1...6 {
                     if scalePCs.contains((m3raw + d) % 12) { return (m3raw + d) % 12 }
@@ -463,7 +473,8 @@ struct KosmicPadsGenerator {
                 return m3raw
             }()
             let minor3rd = noteInPadsRegister(pc: m3pc, targetOct: 2)
-            let fifth    = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+            let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
+            let fifth    = noteInPadsRegister(pc: fifthPC, targetOct: 2)
             return [
                 MIDIEvent(stepIndex: barStart, note: UInt8(root),     velocity: 55, durationSteps: 14),
                 MIDIEvent(stepIndex: barStart, note: UInt8(minor3rd), velocity: 50, durationSteps: 14),
@@ -478,8 +489,9 @@ struct KosmicPadsGenerator {
     private static func quartalStackBar(
         barStart: Int, bar: Int, sectionStartBar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
-        let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)  // snap borrowed/chromatic roots
         // b7 above chord root may be outside scale when chord is non-tonic; snap to scale.
         let b7raw    = (rootPC + 10) % 12
         let b7pc     = scalePCs.contains(b7raw) ? b7raw : {
@@ -526,9 +538,11 @@ struct KosmicPadsGenerator {
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         intensity: SectionIntensity = .high, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let root   = noteInPadsRegister(pc: rootPC, targetOct: 2)
-        let fifth  = noteInPadsRegister(pc: (rootPC + 7) % 12, targetOct: 2)
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
+        let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
+        let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
 
         // Downbeats (1, 3) fire more reliably than upbeats (2, 4).
         // Scale by intensity: .low sections are ~55% of full density, .medium ~80%.
@@ -580,7 +594,9 @@ struct KosmicPadsGenerator {
     private static func shimmerLayerBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs  = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
 
         // 1–3 notes from upper register (root + 2 or 3 octaves = MIDI 60+key+24 or +36)
         let noteCount = 1 + rng.nextInt(upperBound: 3)
@@ -588,8 +604,11 @@ struct KosmicPadsGenerator {
 
         let semitones = [0, 7, 12]  // root, fifth, octave
         for i in 0..<noteCount {
-            let st = semitones[i % semitones.count]
-            let midi = clampToRegister(60 + rootPC + st, low: 60, high: 84)
+            let st      = semitones[i % semitones.count]
+            let rawMidi = 60 + rootPC + st
+            let rawPC   = rawMidi % 12
+            let snapPC  = snapToScale(rawPC, scalePCs: scalePCs)
+            let midi    = clampToRegister(rawMidi - rawPC + snapPC, low: 60, high: 84)
 
             // Velocity ramp 52→72 over 4–8 beats
             let dur = 4 * (1 + rng.nextInt(upperBound: 2))  // 4 or 8 steps

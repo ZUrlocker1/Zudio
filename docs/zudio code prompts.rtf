@@ -3,7 +3,7 @@
 }
 {\colortbl;\red255\green255\blue255;}
 {\*\expandedcolortbl;;}
-\margl1440\margr1440\vieww19320\viewh12880\viewkind0
+\margl1440\margr1440\vieww19300\viewh12880\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
 \f0\b\fs36 \cf0 Zudio Code prompts\
@@ -1464,11 +1464,9 @@ I notice with the Play mode selector I need to click exactly on the text for Son
 lets make the up next and rewind messages consistent with the SONG messages in the status bar area, e.g. White text and Yellow for the song title.\
 \
 
-\f0\b Evolve mode\
-\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
-
-\f2\b0 \cf0 \
-i have made some edits to the continuous play evolve section of the doc and it is now a bit ambiguous.  Should there be 2 evolutions or more than that?  what are the pros and cons?\
+\f0\b Evolve mode
+\f2\b0 \
+I have made some edits to the continuous play evolve section of the doc and it is now a bit ambiguous.  Should there be 2 evolutions or more than that?  what are the pros and cons?\
 \
 lets keep it simple with 2 in-song evolutions, then we generate a new song. The song should be in the same "mood" and within 5 bpm of the prior song.  Then the next time we evolve, lets have a 50% probability of an entirely new song, and 50% that we stick with the same Mood.  How does that sound?\
 \
@@ -1476,11 +1474,11 @@ To be more clear, Evolve mode stays only with the current style. If you're evolv
 There is a mood setting that says Bright, Deep, Dream, Free which controls I think key, scale, tempo.  But I'm not sure how much that is really used.
 \f0\b \
 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
-\f2\b0 1. yes use the current mood as anchor\
+\f2\b0 \cf0 1. yes use the current mood as anchor\
 2. if you hit evolve, you generate a new additional section that extends the song by at least 32 bars. It's not replacing the existing song, but extending it. This is important to get right. \
 3. the style locks to the style of the song that is currently being used.  However, I think the control should still be enabled. Meaning if the user clicks a different style, they can click generate and start evolving in the new style.\
-\
 \
 1. insert the new evolved section before the outro. \
 2. yes rewind takes you back to the beginning of the original song.  If the user hits rewind a second time (within the first 2 bars) then go back to the preivous song.  So like Endless mode, keep track of the songs that have been played (up to 10)\
@@ -1488,5 +1486,94 @@ There is a mood setting that says Bright, Deep, Dream, Free which controls I thi
 review the plan and let me know if you think its clear enough to go into implementation\
 \
 ok go ahead and code it.\
+\
+I evolved a Chill song. It seemed to handle the first eovlution of a song, but then at the end it stopped, the audio texture file was still playing and then I got a crash error Task 1030: Swift runtime failure: arithmetic overflow line 992 Playbackengine.swift\
+Make the play mode selector (Song / Evolve / Endless) more at least 30 pixels more narrow.\
+\
+Make sure that the Evolution status updates appear when the player is approxumately 12 bars before the end.  At that point, please ADD the newly generated bars into the current display, extending the song, rather than as if it is a brand new song. It seems to be working otherwise for pass 1.  For pass 2 it seemed to work, but the playing stopped. It should continue to play the second pass evolution automatically, just like the first.\
+Show\
+\
+similarly, at the end of the second evolution, when the new song is generated, make sure you play the song also\
+\
+I saw quite a few messages in the status area:\
+Evolve         Extending song with 42 + 21 bar evolution\
+Evolve         Evolution ready \'97 42 + 21 bars\
+Evolve         Evolution Pass 1\
+Only display one message when we are 12 bars from the first evolution occurring. That message can be:\
+Evolve         Extended section 42 bars with new leads\
+and for the second pass\
+Evolve         Extended section 21 bars with new pads, rhtyhm \
+or similar \
+These Evolve messages should be like the regular status messages in Green and White text. \
+Also, I would like you to insert the extra bars visually when we are 12 bars from the finish, rather than when the evolution actually happens so it will display more smoothly.\
+\
+\
+I also need you to investigate how the scrollbars are being adjusted when we add the extended evolution sections because they are drawing the light grey area far to the right of where it should be, well into where the effects buttons are located. then if I click on it, it corrects it and draws it within the midi grid the way its supposed to be done. \
+\
+it seems sometimes the scrollbars are drawn properly but then they are adjusted a second time and not working when the new regen messages are displayed. Please verify you're not updating the scrollbars in too many places	\
+note that when we generate the next song after evolving pass 1 and 2 it should display all the normal messages of generation in the status area, just like happens in endless play mode. That does not seem to be happening.\
+Also the outro message should be done in the normal style along the lines of:\
+Bar 065        Outro  4 bar cold stop \'97 drum fill ending\
+whatever was generated for the original song\
+\
+its all working quite well. But I notice the\
+Up next        Kosmic - Tief Ferne\
+is being displayed after the \
+Bar 171        Outro  8 bar fade\
+As with the Endless mode the up next message should be displayed when the new song is generated, 12 bars before the end, so before the intro starts.\
+\
+During evolve mode the Up next message is still not displayed at the right time. Please verify the code for that so its displayed 12 bars before the end of the song and before the normal outro message.\
+\
+\
+take a look at the motorik song Zudio-TagKraft zudio file and MIDI. it evolved but the new solos:\
+\uc0\u9889  REGEN        Lead 1\
+MOT-LD1-007    Vanishing solo\
+\uc0\u9889  REGEN        Lead 2\
+MOT-LD2-005    Descending line\
+didn't generate any notes.  Please make sure that for MOD-LD1-007 and 008  Vanishing and visiting solos that they do not get suppressed and generate at least one instance of the solo melody in the extended evolve bars\
+This may be peculiar to the logic of those two solos but check if its a general problem\
+\
+similarly when it got to the second evolve I got these messages:\
+\uc0\u9889  REGEN        Pads\
+MOT-PADS-003   Pulsed\
+\uc0\u9889  REGEN        Rhythm\
+\'97              no rules captured\
+but there were no notes for rhythm or pads\
+\
+\
+I\'92m not sure the fix for ensuring the MOT-LD1-007 and MOT-LD1-008 evolve solos worked. There\'92s a song Zudio-Bewegt-Raum I want you to analyze. It had the evolve 1 regen as:\
+\uc0\u9889  REGEN        Lead 1\
+MOT-LD1-008    Visiting solo\
+\uc0\u9889  REGEN        Lead 2\
+MOT-LD2-005    Descending line\
+But there\'92s really no sign of the LD1-007 Vanishing solo.  Please force that when we regen LD1 and get Vanishing or Visiting solo ensure that the melody of the solo plays at least once in the new bars\
+\
+take a look at the motorik song Zudio-TagKraft zudio file and MIDI. it evolved but the new solos:\
+\uc0\u9889  REGEN        Lead 1\
+MOT-LD1-007    Vanishing solo\
+\uc0\u9889  REGEN        Lead 2\
+MOT-LD2-005    Descending line\
+didn't generate any notes.  Please make sure that for MOD-LD1-007 and 008  Vanishing and visiting solos that they do not get suppressed and generate at least one instance of the solo melody in the extended evolve bars\
+This may be peculiar to the logic of those two solos but check if its a general problem\
+\
+similarly when it got to the second evolve I got these messages:\
+\uc0\u9889  REGEN        Pads\
+MOT-PADS-003   Pulsed\
+\uc0\u9889  REGEN        Rhythm\
+\'97              no rules captured\
+but there were no notes for rhythm or pads\
+\
+lets add hotkeys D for Endless mode and V for Evolve mode. Please put an underscore under the d and the v of the buttons. lets add a hotkey N for Song mode and put an underscore under the n in that button.\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 More musical issues
+\f2\b0 \
+The Kosmic song Zudio-Trage-Welle seemed to evolve reasonably well. Please analyze the Zudio and MIDI file. It seems that in the new extended bridges bars 125-132 and bars 161-166 there were no drums which sounded strange. Shouldn\'92t there be drums during a kosmic bridge? \
+\
+please examine the song Zudio-Ruhig-Licht especially the extended evolve phases to see if there are tonal clashes from the evolved Lead 1\
+\
+are there any other acoustic MIDI pianos we could try for Ambient lead 2?  Go ahead and add them so I can test them\
 \
 }

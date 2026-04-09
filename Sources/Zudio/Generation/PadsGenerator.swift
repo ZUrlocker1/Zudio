@@ -201,25 +201,21 @@ struct PadsGenerator {
         // Snapping keeps voicings audible and in-key without removing notes entirely.
         let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
         return offsets.map { offset -> UInt8 in
-            let rawMidi = clamped(rootMIDI + offset, low: 48, high: 84)
-            let pc = rawMidi % 12
-            guard !scalePCs.contains(pc) else { return UInt8(rawMidi) }
-            let nearestPC = scalePCs.min(by: {
-                min(($0 - pc + 12) % 12, (pc - $0 + 12) % 12) <
-                min(($1 - pc + 12) % 12, (pc - $1 + 12) % 12)
-            }) ?? pc
-            let dist  = (nearestPC - pc + 12) % 12
-            let shift = dist <= 6 ? dist : dist - 12   // shortest semitone path
+            let rawMidi   = clamped(rootMIDI + offset, low: 48, high: 84)
+            let pc        = rawMidi % 12
+            let nearestPC = nearestScalePitchClass(pc, in: scalePCs)
+            let dist      = (nearestPC - pc + 12) % 12
+            let shift     = dist <= 6 ? dist : dist - 12   // shortest semitone path
             return UInt8(clamped(rawMidi + shift, low: 48, high: 84))
         }
     }
 
     // MARK: - Helpers
 
-    private static func nearestMIDI(pc: Int, target: Int) -> Int {
+    private static func nearestMIDI(pc: Int, target: Int, low: Int = 48, high: Int = 84) -> Int {
         let base = (target / 12) * 12 + pc
-        let candidates = [base - 12, base, base + 12]
-        return candidates.min(by: { abs($0 - target) < abs($1 - target) }) ?? base
+        let candidates = [base - 12, base, base + 12].filter { $0 >= low && $0 <= high }
+        return candidates.min(by: { abs($0 - target) < abs($1 - target) }) ?? clamped(base, low: low, high: high)
     }
 
     private static func clamped(_ v: Int, low: Int, high: Int) -> Int {

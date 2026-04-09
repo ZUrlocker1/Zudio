@@ -36,7 +36,6 @@ struct TrackRowView: View {
                 return [.init(name:"Flute",         program:73),  .init(name:"Ocarina",       program:79),
                         .init(name:"Pan Flute",     program:75),  .init(name:"Whistle",       program:78),
                         .init(name:"Recorder",      program:74),  .init(name:"Brightness",    program:100),
-                        .init(name:"Halo Pad",      program:94),  .init(name:"New Age Pad",   program:88),
                         .init(name:"Calliope Lead", program:82)]
             }
             if isKosmic {
@@ -44,15 +43,14 @@ struct TrackRowView: View {
                         .init(name:"Oboe",         program:68),  .init(name:"Recorder",       program:74)]
             }
             return [.init(name:"Mono Synth",       program:81), .init(name:"Soft Brass",      program:62),
-                    .init(name:"Fifths Lead",      program:86)]
+                    .init(name:"Pad 3 Poly",       program:90), .init(name:"Square Lead",      program:80)]
         case kTrackLead2:
             if isChill {
                 return [.init(name:"Vibraphone",   program:11),  .init(name:"Flute",          program:73),
                         .init(name:"Soprano Sax",  program:64),  .init(name:"Trombone",       program:57)]
             }
             if isAmbient {
-                return [.init(name:"Vibraphone",   program:11),  .init(name:"Celesta",        program:8),
-                        .init(name:"Glockenspiel", program:9),   .init(name:"Grand Piano",    program:0),
+                return [.init(name:"Celesta",       program:8),   .init(name:"Grand Piano",    program:0),
                         .init(name:"Warm Pad",     program:89),  .init(name:"Space Voice",    program:91),
                         .init(name:"FX Atmosphere",program:99)]
             }
@@ -60,13 +58,12 @@ struct TrackRowView: View {
                 return [.init(name:"Brightness",  program:100), .init(name:"Bassoon",    program:70),
                         .init(name:"Charang",     program:84),  .init(name:"Vox Solo",   program:85)]
             }
-            return [.init(name:"Brightness",  program:100), .init(name:"Polysynth",   program:90),
+            return [.init(name:"Polysynth",   program:90),  .init(name:"Brightness",  program:100),
                     .init(name:"Minimoog",    program:39),  .init(name:"Elec Guitar", program:30)]
         case kTrackPads:
             if isAmbient {
                 return [.init(name:"Sweep Pad",    program:95), .init(name:"Synth Strings",program:50),
-                        .init(name:"Warm Pad",     program:89), .init(name:"Halo Pad",     program:94),
-                        .init(name:"New Age Pad",  program:88)]
+                        .init(name:"Halo Pad",     program:94), .init(name:"New Age Pad",  program:88)]
             }
             if isKosmic {
                 return [.init(name:"Sweep Pad",    program:95), .init(name:"Synth Strings", program:50),
@@ -116,8 +113,9 @@ struct TrackRowView: View {
                 return [.init(name:"FX Atmosphere", program:99), .init(name:"Pad 3 Poly",    program:90),
                         .init(name:"Fifths Lead",    program:86)]
             }
-            return [.init(name:"Halo Pad",      program:94), .init(name:"Warm Pad",     program:89),
-                    .init(name:"FX Atmosphere", program:99), .init(name:"FX Echoes",   program:102)]
+            return [.init(name:"Fifths Lead",   program:86), .init(name:"Halo Pad",      program:94),
+                    .init(name:"Warm Pad",      program:89), .init(name:"FX Atmosphere", program:99),
+                    .init(name:"FX Echoes",     program:102)]
         case kTrackBass:
             if isChill {
                 return [.init(name:"Fretless Bass",  program:35), .init(name:"Acoustic Bass",  program:32),
@@ -296,6 +294,12 @@ struct TrackRowView: View {
             instrumentIndex = override.map { min($0, instruments.count - 1) } ?? 0
             appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
             applyDefaultEffects()
+        }
+        .onChange(of: appState.instrumentChangeToken) { _ in
+            // Evolve pass switched instruments — update display to match (audio already changed)
+            let override = appState.instrumentOverrides[trackIndex]
+            let newIdx = override.map { min($0, instruments.count - 1) } ?? 0
+            if newIdx != instrumentIndex { instrumentIndex = newIdx }
         }
     }
 

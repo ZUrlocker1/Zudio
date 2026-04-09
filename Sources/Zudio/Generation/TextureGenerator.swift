@@ -10,7 +10,7 @@
 //   TEXT-004: Shimmer Hold — single scale tone sustained 4+ bars, very quiet, ~once per 16 bars
 //   TEXT-005: Breath Release — quiet note on last step of a section's final bar (50% per section end)
 //   TEXT-006: High Tension Touch — single scale-tension note, off-beat, fires ~once per 20 bars (body only)
-//   TEXT-007: Pedal Drone — tonic held quietly (vel 28–38) in MIDI 80–96, ~once per 32 body bars
+//   TEXT-007: Pedal Drone — tonic held (vel 45–60) in MIDI 80–96, ~once per 16 body bars
 //   TEXT-008: Phase Slip — two adjacent semitone notes at same step (vel 25–35), ~once per 20 body bars
 //
 // Per song: TEXT-001 always active; 1–2 supplementary rules chosen at generation time.
@@ -92,13 +92,13 @@ struct TextureGenerator {
                     let passPC  = (loPC + 11) % 12   // chromatic lower neighbour
                     let hiPC    = pool[rng.nextInt(upperBound: pool.count)]
                     let offBeat = rng.nextInt(upperBound: 8)
-                    let vel     = UInt8(30 + rng.nextInt(upperBound: 16))
+                    let vel     = UInt8(42 + rng.nextInt(upperBound: 16))
                     events.append(MIDIEvent(stepIndex: barStart + offBeat,     note: noteInRange(pc: passPC, low: 72, high: 104),
-                                           velocity: UInt8(max(22, Int(vel) - 8)), durationSteps: 2))
+                                           velocity: UInt8(max(32, Int(vel) - 8)), durationSteps: 2))
                     events.append(MIDIEvent(stepIndex: barStart + offBeat + 2, note: noteInRange(pc: loPC,   low: 72, high: 104),
                                            velocity: vel, durationSteps: 3))
                     events.append(MIDIEvent(stepIndex: barStart + offBeat + 6, note: noteInRange(pc: hiPC,   low: 72, high: 104),
-                                           velocity: UInt8(max(22, Int(vel) - 4)), durationSteps: 4))
+                                           velocity: UInt8(max(32, Int(vel) - 4)), durationSteps: 4))
                 }
             }
 
@@ -110,7 +110,7 @@ struct TextureGenerator {
                 if !pool.isEmpty {
                     let pc   = pool[rng.nextInt(upperBound: pool.count)]
                     let note = noteInRange(pc: pc, low: 72, high: 100)
-                    let vel  = UInt8(20 + rng.nextInt(upperBound: 13))
+                    let vel  = UInt8(35 + rng.nextInt(upperBound: 16))
                     events.append(MIDIEvent(stepIndex: barStart, note: note,
                                            velocity: vel, durationSteps: 64 + rng.nextInt(upperBound: 17)))
                 }
@@ -119,7 +119,7 @@ struct TextureGenerator {
             // --- TEXT-005: Breath Release — last step of a section's final bar ---
             if activeSupp.contains("MOT-TEXT-005") && isSectionEnd && rng.nextDouble() < 0.50 {
                 let note     = noteInRange(pc: rootPC, low: 72, high: 96)
-                let velocity = UInt8(25 + rng.nextInt(upperBound: 11))
+                let velocity = UInt8(40 + rng.nextInt(upperBound: 16))
                 events.append(MIDIEvent(stepIndex: barStart + 15, note: note,
                                         velocity: velocity, durationSteps: 2))
             }
@@ -138,12 +138,12 @@ struct TextureGenerator {
                 }
             }
 
-            // --- TEXT-007: Pedal Drone — tonic held quietly, ~once per 32 body bars ---
+            // --- TEXT-007: Pedal Drone — tonic held, ~once per 16 body bars ---
             // Motorik reference: constant-tonic undercurrent under moving chord changes.
             if activeSupp.contains("MOT-TEXT-007") && isBodySection && !isSectionEnd {
-                if rng.nextDouble() < (1.0 / 32.0) {
+                if rng.nextDouble() < (1.0 / 16.0) {
                     let note    = noteInRange(pc: keyS, low: 80, high: 96)
-                    let vel     = UInt8(28 + rng.nextInt(upperBound: 11))
+                    let vel     = UInt8(45 + rng.nextInt(upperBound: 16))
                     events.append(MIDIEvent(stepIndex: barStart, note: note,
                                            velocity: vel, durationSteps: 32))
                 }
@@ -159,12 +159,12 @@ struct TextureGenerator {
                     let loNote  = noteInRange(pc: loPC, low: 72, high: 96)
                     let hiNote  = noteInRange(pc: hiPC, low: 72, high: 96)
                     let offBeat = [4, 8, 12][rng.nextInt(upperBound: 3)]
-                    let vel     = UInt8(25 + rng.nextInt(upperBound: 11))
+                    let vel     = UInt8(35 + rng.nextInt(upperBound: 16))
                     let dur     = 2 + rng.nextInt(upperBound: 3)
                     events.append(MIDIEvent(stepIndex: barStart + offBeat, note: loNote,
                                            velocity: vel, durationSteps: dur))
                     events.append(MIDIEvent(stepIndex: barStart + offBeat, note: hiNote,
-                                           velocity: UInt8(max(20, Int(vel) - 5)), durationSteps: dur))
+                                           velocity: UInt8(max(30, Int(vel) - 5)), durationSteps: dur))
                 }
             }
         }

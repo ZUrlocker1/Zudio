@@ -187,6 +187,33 @@ struct SongState: Sendable {
                   keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
 
+    /// Convenience initializer for synthetic pass/extended states: carries all style-specific
+    /// fields from an anchor, resetting trackOverrides to empty. The caller supplies only the
+    /// structural fields that differ (frame, structure, trackEvents, generationLog, stepAnnotations).
+    init(frame: GlobalMusicalFrame,
+         structure: SongStructure,
+         trackEvents: [[MIDIEvent]],
+         generationLog: [GenerationLogEntry],
+         stepAnnotations: [Int: [GenerationLogEntry]],
+         copyingStyleFieldsFrom anchor: SongState) {
+        self.init(frame: frame, structure: structure, tonalMap: anchor.tonalMap,
+                  trackEvents: trackEvents, globalSeed: anchor.globalSeed,
+                  trackOverrides: [:], title: anchor.title, form: anchor.form,
+                  style: anchor.style, percussionStyle: anchor.percussionStyle,
+                  kosmicProgFamily: anchor.kosmicProgFamily,
+                  generationLog: generationLog, stepAnnotations: stepAnnotations,
+                  ambientProgFamily: anchor.ambientProgFamily,
+                  ambientLoopLengths: anchor.ambientLoopLengths,
+                  ambientUseBrushKit: anchor.ambientUseBrushKit,
+                  chillProgFamily: anchor.chillProgFamily,
+                  chillLeadInstrument: anchor.chillLeadInstrument,
+                  chillBeatStyle: anchor.chillBeatStyle,
+                  chillBreakdownStyle: anchor.chillBreakdownStyle,
+                  chillSwingFeel: anchor.chillSwingFeel,
+                  chillAudioTexture: anchor.chillAudioTexture,
+                  chillAudioTextureOffset: anchor.chillAudioTextureOffset)
+    }
+
     /// Returns a copy of this state with one track's events replaced.
     /// The generation log is carried through unchanged (reflects the full generation).
     func replacingEvents(_ events: [MIDIEvent], forTrack trackIndex: Int) -> SongState {

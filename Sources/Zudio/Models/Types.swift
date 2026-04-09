@@ -11,7 +11,7 @@ let kTrackDrums      = 6
 let kTrackLeadSynth  = 7   // Kosmic only: silent Fantasia layer doubling Lead 1
 let kTrackCount      = 8
 
-let kTrackNames = ["Lead 1", "Lead Solo Vox", "Pads", "Rhythm", "Texture", "Bass", "Drums", "Lead Synth"]
+let kTrackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums", "Lead Synth"]
 
 // MIDI channel per track (Drums must be channel 9 for GM)
 let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9, 6]
@@ -125,6 +125,15 @@ enum ChordType: String, Codable, Sendable {
 
     // Pitch classes (mod 12)
     var pitchClasses: Set<Int> { Set(intervals.map { $0 % 12 }) }
+
+    /// True for chord types that imply a major harmonic context in bass patterns.
+    /// Used to decide whether b7 / flatSeven slots use the mode's b7 or a neutral replacement.
+    var isMajorContext: Bool {
+        switch self {
+        case .major, .sus2, .sus4, .add9: return true
+        default:                           return false
+        }
+    }
 }
 
 enum ProgressionFamily: String, Codable, Sendable {
@@ -289,6 +298,17 @@ enum OutroStyle: Equatable, Sendable {
     case coldStop
 }
 
+// MARK: - Scale-snapping utilities
+
+/// Snaps `pc` to the nearest pitch class present in `scalePCs`, using circular semitone distance.
+/// Returns `pc` unchanged if it is already in the scale.
+func nearestScalePitchClass(_ pc: Int, in scalePCs: Set<Int>) -> Int {
+    guard !scalePCs.contains(pc) else { return pc }
+    return scalePCs.min(by: {
+        min(abs($0 - pc), 12 - abs($0 - pc)) < min(abs($1 - pc), 12 - abs($1 - pc))
+    }) ?? pc
+}
+
 // MARK: - Key semitone table
 
 /// Maps a key name string to its semitone offset from C (0–11).
@@ -374,7 +394,7 @@ struct RegisterBounds {
 }
 
 let kRegisterBounds: [Int: RegisterBounds] = [
-    kTrackLead1:      RegisterBounds(low: 60, high: 88),
+    kTrackLead1:      RegisterBounds(low: 52, high: 79),
     kTrackLead2:      RegisterBounds(low: 55, high: 81),
     kTrackPads:       RegisterBounds(low: 48, high: 84),
     kTrackRhythm:     RegisterBounds(low: 45, high: 76),
@@ -388,10 +408,10 @@ let kRegisterBounds: [Int: RegisterBounds] = [
 
 let kDefaultGMPrograms: [Int: UInt8] = [
     kTrackLead1:      80,  // Square Lead
-    kTrackLead2:      80,  // Square Lead
+    kTrackLead2:      90,  // Polysynth
     kTrackPads:       89,  // Warm Pad
     kTrackRhythm:     28,  // Guitar Pulse
-    kTrackTexture:    95,  // Swell
+    kTrackTexture:    86,  // Fifths Lead
     kTrackBass:       39,  // Moog Bass
     kTrackDrums:      8,   // Rock Kit
     kTrackLeadSynth:  90,  // Polysynth — Kosmic lead doubling layer

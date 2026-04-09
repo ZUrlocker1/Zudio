@@ -894,7 +894,7 @@ struct SongGenerator {
 
     /// Regenerates a single track without touching any other track or the global seed.
     /// Appends regen log entries so the status box reflects the new rules used.
-    static func regenerateTrack(_ trackIndex: Int, songState: SongState, overrideSeed: UInt64? = nil) -> SongState {
+    static func regenerateTrack(_ trackIndex: Int, songState: SongState, overrideSeed: UInt64? = nil, passBodyBars: Int? = nil) -> SongState {
         let newTrackSeed = overrideSeed ?? UInt64.random(in: .min ... .max)
         var rng = SeededRNG(seed: newTrackSeed)
         var usedRules: Set<String> = []
@@ -1007,7 +1007,7 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+                (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars)
             }
         case kTrackLead2:
             if isAmbient {

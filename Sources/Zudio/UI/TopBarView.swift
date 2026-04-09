@@ -124,6 +124,12 @@ struct TopBarView: View {
                             .keyboardShortcut("a", modifiers: .command)
                         Button("") { appState.selectedStyle = .chill }
                             .keyboardShortcut("c", modifiers: [])
+                        Button("") { appState.playMode = .song }
+                            .keyboardShortcut("n", modifiers: [])
+                        Button("") { appState.playMode = .evolve }
+                            .keyboardShortcut("v", modifiers: [])
+                        Button("") { appState.playMode = .endless }
+                            .keyboardShortcut("d", modifiers: [])
                         Button("") { appState.seekToStart() }
                             .keyboardShortcut("b", modifiers: .command)
                             .disabled(appState.songState == nil)
@@ -230,7 +236,7 @@ struct TopBarView: View {
                     Button { appState.playMode = .song } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "music.note")
-                            Text("Song").fontWeight(.semibold)
+                            (Text("So") + Text("n").underline() + Text("g")).fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 22)
@@ -245,7 +251,7 @@ struct TopBarView: View {
                     Button { appState.playMode = .evolve } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "waveform")
-                            Text("Evolve").fontWeight(.semibold)
+                            (Text("E") + Text("v").underline() + Text("olve")).fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 22)
@@ -260,7 +266,7 @@ struct TopBarView: View {
                     Button { appState.playMode = .endless } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "infinity")
-                            Text("Endless").fontWeight(.semibold)
+                            (Text("En") + Text("d").underline() + Text("less")).fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 22)
@@ -271,7 +277,7 @@ struct TopBarView: View {
                     .buttonStyle(.plain)
                 }
                 .font(.callout)
-                .frame(width: 270)
+                .frame(width: 240)
                 .background(Color(NSColor.controlColor))
                 .clipShape(RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5))
@@ -502,7 +508,7 @@ struct HelpView: View {
                 Text("Zudio generates Ambient, Chill, Kosmic and Motorik inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve or Endless mode to play continuously.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback  &amp; generation.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")

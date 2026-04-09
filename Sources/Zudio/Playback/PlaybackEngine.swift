@@ -523,12 +523,40 @@ final class PlaybackEngine: ObservableObject {
         currentStep = 0
         currentBar  = 0
         currentSchedulerID += 1
-        if isPlaying {
-            let sched = StepScheduler(engine: self, songState: passState,
-                                      startStep: 0, schedulerID: currentSchedulerID)
-            scheduler = sched
-            sched.start()
-        }
+        // Always restart — switchToPass is called mid-Evolve; onSongEnd sets isPlaying=false
+        // before the callback fires, so we can't rely on that flag here.
+        isPlaying = true
+        let sched = StepScheduler(engine: self, songState: passState,
+                                  startStep: 0, schedulerID: currentSchedulerID)
+        scheduler = sched
+        sched.start()
+    }
+
+    /// Loads a new SongState and immediately starts playing from `startStep`.
+    /// Used by Evolve mode to extend the display mid-song without resetting to bar 0.
+    /// Always restarts the scheduler regardless of current isPlaying state.
+    func loadAndPlay(state: SongState, fromStep startStep: Int) {
+        songState           = state
+        approachingEndFired = false
+        outroStartFired     = false
+        scheduler?.stop()
+        scheduler = nil
+        allNotesOff()
+        stopKosmicDroneFades()
+        stopMotorikFades()
+        stopAmbientNoteFades()
+        buildStepEventMap(state: state)
+        let totalSteps = state.frame.totalBars * 16
+        currentStep = max(0, min(startStep, totalSteps - 1))
+        currentBar  = currentStep / 16
+        currentSchedulerID += 1
+        isPlaying = true
+        let sched = StepScheduler(engine: self, songState: state, startStep: currentStep,
+                                  schedulerID: currentSchedulerID)
+        scheduler = sched
+        sched.start()
+        // Pass states have no intro/outro — set volume directly to full.
+        engine.mainMixerNode.outputVolume = 1.0
     }
 
     // MARK: - Instrument program change (called from TrackRowView via AppState)
@@ -556,14 +584,32 @@ final class PlaybackEngine: ObservableObject {
         // Per-track default volumes; tremolo overrides this via LFO
         if !tremEnabled[trackIndex] {
             let vol: Float
-            if trackIndex == kTrackBass && kosmicStyle && program == 87 {
+            if trackIndex == kTrackLead1 && program == 81 {
+                vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
+            } else if trackIndex == kTrackLead1 && program == 80 {
+                vol = 0.78   // Square Lead on Lead 1
+            } else if trackIndex == kTrackBass && kosmicStyle && program == 87 {
                 vol = 0.40   // Lead Bass runs hot on Kosmic bass — pull back further
             } else if trackIndex == kTrackBass && program == 87 {
                 vol = 0.56   // Lead Bass runs hot
             } else if trackIndex == kTrackLead2 && program == 0 {
-                vol = 1.8    // Grand Piano runs soft in GM
+                vol = 1.4    // Grand Piano runs soft in GM
+            } else if trackIndex == kTrackLead2 && program == 8 {
+                vol = 1.8    // Celesta runs soft in GM
+            } else if trackIndex == kTrackLead2 && program == 99 {
+                vol = 2.0    // FX Atmosphere runs very soft in GM
             } else if trackIndex == kTrackTexture && (program == 90 || program == 86) {
                 vol = 0.85   // Pad 3 Poly (90) and Fifths Lead (86) run loud — pull back
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 99 {
+                vol = 3.2    // FX Atmosphere very soft on Kosmic Texture — boost more
+            } else if trackIndex == kTrackTexture && ambientMode && program == 99 {
+                vol = 4.0    // FX Atmosphere very soft on Ambient Texture — boost more
+            } else if trackIndex == kTrackTexture && program == 99 {
+                vol = 2.6    // FX Atmosphere runs very soft on Texture — boost
+            } else if trackIndex == kTrackTexture && program == 89 {
+                vol = 0.9    // Warm Pad runs loud on Texture — pull back
+            } else if trackIndex == kTrackTexture && ambientMode {
+                vol = 2.0    // Ambient Texture instruments run soft — boost
             } else if trackIndex == kTrackTexture {
                 vol = 1.4    // Texture pads are quiet
             } else if trackIndex == kTrackDrums && ambientMode {
@@ -989,8 +1035,9 @@ final class PlaybackEngine: ObservableObject {
         let introEndStep   = (intro?.endBar ?? 0) * 16
         let inIntro        = intro != nil && currentStep < introEndStep
         let outro          = state.structure.outroSection
-        let outroStartStep = (outro?.startBar ?? Int.max) * 16
-        let outroEndStep   = (outro?.endBar   ?? Int.max) * 16
+        let totalBars      = state.frame.totalBars
+        let outroStartStep = (outro?.startBar ?? totalBars) * 16   // Int.max would overflow × 16
+        let outroEndStep   = (outro?.endBar   ?? totalBars) * 16
         let inOutro        = outro != nil && currentStep >= outroStartStep && currentStep < outroEndStep
 
         // --- Volume setup: depends on where the playhead is ---

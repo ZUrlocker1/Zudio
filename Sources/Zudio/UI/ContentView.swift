@@ -49,6 +49,7 @@ struct ContentView: View {
                     Text("Bars:")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                        .fixedSize()
                     Slider(
                         value: Binding(
                             get: { Double(appState.visibleBars) },
@@ -279,39 +280,52 @@ struct HorizontalScrollBar: View {
     private let trackHeight: CGFloat = 6
     private let thumbMinWidth: CGFloat = 24
 
+    // Canvas receives its correct settled size directly from SwiftUI layout with no
+    // GeometryReader in the main layout path — eliminates the greedy-width inflation
+    // that caused the thumb to overflow into the effects buttons area during evolve
+    // transitions. The overlay GeometryReader is safe: it measures the Canvas frame
+    // (already sized by frame(maxWidth:)) rather than competing for HStack space.
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let maxOffset = max(1, total - visible)
-            let thumbFraction = min(1.0, CGFloat(visible) / CGFloat(max(1, total)))
-            let thumbW = max(thumbMinWidth, w * thumbFraction)
-            let travel = w - thumbW
+        let maxOffset = max(1, total - visible)
+        let fraction  = min(1.0, CGFloat(visible) / CGFloat(max(1, total)))
+
+        Canvas { ctx, size in
+            let w      = size.width
+            let thumbW = max(thumbMinWidth, w * fraction)
+            let travel = max(0, w - thumbW)
             let thumbX = travel > 0 ? (CGFloat(value) / CGFloat(maxOffset)) * travel : 0
+            let midY   = size.height / 2
 
-            ZStack(alignment: .leading) {
-                // Track
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.10))
-                    .frame(height: trackHeight)
-
-                // Thumb
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.35))
-                    .frame(width: thumbW, height: trackHeight)
-                    .offset(x: thumbX)
-            }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { drag in
-                        guard travel > 0 else { return }
-                        let newThumbX = max(0, min(drag.location.x - thumbW / 2, travel))
-                        let newOffset = Int((newThumbX / travel) * CGFloat(maxOffset) + 0.5)
-                        value = max(0, min(newOffset, maxOffset))
-                    }
-            )
+            // Track
+            ctx.fill(Path(roundedRect: CGRect(x: 0, y: midY - trackHeight / 2,
+                                              width: w, height: trackHeight), cornerRadius: 3),
+                     with: .color(.white.opacity(0.10)))
+            // Thumb
+            ctx.fill(Path(roundedRect: CGRect(x: thumbX, y: midY - trackHeight / 2,
+                                              width: thumbW, height: trackHeight), cornerRadius: 3),
+                     with: .color(.white.opacity(0.35)))
         }
+        .frame(maxWidth: .infinity)
         .frame(height: 14)
+        // Drag-to-seek: overlay GeometryReader reads the Canvas's resolved width.
+        // Overlay does not affect parent layout — Canvas already claimed the space.
+        .overlay {
+            GeometryReader { geo in
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { drag in
+                                let w      = geo.size.width
+                                let thumbW = max(thumbMinWidth, w * fraction)
+                                let travel = max(0, w - thumbW)
+                                guard travel > 0 else { return }
+                                let newThumbX = max(0, min(drag.location.x - thumbW / 2, travel))
+                                let newOffset = Int((newThumbX / travel) * CGFloat(maxOffset) + 0.5)
+                                value = max(0, min(newOffset, maxOffset))
+                            }
+                    )
+            }
+        }
     }
 }

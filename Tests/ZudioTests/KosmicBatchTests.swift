@@ -28,10 +28,10 @@ struct KosmicBatchTests {
             try? fm.removeItem(at: url)
         }
 
-        print("\n=== Generating 10 Kosmic songs ===")
+        print("\n=== Generating 20 Kosmic songs ===")
         print("Output: \(dir.path)\n")
 
-        for i in 1...10 {
+        for i in 1...20 {
             let seed = UInt64.random(in: .min ... .max)
             let song = SongGenerator.generate(seed: seed, style: .kosmic, testMode: false)
 
@@ -50,5 +50,6 @@ struct KosmicBatchTests {
         }
 
         print("\n✓ Done. Run: cd tools/batch-output/kosmic && python3 ../../kosmic_analyze.py *.MID")
+        // ^ 20-song batch
     }
 }
