@@ -203,10 +203,12 @@ struct TopBarView: View {
                         )
                         .help("Forward 1 bar (hold: forward 2 bars repeatedly)")
 
-                    // Jump to end (Song mode) / Skip to next song (Endless mode)
+                    // Jump to end (Song mode) / Skip to next song/pass (Endless/Evolve)
                     Button(action: {
                         if appState.playMode == .endless {
                             appState.skipToNextSong()
+                        } else if appState.playMode == .evolve {
+                            appState.skipEvolvePass()
                         } else {
                             appState.seekToEnd()
                         }
@@ -215,13 +217,15 @@ struct TopBarView: View {
                             .foregroundStyle(.primary)
                     }
                     .disabled(appState.songState == nil)
-                    .help(appState.playMode == .endless ? "Skip to next song" : "Go to end (stops playback)")
+                    .help(appState.playMode == .endless ? "Skip to next song" :
+                          appState.playMode == .evolve  ? "Skip to next evolution pass" :
+                          "Go to end (stops playback)")
                 }
                 .font(.callout)
                 .padding(.vertical, 8)
                 .background(FirstMouseFix())
 
-                // Mode selector: Song / Endless — font/height matches Reset button; blue active = effects buttons
+                // Mode selector: Song / Evolve / Endless — font/height matches Reset button; blue active = effects buttons
                 HStack(spacing: 0) {
                     Button { appState.playMode = .song } label: {
                         HStack(spacing: 4) {
@@ -232,6 +236,21 @@ struct TopBarView: View {
                         .frame(height: 22)
                         .background(appState.playMode == .song ? Color(red: 0.18, green: 0.42, blue: 0.78) : Color.clear)
                         .foregroundStyle(appState.playMode == .song ? Color.white : Color.primary)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Rectangle()
+                        .fill(Color(NSColor.separatorColor))
+                        .frame(width: 0.5, height: 22)
+                    Button { appState.playMode = .evolve } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "waveform")
+                            Text("Evolve").fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 22)
+                        .background(appState.playMode == .evolve ? Color(red: 0.18, green: 0.42, blue: 0.78) : Color.clear)
+                        .foregroundStyle(appState.playMode == .evolve ? Color.white : Color.primary)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -252,7 +271,7 @@ struct TopBarView: View {
                     .buttonStyle(.plain)
                 }
                 .font(.callout)
-                .frame(width: 200)
+                .frame(width: 270)
                 .background(Color(NSColor.controlColor))
                 .clipShape(RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(NSColor.separatorColor), lineWidth: 0.5))
@@ -483,7 +502,7 @@ struct HelpView: View {
                 Text("Zudio generates Ambient, Chill, Kosmic and Motorik inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G / Return)", "Creates a new song. Use endless mode to play continuously.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve or Endless mode to play continuously.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
                 helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")

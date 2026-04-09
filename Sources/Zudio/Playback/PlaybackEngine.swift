@@ -73,11 +73,13 @@ final class PlaybackEngine: ObservableObject {
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
 
-    // Endless mode callbacks — set by AppState.init(); both called on main actor.
+    // Endless / Evolve callbacks — set by AppState.init(); all called on main actor.
     var onApproachingEnd:   (() -> Void)? = nil
     var onSongEndNaturally: (() -> Void)? = nil
-    // Set to true once the approaching-end callback fires; reset on load() and seek().
+    var onOutroStart:       (() -> Void)? = nil
+    // Set to true once the corresponding callback fires; reset on load(), seek(), switchToPass().
     private var approachingEndFired = false
+    private var outroStartFired     = false
 
     // Kosmic drone fade (intro 0→1, outro 1→0 on boosts[bass] and boosts[pads])
     var kosmicStyle: Bool = false
@@ -181,6 +183,7 @@ final class PlaybackEngine: ObservableObject {
     func load(_ state: SongState) {
         songState = state
         approachingEndFired = false
+        outroStartFired     = false
         buildStepEventMap(state: state)
         // Cancel any in-progress note fades before restoring volumes.
         stopAmbientNoteFades()
@@ -429,6 +432,13 @@ final class PlaybackEngine: ObservableObject {
                     cb()
                 }
             }
+            // Evolve: fire once when playhead first reaches the Outro section start.
+            if let cb = self.onOutroStart, !self.outroStartFired,
+               let outroBar = self.songState?.structure.outroSection?.startBar,
+               bar >= outroBar {
+                self.outroStartFired = true
+                cb()
+            }
         }
     }
 
@@ -457,6 +467,7 @@ final class PlaybackEngine: ObservableObject {
         let totalSteps = state.frame.totalBars * 16
         let clampedStep = max(0, min(newStep, totalSteps - 1))
         approachingEndFired = false
+        outroStartFired     = false
         if isPlaying {
             scheduler?.stop()
             scheduler = nil
@@ -494,6 +505,30 @@ final class PlaybackEngine: ObservableObject {
         let sched = StepScheduler(engine: self, songState: songState!, startStep: currentStep, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
+    }
+
+    // MARK: - Evolve pass swap
+
+    /// Hot-swap to an Evolve pass state without resetting audio effects or volumes.
+    /// Stops the current scheduler, rebuilds the step-event map atomically, and restarts
+    /// from bar 0 using the pass state's shorter totalBars. Called on main actor.
+    func switchToPass(_ passState: SongState) {
+        songState           = passState
+        approachingEndFired = false
+        outroStartFired     = false
+        scheduler?.stop()
+        scheduler = nil
+        allNotesOff()
+        buildStepEventMap(state: passState)
+        currentStep = 0
+        currentBar  = 0
+        currentSchedulerID += 1
+        if isPlaying {
+            let sched = StepScheduler(engine: self, songState: passState,
+                                      startStep: 0, schedulerID: currentSchedulerID)
+            scheduler = sched
+            sched.start()
+        }
     }
 
     // MARK: - Instrument program change (called from TrackRowView via AppState)

@@ -30,6 +30,12 @@ struct GlobalMusicalFrame: Equatable, Sendable {
                            progressionFamily: progressionFamily, totalBars: totalBars)
     }
 
+    /// Returns a copy with only totalBars changed (used for Evolve pass states).
+    func withTotalBars(_ newBars: Int) -> GlobalMusicalFrame {
+        GlobalMusicalFrame(key: key, mode: mode, tempo: tempo, mood: mood,
+                           progressionFamily: progressionFamily, totalBars: newBars)
+    }
+
     /// Absolute MIDI note for a given degree string and octave offset, clamped to a track's register.
     func midiNote(degree: String, oct: Int, trackIndex: Int) -> UInt8 {
         let raw = 60 + keySemitoneValue + degreeSemitone(degree) + (oct * 12)

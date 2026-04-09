@@ -2,7 +2,9 @@
 
 Zudio is a generative music app for macOS. It generates complete multi-track songs in one click using human-curated musical rules derived from analyzing real artists rather than machine learning.
 
-It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk, Harmonia). Each song is built from 7 simultaneous tracks (`Lead 1`, `Lead 2`, `Pads`, `Rhythm`, `Texture`, `Bass`, `Drums`) with deterministic seed-based variation. Sometimes it even sounds like music! 
+It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk, Harmonia). Songs are built from 7 tracks (e.g. Lead, Pads, Bass, Drums, etc.) with deterministic seed-based variation. Sometimes it even sounds like music! 
+
+![Zudio screenshot](assets/images/Zudio%20099%20screenshot.jpg)
 
 You can generate a song at a time, or use Endless mode for continuous listening. Songs can be saved and reloaded. Related MIDI files can be loaded into any DAW for further editing. 
 
@@ -10,8 +12,6 @@ Rules were developed by analyzing tracks from artists across those styles. The r
 The app includes built-in effects such as reverb, delay, auto-pan and sweep. You can export both MIDI and M4A audio.
 
 This repository contains the macOS app source, implementation notes, and supporting design documentation all developed using Claude. 
-
-![Zudio screenshot](assets/images/Zudio%20099%20screenshot.jpg)
 
 **Listen to a sample (Ambient style):** [The-ChatGPT-Meditations](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
 
