@@ -643,6 +643,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.75   // Wurlitzer runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
                 vol = 0.48   // Mono Synth runs hot on Kosmic bass — pull back more
+            } else if trackIndex == kTrackLead2 && chillPadsMode {
+                vol = 1.25   // Chill Lead 2 instruments run soft — boost for presence
             } else if trackIndex == kTrackLead2 && motorikStyle && program == 39 {
                 vol = 1.8    // Minimoog runs soft on Lead 2 — boost
             } else if trackIndex == kTrackRhythm && motorikStyle && program == 29 {
@@ -762,7 +764,8 @@ final class PlaybackEngine: ObservableObject {
         case .space:
             reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             let wet: Float = ambientMode && trackIndex < ambientReverbWet.count
-                ? ambientReverbWet[trackIndex] : 70
+                ? ambientReverbWet[trackIndex]
+                : (chillPadsMode ? 55 : 70)
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         }
     }

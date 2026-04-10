@@ -15,6 +15,8 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Listen to a sample (Ambient style):** [The-ChatGPT-Meditations](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
 
+**Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=xWLq9HVswmo) on YouTube
+
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v0.99/Zudio-0.99.dmg)
 
 Current release: `0.99 (alpha)`. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
