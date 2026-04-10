@@ -329,7 +329,7 @@ struct BassGenerator {
         case "MOT-BASS-005":   // McCartney Drive → breathe bar: root sustain + low fifth + approach
             let lowerFifth = UInt8(clamped(Int(root) - 5, low: 28, high: 52))
             let approachPC5    = (Int(root) - 2 + 12) % 12
-            let approachInScale5 = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 }).contains(approachPC5)
+            let approachInScale5 = frame.scalePCs.contains(approachPC5)
             let approach   = UInt8(clamped(Int(root) - 2, low: 28, high: 52))
             var introEvs5: [MIDIEvent] = [
                 MIDIEvent(stepIndex: barStart,     note: root,       velocity: 84, durationSteps: 7),
@@ -467,12 +467,10 @@ struct BassGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let rootNote = chordRootNote(entry: entry, frame: frame)
-        let chordTones = entry.chordWindow.chordTones.sorted()
-
         events.append(MIDIEvent(stepIndex: barStart, note: rootNote, velocity: 92, durationSteps: 6))
 
         let beat3Note: UInt8
-        if let fifth = chordTones.first(where: { ($0 - (Int(rootNote) % 12) + 12) % 12 == 7 }) {
+        if let fifth = entry.chordWindow.chordTones.first(where: { ($0 - (Int(rootNote) % 12) + 12) % 12 == 7 }) {
             beat3Note = noteInBassRegister(pc: fifth, frame: frame)
         } else {
             beat3Note = rootNote
@@ -535,8 +533,7 @@ struct BassGenerator {
         // the chromatic approach clashes badly in Dorian/Aeolian where -2 from the chord root
         // often lands outside the mode.
         let approachPC   = (Int(rootNote) - 2 + 12) % 12
-        let keyST        = keySemitone(frame.key)
-        let scalePCs     = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+        let scalePCs     = frame.scalePCs
         let useApproach  = scalePCs.contains(approachPC)
         let approachNote = UInt8(clamped(Int(rootNote) - 2, low: 28, high: 52))
 
@@ -578,7 +575,7 @@ struct BassGenerator {
         let lowerThird = nearestScaleNote(to: Int(rootNote) - 4, frame: frame, low: 28, high: 52)  // mode 3rd below root
         let lowerFifth = UInt8(clamped(Int(rootNote) - 5, low: 28, high: 52))  // P5 down, always mode-neutral
         let approachPC = (Int(rootNote) - 2 + 12) % 12
-        let approachInScale = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 }).contains(approachPC)
+        let approachInScale = frame.scalePCs.contains(approachPC)
         let approach   = UInt8(clamped(Int(rootNote) - 2, low: 28, high: 52))
 
         // allDrive: bass "sits on" the descent groove for 4 bars straight (1/3 of phrases).
@@ -685,7 +682,7 @@ struct BassGenerator {
 
     /// Returns the nearest in-scale MIDI note to `target`, clamped to [low, high].
     private static func nearestScaleNote(to target: Int, frame: GlobalMusicalFrame, low: Int, high: Int) -> UInt8 {
-        let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let nearest  = (low...high).filter { scalePCs.contains($0 % 12) }
                                    .min(by: { abs($0 - target) < abs($1 - target) })
         return UInt8(clamped(nearest ?? target, low: low, high: high))

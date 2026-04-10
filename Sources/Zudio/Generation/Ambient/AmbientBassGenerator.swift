@@ -89,7 +89,7 @@ struct AmbientBassGenerator {
                 // Splits hold: root (60%) → scale neighbour (25%) → root (15%).
                 var didNeighbour = false
                 if !useRootFifth && noteToPlay == rootNote && dur >= 12 && rng.nextDouble() < 0.20 {
-                    let scalePCs   = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+                    let scalePCs   = frame.scalePCs
                     let scaleNotes = (bounds.low...bounds.high).filter { scalePCs.contains($0 % 12) }
                     if let rootIdx = scaleNotes.firstIndex(of: rootNote) {
                         let neighbour: Int? = rootIdx > 0 && rootIdx < scaleNotes.count - 1

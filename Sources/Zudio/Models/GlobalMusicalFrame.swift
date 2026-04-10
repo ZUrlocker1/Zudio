@@ -15,6 +15,10 @@ struct GlobalMusicalFrame: Equatable, Sendable {
 
     var keySemitoneValue: Int { keySemitone(key) }
 
+    /// All pitch classes (mod 12) present in the current key + mode.
+    /// Computed on demand — use instead of repeating Set(mode.intervals.map { ... }) in generators.
+    var scalePCs: Set<Int> { Set(mode.intervals.map { (keySemitoneValue + $0) % 12 }) }
+
     /// Seconds per sixteenth-note step at this tempo.
     var secondsPerStep: Double { 60.0 / Double(tempo) / 4.0 }
 

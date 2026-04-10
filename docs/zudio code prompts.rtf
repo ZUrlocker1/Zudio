@@ -1565,6 +1565,14 @@ but there were no notes for rhythm or pads\
 \
 lets add hotkeys D for Endless mode and V for Evolve mode. Please put an underscore under the d and the v of the buttons. lets add a hotkey N for Song mode and put an underscore under the n in that button.\
 \
+I would like to change how the Next track buttons works in Evolve mode to make it the same as Endless mode. If the user hits the Next Track button, jump to the next track. If it has not been generated, generate it and continue playing. \
+\
+Also, please map the Mac keyboard hotkeys RW and FF to Previous and Next track buttons.\
+Map the transport buttons for RW and FF to the same as the arrow keys, e.g. RW is like the left scrub aarrow and FF is the right scrub arrow.  Make it so that if you hold down the RW or FF buttons it moves more quickly, like the arrows operate currently. \
+\
+The FF and RW buttons in the transport are working like the arrow keys. That's good.\
+In song mode if we have generated previous songs, I would like the Previous button to work like Endless mode, take you to the beginning of the song, but if you're in the first two bars, go to the previous song. If we're in the first bar and there is no previous song, emit a short low beep sound effect.\
+\
 \
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
@@ -1576,4 +1584,21 @@ please examine the song Zudio-Ruhig-Licht especially the extended evolve phases 
 \
 are there any other acoustic MIDI pianos we could try for Ambient lead 2?  Go ahead and add them so I can test them\
 \
-}
+\
+
+\f0\b Performance optimization\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 please do another round of performance optimization. Look at the existing optimization plan like a skeptical engineer and consider what other improvements could be made. Look for any code in generation or regeneration that is making multiple attempts to do something and figure out a different approach. Look especially for improvements in generation, regeneration, that might slow down playback.  present a plan before doing any actual code changes with estimates on hwo much CPU you can save or how many unnecessary operations can be eliminated\
+\
+can you examine the code specifically for Chill generation, regeneration and chill playback of audio and drawing or updating of the audio texture track to see if that can be optimized. For example, I am happy to use a slightly less high resolution rendering of the track visualizaiton if that's more efficient for CPU. Or other trade offs.  Give me some suggestions to improve performance for Chill optimization.\
+Show\
+\
+I'd like you to look at the MIDI grid drawing code, the scrolling code, updates that are made during playback as well as the code where audio is used for fade in, fade out, effects like reverb, delay etc and see if there are any additional performance optimizations that can be made in the code to reduce CPU load.  Look for things that could be eliminated to make it run with less CPU overhead\
+\
+Take a look at the Ambient song generation, regeneration and use of delay, reverb effects to see what code optimizations could be done to make playback, generation and evolve mode less demanding on CPU. \
+\
+Take a look at the Kosmic song generation, regeneration, use of audio effects to see what code optimizations could be done to make playback, generation and evolve mode less demanding on CPU. \
+\
+Take a look at the Motorik song generation, regeneration, use of audio effects to see what code optimizations could be done to make playback, generation and evolve mode less demanding on CPU. }

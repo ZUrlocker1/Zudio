@@ -6,8 +6,8 @@
 // Registered commands:
 //   togglePlayPause  (F8 / ⏯)  → playOrStop()
 //   play / pause / stop         → play() / stop()
-//   previousTrack   (F7 / ⏮)  → seekToStart()
-//   nextTrack       (F9 / ⏭)  → seekToEnd()
+//   previousTrack   (F7 / ⏮)  → seekToStart() (bars 0-1: go to previous song)
+//   nextTrack       (F9 / ⏭)  → mode-aware next song: Endless=skipToNextSong, Evolve=skipEvolvePass
 //
 // Media-key routing on macOS is controlled by MPNowPlayingInfoCenter.playbackState
 // (separate from nowPlayingInfo) — the system routes to whichever app most recently
@@ -76,12 +76,16 @@ final class NowPlayingController {
             return .success
         }
 
-        // Next track (F9 / ⏭) → go to end / stop
+        // Next track (F9 / ⏭) → skip to next song (mode-aware)
         center.nextTrackCommand.isEnabled = true
         center.nextTrackCommand.addTarget { [weak self] _ in
             DispatchQueue.main.async {
-                guard let app = self?.appState, app.songState != nil else { return }
-                app.seekToEnd()
+                guard let app = self?.appState else { return }
+                switch app.playMode {
+                case .endless: app.skipToNextSong()
+                case .evolve:  app.skipEvolvePass()
+                case .song:    app.seekToEnd()
+                }
             }
             return .success
         }

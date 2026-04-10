@@ -48,7 +48,7 @@ struct RhythmGenerator {
 
             // For RHY-004: build a 2-bar riff once per section
             let riffPattern = buildMelodicRiff(rng: &rng)
-            let riffScalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+            let riffScalePCs = frame.scalePCs
 
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
@@ -188,7 +188,7 @@ struct RhythmGenerator {
         let fifthPC = (rootPC + 7) % 12
         // Snap third and flat-7 to nearest in-scale pitch class to prevent chromatic leakage
         // when the chord root is non-tonic (e.g. Bbsus2 in G Dorian: raw minor-3rd = C# OOS).
-        let scalePCsSet = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCsSet = frame.scalePCs
         let rawThird = (rootPC + (isMajorThird ? 4 : 3)) % 12
         let thirdPC  = nearestScalePitchClass(rawThird, in: scalePCsSet)
         let rawFlat7 = (rootPC + 10) % 12

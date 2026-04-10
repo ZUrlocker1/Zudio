@@ -71,6 +71,8 @@ struct ChillRhythmGenerator {
                                          breakdownStyle: ChillBreakdownStyle,
                                          rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
+        let scalePCs  = frame.scalePCs
+        let snapTable = ChillPadsGenerator.makeSnapTable(scalePCs)
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -95,7 +97,7 @@ struct ChillRhythmGenerator {
                 if breakdownStyle == .stopTime && breakdownBar % 2 == 1 {
                     // Odd (silence) bars: chord reveal — play voicing bottom to top on beats 2, 3, 4.
                     // Tonal buildup that converges on the full chord hit in the next bar.
-                    let sorted = buildVoicing(frame: frame, chord: chord, baseRegister: 52).sorted()
+                    let sorted = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable).sorted()
                     let n = sorted.count
                     if n >= 1 {
                         events.append(MIDIEvent(stepIndex: base + 4,  note: UInt8(sorted[0]),
@@ -115,7 +117,7 @@ struct ChillRhythmGenerator {
                     }
                 } else if breakdownStyle == .bassOstinato {
                     // Bass ostinato: one beat-2 chord stab keeps harmonic context
-                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52)
+                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
                     let vel     = UInt8(42 + rng.nextInt(upperBound: 12))
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: vel, durationSteps: 4))
@@ -125,7 +127,7 @@ struct ChillRhythmGenerator {
             }
 
             let chord     = structure.chordPlan.first { $0.contains(bar: bar) }
-            let voicing   = buildVoicing(frame: frame, chord: chord, baseRegister: 52)
+            let voicing   = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
             let base      = bar * 16
 
             switch compingMode {
@@ -342,11 +344,10 @@ struct ChillRhythmGenerator {
     /// Root omitted — bass covers it (CHL-SYNC-004).
     /// All notes snapped to scale (CHL-SYNC-001).
     private static func buildVoicing(frame: GlobalMusicalFrame, chord: ChordWindow?,
-                                      baseRegister: Int) -> [Int] {
+                                      baseRegister: Int, snapTable: [Int]) -> [Int] {
         let chordRoot  = chord?.chordRoot ?? "1"
         let chordType  = chord?.chordType ?? .min7
         let chordRootPC = (frame.keySemitoneValue + degreeSemitone(chordRoot)) % 12
-        let scalePCs   = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
 
         let intervals: [Int]
         switch chordType {
@@ -359,10 +360,7 @@ struct ChillRhythmGenerator {
 
         var notes: [Int] = []
         for (i, interval) in intervals.enumerated() {
-            var pc = (chordRootPC + interval) % 12
-            if !scalePCs.contains(pc) {
-                pc = scalePCs.min(by: { abs($0 - pc) < abs($1 - pc) }) ?? pc
-            }
+            let pc = snapTable[(chordRootPC + interval) % 12]
             // Correct pitch-class-to-MIDI: find nearest note at/above (baseRegister + octaveOffset)
             // with pitch class pc. Avoids the subtraction bug that produced wrong pitch classes.
             let octaveOffset = i == 2 ? 12 : 0

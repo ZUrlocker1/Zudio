@@ -24,6 +24,6 @@ struct AmbientLoopTiler {
             }
             tileStart += loopSteps
         }
-        return result.sorted { $0.stepIndex < $1.stepIndex }
+        return result  // already sorted: tileStart is monotonically increasing and events are pre-sorted
     }
 }

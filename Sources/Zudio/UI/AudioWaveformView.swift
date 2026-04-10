@@ -19,6 +19,7 @@ struct AudioWaveformView: View {
 
     @State private var samples: [Float] = []
     @State private var audioDurationBars: Double = 0
+    @State private var audioDurationSeconds: Double = 0
     // Tracks the most-recently-requested filename so stale background tasks
     // cannot repopulate samples after a newer filename (including nil) has been set.
     @State private var expectedFilename: String? = nil
@@ -73,12 +74,10 @@ struct AudioWaveformView: View {
                 audioDurationBars = 0
             }
         }
-        .onChange(of: tempo) { _, _ in
-            // Recalculate bar duration when tempo changes without reloading audio
-            if audioDurationBars > 0, let f = filename {
-                expectedFilename = f
-                Task { await loadWaveform(filename: f) }
-            }
+        .onChange(of: tempo) { _, newTempo in
+            // Recalculate bar duration from cached seconds — no file re-read needed
+            guard audioDurationSeconds > 0 else { return }
+            audioDurationBars = audioDurationSeconds / (240.0 / max(newTempo, 1))
         }
     }
 
@@ -106,8 +105,8 @@ struct AudioWaveformView: View {
         let frameLength  = Int(buffer.frameLength)
         let channelCount = Int(buffer.format.channelCount)
 
-        // Downsample to 1024 peak buckets
-        let bucketCount = 1024
+        // Downsample to 256 peak buckets — more than enough for the lane width (~400–600px)
+        let bucketCount = 256
         let bucketSize  = max(1, frameLength / bucketCount)
         var peaks = [Float](repeating: 0, count: bucketCount)
         for i in 0..<bucketCount {
@@ -141,6 +140,7 @@ struct AudioWaveformView: View {
             // Discard if a newer filename (or nil) has been requested since this task started
             guard expectedFilename == filename else { return }
             self.samples = peaks
+            self.audioDurationSeconds = durationSec
             self.audioDurationBars = durationBars
         }
     }
@@ -245,8 +245,8 @@ private struct WaveformLayerView: View, Equatable {
             }
         }
 
+        outlineTop.addPath(outlineBottom)
         ctx.fill(fillPath, with: .color(.blue.opacity(0.45)))
-        ctx.stroke(outlineTop,    with: .color(.blue.opacity(0.80)), lineWidth: 1)
-        ctx.stroke(outlineBottom, with: .color(.blue.opacity(0.80)), lineWidth: 1)
+        ctx.stroke(outlineTop, with: .color(.blue.opacity(0.80)), lineWidth: 1)
     }
 }

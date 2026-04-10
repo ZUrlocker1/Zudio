@@ -199,7 +199,7 @@ struct PadsGenerator {
         // Chord type intervals can add chromatic tones even when the chord root is diatonic
         // (e.g. dom7 adds a minor 7th that may not be in the mode; F#m7 adds C# in E Aeolian).
         // Snapping keeps voicings audible and in-key without removing notes entirely.
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         return offsets.map { offset -> UInt8 in
             let rawMidi   = clamped(rootMIDI + offset, low: 48, high: 84)
             let pc        = rawMidi % 12

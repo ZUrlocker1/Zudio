@@ -81,7 +81,8 @@ final class AppState: ObservableObject {
         let style: MusicStyle
         let title: String
     }
-    private var songHistory:      [SongHistoryEntry] = []
+    private var songHistory:        [SongHistoryEntry] = []
+    private var forwardSongHistory: [SongHistoryEntry] = []  // forward stack for Song mode ⏭ navigation
     private let songHistoryLimit = 10
 
     // Endless style continuum: fixed axis, movement ±1 only
@@ -147,6 +148,7 @@ final class AppState: ObservableObject {
         // Reset Endless / Evolve mode state
         playMode             = .song
         songHistory          = []
+        forwardSongHistory   = []
         nextSongState        = nil
         isPreGenerating      = false
         songsInCurrentStyle  = 0
@@ -773,8 +775,9 @@ final class AppState: ObservableObject {
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
-                // Track song history for ⏮ back navigation
+                // Track song history for ⏮ back navigation; new song clears forward stack
                 self.appendSongHistory(from: state)
+                self.forwardSongHistory = []
                 // Endless: reset stream counters to current style; start pre-gen for song after next
                 if self.playMode == .endless {
                     self.songsInCurrentStyle = 1
@@ -980,9 +983,9 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Rewind to bar 1. Already in bars 1–2: load previous song from history if available.
+    /// Rewind to the start. Already in bar 0: load previous song from history (or beep if none).
     func seekToStart() {
-        if playback.currentBar < 2 {
+        if playback.currentBar == 0 {
             goToPreviousSong()
         } else {
             seekTo(step: 0)
@@ -990,9 +993,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Jump to the last bar and stop playback.
+    /// Jump to the last bar and stop playback. In Song mode at the last bar: go to next song if
+    /// one exists in forward history, otherwise beep.
     func seekToEnd() {
         guard let song = songState else { return }
+        if playMode == .song && playback.currentBar >= song.frame.totalBars - 1 {
+            goToNextSong()
+            return
+        }
         stop()
         let lastStep = song.frame.totalBars * 16 - 1
         let totalBars = song.frame.totalBars
@@ -1009,8 +1017,12 @@ final class AppState: ObservableObject {
     }
 
     private func goToPreviousSong() {
-        guard songHistory.count >= 2 else { return }
-        songHistory.removeLast()   // drop current song entry
+        guard songHistory.count >= 2 else {
+            NSSound(named: "Basso")?.play()   // low thud: nowhere to go back to
+            return
+        }
+        let current = songHistory.removeLast()   // drop current; save it for forward navigation
+        forwardSongHistory.append(current)
         let prev = songHistory.last!
         appendToLog([GenerationLogEntry(tag: "Rewind",
             description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
@@ -1021,6 +1033,26 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.selectedStyle = state.style
                 self.finishLoadingSong(state, thenPlay: wasPlaying)
+            }
+        }
+    }
+
+    private func goToNextSong() {
+        guard !forwardSongHistory.isEmpty else {
+            NSSound(named: "Basso")?.play()   // low thud: nowhere to go forward to
+            return
+        }
+        let next = forwardSongHistory.removeLast()
+        songHistory.append(next)
+        if songHistory.count > songHistoryLimit { songHistory.removeFirst() }
+        appendToLog([GenerationLogEntry(tag: "Forward",
+            description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let state = SongGenerator.generate(seed: next.seed, style: next.style, testMode: false)
+            await MainActor.run {
+                self.selectedStyle = state.style
+                self.finishLoadingSong(state, thenPlay: true)
             }
         }
     }
@@ -1094,10 +1126,14 @@ final class AppState: ObservableObject {
         selectedStyle            = state.style
         shouldLogNextUpWhenReady = false   // reset — next pre-gen is silent until trigger fires
         upNextLogged             = false
-        finishLoadingSong(state, thenPlay: true)
         nextSongState   = nil
         isPreGenerating = false
-        preGenerateNextSong()   // silently pre-gen the song after next
+        preGenerateNextSong()   // silently pre-gen the song after next; starts during the gap
+        // 500 ms silence between songs
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.playMode == .endless else { return }
+            self.finishLoadingSong(state, thenPlay: true)
+        }
     }
 
     private func generateAndStartNextSong() {
@@ -1236,10 +1272,10 @@ final class AppState: ObservableObject {
             //              their solo window. passBodyBars constrains the solo to land within the
             //              pass window, but we still retry if only intro motif notes exist.
             var attempts = 1
-            while attempts < 12 {
+            while attempts < 4 {
                 let newRuleIDs = Set(newEntries.map(\.tag).filter(isRuleID))
                 let eventsEmpty = anchorHadContent &&
-                    regen.trackEvents[idx].filter({ $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }).isEmpty
+                    !regen.trackEvents[idx].contains { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
                 if newRuleIDs.isDisjoint(with: anchorRuleIDs) && !eventsEmpty { break }
                 regen      = SongGenerator.regenerateTrack(idx, songState: anchor, passBodyBars: passBars)
                 newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
@@ -1532,7 +1568,11 @@ final class AppState: ObservableObject {
                 appendToLog([GenerationLogEntry(tag: "Up next",
                     description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
             }
-            finishLoadingEvolveSong(next)
+            // 500 ms silence between songs
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, self.playMode == .evolve else { return }
+                self.finishLoadingEvolveSong(next)
+            }
         } else {
             appendToLog([GenerationLogEntry(tag: "Evolve", description: "Loading next song...", isTitle: false)])
             guard let anchor = evolveAnchorState else { return }
@@ -1551,7 +1591,11 @@ final class AppState: ObservableObject {
                         self.appendToLog([GenerationLogEntry(tag: "Up next",
                             description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
                     }
-                    self.finishLoadingEvolveSong(state)
+                    // 500 ms silence between songs
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        guard let self, self.playMode == .evolve else { return }
+                        self.finishLoadingEvolveSong(state)
+                    }
                 }
             }
         }
@@ -1575,16 +1619,11 @@ final class AppState: ObservableObject {
         startEvolveMode(from: state, lockMoodToSong: false)
     }
 
-    /// Skip to the next evolution pass immediately (Evolve mode ⏭ button).
+    /// Skip to the next song immediately (Evolve mode ⏭ button).
+    /// Uses pre-generated next song if available, otherwise generates one — same as Endless skipToNextSong.
     func skipEvolvePass() {
         guard playMode == .evolve else { return }
-        switch evolvePhase {
-        case .original: handleEvolveOutroStart()
-        case .pass1:    handleEvolvePhaseEnded()
-        case .pass2:    transitionToEvolveNextSong()
-        case .outro:    transitionToEvolveNextSong()
-        case .inactive: break
-        }
+        transitionToEvolveNextSong()
     }
 
     /// Shared song-loading kernel for Endless transitions and ⏮ rewind.
@@ -1617,8 +1656,12 @@ final class AppState: ObservableObject {
         NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
-    /// Step back one bar. Clamps at bar 0.
+    /// Step back one bar. Beeps when already at the very start (step 0).
     func seekBackOneBar() {
+        if playback.currentStep == 0 {
+            NSSound(named: "Basso")?.play()
+            return
+        }
         let targetBar = max(0, playback.currentBar - 1)
         seekEdgeSensitive(toBar: targetBar)
     }
@@ -1629,9 +1672,18 @@ final class AppState: ObservableObject {
         seekEdgeSensitive(toBar: targetBar)
     }
 
-    /// Step forward one bar. Clamps at last bar.
+    /// Step forward one bar. At the last bar in Song mode: go to next song if available, else beep.
+    /// In other modes: beep at the last bar.
     func seekForwardOneBar() {
         guard let song = songState else { return }
+        if playback.currentBar >= song.frame.totalBars - 1 {
+            if playMode == .song {
+                goToNextSong()
+            } else {
+                NSSound(named: "Basso")?.play()
+            }
+            return
+        }
         let targetBar = min(song.frame.totalBars - 1, playback.currentBar + 1)
         seekEdgeSensitive(toBar: targetBar)
     }

@@ -28,6 +28,10 @@
 //   Rotate     — shifts all non-beat1 notes by ±1–2 steps, accumulating across the window.
 //                Available with 35% probability; only on windows ≥ 8 bars.
 //                The evolve-reset arc reverses the rotation on the descent.
+//
+// Performance: events are pre-indexed into a [bar → [MIDIEvent]] dictionary once at the
+// top of apply(). All per-bar operations do O(1) dictionary lookups instead of O(n_events)
+// filter scans. The tonal map is also pre-indexed per bar. Total work drops from O(n² ) to O(n).
 
 struct PatternEvolver {
 
@@ -42,31 +46,52 @@ struct PatternEvolver {
         var events = trackEvents
 
         // Window size chosen once per song: 8 bars (15%), 16 bars (50%), 32 bars (35%).
-        // Longer windows mean mutations spread more gradually, staying in sync with the groove.
         let windowSize = [8, 16, 32][rng.weightedPick([0.15, 0.50, 0.35])]
 
+        // Pre-index bass events by bar — eliminates repeated O(n_events) filter scans.
+        var barDict = buildBarDict(events[kTrackBass])
+
+        // Pre-index tonal map by bar — replaces O(n_windows) linear scan per bar.
+        let entryForBar = tonalMap.barEntryMap(totalBars: frame.totalBars)
+
         // Busyness: avg events per body bar, normalised so 8 events/bar = 1.0
-        let busyness = measureBusyness(events[kTrackBass], frame: frame, structure: structure)
+        let busyness = measureBusyness(barDict, frame: frame, structure: structure)
 
         var bar = 0
         while bar < frame.totalBars {
             let windowEnd = min(bar + windowSize, frame.totalBars)
-            events[kTrackBass] = evolveWindow(
-                events[kTrackBass],
+            evolveWindow(
+                &barDict,
                 startBar: bar, endBar: windowEnd,
-                frame: frame, structure: structure, tonalMap: tonalMap,
+                frame: frame, structure: structure, entryForBar: entryForBar,
                 busyness: busyness, rng: &rng
             )
             bar = windowEnd
         }
 
+        // Reconstruct flat sorted array from bar dictionary.
+        events[kTrackBass] = barDict.values
+            .flatMap { $0 }
+            .sorted { $0.stepIndex < $1.stepIndex }
         return events
+    }
+
+    // MARK: - Bar indexing
+
+    /// Buckets events by bar number for O(1) per-bar access.
+    private static func buildBarDict(_ events: [MIDIEvent]) -> [Int: [MIDIEvent]] {
+        var dict = [Int: [MIDIEvent]]()
+        dict.reserveCapacity(max(1, events.count / 4))
+        for ev in events {
+            dict[ev.stepIndex / 16, default: []].append(ev)
+        }
+        return dict
     }
 
     // MARK: - Busyness
 
     private static func measureBusyness(
-        _ events: [MIDIEvent], frame: GlobalMusicalFrame, structure: SongStructure
+        _ barDict: [Int: [MIDIEvent]], frame: GlobalMusicalFrame, structure: SongStructure
     ) -> Double {
         var bodyBars = 0
         var total    = 0
@@ -74,8 +99,7 @@ struct PatternEvolver {
             guard let sec = structure.section(atBar: bar),
                   sec.label != .intro && sec.label != .outro else { continue }
             bodyBars += 1
-            let s = bar * 16
-            total += events.filter { $0.stepIndex >= s && $0.stepIndex < s + 16 }.count
+            total += (barDict[bar] ?? []).count   // O(1) — no filter scan
         }
         guard bodyBars > 0 else { return 0.5 }
         return min(1.0, Double(total) / Double(bodyBars) / 8.0)
@@ -84,16 +108,16 @@ struct PatternEvolver {
     // MARK: - Window evolution
 
     private static func evolveWindow(
-        _ events: [MIDIEvent],
+        _ barDict: inout [Int: [MIDIEvent]],
         startBar: Int, endBar: Int,
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        tonalMap: TonalGovernanceMap,
+        entryForBar: [Int: TonalGovernanceEntry],
         busyness: Double,
         rng: inout SeededRNG
-    ) -> [MIDIEvent] {
+    ) {
         let windowLen = endBar - startBar
-        guard windowLen >= 4 else { return events }
+        guard windowLen >= 4 else { return }
 
         // Arc: 0 = evolve-reset, 1 = evolve-hold, 2 = evolve-reverse
         let arcType = rng.weightedPick([0.40, 0.35, 0.25])
@@ -106,33 +130,31 @@ struct PatternEvolver {
 
         // Pre-select targets for the window (decided once, applied per-bar)
         let thinTargets = canThin
-            ? selectThinTargets(events, startBar: startBar, endBar: endBar,
+            ? selectThinTargets(barDict, startBar: startBar, endBar: endBar,
                                 structure: structure, rng: &rng) : []
         let fillTarget  = canFill
-            ? selectFillTarget(events, startBar: startBar, endBar: endBar,
+            ? selectFillTarget(barDict, startBar: startBar, endBar: endBar,
                                structure: structure, rng: &rng) : nil
         let subTarget   = canSub
-            ? selectSubTarget(events, startBar: startBar, endBar: endBar,
+            ? selectSubTarget(barDict, startBar: startBar, endBar: endBar,
                               structure: structure, rng: &rng) : nil
         let rotateDir   = canRotate ? (rng.nextDouble() < 0.5 ? 1 : -1) : 0
         var rotateAccum = 0
 
         let bassBounds = RegisterBounds(low: 28, high: 52)
-        var result = events
 
         for bar in startBar..<endBar {
             guard let section = structure.section(atBar: bar),
                   section.label != .intro && section.label != .outro else { continue }
-            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            guard let entry = entryForBar[bar] else { continue }   // O(1) — no linear scan
 
             let pos = windowLen > 1
                 ? Double(bar - startBar) / Double(windowLen - 1)
                 : 0.0
             let intensity = arcIntensity(pos: pos, arcType: arcType)
 
-            let barStart    = bar * 16
-            var barEvents   = result.filter { $0.stepIndex >= barStart && $0.stepIndex < barStart + 16 }
-            let otherEvents = result.filter { $0.stepIndex < barStart  || $0.stepIndex >= barStart + 16 }
+            let barStart  = bar * 16
+            var barEvents = barDict[bar] ?? []   // O(1) — no filter scan
 
             // ── Thin ──────────────────────────────────────────────────────────
             if !thinTargets.isEmpty {
@@ -202,19 +224,17 @@ struct PatternEvolver {
                 }
             }
 
-            result = otherEvents + barEvents
+            barDict[bar] = barEvents   // O(1) update — no full-array rebuild
         }
-
-        return result
     }
 
-    // MARK: - Target selection
+    // MARK: - Target selection (operate on barDict directly)
 
     /// Finds 2–3 non-anchor step offsets (within a bar) that appear most frequently
     /// across body bars — these are the candidates for thinning.
     /// Beat 1 (step 0) and beat 3 (step 8) are never thinned.
     private static func selectThinTargets(
-        _ events: [MIDIEvent], startBar: Int, endBar: Int,
+        _ barDict: [Int: [MIDIEvent]], startBar: Int, endBar: Int,
         structure: SongStructure, rng: inout SeededRNG
     ) -> [Int] {
         var freq: [Int: Int] = [:]
@@ -222,7 +242,7 @@ struct PatternEvolver {
             guard let s = structure.section(atBar: bar),
                   s.label != .intro && s.label != .outro else { continue }
             let bs = bar * 16
-            for ev in events where ev.stepIndex >= bs && ev.stepIndex < bs + 16 {
+            for ev in barDict[bar] ?? [] {
                 let off = ev.stepIndex - bs
                 if off != 0 && off != 8 { freq[off, default: 0] += 1 }
             }
@@ -240,7 +260,7 @@ struct PatternEvolver {
 
     /// Finds an off-beat 8th-note step that is consistently empty but adjacent to a note.
     private static func selectFillTarget(
-        _ events: [MIDIEvent], startBar: Int, endBar: Int,
+        _ barDict: [Int: [MIDIEvent]], startBar: Int, endBar: Int,
         structure: SongStructure, rng: inout SeededRNG
     ) -> (stepOffset: Int, direction: Int)? {
         var occupied = Set<Int>()
@@ -250,9 +270,7 @@ struct PatternEvolver {
                   s.label != .intro && s.label != .outro else { continue }
             bodyCount += 1
             let bs = bar * 16
-            for ev in events where ev.stepIndex >= bs && ev.stepIndex < bs + 16 {
-                occupied.insert(ev.stepIndex - bs)
-            }
+            for ev in barDict[bar] ?? [] { occupied.insert(ev.stepIndex - bs) }
         }
         guard bodyCount > 0 else { return nil }
 
@@ -271,7 +289,7 @@ struct PatternEvolver {
     /// Selects a non-anchor step (not beats 1 or 3) that consistently carries a note
     /// in at least half the body bars — candidate for pitch substitution.
     private static func selectSubTarget(
-        _ events: [MIDIEvent], startBar: Int, endBar: Int,
+        _ barDict: [Int: [MIDIEvent]], startBar: Int, endBar: Int,
         structure: SongStructure, rng: inout SeededRNG
     ) -> (stepOffset: Int, direction: Int)? {
         var freq: [Int: Int] = [:]
@@ -281,7 +299,7 @@ struct PatternEvolver {
                   s.label != .intro && s.label != .outro else { continue }
             bodyCount += 1
             let bs = bar * 16
-            for ev in events where ev.stepIndex >= bs && ev.stepIndex < bs + 16 {
+            for ev in barDict[bar] ?? [] {
                 let off = ev.stepIndex - bs
                 if off != 0 && off != 8 { freq[off, default: 0] += 1 }
             }

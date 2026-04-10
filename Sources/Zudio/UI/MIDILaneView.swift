@@ -26,11 +26,15 @@ struct MIDILaneView: View {
     // not on every Canvas redraw (which fires on each playhead step tick).
     @State private var onsetsByNote: [UInt8: [Int]] = [:]
     @State private var cachedPitchRange: (Int, Int) = (48, 84)
+    // Monotonic counter incremented in buildCache(). NoteLayerView.== checks this first
+    // (O(1)) so the expensive onsets dict comparison never runs during normal playback.
+    @State private var cacheVersion: Int = 0
 
     var body: some View {
         // Capture stable locals so closures hold their current values
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
+        let version   = cacheVersion
         let curStep   = playback.currentStep
 
         ZStack {
@@ -46,7 +50,8 @@ struct MIDILaneView: View {
                 totalBars: totalBars,
                 isDrumTrack: isDrumTrack,
                 trackColor: trackColor,
-                noteH: noteH
+                noteH: noteH,
+                cacheVersion: version
             )
             .equatable()
 
@@ -86,6 +91,7 @@ struct MIDILaneView: View {
         for ev in events { map[ev.note, default: []].append(ev.stepIndex) }
         for key in map.keys { map[key]?.sort() }
         onsetsByNote = map
+        cacheVersion += 1
 
         let notes = events.map { Int($0.note) }
         if notes.isEmpty {
@@ -138,18 +144,19 @@ private struct NoteLayerView: View, Equatable {
     let isDrumTrack: Bool
     let trackColor: Color
     let noteH: CGFloat
+    let cacheVersion: Int
 
     static func == (lhs: NoteLayerView, rhs: NoteLayerView) -> Bool {
-        // onsets is derived from events in buildCache(), so it's a faithful
-        // proxy for event equality without requiring MIDIEvent: Equatable.
-        lhs.onsets == rhs.onsets &&
-        lhs.pitchRange.0 == rhs.pitchRange.0 &&
-        lhs.pitchRange.1 == rhs.pitchRange.1 &&
-        lhs.visibleBars == rhs.visibleBars &&
-        lhs.barOffset == rhs.barOffset &&
-        lhs.totalBars == rhs.totalBars &&
-        lhs.isDrumTrack == rhs.isDrumTrack &&
-        lhs.trackColor == rhs.trackColor
+        // Fast path: same cache version means events haven't changed — skip the O(N)
+        // onsets dict comparison entirely. Version differs only on song load / track regen.
+        guard lhs.cacheVersion == rhs.cacheVersion else { return false }
+        return lhs.pitchRange.0 == rhs.pitchRange.0 &&
+               lhs.pitchRange.1 == rhs.pitchRange.1 &&
+               lhs.visibleBars  == rhs.visibleBars  &&
+               lhs.barOffset    == rhs.barOffset     &&
+               lhs.totalBars    == rhs.totalBars     &&
+               lhs.isDrumTrack  == rhs.isDrumTrack   &&
+               lhs.trackColor   == rhs.trackColor
     }
 
     var body: some View {

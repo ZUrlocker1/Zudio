@@ -27,7 +27,7 @@ struct AmbientLeadGenerator {
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackLead1]!  // low:60, high:88
         let loopSteps = loopBars * 16
-        let scalePCs  = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs  = frame.scalePCs
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
@@ -108,7 +108,7 @@ struct AmbientLeadGenerator {
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackLead2]!  // low:55, high:81
         let loopSteps = loopBars * 16
-        let scalePCs  = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs  = frame.scalePCs
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
@@ -397,7 +397,7 @@ struct AmbientLeadGenerator {
                                       minGap: 12, rng: &rng)
         guard !windows.isEmpty else { return [] }
 
-        let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs = frame.scalePCs
         var events: [MIDIEvent] = []
 
         for window in windows {
@@ -457,7 +457,7 @@ struct AmbientLeadGenerator {
                                       minGap: 12, rng: &rng)
         guard !windows.isEmpty else { return [] }
 
-        let scalePCs = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs = frame.scalePCs
         var events: [MIDIEvent] = []
 
         for window in windows {

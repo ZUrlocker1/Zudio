@@ -46,7 +46,7 @@ struct KosmicTitleGenerator {
     private static let germanKosmicNouns = [
         "Kosmos", "Nebel", "Stern", "Raum", "Welle", "Licht", "Aether",
         "Ferne", "Himmel", "Strom", "Feld", "Leere", "Geist", "Tiefe",
-        "Schwere", "Dunkel", "Stille", "Weite", "Schein", "Hauch"
+        "Schwere", "Dunkel", "Stille", "Weite", "Schein", "Hauch", "Basso"
     ]
 
     // MARK: - Patterns

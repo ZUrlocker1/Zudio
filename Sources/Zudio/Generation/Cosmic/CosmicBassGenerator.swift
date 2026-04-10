@@ -488,7 +488,7 @@ struct KosmicBassGenerator {
         guard cycle % 2 == 0 else { return [] }
 
         let rootPC_rfw = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let sPCs_rfw   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let sPCs_rfw   = frame.scalePCs
         func bassPC_rfw(_ interval: Int) -> UInt8 {
             let raw = (rootPC_rfw + interval) % 12
             let pc  = snapToScale(raw, scalePCs: sPCs_rfw)
@@ -718,7 +718,7 @@ struct KosmicBassGenerator {
         useVariation: Bool = false
     ) -> [MIDIEvent] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
         let root  = bassRoot(entry: entry, frame: frame)
         let fifth = UInt8(clampToRegister(36 + fifthPC, low: 40, high: 55))
@@ -787,7 +787,7 @@ struct KosmicBassGenerator {
     ) -> [MIDIEvent] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let fifthPC  = (rootPC + 7) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         // b7 above the chord root may be outside the song's scale when chord is non-tonic.
         // Snap to nearest scale PC to prevent out-of-scale bass notes.
         let b7PC     = snapToScale((rootPC + 10) % 12, scalePCs: scalePCs)
@@ -837,7 +837,7 @@ struct KosmicBassGenerator {
         useVariation: Bool = false, subVariant: Int = 0
     ) -> [MIDIEvent] {
         let rootPC_kw  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let sPCs_kw    = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let sPCs_kw    = frame.scalePCs
         func bassPC_kw(_ interval: Int, lo: Int, hi: Int) -> UInt8 {
             let raw = (rootPC_kw + interval) % 12
             let pc  = snapToScale(raw, scalePCs: sPCs_kw)
@@ -911,7 +911,7 @@ struct KosmicBassGenerator {
         // fifth and b7 always fall on the correct pitch class regardless of octave.
         // e.g. Eb root=51: naive +7=58 clamps to 55=G (wrong); PC approach gives Bb=46.
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         func bassPC(_ interval: Int) -> UInt8 {
             let raw = (rootPC + interval) % 12
             let pc  = snapToScale(raw, scalePCs: scalePCs)
@@ -983,7 +983,7 @@ struct KosmicBassGenerator {
         // Compute fifth via pitch-class to avoid range-clamping wrong notes.
         // Scale-snap: if the raw fifth PC is non-diatonic, move to nearest in-scale PC.
         let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs   = frame.scalePCs
         let bestFifthPC = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
         let fifth = UInt8(clampToRegister(36 + bestFifthPC, low: 40, high: 55))
 
@@ -1017,7 +1017,7 @@ struct KosmicBassGenerator {
         let root       = bassRoot(entry: entry, frame: frame)
         let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         // Scale-snap: if the raw fifth PC is non-diatonic, move to nearest in-scale PC.
-        let scalePCs   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs   = frame.scalePCs
         let bestFifthPC = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
         let fifth = UInt8(clampToRegister(36 + bestFifthPC, low: 40, high: 55))
 
@@ -1102,7 +1102,7 @@ struct KosmicBassGenerator {
         let rawPC    = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         // Scale-snap: if the chord root is a borrowed/non-diatonic PC, move to the nearest
         // in-scale PC. Prevents clashes when the chord plan uses modal-mixture chord roots.
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let rootPC = snapToScale(rawPC, scalePCs: scalePCs)
         // KOS-RULE-06: bass in MIDI 40–55
         return UInt8(clampToRegister(36 + rootPC, low: 40, high: 55))

@@ -553,8 +553,7 @@ struct LeadGenerator {
         if isIntroOutro && rng.nextDouble() < 0.65 { return events }
         let bounds   = kRegisterBounds[kTrackLead1]!
         let rootPC   = chordRootPC(frame: frame, entry: entry)
-        let keyST    = keySemitone(frame.key)
-        let scalePCs = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+        let scalePCs = frame.scalePCs
 
         let offsets: [Int] = (bar % 2 == 0) ? [7, 5, 2, 0] : [frame.mode.nearestInterval(10), 7, 5, 2]
         let durs:    [Int] = [3, 2, 3, 4]
@@ -585,8 +584,7 @@ struct LeadGenerator {
         if isIntroOutro && rng.nextDouble() < 0.65 { return events }
         let bounds   = kRegisterBounds[kTrackLead1]!
         let rootPC   = chordRootPC(frame: frame, entry: entry)
-        let keyST    = keySemitone(frame.key)
-        let scalePCs = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let baseVel  = Int(velocityForIntensity(intensity, rng: &rng))
         var localPrev = prevNote
 
@@ -1159,8 +1157,7 @@ struct LeadGenerator {
         // chord root (e.g. C# in A Ionian) yields OOS notes (Eb, F, Bb). Snapping each
         // result to the nearest in-scale PC fixes this without changing the motif's rhythm
         // or melodic shape.
-        let keyST    = keySemitone(frame.key)
-        let scalePCs = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let velAdj: Int
         switch intensity { case .low: velAdj = -12; case .medium: velAdj = 0; case .high: velAdj = 10 }
         var localPrev = prevNote
@@ -1227,8 +1224,8 @@ struct LeadGenerator {
         trackIndex: Int, prevNote: UInt8?, rng: inout SeededRNG
     ) -> UInt8 {
         let pool: [Int] = (rng.nextDouble() < 0.80)
-            ? entry.chordWindow.chordTones.sorted()
-            : entry.chordWindow.scaleTensions.sorted()
+            ? Array(entry.chordWindow.chordTones)
+            : Array(entry.chordWindow.scaleTensions)
         guard !pool.isEmpty else {
             return frame.midiNote(degree: "1", oct: 0, trackIndex: trackIndex)
         }
@@ -1252,7 +1249,7 @@ struct LeadGenerator {
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         trackIndex: Int, lead1LastNote: UInt8?, rng: inout SeededRNG
     ) -> UInt8 {
-        let pool = entry.chordWindow.chordTones.sorted()
+        let pool = Array(entry.chordWindow.chordTones)
         guard !pool.isEmpty else { return frame.midiNote(degree: "1", oct: 0, trackIndex: trackIndex) }
         let bounds = kRegisterBounds[trackIndex] ?? RegisterBounds(low: 60, high: 96)
 

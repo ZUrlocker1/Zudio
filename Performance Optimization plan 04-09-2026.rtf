@@ -1,0 +1,90 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2869
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11200\viewh10200\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs28 \cf0 Performance Optimization Plan\
+Skeptical baseline: Generation runs off the main thread (Task.detached) and pre-gen starts 8 bars before song end (~30s of headroom). So the real risk isn't blocking playback \'97 it's Evolve mode, where retry loops chain multiple full-track generations and compete for CPU while music is playing. Everything else is generation-time cost that only matters if it exceeds the pre-gen window.\
+\
+Finding 1 \'97 PatternEvolver: O(n\'b2) array scanning (HIGH)\
+The most wasteful algorithm in the codebase. PatternEvolver does four separate full-array linear scans per bar:\
+\
+measureBusyness (line 78):\
+\
+\
+total += events.filter \{ $0.stepIndex >= s && $0.stepIndex < s + 16 \}.count\
+Called once per bar. For an 80-bar song with 300 bass events: 80 \'d7 300 = 24,000 comparisons.\
+\
+evolveWindow per-bar partition (lines 134-135):\
+\
+\
+var barEvents   = result.filter \{ $0.stepIndex >= barStart && ... \}\
+let otherEvents = result.filter \{ $0.stepIndex < barStart  || ... \}\
+Two scans per bar. Then result = otherEvents + barEvents rebuilds the array from scratch. Over 80 bars: 80 \'d7 2 \'d7 300 = 48,000 comparisons + 80 array reallocations.\
+\
+Target selectors (selectThinTargets, selectFillTarget, selectSubTarget):\
+Each iterates the full events array filtering to a window. 5 windows \'d7 3 selectors \'d7 300 events = 4,500 comparisons.\
+\
+Total: ~76,500 comparisons for a typical Motorik generation.\
+\
+Fix: Build a [Int: [MIDIEvent]] dictionary keyed by bar once at the top of apply(). All three functions accept it instead of the raw array. Reduces to one O(n log n) sort + O(1) dictionary lookups. Eliminates both the redundant scanning AND the per-bar array rebuild/reallocation.\
+\
+Estimated savings: ~95% reduction in work \uc0\u8594  ~8-12ms off every Motorik/Chill generation (smaller for Ambient which doesn't use PatternEvolver).\
+\
+Finding 2 \'97 Evolve retry loop: up to 12 full track regenerations per track (HIGH)\
+In buildPassState (AppState.swift line 1243):\
+\
+\
+var attempts = 1\
+while attempts < 12 \{\
+    regen = SongGenerator.regenerateTrack(...)  // full track generation each time\
+    attempts += 1\
+\}\
+2 fresh tracks \'d7 pass 1, 2 fresh tracks \'d7 pass 2 = up to 48 full track regenerations in the worst case. For bass regeneration each attempt also runs PatternEvolver.apply() + DrumVariationEngine.lockBassToExistingFills() \'97 together about 20-30ms.\
+\
+Worst case: 4 tracks \'d7 12 attempts \'d7 25ms = ~1.2 seconds of generation in the background \'97 competing with live playback for the CPU.\
+\
+Fix: Cap retries at 4. After 4 attempts with different random seeds, the musical output differs enough regardless of whether the rule ID matches. The rule-ID check is a proxy for musical difference; 4 reseeds gives the same practical variety.\
+\
+Estimated savings: 66% fewer worst-case retries \uc0\u8594  saves up to 800ms per evolve session.\
+\
+Finding 3 \'97 entry(atBar:) is a linear scan called in every per-bar loop (MEDIUM)\
+\
+func entry(atBar bar: Int) -> TonalGovernanceEntry? \{\
+    first \{ $0.chordWindow.contains(bar: bar) \}  // O(n_windows) scan\
+\}\
+A song has 8-20 chord windows. Every generator that loops over bars calls this per bar. PatternEvolver calls it 80 times per song, BassGenerator does similarly, same for Rhythm, Lead1, Lead2.\
+\
+~6 generators \'d7 80 bars \'d7 15 windows = 7,200 comparisons across a full generation. Not huge but 100% eliminable.\
+\
+Fix: Add func barEntryMap() -> [Int: TonalGovernanceEntry] to TonalGovernanceMap that pre-builds a [Int: TonalGovernanceEntry] dictionary once at generation start. Pass it into generators alongside the map. O(1) lookup replaces O(n_windows) scan.\
+\
+Estimated savings: Eliminates ~7,200 comparisons \uc0\u8594  ~1-2ms, plus makes all generators cleaner.\
+\
+Finding 4 \'97 Set(frame.mode.intervals.map \{ \}) reconstructed 8+ times per generation (LOW/CLEAN)\
+\
+let scalePCs = Set(frame.mode.intervals.map \{ (frame.keySemitoneValue + $0) % 12 \})\
+This exact pattern appears in BassGenerator (3 spots), RhythmGenerator (2), ChillRhythmGenerator, PadsGenerator, ChillPadsGenerator, and more. The mode intervals never change during generation \'97 it's a constant per song.\
+\
+Fix: Add var scalePCs: Set<Int> as a computed property to GlobalMusicalFrame. Eliminates ~10 redundant 7-element Set constructions and makes generators cleaner.\
+\
+Estimated savings: Trivial absolute cost (7-element sets), but zero-friction code cleanup that removes duplicated logic.\
+\
+What I'm NOT recommending\
+structure.section(atBar:) \'97 only 3-5 sections, O(5) is negligible\
+buildLog sorted() calls \'97 sets of 3-4 elements, once per song\
+buildStepEventMap \'97 already O(n), runs fast, previously optimized\
+LFO/tremolo timers \'97 already consolidated to one shared timer\
+preGenerateNextSong threading \'97 already correctly on background Task\
+Summary (no tables)\
+Finding 1 (PatternEvolver) is the only true algorithmic bug \'97 O(n\'b2) where O(n) is straightforward. Worth doing on its own.\
+\
+Finding 2 (evolve retries) is a single constant change (< 12 \uc0\u8594  < 4) with the biggest worst-case win.\
+\
+Findings 3 and 4 are cleanup that compound slightly in generators with many bar loops.\
+\
+Total estimated reduction in generation time: ~15-25ms per Motorik/Chill song (generation-time), ~800ms worst-case improvement in Evolve pass generation (real-time impact during playback).\
+\
+Want me to implement all four, or start with just the high-impact ones?}

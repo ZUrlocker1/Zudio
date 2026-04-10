@@ -21,7 +21,7 @@ struct AmbientRhythmGenerator {
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackRhythm]!  // low:45, high:76
         let loopSteps = loopBars * 16
-        let scalePCs  = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs  = frame.scalePCs
         let scaleNotes = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !scaleNotes.isEmpty else { return [] }
 

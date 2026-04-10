@@ -14,6 +14,20 @@ extension Array where Element == TonalGovernanceEntry {
     func entry(atBar bar: Int) -> TonalGovernanceEntry? {
         first { $0.chordWindow.contains(bar: bar) }
     }
+
+    /// Pre-builds a [bar → entry] dictionary for O(1) lookup in tight bar loops.
+    /// Covers every bar from 0 up to (but not including) totalBars.
+    /// Use this instead of repeated entry(atBar:) calls inside per-bar loops.
+    func barEntryMap(totalBars: Int) -> [Int: TonalGovernanceEntry] {
+        var map = [Int: TonalGovernanceEntry]()
+        map.reserveCapacity(totalBars)
+        for entry in self {
+            let lo = entry.chordWindow.startBar
+            let hi = Swift.min(entry.chordWindow.endBar, totalBars)
+            for bar in lo..<hi { map[bar] = entry }
+        }
+        return map
+    }
 }
 
 // MARK: - Chord-window note pool builder

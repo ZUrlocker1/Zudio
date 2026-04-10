@@ -52,7 +52,8 @@ struct ChillPadsGenerator {
     private static func chordSustain(frame: GlobalMusicalFrame, structure: SongStructure,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
-        let scaleIntervals = frame.mode.intervals
+        let scalePCs  = frame.scalePCs
+        let snapTable = makeSnapTable(scalePCs)
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -67,8 +68,7 @@ struct ChillPadsGenerator {
             let chordRootPC = (frame.keySemitoneValue + degreeSemitone(chord?.chordRoot ?? "1")) % 12
             let voiceNotes  = buildUpperStructure(chordRootPC: chordRootPC,
                                                    chordType: chord?.chordType ?? .min7,
-                                                   scaleIntervals: scaleIntervals,
-                                                   keyRoot: frame.keySemitoneValue,
+                                                   snapTable: snapTable,
                                                    register: 60)  // mid register for pads
 
             // Only emit new sustain on renewal bars (every 2–4 bars within each chord window)
@@ -99,7 +99,8 @@ struct ChillPadsGenerator {
     private static func staggeredEntry(frame: GlobalMusicalFrame, structure: SongStructure,
                                         rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
-        let scaleIntervals = frame.mode.intervals
+        let scalePCs  = frame.scalePCs
+        let snapTable = makeSnapTable(scalePCs)
 
         // Find the first groove section start
         let grooveStart = structure.sections.first { $0.label == .A }?.startBar ?? 0
@@ -134,9 +135,7 @@ struct ChillPadsGenerator {
                 let degree = [0, 3, 7, 10][voiceIdx]  // root, 3rd, 5th, 7th
                 let notePC = (chordRootPC + degree) % 12
                 // Snap to scale
-                let snappedPC = scaleIntervals
-                    .map { (frame.keySemitoneValue + $0) % 12 }
-                    .min(by: { abs($0 - notePC) < abs($1 - notePC) }) ?? notePC
+                let snappedPC = snapTable[notePC]
                 // Correct pitch-class-to-MIDI: find note near register with pitch class snappedPC
                 let targetPC = register % 12
                 let semisUp = (snappedPC - targetPC + 12) % 12
@@ -163,7 +162,8 @@ struct ChillPadsGenerator {
                                       rng: inout SeededRNG) -> [MIDIEvent] {
         guard breakdownStyle != .bassOstinato else { return [] }
         var events: [MIDIEvent] = []
-        let scaleIntervals = frame.mode.intervals
+        let scalePCs  = frame.scalePCs
+        let snapTable = makeSnapTable(scalePCs)
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             guard section?.label == .bridge else { continue }
@@ -171,8 +171,7 @@ struct ChillPadsGenerator {
             let chordRootPC = (frame.keySemitoneValue + degreeSemitone(chord?.chordRoot ?? "1")) % 12
             let voiceNotes  = buildUpperStructure(chordRootPC: chordRootPC,
                                                    chordType: chord?.chordType ?? .sus4,
-                                                   scaleIntervals: scaleIntervals,
-                                                   keyRoot: frame.keySemitoneValue,
+                                                   snapTable: snapTable,
                                                    register: 60)
             let base = bar * 16
             let breakdownBar = bar - (section?.startBar ?? bar)
@@ -229,15 +228,23 @@ struct ChillPadsGenerator {
         return events
     }
 
+    // MARK: - Snap table helper
+
+    /// Builds a 12-element lookup: chromatic PC → nearest scale PC.
+    /// Built once per generator call so per-note snapping is O(1) instead of O(scale_size).
+    static func makeSnapTable(_ scalePCs: Set<Int>) -> [Int] {
+        (0..<12).map { pc in
+            scalePCs.contains(pc) ? pc : (scalePCs.min(by: { abs($0 - pc) < abs($1 - pc) }) ?? pc)
+        }
+    }
+
     // MARK: - Voicing helper
 
     /// Upper-structure voicing: [3rd, 5th, 7th] spread over 2 octaves, root omitted.
     /// All intervals snapped to active scale (CHL-SYNC-004).
     private static func buildUpperStructure(chordRootPC: Int, chordType: ChordType,
-                                             scaleIntervals: [Int], keyRoot: Int,
+                                             snapTable: [Int],
                                              register: Int) -> [Int] {
-        let scalePCs = Set(scaleIntervals.map { (keyRoot + $0) % 12 })
-
         // Chord intervals above root — 4-note upper structure (3rd, 5th, 7th, 9th);
         // root omitted (bass covers it); voicing spread across 2 octaves (CHL-RULE-03).
         let rawIntervals: [Int]
@@ -252,11 +259,7 @@ struct ChillPadsGenerator {
 
         var notes: [Int] = []
         for (i, interval) in rawIntervals.enumerated() {
-            var pc = (chordRootPC + interval) % 12
-            // Snap non-scale PCs to nearest scale tone
-            if !scalePCs.contains(pc) {
-                pc = scalePCs.min(by: { abs($0 - pc) < abs($1 - pc) }) ?? pc
-            }
+            let pc = snapTable[(chordRootPC + interval) % 12]
             // Spread 4 voices across 2 octaves: voices 0–1 in lower octave, voices 2–3 upper.
             // Use correct pitch-class-to-MIDI mapping: find the nearest note at/above
             // (register + octaveOffset) that has pitch class pc.

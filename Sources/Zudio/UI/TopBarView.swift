@@ -65,9 +65,9 @@ struct TopBarView: View {
     @StateObject private var reverseRepeater = HoldRepeater()
     @StateObject private var forwardRepeater = HoldRepeater()
 
-    // @GestureState auto-resets to false when the gesture ends — used for press highlight
-    @GestureState private var reverseIsDown = false
-    @GestureState private var forwardIsDown = false
+    // Tracks button press state for highlight; updated by MousePressTracker callbacks
+    @State private var reverseIsDown = false
+    @State private var forwardIsDown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -153,18 +153,22 @@ struct TopBarView: View {
                     // Reverse: tap = -1 bar, hold = -2 bars per tick, stops at bar 0
                     Image(systemName: "backward.fill")
                         .transportButtonStyle(isDown: reverseIsDown)
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .updating($reverseIsDown) { _, state, _ in state = true }
-                                .onChanged { _ in
+                        .overlay(
+                            MousePressTracker(
+                                onPress: {
                                     guard appState.songState != nil else { return }
+                                    reverseIsDown = true
                                     reverseRepeater.start(
                                         initial:  { appState.seekBackOneBar() },
                                         step:     { appState.seekBackTwoBars() },
                                         atLimit:  { appState.playback.currentBar <= 0 }
                                     )
+                                },
+                                onRelease: {
+                                    reverseIsDown = false
+                                    reverseRepeater.stop()
                                 }
-                                .onEnded { _ in reverseRepeater.stop() }
+                            )
                         )
                         .help("Back 1 bar (hold: back 2 bars repeatedly)")
 
@@ -194,18 +198,25 @@ struct TopBarView: View {
                     // Fast forward: tap = +1 bar, hold = +2 bars per tick, stops at last bar
                     Image(systemName: "forward.fill")
                         .transportButtonStyle(isDown: forwardIsDown)
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .updating($forwardIsDown) { _, state, _ in state = true }
-                                .onChanged { _ in
-                                    guard let song = appState.songState else { return }
+                        .overlay(
+                            MousePressTracker(
+                                onPress: {
+                                    guard appState.songState != nil else { return }
+                                    forwardIsDown = true
                                     forwardRepeater.start(
                                         initial:  { appState.seekForwardOneBar() },
                                         step:     { appState.seekForwardTwoBars() },
-                                        atLimit:  { appState.playback.currentBar >= song.frame.totalBars - 1 }
+                                        atLimit:  {
+                                            guard let s = appState.songState else { return true }
+                                            return appState.playback.currentBar >= s.frame.totalBars - 1
+                                        }
                                     )
+                                },
+                                onRelease: {
+                                    forwardIsDown = false
+                                    forwardRepeater.stop()
                                 }
-                                .onEnded { _ in forwardRepeater.stop() }
+                            )
                         )
                         .help("Forward 1 bar (hold: forward 2 bars repeatedly)")
 
@@ -224,7 +235,7 @@ struct TopBarView: View {
                     }
                     .disabled(appState.songState == nil)
                     .help(appState.playMode == .endless ? "Skip to next song" :
-                          appState.playMode == .evolve  ? "Skip to next evolution pass" :
+                          appState.playMode == .evolve  ? "Skip to next song" :
                           "Go to end (stops playback)")
                 }
                 .font(.callout)
@@ -467,6 +478,40 @@ struct TopBarView: View {
     }
 }
 
+// MARK: - MousePressTracker
+// NSViewRepresentable that intercepts mouseDown/mouseUp natively — more reliable than
+// DragGesture(minimumDistance:0) on macOS, and acceptsFirstMouse so it works without
+// the window needing focus first. Used for the ◀ / ▶ hold-repeat transport buttons.
+
+private struct MousePressTracker: NSViewRepresentable {
+    var onPress:   () -> Void
+    var onRelease: () -> Void
+
+    func makeNSView(context: Context) -> PressNSView {
+        let v = PressNSView()
+        v.onPress   = onPress
+        v.onRelease = onRelease
+        return v
+    }
+
+    func updateNSView(_ nsView: PressNSView, context: Context) {
+        nsView.onPress   = onPress
+        nsView.onRelease = onRelease
+    }
+
+    final class PressNSView: NSView {
+        var onPress:   (() -> Void)?
+        var onRelease: (() -> Void)?
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override var isOpaque: Bool { false }
+
+        override func mouseDown(with event: NSEvent) { onPress?() }
+        // mouseUp fires even if cursor has moved outside the view (macOS mouse capture)
+        override func mouseUp(with event: NSEvent) { onRelease?() }
+    }
+}
+
 // MARK: - Logo loader
 
 private func loadLogoImage() -> NSImage? {
@@ -508,9 +553,9 @@ struct HelpView: View {
                 Text("Zudio generates Ambient, Chill, Kosmic and Motorik inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback  &amp; generation.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback.")
                 helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current playhead position.")
-                helpLine("← → arrows", "Seek back or forward 1 bar. Hold the transport buttons to repeat.")
+                helpLine("⏮ ⏭ Previous / Next track", "Go to the previous or next generated song.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
                 helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to /Downloads. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
                 helpLine("Reset (⌘R)", "Reset audio, and all tracks and settings to initial state.")

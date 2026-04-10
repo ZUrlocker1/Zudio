@@ -22,7 +22,7 @@ struct AmbientTextureGenerator {
 
         let bounds    = kRegisterBounds[kTrackTexture]!  // low:36, high:96
         let loopSteps = loopBars * 16
-        let scalePCs  = Set(frame.mode.intervals.map { (frame.keySemitoneValue + $0) % 12 })
+        let scalePCs  = frame.scalePCs
         let chordPCs  = tonalMap.entry(atBar: 0)?.chordWindow.chordTones ?? scalePCs
 
         if roll < 0.70 {

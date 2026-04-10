@@ -276,7 +276,8 @@ struct KosmicTextureGenerator {
         var cursor      = 0
         var phraseIndex = 0
         while cursor + cycleLens[phraseIndex % cycleLens.count] <= barInBody {
-            cursor      += cycleLens[phraseIndex % cycleLens.count]
+            let cycLen   = cycleLens[phraseIndex % cycleLens.count]
+            cursor      += cycLen
             phraseIndex += 1
         }
         let barInCycle = barInBody - cursor
@@ -392,15 +393,15 @@ struct KosmicTextureGenerator {
         var cursor      = 0
         var phraseIndex = 0
         while cursor + cycleLens[phraseIndex % cycleLens.count] <= barInBody {
-            cursor      += cycleLens[phraseIndex % cycleLens.count]
+            let cycLen   = cycleLens[phraseIndex % cycleLens.count]
+            cursor      += cycLen
             phraseIndex += 1
         }
         guard barInBody == cursor else { return [] }  // only fire on phrase-start bars
 
         // Compute the tight cluster notes (root, 2nd, 3rd) in deep low register MIDI 21–47
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let keyST2   = keySemitone(frame.key)
-        let scalePCs = Set(frame.mode.intervals.map { (keyST2 + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let secondPC = snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
         let thirdPC  = snapToScale((rootPC + 3) % 12, scalePCs: scalePCs)
 

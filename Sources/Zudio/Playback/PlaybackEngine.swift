@@ -38,12 +38,12 @@ final class PlaybackEngine: ObservableObject {
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
-    private let ambientDelayWet:      [Float] = [60,  55, -1, 48, 18, -1, 28, -1]   // -1 = no delay
-    private let ambientDelayFeedback: [Float] = [72,  65, -1, 55, 35, -1, 18,  0]
+    private let ambientDelayWet:      [Float] = [40,  55, -1, 48, 18, -1, 28, -1]   // -1 = no delay
+    private let ambientDelayFeedback: [Float] = [55,  65, -1, 55, 35, -1, 18,  0]
     private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, 2500, -1, 3000, -1]
-    // Delay times in beats: Lead1=dotted-half(1.5), Lead2=dotted-quarter(0.75),
+    // Delay times in beats: Lead1=dotted-quarter(0.75), Lead2=dotted-quarter(0.75),
     //                       Rhythm=dotted-half(1.5), Texture=1-beat, Drums=1-beat
-    private let ambientDelayBeats:   [Double] = [1.5, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0, 1.0]
+    private let ambientDelayBeats:   [Double] = [0.75, 0.75, 1.0, 1.5, 1.0, 1.0, 1.0, 1.0]
 
     // Per-track base volumes — persisted so applyMuteState restores the right level, not 1.0
     private var trackBaseVolume = Array(repeating: Float(1.0), count: kTrackCount)
@@ -92,11 +92,16 @@ final class PlaybackEngine: ObservableObject {
     var chillFade: Bool = false
     private var motorikFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
 
+    // Ambient song-level outro fade (mainMixerNode 1→0 over outro or last 4 bars)
+    private var ambientOutroFadeTimer: DispatchSourceTimer? = nil
+
     // Ambient per-note attack/decay fades on boosts[kTrackBass] and boosts[kTrackPads].
     // Each note-on triggers a ramp to 1.0; each note-off triggers a ramp to 0.0.
     // Duration is capped to 1/3 of the note's duration so short notes still sound.
-    // Index: [0]=Bass, [1]=Pads. 50ms polling interval — identical pattern to Kosmic drone fades.
-    private var ambientNoteFadeTimers:     [DispatchSourceTimer?] = [nil, nil]
+    // Index: [0]=Bass, [1]=Pads. Single shared 20 Hz timer drives both channels — eliminates
+    // the 1000+ DispatchSource alloc/cancel cycles that occurred with one timer per note event.
+    private var ambientFadeTimer:          DispatchSourceTimer? = nil
+    private var ambientNoteFadeActive:     [Bool]   = [false, false]
     private var ambientNoteFadeStartNanos: [UInt64] = [0, 0]
     private var ambientNoteFadeFromVol:    [Float]  = [0, 0]
     private var ambientNoteFadeToVol:      [Float]  = [1, 1]
@@ -187,6 +192,7 @@ final class PlaybackEngine: ObservableObject {
         buildStepEventMap(state: state)
         // Cancel any in-progress note fades before restoring volumes.
         stopAmbientNoteFades()
+        stopAmbientOutroFade()
         // Restore volumes that any in-progress intro/outro fade may have left at non-unity values.
         samplers[kTrackBass].volume = trackBaseVolume[kTrackBass]
         samplers[kTrackPads].volume = trackBaseVolume[kTrackPads]
@@ -287,6 +293,7 @@ final class PlaybackEngine: ObservableObject {
             sched.start()
             if kosmicStyle              { startKosmicDroneFades(state: state) }
             if motorikStyle || chillFade { startMotorikFades(state: state) }
+            if ambientMode               { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
         }
     }
 
@@ -299,6 +306,11 @@ final class PlaybackEngine: ObservableObject {
         stopKosmicDroneFades()
         stopMotorikFades()
         stopAmbientNoteFades()
+        stopAmbientOutroFade()
+        // Clear reverb/delay buffers so tails don't bleed through when volume
+        // is restored for the next song — applies to all styles.
+        for rev in reverbs { rev.reset() }
+        for del in delays  { del.reset() }
     }
 
     /// Stop and restart the AVAudioEngine so macOS re-enumerates the output device.
@@ -353,13 +365,13 @@ final class PlaybackEngine: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
-            self.currentBar  = bar
-            // sps is constant for the life of a song — compute once for both mode blocks.
-            let sps = self.songState?.frame.secondsPerStep ?? 0.1
+            if bar != self.currentBar { self.currentBar = bar }
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
             // The chosen duration is stored per-track and reused for the matching note-off.
             if hasEvents, self.ambientMode {
+                // sps is constant for the life of a song; computed here so silent steps skip it.
+                let sps = self.songState?.frame.secondsPerStep ?? 0.1
                 for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackBass || trackIndex == kTrackPads {
                         let noteSecs  = Double(ev.durationSteps) * sps
@@ -381,6 +393,7 @@ final class PlaybackEngine: ObservableObject {
             // Also resets sweep phase to bottom of cycle (filter fully closed) on each note-on,
             // so every chord starts dark and sweeps upward — then back down before it ends.
             if self.chillPadsMode {
+                let sps = self.songState?.frame.secondsPerStep ?? 0.1
                 for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackPads {
                         let noteSecs = Double(ev.durationSteps) * sps
@@ -456,6 +469,7 @@ final class PlaybackEngine: ObservableObject {
             self.stopKosmicDroneFades()
             self.stopMotorikFades()
             self.stopAmbientNoteFades()
+            self.stopAmbientOutroFade()
             self.onSongEndNaturally?()
         }
     }
@@ -475,6 +489,7 @@ final class PlaybackEngine: ObservableObject {
             stopKosmicDroneFades()
             stopMotorikFades()
             stopAmbientNoteFades()
+            stopAmbientOutroFade()
             currentStep = clampedStep
             currentBar  = clampedStep / 16
             currentSchedulerID += 1
@@ -483,6 +498,7 @@ final class PlaybackEngine: ObservableObject {
             sched.start()
             if kosmicStyle               { startKosmicDroneFades(state: state) }
             if motorikStyle || chillFade { startMotorikFades(state: state) }
+            if ambientMode               { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
         } else {
             currentStep = clampedStep
             currentBar  = clampedStep / 16
@@ -545,6 +561,7 @@ final class PlaybackEngine: ObservableObject {
         stopKosmicDroneFades()
         stopMotorikFades()
         stopAmbientNoteFades()
+        stopAmbientOutroFade()
         buildStepEventMap(state: state)
         let totalSteps = state.frame.totalBars * 16
         currentStep = max(0, min(startStep, totalSteps - 1))
@@ -584,7 +601,11 @@ final class PlaybackEngine: ObservableObject {
         // Per-track default volumes; tremolo overrides this via LFO
         if !tremEnabled[trackIndex] {
             let vol: Float
-            if trackIndex == kTrackLead1 && program == 81 {
+            if trackIndex == kTrackLead1 && program == 59 {
+                vol = 1.3    // Muted Trumpet runs soft in GM — boost for presence
+            } else if trackIndex == kTrackLead2 && program == 11 {
+                vol = 1.45   // Vibraphone runs soft in GM — boost for presence
+            } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
             } else if trackIndex == kTrackLead1 && program == 80 {
                 vol = 0.78   // Square Lead on Lead 1
@@ -606,6 +627,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 4.0    // FX Atmosphere very soft on Ambient Texture — boost more
             } else if trackIndex == kTrackTexture && program == 99 {
                 vol = 2.6    // FX Atmosphere runs very soft on Texture — boost
+            } else if trackIndex == kTrackPads && chillPadsMode && program == 89 {
+                vol = 0.75   // Warm Pad runs hot on Chill Pads — pull back
             } else if trackIndex == kTrackTexture && program == 89 {
                 vol = 0.9    // Warm Pad runs loud on Texture — pull back
             } else if trackIndex == kTrackTexture && ambientMode {
@@ -681,7 +704,18 @@ final class PlaybackEngine: ObservableObject {
         chillPadsMode = enabled
         if !enabled {
             stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
+            return
         }
+        // Tempo-synced delay for Chill Lead 1 (dotted-quarter) and Lead 2 (quarter note).
+        // Without this, both tracks default to the init value of 0.125 s (fixed 16th-note).
+        let tempo    = songState?.frame.tempo ?? 80
+        let beatSecs = 60.0 / Double(tempo)
+        delays[kTrackLead1].delayTime     = Swift.min(2.0, beatSecs * 0.75)  // dotted-quarter
+        delays[kTrackLead1].feedback      = 55
+        delays[kTrackLead1].lowPassCutoff = 5000
+        delays[kTrackLead2].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // quarter note
+        delays[kTrackLead2].feedback      = 40
+        delays[kTrackLead2].lowPassCutoff = 5500
     }
 
     // MARK: - Per-track effect toggle
@@ -741,12 +775,10 @@ final class PlaybackEngine: ObservableObject {
     private func startSharedLFO() {
         guard lfoTimer == nil else { return }
         lfoTickCount = 0
-        let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+        let src = DispatchSource.makeTimerSource(queue: .main)
         src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
         src.setEventHandler { [weak self] in
-            DispatchQueue.main.async { [weak self] in
-                self?.lfoTick()
-            }
+            self?.lfoTick()
         }
         src.resume()
         lfoTimer = src
@@ -766,8 +798,9 @@ final class PlaybackEngine: ObservableObject {
         let do20fps   = (lfoTickCount % 3 == 0)
         let anySolo   = anySoloActive
 
-        // Tremolo — 60fps, all active tracks
+        // Tremolo — 60fps for fast tremolos (≥2 Hz), 20fps for slow swells (<2 Hz, e.g. Chill/Ambient pads at 0.15 Hz)
         for i in 0..<kTrackCount where tremEnabled[i] {
+            if !do20fps && tremPhaseInc[i] < 0.1 { continue }
             tremPhase[i] += tremPhaseInc[i]
             let muted = muteState[i] || (anySolo && !soloState[i])
             let tremVol = Float(1.0 - Double(tremDepth[i]) * (1.0 + sin(tremPhase[i])))
@@ -917,23 +950,21 @@ final class PlaybackEngine: ObservableObject {
             let durationSecs = Double(remSteps) * state.frame.secondsPerStep
             let startNanos   = DispatchTime.now().uptimeNanoseconds
 
-            let fadeSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            let fadeSrc = DispatchSource.makeTimerSource(queue: .main)
             fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
             fadeSrc.setEventHandler { [weak self] in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.currentSchedulerID == schedulerID else { return }
-                    let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                    let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
-                    let progress = startProg + fraction * (1.0 - startProg)
-                    let anySolo  = self.anySoloActive
-                    let bassMuted = self.muteState[kTrackBass] || (anySolo && !self.soloState[kTrackBass])
-                    let padsMuted = self.muteState[kTrackPads] || (anySolo && !self.soloState[kTrackPads])
-                    self.boosts[kTrackBass].outputVolume = bassMuted ? 0.0 : progress
-                    self.boosts[kTrackPads].outputVolume = padsMuted ? 0.0 : progress
-                    if progress >= 1.0 {
-                        self.kosmicIntroFadeTimer?.cancel()
-                        self.kosmicIntroFadeTimer = nil
-                    }
+                guard let self, self.currentSchedulerID == schedulerID else { return }
+                let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
+                let progress = startProg + fraction * (1.0 - startProg)
+                let anySolo  = self.anySoloActive
+                let bassMuted = self.muteState[kTrackBass] || (anySolo && !self.soloState[kTrackBass])
+                let padsMuted = self.muteState[kTrackPads] || (anySolo && !self.soloState[kTrackPads])
+                self.boosts[kTrackBass].outputVolume = bassMuted ? 0.0 : progress
+                self.boosts[kTrackPads].outputVolume = padsMuted ? 0.0 : progress
+                if progress >= 1.0 {
+                    self.kosmicIntroFadeTimer?.cancel()
+                    self.kosmicIntroFadeTimer = nil
                 }
             }
             fadeSrc.resume()
@@ -979,24 +1010,22 @@ final class PlaybackEngine: ObservableObject {
                 self.boosts[kTrackPads].outputVolume = startProgress
                 self.startKosmicIntroEffects()
 
-                let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+                let src = DispatchSource.makeTimerSource(queue: .main)
                 src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
                 src.setEventHandler { [weak self] in
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self, self.currentSchedulerID == schedulerID else { return }
-                        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                        let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
-                        let vol = startProgress * linearFade
-                        let anySolo = self.anySoloActive
-                        for trackIdx in [kTrackBass, kTrackPads] {
-                            let muted = self.muteState[trackIdx] || (anySolo && !self.soloState[trackIdx])
-                            self.boosts[trackIdx].outputVolume = muted ? 0.0 : vol
-                        }
-                        if linearFade <= 0.0 {
-                            self.droneFadeTimers[1]?.cancel()
-                            self.droneFadeTimers[1] = nil
-                            self.stopKosmicIntroEffects()
-                        }
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                    let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
+                    let vol = startProgress * linearFade
+                    let anySolo = self.anySoloActive
+                    for trackIdx in [kTrackBass, kTrackPads] {
+                        let muted = self.muteState[trackIdx] || (anySolo && !self.soloState[trackIdx])
+                        self.boosts[trackIdx].outputVolume = muted ? 0.0 : vol
+                    }
+                    if linearFade <= 0.0 {
+                        self.droneFadeTimers[1]?.cancel()
+                        self.droneFadeTimers[1] = nil
+                        self.stopKosmicIntroEffects()
                     }
                 }
                 src.resume()
@@ -1065,19 +1094,17 @@ final class PlaybackEngine: ObservableObject {
             let durationSecs = Double(remSteps) * state.frame.secondsPerStep
             let startNanos   = DispatchTime.now().uptimeNanoseconds
 
-            let fadeSrc = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+            let fadeSrc = DispatchSource.makeTimerSource(queue: .main)
             fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
             fadeSrc.setEventHandler { [weak self] in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.currentSchedulerID == schedulerID else { return }
-                    let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                    let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
-                    let progress = startProg + fraction * (1.0 - startProg)
-                    self.engine.mainMixerNode.outputVolume = progress
-                    if progress >= 1.0 {
-                        self.motorikFadeTimers[0]?.cancel()
-                        self.motorikFadeTimers[0] = nil
-                    }
+                guard let self, self.currentSchedulerID == schedulerID else { return }
+                let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
+                let progress = startProg + fraction * (1.0 - startProg)
+                self.engine.mainMixerNode.outputVolume = progress
+                if progress >= 1.0 {
+                    self.motorikFadeTimers[0]?.cancel()
+                    self.motorikFadeTimers[0] = nil
                 }
             }
             fadeSrc.resume()
@@ -1110,18 +1137,21 @@ final class PlaybackEngine: ObservableObject {
 
                 self.engine.mainMixerNode.outputVolume = startProgress
 
-                let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+                let src = DispatchSource.makeTimerSource(queue: .main)
                 src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
                 src.setEventHandler { [weak self] in
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self, self.currentSchedulerID == schedulerID else { return }
-                        let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                        let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
-                        self.engine.mainMixerNode.outputVolume = startProgress * linearFade
-                        if linearFade <= 0.0 {
-                            self.motorikFadeTimers[1]?.cancel()
-                            self.motorikFadeTimers[1] = nil
-                        }
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                    let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
+                    self.engine.mainMixerNode.outputVolume = startProgress * linearFade
+                    if linearFade <= 0.0 {
+                        self.motorikFadeTimers[1]?.cancel()
+                        self.motorikFadeTimers[1] = nil
+                        // Clear effect buffers so reverb/delay tails don't bleed through
+                        // when mainMixerNode volume is restored for the next song.
+                        self.allNotesOff()
+                        for rev in self.reverbs { rev.reset() }
+                        for del in self.delays  { del.reset() }
                     }
                 }
                 src.resume()
@@ -1143,39 +1173,118 @@ final class PlaybackEngine: ObservableObject {
 
     /// Smoothly ramps boosts[trackIndex].outputVolume to `toVolume` over `duration` seconds.
     /// Called on the main actor (from the onStep main.async block).
-    /// Replaces any in-progress fade for that track so rapid note changes don't stack timers.
+    /// Updates fade state for the channel and starts the shared timer if not already running —
+    /// no DispatchSource is created or cancelled per note event.
     private func startAmbientBoostFade(trackIndex: Int, toVolume: Float, duration: Double) {
         let idx = trackIndex == kTrackBass ? 0 : 1
-        ambientNoteFadeTimers[idx]?.cancel()
         ambientNoteFadeFromVol[idx]    = boosts[trackIndex].outputVolume
         ambientNoteFadeToVol[idx]      = toVolume
-        ambientNoteFadeDuration[idx]   = duration
+        ambientNoteFadeDuration[idx]   = max(0.001, duration)
         ambientNoteFadeStartNanos[idx] = DispatchTime.now().uptimeNanoseconds
+        ambientNoteFadeActive[idx]     = true
 
-        let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+        // Start shared timer only if not already running
+        guard ambientFadeTimer == nil else { return }
+        let src = DispatchSource.makeTimerSource(queue: .main)
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(10))
-        src.setEventHandler { [weak self] in
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                let elapsed = Double(DispatchTime.now().uptimeNanoseconds - self.ambientNoteFadeStartNanos[idx]) / 1_000_000_000.0
-                let t       = Float(min(1.0, elapsed / self.ambientNoteFadeDuration[idx]))
-                let vol     = self.ambientNoteFadeFromVol[idx] + t * (self.ambientNoteFadeToVol[idx] - self.ambientNoteFadeFromVol[idx])
-                let muted   = self.muteState[trackIndex] || (self.anySoloActive && !self.soloState[trackIndex])
-                self.boosts[trackIndex].outputVolume = muted ? 0.0 : vol
-                if t >= 1.0 {
-                    self.ambientNoteFadeTimers[idx]?.cancel()
-                    self.ambientNoteFadeTimers[idx] = nil
-                }
-            }
-        }
+        src.setEventHandler { [weak self] in self?.tickAmbientFades() }
         src.resume()
-        ambientNoteFadeTimers[idx] = src
+        ambientFadeTimer = src
+    }
+
+    /// 20 Hz tick: advances all active ambient fade channels, stops timer when all complete.
+    private func tickAmbientFades() {
+        let now = DispatchTime.now().uptimeNanoseconds
+        var anyActive = false
+        for idx in 0..<2 {
+            guard ambientNoteFadeActive[idx] else { continue }
+            let trackIndex = idx == 0 ? kTrackBass : kTrackPads
+            let elapsed = Double(now - ambientNoteFadeStartNanos[idx]) / 1_000_000_000.0
+            let t       = Float(min(1.0, elapsed / ambientNoteFadeDuration[idx]))
+            let vol     = ambientNoteFadeFromVol[idx] + t * (ambientNoteFadeToVol[idx] - ambientNoteFadeFromVol[idx])
+            let muted   = muteState[trackIndex] || (anySoloActive && !soloState[trackIndex])
+            boosts[trackIndex].outputVolume = muted ? 0.0 : vol
+            if t >= 1.0 { ambientNoteFadeActive[idx] = false } else { anyActive = true }
+        }
+        if !anyActive {
+            ambientFadeTimer?.cancel()
+            ambientFadeTimer = nil
+        }
     }
 
     private func stopAmbientNoteFades() {
-        for i in 0..<2 { ambientNoteFadeTimers[i]?.cancel(); ambientNoteFadeTimers[i] = nil }
+        ambientFadeTimer?.cancel()
+        ambientFadeTimer = nil
+        ambientNoteFadeActive = [false, false]
         boosts[kTrackBass].outputVolume = 1.0
         boosts[kTrackPads].outputVolume = 1.0
+    }
+
+    // MARK: - Ambient song-level outro fade
+
+    /// Fades engine.mainMixerNode.outputVolume 1→0 over the declared outro section,
+    /// or over the last 4 bars when no outro exists (pureDrone form).
+    private func startAmbientOutroFade(state: SongState, schedulerID: Int) {
+        ambientOutroFadeTimer?.cancel()
+        ambientOutroFadeTimer = nil
+
+        let totalBars = state.frame.totalBars
+        let outroStartStep: Int
+        let outroEndStep: Int
+        if let outro = state.structure.outroSection, outro.endBar > outro.startBar {
+            outroStartStep = outro.startBar * 16
+            outroEndStep   = outro.endBar   * 16
+        } else {
+            // Fallback for pureDrone (no outro section): fade over last 4 bars
+            outroStartStep = max(0, totalBars - 4) * 16
+            outroEndStep   = totalBars * 16
+        }
+        let totalSteps = outroEndStep - outroStartStep
+        guard totalSteps > 0, currentStep < outroEndStep else { return }
+
+        let sps             = state.frame.secondsPerStep
+        let stepsUntilStart = max(0, outroStartStep - currentStep)
+        let delaySeconds    = Double(stepsUntilStart) * sps
+
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delaySeconds) { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
+                guard self.ambientOutroFadeTimer == nil else { return }
+
+                let elapsedInOutro = max(0, self.currentStep - outroStartStep)
+                let startProgress  = Float(1.0 - Double(elapsedInOutro) / Double(totalSteps))
+                let remainingSecs  = Double(totalSteps - elapsedInOutro) * sps
+                let startNanos     = DispatchTime.now().uptimeNanoseconds
+
+                self.engine.mainMixerNode.outputVolume = startProgress
+
+                let src = DispatchSource.makeTimerSource(queue: .main)
+                src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+                src.setEventHandler { [weak self] in
+                    guard let self, self.currentSchedulerID == schedulerID else { return }
+                    let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+                    let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
+                    self.engine.mainMixerNode.outputVolume = startProgress * linearFade
+                    if linearFade <= 0.0 {
+                        self.ambientOutroFadeTimer?.cancel()
+                        self.ambientOutroFadeTimer = nil
+                        // Clear effect buffers so reverb/delay tails don't bleed through
+                        // when mainMixerNode volume is restored for the next song.
+                        self.allNotesOff()
+                        for rev in self.reverbs { rev.reset() }
+                        for del in self.delays  { del.reset() }
+                    }
+                }
+                src.resume()
+                self.ambientOutroFadeTimer = src
+            }
+        }
+    }
+
+    private func stopAmbientOutroFade() {
+        ambientOutroFadeTimer?.cancel()
+        ambientOutroFadeTimer = nil
+        engine.mainMixerNode.outputVolume = 1.0
     }
 
     // MARK: - Kosmic body entrance fade
@@ -1201,24 +1310,22 @@ final class PlaybackEngine: ObservableObject {
         let fadeSecs  = Double(8) * state.frame.secondsPerStep  // half bar — quick entrance, not a slam
         let startNanos = DispatchTime.now().uptimeNanoseconds
 
-        let src = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
+        let src = DispatchSource.makeTimerSource(queue: .main)
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
         src.setEventHandler { [weak self] in
-            DispatchQueue.main.async { [weak self] in
-                guard let self, self.currentSchedulerID == schedulerID else { return }
-                let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                let progress = min(1.0, elapsed / max(0.001, fadeSecs))
-                let curved   = Float(Foundation.sqrt(progress))
-                let anySolo  = self.anySoloActive
-                for i in tracksToFade {
-                    let muted = self.muteState[i] || (anySolo && !self.soloState[i])
-                    self.samplers[i].volume = muted ? 0.0 : curved * self.trackBaseVolume[i]
-                }
-                if progress >= 1.0 {
-                    self.bodyEntranceFadeTimer?.cancel()
-                    self.bodyEntranceFadeTimer = nil
-                    self.applyMuteState()  // restore authoritative mute/solo volumes
-                }
+            guard let self, self.currentSchedulerID == schedulerID else { return }
+            let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+            let progress = min(1.0, elapsed / max(0.001, fadeSecs))
+            let curved   = Float(Foundation.sqrt(progress))
+            let anySolo  = self.anySoloActive
+            for i in tracksToFade {
+                let muted = self.muteState[i] || (anySolo && !self.soloState[i])
+                self.samplers[i].volume = muted ? 0.0 : curved * self.trackBaseVolume[i]
+            }
+            if progress >= 1.0 {
+                self.bodyEntranceFadeTimer?.cancel()
+                self.bodyEntranceFadeTimer = nil
+                self.applyMuteState()  // restore authoritative mute/solo volumes
             }
         }
         src.resume()

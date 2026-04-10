@@ -478,7 +478,7 @@ struct KosmicArpeggioGenerator {
         guard let firstEntry = tonalMap.entry(atBar: firstBodyBar) else { return [] }
 
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(firstEntry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let mode     = firstEntry.sectionMode
         let third    = mode.nearestInterval(3)
 
@@ -567,7 +567,7 @@ struct KosmicArpeggioGenerator {
             let transposeInterval = scale[transposeDeg % scale.count]
 
             let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-            let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+            let scalePCs = frame.scalePCs
             let third    = mode.nearestInterval(3)
 
             func place(_ semitones: Int) -> Int {
@@ -607,7 +607,7 @@ struct KosmicArpeggioGenerator {
             let ascending  = (bar / 8) % 2 == 0
             let noteCount  = 5 + rng.nextInt(upperBound: 3)  // 5–7 notes
             let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-            let scalePCs   = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+            let scalePCs   = frame.scalePCs
             let mode       = entry.sectionMode
             let third      = mode.nearestInterval(3)
             let flat7      = mode.nearestInterval(10)
@@ -669,7 +669,7 @@ struct KosmicArpeggioGenerator {
                 let barInBridge = bar - section.startBar
                 let phase       = min(3, barInBridge * 4 / bridgeLen)
                 let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let scalePCs = frame.scalePCs
                 let mode     = entry.sectionMode
                 let third    = mode.nearestInterval(3)
 
@@ -756,7 +756,7 @@ struct KosmicArpeggioGenerator {
                 // Call bars (even): always held root — clean space before the response.
                 if bridgeBar % 2 == 0 {
                     let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                    let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                    let scalePCs = frame.scalePCs
                     func placeC(_ semitones: Int) -> Int {
                         clampToRegister(60 + snapToScale(rootPC + semitones, scalePCs: scalePCs), low: 60, high: 72)
                     }
@@ -768,7 +768,7 @@ struct KosmicArpeggioGenerator {
 
                 // Response bars (odd): melodic phrase variant
                 let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let scalePCs = frame.scalePCs
                 let mode     = entry.sectionMode
                 let third    = mode.nearestInterval(3)
 
@@ -836,7 +836,7 @@ struct KosmicArpeggioGenerator {
 
         guard let entry = tonalMap.entry(atBar: hintStart) else { return [] }
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let mode     = entry.sectionMode
 
         // Build a short ascending scale fragment: root, 3rd, 5th, octave (4 notes max)
@@ -869,7 +869,7 @@ struct KosmicArpeggioGenerator {
 
     private static func fiveNoteSubset(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         let mode     = entry.sectionMode
         let third    = mode.nearestInterval(3)
         let flat7    = mode.nearestInterval(10)
@@ -884,7 +884,7 @@ struct KosmicArpeggioGenerator {
     /// JMJ hook note set: 4 notes in MIDI 60–80, scale degrees depend on shape
     private static func jmjHookNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, shape: Int) -> [Int] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         // Use chord type (not song mode) for third quality — avoids C natural against a major chord
         // in a Dorian/Aeolian song (mode.nearestInterval gives minor third regardless of chord type).
         let isMajorChord: Bool
@@ -910,7 +910,7 @@ struct KosmicArpeggioGenerator {
     /// JMJ Oxygène 4-note set, quarter-note register MIDI 58–78
     private static func jmjOxygeneNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+        let scalePCs = frame.scalePCs
         // Use chord type (not song mode) — same fix as jmjHookNotes
         let isMajorChord: Bool
         switch entry.chordWindow.chordType {
@@ -1106,8 +1106,7 @@ struct KosmicArpeggioGenerator {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
                 let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let keyST    = keySemitone(frame.key)
-                let scalePCs = Set(frame.mode.intervals.map { (keyST + $0) % 12 })
+                let scalePCs = frame.scalePCs
                 let secondPC = snapToScale((rootPC + 2) % 12, scalePCs: scalePCs)
                 let thirdPC  = snapToScale((rootPC + 3) % 12, scalePCs: scalePCs)
                 let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
@@ -1165,7 +1164,7 @@ struct KosmicArpeggioGenerator {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
 
                 let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-                let scalePCs = Set(frame.mode.intervals.map { (keySemitone(frame.key) + $0) % 12 })
+                let scalePCs = frame.scalePCs
                 let mode     = entry.sectionMode
                 let third    = mode.nearestInterval(3)
                 let second   = mode.nearestInterval(2)
