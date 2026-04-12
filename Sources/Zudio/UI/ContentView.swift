@@ -11,6 +11,25 @@ struct ContentView: View {
     @State private var pinchAnchorBars: Int = 16
     @State private var isPinching: Bool = false
 
+    // Window width — measured by the root GeometryReader so it updates on every
+    // resize (macOS) or orientation change (iOS). GeometryReader as the root view is
+    // proposed new dimensions by the window system; .background/.overlay GeometryReaders
+    // do not reliably re-evaluate on resize/rotation in SwiftUI.
+    #if os(iOS)
+    @State private var contentWidth: CGFloat = UIScreen.main.bounds.width
+    #else
+    @State private var contentWidth: CGFloat = 1200  // actual value set by GeometryReader on first render
+    @State private var fontSizeMonitor: Any? = nil   // NSEvent local monitor for +/= and - hotkeys
+    #endif
+
+    // Brief flash feedback for the Generation Log +/- font-size buttons
+    @State private var logMinusFlash: Bool = false
+    @State private var logPlusFlash:  Bool = false
+
+    // Height of the track-rows VStack — measured via background GeometryReader.
+    // Used to suppress the "Press Generate" placeholder when the grid is too short.
+    @State private var trackRowsHeight: CGFloat = 0
+
     // Layout constants matching TrackRowView internals
     // TrackRowView: .padding(.horizontal, 8) wraps HStack(spacing:0)
     //   left panel: .frame(width:232).padding(.horizontal,6)  → 8+6+232+6 = 252 from left edge
@@ -18,11 +37,32 @@ struct ContentView: View {
     private let midiLaneLeading: CGFloat = 8 + 6 + 232 + 6   // 252
     private let midiLaneTrailing: CGFloat = 8 + 6 + 136 + 6  // 156
 
+    // MARK: - Body
+
     var body: some View {
+        // Root GeometryReader: as the root view it is proposed new dimensions by the window
+        // system on every resize (macOS) or rotation (iOS), guaranteeing onChange fires.
+        // Background/overlay GeometryReaders don't get this guarantee in SwiftUI.
+        GeometryReader { geo in
+            mainContent
+                .onAppear      { contentWidth = geo.size.width }
+                .onChange(of: geo.size) { size in contentWidth = size.width }
+        }
+        #if os(macOS)
+        // frame on the GeometryReader itself so SwiftUI propagates the minimum to the window.
+        // alignment: .top ensures any size mismatch clips from the bottom, never the top.
+        .frame(minWidth: 885, minHeight: kCompactContentHeight, alignment: .top)
+        #endif
+    }
+
+    // MARK: - Main layout (shared between iOS GeometryReader wrapper and macOS direct use)
+
+    @ViewBuilder private var mainContent: some View {
         VStack(spacing: 0) {
-            TopBarView()
+            TopBarView(contentWidth: contentWidth)
                 .fixedSize(horizontal: false, vertical: true)   // top bar never shrinks
                 .layoutPriority(3)
+                .zIndex(1)   // wins every hit-test over track rows + scrollbar when window is short
 
             // Song info + zoom slider — single combined row
             HStack(spacing: 10) {
@@ -85,11 +125,26 @@ struct ContentView: View {
                         visibleBars: appState.visibleBars,
                         barOffset: appState.visibleBarOffset,
                         showPlayheadHandle: trackIndex == 0,
-                        onSeek: { step in appState.seekTo(step: step) }
+                        onSeek: { step in appState.seekTo(step: step) },
+                        contentWidth: contentWidth
                     )
                 }
             }
-            .background(Color(white: 0.18))   // single slab behind all rows — eliminates inter-row seams
+            // frame(minHeight:0) + clipped() lets the VStack compress when the window is
+            // made short: its row children have fixed .frame(height:63) so SwiftUI would
+            // otherwise treat it as incompressible, ignoring layoutPriority(1).
+            // contentShape(Rectangle()) bounds the gesture-capture area to the visible
+            // clipped region so MIDILaneView's DragGesture can't reach outside it.
+            .frame(minHeight: 0)
+            .clipped()
+            .contentShape(Rectangle())
+            .background(
+                GeometryReader { geo in
+                    Color(white: 0.18)   // single slab behind all rows — eliminates inter-row seams
+                        .onAppear      { trackRowsHeight = geo.size.height }
+                        .onChange(of: geo.size.height) { h in trackRowsHeight = h }
+                }
+            )
             .padding(.top, 2)
             .layoutPriority(1)   // shrinks after status box, before top bar
             .gesture(
@@ -122,18 +177,66 @@ struct ContentView: View {
                         .progressViewStyle(.circular)
                         .padding(16)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-                } else if appState.songState == nil {
+                } else if appState.songState == nil && trackRowsHeight >= 300 {
                     Text("Press Generate or Play to create a song")
                         .font(.callout)
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
             }
+            // Clip overlay to track-row frame so "Press Generate" text doesn't escape
+            // into the top bar when track rows compress to 0px in compact window mode.
+            .clipped()
 
             // Horizontal scrollbar — aligned with MIDI lanes, below Drums
             let totalBars = appState.songState?.frame.totalBars ?? 32
             let maxOffset = max(0, totalBars - appState.visibleBars)
             HStack(spacing: 0) {
-                Color.clear.frame(width: midiLaneLeading - 8)
+                // Generation Log label + font-size buttons occupy the blank space under the instrument column
+                HStack(spacing: 4) {
+                    Text("Generation Log")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Button {
+                            appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
+                            logMinusFlash = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { logMinusFlash = false }
+                        } label: {
+                            Image(systemName: "minus")
+                                .frame(width: 11, height: 11)
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(logMinusFlash ? Color.white.opacity(0.55) : Color(white: 0.26),
+                                            in: RoundedRectangle(cornerRadius: 3))
+                                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color(white: 0.48), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .medium))
+                        .help("Decrease log font size")
+                        .disabled(appState.statusLogFontOffset <= -4)
+                        Button {
+                            appState.statusLogFontOffset = min(8, appState.statusLogFontOffset + 1)
+                            logPlusFlash = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { logPlusFlash = false }
+                        } label: {
+                            Image(systemName: "plus")
+                                .frame(width: 11, height: 11)
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(logPlusFlash ? Color.white.opacity(0.55) : Color(white: 0.26),
+                                            in: RoundedRectangle(cornerRadius: 3))
+                                .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color(white: 0.48), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10, weight: .medium))
+                        .help("Increase log font size")
+                        .disabled(appState.statusLogFontOffset >= 8)
+                    }
+                    .padding(.leading, 4)
+                }
+                .frame(width: midiLaneLeading - 8, alignment: .leading)
                 HStack(spacing: 6) {
                     Text("Bar 1")
                         .font(.system(size: 9))
@@ -158,18 +261,64 @@ struct ContentView: View {
             .frame(height: 22)
             .background(Color(white: 0.13))
 
-            StatusBoxView()
+            StatusBoxView(contentWidth: contentWidth)
                 .layoutPriority(0)   // status box shrinks first when window narrows
         }
-        .frame(minWidth: 900, minHeight: 500)
+        #if os(iOS)
+        .frame(minHeight: 500)
+        #else
+        // alignment: .top ensures that when window is at minimum height and TopBarView's
+        // fixedSize children cause the VStack to overflow, the overflow goes BELOW the
+        // visible frame (not above), keeping the top bar and logo always visible.
+        .frame(minWidth: 885, minHeight: kCompactContentHeight, alignment: .top)
+        #endif
         .background(Color(white: 0.20))
         .preferredColorScheme(.dark)
+        #if os(macOS)
+        // Log font-size hotkeys via NSEvent local monitor.
+        // SwiftUI .keyboardShortcut is unreliable for = / - because macOS system shortcuts
+        // (zoom in/out) intercept them before SwiftUI sees them.
+        // The monitor fires first; it passes keys through when a text field is focused.
+        //   = key (with any combo of Cmd/Shift, covering =, +, Cmd-=, Cmd-+) → increase
+        //   - key (plain or Cmd-) → decrease
+        .onAppear {
+            // Sync compact-mode arrow icon with actual window size.
+            // macOS persists the frame via NSUserDefaults even with isRestorable = false,
+            // so the window may launch smaller than the default. Delay lets it settle first.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { appState.syncCompactStateFromWindow() }
+
+            fontSizeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak appState] event in
+                guard let appState else { return event }
+                // Don't steal keys from focused text fields (e.g. BPM input)
+                if let fr = NSApp.keyWindow?.firstResponder,
+                   (fr is NSTextField || fr is NSTextView) { return event }
+                let key  = event.charactersIgnoringModifiers ?? ""
+                let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+                // = key covers =, +, Cmd-=, Cmd-+ (shift changes = to + but same physical key)
+                if key == "=" && !mods.contains(.option) && !mods.contains(.control) {
+                    appState.statusLogFontOffset = min(8, appState.statusLogFontOffset + 1)
+                    return nil   // consume
+                }
+                // - key covers -, Cmd-- (shift on - gives _, which is a different key code)
+                if key == "-" && !mods.contains(.option) && !mods.contains(.control) && !mods.contains(.shift) {
+                    appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
+                    return nil   // consume
+                }
+                return event
+            }
+        }
+        .onDisappear {
+            if let monitor = fontSizeMonitor { NSEvent.removeMonitor(monitor) }
+        }
+        #endif
         .sheet(isPresented: $appState.showExportConfirmation) {
             ExportConfirmationView()
                 .environmentObject(appState)
         }
         .overlay {
             if appState.isExportingAudio {
+                // frame(maxWidth/maxHeight: .infinity) ensures the ZStack fills the full
+                // overlay bounds so the dialog is centered on the complete screen.
                 ZStack {
                     Color.black.opacity(0.55).ignoresSafeArea()
                     VStack(spacing: 18) {
@@ -190,6 +339,7 @@ struct ContentView: View {
                     .padding(32)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
@@ -224,10 +374,10 @@ struct ExportConfirmationView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 10) {
             Text("Export Audio")
                 .font(.headline)
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text("Export to an M4A Audio file will take approximately \(songMinutes).")
                     .multilineTextAlignment(.center)
                 Text("Alternatively, we can save a 60 second sample.")
@@ -237,12 +387,18 @@ struct ExportConfirmationView: View {
             HStack(spacing: 12) {
                 Button("Cancel") { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    #if os(iOS)
+                    .buttonStyle(.bordered)
+                    #endif
                 Button("Sample") {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         appState.startExport(sampleMode: true)
                     }
                 }
+                #if os(iOS)
+                .buttonStyle(.bordered)
+                #endif
                 Button("Full Song") {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -250,10 +406,21 @@ struct ExportConfirmationView: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
+                #if os(iOS)
+                .buttonStyle(.borderedProminent)
+                #endif
             }
         }
+        #if os(iOS)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 14)
+        #else
         .padding(32)
+        #endif
         .frame(width: 400)
+        #if os(iOS)
+        .presentationDetents([.height(240)])
+        #endif
     }
 
     private var songLength: String {

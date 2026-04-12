@@ -2,7 +2,9 @@
 
 import Foundation
 import AVFoundation
+#if os(macOS)
 import AppKit
+#endif
 
 struct AudioFileExporter {
 
@@ -11,7 +13,11 @@ struct AudioFileExporter {
     /// Returns ~/Downloads/Zudio-{songName}.m4a (or Zudio-{songName}-Sample.m4a),
     /// appending -2/-3/... if the file already exists.
     static func nextURL(songName: String, sampleMode: Bool = false) -> URL {
-        let dir  = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        #if os(macOS)
+        let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        #else
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        #endif
         let safe = sanitizedName(songName)
         let base = sampleMode ? "Zudio-\(safe)-Sample" : "Zudio-\(safe)"
         return incrementingURL(in: dir, base: base, ext: "m4a")
@@ -99,6 +105,9 @@ struct AudioFileExporter {
     // Must run on main thread (NSImage/NSGraphicsContext are main-thread-only).
     @MainActor
     private static func appIconPNGData() -> Data? {
+        #if !os(macOS)
+        return nil
+        #else
         let paths = ["assets/images/zudio-icon.icns", "Resources/assets/images/zudio-icon.icns"]
         var img: NSImage?
         if let base = Bundle.main.resourceURL {
@@ -129,5 +138,6 @@ struct AudioFileExporter {
         image.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
         NSGraphicsContext.restoreGraphicsState()
         return rep.representation(using: .png, properties: [:])
+        #endif
     }
 }

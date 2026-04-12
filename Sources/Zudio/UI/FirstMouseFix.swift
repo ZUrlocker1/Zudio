@@ -1,3 +1,4 @@
+#if os(macOS)
 // FirstMouseFix.swift — makes a region accept mouse events without requiring window focus first.
 // Apply as .background(FirstMouseFix()) to any area that should respond on first click.
 
@@ -13,3 +14,4 @@ final class FirstMouseNSView: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var acceptsFirstResponder: Bool { false }
 }
+#endif

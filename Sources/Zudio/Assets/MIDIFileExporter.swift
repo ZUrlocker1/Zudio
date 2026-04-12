@@ -24,7 +24,11 @@ struct MIDIFileExporter {
     // MARK: - File naming
 
     private static func zudioDocumentsDir() -> URL {
-        FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        #if os(macOS)
+        return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        #else
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        #endif
     }
 
     private static func nextFilename(for songName: String, in dir: URL) -> String {

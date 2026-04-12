@@ -2,7 +2,6 @@
 // Output: same base name as the MIDI file, .txt extension.
 // Used by the Musical Coherence analysis workflow (docs/musical-coherence-plan.md).
 
-import AppKit
 import Foundation
 
 struct SongLogExporter {

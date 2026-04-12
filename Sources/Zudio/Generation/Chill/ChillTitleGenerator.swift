@@ -38,39 +38,37 @@ struct ChillTitleGenerator {
             // Time-of-day
             "Late Night", "After Dark", "After Midnight", "Before Dawn",
             "Three AM", "Blue Hour", "Last Light", "After Hours",
-            "Midnight", "Early",
+            "Midnight", "Early", "Sunrise", "Sunset", "Day Break",
             // Atmospheric two-word
-            "Low Light", "Still Water", "Quiet", "Cool",
+            "Low Light", "Still Water", "Quiet", "Cool", "Windy",
             "Slow Burn", "Soft Focus", "Deep", "Open Air",
-            "Warm", "Pale Sun",
+            "Warm", "Pale Sun", "Rainy", "Snow Bound", "Dark",
             // Directional / geographic feel
-            "West End", "East Side", "North Shore", "South",
-            "Upper", "Old", "Inner", "Winter",
+            "West End", "East Side", "North Shore", "South", "Uptown",
+            "Upper", "Old", "Inner", "Winter", "Summer", "Fall", "Upper"
         ]
         let cities = [
             // Montreal neighborhoods
-            "Montreal", "Plateau", "Mile End", "Rosemont", "Verdun",
-            "Outremont", "Westmount", "Hochelaga", "Villeray", "Ahuntsic",
-            "Cote-des-Neiges", "Lachine", "LaSalle", "Longueuil", "NDG",
-            "Saint-Laurent", "Pointe-Saint-Charles", "Griffintown",
+            "Montreal", "Verdun",
+            "Outremont", "Westmount", "Hochelaga",
+            "Cote-des-Neiges", "Lachine", "Longueuil", "NDG",
+            "Saint-Laurent", "Pointe-Saint-Charles", "Loyola",
             // West Island / South Shore
             "Baie d'Urfe", "Dorval", "Pointe-Claire", "Sainte-Anne",
             "Beaconsfield", "Kirkland", "Dollard", "Vaudreuil",
-            // Quebec City
-            "Vieux-Quebec", "Saint-Roch", "Limoilou", "Montcalm",
-            "Saint-Sauveur", "Beauport", "Charlesbourg", "Sainte-Foy",
             // Quebec cities
             "Sherbrooke", "Trois-Rivieres", "Gatineau", "Saguenay",
             "Rimouski", "Chicoutimi", "Jonquiere", "Riviere-du-Loup",
-            "Magog", "Granby", "Saint-Hyacinthe", "Drummondville",
-            "Shawinigan", "Victoriaville", "Val-d'Or", "Rouyn-Noranda",
-            "Sept-Iles", "Alma", "Joliette", "Sorel",
+            "Magog", "Granby", "Drummondville",
+            "Shawinigan", "Val-d'Or", "Hudson", "Sorel", "Sutton",
             // Quebec regions
-            "Laurentides", "Charlevoix", "Gaspesie", "Abitibi",
-            "Beauce", "Lanaudiere", "Brome",
+            "Charlevoix", "Gaspesie", "Abitibi",
             // Other North America
-            "Traverse City", "Detroit", "Brooklyn", "Harlem",
-            "Bed-Stuy", "Crown Heights", "Oakland", "Logan Square",
+            "Traverse City", "Detroit", "Cadillac", "Alpina", "Midland", "Flint", "Petoskey", "Interlochen", "Long Island", "Point Lookout", "Hicksville",
+            "Santa Cruz", "Scotts Valley", "Felton", "Boulder Creek","San Francisco", "Ben Lomond", "Cupertino", "Santa Clara", "San Mateo",
+            "Long Lake", "Leland", "Lelenau", "Ann Arbor", "Ypsilanti", "Northport",
+            "Glen Arbor","Maple City", "Walled Lake", "Waterloo", "Plymouth",
+            "Mississauga","Port Credit", "Toronto", "Etobicoke",
         ]
         let mod  = modifiers[rng.nextInt(upperBound: modifiers.count)]
         let city = cities[rng.nextInt(upperBound: cities.count)]
@@ -81,8 +79,8 @@ struct ChillTitleGenerator {
 
     private static func frenchWord(rng: inout SeededRNG) -> String {
         let words = ["Velours", "Sablier", "Solstice", "Brume", "Toile",
-                     "Azur", "Nuit", "Soiree", "Douceur", "Crepuscule",
-                     "Lune", "Reflet", "Silence", "Calme", "Nuage",
+                     "Azur", "Nuit", "Soiree", "Homard", "Crepuscule",
+                     "Lune", "Reflet", "Silence", "Calme", "Nuage", "Poisson",
                      "Nocturne", "Etude", "Reverie", "Minuit", "Lumiere"]
         let modifiers = [
             // Time-of-day

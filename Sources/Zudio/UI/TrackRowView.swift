@@ -17,6 +17,47 @@ struct TrackRowView: View {
     let barOffset: Int
     var showPlayheadHandle: Bool = false
     var onSeek: ((Int) -> Void)? = nil
+    var contentWidth: CGFloat = 900
+
+    // Adaptive panel widths (iOS only).
+    //
+    // iPad mini portrait (744pt):
+    //   left=220  right=232 (explicit, leading-aligned)  MIDI=728−232−244=252pt
+    //   rightPanelWidth=232 → frame is 232+2×6=244pt. Chips (140pt) left-aligned
+    //   within the 232pt frame: 6pt gap from MIDI, dead space on right edge only.
+    //   MIDI = 252pt (31% narrower than natural 344pt) — narrowed 6pt per request.
+    //
+    // iPad 11" / Air / standard portrait (820–834pt):
+    //   left=222  right≈174 (natural 140+2×17)  MIDI≈398pt  (6pt narrower per request)
+    //
+    // Landscape (any iPad) / macOS:
+    //   left=232  right=152
+    #if os(iOS)
+    private var leftPanelWidth: CGFloat {
+        if contentWidth < 800 { return 220 }           // iPad mini portrait (744pt)
+        if contentWidth < 900 { return 222 }           // iPad 11" / Air portrait (820–834pt)
+        if contentWidth < 1150 { return 242 }          // iPad mini landscape (1133pt) — wider for Lead 1
+        return 232                                     // iPad Pro landscape + macOS
+    }
+    // iPad mini portrait: explicit frame so the effects panel claims a fixed 232pt,
+    // narrowing MIDI to 252pt (31% less than the 344pt natural-sizing result).
+    // Nil for other sizes → natural chip sizing used instead.
+    private var rightPanelWidth: CGFloat? {
+        if contentWidth < 800 { return 232 }
+        return nil
+    }
+    // Padding between MIDI lane and chips (leading) / chips and right edge (trailing).
+    // iPad A16/11"/Air portrait (800–900pt): 9pt leading removes dead space, 17pt trailing
+    // keeps chips away from the right screen edge.
+    private var rightEffectsLeadingPadding: CGFloat {
+        if contentWidth >= 800 && contentWidth < 900 { return 9 }
+        return 6
+    }
+    private var rightEffectsTrailingPadding: CGFloat {
+        if contentWidth >= 800 && contentWidth < 900 { return 17 }
+        return 6
+    }
+    #endif
 
     // MARK: - Instrument definitions (no "Auto" — always show real name)
 
@@ -226,7 +267,11 @@ struct TrackRowView: View {
                         .help("Regenerate \(label)")
                     }
                 }
+                #if os(iOS)
+                .frame(width: leftPanelWidth)
+                #else
                 .frame(width: 232)
+                #endif
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
 
@@ -258,24 +303,8 @@ struct TrackRowView: View {
                     .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
                 }
             }
-            // Right effects column
-            HStack(spacing: 4) {
-                ForEach(trackEffects, id: \.self) { fx in
-                    let isOn = activeEffects.contains(fx.rawValue)
-                    Button {
-                        let nowOn = !isOn
-                        if nowOn { activeEffects.insert(fx.rawValue) }
-                        else     { activeEffects.remove(fx.rawValue) }
-                        appState.setEffect(fx, enabled: nowOn, forTrack: trackIndex)
-                    } label: {
-                        effectChip(fx, active: isOn)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .frame(width: 152)
-            .frame(maxHeight: .infinity)
-            .padding(.horizontal, 6)
+            // Right effects column — layout varies by platform and size class
+            effectsColumn
         }
         .frame(height: 63)
         .padding(.horizontal, 8)
@@ -304,6 +333,54 @@ struct TrackRowView: View {
     }
 
     // MARK: - Helpers
+
+    // Right effects column.
+    // Three layout strategies:
+    //   macOS           : .frame(width:152) — explicit, chips centered with 6pt each side
+    //   iOS mini (<800) : .frame(width:232, alignment:.leading) — chips sit at leading
+    //                     edge; dead space on right only; MIDI=252pt (31% narrower)
+    //   iOS other       : natural chip width (140pt) + asymmetric leading/trailing — no frame
+    @ViewBuilder private var effectsColumn: some View {
+        #if os(macOS)
+        HStack(spacing: 4) { chipButtons }
+            .frame(width: 152)
+            .frame(maxHeight: .infinity)
+            .padding(.horizontal, 6)
+        #else
+        if let w = rightPanelWidth {
+            // iPad mini portrait: explicit frame keeps panel at full width so MIDI
+            // yields 25% of its space. Leading alignment puts chips flush left.
+            HStack(spacing: 4) { chipButtons }
+                .frame(width: w, alignment: .leading)
+                .frame(maxHeight: .infinity)
+                .padding(.horizontal, 6)
+        } else {
+            // iPad 11" / Air portrait + landscape: natural chip sizing.
+            // Asymmetric padding trims dead space between MIDI and chips (leading)
+            // while keeping a comfortable gap from the right screen edge (trailing).
+            HStack(spacing: 4) { chipButtons }
+                .frame(maxHeight: .infinity)
+                .padding(.leading, rightEffectsLeadingPadding)
+                .padding(.trailing, rightEffectsTrailingPadding)
+        }
+        #endif
+    }
+
+    // Chip buttons extracted so effectsColumn can reference them in multiple branches.
+    @ViewBuilder private var chipButtons: some View {
+        ForEach(trackEffects, id: \.self) { fx in
+            let isOn = activeEffects.contains(fx.rawValue)
+            Button {
+                let nowOn = !isOn
+                if nowOn { activeEffects.insert(fx.rawValue) }
+                else     { activeEffects.remove(fx.rawValue) }
+                appState.setEffect(fx, enabled: nowOn, forTrack: trackIndex)
+            } label: {
+                effectChip(fx, active: isOn)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 
     // Per-track effect subset — exactly 3 per track (style-specific)
     private var trackEffects: [TrackEffect] {

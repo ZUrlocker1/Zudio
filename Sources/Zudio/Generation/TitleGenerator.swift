@@ -14,7 +14,7 @@ struct TitleGenerator {
     ]
     private static let motorikAdjectives = [
         "Ewig", "Dunkel", "Hell", "Klar", "Tief", "Weit", "Stark", "Ruhig",
-        "Endlos", "Frei", "Neu", "Alt", "Gross", "Klein", "Schnell", "Langsam"
+        "Endlos", "Frei", "Neu", "Alt", "Gross", "Klein", "Schnell", "Langsam", "Zorvaak"
     ]
     private static let motorikVerbs = [
         "Fahrt", "Lauft", "Dreht", "Fliesst", "Leuchtet", "Klingt", "Bewegt", "Zieht"

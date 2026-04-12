@@ -2,31 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Zudio</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.zudio.app</string>
-    <key>CFBundleVersion</key>
-    <string>99</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.99b</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleExecutable</key>
-    <string>Zudio</string>
-    <key>NSPrincipalClass</key>
-    <string>NSApplication</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <key>CFBundleIconFile</key>
-    <string>zudio-icon</string>
-
-    <!-- Prevent macOS from launching a second process when opening .zudio files -->
-    <key>LSMultipleInstancesProhibited</key>
-    <true/>
-
     <!-- Custom document type: .zudio song files -->
     <key>CFBundleDocumentTypes</key>
     <array>
@@ -37,8 +12,6 @@
             <array>
                 <string>zudio</string>
             </array>
-            <key>CFBundleTypeIconFile</key>
-            <string>zudio-doc</string>
             <key>CFBundleTypeRole</key>
             <string>Editor</string>
             <key>LSItemContentTypes</key>
@@ -48,7 +21,7 @@
         </dict>
     </array>
 
-    <!-- Declare the UTI so macOS knows com.zudio.song is a real type owned by this app -->
+    <!-- Export the UTI so iOS knows com.zudio.song is owned by this app -->
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
@@ -61,8 +34,6 @@
                 <string>public.plain-text</string>
                 <string>public.data</string>
             </array>
-            <key>UTTypeIconFile</key>
-            <string>zudio-doc</string>
             <key>UTTypeTagSpecification</key>
             <dict>
                 <key>public.filename-extension</key>
@@ -73,7 +44,7 @@
         </dict>
     </array>
 
-    <!-- iOS: allow files to appear in Files app and be opened in place -->
+    <!-- Allow .zudio files to appear in Files app and be opened in place -->
     <key>UIFileSharingEnabled</key>
     <true/>
     <key>LSSupportsOpeningDocumentsInPlace</key>

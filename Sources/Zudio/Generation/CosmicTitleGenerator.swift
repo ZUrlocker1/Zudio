@@ -28,14 +28,14 @@ struct KosmicTitleGenerator {
     private static let kosmicAdjectives = [
         "Solar", "Dark", "Deep", "Void", "Stellar", "Astral", "Polar",
         "Silent", "Orbital", "Distant", "Ancient", "Frozen", "Hollow",
-        "Radiant", "Spectral", "Liminal", "Oblique", "Inert", "Ambient"
+        "Radiant", "Spectral", "Liminal", "Oblique", "Inert", "Ambient", "Forest"
     ]
 
     private static let kosmicNouns = [
         "Arc", "Field", "Drift", "Pulse", "Nebula", "Void", "Ether",
-        "Flux", "Prism", "Helix", "Vortex", "Horizon", "Signal",
+        "Flux", "Prism", "Helix", "Vortex", "Horizon", "Signal", "Connection",
         "Current", "Phase", "Lattice", "Aurora", "Apex", "Zenith",
-        "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra"
+        "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra", "Zorvaak"
     ]
 
     private static let germanAdjectives = [
@@ -45,7 +45,7 @@ struct KosmicTitleGenerator {
 
     private static let germanKosmicNouns = [
         "Kosmos", "Nebel", "Stern", "Raum", "Welle", "Licht", "Aether",
-        "Ferne", "Himmel", "Strom", "Feld", "Leere", "Geist", "Tiefe",
+        "Ferne", "Himmel", "Strom", "Feld", "Leere", "Geist", "Tiefe", "Zorvaak",
         "Schwere", "Dunkel", "Stille", "Weite", "Schein", "Hauch", "Basso"
     ]
 

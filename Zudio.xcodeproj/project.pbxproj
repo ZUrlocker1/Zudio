@@ -60,6 +60,9 @@
 		AA000000000000000000036 /* CosmicDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000036 /* CosmicDrumGenerator.swift */; };
 		AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000037 /* CosmicTextureGenerator.swift */; };
 		AA00000000000000000007C /* CosmicHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007C /* CosmicHelpers.swift */; };
+		AA00000000000000000007D /* ZudioPlatformHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007D /* ZudioPlatformHost.swift */; };
+		AA00000000000000000007E /* MacPlatformHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007E /* MacPlatformHost.swift */; };
+		AA00000000000000000007F /* IOSPlatformHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007F /* IOSPlatformHost.swift */; };
 		AA000000000000000000038 /* CosmicTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000038 /* CosmicTitleGenerator.swift */; };
 		AA000000000000000000039 /* AudioFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000039 /* AudioFileExporter.swift */; };
 		AA000000000000000000040 /* SongLogExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000040 /* SongLogExporter.swift */; };
@@ -91,6 +94,86 @@
 		TT000000000000000000009 /* KosmicBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000005 /* KosmicBatchTests.swift */; };
 		TT000000000000000000010 /* AmbientBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000010 /* AmbientBatchTests.swift */; };
 		TT000000000000000000004 /* Zudio.app in Frameworks */ = {isa = PBXBuildFile; fileRef = BB000000000000000000021 /* Zudio.app */; };
+		/* iOS target build files */
+		AA000000000000000000100 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
+		IS000000000000000000001 /* ZudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* ZudioApp.swift */; };
+		IS000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000002 /* AppState.swift */; };
+		IS000000000000000000003 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* Types.swift */; };
+		IS000000000000000000004 /* MIDIEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004 /* MIDIEvent.swift */; };
+		IS000000000000000000005 /* GlobalMusicalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000005 /* GlobalMusicalFrame.swift */; };
+		IS000000000000000000006 /* SongStructure.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000006 /* SongStructure.swift */; };
+		IS000000000000000000007 /* TonalGovernanceMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000007 /* TonalGovernanceMap.swift */; };
+		IS000000000000000000008 /* SongState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008 /* SongState.swift */; };
+		IS000000000000000000009 /* SeededRNG.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000009 /* SeededRNG.swift */; };
+		IS00000000000000000000A /* SongGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000A /* SongGenerator.swift */; };
+		IS00000000000000000000B /* TonalGovernanceBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000B /* TonalGovernanceBuilder.swift */; };
+		IS00000000000000000000C /* DrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000C /* DrumGenerator.swift */; };
+		IS00000000000000000000D /* PadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000D /* PadsGenerator.swift */; };
+		IS00000000000000000000E /* DensitySimplifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000E /* DensitySimplifier.swift */; };
+		IS00000000000000000000F /* StructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000000F /* StructureGenerator.swift */; };
+		IS000000000000000000010 /* TitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000010 /* TitleGenerator.swift */; };
+		IS000000000000000000011 /* MusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000011 /* MusicalFrameGenerator.swift */; };
+		IS000000000000000000012 /* LeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000012 /* LeadGenerator.swift */; };
+		IS000000000000000000013 /* BassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000013 /* BassGenerator.swift */; };
+		IS000000000000000000014 /* TextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000014 /* TextureGenerator.swift */; };
+		IS000000000000000000015 /* RhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000015 /* RhythmGenerator.swift */; };
+		IS000000000000000000016 /* StepScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000016 /* StepScheduler.swift */; };
+		IS000000000000000000017 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000017 /* PlaybackEngine.swift */; };
+		IS000000000000000000018 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000018 /* ContentView.swift */; };
+		IS000000000000000000019 /* TrackRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000019 /* TrackRowView.swift */; };
+		IS00000000000000000001A /* MIDILaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001A /* MIDILaneView.swift */; };
+		IS00000000000000000001B /* StatusBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001B /* StatusBoxView.swift */; };
+		IS00000000000000000001C /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001C /* TopBarView.swift */; };
+		IS00000000000000000001D /* AssetLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001D /* AssetLoader.swift */; };
+		IS000000000000000000022 /* MIDIFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000022 /* MIDIFileExporter.swift */; };
+		IS000000000000000000023 /* FirstMouseFix.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000023 /* FirstMouseFix.swift */; };
+		IS000000000000000000024 /* ArrangementFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000024 /* ArrangementFilter.swift */; };
+		IS000000000000000000025 /* HarmonicFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000025 /* HarmonicFilter.swift */; };
+		IS000000000000000000026 /* PatternEvolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000026 /* PatternEvolver.swift */; };
+		IS000000000000000000027 /* DrumVariationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000027 /* DrumVariationEngine.swift */; };
+		IS000000000000000000030 /* CosmicMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000030 /* CosmicMusicalFrameGenerator.swift */; };
+		IS000000000000000000031 /* CosmicStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000031 /* CosmicStructureGenerator.swift */; };
+		IS000000000000000000032 /* CosmicArpeggioGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000032 /* CosmicArpeggioGenerator.swift */; };
+		IS000000000000000000033 /* CosmicPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000033 /* CosmicPadsGenerator.swift */; };
+		IS000000000000000000034 /* CosmicLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000034 /* CosmicLeadGenerator.swift */; };
+		IS000000000000000000035 /* CosmicBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000035 /* CosmicBassGenerator.swift */; };
+		IS000000000000000000036 /* CosmicDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000036 /* CosmicDrumGenerator.swift */; };
+		IS000000000000000000037 /* CosmicTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000037 /* CosmicTextureGenerator.swift */; };
+		IS000000000000000000038 /* CosmicTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000038 /* CosmicTitleGenerator.swift */; };
+		IS000000000000000000039 /* AudioFileExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000039 /* AudioFileExporter.swift */; };
+		IS000000000000000000040 /* SongLogExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000040 /* SongLogExporter.swift */; };
+		IS000000000000000000041 /* AmbientTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000041 /* AmbientTitleGenerator.swift */; };
+		IS000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000050 /* AmbientMusicalFrameGenerator.swift */; };
+		IS000000000000000000051 /* AmbientStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000051 /* AmbientStructureGenerator.swift */; };
+		IS000000000000000000052 /* AmbientLoopTiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000052 /* AmbientLoopTiler.swift */; };
+		IS000000000000000000053 /* AmbientPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000053 /* AmbientPadsGenerator.swift */; };
+		IS000000000000000000054 /* AmbientBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000054 /* AmbientBassGenerator.swift */; };
+		IS000000000000000000055 /* AmbientDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000055 /* AmbientDrumGenerator.swift */; };
+		IS000000000000000000056 /* AmbientLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000056 /* AmbientLeadGenerator.swift */; };
+		IS000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000057 /* AmbientRhythmGenerator.swift */; };
+		IS000000000000000000058 /* AmbientTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000058 /* AmbientTextureGenerator.swift */; };
+		IS000000000000000000059 /* AmbientHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000059 /* AmbientHelpers.swift */; };
+		IS000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000060 /* ChillMusicalFrameGenerator.swift */; };
+		IS000000000000000000061 /* ChillStructureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000061 /* ChillStructureGenerator.swift */; };
+		IS000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
+		IS000000000000000000063 /* ChillBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000063 /* ChillBassGenerator.swift */; };
+		IS000000000000000000064 /* ChillPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000064 /* ChillPadsGenerator.swift */; };
+		IS000000000000000000065 /* ChillLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000065 /* ChillLeadGenerator.swift */; };
+		IS000000000000000000066 /* ChillRhythmGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000066 /* ChillRhythmGenerator.swift */; };
+		IS000000000000000000067 /* ChillTitleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000067 /* ChillTitleGenerator.swift */; };
+		IS000000000000000000068 /* AudioTexturePlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000068 /* AudioTexturePlayer.swift */; };
+		IS00000000000000000006A /* AudioWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006A /* AudioWaveformView.swift */; };
+		IS00000000000000000007B /* NowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007B /* NowPlayingController.swift */; };
+		IS00000000000000000007C /* CosmicHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007C /* CosmicHelpers.swift */; };
+		IS00000000000000000007D /* ZudioPlatformHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007D /* ZudioPlatformHost.swift */; };
+		IS00000000000000000007E /* MacPlatformHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007E /* MacPlatformHost.swift */; };
+		IS00000000000000000007F /* IOSPlatformHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007F /* IOSPlatformHost.swift */; };
+		IR000000000000000000001 /* Assets.xcassets in Resources (iOS) */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
+		IR000000000000000000002 /* GeneralUser_GS_v1.471.sf2 in Resources (iOS) */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006C /* GeneralUser_GS_v1.471.sf2 */; };
+		IR000000000000000000003 /* zudio-logo.png in Resources (iOS) */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006D /* zudio-logo.png */; };
+		IR000000000000000000004 /* Textures in Resources (iOS) */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Textures */; };
+		IF000000000000000000001 /* AVFoundation.framework in Frameworks (iOS) */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
+		IF000000000000000000002 /* MediaPlayer.framework in Frameworks (iOS) */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007A /* MediaPlayer.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -149,6 +232,9 @@
 		BB000000000000000000036 /* CosmicDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicDrumGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000037 /* CosmicTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTextureGenerator.swift; sourceTree = "<group>"; };
 		BB00000000000000000007C /* CosmicHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicHelpers.swift; sourceTree = "<group>"; };
+		BB00000000000000000007D /* ZudioPlatformHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioPlatformHost.swift; sourceTree = "<group>"; };
+		BB00000000000000000007E /* MacPlatformHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlatformHost.swift; sourceTree = "<group>"; };
+		BB00000000000000000007F /* IOSPlatformHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSPlatformHost.swift; sourceTree = "<group>"; };
 		BB000000000000000000038 /* CosmicTitleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CosmicTitleGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000039 /* AudioFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000040 /* SongLogExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongLogExporter.swift; sourceTree = "<group>"; };
@@ -180,6 +266,8 @@
 		UU000000000000000000005 /* KosmicBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KosmicBatchTests.swift; sourceTree = "<group>"; };
 		UU000000000000000000010 /* AmbientBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmbientBatchTests.swift; sourceTree = "<group>"; };
 		UU000000000000000000004 /* ZudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB000000000000000000100 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB000000000000000000101 /* ZudioiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZudioiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -196,6 +284,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC000000000000000000020 /* Frameworks (ZudioiOS) */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				IF000000000000000000001 /* AVFoundation.framework in Frameworks (iOS) */,
+				IF000000000000000000002 /* MediaPlayer.framework in Frameworks (iOS) */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,6 +313,7 @@
 			children = (
 				BB000000000000000000021 /* Zudio.app */,
 				UU000000000000000000004 /* ZudioTests.xctest */,
+				BB000000000000000000101 /* ZudioiOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -333,11 +431,13 @@
 				BB000000000000000000001 /* ZudioApp.swift */,
 				BB000000000000000000002 /* AppState.swift */,
 				BB000000000000000000020 /* Info.plist */,
+				BB000000000000000000100 /* Assets.xcassets */,
 				DD000000000000000000003 /* Models */,
 				DD000000000000000000004 /* Generation */,
 				DD000000000000000000005 /* Playback */,
 				DD000000000000000000006 /* UI */,
 				DD000000000000000000007 /* Assets */,
+				DD000000000000000000015 /* Platform */,
 			);
 			path = Zudio;
 			sourceTree = "<group>";
@@ -411,6 +511,16 @@
 			path = Chill;
 			sourceTree = "<group>";
 		};
+		DD000000000000000000015 /* Platform */ = {
+			isa = PBXGroup;
+			children = (
+				BB00000000000000000007D /* ZudioPlatformHost.swift */,
+				BB00000000000000000007E /* MacPlatformHost.swift */,
+				BB00000000000000000007F /* IOSPlatformHost.swift */,
+			);
+			path = Platform;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -448,6 +558,23 @@
 			productReference = UU000000000000000000004 /* ZudioTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		EE000000000000000000004 /* ZudioiOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FF000000000000000000004 /* Build configuration list for PBXNativeTarget "ZudioiOS" */;
+			buildPhases = (
+				CC000000000000000000021 /* Sources (ZudioiOS) */,
+				CC000000000000000000020 /* Frameworks (ZudioiOS) */,
+				CC000000000000000000022 /* Resources (ZudioiOS) */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ZudioiOS;
+			productName = ZudioiOS;
+			productReference = BB000000000000000000101 /* ZudioiOS.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXContainerItemProxy section */
@@ -483,6 +610,9 @@
 						CreatedOnToolsVersion = 15.0;
 						TestTargetID = EE000000000000000000001;
 					};
+					EE000000000000000000004 = {
+						CreatedOnToolsVersion = 15.0;
+					};
 				};
 			};
 			buildConfigurationList = FF000000000000000000001 /* Build configuration list for PBXProject "Zudio" */;
@@ -500,6 +630,7 @@
 			targets = (
 				EE000000000000000000001 /* Zudio */,
 				EE000000000000000000003 /* ZudioTests */,
+				EE000000000000000000004 /* ZudioiOS */,
 			);
 		};
 /* End PBXProject section */
@@ -514,6 +645,18 @@
 				AA000000000000000000028 /* assets/images/zudio-icon.icns in Resources */,
 				AA000000000000000000029 /* assets/images/zudio-doc.icns in Resources */,
 				AA000000000000000000069 /* Textures in Resources */,
+				AA000000000000000000100 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC000000000000000000022 /* Resources (ZudioiOS) */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				IR000000000000000000001 /* Assets.xcassets in Resources (iOS) */,
+				IR000000000000000000002 /* GeneralUser_GS_v1.471.sf2 in Resources (iOS) */,
+				IR000000000000000000003 /* zudio-logo.png in Resources (iOS) */,
+				IR000000000000000000004 /* Textures in Resources (iOS) */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -571,6 +714,9 @@
 				AA000000000000000000036 /* CosmicDrumGenerator.swift in Sources */,
 				AA000000000000000000037 /* CosmicTextureGenerator.swift in Sources */,
 				AA00000000000000000007C /* CosmicHelpers.swift in Sources */,
+				AA00000000000000000007D /* ZudioPlatformHost.swift in Sources */,
+				AA00000000000000000007E /* MacPlatformHost.swift in Sources */,
+				AA00000000000000000007F /* IOSPlatformHost.swift in Sources */,
 				AA000000000000000000039 /* AudioFileExporter.swift in Sources */,
 				AA000000000000000000040 /* SongLogExporter.swift in Sources */,
 				AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
@@ -605,6 +751,85 @@
 				TT000000000000000000003 /* MotorikBatchTests.swift in Sources */,
 				TT000000000000000000009 /* KosmicBatchTests.swift in Sources */,
 				TT000000000000000000010 /* AmbientBatchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC000000000000000000021 /* Sources (ZudioiOS) */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				IS000000000000000000001 /* ZudioApp.swift in Sources */,
+				IS000000000000000000002 /* AppState.swift in Sources */,
+				IS000000000000000000003 /* Types.swift in Sources */,
+				IS000000000000000000004 /* MIDIEvent.swift in Sources */,
+				IS000000000000000000005 /* GlobalMusicalFrame.swift in Sources */,
+				IS000000000000000000006 /* SongStructure.swift in Sources */,
+				IS000000000000000000007 /* TonalGovernanceMap.swift in Sources */,
+				IS000000000000000000008 /* SongState.swift in Sources */,
+				IS000000000000000000009 /* SeededRNG.swift in Sources */,
+				IS00000000000000000000A /* SongGenerator.swift in Sources */,
+				IS00000000000000000000B /* TonalGovernanceBuilder.swift in Sources */,
+				IS00000000000000000000C /* DrumGenerator.swift in Sources */,
+				IS00000000000000000000D /* PadsGenerator.swift in Sources */,
+				IS00000000000000000000E /* DensitySimplifier.swift in Sources */,
+				IS000000000000000000024 /* ArrangementFilter.swift in Sources */,
+				IS000000000000000000025 /* HarmonicFilter.swift in Sources */,
+				IS000000000000000000026 /* PatternEvolver.swift in Sources */,
+				IS000000000000000000027 /* DrumVariationEngine.swift in Sources */,
+				IS00000000000000000000F /* StructureGenerator.swift in Sources */,
+				IS000000000000000000010 /* TitleGenerator.swift in Sources */,
+				IS000000000000000000038 /* CosmicTitleGenerator.swift in Sources */,
+				IS000000000000000000041 /* AmbientTitleGenerator.swift in Sources */,
+				IS000000000000000000011 /* MusicalFrameGenerator.swift in Sources */,
+				IS000000000000000000012 /* LeadGenerator.swift in Sources */,
+				IS000000000000000000013 /* BassGenerator.swift in Sources */,
+				IS000000000000000000014 /* TextureGenerator.swift in Sources */,
+				IS000000000000000000015 /* RhythmGenerator.swift in Sources */,
+				IS000000000000000000016 /* StepScheduler.swift in Sources */,
+				IS000000000000000000017 /* PlaybackEngine.swift in Sources */,
+				IS000000000000000000018 /* ContentView.swift in Sources */,
+				IS000000000000000000019 /* TrackRowView.swift in Sources */,
+				IS00000000000000000001A /* MIDILaneView.swift in Sources */,
+				IS00000000000000000006A /* AudioWaveformView.swift in Sources */,
+				IS00000000000000000001B /* StatusBoxView.swift in Sources */,
+				IS00000000000000000001C /* TopBarView.swift in Sources */,
+				IS00000000000000000001D /* AssetLoader.swift in Sources */,
+				IS000000000000000000022 /* MIDIFileExporter.swift in Sources */,
+				IS000000000000000000023 /* FirstMouseFix.swift in Sources */,
+				IS000000000000000000030 /* CosmicMusicalFrameGenerator.swift in Sources */,
+				IS000000000000000000031 /* CosmicStructureGenerator.swift in Sources */,
+				IS000000000000000000032 /* CosmicArpeggioGenerator.swift in Sources */,
+				IS000000000000000000033 /* CosmicPadsGenerator.swift in Sources */,
+				IS000000000000000000034 /* CosmicLeadGenerator.swift in Sources */,
+				IS000000000000000000035 /* CosmicBassGenerator.swift in Sources */,
+				IS000000000000000000036 /* CosmicDrumGenerator.swift in Sources */,
+				IS000000000000000000037 /* CosmicTextureGenerator.swift in Sources */,
+				IS00000000000000000007C /* CosmicHelpers.swift in Sources */,
+				IS00000000000000000007D /* ZudioPlatformHost.swift in Sources */,
+				IS00000000000000000007E /* MacPlatformHost.swift in Sources */,
+				IS00000000000000000007F /* IOSPlatformHost.swift in Sources */,
+				IS000000000000000000039 /* AudioFileExporter.swift in Sources */,
+				IS000000000000000000040 /* SongLogExporter.swift in Sources */,
+				IS000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
+				IS000000000000000000051 /* AmbientStructureGenerator.swift in Sources */,
+				IS000000000000000000052 /* AmbientLoopTiler.swift in Sources */,
+				IS000000000000000000053 /* AmbientPadsGenerator.swift in Sources */,
+				IS000000000000000000054 /* AmbientBassGenerator.swift in Sources */,
+				IS000000000000000000055 /* AmbientDrumGenerator.swift in Sources */,
+				IS000000000000000000056 /* AmbientLeadGenerator.swift in Sources */,
+				IS000000000000000000057 /* AmbientRhythmGenerator.swift in Sources */,
+				IS000000000000000000058 /* AmbientTextureGenerator.swift in Sources */,
+				IS000000000000000000059 /* AmbientHelpers.swift in Sources */,
+				IS000000000000000000060 /* ChillMusicalFrameGenerator.swift in Sources */,
+				IS000000000000000000061 /* ChillStructureGenerator.swift in Sources */,
+				IS000000000000000000062 /* ChillDrumGenerator.swift in Sources */,
+				IS000000000000000000063 /* ChillBassGenerator.swift in Sources */,
+				IS000000000000000000064 /* ChillPadsGenerator.swift in Sources */,
+				IS000000000000000000065 /* ChillLeadGenerator.swift in Sources */,
+				IS000000000000000000066 /* ChillRhythmGenerator.swift in Sources */,
+				IS000000000000000000067 /* ChillTitleGenerator.swift in Sources */,
+				IS000000000000000000068 /* AudioTexturePlayer.swift in Sources */,
+				IS00000000000000000007B /* NowPlayingController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -662,6 +887,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -718,6 +944,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -823,6 +1050,66 @@
 			};
 			name = Release;
 		};
+		GG000000000000000000007 /* Debug (ZudioiOS) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K66MA9TR8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sources/Zudio/iOS-Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.99b;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
+				PRODUCT_NAME = ZudioiOS;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		GG000000000000000000008 /* Release (ZudioiOS) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = K66MA9TR8Z;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Sources/Zudio/iOS-Info.plist";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.99b;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
+				PRODUCT_NAME = ZudioiOS;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -849,6 +1136,15 @@
 			buildConfigurations = (
 				GG000000000000000000005 /* Debug */,
 				GG000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FF000000000000000000004 /* Build configuration list for PBXNativeTarget "ZudioiOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				GG000000000000000000007 /* Debug */,
+				GG000000000000000000008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

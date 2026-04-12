@@ -1,14 +1,18 @@
 // AppState.swift — global observable app state, shared across all views
 
 import SwiftUI
-import AppKit
 import Combine
 import MediaPlayer
-import UniformTypeIdentifiers
 
 // MARK: - Play mode
 
 enum PlayMode: String, Hashable { case song, endless, evolve }
+
+#if os(macOS)
+/// Minimum content-area height (points) for the compact Mac window, excluding the title bar.
+/// Referenced by AppState, ContentView, and ZudioApp — change here to update all four sites.
+let kCompactContentHeight: CGFloat = 206
+#endif
 
 // MARK: - AppState
 
@@ -37,6 +41,59 @@ final class AppState: ObservableObject {
     // observes this instead of statusLog.count so onChange fires even when the
     // net count is unchanged (e.g. simultaneous append+trim).
     @Published var statusLogVersion: Int = 0
+
+    // Font size offset for the generation log — adjusted by +/- hotkeys.
+    // 0 = default (12pt macOS, 12pt mini iOS, 14pt other iOS). Clamped to [-4, +8].
+    @Published var statusLogFontOffset: Int = 0
+
+    // MARK: - Compact window toggle (macOS only)
+    #if os(macOS)
+    @Published var isWindowCompact: Bool = false
+    var windowExpandedFrame: NSRect? = nil   // saved before compressing; not published (no UI depends on it)
+
+    func toggleWindowCompact() {
+        guard let window = NSApp.keyWindow else { return }
+        let currentFrame = window.frame
+        if isWindowCompact {
+            // Restore to saved frame, or fall back to default expanded size if launched compact
+            let targetFrame: NSRect
+            if let saved = windowExpandedFrame {
+                targetFrame = saved
+            } else {
+                let defaultContent = NSSize(width: 1175, height: 775)
+                let newWinSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: defaultContent)).size
+                let newOrigin  = NSPoint(x: currentFrame.origin.x,
+                                         y: currentFrame.origin.y + currentFrame.height - newWinSize.height)
+                targetFrame = NSRect(origin: newOrigin, size: newWinSize)
+            }
+            window.setFrame(targetFrame, display: true, animate: true)
+            isWindowCompact = false
+        } else {
+            // Save current frame, then collapse to minimum size keeping top-left pinned
+            windowExpandedFrame = currentFrame
+            // Use a taller compact height when no song is loaded so the scrollbar /
+            // Generation Log strip is always visible even at minimum size.
+            let compactH: CGFloat = (songState == nil) ? 220 : 206
+            let minContent = NSSize(width: 885, height: compactH)
+            let newWinSize  = window.frameRect(forContentRect: NSRect(origin: .zero, size: minContent)).size
+            let newOrigin   = NSPoint(x: currentFrame.origin.x,
+                                      y: currentFrame.origin.y + currentFrame.height - newWinSize.height)
+            window.setFrame(NSRect(origin: newOrigin, size: newWinSize), display: true, animate: true)
+            isWindowCompact = true
+        }
+    }
+
+    /// Called on launch to sync isWindowCompact with the actual window size.
+    /// macOS persists window frame via NSUserDefaults even when isRestorable = false,
+    /// so we must check the real size rather than assuming the default.
+    func syncCompactStateFromWindow() {
+        guard let contentView = NSApp.keyWindow?.contentView else { return }
+        let w = contentView.frame.width
+        let h = contentView.frame.height
+        // Treat as compact if within 50pt of the minimum in either dimension
+        isWindowCompact = (w <= 885 + 50) || (h <= kCompactContentHeight + 50)
+    }
+    #endif
 
     // MARK: - Visible window — zoom + DAW scroll
 
@@ -377,6 +434,7 @@ final class AppState: ObservableObject {
     // MARK: - Sheet triggers (set by key monitor, observed by TopBarView)
     @Published var triggerShowHelp  = false
     @Published var triggerShowAbout = false
+    @Published var saveFlashCounter = 0   // incremented each save; TopBarView flashes Save button
 
     // MARK: - Per-track UI state
 
@@ -395,7 +453,7 @@ final class AppState: ObservableObject {
     let nowPlaying = NowPlayingController()
 
     private var cancellables = Set<AnyCancellable>()
-    private var keyEventMonitor: Any?
+    var platformHost: ZudioPlatformHost?
 
     init() {
         // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
@@ -452,122 +510,18 @@ final class AppState: ObservableObject {
             self?.loadFromLogURL(url)
         }
 
-        // Global key monitor — intercepts transport/generation shortcuts regardless of focus.
-        // NSEvent monitor callbacks always run on the main thread.
-        // Arrow keys and Return guard against text field focus (BPM field uses these for editing).
-        // Return also guards against open sheets (Help/About use .defaultAction = Return on Close).
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
-            // Strip modifier keys irrelevant to our shortcuts (.numericPad/.function are set on arrows)
-            let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
-
-            switch event.keyCode {
-
-            case 49: // Space — play/stop (BPM field never needs space, no guard required)
-                guard mods.isEmpty else { return event }
-                Task { @MainActor [weak self] in
-                    guard let self, !self.isGenerating else { return }
-                    self.playOrStop()
-                }
-                return nil
-
-            case 36: // Return/Enter — generate new song
-                guard mods.isEmpty else { return event }
-                // Pass through only if an *editable* text field is focused (Enter commits the value)
-                // or if a sheet is open (Return = Close on Help/About).
-                // Read-only views like the status log must not block this.
-                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
-                let sheetOpen   = !(NSApp.keyWindow?.sheets.isEmpty ?? true)
-                guard !isTextField, !sheetOpen else { return event }
-                Task { @MainActor [weak self] in
-                    guard let self, !self.isGenerating else { return }
-                    self.generateNew()
-                }
-                return nil
-
-            case 123: // Left arrow — seek back 1 bar (plain) or to start (Cmd)
-                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
-                guard !isTextField else { return event }
-                if mods.isEmpty {
-                    Task { @MainActor [weak self] in
-                        guard let self, self.songState != nil else { return }
-                        self.seekBackOneBar()
-                    }
-                    return nil
-                } else if mods == .command {
-                    Task { @MainActor [weak self] in
-                        guard let self, self.songState != nil else { return }
-                        self.seekToStart()
-                    }
-                    return nil
-                }
-
-            case 124: // Right arrow — seek forward 1 bar (plain) or to end (Cmd)
-                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
-                guard !isTextField else { return event }
-                if mods.isEmpty {
-                    Task { @MainActor [weak self] in
-                        guard let self, self.songState != nil else { return }
-                        self.seekForwardOneBar()
-                    }
-                    return nil
-                } else if mods == .command {
-                    Task { @MainActor [weak self] in
-                        guard let self, self.songState != nil else { return }
-                        self.seekToEnd()
-                    }
-                    return nil
-                }
-
-            // Plain-letter shortcuts — all guard against text-field focus and open sheets
-            case 5, 1, 37, 46, 15, 40, 4, 0, 11, 6:
-                guard mods.isEmpty else { return event }
-                let isTextField = (NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable == true
-                let sheetOpen   = !(NSApp.keyWindow?.sheets.isEmpty ?? true)
-                guard !isTextField, !sheetOpen else { return event }
-                switch event.keyCode {
-                case 5:  // 'g' — generate
-                    Task { @MainActor [weak self] in
-                        guard let self, !self.isGenerating else { return }
-                        self.generateNew()
-                    }
-                case 14: // 'e' — export audio
-                    guard songState != nil, !isExportingAudio else { return event }
-                    Task { @MainActor [weak self] in self?.requestExport() }
-                case 1:  // 's' — save MIDI
-                    guard songState != nil else { return event }
-                    Task { @MainActor [weak self] in self?.saveMIDI() }
-                case 37: // 'l' — load song
-                    guard !isGenerating else { return event }
-                    Task { @MainActor [weak self] in self?.loadFromLog() }
-                case 46: // 'm' — Motorik
-                    Task { @MainActor [weak self] in self?.selectedStyle = .motorik }
-                case 15: // 'r' — reset (always allowed — clears everything)
-                    Task { @MainActor [weak self] in self?.resetTrackDefaults() }
-                case 40: // 'k' — Kosmic
-                    Task { @MainActor [weak self] in self?.selectedStyle = .kosmic }
-                case 4:  // 'h' — help
-                    Task { @MainActor [weak self] in self?.triggerShowHelp.toggle() }
-                case 0:  // 'a' — Ambient
-                    Task { @MainActor [weak self] in self?.selectedStyle = .ambient }
-                case 8:  // 'c' — Chill
-                    Task { @MainActor [weak self] in self?.selectedStyle = .chill }
-                case 11: // 'b' — beginning
-                    guard songState != nil else { return event }
-                    Task { @MainActor [weak self] in self?.seekToStart() }
-                case 6:  // 'z' — end
-                    guard songState != nil else { return event }
-                    Task { @MainActor [weak self] in self?.seekToEnd() }
-                default: break
-                }
-                return nil
-
-            default:
-                break
-            }
-
-            return event
-        }
+        // Create the platform host and wire up keyboard shortcuts + audio session.
+        #if os(macOS)
+        let host = MacPlatformHost()
+        platformHost = host
+        host.configureAudioSession()
+        host.registerKeyboardShortcuts(target: self)
+        #elseif os(iOS)
+        let host = IOSPlatformHost()
+        platformHost = host
+        host.configureAudioSession()
+        host.registerKeyboardShortcuts(target: self)
+        #endif
 
         // Real-time tempo scrubbing: update live playback when BPM changes on a loaded song
         $tempoOverride
@@ -880,7 +834,7 @@ final class AppState: ObservableObject {
                 self.defaultsResetToken += 1
                 if thenPlay || wasPlaying { self.playback.play() }
                 // Resign first responder so BPM TextField doesn't hold focus
-                NSApp.keyWindow?.makeFirstResponder(nil)
+                self.platformHost?.dismissKeyboard()
                 // If a file-open arrived while we were generating, load it now.
                 self.consumePendingLoad()
             }
@@ -937,7 +891,6 @@ final class AppState: ObservableObject {
     // MARK: - Transport
 
     func play() {
-        NSApp.activate(ignoringOtherApps: true)
         if songState == nil {
             generateNew(thenPlay: true)
         } else {
@@ -961,7 +914,6 @@ final class AppState: ObservableObject {
     }
 
     func stop() {
-        NSApp.activate(ignoringOtherApps: true)
         playback.stop()
         audioTexture.stop()
     }
@@ -1018,7 +970,7 @@ final class AppState: ObservableObject {
 
     private func goToPreviousSong() {
         guard songHistory.count >= 2 else {
-            NSSound(named: "Basso")?.play()   // low thud: nowhere to go back to
+            platformHost?.playErrorSound()   // low thud: nowhere to go back to
             return
         }
         let current = songHistory.removeLast()   // drop current; save it for forward navigation
@@ -1039,7 +991,7 @@ final class AppState: ObservableObject {
 
     private func goToNextSong() {
         guard !forwardSongHistory.isEmpty else {
-            NSSound(named: "Basso")?.play()   // low thud: nowhere to go forward to
+            platformHost?.playErrorSound()   // low thud: nowhere to go forward to
             return
         }
         let next = forwardSongHistory.removeLast()
@@ -1416,13 +1368,14 @@ final class AppState: ObservableObject {
         guard let anchor = evolveAnchorState, !evolveIsPreGenerating,
               evolveNextSongState == nil else { return }
         evolveIsPreGenerating = true
-        let style = anchor.style
-        let mood  = evolveMoodAnchor
-        let tempo = evolveTempoAnchor
+        let style        = selectedStyle   // use the currently selected style, not the anchor's
+        let styleChanged = style != (anchor.style)
+        // If style changed, generate fresh — no BPM, mood, key or scale from the previous song.
+        let mood:  Mood? = styleChanged ? nil : evolveMoodAnchor
+        let tempo: Int?  = styleChanged ? nil : evolveTempoAnchor
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
-            let bpmDelta = Int.random(in: -5...5)
-            let newTempo = max(20, min(200, tempo + bpmDelta))
+            let newTempo: Int? = tempo.map { max(20, min(200, $0 + Int.random(in: -5...5))) }
             let state = SongGenerator.generate(tempoOverride: newTempo, moodOverride: mood,
                                                style: style, testMode: false)
             await MainActor.run {
@@ -1562,6 +1515,12 @@ final class AppState: ObservableObject {
     }
 
     private func transitionToEvolveNextSong() {
+        // Discard pre-generated next song if its style no longer matches the user's selection.
+        if let next = evolveNextSongState, next.style != selectedStyle {
+            evolveNextSongState  = nil
+            evolveIsPreGenerating = false
+            evolveNextSongLogged  = false
+        }
         if let next = evolveNextSongState {
             evolveNextSongState = nil
             if !evolveNextSongLogged {
@@ -1575,14 +1534,14 @@ final class AppState: ObservableObject {
             }
         } else {
             appendToLog([GenerationLogEntry(tag: "Evolve", description: "Loading next song...", isTitle: false)])
-            guard let anchor = evolveAnchorState else { return }
-            let style = anchor.style
-            let mood  = evolveMoodAnchor
-            let tempo = evolveTempoAnchor
+            let style        = selectedStyle   // use currently selected style, not anchor's
+            let styleChanged = style != (evolveAnchorState?.style ?? style)
+            // If style changed, generate fresh — no BPM, mood, key or scale from the previous song.
+            let mood:  Mood? = styleChanged ? nil : evolveMoodAnchor
+            let tempo: Int?  = styleChanged ? nil : evolveTempoAnchor
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
-                let bpmDelta = Int.random(in: -5...5)
-                let newTempo = max(20, min(200, tempo + bpmDelta))
+                let newTempo: Int? = tempo.map { max(20, min(200, $0 + Int.random(in: -5...5))) }
                 let state = SongGenerator.generate(tempoOverride: newTempo, moodOverride: mood,
                                                    style: style, testMode: false)
                 await MainActor.run {
@@ -1653,13 +1612,13 @@ final class AppState: ObservableObject {
             audioTexture.start(style: state.style, texture: state.chillAudioTexture,
                                offsetSeconds: state.chillAudioTextureOffset)
         }
-        NSApp.keyWindow?.makeFirstResponder(nil)
+        platformHost?.dismissKeyboard()
     }
 
     /// Step back one bar. Beeps when already at the very start (step 0).
     func seekBackOneBar() {
         if playback.currentStep == 0 {
-            NSSound(named: "Basso")?.play()
+            platformHost?.playErrorSound()
             return
         }
         let targetBar = max(0, playback.currentBar - 1)
@@ -1680,7 +1639,7 @@ final class AppState: ObservableObject {
             if playMode == .song {
                 goToNextSong()
             } else {
-                NSSound(named: "Basso")?.play()
+                platformHost?.playErrorSound()
             }
             return
         }
@@ -1733,6 +1692,7 @@ final class AppState: ObservableObject {
 
     func saveMIDI() {
         guard let song = songState else { return }
+        saveFlashCounter += 1
         do {
             let url = try MIDIFileExporter.export(song)
             lastSaveURL = url
@@ -1749,17 +1709,10 @@ final class AppState: ObservableObject {
     // MARK: - Load from log
 
     func loadFromLog() {
-        let panel = NSOpenPanel()
-        panel.title = "Load Zudio Song"
-        panel.message = "Select a Zudio song file (.zudio or .txt)"
-        // Accept both the new .zudio type and plain-text .txt files from earlier versions
-        var types: [UTType] = [.plainText]
-        if let zudioType = UTType("com.zudio.song") { types.insert(zudioType, at: 0) }
-        panel.allowedContentTypes = types
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        loadFromLogURL(url)
+        platformHost?.showOpenPanel { [weak self] url in
+            guard let url else { return }
+            self?.loadFromLogURL(url)
+        }
     }
 
     func loadFromLogURL(_ url: URL) {
@@ -1907,7 +1860,7 @@ final class AppState: ObservableObject {
                 self.playback.setChillMode(style == .chill)
                 self.defaultsResetToken += 1
                 if wasPlaying { self.playback.play() }
-                NSApp.keyWindow?.makeFirstResponder(nil)
+                self.platformHost?.dismissKeyboard()
                 // If another file-open arrived while we were loading, load it now.
                 self.consumePendingLoad()
             }

@@ -2,7 +2,7 @@
 
 ## Context
 
-Zudio is currently a macOS-only app. This plan covers what is required to make it run on iPhone and iPad. The audio engine and all generation code are already iOS-compatible. The primary work is: removing four AppKit dependencies, redesigning the UI for touch and smaller screens, and adapting the file export path. No code is written here.
+Zudio is currently a macOS-only app. This plan covers what is required to make it run on iPhone and iPad. The audio engine and all generation code are already iOS-compatible. The primary work is: isolating AppState's platform-specific behavior behind a `ZudioPlatformHost` protocol, removing remaining AppKit dependencies in UI files with conditional compilation, redesigning the UI for touch and smaller screens, and adapting the file export path. No code is written here.
 
 ---
 
@@ -32,15 +32,17 @@ Fix: Wrap in `#if os(macOS)` conditionals. The dock icon setter is macOS-only by
 
 ### AppState.swift
 Current Mac-only code:
-- `NSEvent.addLocalMonitorForEvents(matching: .keyDown)` — global space-bar monitor for play/stop toggle
+- `NSEvent.addLocalMonitorForEvents(matching: .keyDown)` — global keyboard monitor for play/stop toggle
 - `event.keyCode == 49` (space bar), `event.modifierFlags` inspection
 - `NSApp.keyWindow?.makeFirstResponder(nil)` — unfocus BPM text field after editing
 - `NSApp.activate(ignoringOtherApps: true)` — called in `play()` and `stop()`
+- `NSOpenPanel` — file open dialog
+- `NSSound.beep()` — error feedback sound
+- `NSWorkspace.shared.activateFileViewerSelecting` — reveal exported file in Finder
 
-Fix:
-- Wrap the entire space-bar monitor in `#if os(macOS)`. On iOS, play/stop is only triggered by the on-screen button — no physical keyboard needed.
-- Replace `NSApp.keyWindow?.makeFirstResponder(nil)` with `@FocusState` dismissal (SwiftUI-native, works on both platforms).
-- Remove `NSApp.activate()` calls — not needed on iOS.
+Fix: **Protocol injection via `ZudioPlatformHost`** (see Part 13, platform protocol subsection). All NSApp, NSEvent, NSSound, and NSWorkspace call sites in AppState move into a `MacPlatformHost` conformer that is injected at startup. AppState holds `weak var platformHost: ZudioPlatformHost?` and calls through it, with no platform imports in the shared file.
+
+The one exception is `NSApp.keyWindow?.makeFirstResponder(nil)` — replace this with `@FocusState` dismissal (SwiftUI-native, works on both platforms without needing the platform host).
 
 ### FirstMouseFix.swift
 An `NSViewRepresentable` wrapper that allows transport buttons to receive clicks without the window first needing to become focused. This is a macOS window-system concept that doesn't exist on iOS (every touch goes directly to the view).
@@ -137,56 +139,115 @@ Two keys are required to make exported files visible in the Files app independen
 
 ---
 
-## Part 5: UI Layout Strategy
+## Part 5: iPad Layout Strategy (Implemented)
 
-This is the most significant design challenge. The current layout assumes a minimum 900×500pt window. The layouts needed:
+The iPad layout uses `contentWidth` (measured by the root GeometryReader) as the sole branching variable. Four breakpoints are active in the shipped code:
 
-| Device | Width | Height | Orientation | Challenge |
-|--------|-------|--------|-------------|-----------|
-| iPad Pro 12.9" | 1024pt | 1366pt | Portrait | Workable, needs compression |
-| iPad Pro 12.9" | 1366pt | 1024pt | Landscape | Very close to current Mac layout |
-| iPad mini | 768pt | 1024pt | Portrait | Needs compression |
-| iPhone 15 Pro Max | 430pt | 932pt | Portrait | Complete redesign needed |
-| iPhone SE | 375pt | 667pt | Portrait | Most constrained case |
-| iPhone (any) | 667–932pt | 375–430pt | Landscape | Compact height, medium width |
+**Tested devices and their contentWidth at runtime:**
+- iPad mini portrait — 744pt
+- iPad 11" / Air portrait — 820–834pt
+- iPad mini landscape — 1133pt
+- iPad Pro landscape — 1194pt (also covers macOS at ≥1150pt)
 
-The current fixed panels total 384pt wide (232 left + 152 right) before the MIDI lane even gets space. This exceeds the iPhone SE's total width of 375pt.
+**Portrait mode adjustments** (contentWidth < 900):
+- Logo moves from the left of the transport row into the transport VStack, stacked above the buttons
+- Version text ("V 0.99b") is hidden below 900pt to save space
+- TrackRowView left panel narrows: 220pt (mini portrait) or 222pt (11"/Air portrait)
+- On mini portrait (< 800pt), the right effects panel is given an explicit 232pt frame to prevent it from being squeezed to zero; on 11"/Air portrait (800–900pt) it sizes naturally with adjusted leading/trailing padding
+- StatusBoxView minimum height reduces to 44pt on mini portrait
+- iPad mini landscape (900–1150pt) treated as a separate tier: left panel widens to 242pt, buttons use `.small` control size
 
-**Recommended strategy: Three layout tiers using `horizontalSizeClass`**
+**Landscape mode** (contentWidth ≥ 900) uses the same layout as macOS, just narrower. No structural differences.
 
-SwiftUI provides `@Environment(\.horizontalSizeClass)` which returns `.regular` (iPad, iPhone landscape) or `.compact` (iPhone portrait). This is the right branching point.
+---
 
-### Tier 1: Regular Width (iPad all orientations, iPhone landscape)
-Keep the current three-column track row layout but compress:
-- Left panel: reduce from 232pt → 180pt (drop the icon, abbreviate labels)
-- Right effects panel: reduce from 152pt → 120pt (smaller chip text)
-- Track height: reduce from 63pt → 52pt
-- Top bar: keep two-row layout but reduce logo to 60pt height
-- All pickers fit; no layout change needed
+## Part 16: iPhone Player Mode Strategy
 
-### Tier 2: Compact Width / Adequate Height (iPhone portrait, 375–430pt wide)
-The track row layout must be completely rethought. The three-column approach (controls | MIDI lane | effects) is impossible. Recommended layout:
+iPhone is a fundamentally different form factor. At 393 × 852pt (portrait) or 852 × 393pt (landscape), the MIDI grid layout is not viable — 7 track rows at 63pt each alone exceed the landscape screen height, and the left+right panels (220 + 232 = 452pt) are wider than the portrait screen. Rather than compressing the existing layout, iPhone gets a minimal dedicated **Player Mode** — a pure listening and experimentation experience with no MIDI grid, no track controls, and no instrument editing.
 
-**Track row becomes a two-zone card:**
-- **Top zone** (full width, 38pt tall): Track icon + label + Mute + Solo + Regenerate (⚡) + instrument name
-- **Bottom zone** (full width, 44pt tall): MIDI lane (full width, no left/right panels)
-- **Effects hidden** behind a tap — tapping anywhere on the top zone opens an effects sheet anchored to that track
+**Controls:**
+- Minimal transport: ⏮ ◀ ▶/■ ▶ ⏭
+- Mode selector: Song / Evolve / Endless
+- Style picker: Ambient / Chill / Kosmic / Motorik
+- Export Audio (only action button; no Save / Load)
 
-This gives each track 82pt height (up from 63pt) but removes the side panels entirely. The MIDI lane gets the full width which actually improves readability.
+**Main body:** Abstract generative visual (Eno Reflection / JMJ Eon aesthetic) toggled with the generation log via a tab strip at the bottom. Canvas-based per-note orbs spawn on note-on events, positioned by pitch (vertical axis) and track (horizontal spread), sized by velocity, color-coded by track, fading over 1.5–3s. Background gradient is keyed to the current style. Driven by `activeVisualizerNotes: [VisualizerNote]` published by `PlaybackEngine` and a 30fps `TimelineView`.
 
-**Top bar (iPhone portrait):** The current two-row header won't fit. Replace with:
-- Row 1: Logo (left, 40pt tall) + Play/Stop (center) + Generate (right)
-- Row 2: Style picker (Motorik/Kosmic/Ambient) + Mood + Key + BPM
-- Logo tap still toggles Test Mode
-- Help/About moved to a settings sheet (tap "..." or gear icon)
+**Touch interactions on the visual canvas:**
+The canvas is a playable surface. Eight gestures across three groups:
 
-**Status log:** On iPhone, the status log takes too much vertical space. Move it to a swipe-up sheet (using `.presentationDetents([.fraction(0.3), .large])`) accessible via a small "≡ log" button in the top bar.
+| Gesture | Target | Action |
+|---------|--------|--------|
+| Tap | Orb | 4-bar solo of that track, auto-releases |
+| Double-tap | Orb | 4-bar mute → auto-restore with new instrument |
+| Long-press | Orb | Toggle: strip all effects (dry) ↔ restore track defaults |
+| Tap | Empty canvas | Play / pause |
+| Long-press | Empty canvas | Regen a random non-drum track (pattern + instrument) |
+| Swipe right | Canvas | Instrument shuffle on a random non-drum track |
+| Swipe left | Canvas | Undo last instrument shuffle |
+| Two-finger any | Canvas | Trigger automated filter sweep across all tracks (~2 bars) |
 
-### Tier 3: Compact Width + Compact Height (iPhone landscape)
-iPhone landscape gives ~667–932pt width but only ~375–430pt height. Seven track rows at 63pt each = 441pt — already taller than the available height. Use:
-- A horizontal scroll view (SwiftUI `ScrollView(.vertical)`) for the track list
-- Top bar collapses to a single row: Logo + Transport + Generate (all small)
-- Status log hidden by default, accessible via sheet
+Implementation notes:
+- **Tap orb / solo:** uses existing `soloState` in AppState. Tapped orb brightens to confirm. Note: single-tap has ~350ms iOS delay while waiting to rule out double-tap.
+- **Double-tap orb / mute + new instrument:** orb fades out for 4 bars, track restores with a freshly selected instrument, orb pulses white briefly on re-entry.
+- **Long-press orb / effects toggle:** a `Set<Int>` in `PhonePlayerView` tracks which tracks are currently stripped dry. First long-press → call per-track "clear effects" path; second → call per-track "restore defaults" path (each track has different defaults already in the engine). Orb gains a faint grey ring while in dry state.
+- **Long-press empty / regen:** uses existing per-track regen path. Track's orbs visibly shift character to signal the change.
+- **Swipe / shuffle:** previous instrument stored in a `[Int: String]` dict keyed by track index for the undo. Affected track's orbs flash briefly.
+- **Two-finger / filter sweep:** new `AVAudioUnitEQ` or low-pass filter node added to the engine chain. Sweep is automated (~2 bars open then return); the gesture is a trigger, not a continuous control.
+
+Orb hit-testing: an orb is "hit" if the tap lands within 1.5× its display radius of the orb centre, using the same position calculation as the canvas draw pass.
+
+**Orb appearance — track colors match the MIDI grid family, with hue shifts to distinguish tracks within the same family:**
+- Lead 1: pure red (hue 0.02) — solid orb
+- Lead 2: warm orange-red (hue 0.06) — same family, visually distinguishable
+- Pads: soft blue (hue 0.60) — large, slow float drift
+- Rhythm: cyan-blue (hue 0.54) — tighter, faster fade, less drift
+- Texture: blue-indigo (hue 0.66) — wide lateral drift, larger and more translucent
+- Bass: purple (hue 0.78)
+- Drums: yellow (hue 0.14)
+
+Within-family distinction strategy: reds differ by hue (0.02 vs 0.06); blues differ by both hue shift and drift behaviour (speed and direction) so they remain distinguishable even at small sizes on a dark background.
+
+**Orb appearance — note duration is visually encoded:**
+- Short notes (1/16–1/8, durationSteps 1–4): small tight circle, very bright core, fast fade (~0.8s). Appears and vanishes like a spark.
+- Medium notes (1/4, durationSteps 4–8): standard orb, ~1.5s fade.
+- Long notes (half–whole note, durationSteps 8–16): larger orb, slow 2.5–3s fade, plus a **comet tail** — 3–4 ghost circles at the orb's previous drift positions, each more transparent than the last. The tail reads immediately as "still ringing."
+- Very long notes (2+ bars, durationSteps 32+): same comet tail plus a slow-expanding sonar ring that fades as it grows, re-asserting the note's presence across multiple seconds.
+
+**Haptic feedback:**
+All haptics use SwiftUI `.sensoryFeedback` (iOS 17+, no import needed) attached to state triggers, keeping haptic logic out of the canvas gesture handlers.
+
+Gesture haptics:
+- Tap orb (solo): `.impact(weight: .medium)` — confirms track grab
+- Double-tap orb (mute): `.impact(weight: .light)` — lighter, distinct from solo
+- Long-press orb (effects toggle): `.impact(weight: .heavy)` on toggle; `.success` notification on restore — the "thunk / tada" pair makes the two states feel different
+- Tap empty canvas (play): `.impact(weight: .medium)`; (pause): `.impact(weight: .soft)` — start feels assertive, stop feels gentle
+- Long-press empty (regen): `.impact(weight: .heavy)` on completion — something significant regenerated
+- Swipe right (shuffle): `.selection` — light tick like a slot machine advancing
+- Swipe left (undo): `.impact(weight: .soft)` — feels like a step back rather than a new action
+- Two-finger filter sweep: `.impact(weight: .rigid)` at sweep start — one crisp pulse to confirm the trigger
+
+Transport button haptics:
+- Play: `.impact(weight: .medium)`
+- Stop: `.impact(weight: .soft)`
+- ⏭ Skip / generate next: `.impact(weight: .medium)`
+- ⏮ Previous: `.impact(weight: .light)`
+- Seek forward/back (◀ ▶): `.selection`
+
+System event haptics:
+- Song generation complete: `.success` notification
+- Export Audio complete: `.success` notification
+- Error / disabled action: `.warning` notification (e.g. tapping Export when no song loaded)
+
+**Orientation:**
+- Portrait: VStack — header / transport / mode / style / export / body (visual or log) / tab strip
+- Landscape: HStack — left controls column (~210pt) / right body + tab strip
+
+**Routing:** `ContentView.body` detects `UIDevice.current.userInterfaceIdiom == .phone` and renders `PhonePlayerView` instead of the full grid layout. iPad path is completely unchanged.
+
+**New files:** `PhonePlayerView.swift`, `VisualizerView.swift`. Modifications: `ContentView.swift` (routing check), `PlaybackEngine.swift` (VisualizerNote population + reverb mix parameter), `Types.swift` (VisualizerNote struct), `AppState.swift` (`loadPreviousFromHistory()` for ⏮ button).
+
+A detailed implementation plan is in the Claude plan file (`polished-painting-zephyr.md`).
 
 ---
 
@@ -258,9 +319,9 @@ try AVAudioSession.sharedInstance().setActive(true)
 #endif
 ```
 
-This should be called in `PlaybackEngine.init()` inside an `#if os(iOS)` block.
+This is handled by `ZudioPlatformHost.configureAudioSession()` — the platform protocol method AppState calls during engine startup. The macOS conformer (`MacPlatformHost`) is a no-op; the iOS conformer (`IOSPlatformHost`) runs the AVAudioSession setup shown above. This keeps AVFoundation session imports out of the shared `AppState.swift`.
 
-Additionally, on iOS the audio session can be interrupted (phone call, Siri, etc.). The app should observe `AVAudioSession.interruptionNotification` and pause playback on interruption, resuming when interruption ends.
+Additionally, on iOS the audio session can be interrupted (phone call, Siri, etc.). The app should observe `AVAudioSession.interruptionNotification` and pause playback on interruption, resuming when interruption ends. This notification observer is also set up inside `IOSPlatformHost.configureAudioSession()`.
 
 ---
 
@@ -288,19 +349,22 @@ On iOS, brief haptic feedback on Generate completion and Play/Stop would improve
 
 **Modify (platform adaptation):**
 - `Sources/Zudio/ZudioApp.swift` — `#if os(macOS)` around NSApp calls
-- `Sources/Zudio/AppState.swift` — `#if os(macOS)` around NSEvent monitor; cross-platform BPM field focus dismissal
+- `Sources/Zudio/AppState.swift` — replace all NSApp/NSEvent/NSSound/NSWorkspace call sites with `platformHost?.method()` calls; add `weak var platformHost: ZudioPlatformHost?`; replace NSApp BPM dismissal with `@FocusState`
 - `Sources/Zudio/UI/FirstMouseFix.swift` — entire file wrapped in `#if os(macOS)`
 - `Sources/Zudio/UI/TopBarView.swift` — sizeClass branching, NSColor/NSImage replacement, compact layout
 - `Sources/Zudio/UI/ContentView.swift` — remove minWidth/minHeight, add ScrollView, sizeClass branching
 - `Sources/Zudio/UI/TrackRowView.swift` — sizeClass branching, compact two-zone layout, larger touch targets
 - `Sources/Zudio/UI/HelpView + AboutView` (in TopBarView.swift) — adaptive sheet sizing
 - `Sources/Zudio/UI/StatusBoxView.swift` — inline on iPad, sheet on iPhone
-- `Sources/Zudio/Playback/PlaybackEngine.swift` — add AVAudioSession setup and interruption handling in `#if os(iOS)` block
+- `Sources/Zudio/Playback/PlaybackEngine.swift` — no AVAudioSession changes needed here; session is configured via `ZudioPlatformHost.configureAudioSession()` called from AppState
 - `Sources/Zudio/Assets/MIDIFileExporter.swift` — platform-conditional output path + ShareLink on iOS
 - `Package.swift` — add iOS/iPadOS platforms
 - `Zudio.xcodeproj/project.pbxproj` — add iOS deployment target
 
 **Create new:**
+- `Sources/Zudio/Platform/ZudioPlatformHost.swift` — protocol definition; lives in ZudioCore; no platform imports
+- `Sources/Zudio/Platform/MacPlatformHost.swift` — macOS conformer; Zudio target only; imports AppKit
+- `Sources/ZudioiOS/Platform/IOSPlatformHost.swift` — iOS conformer; created during Phase 1; imports UIKit and AVFoundation
 - `Sources/Zudio/UI/TrackEffectsSheet.swift` — the effects panel as a sheet for iPhone compact layout
 - App icon assets for iOS (AppIcon.appiconset in asset catalog)
 - `Sources/Zudio/Resources/Info.plist` additions — UIFileSharingEnabled, LSSupportsOpeningDocumentsInPlace, UISupportedInterfaceOrientations
@@ -336,16 +400,16 @@ Goal: A compilable iOS target that runs on an iPad simulator with full audio and
 
 1. Add `.iOS(.v16)` and `.iPadOS(.v16)` to `Package.swift` platforms array
 2. Add iOS deployment target to `Zudio.xcodeproj/project.pbxproj`
-3. Wrap `ZudioApp.swift` NSApp calls in `#if os(macOS)`
-4. Wrap `AppState.swift` NSEvent monitor and NSApp calls in `#if os(macOS)`
-5. Wrap `FirstMouseFix.swift` entirely in `#if os(macOS)`; remove its `.background()` usage in TopBarView on iOS
-6. Replace `NSColor` in `TopBarView.swift` with SwiftUI `Color` equivalents
-7. Replace `NSImage` logo loading with asset-catalog `Image` (cross-platform)
-8. Add `AVAudioSession` setup and interruption handling in `PlaybackEngine.swift` inside `#if os(iOS)`
+3. Wrap `ZudioApp.swift` NSApp dock-icon calls in `#if os(macOS)`
+4. Create `ZudioPlatformHost.swift` (protocol) and `MacPlatformHost.swift` (macOS conformer); inject `MacPlatformHost` into `AppState` from the macOS `ZudioApp`; replace all NSApp/NSEvent/NSSound/NSWorkspace call sites in AppState with `platformHost?.method()` calls; replace BPM field NSApp dismissal with `@FocusState`
+5. Create `IOSPlatformHost.swift` (iOS conformer) with `configureAudioSession()` handling AVAudioSession setup and interruption notification; inject from the iOS `ZudioApp` entry point
+6. Wrap `FirstMouseFix.swift` entirely in `#if os(macOS)`; remove its `.background()` usage in TopBarView on iOS
+7. Replace `NSColor` in `TopBarView.swift` with SwiftUI `Color` equivalents
+8. Replace `NSImage` logo loading with asset-catalog `Image` (cross-platform)
 9. Fix `MIDIFileExporter.swift` to use `.documentDirectory` on iOS
 10. Add iOS app icon assets to asset catalog
 11. Add `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` to Info.plist
-12. **Verify:** `xcodebuild -scheme Zudio -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' build` passes with no errors
+12. **Verify:** `xcodebuild -scheme Zudio -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)' build` passes with no errors on both Mac and iOS targets
 
 ---
 
@@ -374,23 +438,19 @@ At this point the app is shippable as an iPad app.
 
 ---
 
-### Phase 4: iPhone Portrait — Compact Layout (Est. 3–5 days, separate project)
-Goal: Full iPhone support including portrait mode.
+### Phase 4: iPhone Player Mode (Est. 2–3 days, separate project)
+Goal: Full iPhone support via a dedicated player mode UI (no MIDI grid).
 
-This phase is a separate design and implementation project. `horizontalSizeClass == .compact` is the branch point.
+See Part 16 for the design rationale. Implementation plan is in `polished-painting-zephyr.md`.
 
-22. Build `TrackRowView` compact layout — two-zone card:
-    - Top zone (full width, 38pt): icon + label + M + S + ⚡ + instrument name
-    - Bottom zone (full width, 44pt): MIDI lane at full width
-23. Build `TrackEffectsSheet.swift` — new view, effects panel as `.sheet` presented on track row tap
-24. Build compact `TopBarView` — single-row: logo (left) + play/stop (center) + generate (right); second row: style + mood + key + BPM
-25. Move Help/About to a settings sheet triggered by "..." button on iPhone
-26. Move `StatusBoxView` to a detent sheet (`.presentationDetents([.fraction(0.3), .large])`) on iPhone; add a "≡ log" trigger button in the top bar
-27. Handle iPhone landscape (compact height / regular width) — single-row top bar, scrollable track list
-28. **Verify on iPhone SE (3rd gen) simulator** — the hardest case: 375×667pt portrait
-29. **Verify on iPhone 15 Pro Max simulator** — largest iPhone portrait: 430×932pt
-30. Add haptic feedback (`UIImpactFeedbackGenerator`) for Generate complete, Play, Stop — iOS-only via `#if os(iOS)`
-31. **Test iPhone SE on a real device** if available
+22. Add `VisualizerNote` struct to `Types.swift`
+23. Add `activeVisualizerNotes` publishing to `PlaybackEngine.onStep`; expose reverb mix parameter
+24. Add `loadPreviousFromHistory()` to `AppState`
+25. Create `VisualizerView.swift` — Canvas-based per-note orb animation at 30fps + touch interactions (tap orb → 4-bar solo, double-tap → mute/unmute, tap empty → play/pause, long-press → regen random track, pinch → reverb)
+26. Create `PhonePlayerView.swift` — portrait + landscape layouts, tab strip for visual/log toggle
+27. Add iPhone routing check to `ContentView.body`
+28. **Verify on iPhone 15 Pro simulator** (393 × 852pt) — portrait and landscape
+29. Add haptic feedback (`UIImpactFeedbackGenerator`) for Play, Stop, Generate complete, orb-tap solo — iOS-only via `#if os(iOS)`
 
 ---
 
@@ -403,6 +463,48 @@ All musical logic (generators, rules, models, playback engine, exporters) should
 **What stays platform-specific:** all UI views, `NSApp`/`AppKit` code on Mac, and `UIKit`/share sheet code on iPad.
 
 This refactor should be done at the start of the iPad port, not before. It is mechanical work (moving files, fixing imports) — the musical logic itself does not change. Once in place, the workflow is: edit a generator in ZudioCore, both apps update on next build.
+
+### Platform Abstraction — ZudioPlatformHost
+
+`AppState.swift` contains macOS-specific API calls scattered through its transport, keyboard, file, and audio methods. The shared ZudioCore version of AppState must call none of these directly. The solution is **protocol injection**: AppState holds a reference to a `ZudioPlatformHost` conformer and delegates all platform behavior through it. The concrete implementations live in the platform-specific targets.
+
+**Why not `#if os(macOS)` in AppState?** Conditional compilation works for isolated one-liners. AppState's platform divergence is behavioral — the keyboard monitor is set up in one place and torn down in another, the file picker has async completion semantics, the audio session interacts with engine startup. A single protocol makes the platform surface explicit and keeps AppState free of platform imports and testable without a macOS environment. All other files with simpler, isolated divergences (ZudioApp dock icon, TopBarView colors, FirstMouseFix, MIDIFileExporter paths) continue to use `#if os(macOS)` conditionals.
+
+**Protocol definition** (in `ZudioPlatformHost.swift`, ZudioCore — no platform imports):
+
+```swift
+protocol ZudioPlatformHost: AnyObject {
+    func activateApp()
+    func showOpenPanel(completion: @escaping (URL?) -> Void)
+    func playErrorSound()
+    func registerKeyboardShortcuts(target: AppState)
+    func revealOrShareFile(url: URL)
+    func configureAudioSession()
+}
+```
+
+**Injection point** — AppState declares:
+
+```swift
+weak var platformHost: ZudioPlatformHost?
+```
+
+`ZudioApp.swift` (macOS) sets it at startup before any playback:
+
+```swift
+appState.platformHost = MacPlatformHost()
+```
+
+`ZudioApp.swift` (iOS, created during Phase 1) injects `IOSPlatformHost()` instead.
+
+**What each method does on each platform:**
+
+- `activateApp()` — Mac: `NSApp.activate(ignoringOtherApps: true)`. iOS: no-op.
+- `showOpenPanel(completion:)` — Mac: `NSOpenPanel` sheet. iOS: `UIDocumentPickerViewController`.
+- `playErrorSound()` — Mac: `NSSound.beep()`. iOS: `UINotificationFeedbackGenerator(.error)`.
+- `registerKeyboardShortcuts(target:)` — Mac: `NSEvent.addLocalMonitorForEvents`. iOS: `UIKeyCommand` registration (iPad with hardware keyboard only).
+- `revealOrShareFile(url:)` — Mac: `NSWorkspace.shared.activateFileViewerSelecting([url])`. iOS: `UIActivityViewController` share sheet.
+- `configureAudioSession()` — Mac: no-op. iOS: `AVAudioSession` category, activation, and interruption observer setup.
 
 ---
 

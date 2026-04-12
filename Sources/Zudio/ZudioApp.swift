@@ -1,7 +1,9 @@
 // ZudioApp.swift — @main entry point
 
 import SwiftUI
+#if os(macOS)
 import AppKit
+#endif
 
 extension Notification.Name {
     /// Posted by AppDelegate when Finder asks us to open a .zudio file.
@@ -20,6 +22,7 @@ extension Notification.Name {
 }
 
 // Quit the app when the last window closes (window-close = full exit, not just hide)
+#if os(macOS)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
@@ -30,7 +33,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         // giving two windows on startup. Mark all windows non-restorable and close any extras.
         DispatchQueue.main.async {
             let content = NSApp.windows.filter { !($0 is NSPanel) }
-            content.forEach { $0.isRestorable = false }
+            content.forEach {
+                $0.isRestorable = false
+                // minSize must be the window FRAME size (includes title bar), not the content size.
+                // frameRect(forContentRect:) converts 885×205 content → correct frame minimum.
+                $0.minSize = $0.frameRect(forContentRect: NSRect(origin: .zero,
+                                           size: NSSize(width: 885, height: kCompactContentHeight))).size
+            }
             // Keep only the first content window; close any duplicates from state restore.
             content.dropFirst().forEach { $0.close() }
         }
@@ -43,6 +52,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         // Browsers continuously update their playbackState while media is playing;
         // re-asserting here ensures Zudio owns F8 whenever it is the active app.
         NotificationCenter.default.post(name: .zudioClaimNowPlaying, object: nil)
+        // Re-enforce minimum window size in case SwiftUI's layout pass reset it.
+        NSApp.windows.filter { !($0 is NSPanel) }.forEach {
+            let reqMin = $0.frameRect(forContentRect: NSRect(origin: .zero,
+                                       size: NSSize(width: 885, height: kCompactContentHeight))).size
+            if $0.minSize.width < reqMin.width || $0.minSize.height < reqMin.height {
+                $0.minSize = reqMin
+            }
+        }
     }
 
     /// Prevent a new window from opening when the user clicks the Dock icon
@@ -96,13 +113,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+#endif
 
 @main
 struct ZudioApp: App {
+    #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    #endif
     @StateObject private var appState = AppState()
 
     init() {
+        #if os(macOS)
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
             // Set dock icon from bundled assets (works for both Xcode and make run)
@@ -112,6 +133,7 @@ struct ZudioApp: App {
                 NSApp.applicationIconImage = icon
             }
         }
+        #endif
     }
 
     var body: some Scene {
@@ -123,6 +145,8 @@ struct ZudioApp: App {
         // Prevent WindowGroup from opening a second window when a .zudio file is opened.
         // File loading is handled entirely by AppDelegate.application(_:open:) → zudioOpenFile notification.
         .handlesExternalEvents(matching: [])
+        #if os(macOS)
+        .defaultSize(width: 1175, height: 775)
         .windowStyle(.titleBar)
         .commands {
             // App menu: wire "About Zudio" to our custom AboutView
@@ -135,7 +159,7 @@ struct ZudioApp: App {
             // File menu: Generate New + Save Song
             CommandGroup(replacing: .newItem) {
                 Button("Generate New") {
-                    appState.generateNew()
+                    appState.generateNew(thenPlay: true)
                 }
                 .keyboardShortcut("g", modifiers: .command)
             }
@@ -159,6 +183,13 @@ struct ZudioApp: App {
                 }
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(appState.songState == nil || appState.isExportingAudio)
+
+                Divider()
+
+                Button("Compact / Expand Window") {
+                    appState.toggleWindowCompact()
+                }
+                .keyboardShortcut("0", modifiers: .command)
             }
 
             // Empty out Edit menu groups so the menu is blank before removal.
@@ -179,5 +210,6 @@ struct ZudioApp: App {
                 .keyboardShortcut("/", modifiers: .command)
             }
         }
+        #endif
     }
 }

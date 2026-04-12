@@ -71,7 +71,7 @@ struct AmbientTitleGenerator {
     private static let drabLocations = [
         "Slough", "Stevenage", "the Retail Park", "Milton Keynes", "Luton",
         "the Industrial Estate", "the Business Park", "a Roundabout",
-        "the Lower Car Park", "a Disused Underpass", "Basingstoke",
+        "the Lower Car Park", "a Disused Underpass", "Basingstoke", "Slough",
         "the Ring Road", "a Disused Gravel Pit", "the Trading Estate",
         "Hemel Hempstead", "the NCP Car Park", "a Suburban Cul-de-Sac",
         "the Service Station", "the B2047", "the Overflow Car Park",
@@ -96,8 +96,8 @@ struct AmbientTitleGenerator {
         "a Partially Eaten Sandwich", "the Suspended Ceiling",
         "a Persistent Low-Level Hum", "a Lukewarm Radiator",
         "the Beige Carpet", "a Receding Hairline",
-        "an Unanswered Voicemail", "the Fire Exit",
-        "a Nearly Empty Stapler", "Mild Disappointment"
+        "an Unanswered Voicemail", "the Fire Exit", "a bad investment", "the Reign of Zorvaak",
+        "a Nearly Empty Stapler", "Mild Disappointment", "the Forrest Connection"
     ]
 
     private static let technicalAdjectives = [
@@ -111,7 +111,7 @@ struct AmbientTitleGenerator {
         "Patterns", "Textures", "Fragments", "Functions",
         "Oscillations", "Drifts", "Sequences", "Feedback",
         "Processes", "Permutations", "Data", "Decay Functions",
-        "Error Rates", "Gradient Descent", "Signal Loss"
+        "Error Rates", "Gradient Descent", "Signal Loss", "Connection"
     ]
 
     private static let mundaneActivities = [
@@ -147,8 +147,8 @@ struct AmbientTitleGenerator {
         "Humming", "Droning", "Hiss", "Ticking", "Background Noise",
         "Fan Noise", "Rattling", "Gurgling", "Beeping", "Whirring",
         "Air Conditioning", "Distant Traffic", "Lift Music",
-        "The Sound of a Building Settling", "Printer Noise",
-        "A Fluorescent Tube Flickering", "A Tap Dripping",
+        "The Sound of a Building", "Printer Noise",
+        "A Fluorescent Flickering", "A Tap Dripping",
         "The Noise the Boiler Makes"
     ]
 
@@ -196,10 +196,10 @@ struct AmbientTitleGenerator {
 
     // JMJ-style French concept words (parody of Oxygene, Equinoxe, etc.)
     private static let jmjConcepts = [
-        "Oxygene", "Equinoxe", "Magnetique", "Chronologie",
+        "Oxygene", "Equinoxe", "Magnetique", "Kronologie",
         "Metamorphoses", "Electronique", "Atmosphere",
-        "Cosmique", "Solstice", "Meridien", "Lumineux",
-        "Telephonie", "Zenith", "Isotrope"
+        "Cozmique", "Solstice", "Meridien", "Lumineux", "Zorvaak", 
+        "Telephonie", "Zenith", "Isotrope", "Maladoxe", "Zut alors"
     ]
 
     // JMJ mundane deflating suffixes
@@ -224,12 +224,12 @@ struct AmbientTitleGenerator {
         "Substagna", "Greyform", "Dampworks", "Sedimentia",
         "Murkling", "Fogware", "Drearscape", "Blankwave",
         "Hazura", "Stillence", "Tidemarks", "Vapourings",
-        "Mistform", "Pallor", "Residua"
+        "Mistform", "Pallor", "Residua", "Zorvaak"
     ]
 
     private static let lightConditions = [
         "Light Reflected", "Grey Light Falling", "Refracted Light",
-        "Diffuse Light Pooling", "Fluorescent Light Flickering",
+        "Diffuse Light Pooling", "Pale Light Flickering",
         "Light Scattering Across", "Pale Light Resting On",
         "Ambient Light Failing Above"
     ]
@@ -237,7 +237,7 @@ struct AmbientTitleGenerator {
     private static let mundaneSurfaces = [
         "a Puddle of Oil", "the Car Park Tarmac", "a Polished Floor",
         "the Office Partition", "a Cheap Laminate Surface",
-        "a Fogged Mirror", "the Suspended Ceiling Tiles",
+        "a Fogged Mirror", "the Beige Ceiling Tiles",
         "an Off-White Wall", "a Lukewarm Cup of Tea",
         "the Back of a Bus Seat", "a Fire Door",
         "a Slightly Damp Pavement"
@@ -308,7 +308,7 @@ struct AmbientTitleGenerator {
         "Chief Transformation Officer",
         "First-Time Angel Investor",
         "Head of Growth (Redundant)",
-        "Technical Co-Founder (Diluted)",
+        "Technical Co-Founder (Diluted)", 
         "Series A Optimist"
     ]
 
