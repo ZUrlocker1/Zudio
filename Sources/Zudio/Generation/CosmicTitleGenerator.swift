@@ -34,7 +34,7 @@ struct KosmicTitleGenerator {
     private static let kosmicNouns = [
         "Arc", "Field", "Drift", "Pulse", "Nebula", "Void", "Ether",
         "Flux", "Prism", "Helix", "Vortex", "Horizon", "Signal", "Connection",
-        "Current", "Phase", "Lattice", "Aurora", "Apex", "Zenith",
+        "Current", "Phase", "Lattice", "Aurora", "Apex", "Zenith", "Crescendo",
         "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra", "Zorvaak"
     ]
 

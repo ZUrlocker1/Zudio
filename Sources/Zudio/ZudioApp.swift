@@ -21,41 +21,150 @@ extension Notification.Name {
     nonisolated(unsafe) static var zudioPendingOpenURL: URL? = nil
 }
 
-// Quit the app when the last window closes (window-close = full exit, not just hide)
+// MARK: - Menu sweeper (macOS only)
+
+// Items that AppKit injects into the View submenu that Zudio doesn't want.
+// Checked by title — works regardless of localization changes to our own items.
 #if os(macOS)
+private let kViewMenuUnwanted: Set<String> = [
+    "Show Tab Bar", "Hide Tab Bar", "Show All Tabs", "New Tab",
+    "Enter Full Screen", "Exit Full Screen",
+    "Show Sidebar", "Hide Sidebar",
+    "Show Toolbar", "Hide Toolbar", "Customize Toolbar…",
+]
+
+/// Single delegate/sweeper used for both NSApp.mainMenu and the View submenu.
+/// NSMenu holds a weak reference — AppDelegate owns this object strongly.
+private final class MenuSweeper: NSObject, NSMenuDelegate {
+
+    // Called right before a menu is displayed — guaranteed last word before the user sees it.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === NSApp.mainMenu {
+            pruneMainMenu(menu)
+        } else {
+            pruneViewSubmenu(menu)
+        }
+    }
+
+    // MARK: - Targeted sweeps
+
+    func pruneMainMenu(_ menu: NSMenu) {
+        for title in ["Format", "Window"] {
+            menu.item(withTitle: title).map { menu.removeItem($0) }
+        }
+        // Keep the View submenu delegate current — SwiftUI may have rebuilt the submenu object.
+        reattachViewSubmenuDelegate(in: menu)
+    }
+
+    func pruneViewSubmenu(_ menu: NSMenu) {
+        for item in menu.items where kViewMenuUnwanted.contains(item.title) {
+            menu.removeItem(item)
+        }
+        // Remove orphaned separators at top and bottom
+        while menu.items.first?.isSeparatorItem == true { menu.removeItem(at: 0) }
+        while let last = menu.items.last, last.isSeparatorItem {
+            menu.removeItem(at: menu.items.count - 1)
+        }
+    }
+
+    func reattachViewSubmenuDelegate(in mainMenu: NSMenu) {
+        if let viewMenu = mainMenu.item(withTitle: "View")?.submenu,
+           viewMenu.delegate !== self {
+            viewMenu.delegate = self
+        }
+    }
+}
+
+// MARK: - AppDelegate
+
+// Quit the app when the last window closes (window-close = full exit, not just hide)
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    // Owned strongly here — NSMenu only holds a weak reference to its delegate.
+    private let sweeper = MenuSweeper()
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        removeUnwantedMenus()
+        // Attach sweeper as main menu delegate — fires right before menu bar is displayed.
+        NSApp.mainMenu?.delegate = sweeper
+        // Also attach to View submenu immediately if it already exists.
+        if let viewMenu = NSApp.mainMenu?.item(withTitle: "View")?.submenu {
+            viewMenu.delegate = sweeper
+        }
 
-        // macOS State Restoration can re-open the previous session window alongside the new one,
-        // giving two windows on startup. Mark all windows non-restorable and close any extras.
-        DispatchQueue.main.async {
+        // Broad notification observer — catches unwanted items the instant they're added
+        // to ANY menu in the app, including the View submenu during SwiftUI rebuilds.
+        // Correct userInfo key is "NSMenuItemIndex" (NSNumber), not "NSMenuItem".
+        NotificationCenter.default.addObserver(
+            forName: NSMenu.didAddItemNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let idx  = note.userInfo?["NSMenuItemIndex"] as? Int,
+                  let srcMenu = note.object as? NSMenu,
+                  idx >= 0, idx < srcMenu.items.count else { return }
+
+            let addedItem = srcMenu.items[idx]
+
+            if srcMenu === NSApp.mainMenu {
+                // Top-level: remove Format and Window.
+                if addedItem.title == "Format" || addedItem.title == "Window" {
+                    srcMenu.removeItem(addedItem)
+                }
+                // Re-attach sweeper if SwiftUI rebuilt the menu object.
+                if srcMenu.delegate == nil { srcMenu.delegate = self.sweeper }
+                // Re-attach to View submenu in case SwiftUI rebuilt it too.
+                self.sweeper.reattachViewSubmenuDelegate(in: srcMenu)
+            } else {
+                // Any other menu (typically the View submenu): remove known unwanted items.
+                if kViewMenuUnwanted.contains(addedItem.title) {
+                    srcMenu.removeItem(addedItem)
+                }
+                // If this turns out to be the View submenu with no delegate, attach now.
+                if srcMenu.delegate == nil,
+                   srcMenu === NSApp.mainMenu?.item(withTitle: "View")?.submenu {
+                    srcMenu.delegate = self.sweeper
+                }
+            }
+        }
+
+        // Window setup — async because windows aren't fully initialised at this point.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
             let content = NSApp.windows.filter { !($0 is NSPanel) }
-            content.forEach {
-                $0.isRestorable = false
-                // minSize must be the window FRAME size (includes title bar), not the content size.
-                // frameRect(forContentRect:) converts 885×205 content → correct frame minimum.
-                $0.minSize = $0.frameRect(forContentRect: NSRect(origin: .zero,
-                                           size: NSSize(width: 885, height: kCompactContentHeight))).size
+            content.forEach { win in
+                win.isRestorable = false
+                // minSize must be the window FRAME size (includes title bar).
+                win.minSize = win.frameRect(forContentRect: NSRect(
+                    origin: .zero,
+                    size:   NSSize(width: 650, height: kCompactContentHeight)
+                )).size
+                // Disallow tabbing — prevents "Show Tab Bar / New Tab" menu items.
+                // (NSWindow.allowsAutomaticWindowTabbing = false in init() covers the
+                // class-level default; this is per-window belt-and-suspenders.)
+                win.tabbingMode = .disallowed
+                // Opt out of full screen — prevents "Enter Full Screen" menu item and
+                // removes the green button's full-screen affordance.
+                win.collectionBehavior.remove(.fullScreenPrimary)
+                win.collectionBehavior.insert(.fullScreenNone)
             }
             // Keep only the first content window; close any duplicates from state restore.
             content.dropFirst().forEach { $0.close() }
+            // Run a manual sweep now that windows exist and menus are fully built.
+            self.sweepAll()
         }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        // Re-apply removals in case SwiftUI rebuilds menus after activation.
-        removeUnwantedMenus()
-        // Re-claim Now Playing routing whenever Zudio comes to front.
-        // Browsers continuously update their playbackState while media is playing;
-        // re-asserting here ensures Zudio owns F8 whenever it is the active app.
+        sweepAll()
         NotificationCenter.default.post(name: .zudioClaimNowPlaying, object: nil)
         // Re-enforce minimum window size in case SwiftUI's layout pass reset it.
         NSApp.windows.filter { !($0 is NSPanel) }.forEach {
-            let reqMin = $0.frameRect(forContentRect: NSRect(origin: .zero,
-                                       size: NSSize(width: 885, height: kCompactContentHeight))).size
+            let reqMin = $0.frameRect(forContentRect: NSRect(
+                origin: .zero,
+                size:   NSSize(width: 650, height: kCompactContentHeight)
+            )).size
             if $0.minSize.width < reqMin.width || $0.minSize.height < reqMin.height {
                 $0.minSize = reqMin
             }
@@ -71,14 +180,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         return !flag
     }
 
-    /// Called by macOS when the user double-clicks a .zudio file in Finder, both when Zudio
-    /// is already running and when macOS launches it fresh to open the file.
-    /// On fresh launch, SwiftUI may not have finished creating AppState (and its notification
-    /// observer) by the time this fires.  We therefore:
-    ///   1. Post immediately — handles the already-running case where AppState is ready.
-    ///   2. Store the URL and re-post after 0.5 s — handles fresh launch where SwiftUI's
-    ///      @StateObject init races with this callback.  AppState clears pendingOpenURL on
-    ///      first receipt so the fallback post is a no-op once the URL is handled.
+    /// Called by macOS when the user double-clicks a .zudio file in Finder.
     func application(_ application: NSApplication, open urls: [URL]) {
         guard let url = urls.first else { return }
         if let window = application.windows.first(where: { $0.isVisible && !($0 is NSPanel) }) {
@@ -86,11 +188,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             application.activate(ignoringOtherApps: true)
         }
         Notification.Name.zudioPendingOpenURL = url
-        // Immediate post — works when app is already running.
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .zudioOpenFile, object: url)
         }
-        // Fallback post — for fresh launch where AppState may not be ready yet.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             guard Notification.Name.zudioPendingOpenURL != nil else { return }
             Notification.Name.zudioPendingOpenURL = nil
@@ -98,22 +198,34 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func removeUnwantedMenus() {
-        DispatchQueue.main.async {
-            guard let menu = NSApp.mainMenu else { return }
-            // Hide Edit rather than remove — removal kills pasteboard key equivalents (⌘C etc.)
-            // that .textSelection(.enabled) depends on. Hidden items stay in the responder chain.
-            if let edit = menu.item(withTitle: "Edit") { edit.isHidden = true }
-            // Format, View, Window have no needed key equivalents — remove entirely.
-            for title in ["Format", "View", "Window"] {
-                if let item = menu.item(withTitle: title) {
-                    menu.removeItem(item)
-                }
-            }
+    // MARK: - Sweep helpers
+
+    /// Full menu-bar sweep: re-attaches delegates and manually prunes all known unwanted items.
+    /// Called at launch (after window setup) and on every activation.
+    private func sweepAll() {
+        guard let mainMenu = NSApp.mainMenu else { return }
+
+        // Re-attach main menu delegate.
+        if mainMenu.delegate == nil { mainMenu.delegate = sweeper }
+
+        // Hide Edit (don't remove — ⌘C etc. rely on its responder-chain presence).
+        mainMenu.item(withTitle: "Edit").map { $0.isHidden = true }
+
+        // Remove Format and Window entirely.
+        for title in ["Format", "Window"] {
+            mainMenu.item(withTitle: title).map { mainMenu.removeItem($0) }
+        }
+
+        // Clean the View submenu and (re-)attach its delegate.
+        if let viewMenu = mainMenu.item(withTitle: "View")?.submenu {
+            if viewMenu.delegate == nil { viewMenu.delegate = sweeper }
+            sweeper.pruneViewSubmenu(viewMenu)
         }
     }
 }
 #endif
+
+// MARK: - App entry point
 
 @main
 struct ZudioApp: App {
@@ -124,9 +236,13 @@ struct ZudioApp: App {
 
     init() {
         #if os(macOS)
+        // Disable automatic window tabbing at the class level BEFORE any window is created.
+        // This is the only reliable way to prevent "Show Tab Bar / New Tab" from appearing —
+        // per-window tabbingMode = .disallowed is set async and races with menu construction.
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
-            // Set dock icon from bundled assets (works for both Xcode and make run)
             if let url = Bundle.main.resourceURL?
                 .appendingPathComponent("assets/images/zudio-icon.icns"),
                let icon = NSImage(contentsOf: url) {
@@ -140,74 +256,62 @@ struct ZudioApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .environmentObject(appState.playback)  // MIDILaneView observes directly — no AppState cascade on each step
+                .environmentObject(appState.playback)
         }
-        // Prevent WindowGroup from opening a second window when a .zudio file is opened.
-        // File loading is handled entirely by AppDelegate.application(_:open:) → zudioOpenFile notification.
         .handlesExternalEvents(matching: [])
         #if os(macOS)
         .defaultSize(width: 1175, height: 775)
         .windowStyle(.titleBar)
         .commands {
-            // App menu: wire "About Zudio" to our custom AboutView
             CommandGroup(replacing: .appInfo) {
-                Button("About Zudio") {
-                    appState.triggerShowAbout.toggle()
-                }
+                Button("About Zudio") { appState.triggerShowAbout.toggle() }
             }
 
-            // File menu: Generate New + Save Song
             CommandGroup(replacing: .newItem) {
-                Button("Generate New") {
-                    appState.generateNew(thenPlay: true)
-                }
-                .keyboardShortcut("g", modifiers: .command)
+                Button("Generate New") { appState.generateNew(thenPlay: true) }
+                    .keyboardShortcut("g", modifiers: .command)
             }
             CommandGroup(replacing: .saveItem) {
-                Button("Load Song") {
-                    appState.loadFromLog()
-                }
-                .keyboardShortcut("l", modifiers: .command)
-                .disabled(appState.isGenerating)
+                Button("Load Song") { appState.loadFromLog() }
+                    .keyboardShortcut("l", modifiers: .command)
+                    .disabled(appState.isGenerating)
 
                 Divider()
 
-                Button("Save Song") {
-                    appState.saveMIDI()
-                }
-                .keyboardShortcut("s", modifiers: .command)
-                .disabled(appState.songState == nil)
+                Button("Save Song") { appState.saveMIDI() }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(appState.songState == nil)
 
-                Button("Export Audio") {
-                    appState.requestExport()
-                }
-                .keyboardShortcut("e", modifiers: .command)
-                .disabled(appState.songState == nil || appState.isExportingAudio)
-
-                Divider()
-
-                Button("Compact / Expand Window") {
-                    appState.toggleWindowCompact()
-                }
-                .keyboardShortcut("0", modifiers: .command)
+                Button("Export Audio") { appState.requestExport() }
+                    .keyboardShortcut("e", modifiers: .command)
+                    .disabled(appState.songState == nil || appState.isExportingAudio)
             }
 
-            // Empty out Edit menu groups so the menu is blank before removal.
-            // NOTE: .pasteboard must NOT be replaced — SwiftUI's .textSelection relies on it for ⌘C.
+            // View menu — uses .toolbar slot so it injects into the existing system View menu.
+            // Static labels keep these buttons out of SwiftUI's @Published observation graph
+            // so they don't trigger unnecessary menu rebuilds during playback.
+            CommandGroup(replacing: .toolbar) {
+                Button("Compact / Expand") { appState.toggleWindowCompact() }
+                    .keyboardShortcut("0", modifiers: .command)
+
+                Divider()
+
+                Button("Visualizer / Tracks") { appState.macShowVisualizer.toggle() }
+                    .keyboardShortcut("z", modifiers: .command)
+            }
+
+            // Empty out Edit menu groups (menu itself stays hidden for ⌘C responder chain).
             CommandGroup(replacing: .undoRedo) {}
             CommandGroup(replacing: .textFormatting) {}
 
-            // Empty out Window menu groups
+            // Empty out Window menu groups so it collapses to nothing (then removed entirely).
             CommandGroup(replacing: .windowSize) {}
             CommandGroup(replacing: .windowArrangement) {}
             CommandGroup(replacing: .singleWindowList) {}
 
-            // Help menu: single "Zudio Help" item that opens our HelpView sheet
             CommandGroup(replacing: .help) {
-                Button("Zudio Help") {
-                    appState.triggerShowHelp.toggle()
-                }
-                .keyboardShortcut("/", modifiers: .command)
+                Button("Zudio Help") { appState.triggerShowHelp.toggle() }
+                    .keyboardShortcut("/", modifiers: .command)
             }
         }
         #endif

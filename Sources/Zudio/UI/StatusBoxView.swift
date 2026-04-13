@@ -12,6 +12,15 @@ struct StatusBoxView: View {
     /// Passed from ContentView so font size can adapt for iPad mini.
     var contentWidth: CGFloat = 0
 
+    /// When true, shows a "Generation Log  [−] [+]" header bar above the log.
+    /// Used when StatusBoxView fills the full Log tab (iPhone / iPad) rather than
+    /// sitting below the scrollbar strip that already contains these controls.
+    var showHeader: Bool = false
+
+    /// Optional reset action — when provided, a red "Reset" button appears in the
+    /// header to the left of the − and + font-size buttons.
+    var onReset: (() -> Void)? = nil
+
     // Tag column fixed width in monospaced chars (must exceed longest rule ID + space)
     private let tagWidth = 15
 
@@ -32,9 +41,73 @@ struct StatusBoxView: View {
 
     // Cached Text built from the log — rebuilt only when entry count or font size changes.
     @State private var builtText: Text = Text("")
+    @State private var minusFlash: Bool = false
+    @State private var plusFlash:  Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header — "Generation Log" label + font-size ±buttons.
+            // Only shown when embedded as a standalone Log tab panel (not below the
+            // scrollbar strip in the Tracks tab, which already contains these controls).
+            if showHeader {
+                HStack(spacing: 6) {
+                    Text("Generation Log")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.70))
+                    Spacer()
+                    if let onReset {
+                        Button(action: onReset) {
+                            Text("Reset")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.red)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(white: 0.20), in: RoundedRectangle(cornerRadius: 4))
+                                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.red.opacity(0.5), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 4)
+                    }
+                    Button {
+                        appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
+                        minusFlash = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { minusFlash = false }
+                    } label: {
+                        Image(systemName: "minus")
+                            .frame(width: 13, height: 13)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(minusFlash ? Color.white.opacity(0.55) : Color(white: 0.30),
+                                        in: RoundedRectangle(cornerRadius: 4))
+                            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(white: 0.55), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .font(.system(size: 11, weight: .medium))
+                    .disabled(appState.statusLogFontOffset <= -4)
+                    Button {
+                        appState.statusLogFontOffset = min(8, appState.statusLogFontOffset + 1)
+                        plusFlash = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { plusFlash = false }
+                    } label: {
+                        Image(systemName: "plus")
+                            .frame(width: 13, height: 13)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(plusFlash ? Color.white.opacity(0.55) : Color(white: 0.30),
+                                        in: RoundedRectangle(cornerRadius: 4))
+                            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(white: 0.55), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .font(.system(size: 11, weight: .medium))
+                    .disabled(appState.statusLogFontOffset >= 8)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(Color(white: 0.13))
+            }
+
             Divider()
 
             ScrollViewReader { proxy in
@@ -76,7 +149,12 @@ struct StatusBoxView: View {
                 .frame(minHeight: 0)    // shrinks first (layoutPriority 0) when window height is reduced
                 #endif
                 .background(Color(white: 0.10))
-                .onAppear { builtText = buildLogText() }
+                .onAppear {
+                    builtText = buildLogText()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    }
+                }
                 .onChange(of: appState.statusLogVersion) { _ in
                     builtText = buildLogText()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

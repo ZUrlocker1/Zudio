@@ -44,13 +44,13 @@ struct ChillTitleGenerator {
             "Slow Burn", "Soft Focus", "Deep", "Open Air",
             "Warm", "Pale Sun", "Rainy", "Snow Bound", "Dark",
             // Directional / geographic feel
-            "West End", "East Side", "North Shore", "South", "Uptown",
-            "Upper", "Old", "Inner", "Winter", "Summer", "Fall", "Upper"
+            "West Side", "East Side", "North Shore", "South", "Uptown","Downtown",
+            "Upper", "Old", "Inner", "Winter", "Summer", "Fall", "Upper", "Midtown",
+            "Game","Set","Match"
         ]
         let cities = [
             // Montreal neighborhoods
-            "Montreal", "Verdun",
-            "Outremont", "Westmount", "Hochelaga",
+            "Montreal", "Verdun", "Outremont", "Westmount", "Hochelaga",
             "Cote-des-Neiges", "Lachine", "Longueuil", "NDG",
             "Saint-Laurent", "Pointe-Saint-Charles", "Loyola",
             // West Island / South Shore
@@ -60,7 +60,7 @@ struct ChillTitleGenerator {
             "Sherbrooke", "Trois-Rivieres", "Gatineau", "Saguenay",
             "Rimouski", "Chicoutimi", "Jonquiere", "Riviere-du-Loup",
             "Magog", "Granby", "Drummondville",
-            "Shawinigan", "Val-d'Or", "Hudson", "Sorel", "Sutton",
+            "Shawinigan", "Val d'Or", "Hudson", "Sorel", "Sutton",
             // Quebec regions
             "Charlevoix", "Gaspesie", "Abitibi",
             // Other North America
@@ -69,6 +69,7 @@ struct ChillTitleGenerator {
             "Long Lake", "Leland", "Lelenau", "Ann Arbor", "Ypsilanti", "Northport",
             "Glen Arbor","Maple City", "Walled Lake", "Waterloo", "Plymouth",
             "Mississauga","Port Credit", "Toronto", "Etobicoke",
+            "TVC", "YYZ", "SFO", "ORD", "LHR", "SJC", "DTW", "LGA"
         ]
         let mod  = modifiers[rng.nextInt(upperBound: modifiers.count)]
         let city = cities[rng.nextInt(upperBound: cities.count)]

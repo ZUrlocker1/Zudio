@@ -1616,4 +1616,222 @@ tell me the wet, delay, reverb, dotted note settings for lead 1, lead 2 in Chill
 \f2\b0 \
 there's an issue I've found. I want the Zudio app to be able to play in the background. So when someone hits the F7 or F9 or similar buttons, it should work, but not bring Zudio to the foreground. It should still operate in the background. Please do some research on how to make it so Zudio really runs in the background. Then we can code it if you have a good plan.\
 \
+\
+
+\f0\b iPad version\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 please review the ios-ipad plan and consider if there is anything else we need to do before refactoring the code to have a ZudioCore separate from the UX for Mac and later iphone.  I would like to do all that refactoring and test before we implement any iPad code, iphone code.\
+\
+Note since ipads can have an attached keyboard, lets not remove underscores and shortcuts for ipad. (But deifnitely remove them for iphone.) \
+Lets support ios 16 please. \
+Package.swift suggestion look good\
+We will figure out monetization later \
+Give me more info on protocol injection and the tadeoffs\
+\
+ok lets do the one protocol thing, that's better than conditional compilation.\
+please note any changes or details about al of this in the ios-ipad-plan, but make sure there's no lingering contradictions, ambiguity, duplication etc and that the doc file remains well organized and complete\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 lets do the first 3 steps of the refactor so I can test that the mac version is still compiling and working properly\
+\
+I don't know if this a new bug or a bug at all but *sometimes* when I put Zudio visually behind other apps and hit stop it pops to the front. But not always!  I think this behavior is unrelated to these new changes and was in the last signed Zudio.app we did a few hours ago. I thought we fixed this.\
+\
+ok working better.  Now lets do the next steps 4-5\
+\
+two minor issues, possibly pre-existing... there should be a hot key plain E in addition to CMD-E for Export Audio.  make sure that if we hit S or CMD-S (to save) that the Save button flashes.\
+\
+Do the 2 things for the ios port. we have previously run the QA loop plan for ambient and it was fine\
+\
+Ok it's running and playing properly for ipad.  But a few cosmetic issues I'd like to fix on the ipad version\
+1. the logo didn't appear, just text Zudio\
+2. The mode selector (Song/Evolve/Endless) the word Endless is cut off. Make the space that the transport and mode selector appears in about 20 pixels wider. \
+3. the generate, save song, Load song, export audio buttons don't look like buttons. They just look like blue text on the same dark grey background. There's no outline to them. Maybe its just all the same grey color as the background. \
+4. Load song didn't open a dialog box. The other buttons seemed to work. \
+5. The style selector works but Ambient is cut off. Make it 15 pixels wider. \
+6. Reset, Help, About buttons also don't look like buttons, just blue text on dark grey with no button outline. Is that how its supposed to look on ipad?\
+7. The about and help dialogs work but the close buttons don't look like buttons. Just blue text on grey background. Again, I'm not sure if that's consistent with ipad UX. Tell me more about ipad UX conventions.\
+8. The text in the generation log is very small. Lets make it larger.  \
+\
+Ok logo and buttons working well. Some other minor issues:\
+1. When I select Load Song the dialog box should show only Zudio documents. \
+2. The Z! icon is missing in the About and Help dialog boxes. It should appear at the top left of the title same as the Mac version.\
+3. The version number V 0.99 alpha needs to be moved down about 10 pixels \
+4. make the transport control buttons 50% larger and put them about 15 pixels higher to create more space. Also make that section 20 pixels wider. \
+5. The export audio dialog Cancel, Sample, Full Song are just blue text on grey. Make them into proper buttons as we did elsewhere.\
+6. The Key and Mood labels are missing from those controls \
+\
+ok some problems...\
+1. The V 0.99 alpha text needs to be lowered further another 10 pixels\
+2. Mood is appearing above the Mood selector. It shoudl be to the left of the Mood selector.\
+3. I'm not seeing the Key label. It should be to the left of the Key selector. \
+4. Still no Z! icon in the About and Help dialogs. Did we forget to use that icon? Or is it not ipad compatible? \
+5. Make the export audio dilaog box 80 pixels shorter\
+\
+\
+-move the V 0.99 alpha left 5 pixels and up 5 pixels\
+-move the song style selector (ambient etc) to the right 5 pixels\
+-I can see we are going to have to do a lot more adjustment to make it display on lower resolution more common ipads. \
+-change Save Song, Load Song, Export Audio buttons to just say Save, Load, Export\
+-also lets get rid of the icons on the Song, Evolve Endless style selector. (We may revisit this later.) (Lets do this for all ipads not just 11 inch.)\
+-on 11 inch ipad pro there's dead light grey space to the left of the logo and to the right of the Help, About, Copyright areas.\
+\
+Make the export audio dialog box 40 pixels taller.\
+The selector for Ambient needs to be a bit wider still as we get only Ambi...\
+The spacer is not working for ipad 11" or similar.  I think you might be conflating mutliple issues.  The help about copyright is working fine but the  mood key bpm selectors are always goofed up and the Style selector is forced up to the top.  Can you rethink how to lay out those two set of buttons (e.g. style selector / reset is the first group, Mood, Key, BPM selectors the second group.) Should they have their own separate areas? Is that the issue?\
+\
+ipad landscape is looking better.\
+-move the style selector to the right 5 pixels\
+-we're missing the Mood and Key labels - I assume they are cut off\
+-in portrait mode (or narrow) \
+  --put the Zudio Logo above the transport in the same vertical space \
+  --make the midi grid 15 pixels more narrow to accomodate the 3 effects buttons (the right one is cut off) \
+ --make sure the generate log text is not cut off on the right (we are missing the first 3-4 characters)\
+\
+portrait mode now seem more cut off.  I suggested moving the Logo above the transport but it's still to the left in portrait. now even more is cuttoff in the midi grid area. the right most effects button is completely cutoff, more of the log generation text is cutoff on the left and now the names of the tracks Lead 1, Lead 2 etc are cut off. Make the MIDI grid (the central part of that area) more narrow so we can see the instrument names and all 3 effects buttons in portrait mode.\
+\
+in ipad portrait (A16) you need to make the midi grid area skinnier still, but I think it\'92s a general situation for all ipads in portrait.   I can't see the Lead 1, Lead 2 names and only half the effects buttons. Please move the Zudio Logo to above the transport in the same area (vstack?)   The generation log is still cutting off the first 8 characters.  In iPad Mini portrait it needs to be even skinnier than regular ipad Portrait.\
+\
+in all portrait modes skip the word "Copyright" \
+ipad portrat 11" (A5) looks good when it first comes up, but when I reorient to landscape and back to portrait the midi grid is much too wide.  \
+with ipad mini you need to make the midi grid area skinnier still.  \
+\
+Ok in portrait mode, lets just not bother with the copyright notice at all. \
+in portrait mode, when I rotate to landscape and again to portrait, it's not resizing the same way and the MIDI grid is too wide. The layout should be consistent if I rotate back to Portrait with the original portrait layout. \
+in portrait mode ipad A16 the left edge of the generation log is still cut off by about 5 pixels\
+ipad mini make the midi grid much skinnier!  please do some math on this to figure out how to display the left hand side instruments and the right hand side effects buttons.\
+\
+the audio export dialog box seems weird showing up in the bottom third of the screen. shouldn't it be centered vertically?\
+\
+make the Mac song and Evolve buttons 6 pixels narrower\
+\
+make the Song button on mac 5 pixels shorter horizontally. \
+make the minimum vertical size of the window 230 px \
+Add hotkeys for Cmd-+  CMD-=  and plain + or = to increase the font size of the generation log and \
+CMD- Minus or just plain - to decrease the font size\
+\
+haahha ! you changed the size of the words "Generation log" but I actually meant to change the size of the text in the generation log and not that label!   That is quite funny.  But please don't change the size of the label, change the text that shows up when we generate or play a song!!!!\
+	\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 Mac Compact Mode\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 I\'92d like to add some additional new logic for resizing the mac application. Once it gets resized to be narrow enough that half the logo is clipped and the help and about buttons are off screen (about 1150 pixels wide) then display a half size version of the Zudio logo above the transport controls and put the About and Help buttons horizontally on a row below the mode selector Song / Evolve / Endless. Let the user continue to resize until a minimum width of 885 pixels making the midi grid more narrow. \
+\
+on the mac don't let the user resize Zudio to be smaller than 885\'d7205 pixels.  
+\f0\b \
+
+\f2\b0 \
+Also on the mac lets add a button in the upper left corner of the top panel arrow.down.right.and.arrow.up left. When pressed, resize the window to "compact mode, e.g. the minimum size horizontally and vertically.  Also then change the icon toe arrow.up.left.and.arrow.down.right.  Then if clicked again, resize to the last size.  \
+First time Zudio Mac is opened what size window do we get? can we use 1175 x 775? or is it determined by the system somehow?\
+\
+ok but when I restart Zudio, it seems to launch in the last window size that was used. So if that was a compact window (or close to it within 50 px vertical or horiz) then we should use the outward facing arrows and clicking them should make the window larger. Make sure the arrow icons are not clipped off screen which seems to be happening. Are you clear on what I've said?\
+\
+also, I would like to consolidate the two separate transport control buttons Play and Stop and just have one button appear.  When the application first starts it should be a Green Play button. But once it's pressed (or the music is playing from Generate) then display the Red Stop button in its place.\
+\
+lets make it so that if you press the generate button it automatically starts playing\
+\
+if the user changes the song style while in Evolve mode, then the next time a song is generated, it should be in that newly selected style\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 iPhone Minimal Player\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 how about iphone 15 pro can we suport that? that's what I own\
+\
+Yes, I think we will need a minimal "player mode" for iphone that likely does not show the instruments, MIDI grid or effects. Just a very small transport (previous, play/stop, next track), minimal modes (Evolve, Endless), style (Ambient, Chill, Kosmic, Motoric) and not minimal buttons (export audio, no save, no load.) Show the generation log or optionally some abstrct geometric patterns of the music as it plays, e.g. more like JMJ Eon app or Brian Eno Reflections.   Please give me a plan with enough implenetation detail.\
+\
+in the iphone plan note that it's a minimal dedicted "player mode". \
+Also, I would like there to be some ways to interact with the display. It does not need to be much, but for example, if we tap on an orb then take some action that impacts the music.  What ideas do you have?\
+\
+lets not do swipe left right as seek.  instead, lets have it alter the effects. Randomly pick a track and toggle the current effects?  Or something else? \
+how about for the double tap it mutes the track for 4 bars and then it automatically comes back with a new instrument?  Also, lets be clear that we use the colors of the existing MIDI tracks, e.g. Leads in red, drums yellow and so on.  How would long notes (1/2 note, whole notes or longer) differ visually from short notes (1/8, 1/16)?\
+\
+long press on an orb toggle delay on that specific track (to be clear: toggle off all effects, then toggle on)\
+two finger any gesture anywhere does a filter sweep across all tracks. this is a new effect that will need to be implemented. \
+Are all the ux controls pretty clear and clean at this point?\
+\
+review the ios plan. is there anything we are missing that we should refine or clarify before coding?\
+\
+what models of iphone (and how old) can we support now that the display resolution is not a big issue?\
+\
+ok!  This is pretty good!  Here are some refinements:\
+-don't display the word Zudio or the logo or the version\
+-we will make it look more like the Apple music player with controls at the bottom where they are easily accessible \
+-in portrait mode, put the visualization (or log file) at the top\
+-display the song title below the visualization (or log file) \
+-display a scroll bar showing progress into the song below that\
+-display the Song / Evolve / Endless selector below that \
+-put the style selector below that \
+-make sure that all the styles are visible, it looks like only the selected style is visible the others are black text on black background!\
+-then the transport controls, just prior track, stop / play, next track\
+-put export audio and reset buttons below that\
+-in landscape mode make the naviation panel wider so that the text for Ambient, Chill, etc is not cut off\
+- the visuals look good, but it appears that each track shows up in the same location, e.g. drums lower right, leads upper right.  I'd like the regions to drift more. e.g. over time drums are moving in some random direction. each track drifts in its own random direction.  also double the amount of time any single orb is displayed. Make half notes and whole notes twice as large.\
+-make the solo and other and mute functions 2 bars instead of 4\
+\
+lets also add a button along side log / visuals that shows a list of the recently generated song names (like Apple Music does) and allows the user to click on one to play it\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 Adding Visualiser back to ipad 
+\f2\b0 \
+create a plan to add visualizations used in the iphone back into the Mac and ipad versions. How would it look. don't change any code, but give me an approach or ideas\
+\
+I think we need a different approach. I would like to have a "minimal player" mode like we have on iphone that is a menu choice (and perhaps some other button) on Mac and ipad. This basically  eliminates some controls. So no key, mode, bpm selector.  Like the existing compact mode for the mac, but more narrow and then show the visualizer below.\
+on the ipad, similar, don't show the MIDI tracks, but fill the rest of the screen with the visualizer.  have buttons to switch log view, track view, song list.  \
+revise the plan\
+\
+lets start first with the ipad version of visualization first, then we'll figure out the mac version.  Tell me more details about the ipad version. How do we move from the tracks view (current approach) to the visuals view.  Or really tracks (as is) / visuals / log / songs?\
+\
+update the ios-ipad plan doc so its clear ipad has the visuals also (it's not iphone only)\
+\
+i noticed on ipad and iphone that chill when it starts is not playing muted trumpet for lead 1 it's playing some bad square lead or similar.  But if I cycle through and select muted trumpet it plays correctly.  Can you figure out why this is happening?\
+\
+make sure that in the log view of iphone or ipad there is a  row that shows the label Generation Log and then a gap and the + and - buttons for increasing or decreaseing the font of the log text\
+\
+
+\f0\b Adding Visualiser back to ipad
+\f2\b0  \
+on the mac go back to having the compact / expand arrows in the upper left corner.  Put the sparkles (visualizer) to the right of the expand compact button. \
+\
+why are there two view menus?  What is show tab view etc?  What is the format menu?  why does it exist? can we get rid of it?\
+\
+when we are in visualizer mode on mac, change the sparkles icon to somethign that looks like a grid (to be the tracks)\
+\
+on the mac lets allow the user to resize to 550px wide both manually resizing and the compact view.  When the size gets to the point where the BPM selector would start to clip, remove the key, bpm and mood labels and selectors completely.\
+\
+on the mac and the ipad, is there a way when Zudio starts to use the last view?  e.g. if the user last had the visualizer work, show that view. (Which is the default.)  if they last had the tracks view, show that?\
+\
+lets make it so that on the Mac\
+-if you click on an orb it's a 2 bar auto releasing solo, just like on iphone, dim the other muted instruments\
+-if you double click on an orb it's a 2 bar auto releasing mute, just like on iphone.  (Be sure to dim that instrument while it's muted on all visualizations)\
+-single click on empy canas - play / pause same as iphone\
+are there any other click actions or mouse interactions we can capture on mac?\
+\
+lets do the two right clicks as described\
+-when we do the dry / wet toggle in any visualization, give some visual feedback on the orb by having it slightly ripple or briefly modifying its color or fillig it in with white or something else that is computationally very light CPU. What do you suggest? \
+- when we regenerate a track please do something similar to the above on whatever was impacted (if there's an orb of that instrument visible)\
+-change the cursor as appropriate over orbs\
+\
+on the mac i notice the Window menu populates with a bunch of extra choices and then disappears. What is going on?  I don't want all these extra items. Same with the Format menu. Please prevent these from ever showing up.  It didn't used to happen. What caused these?\
+Also, remove the Mac click on blank canvas to stop / play because that will happen too much by accident.  Have it do the filter sweep instead and create some kind of white flash across all visible orbs  or some other effect that is efficeint.  Do a similar thing in all visualizations.\
+\
+
+\f0\b Some Minor Bugs
+\f2\b0 \
+the song list on iphone and ipad is goofy.  Display it like a stack, where the oldest song at the top position, the most recent song at the bottom. Do not change the order of how they are displayed.  if the user presses prior track or next track, just move the highlight (green player) to the appropriate song.\
+\
+There\'92s a bug when you draw the song list on iphone and ipad. I think it happens when you get to the top of the list (the oldest song) and hit prior. it messed up the list by inserting some blank rows. Also the style on ipad song list is way to the right and sometimes clipped. I want the song style just a few characters away from the song title. Don\'92t have any extra space.  Or just generate in text e.g.  \
+    Winter Granby  - Chill \
+\
+Tell me again what double click on the orbs does \
+change the defaults\
+\
 }

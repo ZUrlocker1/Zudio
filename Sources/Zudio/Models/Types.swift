@@ -1,5 +1,7 @@
 // Types.swift — all enums and track-index constants (authoritative per prototype spec)
 
+import Foundation
+
 // MARK: - Track index constants
 let kTrackLead1   = 0
 let kTrackLead2   = 1
@@ -403,6 +405,18 @@ let kRegisterBounds: [Int: RegisterBounds] = [
     kTrackDrums:      RegisterBounds(low: 35, high: 81),
     kTrackLeadSynth:  RegisterBounds(low: 60, high: 88),
 ]
+
+// MARK: - Visualizer
+
+/// A note event captured during playback for the iPhone abstract visualizer.
+struct VisualizerNote: Identifiable, Sendable {
+    let id          = UUID()
+    let trackIndex:    Int
+    let note:          UInt8   // MIDI pitch 0–127
+    let velocity:      UInt8   // 0–127 → drives orb size/brightness
+    let birthDate:     Date    // wall-clock spawn time
+    let durationSteps: Int     // gate length → drives orb lifetime and comet tail
+}
 
 // MARK: - GM program numbers per track (v1 defaults)
 

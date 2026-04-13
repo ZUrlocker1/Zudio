@@ -6,7 +6,7 @@
 set -euo pipefail
 
 APP_SRC="${1:-${HOME}/Downloads/Zudio.app}"
-VERSION="0.99b"
+VERSION="0.99c"
 TEAM_ID="K66MA9TR8Z"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
 OUTPUT_DMG="${HOME}/Downloads/Zudio-${VERSION}.dmg"

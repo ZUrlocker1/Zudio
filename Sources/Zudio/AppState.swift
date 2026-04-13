@@ -11,7 +11,7 @@ enum PlayMode: String, Hashable { case song, endless, evolve }
 #if os(macOS)
 /// Minimum content-area height (points) for the compact Mac window, excluding the title bar.
 /// Referenced by AppState, ContentView, and ZudioApp — change here to update all four sites.
-let kCompactContentHeight: CGFloat = 206
+let kCompactContentHeight: CGFloat = 205
 #endif
 
 // MARK: - AppState
@@ -46,18 +46,30 @@ final class AppState: ObservableObject {
     // 0 = default (12pt macOS, 12pt mini iOS, 14pt other iOS). Clamped to [-4, +8].
     @Published var statusLogFontOffset: Int = 0
 
-    // MARK: - Compact window toggle (macOS only)
+    // MARK: - Compact window toggle + visualizer mode (macOS only)
     #if os(macOS)
     @Published var isWindowCompact: Bool = false
+    @Published var macShowVisualizer: Bool = UserDefaults.standard.bool(forKey: "macShowVisualizer") {
+        didSet { UserDefaults.standard.set(macShowVisualizer, forKey: "macShowVisualizer") }
+    }
     var windowExpandedFrame: NSRect? = nil   // saved before compressing; not published (no UI depends on it)
 
     func toggleWindowCompact() {
         guard let window = NSApp.keyWindow else { return }
         let currentFrame = window.frame
-        if isWindowCompact {
-            // Restore to saved frame, or fall back to default expanded size if launched compact
+        // Use actual frame height to decide direction — avoids stale isWindowCompact state
+        // that occurs when the user manually drags the window to minimum height.
+        let compactContent   = NSSize(width: 650, height: kCompactContentHeight)
+        let compactFrameSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: compactContent)).size
+        let compactFrameH    = compactFrameSize.height
+        // Never go below AppKit's enforced minimum (user-drag floor).
+        // Use whichever is larger so compact never drops the scrollbar.
+        let collapseTargetH    = max(compactFrameH, window.minSize.height)
+        let isCurrentlyCompact = currentFrame.height <= collapseTargetH + 4  // 4pt tolerance for rounding
+        if isCurrentlyCompact {
+            // Restore to saved frame, or fall back to default expanded size
             let targetFrame: NSRect
-            if let saved = windowExpandedFrame {
+            if let saved = windowExpandedFrame, saved.height > collapseTargetH + 4 {
                 targetFrame = saved
             } else {
                 let defaultContent = NSSize(width: 1175, height: 775)
@@ -71,13 +83,10 @@ final class AppState: ObservableObject {
         } else {
             // Save current frame, then collapse to minimum size keeping top-left pinned
             windowExpandedFrame = currentFrame
-            // Use a taller compact height when no song is loaded so the scrollbar /
-            // Generation Log strip is always visible even at minimum size.
-            let compactH: CGFloat = (songState == nil) ? 220 : 206
-            let minContent = NSSize(width: 885, height: compactH)
-            let newWinSize  = window.frameRect(forContentRect: NSRect(origin: .zero, size: minContent)).size
-            let newOrigin   = NSPoint(x: currentFrame.origin.x,
-                                      y: currentFrame.origin.y + currentFrame.height - newWinSize.height)
+            let newWinSize = CGSize(width: compactFrameSize.width,
+                                    height: collapseTargetH)
+            let newOrigin  = NSPoint(x: currentFrame.origin.x,
+                                     y: currentFrame.origin.y + currentFrame.height - newWinSize.height)
             window.setFrame(NSRect(origin: newOrigin, size: newWinSize), display: true, animate: true)
             isWindowCompact = true
         }
@@ -87,11 +96,10 @@ final class AppState: ObservableObject {
     /// macOS persists window frame via NSUserDefaults even when isRestorable = false,
     /// so we must check the real size rather than assuming the default.
     func syncCompactStateFromWindow() {
-        guard let contentView = NSApp.keyWindow?.contentView else { return }
-        let w = contentView.frame.width
-        let h = contentView.frame.height
-        // Treat as compact if within 50pt of the minimum in either dimension
-        isWindowCompact = (w <= 885 + 50) || (h <= kCompactContentHeight + 50)
+        guard let window = NSApp.keyWindow else { return }
+        let compactContent = NSSize(width: 650, height: kCompactContentHeight)
+        let compactFrameH  = window.frameRect(forContentRect: NSRect(origin: .zero, size: compactContent)).size.height
+        isWindowCompact = window.frame.height <= compactFrameH + 4
     }
     #endif
 
@@ -366,6 +374,9 @@ final class AppState: ObservableObject {
     // Tracks which styles have had at least one song generated — used for best-song mode.
     private var stylesWithGeneratedSongs: Set<MusicStyle> = []
     var instrumentOverrides: [Int: Int] = [:]
+    /// Snapshot of instrumentOverrides taken right after each song finishes generating or loading.
+    /// resetEffectsToDefaults() restores from this so instruments return to their song-original state.
+    private var songInstrumentOverrides: [Int: Int] = [:]
 
     private static let randomizableTrackIndices = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass, kTrackDrums]
 
@@ -411,23 +422,52 @@ final class AppState: ObservableObject {
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
     static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
         switch (trackIndex, style) {
-        case (kTrackLead1, .chill):   return [59, 66, 65, 56]
-        case (kTrackLead1, .ambient): return [73, 79, 75, 78, 74, 100, 94, 88, 82]
-        case (kTrackLead1, .kosmic):  return [73, 100, 68, 74]
-        case (kTrackLead1, _):        return [81, 62, 90, 80]
-        case (kTrackLead2, .chill):   return [11, 73, 64, 57]
-        case (kTrackLead2, .ambient): return [11, 8, 9, 0, 89, 91, 99]
-        case (kTrackLead2, .kosmic):  return [100, 70, 84, 85]
-        case (kTrackLead2, _):        return [90, 100, 39, 30]
-        case (kTrackPads, .ambient):  return [95, 50, 89, 94, 88]
-        case (kTrackPads, .kosmic):   return [95, 50, 89, 91]
-        case (kTrackPads, .chill):    return [89, 50, 48, 95]
-        case (kTrackPads, _):         return [94, 95, 92, 50]
+        case (kTrackLead1, .chill):    return [59, 66, 65, 56]
+        case (kTrackLead1, .ambient):  return [73, 79, 75, 78, 74, 100, 94, 88, 82]
+        case (kTrackLead1, .kosmic):   return [73, 100, 68, 74]
+        case (kTrackLead1, _):         return [81, 62, 90, 80]
+        case (kTrackLead2, .chill):    return [11, 73, 64, 57]
+        case (kTrackLead2, .ambient):  return [11, 8, 9, 0, 89, 91, 99]
+        case (kTrackLead2, .kosmic):   return [100, 70, 84, 85]
+        case (kTrackLead2, _):         return [90, 100, 39, 30]
+        case (kTrackPads, .ambient):   return [95, 50, 89, 94, 88]
+        case (kTrackPads, .kosmic):    return [95, 50, 89, 91]
+        case (kTrackPads, .chill):     return [89, 50, 48, 95]
+        case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [11, 12, 14, 9, 98, 102]
         case (kTrackRhythm, .chill):   return [4, 5, 17]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18]
         case (kTrackRhythm, _):        return [28, 39, 29]
+        case (kTrackTexture, .chill):  return [240, 241, 242, 243, 245, 246, 247, 248, 250]
+        case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
+        case (kTrackTexture, .kosmic): return [99, 90, 86]
+        case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
+        case (kTrackBass, .chill):     return [35, 32, 33]
+        case (kTrackBass, .ambient):   return [42, 60, 43, 35]
+        case (kTrackBass, .kosmic):    return [39, 35, 87, 81]
+        case (kTrackBass, _):          return [39, 87, 34, 33]
+        case (kTrackDrums, .chill):    return [40, 25, 0]
+        case (kTrackDrums, .ambient):  return [0, 40]
+        case (kTrackDrums, .kosmic):   return [40, 25, 24, 0]
+        case (kTrackDrums, _):         return [8, 25, 40]
         default: return []
+        }
+    }
+
+    /// Synchronously loads the correct instrument for every track into the playback engine.
+    /// Must be called right before playback.play() at each song-load site.
+    /// TrackRowView.onChange(of: defaultsResetToken) fires on the NEXT SwiftUI render cycle
+    /// (deferred), so without this call the first notes play with stale/default programs.
+    private func applyCurrentInstrumentsToPlayback() {
+        let style = selectedStyle
+        for trackIndex in 0..<kTrackCount {
+            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+            guard !programs.isEmpty else { continue }
+            // Chill texture pseudo-programs (240+) are handled by audioTexture.start() — skip
+            if trackIndex == kTrackTexture && style == .chill { continue }
+            let idx = instrumentOverrides[trackIndex] ?? 0
+            let program = programs[min(idx, programs.count - 1)]
+            playback.setProgram(program, forTrack: trackIndex)
         }
     }
 
@@ -440,6 +480,23 @@ final class AppState: ObservableObject {
 
     @Published var muteState: [Bool] = Array(repeating: false, count: kTrackCount)
     @Published var soloState: [Bool] = Array(repeating: false, count: kTrackCount)
+
+    /// trackIndex → Date when a flash was triggered (dry/wet toggle, instrument regen).
+    /// VisualizerView reads this each frame via TimelineView — does NOT need @Published.
+    /// Keeping it plain avoids broadcasting objectWillChange on every note action, which
+    /// was causing SwiftUI to rebuild command menus and briefly re-inject Format/Window.
+    var visualizerFlashEvents: [Int: Date] = [:]
+
+    func triggerVisualizerFlash(trackIndex: Int) {
+        visualizerFlashEvents[trackIndex] = Date()
+        // Auto-remove after 0.6 s so the dictionary stays clean
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self else { return }
+            if let d = visualizerFlashEvents[trackIndex], Date().timeIntervalSince(d) >= 0.55 {
+                visualizerFlashEvents.removeValue(forKey: trackIndex)
+            }
+        }
+    }
 
     // MARK: - Live playback feed (Now Playing strip)
 
@@ -649,6 +706,34 @@ final class AppState: ObservableObject {
 
     // MARK: - Generate
 
+    /// In Song mode: steps back to the previous song in generationHistory.
+    /// Falls back to seekToStart() when already at the oldest entry or no song is loaded.
+    func loadPreviousFromHistory() {
+        guard playMode == .song else { return }
+        if let current = songState,
+           let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
+           idx > 0 {
+            loadFromGenerationHistory(generationHistory[idx - 1])
+        } else {
+            seekToStart()
+        }
+    }
+
+    /// In Song mode: advances to the next song in generationHistory if the current song
+    /// is not the most recent entry; generates a new song only when already at the end.
+    func loadNextFromHistory() {
+        guard playMode == .song else { return }
+        if let current = songState,
+           let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
+           idx + 1 < generationHistory.count {
+            // There is a newer song in history — load it without generating
+            loadFromGenerationHistory(generationHistory[idx + 1])
+        } else {
+            // Already at (or past) the most recent song — generate a new one
+            generateNew(thenPlay: true)
+        }
+    }
+
     func generateNew(thenPlay: Bool = false) {
         guard !isGenerating else { return }
         isGenerating = true
@@ -725,7 +810,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.songState    = state
                 self.generationHistory.append(state)
-                if self.generationHistory.count > 5 { self.generationHistory.removeFirst() }
+                if self.generationHistory.count > 10 { self.generationHistory.removeFirst() }
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
@@ -779,6 +864,8 @@ final class AppState: ObservableObject {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
                 }
+                // Snapshot the final overrides — resetEffectsToDefaults() restores from here.
+                self.songInstrumentOverrides = self.instrumentOverrides
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
 
@@ -829,9 +916,12 @@ final class AppState: ObservableObject {
                 // uses the correct Ambient reverb/delay values from the start.
                 self.playback.setAmbientMode(self.selectedStyle == .ambient)
                 self.playback.setChillMode(self.selectedStyle == .chill)
-                // Reset instruments + effects BEFORE play so setProgram() doesn't race
-                // against the first note firing.
+                // Reset instruments + effects and apply them synchronously before play.
+                // defaultsResetToken fires TrackRowView.onChange on the next render cycle
+                // (deferred), so applyCurrentInstrumentsToPlayback() ensures the correct
+                // programs are loaded before the first note fires.
                 self.defaultsResetToken += 1
+                self.applyCurrentInstrumentsToPlayback()
                 if thenPlay || wasPlaying { self.playback.play() }
                 // Resign first responder so BPM TextField doesn't hold focus
                 self.platformHost?.dismissKeyboard()
@@ -1591,8 +1681,12 @@ final class AppState: ObservableObject {
         playback.stop()
         audioTexture.stop()
         songState = state
-        generationHistory.append(state)
-        if generationHistory.count > 5 { generationHistory.removeFirst() }
+        // Avoid duplicate entries (e.g. ⏮ reloads a song already in the list).
+        // Duplicate globalSeeds break ForEach identity in the Songs tab UI.
+        if !generationHistory.contains(where: { $0.globalSeed == state.globalSeed }) {
+            generationHistory.append(state)
+            if generationHistory.count > 10 { generationHistory.removeFirst() }
+        }
         visibleBarOffset = 0
         lastEmittedStep  = -1
         muteState = Array(repeating: false, count: kTrackCount)
@@ -1607,6 +1701,7 @@ final class AppState: ObservableObject {
         playback.load(state)
         playback.seek(toStep: 0)
         defaultsResetToken += 1
+        applyCurrentInstrumentsToPlayback()
         if thenPlay {
             playback.play()
             audioTexture.start(style: state.style, texture: state.chillAudioTexture,
@@ -1822,7 +1917,7 @@ final class AppState: ObservableObject {
                 if !loadTitle.isEmpty { state.title = loadTitle }
                 self.songState        = state
                 self.generationHistory.append(state)
-                if self.generationHistory.count > 5 { self.generationHistory.removeFirst() }
+                if self.generationHistory.count > 10 { self.generationHistory.removeFirst() }
                 self.isGenerating     = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
@@ -1859,6 +1954,7 @@ final class AppState: ObservableObject {
                 self.playback.setAmbientMode(style == .ambient)
                 self.playback.setChillMode(style == .chill)
                 self.defaultsResetToken += 1
+                self.applyCurrentInstrumentsToPlayback()
                 if wasPlaying { self.playback.play() }
                 self.platformHost?.dismissKeyboard()
                 // If another file-open arrived while we were loading, load it now.
@@ -2014,5 +2110,167 @@ final class AppState: ObservableObject {
 
     func isEffectivelyMuted(_ trackIndex: Int) -> Bool {
         isAnySolo && !soloState[trackIndex]
+    }
+
+    // MARK: - Phone player gesture helpers
+
+    /// Returns the current MIDI program number for a track, using instrumentOverrides if set.
+    func currentInstrument(forTrack trackIndex: Int) -> UInt8 {
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
+        guard !programs.isEmpty else { return 0 }
+        let idx = instrumentOverrides[trackIndex] ?? 0
+        return programs[min(idx, programs.count - 1)]
+    }
+
+    /// Shuffles the instrument on a track to a different entry in its pool.
+    func regenInstrument(forTrack trackIndex: Int) {
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
+        guard programs.count > 1 else { return }
+        let currentIdx = instrumentOverrides[trackIndex] ?? 0
+        var newIdx = currentIdx
+        var attempts = 0
+        repeat {
+            newIdx = Int.random(in: 0..<programs.count)
+            attempts += 1
+        } while newIdx == currentIdx && attempts < 16
+        guard newIdx != currentIdx else { return }
+        instrumentOverrides[trackIndex] = newIdx
+        setProgram(programs[newIdx], forTrack: trackIndex)
+        instrumentChangeToken += 1
+        triggerVisualizerFlash(trackIndex: trackIndex)
+    }
+
+    /// Sets a specific program on a track and records the override index.
+    func setInstrument(_ program: UInt8, forTrack trackIndex: Int) {
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
+        if let idx = programs.firstIndex(of: program) {
+            instrumentOverrides[trackIndex] = idx
+        }
+        setProgram(program, forTrack: trackIndex)
+        instrumentChangeToken += 1
+    }
+
+    /// Removes all active effects from a track.
+    func clearAllEffects(forTrack trackIndex: Int) {
+        for fx in TrackEffect.allCases {
+            setEffect(fx, enabled: false, forTrack: trackIndex)
+        }
+        triggerVisualizerFlash(trackIndex: trackIndex)
+    }
+
+    /// Restores the style-default effects for a track (mirrors TrackRowView.applyDefaultEffects).
+    func restoreDefaultEffects(forTrack trackIndex: Int) {
+        // Clear all first
+        for fx in TrackEffect.allCases {
+            setEffect(fx, enabled: false, forTrack: trackIndex)
+        }
+        // Apply style defaults
+        let defaults: [TrackEffect]
+        switch selectedStyle {
+        case .ambient:
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.delay, .space]
+            case kTrackLead2:   [.delay, .space]
+            case kTrackPads:    [.space, .tremolo]
+            case kTrackRhythm:  [.delay, .reverb]
+            case kTrackTexture: [.space, .pan]
+            case kTrackBass:    [.reverb, .sweep]
+            case kTrackDrums:   [.delay, .reverb]
+            default:            []
+            }
+        case .chill:
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.space, .delay, .compression]
+            case kTrackLead2:   [.space, .delay]
+            case kTrackRhythm:  [.tremolo, .space]
+            case kTrackPads:    [.sweep, .tremolo]
+            case kTrackTexture: [.lowShelf, .reverb]
+            case kTrackBass:    [.reverb]
+            case kTrackDrums:   [.space]
+            default:            []
+            }
+        case .kosmic:
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.delay, .space]
+            case kTrackLead2:   [.space]
+            case kTrackPads:    [.space, .delay]
+            case kTrackTexture: [.delay, .space]
+            case kTrackBass:    [.reverb]
+            case kTrackRhythm:  [.delay]
+            default:            []
+            }
+        case .motorik:
+            defaults = switch trackIndex {
+            case kTrackLead1:   [.delay]
+            case kTrackRhythm:  [.delay]
+            case kTrackPads:    [.space]
+            case kTrackTexture: [.pan]
+            default:            []
+            }
+        }
+        for fx in defaults {
+            setEffect(fx, enabled: true, forTrack: trackIndex)
+        }
+        triggerVisualizerFlash(trackIndex: trackIndex)
+    }
+
+    /// Regenerates the pattern for a random non-drum track.
+    func regenRandomNonDrumTrack() {
+        let eligible = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass]
+        guard let track = eligible.randomElement() else { return }
+        triggerVisualizerFlash(trackIndex: track)
+        regenerateTrack(track)
+    }
+
+    /// Loads a SongState from the in-memory generationHistory without re-generating.
+    func loadFromGenerationHistory(_ state: SongState) {
+        guard !isGenerating else { return }
+        let wasPlaying = playback.isPlaying
+        stop()
+        selectedStyle    = state.style
+        keyOverride      = nil
+        tempoOverride    = nil
+        moodOverride     = nil
+        songState        = state
+        visibleBarOffset = 0
+        lastEmittedStep  = -1
+        instrumentOverrides = [:]
+        if state.style == .chill {
+            let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
+            instrumentOverrides[kTrackTexture] = Int(prog) - 240
+        }
+        // Snapshot so resetEffectsToDefaults() can restore to this song's original instruments.
+        songInstrumentOverrides = instrumentOverrides
+        muteState = Array(repeating: false, count: kTrackCount)
+        soloState = Array(repeating: false, count: kTrackCount)
+        playback.muteState    = muteState
+        playback.soloState    = soloState
+        playback.kosmicStyle  = state.style == .kosmic
+        playback.motorikStyle = state.style == .motorik
+        playback.setAmbientMode(state.style == .ambient)
+        playback.setChillMode(state.style == .chill)
+        playback.load(state)
+        playback.seek(toStep: 0)
+        defaultsResetToken += 1
+        applyCurrentInstrumentsToPlayback()
+        if wasPlaying { playback.play() }
+    }
+
+    /// Clears all mutes, solos, manual effect changes, and instrument overrides —
+    /// restores the song to the exact state it was in right after generation/load.
+    func resetEffectsToDefaults() {
+        muteState = Array(repeating: false, count: kTrackCount)
+        soloState = Array(repeating: false, count: kTrackCount)
+        playback.muteState = muteState
+        playback.soloState = soloState
+        audioTexture.setSoloMuted(false)
+        // Restore instruments to what they were when the song was generated/loaded.
+        instrumentOverrides = songInstrumentOverrides
+        defaultsResetToken += 1
+        applyCurrentInstrumentsToPlayback()
+        // Restore audio effects to style defaults.
+        for trackIndex in 0..<kTrackCount {
+            restoreDefaultEffects(forTrack: trackIndex)
+        }
     }
 }

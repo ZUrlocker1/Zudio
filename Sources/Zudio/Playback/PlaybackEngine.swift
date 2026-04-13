@@ -11,6 +11,7 @@ final class PlaybackEngine: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentBar: Int = 0
     @Published var currentStep: Int = 0
+    @Published var activeVisualizerNotes: [VisualizerNote] = []
 
     // MARK: - Audio graph
 
@@ -62,6 +63,16 @@ final class PlaybackEngine: ObservableObject {
     // Sweep LFO (low-pass filter cutoff modulation)
     private var sweepEnabled = Array(repeating: false, count: kTrackCount)
     private var sweepPhase   = Array(repeating: Double(0), count: kTrackCount)
+
+    // Global filter sweep (iPhone two-finger gesture): briefly opens all non-drum filters
+    // together, then returns each track to its previous bypass state.
+    private var globalSweepTicksRemaining: Int = 0
+    private var globalSweepPhase: Double = 0
+    private var preGlobalSweepEnabled: [Bool] = Array(repeating: false, count: kTrackCount)
+
+    // Canvas-wide flash for filter-sweep gesture — set when sweep triggers, read by VisualizerView Canvas.
+    // NOT @Published: Canvas reads it on TimelineView ticks, no SwiftUI reactive update needed.
+    var canvasFlashDate: Date? = nil
 
     // Pan LFO (auto-pan on boost mixer node)
     private var panEnabled   = Array(repeating: false, count: kTrackCount)
@@ -189,6 +200,7 @@ final class PlaybackEngine: ObservableObject {
         songState = state
         approachingEndFired = false
         outroStartFired     = false
+        activeVisualizerNotes = []
         buildStepEventMap(state: state)
         // Cancel any in-progress note fades before restoring volumes.
         stopAmbientNoteFades()
@@ -331,6 +343,7 @@ final class PlaybackEngine: ObservableObject {
     func resetPlayhead() {
         currentStep = 0
         currentBar  = 0
+        activeVisualizerNotes = []
     }
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
@@ -366,6 +379,19 @@ final class PlaybackEngine: ObservableObject {
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             if bar != self.currentBar { self.currentBar = bar }
+            // Visualizer note spawning — append new notes, prune expired every 16 steps
+            if !noteOns.isEmpty {
+                let now = Date()
+                self.activeVisualizerNotes.append(contentsOf: noteOns.map { (trackIdx, ev) in
+                    VisualizerNote(trackIndex: trackIdx, note: ev.note,
+                                   velocity: ev.velocity, birthDate: now,
+                                   durationSteps: ev.durationSteps)
+                })
+            }
+            if step % 16 == 0 {
+                let cutoff = Date().addingTimeInterval(-8.0)  // max orb lifetime is 7s (doubled)
+                self.activeVisualizerNotes.removeAll { $0.birthDate < cutoff }
+            }
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
             // The chosen duration is stored per-track and reused for the matching note-off.
@@ -538,6 +564,7 @@ final class PlaybackEngine: ObservableObject {
         buildStepEventMap(state: passState)
         currentStep = 0
         currentBar  = 0
+        activeVisualizerNotes = []
         currentSchedulerID += 1
         // Always restart — switchToPass is called mid-Evolve; onSongEnd sets isPlaying=false
         // before the callback fires, so we can't rely on that flag here.
@@ -812,11 +839,33 @@ final class PlaybackEngine: ObservableObject {
 
         guard do20fps else { return }
 
-        // Sweep — ~20fps, all active tracks
-        for i in 0..<kTrackCount where sweepEnabled[i] {
+        // Sweep — ~20fps, all active tracks (skipped for tracks overridden by global sweep)
+        for i in 0..<kTrackCount where sweepEnabled[i] && globalSweepTicksRemaining == 0 {
             sweepPhase[i] += 0.02199  // 2π × 0.07 Hz / 20 fps
             let cutoff = Float(300 + 1600 * (1 + sin(sweepPhase[i])))
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+        }
+
+        // Global filter sweep (iPhone two-finger gesture) — one unified phase across all tracks
+        if globalSweepTicksRemaining > 0 {
+            globalSweepTicksRemaining -= 1
+            globalSweepPhase += 0.052   // ~0.33 Hz → full open-close cycle in ~6 seconds
+            let cutoff = Float(300 + 5700 * (1.0 + sin(globalSweepPhase)) / 2.0)
+            for i in 0..<kTrackCount where i != kTrackDrums {
+                AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+            }
+            if globalSweepTicksRemaining == 0 {
+                // Restore each track to its pre-sweep state and drop resonance back to static 3 dB
+                for i in 0..<kTrackCount where i != kTrackDrums {
+                    AudioUnitSetParameter(sweepFilters[i].audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0) // restore from 10 dB
+                    if preGlobalSweepEnabled[i] {
+                        // Track had its own sweep running — let sweepEnabled[] loop resume next tick
+                    } else {
+                        sweepFilters[i].auAudioUnit.shouldBypassEffect = true
+                        AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
+                    }
+                }
+            }
         }
 
         // Pan — ~20fps, all active tracks
@@ -878,6 +927,27 @@ final class PlaybackEngine: ObservableObject {
         sweepFilters[i].auAudioUnit.shouldBypassEffect = true
         AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
         stopSharedLFOIfIdle()
+    }
+
+    /// Triggers a global filter sweep across all non-drum tracks (~3 seconds, open→close→open).
+    /// Re-triggerable — a second call restarts from fully open so the effect is always audible.
+    /// Resonance is boosted to 15 dB during the sweep for a dramatic Moog-style wah character,
+    /// then restored to the 3 dB static value when the sweep completes.
+    func triggerGlobalFilterSweep() {
+        preGlobalSweepEnabled = sweepEnabled
+        globalSweepPhase = .pi / 2    // start at maximum cutoff (6000 Hz — fully open)
+        globalSweepTicksRemaining = 60 // 60 × 50ms (20fps) ≈ 3 seconds (open → close → open)
+        canvasFlashDate = Date()       // triggers canvas-wide white flash in VisualizerView
+        for i in 0..<kTrackCount where i != kTrackDrums {
+            sweepFilters[i].auAudioUnit.shouldBypassEffect = false
+            // Boost resonance from 3 dB (static) to 10 dB for an audible resonant wah peak.
+            // 15 dB caused EXC_BAD_ACCESS on the IO thread: the resonant peak (Q≈5.6) fed into
+            // delay feedback loops (up to 65% in Ambient mode) producing ~16× signal accumulation
+            // that overwhelmed the dynamics processor / reverb on the render thread.
+            // 10 dB (Q≈3.2) is clearly audible and dramatic without blowing up the feedback chain.
+            AudioUnitSetParameter(sweepFilters[i].audioUnit, 1, kAudioUnitScope_Global, 0, 10.0, 0)
+        }
+        startSharedLFO()
     }
 
     // MARK: - Pan LFO (sine, sweeps −1.0 to +1.0)

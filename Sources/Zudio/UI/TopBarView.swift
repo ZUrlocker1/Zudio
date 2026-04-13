@@ -60,7 +60,7 @@ private final class HoldRepeater: ObservableObject {
 }
 
 /// Highlight colour for the active Song / Evolve / Endless mode button.
-private let kActiveModeBlue = Color(red: 0.18, green: 0.42, blue: 0.78)
+let kActiveModeBlue = Color(red: 0.18, green: 0.42, blue: 0.78)
 
 // Platform-adaptive spacing and sizing — avoids duplicate view code.
 #if os(iOS)
@@ -483,8 +483,10 @@ struct TopBarView: View {
                     }
                     #if os(iOS)
                     .buttonStyle(.bordered)
-                    // iPad mini landscape (≈1133pt): slim down buttons 4pt vertically
-                    .environment(\.controlSize, (contentWidth >= 900 && contentWidth < 1150) ? .small : .regular)
+                    // All 11-inch iPads in landscape (mini ≈1133pt, Air/Pro 11" ≈1180–1195pt):
+                    // slim down buttons 4pt vertically so 7 MIDI track rows aren't clipped.
+                    // 13-inch iPads (≈1366pt+) have enough vertical room and keep .regular.
+                    .environment(\.controlSize, (contentWidth >= 900 && contentWidth < 1220) ? .small : .regular)
                     #endif
 
                     // Right block — iOS: VStack (style+reset row, then mood/key/bpm row)
@@ -583,7 +585,8 @@ struct TopBarView: View {
                         .frame(width: kStyleVStackWidth)
                         .offset(x: 20)
 
-                        // Right column: Mood above Key + BPM
+                        // Right column: Mood above Key + BPM — hidden when window is too narrow
+                        if contentWidth >= 850 {
                         VStack(alignment: .center, spacing: 4) {
                             HStack(spacing: 6) {
                                 Picker("Mood", selection: $appState.moodOverride) {
@@ -621,6 +624,7 @@ struct TopBarView: View {
                                 }
                             }
                         }
+                        } // end if contentWidth >= 850
                     }
                     #endif
                 }
@@ -674,21 +678,36 @@ struct TopBarView: View {
             Divider()
         }
         #if os(macOS)
-        // Compact/expand toggle — overlay on TopBarView's own VStack so it is always
-        // rendered inside a view with layoutPriority(3) + fixedSize(vertical: true),
-        // guaranteeing it is never pushed above the visible window boundary.
+        // Compact/expand + visualizer toggle — top-left overlay, always inside
+        // layoutPriority(3) + fixedSize(vertical:true) so it never leaves the window.
         .overlay(alignment: .topLeading) {
-            Button { appState.toggleWindowCompact() } label: {
-                Image(systemName: appState.isWindowCompact
-                      ? "arrow.up.left.and.arrow.down.right"
-                      : "arrow.down.right.and.arrow.up.left")
-                    .font(.system(size: 14))
+            HStack(spacing: 2) {
+                Button { appState.toggleWindowCompact() } label: {
+                    Image(systemName: appState.isWindowCompact
+                          ? "arrow.up.left.and.arrow.down.right"
+                          : "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(Color.white.opacity(0.7))
+                .help(appState.isWindowCompact ? "Restore window (\\ or ⌘0)"
+                      : "Compact window (\\ or ⌘0)")
+
+                Button { appState.macShowVisualizer.toggle() } label: {
+                    Image(systemName: appState.macShowVisualizer
+                          ? "slider.horizontal.3"
+                          : "sparkles")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(appState.macShowVisualizer
+                                 ? Color.white
+                                 : Color.white.opacity(0.55))
+                .help(appState.macShowVisualizer ? "Show Tracks (⌘Z)"
+                      : "Show Visualizer (⌘Z)")
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(Color.white.opacity(0.7))
-            .help(appState.isWindowCompact ? "Restore window" : "Compact window")
             .padding(.leading, 6)
-            .padding(.top, 4)
+            .padding(.top, 9)
         }
         #endif
         .sheet(isPresented: $showHelp)  { HelpView() }
@@ -742,12 +761,12 @@ private struct LogoAreaView: View {
                     if !compact {
                         #if os(iOS)
                         if contentWidth >= 900 {
-                            Text("V 0.99b")
+                            Text("V 0.99c")
                                 .font(.callout)
                                 .foregroundStyle(.white.opacity(0.55))
                         }
                         #else
-                        Text("V 0.99b")
+                        Text("V 0.99c")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                         #endif
@@ -900,14 +919,45 @@ struct HelpView: View {
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
                 helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback.")
-                helpLine("Play / Stop (Space)", "Space bar toggles play/stop from the current  position. Works in the background.")
                 helpLine("⏮ ⏭ Previous / Next track", "Go to the previous or next generated song.")
                 helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
                 helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to /Downloads. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
                 helpLine("Reset (⌘R)", "Reset audio, and all tracks and settings to initial state.")
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .bold))
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("Visualizer / Tracks (⌘Z)")
+                            .font(.system(size: 14).bold())
+                    }
+                    Text("Switch between visualizer and track view. Click on visuals to modify sounds.")
+                        .font(.system(size: 14)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 helpLine("◀ Name ▶", "Cycle through MIDI instruments for that track.")
                 helpLine("⚡ Lightning", "Regenerates a track and its     instrument. Structure and key are preserved.")
-                helpLine("M / S", "Mute or Solo a track. Click again to toggle off.")
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 5) {
+                        Text("M")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 22, height: 18)
+                            .background(Color(white: 0.30))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        Text("S")
+                            .font(.system(size: 11, weight: .bold))
+                            .frame(width: 22, height: 18)
+                            .background(Color(white: 0.30))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        Text("Mute / Solo").font(.system(size: 14).bold())
+                    }
+                    Text("Mute or Solo a track. Click again to toggle off.")
+                        .font(.system(size: 14)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 helpLine("Status log", "Shows the generation rules applied to the current song.")
             }
             Spacer()
@@ -955,7 +1005,7 @@ struct AboutView: View {
             #if os(iOS)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Version: 0.99b").font(.system(size: 14))
+                    Text("Version: 0.99c").font(.system(size: 14))
                     Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
                 }
@@ -963,7 +1013,7 @@ struct AboutView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.99b").font(.system(size: 14))
+                Text("Version: 0.99c").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))

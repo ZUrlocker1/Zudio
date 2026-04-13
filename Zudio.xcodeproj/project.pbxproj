@@ -36,6 +36,10 @@
 		AA00000000000000000006A /* AudioWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006A /* AudioWaveformView.swift */; };
 		AA00000000000000000001B /* StatusBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001B /* StatusBoxView.swift */; };
 		AA00000000000000000001C /* TopBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001C /* TopBarView.swift */; };
+		AA000000000000000000080 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000080 /* VisualizerView.swift */; };
+		AA000000000000000000081 /* PhonePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000081 /* PhonePlayerView.swift */; };
+		IS000000000000000000080 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000080 /* VisualizerView.swift */; };
+		IS000000000000000000081 /* PhonePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000081 /* PhonePlayerView.swift */; };
 		AA00000000000000000001D /* AssetLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001D /* AssetLoader.swift */; };
 		AA00000000000000000001E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
 		AA00000000000000000007A /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007A /* MediaPlayer.framework */; };
@@ -206,6 +210,8 @@
 		BB00000000000000000006A /* AudioWaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001B /* StatusBoxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBoxView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001C /* TopBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopBarView.swift; sourceTree = "<group>"; };
+		BB000000000000000000080 /* VisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerView.swift; sourceTree = "<group>"; };
+		BB000000000000000000081 /* PhonePlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhonePlayerView.swift; sourceTree = "<group>"; };
 		BB00000000000000000001D /* AssetLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetLoader.swift; sourceTree = "<group>"; };
 		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		BB00000000000000000007A /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
@@ -410,6 +416,8 @@
 				BB00000000000000000001B /* StatusBoxView.swift */,
 				BB00000000000000000001C /* TopBarView.swift */,
 				BB000000000000000000023 /* FirstMouseFix.swift */,
+				BB000000000000000000080 /* VisualizerView.swift */,
+				BB000000000000000000081 /* PhonePlayerView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -705,6 +713,8 @@
 				AA00000000000000000001D /* AssetLoader.swift in Sources */,
 				AA000000000000000000020 /* MIDIFileExporter.swift in Sources */,
 				AA000000000000000000021 /* FirstMouseFix.swift in Sources */,
+				AA000000000000000000080 /* VisualizerView.swift in Sources */,
+				AA000000000000000000081 /* PhonePlayerView.swift in Sources */,
 				AA000000000000000000030 /* CosmicMusicalFrameGenerator.swift in Sources */,
 				AA000000000000000000031 /* CosmicStructureGenerator.swift in Sources */,
 				AA000000000000000000032 /* CosmicArpeggioGenerator.swift in Sources */,
@@ -796,6 +806,8 @@
 				IS00000000000000000001D /* AssetLoader.swift in Sources */,
 				IS000000000000000000022 /* MIDIFileExporter.swift in Sources */,
 				IS000000000000000000023 /* FirstMouseFix.swift in Sources */,
+				IS000000000000000000080 /* VisualizerView.swift in Sources */,
+				IS000000000000000000081 /* PhonePlayerView.swift in Sources */,
 				IS000000000000000000030 /* CosmicMusicalFrameGenerator.swift in Sources */,
 				IS000000000000000000031 /* CosmicStructureGenerator.swift in Sources */,
 				IS000000000000000000032 /* CosmicArpeggioGenerator.swift in Sources */,
@@ -1070,7 +1082,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.99b;
+				MARKETING_VERSION = 0.99c;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;
@@ -1099,7 +1111,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.99b;
+				MARKETING_VERSION = 0.99c;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;

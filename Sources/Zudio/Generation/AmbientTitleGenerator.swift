@@ -70,8 +70,8 @@ struct AmbientTitleGenerator {
 
     private static let drabLocations = [
         "Slough", "Stevenage", "the Retail Park", "Milton Keynes", "Luton",
-        "the Industrial Estate", "the Business Park", "a Roundabout",
-        "the Lower Car Park", "a Disused Underpass", "Basingstoke", "Slough",
+        "the Industrial Estate", "the Business Park", "a Roundabout", "Bristol",
+        "the Lower Car Park", "a Disused Underpass", "Basingstoke", "Guilford",
         "the Ring Road", "a Disused Gravel Pit", "the Trading Estate",
         "Hemel Hempstead", "the NCP Car Park", "a Suburban Cul-de-Sac",
         "the Service Station", "the B2047", "the Overflow Car Park",
@@ -92,8 +92,8 @@ struct AmbientTitleGenerator {
     private static let tepidSubjects = [
         "a Beige Wall", "Tepid Tea", "the Waiting Room",
         "a Slightly Damp Coat", "Mildly Warm Coffee",
-        "an Unread Email", "a Forgotten Password",
-        "a Partially Eaten Sandwich", "the Suspended Ceiling",
+        "an Unread Email", "a Forgotten Password", "the Permanent Under-Secretary",
+        "a Partially Eaten Sandwich", "the Suspended Ceiling","WOOC(P)",
         "a Persistent Low-Level Hum", "a Lukewarm Radiator",
         "the Beige Carpet", "a Receding Hairline",
         "an Unanswered Voicemail", "the Fire Exit", "a bad investment", "the Reign of Zorvaak",
@@ -196,9 +196,9 @@ struct AmbientTitleGenerator {
 
     // JMJ-style French concept words (parody of Oxygene, Equinoxe, etc.)
     private static let jmjConcepts = [
-        "Oxygene", "Equinoxe", "Magnetique", "Kronologie",
-        "Metamorphoses", "Electronique", "Atmosphere",
-        "Cozmique", "Solstice", "Meridien", "Lumineux", "Zorvaak", 
+        "Oxygene", "Equinoxe", "Magnetique", "Kronologie", "Electrique",
+        "Metamorphoses", "Electronique", "Atmosphere", "Crezendo",
+        "Cozmique", "Solstice", "Meridien", "Lumineux", "Zorvaak",
         "Telephonie", "Zenith", "Isotrope", "Maladoxe", "Zut alors"
     ]
 
@@ -322,7 +322,7 @@ struct AmbientTitleGenerator {
     private static let aiEntities = [
         "Claude", "ChatGPT", "Copilot", "Gemini",
         "The LLM", "The Foundation Model", "The Transformer",
-        "The Inference Engine", "GPT", "The Prompt"
+        "The Inference Engine", "GPT", "The Prompt", "Buddha"
     ]
 
     // Words that follow an AI entity name
