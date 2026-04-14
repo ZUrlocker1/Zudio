@@ -1,8 +1,7 @@
 // ChillTitleGenerator.swift — Chill generation step 8
 // Urban/nocturnal/cosmopolitan title vocabulary.
-// Five pools: city+modifier (50%), French word, English two-word, adj+noun, time-of-day.
-// City combinations use a modifier drawn from time-of-day phrases, two-word phrases,
-// or directional/atmospheric words — all produce "Modifier City" style titles.
+// Five pools: city phrase (50%), French word, English two-word, adj+noun, time-of-day.
+// City phrases use three sub-patterns: prefix+city, city+suffix, or "The [City] [Suffix]".
 // Mood-shaded: Deep/Dream favor French words; Bright/Free favor English and adj+noun.
 // No accents in any word.
 
@@ -31,23 +30,9 @@ struct ChillTitleGenerator {
         return timeOfDay(rng: &rng)
     }
 
-    // MARK: - City + modifier (50%)
+    // MARK: - City phrase (50% of all titles, three sub-patterns)
 
     private static func cityPhrase(rng: inout SeededRNG) -> String {
-        let modifiers = [
-            // Time-of-day
-            "Late Night", "After Dark", "After Midnight", "Before Dawn",
-            "Three AM", "Blue Hour", "Last Light", "After Hours",
-            "Midnight", "Early", "Sunrise", "Sunset", "Day Break",
-            // Atmospheric two-word
-            "Low Light", "Still Water", "Quiet", "Cool", "Windy",
-            "Slow Burn", "Soft Focus", "Deep", "Open Air",
-            "Warm", "Pale Sun", "Rainy", "Snow Bound", "Dark",
-            // Directional / geographic feel
-            "West Side", "East Side", "North Shore", "South", "Uptown","Downtown",
-            "Upper", "Old", "Inner", "Winter", "Summer", "Fall", "Upper", "Midtown",
-            "Game","Set","Match"
-        ]
         let cities = [
             // Montreal neighborhoods
             "Montreal", "Verdun", "Outremont", "Westmount", "Hochelaga",
@@ -69,11 +54,75 @@ struct ChillTitleGenerator {
             "Long Lake", "Leland", "Lelenau", "Ann Arbor", "Ypsilanti", "Northport",
             "Glen Arbor","Maple City", "Walled Lake", "Waterloo", "Plymouth",
             "Mississauga","Port Credit", "Toronto", "Etobicoke",
-            "TVC", "YYZ", "SFO", "ORD", "LHR", "SJC", "DTW", "LGA"
+            "TVC", "YYZ", "SFO", "ORD", "LHR", "SJC", "DTW", "LGA","Forest",
+            "Berlin", "Mexico", "London", "Mittelwerk", "Nordhausen", "Dora"
         ]
-        let mod  = modifiers[rng.nextInt(upperBound: modifiers.count)]
         let city = cities[rng.nextInt(upperBound: cities.count)]
-        return "\(mod) \(city)"
+        let sub  = rng.nextDouble()
+
+        if sub < 0.55 {
+            // Pattern A: prefix + city  ("Funeral in Berlin", "Night Train to Dorval")
+            let prefixes = [
+                // Time-of-day
+                "Late Night", "After Dark", "After Midnight", "Before Dawn",
+                "Three AM", "Blue Hour", "Last Light", "After Hours",
+                "Midnight", "Early", "Sunrise", "Sunset", "Day Break",
+                // Atmospheric
+                "Low Light", "Still Water", "Quiet", "Cool", "Windy",
+                "Slow Burn", "Soft Focus", "Deep", "Open Air",
+                "Warm", "Pale Sun", "Rainy", "Snow Bound", "Dark",
+                // Directional / geographic
+                "West Side", "East Side", "North Shore", "South", "Uptown", "Downtown",
+                "Upper", "Old", "Inner", "Winter", "Summer", "Fall", "Midtown",
+                // Spy / thriller / mystery prefixes
+                "Funeral in",       // Funeral in Berlin (Deighton)
+                "The Man from",     // The Man from Mittelwerk
+                "Our Man in",       // Our Man in Havana (Greene)
+                "Death in",         // Donna Leon / Christie style
+                "Murder in",        // classic mystery
+                "Night Train to",   // atmospheric Cold War escape feel
+                "Midnight in",      // noir
+                "Last Train from",  // Cold War / thriller
+                "Appointment in",   // Appointment with Death (Christie)
+                "Station",          // intelligence world ("Station Berlin")
+            ]
+            let prefix = prefixes[rng.nextInt(upperBound: prefixes.count)]
+            return "\(prefix) \(city)"
+
+        } else if sub < 0.85 {
+            // Pattern B: city + suffix  ("Berlin Game", "London File", "Toronto Station")
+            let suffixes = [
+                "Game", "Set", "Match",          // Len Deighton Game Set Match trilogy
+                "File", "Affair", "Protocol",    // spy thriller (Forsyth / le Carre style)
+                "Option", "Sanction",            // Trevanian / MacLean style
+                "Exchange", "Document",          // tradecraft / Forsyth
+                "Memorandum",                    // The Quiller Memorandum
+                "Station",                       // Berlin Station (TV)
+                "Connection",                    // the Forrest connection
+                "Case", "Inquest",               // murder mystery
+            ]
+            let suffix = suffixes[rng.nextInt(upperBound: suffixes.count)]
+            return "\(city) \(suffix)"
+
+        } else {
+            // Pattern C: "The [City] [Suffix]" or "From [City] with Love"
+            if rng.nextDouble() < 0.20 {
+                return "From \(city) with Love"  // From Russia with Love (Fleming)
+            }
+            let suffixes = [
+                "File",          // The Odessa File (Forsyth)
+                "Affair",        // Christie / le Carre style
+                "Protocol",      // modern thriller
+                "Option",        // MacLean style
+                "Sanction",      // The Eiger Sanction (Trevanian)
+                "Exchange",      // Cold War spy exchange
+                "Memorandum",    // The Quiller Memorandum
+                "Document",      // Forsyth style
+                "Alternative",   // The Afghan Alternative (Forsyth)
+            ]
+            let suffix = suffixes[rng.nextInt(upperBound: suffixes.count)]
+            return "The \(city) \(suffix)"
+        }
     }
 
     // MARK: - French word + modifier

@@ -272,14 +272,14 @@ struct TopBarView: View {
                     .help("Forward 1 bar")
                     #endif
 
-                    // Jump to end (Song mode) / Skip to next song/pass (Endless/Evolve)
+                    // Next song/pass — always generates a new song in Song mode
                     Button(action: {
                         if appState.playMode == .endless {
                             appState.skipToNextSong()
                         } else if appState.playMode == .evolve {
                             appState.skipEvolvePass()
                         } else {
-                            appState.seekToEnd()
+                            appState.loadNextFromHistory()
                         }
                     }) {
                         Image(systemName: "forward.end.fill")
@@ -295,7 +295,7 @@ struct TopBarView: View {
                           "Go to end (stops playback)")
                 }
                 #if os(iOS)
-                .font(.system(size: 22))
+                .font(.system(size: 29))
                 .padding(.bottom, 22)
                 #else
                 .font(.callout)
@@ -503,8 +503,10 @@ struct TopBarView: View {
                             }
                             .pickerStyle(.segmented)
                             .tint(Color.gray)
-                            .font(.system(size: 11))
-                            .frame(width: 260)
+                            // iPad mini portrait (<800pt): 220pt with 10pt font so "Ambient" fits
+                            // without truncation (11pt + default insets would overflow the segment).
+                            .font(.system(size: contentWidth < 800 ? 10 : 11))
+                            .frame(width: contentWidth < 800 ? 220 : 260)
                             .disabled(appState.playMode == .endless)
                             .opacity(appState.playMode == .endless ? 0.5 : 1.0)
 
@@ -705,6 +707,17 @@ struct TopBarView: View {
                                  : Color.white.opacity(0.55))
                 .help(appState.macShowVisualizer ? "Show Tracks (⌘Z)"
                       : "Show Visualizer (⌘Z)")
+
+                Button { appState.macShowSongList.toggle() } label: {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 14))
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(appState.macShowSongList
+                                 ? Color.white
+                                 : Color.white.opacity(0.55))
+                .help(appState.macShowSongList ? "Hide Song List (⌘I)"
+                      : "Show Song List (⌘I)")
             }
             .padding(.leading, 6)
             .padding(.top, 9)
@@ -730,6 +743,9 @@ struct TopBarView: View {
             appState.loadFromLogURL(url)
             url.stopAccessingSecurityScopedResource()
         }
+        // Pin to the default Dynamic Type size so the top bar doesn't grow when
+        // the user has increased system text size in Accessibility settings.
+        .dynamicTypeSize(.large)
         #endif
     }
 }
@@ -761,12 +777,12 @@ private struct LogoAreaView: View {
                     if !compact {
                         #if os(iOS)
                         if contentWidth >= 900 {
-                            Text("V 0.99c")
+                            Text("V 0.99d")
                                 .font(.callout)
                                 .foregroundStyle(.white.opacity(0.55))
                         }
                         #else
-                        Text("V 0.99c")
+                        Text("V 0.99d")
                             .font(.callout)
                             .foregroundStyle(.white.opacity(0.55))
                         #endif
@@ -1005,7 +1021,7 @@ struct AboutView: View {
             #if os(iOS)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Version: 0.99c").font(.system(size: 14))
+                    Text("Version: 0.99d").font(.system(size: 14))
                     Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
                 }
@@ -1013,7 +1029,7 @@ struct AboutView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.99c").font(.system(size: 14))
+                Text("Version: 0.99d").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))

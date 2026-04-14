@@ -1082,7 +1082,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.99c;
+				MARKETING_VERSION = 0.99d;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;
@@ -1111,7 +1111,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.99c;
+				MARKETING_VERSION = 0.99d;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;

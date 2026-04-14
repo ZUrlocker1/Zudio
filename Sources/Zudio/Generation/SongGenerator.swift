@@ -1150,14 +1150,9 @@ struct SongGenerator {
         // Structure form rule
         log.append(GenerationLogEntry(tag: "Form", description: formLabel(form)))
 
-        // Chord progression — key/mode + progression family + chord names on one line
-        let chordNames = structure.chordPlan
-            .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
-            .removingAdjacentDuplicates()
-            .joined(separator: ", ")
+        // Chord progression — key/mode + progression family
         let progLabel = progressionFamilyLabel(frame.progressionFamily)
-        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(progLabel)" + (chordNames.isEmpty ? "" : "  \(chordNames)")
-        log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(progLabel)"))
 
         // Drums
         for ruleID in drumRules.sorted() {
@@ -1270,7 +1265,7 @@ struct SongGenerator {
         switch style {
         case .fade:     return "fade"
         case .dissolve: return "dissolve"
-        case .coldStop: return "cold stop — drum fill ending"
+        case .coldStop: return "cold stop"
         }
     }
 
@@ -1597,14 +1592,9 @@ struct SongGenerator {
         log.append(GenerationLogEntry(tag: formTag, description: kosmicFormLabel + bridgeSuffix))
 
 
-        // Chord progression — key/mode + progression family + chord names on one line
-        let chordNames = structure.chordPlan
-            .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
-            .removingAdjacentDuplicates()
-            .joined(separator: ", ")
+        // Chord progression — key/mode + progression family
         let progFamilyLabel = kosmicProgressionFamilyLabel(kosmicProgFamily)
-        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(progFamilyLabel)" + (chordNames.isEmpty ? "" : "  \(chordNames)")
-        log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(progFamilyLabel)"))
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {
@@ -1653,7 +1643,7 @@ struct SongGenerator {
         case .droneSingle:    return "Static drone"
         case .droneTwo:       return "Two-chord drift  i - ♭VII"
         case .modalDrift:     return "Modal drift  i - ♭VII - ♭VI"
-        case .suspendedDrone: return "Suspended drone  sus2"
+        case .suspendedDrone: return "suspended drone"
         case .dissonantHaze:  return "Dissonant haze  m7"
         }
     }
@@ -1730,14 +1720,9 @@ struct SongGenerator {
         }
         log.append(GenerationLogEntry(tag: "Form", description: formDesc))
 
-        // Chord plan
-        let chordNames = structure.chordPlan
-            .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
-            .removingAdjacentDuplicates()
-            .joined(separator: ", ")
+        // Chord plan — key/mode + progression family
         let progLabel = ambientProgressionFamilyLabel(ambientProgFamily)
-        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(progLabel)" + (chordNames.isEmpty ? "" : "  \(chordNames)")
-        log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(progLabel)"))
 
         // Loop lengths (shows phase-shift structure)
         let loopDesc = "pads \(loopLengths.pads)  lead1 \(loopLengths.lead1)  lead2 \(loopLengths.lead2)  rhythm \(loopLengths.rhythm)  tex \(loopLengths.texture)  bass \(loopLengths.bass)"
@@ -1785,7 +1770,7 @@ struct SongGenerator {
         // Lead 1
         case "AMB-LEAD-001":  return "Eno floating tone"
         case "AMB-LEAD-002":  return "Echo phrase"
-        case "AMB-LEAD-003":  return "Harold Budd pentatonic shimmer"
+        case "AMB-LEAD-003":  return "Harold Budd shimmer"
         case "AMB-LEAD-007":  return "Lyric fragment"
         case "AMB-LEAD-008":  return "Returning motif"
         case "AMB-LEAD-009":  return "Magnetik solo"
@@ -1915,18 +1900,6 @@ struct SongGenerator {
             case .quartal: return root
             case .power:   return root + "5"
             }
-        }
-
-        // Helper: 2–3 chord names covering a section's bars.
-        // Includes windows that started before the section but are still active during it.
-        func chordsLabel(for section: SongSection) -> String {
-            let windows = structure.chordPlan.filter {
-                $0.startBar < section.endBar && $0.endBar > section.startBar
-            }
-            let names = windows.prefix(3).map { chordName($0.chordRoot, $0.chordType) }
-            guard !names.isEmpty else { return "" }
-            let joined = names.joined(separator: " ")
-            return windows.count > 3 ? joined + " …" : joined
         }
 
         // Helper: describe which instruments are active in a section (for intro/outro labels)
@@ -2086,24 +2059,22 @@ struct SongGenerator {
                 fireBar(bar, tag: "Intro", desc: introDesc)
             case .A:
                 if !isAmbient {
-                    let chords = chordsLabel(for: section)
                     if seenLabels.contains(.A) && chillBreakdownStyle != nil && seenLabels.contains(.bridge) {
-                        fireBar(bar, tag: "Groove A", desc: "Groove returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                        fireBar(bar, tag: "Groove A", desc: "Groove returns")
                     } else if seenLabels.contains(.A) {
-                        fireBar(bar, tag: "Form", desc: "Return to A section" + (chords.isEmpty ? "" : " — \(chords)"))
+                        fireBar(bar, tag: "Form", desc: "Return to A section")
                     } else {
                         fireBar(bar, tag: "Section A", desc: "\(section.lengthBars) bars")
                     }
                 }
             case .B:
-                let chords = chordsLabel(for: section)
                 if chillBreakdownStyle != nil && seenLabels.contains(.bridge) {
                     // Chill: B section is always the groove return after breakdown
-                    fireBar(bar, tag: "Groove B", desc: "Groove returns" + (chords.isEmpty ? "" : " — \(chords)"))
+                    fireBar(bar, tag: "Groove B", desc: "Groove returns")
                 } else if seenLabels.contains(.B) {
-                    fireBar(bar, tag: "Form", desc: "Enter B section again" + (chords.isEmpty ? "" : " — \(chords)"))
+                    fireBar(bar, tag: "Form", desc: "Enter B section again")
                 } else {
-                    fireBar(bar, tag: "Form", desc: "Enter B section" + (chords.isEmpty ? "" : " — \(chords)"))
+                    fireBar(bar, tag: "Form", desc: "Enter B section")
                 }
             case .outro:
                 fireBar(bar, tag: "Outro", desc: "\(section.lengthBars) bar \(outroStyleLabel(structure.outroStyle))")
@@ -2671,21 +2642,15 @@ struct SongGenerator {
         let formDesc = hasBreakdown ? "Groove - breakdown (\(breakdownLabel))" : "Groove"
         log.append(GenerationLogEntry(tag: "Form", description: formDesc))
 
-        // Chords — key/mode + family + unique chord names (order of first appearance)
-        let allChordNames = structure.chordPlan
-            .map { chordName(key: frame.key, degree: $0.chordRoot, type: $0.chordType) }
-        var seen = Set<String>()
-        let uniqueChordNames = allChordNames.filter { seen.insert($0).inserted }
+        // Chords — key/mode + family
         let familyLabel: String
         switch chillProgFamily {
         case .static_groove:      familyLabel = "Static groove"
-        case .two_chord_pendulum: familyLabel = "Two-chord pendulum"
+        case .two_chord_pendulum: familyLabel = "2 chord pendulum"
         case .minor_blues:        familyLabel = "Minor blues"
         case .modal_drift:        familyLabel = "Modal drift"
         }
-        let chordDesc = "\(frame.key) \(frame.mode.rawValue)  \(familyLabel)" +
-            (uniqueChordNames.isEmpty ? "" : "  \(uniqueChordNames.joined(separator: " | "))")
-        log.append(GenerationLogEntry(tag: "Chords", description: chordDesc))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(familyLabel)"))
 
         // Audio texture
         let textureDesc = chillAudioTexture.map { name in

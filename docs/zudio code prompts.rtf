@@ -1834,4 +1834,112 @@ There\'92s a bug when you draw the song list on iphone and ipad. I think it happ
 Tell me again what double click on the orbs does \
 change the defaults\
 \
+
+\f0\b Performance Optimization
+\f2\b0 \
+Lets do another round of performance optimizaiton. Review the generation, regeneration and playback code as well as the code for MIDI grid drawing during playback and the visualizer to see what we can optimize so that Zudio runs efficiently with low CPU in the background\
+\
+give me the plan beofre changing anything\
+\
+I'd like you to re-examine the new visualizer code and come back with suggestions of what could be done to make these less computationally expensive, specifically if there are some things that reduce how often it draws or the animation or other things that might not be that perceptible to a user. \
+And also  lets drill into the 8 MIDI lane canvas redraws per step.\
+\
+i have a question - when the mac is in compact mode can we eliminate all drawing of tracks or visualizer so its as low CPU as possible and then just restart drawing in whatever view as appropriate when no longer in compact mode?  does that make sense?\
+\
+Looks good.  Lets reduce visual animation to 12 FPS.  \
+Can we make it so that in the iphone, if you click the visuaizer button while you're in the visualizer mode, it basically turns off all animation  like we did for compact view on the mac?\
+\
+Also in iphone landscape mode, lets put some spacing of about 6 pixels vertical space  between each of the Mode selector (song / evolve etc) the style selector (Ambient etc) and the transport control, so its a bit more spread out.  \
+\
+how do we ensure that the Zudio app properly handles if the user switches audio output, e.g. they turn on or off a bluetooth headset for example. Do some research if necessary\
+\
+
+\f0\b iphone, iPad Testing \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f2\b0 \cf0 \
+how do I test the iphone and ipad apps on an actual iphone and ipad that I have\
+\
+on iphone or ipad when we turn the visuals off, display a text message in the lower left corner that says "Visuals off" for about 8 seconds. \
+on the iphone below the song title in a slightly smaller font, put the style e.g. Ambient, Chill etc\
+on the iphone add a generate button\
+\
+on iphone portrait mode put the generate button in the middle. make the export and Info buttons more narrow so Generate is not cut off.  \
+on iphone landscape mode put the generate button on its own row below the transport, with export and info below it.  \
+on iphone, both landscape and portrait Make the Generate button slightly brighter\
+on iphone main display both portrait and landcape make the Song title sightly larger\
+\
+what haptics should I be observing on the iphone?  I'm not observing anything\
+\
+on iphone portrait  make the Generate button wider so the text is not cut off. Make the export and info buttons slightly narrower to accomodate. When you have the export button disabled  at startup (because there's no song) just have it slightly dimmer text\
+\
+\
+in iphone landscape mode the export audio button is stil showing up empty (disabled) when there is no song. in portrait mode its a bit too faint. make it 50% brightness. \
+in iphone portrait mode the generate button is still too wide. Make it 20 px narrower and see if that works\
+\
+ok now running on a real ipad Mini 5 the buttons in the top section are all too large. (e.g Song, Evolve, Endles, Generate, Load, Save, Export, Mood label and selector, Key label and selector, BPM label, Help, About.)  Only the Ambient / Chill selector looks good. What do you suggest?  Is this just peculiar to this particular ipad because of its low resolution?\
+\
+the generate button doesn't seem to be getting more narrow. try again. make it 15px narrower\
+\
+on my ipad mini I notice the + - buttons for increasing the size of the text in the tracks view generation log and in the Log view are cut off.  what's a good solution?  Also can we have the generation log text follow the size if the user has overridden default text size to be larger?\
+\
+try making the iphone protrait generate button 15 px more narrow again. \
+I'm still not seeing the + - generation log buttons on the ipad mini. I think they are cut off on the right hand side.\
+\
+since songs are basically stored as seeds. is there a way to maintain the current list of generated songs between sessions? how and where would it be stored?  is that a good idea? \
+\
+ had a weird problem. The iphone app seemed to be working but then I plugged into my car audio via cable. The audio was slightly muffled. I generated a new song. It seemed to play. But it was clearly not using all the GS midi sounds. For example, not the muted trumpet of chill. In factor other than the drums, it all sounded like the default MIDI patch.  Why is this?  Is there a way we can detect some failure like this and put a message in the Generation log?\
+\
+In the log make AUDIO just regualr case Audio.\
+How would I know if the instruments failed to load?  is there a message for that?\
+I noticed on the Mac also when I changed the audio it did not from intenral speaker to bluetooth it did not sound like the GS cello or other bass and string instruments.\
+\
+On iphone I am again getting a lot of generic midi instruments. Drums sound good, but the others all sound like default MIDI until I switch out the Lead and then I hear trumpet.  No error messages.  Is there a way in the log that you can automatically note if we're using the generic MIDI patch, e.g. \
+Error    Lead 1 instrument (xx) using default MIDI\
+While I don't want to get flooded with these messages, it might help us find a problem.\
+\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\b \cf0 Adding Song List to the Mac
+\f2\b0 \
+if I wanted to have somethign like the Song List of the ipad in the Mac how do you recommend we do that?  (don't make code changes give me just a couple of approaches)\
+\
+Ok so how does slide drawer panel show up visually? does it have an icon?  WOuld it be visible over the tracks view or the visualizer or both?\
+In the tracks view could we have it take over the effects panel so the MIDI grid remains in place?\
+in the tracks view the effects panel cannot be closed, but I think replacing that with the Song list is fine and better than compressing the grid.  \
+I also think it would be fine to show the song list over the visualization area. in the same size as it takes over the effects panel.\
+\
+ok the song list works. However, it needs to be about 15 px lower as its covering the Bars slider. It should also be about 10 px wider on the left as I still see some of the effects chips.  \
+Also we should only be keeping the last 10 songs, so why are there so many songs in the list?\
+\
+if the user goes to compact view, close the Songs list\
+\
+lower the song list in mac another 10px.  Note that if we are in compact view (and therefore no animation of tracks or visuals) if we manually resize the window we should show the visuals or the tracks, same as if I had hit the expand button. That's not happening.\
+\
+Ok there's definitley a bug in the song list.  I had several songs in the list (from prior runs) and I could not get to them.  make sure that those are handled properly.\
+\
+check that the ipad and iphone have the correct behavior for the song list. When there are old songs in the list from past runs its not letting me go back to them.\
+\
+Song list is still not playing the songs from the prior sessions.  I want you to review this carefully. The behavior shoudl be as follows.  \
+When Zudio loads, reload the prior session songs that are stored.  Read them in as if they were genreated in this session.  As new songs are generated, add them to the list.  The maximum list size is 10.  It is to be treated like a Fixed Size Stack.  Anytime a new song is generated, add it to the top of the stack.  If we already have 10 items, then delete the oldest from the bottom of the stack.  Always move between songs in the stack order sequence. \
+If you need to do some research on how to do this properly, do that.  It is a very common data structure for maintaining a short "recently played" set of songs.  \
+It shoudl work the same way across Mac, iphone and ipad.  Please review the ideas here and then make the code consistent across all three.\
+\
+
+\f0\b Minor changes
+\f2\b0 \
+although the ambient song titles are great, some are coming out too long and therefore clipped. I think 35 characters is about the max. I don't want to just trim the song titles but can you identify for me the longest subphrases used in Ambient titles and give me suggestions on what could be made shorter while still humorous\
+\
+On the mac I'm still getting some wrong instruments. For example Ambient bass was listed as Cello Instrument Bs:42  but it didn't play the cello until I swithced instruments and then back to cello. \
+I'm not sure the instruments log telling me the MIDI patches its supposed to use is really going to help if it uses the wrong instrument.\
+\
+I want to simplify how the Next Track button works for Mac and iPad. Currently in song mode, it takes you to the last bar of the track.  and if you\'92re at the last bar it beeps basso. I want it to instead always generate a new song, put you at the first bar and start playing the song.  This is consistent with how it works if you are in Evolve or Endless mode. \
+\
+For the Previous Track button, it takes you to the beginning of the song. But if you\'92re in the first 2 bars, it goes to the previous generated track if there is one, otherwise basso beep.  Make it the 3 first bars instead. \
+Please review all related code and look for anything that can be simplified.\
+\
+\
+\
+\
 }

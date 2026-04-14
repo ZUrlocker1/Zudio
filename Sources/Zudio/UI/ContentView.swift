@@ -33,6 +33,8 @@ struct ContentView: View {
         let stored = UserDefaults.standard.string(forKey: "iPadTabPersist") ?? ""
         return (stored == "tracks") ? .tracks : .visuals
     }()
+    @State private var iPadVisualizerPaused: Bool = false
+    @State private var iPadShowVisualsOffLabel = false
 
     // iPad mini landscape: contentWidth 900–1150pt (portrait mini is <800pt).
     // In this orientation there isn't enough vertical room to show all 7 track rows
@@ -59,6 +61,13 @@ struct ContentView: View {
     private var macIsCompact: Bool {
         #if os(macOS)
         return appState.isWindowCompact
+        #else
+        return false
+        #endif
+    }
+    private var macShowSongList: Bool {
+        #if os(macOS)
+        return appState.macShowSongList
         #else
         return false
         #endif
@@ -96,7 +105,15 @@ struct ContentView: View {
         GeometryReader { geo in
             mainContent
                 .onAppear      { contentWidth = geo.size.width; contentHeight = geo.size.height }
-                .onChange(of: geo.size) { size in contentWidth = size.width; contentHeight = size.height }
+                .onChange(of: geo.size) { size in
+                    contentWidth = size.width
+                    contentHeight = size.height
+                    #if os(macOS)
+                    if !appState.suppressWindowResizeSync {
+                        appState.syncCompactStateFromWindow()
+                    }
+                    #endif
+                }
         }
         .frame(minWidth: 650, minHeight: kCompactContentHeight, alignment: .top)
         #endif
@@ -110,6 +127,9 @@ struct ContentView: View {
                 .fixedSize(horizontal: false, vertical: true)   // top bar never shrinks
                 .layoutPriority(3)
                 .zIndex(1)   // wins every hit-test over track rows + scrollbar when window is short
+
+            // Sub-container for everything below TopBarView — receives the macOS song list overlay.
+            VStack(spacing: 0) {
 
             // Song info + zoom slider — single combined row
             HStack(spacing: 10) {
@@ -132,7 +152,7 @@ struct ContentView: View {
                 Spacer()
 
                 // Zoom slider — right side of the same row; hidden in compact/minimum window
-                if !macIsCompact && contentHeight >= 250 {
+                if !macIsCompact && !macShowVisualizer && contentHeight >= 250 {
                     HStack(spacing: 5) {
                         Text("Bars:")
                             .font(.system(size: 10))
@@ -163,6 +183,7 @@ struct ContentView: View {
             // Track rows (or Visualizer) + scrollbar in a single sub-VStack so the scrollbar
             // always claims its 22pt before track rows compress — at any window height.
             VStack(spacing: 0) {
+            if !macIsCompact {
             if macShowVisualizer {
                 VisualizerView(style: appState.selectedStyle)
                     .environmentObject(appState.playback)
@@ -243,14 +264,27 @@ struct ContentView: View {
                 // into the top bar when track rows compress to 0px in compact window mode.
                 .clipped()
             }
+            } // end !macIsCompact guard — removes VisualizerView/TrackRows from hierarchy in compact mode
 
             // Horizontal scrollbar — always visible.
             // In tracks mode (normal): aligned with MIDI lanes, Generation Log label + ±buttons on left.
             // In visualizer or compact mode: full-width scrollbar only (no label/buttons).
-            let totalBars = appState.songState?.frame.totalBars ?? 32
-            let maxOffset = max(0, totalBars - appState.visibleBars)
+            let totalBars  = appState.songState?.frame.totalBars ?? 32
+            let maxOffset  = max(0, totalBars - appState.visibleBars)
+            let isTracksMode = !macShowVisualizer && !macIsCompact
+            // Tracks mode: scrollbar scrolls the visible window.
+            // Visualizer / compact: scrollbar drags the playhead (seek).
+            let macScrollBinding = isTracksMode
+                ? Binding<Int>(
+                    get: { appState.visibleBarOffset },
+                    set: { appState.visibleBarOffset = max(0, min($0, maxOffset)) }
+                  )
+                : Binding<Int>(
+                    get: { appState.playback.currentBar },
+                    set: { newBar in appState.seekTo(step: max(0, min(newBar, totalBars - 1)) * 16) }
+                  )
             HStack(spacing: 0) {
-                if !macShowVisualizer && !macIsCompact {
+                if isTracksMode {
                     // Generation Log label + font-size buttons — MIDI lane left column
                     HStack(spacing: 4) {
                         Text("Generation Log")
@@ -304,20 +338,17 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: 28, alignment: .leading)
                     HorizontalScrollBar(
-                        value: Binding(
-                            get: { appState.visibleBarOffset },
-                            set: { appState.visibleBarOffset = max(0, min($0, maxOffset)) }
-                        ),
+                        value: macScrollBinding,
                         total: totalBars,
-                        visible: appState.visibleBars
+                        visible: isTracksMode ? appState.visibleBars : 1
                     )
                     Text("Bar \(totalBars)")
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .frame(width: 36, alignment: .trailing)
                 }
-                if !macShowVisualizer && !macIsCompact {
-                    Color.clear.frame(width: midiLaneTrailing - 8)
+                if isTracksMode {
+                    Color.clear.frame(width: midiLaneTrailing + 5)
                 }
             }
             .padding(.horizontal, 8)
@@ -332,6 +363,19 @@ struct ContentView: View {
                 StatusBoxView(contentWidth: contentWidth)
                     .layoutPriority(0)   // status box shrinks first when window narrows
             }
+
+            }   // end sub-container VStack
+            #if os(macOS)
+            .overlay(alignment: .topTrailing) {
+                if appState.macShowSongList {
+                    macSongListPanel
+                        .frame(width: midiLaneTrailing + 10)
+                        .padding(.top, 30)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            #endif
+
         }
         #if os(iOS)
         .frame(minHeight: 500)
@@ -419,7 +463,7 @@ struct ContentView: View {
 
     /// Root content for iPad: TopBarView + song info + tab body + scrollbar + tab strip.
     @ViewBuilder private var iPadContent: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             TopBarView(contentWidth: contentWidth)
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(3)
@@ -431,10 +475,24 @@ struct ContentView: View {
             // Tab body — fills all remaining space
             Group {
                 if iPadTab == .visuals {
-                    VisualizerView(style: appState.selectedStyle)
-                        .environmentObject(appState.playback)
+                    if !iPadVisualizerPaused {
+                        VisualizerView(style: appState.selectedStyle)
+                            .environmentObject(appState.playback)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .onTapGesture(count: 2) { appState.resetEffectsToDefaults() }
+                    } else {
+                        ZStack(alignment: .bottomLeading) {
+                            Color(white: 0.04)
+                            if iPadShowVisualsOffLabel {
+                                Text("Visuals off")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.green.opacity(0.80))
+                                    .padding(.horizontal, 14)
+                                    .padding(.bottom, 12)
+                            }
+                        }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .onTapGesture(count: 2) { appState.resetEffectsToDefaults() }
+                    }
                 } else if iPadTab == .log {
                     StatusBoxView(contentWidth: contentWidth, showHeader: true)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -574,7 +632,9 @@ struct ContentView: View {
 
     /// Song title + info chips + zoom slider — shown above all tab bodies.
     private var iPadSongInfoRow: some View {
-        HStack(spacing: 10) {
+        // iPad mini portrait (<800pt): omit "Bar" chip to save horizontal space.
+        let isMiniPortrait = contentWidth < 800
+        return HStack(spacing: 10) {
             if let song = appState.songState {
                 Text(song.title)
                     .font(.system(size: 14, weight: .bold))
@@ -584,7 +644,9 @@ struct ContentView: View {
                 infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)")
                 infoChip("BPM",    "\(song.frame.tempo)")
                 infoChip("Length", songLength(song))
-                infoChip("Bar", String(format: "%03d", appState.playback.currentBar + 1))
+                if !isMiniPortrait {
+                    infoChip("Bar", String(format: "%03d", appState.playback.currentBar + 1))
+                }
             } else if !appState.isGenerating {
                 Text("No song — press Generate or Play")
                     .foregroundStyle(Color.white.opacity(0.45))
@@ -659,17 +721,46 @@ struct ContentView: View {
 
     private var iPadTabStrip: some View {
         HStack(spacing: 0) {
-            iPadTabButton("Visuals", systemImage: "sparkles",            tab: .visuals)
-            iPadTabButton("Log",     systemImage: "list.bullet",         tab: .log)
-            iPadTabButton("Tracks",  systemImage: "slider.horizontal.3", tab: .tracks)
-            iPadTabButton("Songs",   systemImage: "music.note.list",     tab: .songs)
+            // Visuals button: tap again while on Visuals to stop animation; tap again to resume.
+            Button {
+                if iPadTab == .visuals {
+                    iPadVisualizerPaused.toggle()
+                    if iPadVisualizerPaused {
+                        iPadShowVisualsOffLabel = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 6.5) {
+                            withAnimation(.easeOut(duration: 0.6)) { iPadShowVisualsOffLabel = false }
+                        }
+                    }
+                } else {
+                    iPadTab = .visuals
+                    iPadVisualizerPaused = false
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "sparkles").font(.system(size: 14))
+                    Text("Visuals").font(.system(size: 10))
+                }
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(
+                    iPadTab == .visuals
+                        ? (iPadVisualizerPaused ? Color(white: 0.38) : Color.white)
+                        : Color(white: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            iPadTabButton("Log",    systemImage: "list.bullet",         tab: .log)
+            iPadTabButton("Tracks", systemImage: "slider.horizontal.3", tab: .tracks)
+            iPadTabButton("Songs",  systemImage: "music.note.list",     tab: .songs)
         }
         .frame(height: 36)
         .background(Color(white: 0.10))
     }
 
     private func iPadTabButton(_ label: String, systemImage: String, tab: IPadTab) -> some View {
-        Button { iPadTab = tab } label: {
+        Button {
+            iPadTab = tab
+            if tab == .visuals { iPadVisualizerPaused = false }
+        } label: {
             VStack(spacing: 2) {
                 Image(systemName: systemImage).font(.system(size: 14))
                 Text(label).font(.system(size: 10))
@@ -683,12 +774,12 @@ struct ContentView: View {
     private var iPadSongHistoryList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(appState.generationHistory, id: \.globalSeed) { song in
-                        // oldest at top, newest at bottom — natural history order
-                        Button { appState.loadFromGenerationHistory(song) } label: {
+                VStack(spacing: 0) {
+                    // Newest at top — reverse the persisted list for display
+                    ForEach(Array(appState.persistedHistory.reversed())) { song in
+                        Button { appState.loadFromPersistedSong(song) } label: {
                             HStack(spacing: 8) {
-                                if song.globalSeed == appState.songState?.globalSeed {
+                                if song.seed == appState.songState?.globalSeed {
                                     Image(systemName: "speaker.wave.2.fill")
                                         .foregroundStyle(.green).font(.system(size: 12))
                                 } else {
@@ -710,8 +801,9 @@ struct ContentView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
+                            .contentShape(Rectangle())
                         }
-                        .id(song.globalSeed)
+                        .id(song.seed)
                         .buttonStyle(.plain)
                         Divider().background(Color(white: 0.25))
                     }
@@ -722,14 +814,88 @@ struct ContentView: View {
                     proxy.scrollTo(seed, anchor: .center)
                 }
             }
-            .onChange(of: appState.songState?.globalSeed) { _, seed in
-                if let seed { proxy.scrollTo(seed, anchor: .center) }
-            }
         }
         .background(Color(white: 0.08))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    #endif
+
+    // MARK: - Mac song list panel (macOS only)
+
+    #if os(macOS)
+    /// Narrow song list panel that overlays the right side of the main content area.
+    /// Width is set by the caller to match midiLaneTrailing; content uses compact fonts.
+    private var macSongListPanel: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Songs")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button { appState.macShowSongList = false } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 22)
+            .background(Color(white: 0.13))
+
+            // Song rows
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(Array(appState.persistedHistory.reversed())) { song in
+                            Button {
+                                appState.loadFromPersistedSong(song)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if song.seed == appState.songState?.globalSeed {
+                                        Image(systemName: "speaker.wave.2.fill")
+                                            .foregroundStyle(.green)
+                                            .font(.system(size: 10))
+                                    } else {
+                                        Image(systemName: "speaker.wave.2.fill")
+                                            .font(.system(size: 10))
+                                            .hidden()
+                                    }
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(song.title)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                            .lineLimit(1)
+                                        Text(song.style.rawValue.capitalized)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color.white.opacity(0.50))
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .contentShape(Rectangle())
+                            }
+                            .id(song.seed)
+                            .buttonStyle(.plain)
+                            .disabled(appState.isGenerating)
+                            Divider().background(Color(white: 0.28))
+                        }
+                    }
+                }
+                .onAppear {
+                    if let seed = appState.songState?.globalSeed {
+                        proxy.scrollTo(seed, anchor: .center)
+                    }
+                }
+            }
+            .background(Color(white: 0.10))
+            .frame(maxHeight: .infinity)
+        }
+        .background(Color(white: 0.13))
+    }
     #endif
 
     // MARK: - Helpers

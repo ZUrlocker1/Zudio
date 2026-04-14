@@ -24,15 +24,22 @@ struct StatusBoxView: View {
     // Tag column fixed width in monospaced chars (must exceed longest rule ID + space)
     private let tagWidth = 15
 
-    // Body font: the generated log entries. Affected by +/- hotkeys and mini-device reduction.
+    // Scales with the user's Dynamic Type setting so the log text honours
+    // their preferred reading size. The +/- buttons then nudge within that scale.
+    #if os(iOS)
+    @ScaledMetric(relativeTo: .body) private var scaledBase: CGFloat = 14
+    #endif
+
+    // Body font: the generated log entries. Scales with Dynamic Type on iOS;
+    // further adjusted by +/- buttons via statusLogFontOffset.
     private var fontBody: CGFloat {
         let base: CGFloat
         #if os(macOS)
         base = 12
         #else
-        base = isMini ? 12 : 14
+        base = isMini ? min(scaledBase, 12) : scaledBase
         #endif
-        return max(8, min(20, base + CGFloat(appState.statusLogFontOffset)))
+        return max(8, min(28, base + CGFloat(appState.statusLogFontOffset)))
     }
     // iPad mini portrait (<800pt) or mini landscape (900–1150pt)
     private var isMini: Bool {
@@ -50,11 +57,10 @@ struct StatusBoxView: View {
             // Only shown when embedded as a standalone Log tab panel (not below the
             // scrollbar strip in the Tracks tab, which already contains these controls).
             if showHeader {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Text("Generation Log")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.70))
-                    Spacer()
                     if let onReset {
                         Button(action: onReset) {
                             Text("Reset")
@@ -66,7 +72,6 @@ struct StatusBoxView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.red.opacity(0.5), lineWidth: 0.5))
                         }
                         .buttonStyle(.plain)
-                        .padding(.trailing, 4)
                     }
                     Button {
                         appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
@@ -102,9 +107,11 @@ struct StatusBoxView: View {
                     .foregroundStyle(Color.white.opacity(0.85))
                     .font(.system(size: 11, weight: .medium))
                     .disabled(appState.statusLogFontOffset >= 8)
+                    Spacer()
                 }
                 .padding(.horizontal, 12)
-                .frame(height: 28)
+                .frame(height: 34)
+                .dynamicTypeSize(.large)
                 .background(Color(white: 0.13))
             }
 
@@ -173,6 +180,9 @@ struct StatusBoxView: View {
                 }
             }
         }
+        // Ensure the VStack always fills the full proposed width so the header's Spacer
+        // pushes the +/- buttons to the true right edge regardless of log content width.
+        .frame(maxWidth: .infinity)
     }
 
     // Build the entire log as a single AttributedString so text selection spans all lines.

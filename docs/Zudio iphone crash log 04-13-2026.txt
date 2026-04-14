@@ -1,0 +1,282 @@
+Incident Identifier: 4304CF6C-E614-4BE7-BFBC-408CA9565A3E
+CrashReporter Key:   c9db3e402f7e6622324af70cf619a4451fc51f36
+Hardware Model:      iPhone16,1
+Process:             ZudioiOS [842]
+Path:                /private/var/containers/Bundle/Application/90346F75-A795-45B5-8173-551B85208B18/ZudioiOS.app/ZudioiOS
+Identifier:          com.zudio.app.ios
+Version:             0.99c (1)
+Code Type:           ARM-64 (Native)
+Role:                Foreground
+Parent Process:      launchd [1]
+Coalition:           com.zudio.app.ios [782]
+
+Date/Time:           2026-04-13 10:16:36.7105 -0400
+Launch Time:         2026-04-13 09:36:26.4310 -0400
+OS Version:          iPhone OS 18.7.7 (22H340)
+Release Type:        User
+Baseband Version:    2.70.04
+Report Version:      104
+
+Exception Type:  EXC_BAD_ACCESS (SIGSEGV)
+Exception Subtype: KERN_INVALID_ADDRESS at 0x000000010bbffffc
+Exception Codes: 0x0000000000000001, 0x000000010bbffffc
+VM Region Info: 0x10bbffffc is not in any region.  Bytes after previous region: 8257533  Bytes before following region: 4
+      REGION TYPE                 START - END      [ VSIZE] PRT/MAX SHRMOD  REGION DETAIL
+      CoreAnimation            10b41c000-10b420000 [   16K] rw-/rwx SM=PRV  
+--->  GAP OF 0x7e0000 BYTES
+      MALLOC_SMALL             10bc00000-10c000000 [ 4096K] rw-/rwx SM=PRV  
+Termination Reason: SIGNAL 11 Segmentation fault: 11
+Terminating Process: exc handler [842]
+
+Triggered by Thread:  13
+
+Thread 0 name:   Dispatch queue: com.apple.main-thread
+Thread 0:
+0   libsystem_kernel.dylib        	       0x1d89f5ce4 mach_msg2_trap + 8
+1   libsystem_kernel.dylib        	       0x1d89f939c mach_msg2_internal + 75
+2   libsystem_kernel.dylib        	       0x1d89f92b8 mach_msg_overwrite + 427
+3   libsystem_kernel.dylib        	       0x1d89f9100 mach_msg + 23
+4   CoreFoundation                	       0x187b356d0 __CFRunLoopServiceMachPort + 159
+5   CoreFoundation                	       0x187b33fc0 __CFRunLoopRun + 1207
+6   CoreFoundation                	       0x187b35a0c CFRunLoopRunSpecific + 571
+7   GraphicsServices              	       0x1d49bd454 GSEventRunModal + 167
+8   UIKitCore                     	       0x18a5551a4 -[UIApplication _run] + 815
+9   UIKitCore                     	       0x18a520a28 UIApplicationMain + 335
+10  SwiftUI                       	       0x18c6667a4 closure #1 in KitRendererCommon(_:) + 167
+11  SwiftUI                       	       0x18c36c01c runApp<A>(_:) + 111
+12  SwiftUI                       	       0x18c36bed0 static App.main() + 179
+13  ZudioiOS.debug.dylib          	       0x10250955c static ZudioApp.$main() + 40
+14  ZudioiOS.debug.dylib          	       0x10250962c __debug_main_executable_dylib_entry_point + 12
+15  dyld                          	       0x1ae621f08 start + 6039
+
+Thread 1 name:  com.apple.uikit.eventfetch-thread
+Thread 1:
+0   libsystem_kernel.dylib        	       0x1d89f5ce4 mach_msg2_trap + 8
+1   libsystem_kernel.dylib        	       0x1d89f939c mach_msg2_internal + 75
+2   libsystem_kernel.dylib        	       0x1d89f92b8 mach_msg_overwrite + 427
+3   libsystem_kernel.dylib        	       0x1d89f9100 mach_msg + 23
+4   CoreFoundation                	       0x187b356d0 __CFRunLoopServiceMachPort + 159
+5   CoreFoundation                	       0x187b33fc0 __CFRunLoopRun + 1207
+6   CoreFoundation                	       0x187b35a0c CFRunLoopRunSpecific + 571
+7   Foundation                    	       0x1867aa79c -[NSRunLoop(NSRunLoop) runMode:beforeDate:] + 211
+8   Foundation                    	       0x1867b0020 -[NSRunLoop(NSRunLoop) runUntilDate:] + 63
+9   UIKitCore                     	       0x18a53f49c -[UIEventFetcher threadMain] + 423
+10  Foundation                    	       0x186810804 __NSThread__start__ + 731
+11  libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+12  libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 2 name:  caulk::deferred_logger
+Thread 2:
+0   libsystem_kernel.dylib        	       0x1d89f5c60 semaphore_wait_trap + 8
+1   caulk                         	       0x2154f19e4 caulk::semaphore::timed_wait(double) + 223
+2   caulk                         	       0x2154f0020 caulk::concurrent::details::worker_thread::run() + 31
+3   caulk                         	       0x215506ee0 void* caulk::thread_proxy<std::__1::tuple<caulk::thread::attributes, void (caulk::concurrent::details::worker_thread::*)(), std::__1::tuple<caulk::concurrent::details::worker_thread*>>>(void*) + 95
+4   libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+5   libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 3 name:  caulk.messenger.shared:high
+Thread 3:
+0   libsystem_kernel.dylib        	       0x1d89f5c60 semaphore_wait_trap + 8
+1   caulk                         	       0x2154f19e4 caulk::semaphore::timed_wait(double) + 223
+2   caulk                         	       0x2154f0020 caulk::concurrent::details::worker_thread::run() + 31
+3   caulk                         	       0x215506ee0 void* caulk::thread_proxy<std::__1::tuple<caulk::thread::attributes, void (caulk::concurrent::details::worker_thread::*)(), std::__1::tuple<caulk::concurrent::details::worker_thread*>>>(void*) + 95
+4   libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+5   libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 4 name:  com.apple.audio.toolbox.AUScheduledParameterRefresher
+Thread 4:
+0   libsystem_kernel.dylib        	       0x1d89f5c60 semaphore_wait_trap + 8
+1   caulk                         	       0x2154f19e4 caulk::semaphore::timed_wait(double) + 223
+2   caulk                         	       0x2154f0020 caulk::concurrent::details::worker_thread::run() + 31
+3   caulk                         	       0x215506ee0 void* caulk::thread_proxy<std::__1::tuple<caulk::thread::attributes, void (caulk::concurrent::details::worker_thread::*)(), std::__1::tuple<caulk::concurrent::details::worker_thread*>>>(void*) + 95
+4   libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+5   libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 5:
+0   libsystem_kernel.dylib        	       0x1d89fb438 __psynch_cvwait + 8
+1   libsystem_pthread.dylib       	       0x212065e50 _pthread_cond_wait + 983
+2   libAudioToolboxUtility.dylib  	       0x1b10e6bd0 CADeprecated::CAGuard::Wait() + 75
+3   libAudioToolboxUtility.dylib  	       0x1b10de98c TFileBSD::AsyncFileIOHandler(void*) + 247
+4   libAudioToolboxUtility.dylib  	       0x1b10cd51c CADeprecated::CAPThread::Entry(void*) + 95
+5   libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+6   libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 6:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+Thread 7:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+Thread 8:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+Thread 9:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+Thread 10:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+Thread 11 name:  AudioStreamerImpl::sIOWorkerProcess
+Thread 11:
+0   libsystem_kernel.dylib        	       0x1d89f5c60 semaphore_wait_trap + 8
+1   libdispatch.dylib             	       0x18fac58e0 _dispatch_sema4_wait + 27
+2   libdispatch.dylib             	       0x18fac5e90 _dispatch_semaphore_wait_slow + 131
+3   libEmbeddedSystemAUs.dylib    	       0x2204020b4 AudioStreamerImpl::sIOWorkerProcess(void*) + 195
+4   libAudioToolboxUtility.dylib  	       0x1b10cd51c CADeprecated::CAPThread::Entry(void*) + 95
+5   libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+6   libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 12 name:  AudioSession - RootQueue
+Thread 12:
+0   libsystem_kernel.dylib        	       0x1d89f5c78 semaphore_timedwait_trap + 8
+1   libdispatch.dylib             	       0x18faf81c0 _dispatch_sema4_timedwait + 63
+2   libdispatch.dylib             	       0x18fac5e58 _dispatch_semaphore_wait_slow + 75
+3   libdispatch.dylib             	       0x18fad5ba8 _dispatch_worker_thread + 323
+4   libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+5   libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 13 name:  AURemoteIO::IOThread
+Thread 13 Crashed:
+0   libEmbeddedSystemAUs.dylib    	       0x2203adaf0 bool ProcessMono<false>(float*, unsigned int*, float*, double*, double, double, double, double, bool) + 104
+1   libEmbeddedSystemAUs.dylib    	       0x2203ab864 SamplerNote::Render(unsigned long long, unsigned int, AudioBufferList**, unsigned int, unsigned int) + 3319
+2   libEmbeddedSystemAUs.dylib    	       0x2203a669c non-virtual thunk to SamplerNote::Render(unsigned long long, unsigned int, AudioBufferList**, unsigned int, unsigned int) + 19
+3   libEmbeddedSystemAUs.dylib    	       0x2203a662c SynthGroupElement::Render(long long, unsigned int, ausdk::AUScope&, unsigned int) + 299
+4   libEmbeddedSystemAUs.dylib    	       0x2203a5e28 AUInstrumentBase::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 1419
+5   libEmbeddedSystemAUs.dylib    	       0x2203addb4 SamplerBase::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 175
+6   libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+7   libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+8   AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+9   AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+10  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+11  AVFAudio                      	       0x1a31638a8 invocation function for block in AUGraphMultiBusNode::AllocateInputBlock() + 167
+12  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+13  libEmbeddedSystemAUs.dylib    	       0x2203df108 AUMultiChannelMixer::MixerCore::RenderInput(unsigned int, AudioTimeStamp const&, unsigned int) + 447
+14  libEmbeddedSystemAUs.dylib    	       0x2203ddffc AUMultiChannelMixer::MixerCore::Mix(InputRenderOrderInfo const*, int, AudioTimeStamp const&, unsigned int) + 1247
+15  libEmbeddedSystemAUs.dylib    	       0x2203dd934 AUMultiChannelMixer::MixerCore::MasterMix(AudioTimeStamp const&, unsigned int) + 2211
+16  libEmbeddedSystemAUs.dylib    	       0x2203dce30 AUMultiChannelMixer::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 859
+17  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+18  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+19  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+20  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+21  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+22  AVFAudio                      	       0x1a315f9a4 invocation function for block in AUGraphNodeBaseV3::AllocateInputBlock() + 159
+23  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+24  libEmbeddedSystemAUs.dylib    	       0x220394700 ausdk::AUInputElement::PullInput(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 179
+25  libEmbeddedSystemAUs.dylib    	       0x22047c984 ausdk::AUEffectBase::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 95
+26  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+27  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+28  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+29  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+30  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+31  AVFAudio                      	       0x1a315f9a4 invocation function for block in AUGraphNodeBaseV3::AllocateInputBlock() + 159
+32  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+33  libEmbeddedSystemAUs.dylib    	       0x220394700 ausdk::AUInputElement::PullInput(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 179
+34  libEmbeddedSystemAUs.dylib    	       0x22047c984 ausdk::AUEffectBase::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 95
+35  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+36  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+37  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+38  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+39  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+40  AVFAudio                      	       0x1a315f9a4 invocation function for block in AUGraphNodeBaseV3::AllocateInputBlock() + 159
+41  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+42  libEmbeddedSystemAUs.dylib    	       0x220394700 ausdk::AUInputElement::PullInput(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 179
+43  libEmbeddedSystemAUs.dylib    	       0x220469ce0 AUDynamicsProcessor::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 139
+44  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+45  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+46  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+47  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+48  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+49  AVFAudio                      	       0x1a315f9a4 invocation function for block in AUGraphNodeBaseV3::AllocateInputBlock() + 159
+50  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+51  libEmbeddedSystemAUs.dylib    	       0x220394700 ausdk::AUInputElement::PullInput(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 179
+52  libEmbeddedSystemAUs.dylib    	       0x22044fca0 AUNBandEQ::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 111
+53  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+54  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+55  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+56  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+57  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+58  AVFAudio                      	       0x1a315f9a4 invocation function for block in AUGraphNodeBaseV3::AllocateInputBlock() + 159
+59  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+60  libEmbeddedSystemAUs.dylib    	       0x220394700 ausdk::AUInputElement::PullInput(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 179
+61  libEmbeddedSystemAUs.dylib    	       0x2204671b8 AUMatrixReverbLite::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 75
+62  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+63  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+64  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+65  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+66  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+67  AVFAudio                      	       0x1a31638a8 invocation function for block in AUGraphMultiBusNode::AllocateInputBlock() + 167
+68  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+69  libEmbeddedSystemAUs.dylib    	       0x2203df108 AUMultiChannelMixer::MixerCore::RenderInput(unsigned int, AudioTimeStamp const&, unsigned int) + 447
+70  libEmbeddedSystemAUs.dylib    	       0x2203ddfa8 AUMultiChannelMixer::MixerCore::Mix(InputRenderOrderInfo const*, int, AudioTimeStamp const&, unsigned int) + 1163
+71  libEmbeddedSystemAUs.dylib    	       0x2203dd934 AUMultiChannelMixer::MixerCore::MasterMix(AudioTimeStamp const&, unsigned int) + 2211
+72  libEmbeddedSystemAUs.dylib    	       0x2203dce30 AUMultiChannelMixer::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 859
+73  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+74  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+75  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+76  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+77  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+78  AVFAudio                      	       0x1a31638a8 invocation function for block in AUGraphMultiBusNode::AllocateInputBlock() + 167
+79  AudioToolboxCore              	       0x195140b98 AUAudioUnitV2Bridge_Renderer::renderInputProc(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 79
+80  libEmbeddedSystemAUs.dylib    	       0x2203df108 AUMultiChannelMixer::MixerCore::RenderInput(unsigned int, AudioTimeStamp const&, unsigned int) + 447
+81  libEmbeddedSystemAUs.dylib    	       0x2203ddffc AUMultiChannelMixer::MixerCore::Mix(InputRenderOrderInfo const*, int, AudioTimeStamp const&, unsigned int) + 1247
+82  libEmbeddedSystemAUs.dylib    	       0x2203dd3fc AUMultiChannelMixer::MixerCore::MasterMix(AudioTimeStamp const&, unsigned int) + 875
+83  libEmbeddedSystemAUs.dylib    	       0x2203dce30 AUMultiChannelMixer::Render(unsigned int&, AudioTimeStamp const&, unsigned int) + 859
+84  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+85  libEmbeddedSystemAUs.dylib    	       0x220393a04 ausdk::AUMethodRender(void*, unsigned int*, AudioTimeStamp const*, unsigned int, unsigned int, AudioBufferList*) + 51
+86  AudioToolboxCore              	       0x19513f16c invocation function for block in AUAudioUnitV2Bridge_Renderer::renderBlock() + 607
+87  AudioToolboxCore              	       0x1950d3b18 __26-[AUAudioUnit renderBlock]_block_invoke + 291
+88  AVFAudio                      	       0x1a315f850 invocation function for block in CopyInnerInputBlock(AUGraphNodeBaseV3*) + 323
+89  AVFAudio                      	       0x1a315f9a4 invocation function for block in AUGraphNodeBaseV3::AllocateInputBlock() + 159
+90  libEmbeddedSystemAUs.dylib    	       0x220394010 AUConverterBase::RenderBus(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 667
+91  libEmbeddedSystemAUs.dylib    	       0x220393b1c AURemoteIO::RenderBus(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int) + 195
+92  libEmbeddedSystemAUs.dylib    	       0x2203936a0 ausdk::AUBase::DoRender(unsigned int&, AudioTimeStamp const&, unsigned int, unsigned int, AudioBufferList&) + 1975
+93  libEmbeddedSystemAUs.dylib    	       0x2203928f0 AURemoteIO::PerformIO(unsigned int, unsigned int, unsigned int, AudioTimeStamp const&, AudioTimeStamp const&, AudioBufferList const*, AudioBufferList*, int&) + 1255
+94  libEmbeddedSystemAUs.dylib    	       0x220392090 _XPerformIO + 347
+95  libAudioToolboxUtility.dylib  	       0x1b10b8894 mshMIGPerform + 283
+96  libAudioToolboxUtility.dylib  	       0x1b10b8a94 MSHMIGDispatchMessage + 35
+97  libEmbeddedSystemAUs.dylib    	       0x220392ca4 void* caulk::thread_proxy<std::__1::tuple<caulk::thread::attributes, AURemoteIO::IOThread::IOThread(AURemoteIO&, caulk::thread::attributes const&, caulk::mach::os_workgroup_managed const&)::'lambda'(), std::__1::tuple<>>>(void*) + 579
+98  libsystem_pthread.dylib       	       0x212067344 _pthread_start + 135
+99  libsystem_pthread.dylib       	       0x212064ab8 thread_start + 7
+
+Thread 14:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+Thread 15:
+0   libsystem_pthread.dylib       	       0x212064aa4 start_wqthread + 0
+
+
+Thread 13 crashed with ARM Thread State (64-bit):
+    x0: 0x000000010bbf1e10   x1: 0x000000016e002174   x2: 0x000000016e00243c   x3: 0x000000016e002168
+    x4: 0x0000000000000001   x5: 0x0000000000000010   x6: 0x0000000000000000   x7: 0x0000000000000000
+    x8: 0x00000000000000ad   x9: 0x0000000000000005  x10: 0x000000000000c9af  x11: 0x000000000000387b
+   x12: 0x000000010bc00000  x13: 0x000000000000c9af  x14: 0x0000000000000001  x15: 0x0000000115c423a0
+   x16: 0x0000000211fb9af0  x17: 0x0000000270b8bf28  x18: 0x0000000000000000  x19: 0x000000000000c9af
+   x20: 0x000000016e0029a0  x21: 0x000000000000c9af  x22: 0x000000000000387b  x23: 0x00000001f26f6648
+   x24: 0x000000000000387c  x25: 0x000000010bc00000  x26: 0x00000000000000ad  x27: 0x0000000116903c20
+   x28: 0x000000016e0029a0   fp: 0x000000016e0020a0   lr: 0x00000002203ab864
+    sp: 0x000000016e002080   pc: 0x00000002203adaf0 cpsr: 0x20001000
+   far: 0x000000010bbffffc  esr: 0x92000007 (Data Abort) byte read Translation fault
+
+Binary Images:
+       0x10236c000 -        0x102377fff ZudioiOS arm64  <72a7502436e63d6cb22db53f4b1785f7> /var/containers/Bundle/Application/90346F75-A795-45B5-8173-551B85208B18/ZudioiOS.app/ZudioiOS
+       0x102504000 -        0x102883fff ZudioiOS.debug.dylib arm64  <182187d79cf437e2ae6e67664e111c27> /private/var/containers/Bundle/Application/90346F75-A795-45B5-8173-551B85208B18/ZudioiOS.app/ZudioiOS.debug.dylib
+       0x103760000 -        0x10376bfff libobjc-trampolines.dylib arm64e  <bc772703524d32ed813bad64762fcf7d> /private/preboot/Cryptexes/OS/usr/lib/libobjc-trampolines.dylib
+       0x1d89f5000 -        0x1d8a2ee6f libsystem_kernel.dylib arm64e  <ed1dc11f16dc3670aaa833300ec33037> /usr/lib/system/libsystem_kernel.dylib
+       0x187b24000 -        0x1880a0fff CoreFoundation arm64e  <c5317dc2e73b3163b22a64b312109843> /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+       0x1d49bc000 -        0x1d49c4c7f GraphicsServices arm64e  <6f98303a8a7636dd9b510ad06fe5335e> /System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices
+       0x18a420000 -        0x18c36241f UIKitCore arm64e  <e976755fe1c7393f9b0b48b6a40e68de> /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore
+       0x18c363000 -        0x18d5e67bf SwiftUI arm64e  <d62acc4dc51e34d9967019604c6400aa> /System/Library/Frameworks/SwiftUI.framework/SwiftUI
+       0x1ae5e3000 -        0x1ae67d87b dyld arm64e  <0474b929607f356f8e06bd9cc1ddb4f7> /usr/lib/dyld
+               0x0 - 0xffffffffffffffff ??? unknown-arch  <00000000000000000000000000000000> ???
+       0x18679b000 -        0x18740f0df Foundation arm64e  <37e8b254bf2a327e8765aced0377652b> /System/Library/Frameworks/Foundation.framework/Foundation
+       0x212064000 -        0x212070413 libsystem_pthread.dylib arm64e  <2335096f3c713896afe00b48cb67b535> /usr/lib/system/libsystem_pthread.dylib
+       0x2154ee000 -        0x215515e7f caulk arm64e  <4f8343e4f1893f9d90a4254074981726> /System/Library/PrivateFrameworks/caulk.framework/caulk
+       0x1b10b7000 -        0x1b10eeb1f libAudioToolboxUtility.dylib arm64e  <be4d0d3884353dad8c25f00724201e94> /usr/lib/libAudioToolboxUtility.dylib
+       0x18fac2000 -        0x18fb07b3f libdispatch.dylib arm64e  <c19e1caefee03e31844da31bf2c39bd7> /usr/lib/system/libdispatch.dylib
+       0x220391000 -        0x2204a749b libEmbeddedSystemAUs.dylib arm64e  <2136f51c204c3bd4a9603b082314d219> /System/Library/Frameworks/AudioToolbox.framework/libEmbeddedSystemAUs.dylib
+       0x194f09000 -        0x1952b44bf AudioToolboxCore arm64e  <affb948752653498b67ce16c2ea877e0> /System/Library/PrivateFrameworks/AudioToolboxCore.framework/AudioToolboxCore
+       0x1a30fd000 -        0x1a3271fdf AVFAudio arm64e  <19299c35e2773ef9b783ae0cf54aa10c> /System/Library/Frameworks/AVFAudio.framework/AVFAudio
+       0x211fb9000 -        0x211fc08cf libsystem_platform.dylib arm64e  <6079e486f6423100ae63b58df5f5c343> /usr/lib/system/libsystem_platform.dylib
+
+EOF
+

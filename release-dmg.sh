@@ -5,8 +5,9 @@
 
 set -euo pipefail
 
-APP_SRC="${1:-${HOME}/Downloads/Zudio.app}"
-VERSION="0.99c"
+VERSION="0.99d"
+APP_VER="${VERSION//./}"   # "0.99d" → "099d"
+APP_SRC="${1:-${HOME}/Downloads/Zudio ${APP_VER}.app}"
 TEAM_ID="K66MA9TR8Z"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
 OUTPUT_DMG="${HOME}/Downloads/Zudio-${VERSION}.dmg"
@@ -151,7 +152,7 @@ echo ""
 echo " Verify checklist:"
 echo "   1. Open the DMG — Zudio.app on left, Applications on right, arrow visible"
 echo "   2. Drag Zudio.app to Applications and launch"
-echo "   3. About dialog shows version 0.99b"
+echo "   3. About dialog shows version 0.99d"
 echo "   4. spctl --assess --verbose=4 --type exec \"${APP_SRC}\""
 echo "============================================================"
 echo ""

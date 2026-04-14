@@ -31,28 +31,28 @@ struct AmbientTitleGenerator {
 
     private static let mundanePlaces = [
         "Dentist Waiting Rooms", "a Drafty Hallway", "the Lower Deck of a Ferry",
-        "a Mildly Inadequate Conference Room", "the Queue at Boots",
+        "an Inadequate Conference Room", "the Queue at Boots",
         "Browsing IKEA on a Sunday", "a Cancelled Train",
-        "the Waiting Area of a Tyre Fitting Centre",
-        "the Bus that Was Already Full", "Supermarket Self-Checkout",
+        "the Tyre Centre Queue",
+        "the Bus that Was Full", "Supermarket Self-Checkout",
         "an Uneventful Tuesday", "a Slightly Too Long Meeting",
-        "the Leisure Centre Changing Room", "a Business Park in January",
-        "the Period Between Lunch and the 3pm Meeting",
+        "the Unused Changing Room", "a Business Park in January",
+        "the Post-Lunch Deadzone",
         "the NCP Car Park at Dusk", "a Mildly Warm Office",
         "a Regional Distribution Centre", "the Holdmusic",
         "a Slowly Loading Web Page", "an Unattended Printer",
-        "the Forecourt of a Petrol Station", "Reconsidering Life Choices",
-        "Returning an Item Without a Receipt"
+        "the Outside of a Petrol Station", "Reconsidering Life Choices",
+        "Returning Without Receipt"
     ]
 
     private static let endingParentheticals = [
         "That Never Ends", "Possibly", "Eventually",
-        "In Which Nothing Much Happens", "Awaiting Confirmation",
+        "In Which Nothing Happens", "Awaiting Confirmation",
         "TBC", "Already Happened", "Subject to Availability",
         "Pending", "More or Less", "See Previous Notes",
         "Under Review", "Not Really", "Gradually, Then All at Once",
-        "To Be Rescheduled", "Which Was Actually the Middle",
-        "Descending Slowly", "In Which the Tape Simply Runs Out",
+        "To Be Rescheduled", "Which Was Really the Middle",
+        "Descending Slowly", "In Which the Tape Runs Out",
         "Pt. II of I", "Do Not Distribute", "Final Version (3)",
         "The One Where Nothing Resolves"
     ]
@@ -75,28 +75,28 @@ struct AmbientTitleGenerator {
         "the Ring Road", "a Disused Gravel Pit", "the Trading Estate",
         "Hemel Hempstead", "the NCP Car Park", "a Suburban Cul-de-Sac",
         "the Service Station", "the B2047", "the Overflow Car Park",
-        "a Light Industrial Unit", "the Dual Carriageway",
+        "an Industrial Unit", "the Dual Carriageway",
         "the Goods Entrance", "a Medium-Sized Retail Park"
     ]
 
     private static let abstractNouns = [
         "The Memory", "The Properties", "The Persistence",
-        "The Thermodynamic Properties", "The Geometry",
+        "The Thermodynamics", "The Geometry",
         "The Topology", "The Absence", "The Curvature",
         "The Structural Integrity", "The Gradual Decay",
         "The Fading Echo", "The Quiet Insistence",
         "The Phenomenology", "The Specific Gravity",
-        "The Load-Bearing Capacity", "The Half-Life"
+        "The Bearing Capacity", "The Half-Life"
     ]
 
     private static let tepidSubjects = [
         "a Beige Wall", "Tepid Tea", "the Waiting Room",
         "a Slightly Damp Coat", "Mildly Warm Coffee",
-        "an Unread Email", "a Forgotten Password", "the Permanent Under-Secretary",
+        "an Unread Email", "a Forgotten Password", "the Under-Secretary",
         "a Partially Eaten Sandwich", "the Suspended Ceiling","WOOC(P)",
-        "a Persistent Low-Level Hum", "a Lukewarm Radiator",
+        "a Persistent Hum", "a Lukewarm Radiator",
         "the Beige Carpet", "a Receding Hairline",
-        "an Unanswered Voicemail", "the Fire Exit", "a bad investment", "the Reign of Zorvaak",
+        "an Unanswered Voicemail", "the Fire Exit", "a Bad Investment", "the Reign of Zorvaak",
         "a Nearly Empty Stapler", "Mild Disappointment", "the Forrest Connection"
     ]
 
@@ -116,25 +116,25 @@ struct AmbientTitleGenerator {
 
     private static let mundaneActivities = [
         "a Slow Elevator", "the Monday Commute",
-        "Reconsidering Your Career Path", "an Uneventful Tuesday",
-        "a Mild Administrative Error", "an Unscheduled Meeting",
-        "Completing a Form in Triplicate", "a Lukewarm Room",
+        "a Career Rethink", "an Uneventful Tuesday",
+        "an Administrative Error", "an Unscheduled Meeting",
+        "Forms in Triplicate", "a Lukewarm Room",
         "the Lower Suburbs", "a Slight Change of Plans",
         "a Poorly Attended Meeting", "a Delayed Reply",
-        "an Unremarkable Wednesday", "an Expired Parking Permit",
-        "a Very Slow Download", "a Mildly Inconvenient Error Message"
+        "an Uneventful Friday", "an Expired Parking Permit",
+        "a Very Slow Download", "a Mildly Odd Error Message"
     ]
 
     private static let weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Sunday"]
 
     private static let mundaneEvents = [
         "Afternoon", "Lunch", "Morning", "Evening",
-        "the 3pm Meeting", "a Routine Dental Appointment",
+        "the 3pm Meeting", "a Routine Dental Checkup",
         "a Mild Disagreement", "a Brief Drizzle", "Persistent Drizzle",
-        "a Slight Delay", "a Tepid Coffee", "a Cancelled Appointment",
+        "a Slight Delay", "a Tepid Coffee", "a Cancelled Meeting",
         "Nothing in Particular", "the Usual", "a Light Lunch",
         "a Slightly Long Queue", "an Awkward Silence",
-        "a Missed Connection", "a Gentle Administrative Inconvenience"
+        "a Missed Connection", "a Gentle Inconvenience"
     ]
 
     private static let pretentiousAdjectives = [
@@ -153,7 +153,7 @@ struct AmbientTitleGenerator {
     ]
 
     private static let ambientSubtitles = [
-        "Music for Spreadsheets", "Day of Moderate Precipitation",
+        "Music for Spreadsheets", "Day of Moderate Rain",
         "On the Ring Road", "The Plateaux of the Car Park",
         "On Beige", "Thinking Music III", "Mild Weather",
         "Thursday Afternoon (Revised)", "On Hold",
@@ -166,15 +166,15 @@ struct AmbientTitleGenerator {
         "the Gap Under the Door", "a Stairwell",
         "a Fluorescent-Lit Corridor", "a Partially Open Office Door",
         "a Fogged Car Window", "the Suspended Ceiling Tiles",
-        "a Venetian Blind", "a Fire Door (Propped Open)",
-        "the Internal Window of a Conference Room",
-        "a Revolving Door That Moves Too Slowly"
+        "a Venetian Blind", "a Fire Door (Ajar)",
+        "the Window of a Conference Room",
+        "a Revolving Door That Is Stuck"
     ]
 
     private static let frenchWords   = ["Deuxieme", "Troisieme", "Quatrieme", "Fragment", "Suite", "Reprise"]
     private static let frenchTargets = [
         "Part Deux", "Pensees", "Pour le Car Park", "Numero Trois",
-        "Pour la Salle d'Attente", "Studies", "Encore Une Fois (Reluctant)",
+        "Pour la Salle d'Attente", "Studies", "Encore Un Fois (Reluctant)",
         "Interlude (Unnecessary)", "Coda (Unresolved)"
     ]
 
@@ -208,9 +208,9 @@ struct AmbientTitleGenerator {
         "In a Slightly Stuffy Office", "Without the Good Synthesizer",
         "Pt. II (The Sad One)", "En Route to the Car Park",
         "Suite for Overhead Projector", "Live from Basildon",
-        "The Director's Cut (Shorter)", "Pour le Ring Road",
+        "The Director's Cut (Too Long)", "Pour le Ring Road",
         "Version 3 (Almost Final)", "Performed on a Broken Keyboard",
-        "With Reduced Funding", "For a Mostly Empty Arena"
+        "With Reduced Funding", "For an Empty Arena"
     ]
 
     // Loscil-style neologisms: sounds profound, is subtly damp
@@ -231,7 +231,7 @@ struct AmbientTitleGenerator {
         "Light Reflected", "Grey Light Falling", "Refracted Light",
         "Diffuse Light Pooling", "Pale Light Flickering",
         "Light Scattering Across", "Pale Light Resting On",
-        "Ambient Light Failing Above"
+        "Failing Light"
     ]
 
     private static let mundaneSurfaces = [
@@ -240,7 +240,7 @@ struct AmbientTitleGenerator {
         "a Fogged Mirror", "the Beige Ceiling Tiles",
         "an Off-White Wall", "a Lukewarm Cup of Tea",
         "the Back of a Bus Seat", "a Fire Door",
-        "a Slightly Damp Pavement"
+        "Damp Pavement"
     ]
 
     private static let philosophicalOpeners = [
@@ -249,11 +249,11 @@ struct AmbientTitleGenerator {
     ]
 
     private static let philosophicalEvents = [
-        "Meeting About Quarterly Targets", "Moment Through a Pointless Process",
-        "Discussion of Car Park Allocation", "Pause Before the Next Slide",
-        "Reflection on the Biscuit Selection", "Contribution to the Team Away Day",
-        "Response to the Previous Email", "Consideration of the Updated Policy",
-        "Acknowledgement of the Situation", "Review of the Situation (Ongoing)"
+        "Meeting About Quarterly Targets", "Moment in a Pointless Process",
+        "the Car Park Discussion", "Pause Before Next Slide",
+        "Reflection on the Cake Selection", "Contribution to the Team Day",
+        "Response to the Previous Email", "Consideration of the New Policy",
+        "Situation Acknowledgement", "Ongoing Situation Review"
     ]
 
     // Fake scale names — either plausible-sounding corruptions or
@@ -270,13 +270,13 @@ struct AmbientTitleGenerator {
         // Originals
         "Vaguely Phrygian", "Accidentally Octatonic", "Ionian (With Mistakes)",
         "Dorian Mode (The Sad One)", "Wonky Bebop Diminished",
-        "Ukrainian Dorian (Misremembered)", "Reverse-Dorian Approximately",
+        "Ukrainian Dorian (Misremembered)", "Reverse-Dorian Approx.",
         "Debatably Pentatonic", "Post-Lydian (Flat 7)",
         "Hypo-Mixolydian-Adjacent", "Sub-Lydian (Nearly)",
         "B-Flat Existential", "Augmented Disappointment",
         "Double-Harmonic-ish", "Byzantine (Probably)",
-        "Chromatic but Make It Sad", "Slightly Sharp Ionian",
-        "Diminished Self-Esteem Scale", "Whole Tone (Half Remembered)",
+        "Chromatic but Sad", "Slightly Sharp Ionian",
+        "Dim. Self-Esteem Scale", "Whole Tone (Half Remembered)",
         "Octatonic (Missing One Note)", "Altered (Barely)"
     ]
 
@@ -292,7 +292,7 @@ struct AmbientTitleGenerator {
         "SaaS Funeral", "Failed Pivot", "Midlife Crisis",
         "Forced Restructuring", "Dying Startup",
         "Redundancy Notice", "Failed MVP",
-        "Deprioritised Roadmap", "Post-Acquisition Reorg",
+        "Abandoned Roadmap", "Post-Acquisition Reorg",
         "Series C That Didn't Close", "Pivot That Wasn't",
         "Missed Runway", "Down Round", "Strategic Reset",
         "Quiet Layoff", "Vision Misalignment"
@@ -305,7 +305,7 @@ struct AmbientTitleGenerator {
         "Bootstrapped Developer", "Laid-Off Engineer",
         "Venture Partner (Ret.)", "Thought Leader",
         "Pre-Revenue Startup", "Disruptive Innovator",
-        "Chief Transformation Officer",
+        "Chief AI Officer",
         "First-Time Angel Investor",
         "Head of Growth (Redundant)",
         "Technical Co-Founder (Diluted)", 
@@ -321,8 +321,8 @@ struct AmbientTitleGenerator {
     // AI entities — for "The ___ Arrangements" style
     private static let aiEntities = [
         "Claude", "ChatGPT", "Copilot", "Gemini",
-        "The LLM", "The Foundation Model", "The Transformer",
-        "The Inference Engine", "GPT", "The Prompt", "Buddha"
+        "LLM", "Foundation Model", "Transformer",
+        "Inference Engine", "GPT", "Prompt", "Buddha"
     ]
 
     // Words that follow an AI entity name
@@ -337,9 +337,9 @@ struct AmbientTitleGenerator {
         "a Failed AI Pivot", "a Hallucinated Roadmap",
         "a Deprecated Model", "an Orphaned Prompt",
         "a Token Limit", "the Context Window",
-        "Fine-Tuned Disappointment", "a Vibe-Coded Startup",
+        "Fine-Tuned Anger", "a Vibe-Coded Startup",
         "the Alignment Problem", "an AI Wrapper",
-        "a RAG Pipeline That Never Shipped",
+        "a Feature That Never Shipped",
         "Prompt Engineering", "a Missed Inference",
         "a Confident Wrong Answer", "Latency"
     ]

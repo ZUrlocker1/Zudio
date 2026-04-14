@@ -273,7 +273,7 @@ struct ZudioApp: App {
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Load Song") { appState.loadFromLog() }
-                    .keyboardShortcut("l", modifiers: .command)
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
                     .disabled(appState.isGenerating)
 
                 Divider()
@@ -298,6 +298,9 @@ struct ZudioApp: App {
 
                 Button("Visualizer / Tracks") { appState.macShowVisualizer.toggle() }
                     .keyboardShortcut("z", modifiers: .command)
+
+                Button("Song List") { appState.macShowSongList.toggle() }
+                    .keyboardShortcut("i", modifiers: .command)
             }
 
             // Empty out Edit menu groups (menu itself stays hidden for ⌘C responder chain).

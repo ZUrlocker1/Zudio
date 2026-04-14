@@ -73,7 +73,7 @@ final class MacPlatformHost: ZudioPlatformHost {
                 } else if mods == .command {
                     Task { @MainActor [weak target] in
                         guard let target, target.songState != nil else { return }
-                        target.seekToEnd()
+                        target.loadNextFromHistory()
                     }
                     return nil
                 }
@@ -114,9 +114,9 @@ final class MacPlatformHost: ZudioPlatformHost {
                 case 11: // 'b' — beginning
                     guard target.songState != nil else { return event }
                     Task { @MainActor [weak target] in target?.seekToStart() }
-                case 6:  // 'z' — end
+                case 6:  // 'z' — next song (or generate if at top of stack)
                     guard target.songState != nil else { return event }
-                    Task { @MainActor [weak target] in target?.seekToEnd() }
+                    Task { @MainActor [weak target] in target?.loadNextFromHistory() }
                 default: break
                 }
                 return nil

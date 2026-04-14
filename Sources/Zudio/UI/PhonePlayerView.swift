@@ -14,6 +14,8 @@ struct PhonePlayerView: View {
     @EnvironmentObject var playback: PlaybackEngine
 
     @State private var activeTab: PhoneTab = .visuals
+    @State private var visualizerPaused: Bool = false   // tap Visuals tab while on it to stop animation
+    @State private var showVisualsOffLabel = false       // "Visuals off" toast, auto-hides after 8s
     @State private var stopFlash = false
     @State private var showInfo  = false
 
@@ -125,7 +127,7 @@ struct PhonePlayerView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 12)
 
-            actionRow
+            portraitActionRow
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
 
@@ -144,17 +146,22 @@ struct PhonePlayerView: View {
         HStack(spacing: 0) {
             // Left controls column — 260pt wide, enough for Ambient / Motorik labels.
             // Extra top padding (≥16pt) clears the rounded display corners in landscape.
-            VStack(spacing: 6) {
+            VStack(spacing: 0) {
                 songTitleRow
+                    .frame(height: 46, alignment: .leading)   // stable height prevents layout jump on isGenerating change
                 progressRow
-                modeRow
-                styleRow
-                transportRow
                     .padding(.top, 4)
+                modeRow
+                    .padding(.top, 12)
+                styleRow
+                    .padding(.top, 12)
+                transportRow
+                    .padding(.top, 12)
                 Spacer()
-                actionRow
+                landscapeActionRow
             }
             .frame(width: 260)
+            .animation(.none, value: appState.isGenerating)
             .padding(.horizontal, 12)
             .padding(.top, max(safeTop, 16) + 8)
             .padding(.bottom, safeBottom + 4)
@@ -177,8 +184,21 @@ struct PhonePlayerView: View {
         ZStack {
             switch activeTab {
             case .visuals:
-                VisualizerView(style: appState.selectedStyle)
-                    .overlay(canvasGestureLayer)
+                if !visualizerPaused {
+                    VisualizerView(style: appState.selectedStyle)
+                        .overlay(canvasGestureLayer)
+                } else {
+                    ZStack(alignment: .bottomLeading) {
+                        Color(white: 0.04)   // animation off — TimelineView removed from hierarchy
+                        if showVisualsOffLabel {
+                            Text("Visuals off")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.green.opacity(0.80))
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 12)
+                        }
+                    }
+                }
             case .log:
                 StatusBoxView(contentWidth: geo.size.width, showHeader: true,
                               onReset: {
@@ -204,10 +224,15 @@ struct PhonePlayerView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.7))
             } else if let song = appState.songState {
-                Text(song.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(song.title)
+                        .font(.system(size: song.style == .ambient ? 16 : 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text(appState.selectedStyle.rawValue.capitalized)
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.white.opacity(0.50))
+                }
             } else {
                 Text("No song loaded")
                     .font(.system(size: 14))
@@ -327,16 +352,8 @@ struct PhonePlayerView: View {
                     appState.seekToStart()
                     hapticImpactLight.toggle()
                 case .song:
-                    // Only go back if there is a prior entry in history
-                    if let current = appState.songState,
-                       let idx = appState.generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
-                       idx > 0 {
-                        appState.loadPreviousFromHistory()
-                        hapticImpactLight.toggle()
-                    } else {
-                        // Already at the first track — warn instead of wrapping
-                        hapticWarning.toggle()
-                    }
+                    appState.loadPreviousFromHistory()
+                    hapticImpactLight.toggle()
                 }
             } label: {
                 Image(systemName: "backward.end.fill")
@@ -388,23 +405,81 @@ struct PhonePlayerView: View {
 
     // MARK: - Export + Info row
 
-    private var actionRow: some View {
-        HStack(spacing: 10) {
-            Button { appState.requestExport() } label: {
+    // MARK: - Portrait action row: Export | Generate (centre, brighter) | Info
+    private var portraitActionRow: some View {
+        HStack(spacing: 8) {
+            // Export — fixed narrow width; no .disabled() so SwiftUI doesn't grey it out.
+            // Instead use reduced opacity for subtle "not yet available" look.
+            Button {
+                guard appState.songState != nil && !appState.isExportingAudio else { return }
+                appState.requestExport()
+            } label: {
                 Label("Export", systemImage: "waveform")
+            }
+            .buttonStyle(.bordered)
+            .frame(width: 100)
+            .opacity(appState.songState == nil || appState.isExportingAudio ? 0.40 : 1.0)
+
+            Button {
+                appState.generateNew(thenPlay: true)
+                hapticImpactMedium.toggle()
+            } label: {
+                Label("Generate", systemImage: "wand.and.stars")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(appState.songState == nil || appState.isExportingAudio)
+            .tint(.white)
+            .frame(maxWidth: .infinity)
+            .disabled(appState.isGenerating)
 
             Button {
                 showInfo = true
                 hapticImpactLight.toggle()
             } label: {
                 Label("Info", systemImage: "info.circle")
+            }
+            .buttonStyle(.bordered)
+            .frame(width: 90)
+        }
+        .font(.callout)
+        .sheet(isPresented: $showInfo) { PhoneInfoView() }
+    }
+
+    // MARK: - Landscape action rows: Generate full-width, then Export + Info below
+    private var landscapeActionRow: some View {
+        VStack(spacing: 8) {
+            Button {
+                appState.generateNew(thenPlay: true)
+                hapticImpactMedium.toggle()
+            } label: {
+                Label("Generate", systemImage: "wand.and.stars")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            .tint(.white)
+            .frame(maxWidth: .infinity)
+            .disabled(appState.isGenerating)
+
+            HStack(spacing: 10) {
+                Button {
+                    guard appState.songState != nil && !appState.isExportingAudio else { return }
+                    appState.requestExport()
+                } label: {
+                    Label("Export", systemImage: "waveform")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .opacity(appState.songState == nil || appState.isExportingAudio ? 0.40 : 1.0)
+
+                Button {
+                    showInfo = true
+                    hapticImpactLight.toggle()
+                } label: {
+                    Label("Info", systemImage: "info.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
         }
         .font(.callout)
         .sheet(isPresented: $showInfo) { PhoneInfoView() }
@@ -414,16 +489,46 @@ struct PhonePlayerView: View {
 
     private var tabStrip: some View {
         HStack(spacing: 0) {
-            tabButton("Visuals", systemImage: "sparkles",        tab: .visuals)
-            tabButton("Log",     systemImage: "list.bullet",     tab: .log)
-            tabButton("Songs",   systemImage: "music.note.list", tab: .songs)
+            // Visuals button: tap while already on Visuals to stop animation (removes TimelineView).
+            // Tap again (or navigate away and back) to resume.
+            Button {
+                if activeTab == .visuals {
+                    visualizerPaused.toggle()
+                    if visualizerPaused {
+                        showVisualsOffLabel = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 6.5) {
+                            withAnimation(.easeOut(duration: 0.6)) { showVisualsOffLabel = false }
+                        }
+                    }
+                } else {
+                    activeTab = .visuals
+                    visualizerPaused = false
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "sparkles").font(.system(size: 15))
+                    Text("Visuals").font(.system(size: 10))
+                }
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(
+                    activeTab == .visuals
+                        ? (visualizerPaused ? Color(white: 0.38) : Color.white)
+                        : Color(white: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            tabButton("Log",   systemImage: "list.bullet",     tab: .log)
+            tabButton("Songs", systemImage: "music.note.list", tab: .songs)
         }
         .frame(height: 44)
         .background(Color(white: 0.10))
     }
 
     private func tabButton(_ label: String, systemImage: String, tab: PhoneTab) -> some View {
-        Button { activeTab = tab } label: {
+        Button {
+            activeTab = tab
+            if tab == .visuals { visualizerPaused = false }   // always resume on explicit nav
+        } label: {
             VStack(spacing: 2) {
                 Image(systemName: systemImage).font(.system(size: 15))
                 Text(label).font(.system(size: 10))
@@ -439,8 +544,9 @@ struct PhonePlayerView: View {
     private var songHistoryList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    let songs = appState.generationHistory   // oldest at top, newest at bottom
+                VStack(alignment: .leading, spacing: 0) {
+                    // Newest at top — reverse the persisted list for display
+                    let songs = Array(appState.persistedHistory.reversed())
                     if songs.isEmpty {
                         Text("No songs generated yet")
                             .font(.system(size: 14))
@@ -448,14 +554,14 @@ struct PhonePlayerView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 24)
                     } else {
-                        ForEach(songs, id: \.globalSeed) { state in
+                        ForEach(songs) { song in
                             Button {
-                                appState.loadFromGenerationHistory(state)
+                                appState.loadFromPersistedSong(song)
                                 activeTab = .visuals
                                 hapticImpactLight.toggle()
                             } label: {
                                 HStack(spacing: 8) {
-                                    if state.globalSeed == appState.songState?.globalSeed {
+                                    if song.seed == appState.songState?.globalSeed {
                                         Image(systemName: "speaker.wave.2.fill")
                                             .foregroundStyle(.green)
                                             .font(.system(size: 12))
@@ -465,11 +571,11 @@ struct PhonePlayerView: View {
                                             .hidden()
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(state.title)
+                                        Text(song.title)
                                             .font(.system(size: 16, weight: .semibold))
                                             .foregroundStyle(.white)
                                             .lineLimit(1)
-                                        Text(state.style.rawValue.capitalized)
+                                        Text(song.style.rawValue.capitalized)
                                             .font(.system(size: 12))
                                             .foregroundStyle(Color.white.opacity(0.50))
                                     }
@@ -477,8 +583,9 @@ struct PhonePlayerView: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 11)
+                                .contentShape(Rectangle())
                             }
-                            .id(state.globalSeed)
+                            .id(song.seed)
                             .buttonStyle(.plain)
                             Divider()
                                 .overlay(Color(white: 0.25))
@@ -490,9 +597,6 @@ struct PhonePlayerView: View {
                 if let seed = appState.songState?.globalSeed {
                     proxy.scrollTo(seed, anchor: .center)
                 }
-            }
-            .onChange(of: appState.songState?.globalSeed) { _, seed in
-                if let seed { proxy.scrollTo(seed, anchor: .center) }
             }
         }
         .background(Color(white: 0.06))
@@ -624,7 +728,7 @@ private struct PhoneInfoView: View {
                             .foregroundStyle(.primary)
                     }
                 }
-                Text("Generative music · v0.99c")
+                Text("Generative music · v0.99d")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 8)

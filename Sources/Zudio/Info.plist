@@ -7,9 +7,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.zudio.app</string>
     <key>CFBundleVersion</key>
-    <string>99</string>
+    <string>100</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.99c</string>
+    <string>0.99d</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>

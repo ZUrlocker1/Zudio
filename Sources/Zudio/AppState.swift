@@ -52,7 +52,11 @@ final class AppState: ObservableObject {
     @Published var macShowVisualizer: Bool = UserDefaults.standard.bool(forKey: "macShowVisualizer") {
         didSet { UserDefaults.standard.set(macShowVisualizer, forKey: "macShowVisualizer") }
     }
+    @Published var macShowSongList: Bool = false
     var windowExpandedFrame: NSRect? = nil   // saved before compressing; not published (no UI depends on it)
+    /// Set true during a programmatic animated resize so onChange(of: geo.size) doesn't
+    /// call syncCompactStateFromWindow() mid-animation and flip isWindowCompact prematurely.
+    var suppressWindowResizeSync: Bool = false
 
     func toggleWindowCompact() {
         guard let window = NSApp.keyWindow else { return }
@@ -78,8 +82,10 @@ final class AppState: ObservableObject {
                                          y: currentFrame.origin.y + currentFrame.height - newWinSize.height)
                 targetFrame = NSRect(origin: newOrigin, size: newWinSize)
             }
+            suppressWindowResizeSync = true
             window.setFrame(targetFrame, display: true, animate: true)
             isWindowCompact = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.suppressWindowResizeSync = false }
         } else {
             // Save current frame, then collapse to minimum size keeping top-left pinned
             windowExpandedFrame = currentFrame
@@ -87,8 +93,11 @@ final class AppState: ObservableObject {
                                     height: collapseTargetH)
             let newOrigin  = NSPoint(x: currentFrame.origin.x,
                                      y: currentFrame.origin.y + currentFrame.height - newWinSize.height)
+            suppressWindowResizeSync = true
             window.setFrame(NSRect(origin: newOrigin, size: newWinSize), display: true, animate: true)
             isWindowCompact = true
+            macShowSongList = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.suppressWindowResizeSync = false }
         }
     }
 
@@ -140,15 +149,102 @@ final class AppState: ObservableObject {
         }
     }
 
-    // Song history — last 10 seeds, populated in both modes, used by ⏮ back navigation
-    struct SongHistoryEntry {
-        let seed:  UInt64
-        let style: MusicStyle
-        let title: String
+    // MARK: - Persisted song history (survives app restarts — stored in UserDefaults)
+
+    /// Minimal record needed to reproduce a song exactly. Codable so it can be
+    /// JSON-encoded into UserDefaults. Newest entry last, max 50 entries.
+    struct PersistedSong: Codable, Identifiable {
+        var id: UInt64 { seed }
+        let seed:           UInt64
+        let style:          MusicStyle
+        let title:          String
+        let forcedRules:    [String: String]
+        let keyOverride:    String?
+        let tempoOverride:  Int?
+        let moodOverride:   Mood?
+        // [Int: UInt64] → [String: UInt64]: JSON requires String keys in dictionaries.
+        let trackOverrides: [String: UInt64]
+
+        init(from state: SongState) {
+            seed           = state.globalSeed
+            style          = state.style
+            title          = state.title
+            forcedRules    = state.forcedRules
+            keyOverride    = state.keyOverride
+            tempoOverride  = state.tempoOverride
+            moodOverride   = state.moodOverride
+            trackOverrides = Dictionary(uniqueKeysWithValues:
+                state.trackOverrides.map { (String($0.key), $0.value) })
+        }
     }
-    private var songHistory:        [SongHistoryEntry] = []
-    private var forwardSongHistory: [SongHistoryEntry] = []  // forward stack for Song mode ⏭ navigation
-    private let songHistoryLimit = 10
+
+    /// Cross-session song list for the Songs tab. Newest last. Published so the UI updates.
+    @Published var persistedHistory: [PersistedSong] = []
+
+    private static let kPersistedHistoryKey = "persistedSongHistory_v1"
+    private static let kPersistedHistoryMax = 10
+
+    private static func loadPersistedHistory() -> [PersistedSong] {
+        guard let data = UserDefaults.standard.data(forKey: kPersistedHistoryKey),
+              let list = try? JSONDecoder().decode([PersistedSong].self, from: data)
+        else { return [] }
+        // Trim to current max in case the saved list predates a lower limit
+        return list.count > kPersistedHistoryMax ? Array(list.suffix(kPersistedHistoryMax)) : list
+    }
+
+    private func savePersistedHistory() {
+        guard let data = try? JSONEncoder().encode(persistedHistory) else { return }
+        UserDefaults.standard.set(data, forKey: Self.kPersistedHistoryKey)
+    }
+
+    /// Appends a newly generated song to persistedHistory and saves to UserDefaults.
+    /// No-op if this seed is already present (deduplicates reloads).
+    private func appendPersistedSong(from state: SongState) {
+        guard !persistedHistory.contains(where: { $0.seed == state.globalSeed }) else { return }
+        persistedHistory.append(PersistedSong(from: state))
+        if persistedHistory.count > Self.kPersistedHistoryMax { persistedHistory.removeFirst() }
+        savePersistedHistory()
+    }
+
+    /// Called at startup: regenerates all persisted songs in the background and caches them as
+    /// SongState objects in generationHistory. This makes navigation via ⏮/⏭ and song list taps
+    /// instant (fast path in loadFromPersistedSong) without blocking the UI thread.
+    private func preloadPersistedSongs() {
+        let songs = persistedHistory
+        guard !songs.isEmpty else { return }
+        Task.detached(priority: .background) { [weak self, songs] in
+            guard let self else { return }
+            for song in songs {
+                let trackOvr = Dictionary(uniqueKeysWithValues:
+                    song.trackOverrides.compactMap { k, v -> (Int, UInt64)? in
+                        guard let i = Int(k) else { return nil }; return (i, v) })
+                var state = SongGenerator.generate(
+                    seed:            song.seed,
+                    keyOverride:     song.keyOverride,
+                    tempoOverride:   song.tempoOverride,
+                    moodOverride:    song.moodOverride,
+                    style:           song.style,
+                    forceBassRuleID: song.forcedRules["Bass"],
+                    forceDrumRuleID: song.forcedRules["Drums"],
+                    forceArpRuleID:  song.forcedRules["Rhythm"],
+                    forcePadsRuleID: song.forcedRules["Pads"],
+                    forceLeadRuleID: song.forcedRules["Lead"],
+                    forceTexRuleID:  song.forcedRules["Tex"]
+                )
+                for idx in trackOvr.keys.sorted() {
+                    state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOvr[idx])
+                }
+                let finalState = state
+                await MainActor.run {
+                    guard !self.generationHistory.contains(where: { $0.globalSeed == finalState.globalSeed }) else { return }
+                    self.generationHistory.append(finalState)
+                    if self.generationHistory.count > Self.kPersistedHistoryMax {
+                        self.generationHistory.removeFirst()
+                    }
+                }
+            }
+        }
+    }
 
     // Endless style continuum: fixed axis, movement ±1 only
     private let endlessStyleAxis: [MusicStyle] = [.ambient, .chill, .kosmic, .motorik]
@@ -197,9 +293,11 @@ final class AppState: ObservableObject {
         stop()
         audioTexture.stop()
 
-        // Clear the current song and all history
+        // Clear the current song and all history (including persisted song list)
         songState         = nil
         generationHistory = []
+        persistedHistory  = []
+        savePersistedHistory()
         statusLog         = []
         statusLogVersion += 1
         lastEmittedStep   = -1
@@ -212,8 +310,6 @@ final class AppState: ObservableObject {
 
         // Reset Endless / Evolve mode state
         playMode             = .song
-        songHistory          = []
-        forwardSongHistory   = []
         nextSongState        = nil
         isPreGenerating      = false
         songsInCurrentStyle  = 0
@@ -459,16 +555,71 @@ final class AppState: ObservableObject {
     /// TrackRowView.onChange(of: defaultsResetToken) fires on the NEXT SwiftUI render cycle
     /// (deferred), so without this call the first notes play with stale/default programs.
     private func applyCurrentInstrumentsToPlayback() {
+        // iOS: clear the dedup cache so every track reloads its soundbank on each song
+        // transition (a single engine stop/start invalidates AUSampler state for nodes
+        // that weren't reloaded in that cycle). Batch all loads into one engine stop/start.
+        // macOS: uses per-track stop/start (the setProgram() default). The dedup cache
+        // is valid across stop/start on Mac — AUSampler state persists.
+        #if os(iOS)
+        playback.invalidateProgramCache()
+        let batchWasRunning = playback.beginBatchLoad()
+        #endif
+
         let style = selectedStyle
+        let trackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"]
+        var warnings: [GenerationLogEntry] = []
         for trackIndex in 0..<kTrackCount {
             let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
             guard !programs.isEmpty else { continue }
             // Chill texture pseudo-programs (240+) are handled by audioTexture.start() — skip
             if trackIndex == kTrackTexture && style == .chill { continue }
+            // Drums always use percussion bank — no meaningful "default MIDI" concept
+            if trackIndex == kTrackDrums { continue }
             let idx = instrumentOverrides[trackIndex] ?? 0
             let program = programs[min(idx, programs.count - 1)]
             playback.setProgram(program, forTrack: trackIndex)
+            // Check that the load was confirmed (currentProgram updated only on success)
+            let loaded = playback.loadedProgram(forTrack: trackIndex)
+            if loaded != program {
+                let name = trackIndex < trackNames.count ? trackNames[trackIndex] : "Track \(trackIndex)"
+                let loadedStr = loaded == 255 ? "none" : "\(loaded)"
+                warnings.append(GenerationLogEntry(
+                    tag: "Error",
+                    description: "\(name) instrument \(program) load failed (got \(loadedStr))",
+                    isTitle: false))
+            }
         }
+        // Also load drums (excluded from mismatch check above)
+        let drumPrograms = Self.instrumentPoolPrograms(trackIndex: kTrackDrums, style: style)
+        if !drumPrograms.isEmpty {
+            let drumIdx = instrumentOverrides[kTrackDrums] ?? 0
+            playback.setProgram(drumPrograms[min(drumIdx, drumPrograms.count - 1)], forTrack: kTrackDrums)
+        }
+
+        #if os(iOS)
+        // Restart the engine once after all programs are loaded (batch path).
+        // beginBatchLoad() returns false if the engine was already stopped (restartAudio() path),
+        // in which case restartAudio() calls startEngine() itself after we return.
+        if batchWasRunning { playback.endBatchLoad() }
+        #endif
+
+        // Log the actual programs loaded so mismatches are immediately visible.
+        // Format:  Instruments  L1:73  L2:11  Pd:95  Ry:4  Tx:49  Bs:35  Dr:40
+        // Chill texture (240+) is an audio file, not a MIDI patch — shown as "audio".
+        // kTrackCount=8 (includes kTrackLeadSynth=7, Kosmic-only silent doubling layer).
+        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
+        var parts: [String] = []
+        for i in 0..<kTrackCount {
+            let p = playback.loadedProgram(forTrack: i)
+            if i == kTrackTexture && style == .chill {
+                parts.append("Tx:audio")
+            } else if p != 255 {   // omit tracks that weren't loaded (e.g. LeadSynth in non-Kosmic)
+                parts.append("\(shortNames[i]):\(p)")
+            }
+        }
+        appendToLog([GenerationLogEntry(tag: "Instruments", description: parts.joined(separator: " "), isTitle: false)])
+
+        if !warnings.isEmpty { appendToLog(warnings) }
     }
 
     // MARK: - Sheet triggers (set by key monitor, observed by TopBarView)
@@ -513,6 +664,9 @@ final class AppState: ObservableObject {
     var platformHost: ZudioPlatformHost?
 
     init() {
+        persistedHistory = Self.loadPersistedHistory()
+        preloadPersistedSongs()
+
         // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
         // Removing the blanket objectWillChange cascade breaks the per-step chain:
         // PlaybackEngine.currentStep → AppState → ContentView → 7 TrackRowViews → 7 Canvases.
@@ -635,6 +789,23 @@ final class AppState: ObservableObject {
             case .song:    break
             }
         }
+        // Re-apply instruments when the audio engine restarts after a route change.
+        // Route changes (e.g. plugging in car audio) can invalidate sampler soundbank buffers —
+        // without this the playing song falls back to default GM patches until the next song load.
+        playback.onAudioEngineRestarted = { [weak self] in
+            guard let self else { return }
+            self.applyCurrentInstrumentsToPlayback()
+            self.appendToLog([GenerationLogEntry(
+                tag: "Audio",
+                description: "New device — reloading",
+                isTitle: false)])
+        }
+        // Surface engine start failures to the generation log.
+        playback.onEngineError = { [weak self] msg in
+            guard let self else { return }
+            self.appendToLog([GenerationLogEntry(tag: "ERROR", description: msg, isTitle: false)])
+        }
+
         playback.onOutroStart = { [weak self] in
             guard let self, self.playMode == .evolve else { return }
             switch self.evolvePhase {
@@ -706,32 +877,49 @@ final class AppState: ObservableObject {
 
     // MARK: - Generate
 
-    /// In Song mode: steps back to the previous song in generationHistory.
-    /// Falls back to seekToStart() when already at the oldest entry or no song is loaded.
+    /// In Song mode: steps back to the previous song using persistedHistory order.
+    /// If no song is loaded, loads the most recent song from history.
+    /// Beeps if already at the oldest entry or history is empty.
     func loadPreviousFromHistory() {
         guard playMode == .song else { return }
-        if let current = songState,
-           let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
-           idx > 0 {
-            loadFromGenerationHistory(generationHistory[idx - 1])
-        } else {
-            seekToStart()
+        guard let current = songState else {
+            // No song loaded — load the most recent one from history without starting playback
+            if let newest = persistedHistory.last {
+                loadFromPersistedSong(newest, forcePlay: false)
+            } else {
+                platformHost?.playErrorSound()
+            }
+            return
         }
+        if let idx = persistedHistory.firstIndex(where: { $0.seed == current.globalSeed }),
+           idx > 0 {
+            let prev = persistedHistory[idx - 1]
+            appendToLog([GenerationLogEntry(tag: "Rewind",
+                description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
+            loadFromPersistedSong(prev, forcePlay: false)
+            return
+        }
+        // Already at the oldest song — beep and stay at bar 0
+        platformHost?.playErrorSound()
+        seekTo(step: 0)
+        visibleBarOffset = 0
     }
 
-    /// In Song mode: advances to the next song in generationHistory if the current song
-    /// is not the most recent entry; generates a new song only when already at the end.
+    /// In Song mode: advances to the next song using persistedHistory order.
+    /// Generates a new song when already at the newest entry.
     func loadNextFromHistory() {
         guard playMode == .song else { return }
-        if let current = songState,
-           let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
-           idx + 1 < generationHistory.count {
-            // There is a newer song in history — load it without generating
-            loadFromGenerationHistory(generationHistory[idx + 1])
-        } else {
-            // Already at (or past) the most recent song — generate a new one
-            generateNew(thenPlay: true)
+        guard let current = songState else { generateNew(thenPlay: true); return }
+        if let idx = persistedHistory.firstIndex(where: { $0.seed == current.globalSeed }),
+           idx + 1 < persistedHistory.count {
+            let next = persistedHistory[idx + 1]
+            appendToLog([GenerationLogEntry(tag: "Forward",
+                description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+            loadFromPersistedSong(next, forcePlay: false)
+            return
         }
+        // Already at the newest song — generate a new one
+        generateNew(thenPlay: true)
     }
 
     func generateNew(thenPlay: Bool = false) {
@@ -811,12 +999,10 @@ final class AppState: ObservableObject {
                 self.songState    = state
                 self.generationHistory.append(state)
                 if self.generationHistory.count > 10 { self.generationHistory.removeFirst() }
+                self.appendPersistedSong(from: state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
-                // Track song history for ⏮ back navigation; new song clears forward stack
-                self.appendSongHistory(from: state)
-                self.forwardSongHistory = []
                 // Endless: reset stream counters to current style; start pre-gen for song after next
                 if self.playMode == .endless {
                     self.songsInCurrentStyle = 1
@@ -875,7 +1061,7 @@ final class AppState: ObservableObject {
                     batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
                 }
                 var logEntries = state.generationLog
-                if let desc = instrumentLogDesc, style != .chill {
+                if let desc = instrumentLogDesc, style != .chill && style != .ambient {
                     let entry = GenerationLogEntry(tag: "Instruments", description: desc, isTitle: false)
                     if let firstIdx = logEntries.firstIndex(where: { $0.tag == "Intro" || $0.tag == "Outro" }) {
                         logEntries.insert(entry, at: firstIdx)
@@ -1025,77 +1211,13 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Rewind to the start. Already in bar 0: load previous song from history (or beep if none).
+    /// Rewind to bar 0. In Song mode within the first 3 bars: load the previous song instead.
     func seekToStart() {
-        if playback.currentBar == 0 {
-            goToPreviousSong()
+        if playMode == .song && playback.currentBar < 3 {
+            loadPreviousFromHistory()
         } else {
             seekTo(step: 0)
             visibleBarOffset = 0
-        }
-    }
-
-    /// Jump to the last bar and stop playback. In Song mode at the last bar: go to next song if
-    /// one exists in forward history, otherwise beep.
-    func seekToEnd() {
-        guard let song = songState else { return }
-        if playMode == .song && playback.currentBar >= song.frame.totalBars - 1 {
-            goToNextSong()
-            return
-        }
-        stop()
-        let lastStep = song.frame.totalBars * 16 - 1
-        let totalBars = song.frame.totalBars
-        // Show the final window of bars
-        visibleBarOffset = max(0, totalBars - visibleBars)
-        playback.seek(toStep: lastStep)
-    }
-
-    // MARK: - Song history helpers
-
-    private func appendSongHistory(from state: SongState) {
-        songHistory.append(SongHistoryEntry(seed: state.globalSeed, style: state.style, title: state.title))
-        if songHistory.count > songHistoryLimit { songHistory.removeFirst() }
-    }
-
-    private func goToPreviousSong() {
-        guard songHistory.count >= 2 else {
-            platformHost?.playErrorSound()   // low thud: nowhere to go back to
-            return
-        }
-        let current = songHistory.removeLast()   // drop current; save it for forward navigation
-        forwardSongHistory.append(current)
-        let prev = songHistory.last!
-        appendToLog([GenerationLogEntry(tag: "Rewind",
-            description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
-        let wasPlaying = playback.isPlaying
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let state = SongGenerator.generate(seed: prev.seed, style: prev.style, testMode: false)
-            await MainActor.run {
-                self.selectedStyle = state.style
-                self.finishLoadingSong(state, thenPlay: wasPlaying)
-            }
-        }
-    }
-
-    private func goToNextSong() {
-        guard !forwardSongHistory.isEmpty else {
-            platformHost?.playErrorSound()   // low thud: nowhere to go forward to
-            return
-        }
-        let next = forwardSongHistory.removeLast()
-        songHistory.append(next)
-        if songHistory.count > songHistoryLimit { songHistory.removeFirst() }
-        appendToLog([GenerationLogEntry(tag: "Forward",
-            description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let state = SongGenerator.generate(seed: next.seed, style: next.style, testMode: false)
-            await MainActor.run {
-                self.selectedStyle = state.style
-                self.finishLoadingSong(state, thenPlay: true)
-            }
         }
     }
 
@@ -1164,7 +1286,6 @@ final class AppState: ObservableObject {
     }
 
     private func startEndlessSong(_ state: SongState) {
-        appendSongHistory(from: state)
         selectedStyle            = state.style
         shouldLogNextUpWhenReady = false   // reset — next pre-gen is silent until trigger fires
         upNextLogged             = false
@@ -1652,7 +1773,6 @@ final class AppState: ObservableObject {
 
     private func finishLoadingEvolveSong(_ state: SongState) {
         tearDownEvolve()           // resets evolveMoodAnchor to nil
-        appendSongHistory(from: state)
         selectedStyle = state.style
         finishLoadingSong(state, thenPlay: true)
         // Append the full generation log (title, key, mode, rules) for the new song,
@@ -1686,6 +1806,7 @@ final class AppState: ObservableObject {
         if !generationHistory.contains(where: { $0.globalSeed == state.globalSeed }) {
             generationHistory.append(state)
             if generationHistory.count > 10 { generationHistory.removeFirst() }
+            appendPersistedSong(from: state)
         }
         visibleBarOffset = 0
         lastEmittedStep  = -1
@@ -1726,16 +1847,11 @@ final class AppState: ObservableObject {
         seekEdgeSensitive(toBar: targetBar)
     }
 
-    /// Step forward one bar. At the last bar in Song mode: go to next song if available, else beep.
-    /// In other modes: beep at the last bar.
+    /// Step forward one bar. At the last bar: beep (Next Song button handles song generation).
     func seekForwardOneBar() {
         guard let song = songState else { return }
         if playback.currentBar >= song.frame.totalBars - 1 {
-            if playMode == .song {
-                goToNextSong()
-            } else {
-                platformHost?.playErrorSound()
-            }
+            platformHost?.playErrorSound()
             return
         }
         let targetBar = min(song.frame.totalBars - 1, playback.currentBar + 1)
@@ -2223,7 +2339,8 @@ final class AppState: ObservableObject {
     }
 
     /// Loads a SongState from the in-memory generationHistory without re-generating.
-    func loadFromGenerationHistory(_ state: SongState) {
+    /// Pass forcePlay: true (song list taps) to always start playback regardless of prior state.
+    func loadFromGenerationHistory(_ state: SongState, forcePlay: Bool = false) {
         guard !isGenerating else { return }
         let wasPlaying = playback.isPlaying
         stop()
@@ -2253,7 +2370,54 @@ final class AppState: ObservableObject {
         playback.seek(toStep: 0)
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
-        if wasPlaying { playback.play() }
+        if wasPlaying || forcePlay { playback.play() }
+    }
+
+    /// Loads a song from persistedHistory. Fast path: already in session memory.
+    /// Slow path: regenerates deterministically from seed (async).
+    /// forcePlay: true  — always start playback (song list taps, default).
+    /// forcePlay: false — resume playback only if already playing (⏮/⏭ navigation).
+    func loadFromPersistedSong(_ song: PersistedSong, forcePlay: Bool = true) {
+        guard !isGenerating else { return }
+        // Fast path — still in session memory, no regeneration needed.
+        if let existing = generationHistory.first(where: { $0.globalSeed == song.seed }) {
+            loadFromGenerationHistory(existing, forcePlay: forcePlay)
+            return
+        }
+        // Slow path — regenerate from seed.
+        let thenPlay = forcePlay || playback.isPlaying   // capture before stop()
+        stop()
+        isGenerating = true
+        let trackOvr = Dictionary(uniqueKeysWithValues:
+            song.trackOverrides.compactMap { k, v -> (Int, UInt64)? in
+                guard let i = Int(k) else { return nil }; return (i, v) })
+        Task.detached(priority: .userInitiated) { [weak self, song, trackOvr, thenPlay] in
+            guard let self else { return }
+            var state = SongGenerator.generate(
+                seed:            song.seed,
+                keyOverride:     song.keyOverride,
+                tempoOverride:   song.tempoOverride,
+                moodOverride:    song.moodOverride,
+                style:           song.style,
+                forceBassRuleID: song.forcedRules["Bass"],
+                forceDrumRuleID: song.forcedRules["Drums"],
+                forceArpRuleID:  song.forcedRules["Rhythm"],
+                forcePadsRuleID: song.forcedRules["Pads"],
+                forceLeadRuleID: song.forcedRules["Lead"],
+                forceTexRuleID:  song.forcedRules["Tex"]
+            )
+            for idx in trackOvr.keys.sorted() {
+                state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOvr[idx])
+            }
+            await MainActor.run {
+                self.isGenerating  = false
+                self.selectedStyle = song.style
+                self.keyOverride   = song.keyOverride
+                self.tempoOverride = song.tempoOverride
+                self.moodOverride  = song.moodOverride
+                self.finishLoadingSong(state, thenPlay: thenPlay)
+            }
+        }
     }
 
     /// Clears all mutes, solos, manual effect changes, and instrument overrides —

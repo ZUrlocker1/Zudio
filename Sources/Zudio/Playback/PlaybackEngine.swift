@@ -88,6 +88,13 @@ final class PlaybackEngine: ObservableObject {
     var onApproachingEnd:   (() -> Void)? = nil
     var onSongEndNaturally: (() -> Void)? = nil
     var onOutroStart:       (() -> Void)? = nil
+
+    // Audio health callbacks — set by AppState.init(); called on main actor.
+    // onAudioEngineRestarted: fired at the end of restartAudio() so AppState can re-apply
+    // instrument programs (route changes invalidate sampler soundbank buffers).
+    var onAudioEngineRestarted: (() -> Void)? = nil
+    // onEngineError: fired when engine.start() throws so AppState can log the failure.
+    var onEngineError: ((String) -> Void)? = nil
     // Set to true once the corresponding callback fires; reset on load(), seek(), switchToPass().
     private var approachingEndFired = false
     private var outroStartFired     = false
@@ -192,6 +199,43 @@ final class PlaybackEngine: ObservableObject {
     init() {
         setupEngine()
         startEngine()
+        registerAudioNotifications()
+    }
+
+    private func registerAudioNotifications() {
+        // AVAudioEngineConfigurationChange fires on both Mac and iOS when the hardware
+        // config changes (e.g. Bluetooth connects and negotiates a different sample rate,
+        // or a USB audio interface is plugged in). The engine auto-stops; restart it.
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.restartAudio()
+        }
+
+        #if os(iOS)
+        // routeChangeNotification fires when a Bluetooth headset or wired headphones
+        // connect or disconnect. On .oldDeviceUnavailable the OS silences audio;
+        // restart the engine so it re-enumerates the new output route.
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let reasonVal = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                  let reason = AVAudioSession.RouteChangeReason(rawValue: reasonVal)
+            else { return }
+            switch reason {
+            case .oldDeviceUnavailable, .newDeviceAvailable:
+                self.restartAudio()
+            default:
+                break
+            }
+        }
+        #endif
     }
 
     // MARK: - Public API
@@ -234,7 +278,7 @@ final class PlaybackEngine: ObservableObject {
             trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]   // Ambient: no static spread
         }
         for i in 0..<boosts.count {
-                
+            boosts[i].pan = trackStaticPan[i]
         }
     }
 
@@ -330,13 +374,43 @@ final class PlaybackEngine: ObservableObject {
     func restartAudio() {
         allNotesOff()
         engine.stop()
+        // Restart the engine BEFORE clearing the program cache so that the
+        // onAudioEngineRestarted callback fires with the engine running.
+        // On Mac this means per-track stop/start in setProgram() (wasRunning=true)
+        // correctly commits each new preset. On iOS the callback's beginBatchLoad()
+        // stops and restarts the engine around the batch load — same end result.
         startEngine()
-        // AVAudioUnitSampler can lose its loaded soundbank when the engine stops.
-        // Clear the program cache so the next setProgram() calls force a reload
-        // instead of hitting the "already loaded" early-return guard.
         currentProgram = Array(repeating: 255, count: kTrackCount)
         currentBankMSB = Array(repeating: 0,   count: kTrackCount)
         cachedDrumProgram = 255
+        onAudioEngineRestarted?()
+    }
+
+    /// Clears the loaded-program dedup cache so the next setProgram() call for every
+    /// track forces a fresh loadSoundBankInstrument(), regardless of the previous program.
+    /// Required on iOS before every batch load: even a single engine stop/start cycle
+    /// invalidates AUSampler soundbank state for nodes that weren't reloaded in that cycle,
+    /// so tracks with unchanged programs must still reload to stay in a valid state.
+    func invalidateProgramCache() {
+        currentProgram    = Array(repeating: 255, count: kTrackCount)
+        currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
+        cachedDrumProgram = 255
+    }
+
+    /// Stop the engine once before a batch of setProgram() calls so iOS doesn't perform
+    /// a per-track stop/start cycle (which corrupts earlier AUSampler nodes on iOS).
+    /// Returns true if the engine was running and was stopped; false if already stopped.
+    /// Caller must call endBatchLoad() only when this returns true.
+    @discardableResult
+    func beginBatchLoad() -> Bool {
+        guard engine.isRunning else { return false }
+        engine.stop()
+        return true
+    }
+
+    /// Restart the engine after a batch of setProgram() calls initiated by beginBatchLoad().
+    func endBatchLoad() {
+        startEngine()
     }
 
     /// Reset the playhead to bar 1 without requiring a loaded song.
@@ -387,9 +461,14 @@ final class PlaybackEngine: ObservableObject {
                                    velocity: ev.velocity, birthDate: now,
                                    durationSteps: ev.durationSteps)
                 })
+                // Cap at 80 entries — dense songs can accumulate 200+ orbs; oldest are
+                // already nearly transparent (cosine fade) so dropping them is imperceptible.
+                if self.activeVisualizerNotes.count > 80 {
+                    self.activeVisualizerNotes.removeFirst(self.activeVisualizerNotes.count - 80)
+                }
             }
-            if step % 16 == 0 {
-                let cutoff = Date().addingTimeInterval(-8.0)  // max orb lifetime is 7s (doubled)
+            if step % 4 == 0 {
+                let cutoff = Date().addingTimeInterval(-8.0)  // max orb lifetime is 7s
                 self.activeVisualizerNotes.removeAll { $0.birthDate < cutoff }
             }
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
@@ -622,9 +701,16 @@ final class PlaybackEngine: ObservableObject {
         currentProgram[trackIndex] = program
         currentBankMSB[trackIndex] = bankMSB
         if trackIndex == kTrackDrums { cachedDrumProgram = program }
+        #if os(iOS)
+        let wasRunning = engine.isRunning
+        if wasRunning { engine.stop() }
+        #endif
         try? samplers[trackIndex].loadSoundBankInstrument(
             at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
         )
+        #if os(iOS)
+        if wasRunning { startEngine() }
+        #endif
         // Per-track default volumes; tremolo overrides this via LFO
         if !tremEnabled[trackIndex] {
             let vol: Float
@@ -688,6 +774,13 @@ final class PlaybackEngine: ObservableObject {
         }
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
         applyMuteState()
+    }
+
+    /// Returns the most recently CONFIRMED loaded program for a track (255 = never successfully loaded).
+    /// Used by AppState to detect whether a style-specific instrument loaded correctly.
+    func loadedProgram(forTrack trackIndex: Int) -> UInt8 {
+        guard trackIndex < currentProgram.count else { return 255 }
+        return currentProgram[trackIndex]
     }
 
     // MARK: - Ambient mode configuration
@@ -824,6 +917,12 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func lfoTick() {
+        // Skip all work if no effect is currently running — handles the brief window
+        // between an effect being disabled and the timer being cancelled.
+        guard tremEnabled.contains(true) || sweepEnabled.contains(true)
+           || panEnabled.contains(true) || kosmicIntroSweepActive || kosmicIntroBassPanActive
+        else { return }
+
         lfoTickCount += 1
         let do20fps   = (lfoTickCount % 3 == 0)
         let anySolo   = anySoloActive
@@ -1551,7 +1650,11 @@ final class PlaybackEngine: ObservableObject {
 
     private func startEngine() {
         do { try engine.start() }
-        catch { print("AVAudioEngine start error: \(error)") }
+        catch {
+            let msg = "AVAudioEngine failed to start: \(error.localizedDescription)"
+            print(msg)
+            onEngineError?(msg)
+        }
     }
 
 private func loadGMPrograms() {

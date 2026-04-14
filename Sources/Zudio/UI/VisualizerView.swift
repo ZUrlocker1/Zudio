@@ -18,8 +18,12 @@ struct VisualizerView: View {
     // drawOrbs reads this to render a bright burst when the track comes back in.
     @State private var trackUnmuteFlash: [Int: Date] = [:]
 
+    // Background gradient — rebuilt only when style changes, not every frame.
+    @State private var cachedBgGradient: Gradient = Gradient(colors: [.black, .black])
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 12,
+                                paused: !playback.isPlaying && playback.activeVisualizerNotes.isEmpty)) { tl in
             Canvas { ctx, size in
                 drawBackground(ctx: &ctx, size: size)
                 drawOrbs(ctx: &ctx, size: size, now: tl.date)
@@ -47,6 +51,8 @@ struct VisualizerView: View {
                 }
             }
         }
+        .onAppear { rebuildBgGradient() }
+        .onChange(of: style) { _, _ in rebuildBgGradient() }
     }
 
     // MARK: - Mac gesture handlers (mirrors iPhone tap/double-tap-orb, tap-empty)
@@ -105,13 +111,16 @@ struct VisualizerView: View {
     // MARK: - Background
 
     private func drawBackground(ctx: inout GraphicsContext, size: CGSize) {
-        let gradient = Gradient(colors: bgColors)
         ctx.fill(
             Path(CGRect(origin: .zero, size: size)),
-            with: .linearGradient(gradient,
+            with: .linearGradient(cachedBgGradient,
                 startPoint: CGPoint(x: size.width / 2, y: 0),
                 endPoint:   CGPoint(x: size.width / 2, y: size.height))
         )
+    }
+
+    private func rebuildBgGradient() {
+        cachedBgGradient = Gradient(colors: bgColors)
     }
 
     private var bgColors: [Color] {
@@ -127,11 +136,35 @@ struct VisualizerView: View {
         }
     }
 
+    // MARK: - Track colors (static — one Color per track, not one per orb per frame)
+
+    private static let kTrackColors: [Color] = [
+        Color(hue: 0.02, saturation: 0.85, brightness: 0.95), // Lead1: pure red
+        Color(hue: 0.06, saturation: 0.85, brightness: 0.95), // Lead2: orange-red
+        Color(hue: 0.60, saturation: 0.75, brightness: 0.90), // Pads: soft blue (slow float)
+        Color(hue: 0.54, saturation: 0.80, brightness: 0.88), // Rhythm: cyan-blue (tight)
+        Color(hue: 0.66, saturation: 0.70, brightness: 0.92), // Texture: indigo (wide lateral)
+        Color(hue: 0.78, saturation: 0.70, brightness: 0.90), // Bass: purple
+        Color(hue: 0.14, saturation: 0.85, brightness: 0.98), // Drums: yellow
+    ]
+
     // MARK: - Orbs
 
     private func drawOrbs(ctx: inout GraphicsContext, size: CGSize, now: Date) {
-        // When any track is soloed, non-soloed tracks render at 5% intensity — ghostly but present.
-        let anySolo = appState.isAnySolo
+        let anySolo  = appState.isAnySolo
+        let muteSnap = appState.muteState   // snapshot once — avoids per-orb observation overhead
+        let soloSnap = appState.soloState
+        let wallTime = now.timeIntervalSinceReferenceDate
+
+        // Cache all 7 track home positions once per frame — avoids redundant sin/cos for
+        // comet-tail ghost passes (each long note calls orbPosition 3–4× per frame).
+        var hx = [Double](repeating: 0.5, count: kTrackCount)
+        var hy = [Double](repeating: 0.5, count: kTrackCount)
+        for i in 0..<kTrackCount {
+            let h = trackHome(trackIndex: i, wallTime: wallTime)
+            hx[i] = h.x; hy[i] = h.y
+        }
+
         for orb in playback.activeVisualizerNotes {
             let age = now.timeIntervalSince(orb.birthDate)
             let lifetime = orbLifetime(orb)
@@ -144,47 +177,50 @@ struct VisualizerView: View {
             let t       = age / lifetime
             let opacity = 0.5 * (1.0 + cos(t * .pi))
 
-            // Direct mute (click on orb) ghosts at 6%; solo-out ghosts at 5%.
-            let directlyMuted = appState.muteState[orb.trackIndex]
-            let soloedOut     = anySolo && !appState.soloState[orb.trackIndex]
+            // Skip nearly-invisible orbs — at opacity < 4% the halo is ~0.9% visible,
+            // indistinguishable from black. Saves all fill calls for the final ~8% of lifetime.
+            guard opacity > 0.04 else { continue }
+
+            // Direct mute ghosts at 6%; solo-out ghosts at 5%.
+            let directlyMuted = muteSnap[orb.trackIndex]
+            let soloedOut     = anySolo && !soloSnap[orb.trackIndex]
             let muteScale: Double = directlyMuted ? 0.06 : (soloedOut ? 0.05 : 1.0)
 
-            let color = trackColor(orb.trackIndex)
+            // Compute radius and color once — reused for all ghost passes and the live orb.
+            let radius = orbRadius(orb)
+            let color  = Self.kTrackColors[min(orb.trackIndex, Self.kTrackColors.count - 1)]
+            let ox = hx[orb.trackIndex], oy = hy[orb.trackIndex]
 
-            // Comet tail ghosts (drawn before live orb so it sits on top)
-            if isLong {
-                let ghostCount = isVeryLong ? 4 : 3
+            // Comet tail ghosts — 1 pass for long notes, 2 for very long (was 3/4).
+            // Keeps the comet-tail feel at half the fill cost.
+            if isLong && muteScale > 0.1 {
+                let ghostCount = isVeryLong ? 2 : 1
                 for g in 1...ghostCount {
                     let ghostAge = max(0, age - Double(g) * 0.08)
-                    let pos = orbPosition(orb: orb, age: ghostAge, size: size, now: now)
-                    let ghostRadius = orbRadius(orb) * (1.0 - Double(g) * 0.15)
+                    let pos = orbPos(orb: orb, age: ghostAge, size: size, hx: ox, hy: oy)
+                    let ghostRadius = radius * (1.0 - Double(g) * 0.15)
                     let ghostOp = opacity * (0.3 / Double(g)) * muteScale
-                    ctx.fill(
-                        Path(ellipseIn: orbRect(pos, ghostRadius)),
-                        with: .color(color.opacity(ghostOp))
-                    )
+                    ctx.fill(Path(ellipseIn: orbRect(pos, ghostRadius)),
+                             with: .color(color.opacity(ghostOp)))
                 }
             }
 
-            // Sonar ring for very long notes — expands and fades over lifetime
-            if isVeryLong {
+            // Sonar ring — skip on muted/soloed-out orbs.
+            if isVeryLong && muteScale > 0.1 {
                 let ringProgress = age / lifetime
-                let ringRadius   = orbRadius(orb) * (1.0 + ringProgress * 3.0)
+                let ringRadius   = radius * (1.0 + ringProgress * 3.0)
                 let ringOp       = opacity * 0.4 * (1.0 - ringProgress) * muteScale
                 let ringWidth: CGFloat = 1.5
-                let pos = orbPosition(orb: orb, age: age, size: size, now: now)
-                let outer = orbRect(pos, ringRadius)
-                let inner = orbRect(pos, ringRadius - ringWidth)
-                var ring = Path(ellipseIn: outer)
-                ring.addEllipse(in: inner)
+                let pos   = orbPos(orb: orb, age: age, size: size, hx: ox, hy: oy)
+                var ring  = Path(ellipseIn: orbRect(pos, ringRadius))
+                ring.addEllipse(in: orbRect(pos, ringRadius - ringWidth))
                 ctx.fill(ring, with: .color(color.opacity(ringOp)))
             }
 
-            // Live orb: halo + core, with optional un-mute flash burst
-            let pos    = orbPosition(orb: orb, age: age, size: size, now: now)
-            let radius = orbRadius(orb)
+            // Live orb: single radial gradient replaces separate halo + core fills (2 → 1).
+            // Gradient: bright at centre → dim at coreR → transparent at haloR.
+            let pos = orbPos(orb: orb, age: age, size: size, hx: ox, hy: oy)
 
-            // Cosine burst: peaks at 1.0 the instant the track un-mutes, decays to 0 over 0.6 s.
             var flashBoost = 0.0
             if let flashDate = trackUnmuteFlash[orb.trackIndex] {
                 let flashAge = now.timeIntervalSince(flashDate)
@@ -193,45 +229,76 @@ struct VisualizerView: View {
                 }
             }
 
-            let haloR  = radius * (2.2 + flashBoost * 2.5)
-            let haloOp = opacity * (0.22 + flashBoost * 0.55) * muteScale
-            ctx.fill(Path(ellipseIn: orbRect(pos, haloR)), with: .color(color.opacity(haloOp)))
-            let coreR  = radius * (1.0 + flashBoost * 0.45)
-            let coreOp = opacity * (0.85 + flashBoost * 0.60) * muteScale
-            ctx.fill(Path(ellipseIn: orbRect(pos, coreR)), with: .color(color.opacity(coreOp)))
-
+            let haloR    = radius * (2.2 + flashBoost * 2.5)
+            let coreR    = radius * (1.0 + flashBoost * 0.45)
+            let coreOp   = opacity * (0.85 + flashBoost * 0.60) * muteScale
+            let haloOp   = opacity * (0.22 + flashBoost * 0.55) * muteScale
+            let coreStop = haloR > 0 ? coreR / haloR : 0.45
+            ctx.fill(
+                Path(ellipseIn: orbRect(pos, haloR)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: color.opacity(coreOp), location: 0.0),
+                        .init(color: color.opacity(haloOp), location: coreStop),
+                        .init(color: .clear,                location: 1.0)
+                    ]),
+                    center: pos, startRadius: 0, endRadius: haloR
+                )
+            )
         }
 
-        // Flash rings at each track's home position — drawn immediately on action,
-        // independent of live orbs so there is no delay waiting for a note to sound.
-        // One ring per active flash event, centered where that track's orbs congregate.
-        let wallTime = now.timeIntervalSinceReferenceDate
+        // Flash rings — reuse the cached home positions computed above.
         for (trackIndex, flashDate) in appState.visualizerFlashEvents {
             let flashAge = now.timeIntervalSince(flashDate)
-            guard flashAge < 0.5 else { continue }
-            let fp = flashAge / 0.5                          // 0 → 1
-            let (homeX, homeY) = trackHome(trackIndex: trackIndex, wallTime: wallTime)
-            let center = CGPoint(x: size.width * homeX, y: size.height * homeY)
-            let flashR  = 16.0 + fp * 56.0                  // expands 16 pt → 72 pt
-            let flashOp = (1.0 - fp) * 0.85                 // fades to transparent
+            guard flashAge < 0.5, trackIndex < kTrackCount else { continue }
+            let fp     = flashAge / 0.5
+            let center = CGPoint(x: size.width * hx[trackIndex], y: size.height * hy[trackIndex])
+            let flashR  = 16.0 + fp * 56.0
+            let flashOp = (1.0 - fp) * 0.85
             let rw: CGFloat = 2.5
             var ring = Path(ellipseIn: orbRect(center, flashR + rw))
             ring.addEllipse(in: orbRect(center, max(0, flashR - rw)))
             ctx.fill(ring, with: .color(Color.white.opacity(flashOp)))
         }
 
-        // Canvas-wide white flash for filter-sweep gesture — fades over 3s (matches sweep duration).
-        // Drawn last so it overlays everything else briefly.
+        // Canvas-wide white flash for filter-sweep gesture — fades over 3 s.
         if let flashDate = playback.canvasFlashDate {
             let flashAge = now.timeIntervalSince(flashDate)
             if flashAge < 3.0 {
-                let fp = flashAge / 3.0                      // 0 → 1 over 3 seconds
-                // Gentle cosine fade: 0.20 at t=0, smooth decay to 0 at t=3s
+                let fp = flashAge / 3.0
                 let flashOp = 0.20 * 0.5 * (1.0 + cos(fp * .pi))
                 ctx.fill(Path(CGRect(origin: .zero, size: size)),
                          with: .color(Color.white.opacity(flashOp)))
             }
         }
+    }
+
+    /// Canvas-path variant of orbPosition that takes pre-cached home coordinates.
+    /// Avoids redundant trackHome() sin/cos calls in the 15fps draw loop.
+    /// The original orbPosition(orb:age:size:now:) is preserved for the Mac gesture
+    /// Coordinator, which is only called on click — not on the hot draw path.
+    private func orbPos(orb: VisualizerNote, age: Double, size: CGSize,
+                        hx: Double, hy: Double) -> CGPoint {
+        let pitchNorm   = clamp((Double(orb.note) - 36.0) / 60.0, 0.0, 1.0)
+        let pitchOffset = (0.5 - pitchNorm) * 0.30
+        let (driftX, driftY): (Double, Double)
+        switch orb.trackIndex {
+        case kTrackPads:
+            driftX = sin(Double(orb.note % 7) * 0.9) * age * 5.0
+            driftY = -age * 2.5
+        case kTrackRhythm:
+            driftX = sin(Double(orb.note % 5) * 1.1) * age * 2.5
+            driftY = cos(Double(orb.velocity % 5) * 0.8) * age * 1.5
+        case kTrackTexture:
+            driftX = (Double(orb.note % 7) - 3.0) * age * 8.0
+            driftY = sin(Double(orb.velocity % 3) * 1.2) * age * 3.0
+        default:
+            driftX = (Double(orb.note % 7) - 3.0) * 0.03 * age * 10.0
+            driftY = (Double(orb.velocity % 5) - 2.0) * 0.02 * age * 8.0 - age * 3.0
+        }
+        let x = size.width  * clamp(hx + driftX / size.width,  0.02, 0.98)
+        let y = size.height * clamp(hy + pitchOffset + driftY / size.height, 0.02, 0.98)
+        return CGPoint(x: x, y: y)
     }
 
     // MARK: - Lifetime (doubled from original)
@@ -321,19 +388,6 @@ struct VisualizerView: View {
                width: radius * 2, height: radius * 2)
     }
 
-    /// Track hue palette — intra-family hue shifts distinguish Lead1/2 and Pads/Rhythm/Texture.
-    private func trackColor(_ idx: Int) -> Color {
-        switch idx {
-        case kTrackLead1:    return Color(hue: 0.02, saturation: 0.85, brightness: 0.95) // pure red
-        case kTrackLead2:    return Color(hue: 0.06, saturation: 0.85, brightness: 0.95) // orange-red
-        case kTrackPads:     return Color(hue: 0.60, saturation: 0.75, brightness: 0.90) // soft blue (slow float)
-        case kTrackRhythm:   return Color(hue: 0.54, saturation: 0.80, brightness: 0.88) // cyan-blue (tight)
-        case kTrackTexture:  return Color(hue: 0.66, saturation: 0.70, brightness: 0.92) // indigo (wide lateral)
-        case kTrackBass:     return Color(hue: 0.78, saturation: 0.70, brightness: 0.90) // purple
-        case kTrackDrums:    return Color(hue: 0.14, saturation: 0.85, brightness: 0.98) // yellow
-        default:             return .white
-        }
-    }
 
     func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double {
         max(lo, min(hi, v))
@@ -453,6 +507,9 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
 private final class MacGestureNSView: NSView {
     weak var coordinator: MacVisualizerGestureView.Coordinator?
     private var pendingClick: DispatchWorkItem?
+    // Cache last hit-tested position — skip the orb scan if cursor hasn't moved > 1pt.
+    private var lastHitTestPoint: CGPoint = .init(x: -999, y: -999)
+    private var lastHitTestResult: Bool = false
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
@@ -472,12 +529,15 @@ private final class MacGestureNSView: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         let pt   = convert(event.locationInWindow, from: nil)
+        let dx   = pt.x - lastHitTestPoint.x
+        let dy   = pt.y - lastHitTestPoint.y
+        guard dx*dx + dy*dy > 1.0 else { return }   // skip scan if moved < 1pt
+        lastHitTestPoint = pt
         let size = CGSize(width: bounds.width, height: bounds.height)
-        if coordinator?.hitOrb(at: pt, size: size) != nil {
-            NSCursor.pointingHand.set()
-        } else {
-            NSCursor.arrow.set()
-        }
+        let onOrb = coordinator?.hitOrb(at: pt, size: size) != nil
+        guard onOrb != lastHitTestResult else { return }  // skip cursor set if unchanged
+        lastHitTestResult = onOrb
+        if onOrb { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() }
     }
 
     override func mouseExited(with event: NSEvent) {

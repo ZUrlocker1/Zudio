@@ -84,7 +84,7 @@ final class NowPlayingController {
                 switch app.playMode {
                 case .endless: app.skipToNextSong()
                 case .evolve:  app.skipEvolvePass()
-                case .song:    app.seekToEnd()
+                case .song:    app.loadNextFromHistory()
                 }
             }
             return .success
