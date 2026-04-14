@@ -130,13 +130,20 @@ final class PlaybackEngine: ObservableObject {
     private var ambientNoteFadeDuration:   [Double] = [0.5, 0.5]   // stored at note-on; reused at note-off
 
     // Step-event map: built once at load time for O(1) lookup in onStep.
-    // nonisolated(unsafe): written on main actor in load(), read from background timer thread.
-    // Writes always happen-before reads (load() runs before play() which starts the timer).
+    // nonisolated(unsafe): written on main actor in buildStepEventMap(), read from the
+    // audio render thread (AVAudioNode tap). Protected by mapLock below.
     nonisolated(unsafe) private var stepEventMap: [Int: [(Int, MIDIEvent)]] = [:]
 
     // Note-off map: keyed by (stepIndex + durationSteps), value = [(trackIndex, noteNumber)].
     // Built alongside stepEventMap; fired directly in onStep — eliminates asyncAfter allocs.
     nonisolated(unsafe) private var noteOffMap: [Int: [(Int, UInt8)]] = [:]
+
+    // Lock protecting stepEventMap / noteOffMap.
+    // Replaces the old stepTimerQueue.sync pattern: writes happen on the main actor
+    // (buildStepEventMap), reads on the audio render thread (onStep via tap).
+    // os_unfair_lock is safe to call from a real-time thread — hold time is two
+    // pointer assignments (write) or two dictionary lookups (read).
+    nonisolated(unsafe) private var mapLock = os_unfair_lock()
 
     // Export tap state — allows cancelExport() to stop capture from outside the tap closure.
     // @unchecked Sendable: written on main actor, read/written from audio thread; done flag is
@@ -321,13 +328,11 @@ final class PlaybackEngine: ObservableObject {
                 offMap[ev.stepIndex + ev.durationSteps, default: []].append((trackIndex, ev.note))
             }
         }
-        // Sync to stepTimerQueue so the assignment can't race with an in-flight onStep read.
-        // The timer fires on stepTimerQueue (serial), so this sync waits for any running
-        // tick to finish before writing, and blocks the timer until both writes are done.
-        stepTimerQueue.sync {
-            stepEventMap = map
-            noteOffMap   = offMap
-        }
+        // Lock so the write can't race with an in-flight onStep read on the render thread.
+        os_unfair_lock_lock(&mapLock)
+        stepEventMap = map
+        noteOffMap   = offMap
+        os_unfair_lock_unlock(&mapLock)
     }
 
     func play() {
@@ -355,7 +360,7 @@ final class PlaybackEngine: ObservableObject {
             engine.mainMixerNode.outputVolume = 0.0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
                 guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
-                let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
+                let sched = StepScheduler(engine: self, tapNode: self.mixer, songState: state, startStep: 0, schedulerID: schedulerID)
                 self.scheduler = sched
                 sched.start()
                 self.startKosmicDroneFades(state: state)
@@ -365,7 +370,7 @@ final class PlaybackEngine: ObservableObject {
             engine.mainMixerNode.outputVolume = 0.0
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.050) { [weak self] in
                 guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
-                let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
+                let sched = StepScheduler(engine: self, tapNode: self.mixer, songState: state, startStep: 0, schedulerID: schedulerID)
                 self.scheduler = sched
                 sched.start()
                 self.startMotorikFades(state: state)
@@ -380,7 +385,7 @@ final class PlaybackEngine: ObservableObject {
             if chillPadsMode && currentStep == 0 {
                 boosts[kTrackPads].outputVolume = 0.0
             }
-            let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: schedulerID)
+            let sched = StepScheduler(engine: self, tapNode: mixer, songState: state, startStep: currentStep, schedulerID: schedulerID)
             scheduler = sched
             sched.start()
             if kosmicStyle              { startKosmicDroneFades(state: state) }
@@ -481,13 +486,16 @@ final class PlaybackEngine: ObservableObject {
         activeVisualizerNotes = []
     }
 
-    // MARK: - Step callback (called by StepScheduler on a background queue)
+    // MARK: - Step callback (called by StepScheduler on the audio render thread)
 
     nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
         guard currentSchedulerID == schedulerID else { return }
-        // Bind both maps once — eliminates 4 redundant re-lookups in the main.async block.
+        // Lock briefly to read both maps — writer is buildStepEventMap on the main actor.
+        // Hold time: two dictionary lookups. Render thread is not blocked in practice.
+        os_unfair_lock_lock(&mapLock)
         let noteOffs = noteOffMap[step]   ?? []
         let noteOns  = stepEventMap[step] ?? []
+        os_unfair_lock_unlock(&mapLock)
         // Fire note-offs first — pre-computed at load time, no asyncAfter allocations.
         // Chill Pads note-offs are deferred: stopNote fires after the boost fade-out completes
         // (see main.async block below), so the audio has time to fade before the note cuts.
@@ -662,7 +670,7 @@ final class PlaybackEngine: ObservableObject {
             currentStep = clampedStep
             currentBar  = clampedStep / 16
             currentSchedulerID += 1
-            let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
+            let sched = StepScheduler(engine: self, tapNode: mixer, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
             scheduler = sched
             sched.start()
             if kosmicStyle               { startKosmicDroneFades(state: state) }
@@ -687,7 +695,7 @@ final class PlaybackEngine: ObservableObject {
         scheduler = nil
         allNotesOff()
         currentSchedulerID += 1
-        let sched = StepScheduler(engine: self, songState: songState!, startStep: currentStep, schedulerID: currentSchedulerID)
+        let sched = StepScheduler(engine: self, tapNode: mixer, songState: songState!, startStep: currentStep, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
     }
@@ -712,7 +720,7 @@ final class PlaybackEngine: ObservableObject {
         // Always restart — switchToPass is called mid-Evolve; onSongEnd sets isPlaying=false
         // before the callback fires, so we can't rely on that flag here.
         isPlaying = true
-        let sched = StepScheduler(engine: self, songState: passState,
+        let sched = StepScheduler(engine: self, tapNode: mixer, songState: passState,
                                   startStep: 0, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
@@ -738,7 +746,7 @@ final class PlaybackEngine: ObservableObject {
         currentBar  = currentStep / 16
         currentSchedulerID += 1
         isPlaying = true
-        let sched = StepScheduler(engine: self, songState: state, startStep: currentStep,
+        let sched = StepScheduler(engine: self, tapNode: mixer, songState: state, startStep: currentStep,
                                   schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
