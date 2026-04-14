@@ -95,6 +95,10 @@ final class PlaybackEngine: ObservableObject {
     var onAudioEngineRestarted: (() -> Void)? = nil
     // onEngineError: fired when engine.start() throws so AppState can log the failure.
     var onEngineError: ((String) -> Void)? = nil
+    // onAudioInterrupted: fired on iOS when another app takes audio focus (e.g. Apple Music starts)
+    // or when headphones are pulled. PlaybackEngine.stop() has already been called; AppState uses
+    // this to stop audioTexture (Chill background loop) and any other non-engine audio.
+    var onAudioInterrupted: (() -> Void)? = nil
     // Set to true once the corresponding callback fires; reset on load(), seek(), switchToPass().
     private var approachingEndFired = false
     private var outroStartFired     = false
@@ -216,9 +220,30 @@ final class PlaybackEngine: ObservableObject {
         }
 
         #if os(iOS)
-        // routeChangeNotification fires when a Bluetooth headset or wired headphones
-        // connect or disconnect. On .oldDeviceUnavailable the OS silences audio;
-        // restart the engine so it re-enumerates the new output route.
+        // interruptionNotification fires when another app takes audio focus.
+        // On .began: the system has already deactivated our session — stop the scheduler only;
+        //   do NOT call setActive(false) (the session is already gone, and notifying others is
+        //   wrong here since the interrupting app is already playing).
+        // On .ended: do nothing — standard music-app behaviour is to wait for the user to press play.
+        //   play() calls setActive(true) + engine restart so no action needed here.
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let typeVal = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeVal),
+                  type == .began
+            else { return }
+            self.stopSchedulerOnly()
+            self.onAudioInterrupted?()
+        }
+
+        // routeChangeNotification fires when headphones connect or disconnect.
+        // Headphones pulled (.oldDeviceUnavailable): stop playback and restart the engine for the
+        // new output route — iOS silences audio in this case, so running silently is pointless.
+        // New device (.newDeviceAvailable): keep playing, just re-enumerate the output route.
         NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
@@ -229,7 +254,12 @@ final class PlaybackEngine: ObservableObject {
                   let reason = AVAudioSession.RouteChangeReason(rawValue: reasonVal)
             else { return }
             switch reason {
-            case .oldDeviceUnavailable, .newDeviceAvailable:
+            case .oldDeviceUnavailable:
+                // Headphones pulled — stop scheduler (don't touch session, restartAudio re-arms it)
+                self.stopSchedulerOnly()
+                self.onAudioInterrupted?()
+                self.restartAudio()
+            case .newDeviceAvailable:
                 self.restartAudio()
             default:
                 break
@@ -302,6 +332,12 @@ final class PlaybackEngine: ObservableObject {
 
     func play() {
         guard !isPlaying, let state = songState else { return }
+        #if os(iOS)
+        // Re-activate the session (deactivated by the previous stop()) and restart the engine
+        // if it was suspended when the session deactivated. setActive must precede engine.start().
+        try? AVAudioSession.sharedInstance().setActive(true)
+        if !engine.isRunning { startEngine() }
+        #endif
         // Resume from current playhead position (currentStep already set correctly)
         isPlaying = true
         currentSchedulerID += 1
@@ -354,6 +390,17 @@ final class PlaybackEngine: ObservableObject {
     }
 
     func stop() {
+        stopSchedulerOnly()
+        // AVAudioSession stays active — deactivating it on every Stop button press suspends
+        // the engine and can clear AUSampler soundbank state, causing silence on the next Play.
+        // The session is only deactivated by the OS when another app takes audio focus
+        // (interruptionNotification .began), which is the correct trigger.
+    }
+
+    /// Stop the scheduler and clean up playback state without touching the AVAudioSession.
+    /// Used by system-driven stop paths (interruption, headphone pull, route change) where
+    /// the session is already deactivated by iOS — calling setActive(false) there is wrong.
+    private func stopSchedulerOnly() {
         scheduler?.stop()
         scheduler = nil
         isPlaying = false
@@ -369,36 +416,48 @@ final class PlaybackEngine: ObservableObject {
         for del in delays  { del.reset() }
     }
 
-    /// Stop and restart the AVAudioEngine so macOS re-enumerates the output device.
-    /// Call this when the user connects new headphones or Bluetooth audio.
+    /// Stop and restart the AVAudioEngine so it re-enumerates the output device.
+    /// Call this when the user connects or disconnects headphones or Bluetooth audio.
     func restartAudio() {
         allNotesOff()
+        #if os(iOS)
+        // Capture playing state before stopping — beginBatchLoad() inside
+        // applyCurrentInstrumentsToPlayback() checks engine.isRunning, but the engine
+        // is already stopped here, so it returns false and endBatchLoad() is never called.
+        // We restart the engine ourselves below if playback was active.
+        let wasPlaying = isPlaying
+        #endif
         engine.stop()
-        // Restart the engine BEFORE clearing the program cache so that the
-        // onAudioEngineRestarted callback fires with the engine running.
-        // On Mac this means per-track stop/start in setProgram() (wasRunning=true)
-        // correctly commits each new preset. On iOS the callback's beginBatchLoad()
-        // stops and restarts the engine around the batch load — same end result.
-        startEngine()
-        currentProgram = Array(repeating: 255, count: kTrackCount)
-        currentBankMSB = Array(repeating: 0,   count: kTrackCount)
+        currentProgram    = Array(repeating: 255, count: kTrackCount)
+        currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
         cachedDrumProgram = 255
+        #if !os(iOS)
+        // macOS: start now; setProgram() works with the engine running.
+        startEngine()
+        #endif
         onAudioEngineRestarted?()
+        #if os(iOS)
+        // iOS: restart the engine after instruments are loaded if we were playing.
+        // (.oldDeviceUnavailable calls stopSchedulerOnly() first → isPlaying = false
+        //  → stays stopped so the user must press Play to resume through the speaker.
+        //  .newDeviceAvailable while playing → wasPlaying = true → restarts here.)
+        if wasPlaying { startEngine() }
+        #endif
     }
 
     /// Clears the loaded-program dedup cache so the next setProgram() call for every
     /// track forces a fresh loadSoundBankInstrument(), regardless of the previous program.
-    /// Required on iOS before every batch load: even a single engine stop/start cycle
-    /// invalidates AUSampler soundbank state for nodes that weren't reloaded in that cycle,
-    /// so tracks with unchanged programs must still reload to stay in a valid state.
+    /// Called on iOS before applyCurrentInstrumentsToPlayback() so that route-change engine
+    /// restarts (which reset AUSampler state) are followed by a full reload of all tracks.
     func invalidateProgramCache() {
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
         cachedDrumProgram = 255
     }
 
-    /// Stop the engine once before a batch of setProgram() calls so iOS doesn't perform
-    /// a per-track stop/start cycle (which corrupts earlier AUSampler nodes on iOS).
+    /// Stop the engine once before a batch of setProgram() calls.
+    /// On iOS, loadSoundBankInstrument() must be called while the engine is stopped to
+    /// commit the soundbank — calling it while running appears to succeed but produces silence.
     /// Returns true if the engine was running and was stopped; false if already stopped.
     /// Caller must call endBatchLoad() only when this returns true.
     @discardableResult
@@ -409,11 +468,13 @@ final class PlaybackEngine: ObservableObject {
     }
 
     /// Restart the engine after a batch of setProgram() calls initiated by beginBatchLoad().
+    /// startEngine() activates the AVAudioSession before engine.start() so the engine opens
+    /// onto a live audio route, not a null one.
     func endBatchLoad() {
         startEngine()
     }
 
-    /// Reset the playhead to bar 1 without requiring a loaded song.
+    /// Resets the playhead to bar 1 without requiring a loaded song.
     func resetPlayhead() {
         currentStep = 0
         currentBar  = 0
@@ -517,9 +578,12 @@ final class PlaybackEngine: ObservableObject {
                         let fadeSecs = self.ambientNoteFadeDuration[1]
                         self.startAmbientBoostFade(trackIndex: kTrackPads, toVolume: 0.0, duration: fadeSecs)
                         // Defer stopNote until after the fade completes so the audio fades rather than cuts.
-                        let channel = self.gmChannel(kTrackPads)
+                        // Capture schedulerID so a stop/seek during the fade window cancels the stale stopNote.
+                        let channel    = self.gmChannel(kTrackPads)
+                        let capturedID = self.currentSchedulerID
                         DispatchQueue.main.asyncAfter(deadline: .now() + fadeSecs) { [weak self] in
-                            self?.samplers[kTrackPads].stopNote(note, onChannel: channel)
+                            guard let self, self.currentSchedulerID == capturedID else { return }
+                            self.samplers[kTrackPads].stopNote(note, onChannel: channel)
                         }
                     }
                 }
@@ -701,16 +765,9 @@ final class PlaybackEngine: ObservableObject {
         currentProgram[trackIndex] = program
         currentBankMSB[trackIndex] = bankMSB
         if trackIndex == kTrackDrums { cachedDrumProgram = program }
-        #if os(iOS)
-        let wasRunning = engine.isRunning
-        if wasRunning { engine.stop() }
-        #endif
         try? samplers[trackIndex].loadSoundBankInstrument(
             at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
         )
-        #if os(iOS)
-        if wasRunning { startEngine() }
-        #endif
         // Per-track default volumes; tremolo overrides this via LFO
         if !tremEnabled[trackIndex] {
             let vol: Float
@@ -1565,6 +1622,14 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Private setup
 
     private func setupEngine() {
+        #if os(iOS)
+        // Exclusive playback category: activating our session interrupts other apps (Apple Music,
+        // Audible, etc.) and they can interrupt us — the correct behaviour for a music app.
+        // Must be set before engine.start() so the session is configured before audio routes open.
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default, options: [])
+        #endif
+
         engine.attach(mixer)
         engine.connect(mixer, to: engine.mainMixerNode, format: nil)
 
@@ -1650,6 +1715,11 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func startEngine() {
+        #if os(iOS)
+        // Session must be active before the engine starts — starting on an inactive session
+        // causes the engine to open onto a dead route, producing silence even though isRunning=true.
+        try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
         do { try engine.start() }
         catch {
             let msg = "AVAudioEngine failed to start: \(error.localizedDescription)"

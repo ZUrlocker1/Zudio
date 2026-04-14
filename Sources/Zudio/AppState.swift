@@ -555,11 +555,11 @@ final class AppState: ObservableObject {
     /// TrackRowView.onChange(of: defaultsResetToken) fires on the NEXT SwiftUI render cycle
     /// (deferred), so without this call the first notes play with stale/default programs.
     private func applyCurrentInstrumentsToPlayback() {
-        // iOS: clear the dedup cache so every track reloads its soundbank on each song
-        // transition (a single engine stop/start invalidates AUSampler state for nodes
-        // that weren't reloaded in that cycle). Batch all loads into one engine stop/start.
-        // macOS: uses per-track stop/start (the setProgram() default). The dedup cache
-        // is valid across stop/start on Mac — AUSampler state persists.
+        // iOS: loadSoundBankInstrument() must be called while the engine is stopped —
+        // calling it while running appears to succeed but produces silence. Stop once,
+        // load all tracks (including kTrackLeadSynth=7, Kosmic's hidden doubling layer),
+        // then restart. The dedup cache is invalidated first so every track reloads fresh.
+        // macOS: setProgram() works while the engine is running — no stop/start needed.
         #if os(iOS)
         playback.invalidateProgramCache()
         let batchWasRunning = playback.beginBatchLoad()
@@ -597,9 +597,12 @@ final class AppState: ObservableObject {
         }
 
         #if os(iOS)
-        // Restart the engine once after all programs are loaded (batch path).
-        // beginBatchLoad() returns false if the engine was already stopped (restartAudio() path),
-        // in which case restartAudio() calls startEngine() itself after we return.
+        // Restart the engine after all instruments are loaded.
+        // endBatchLoad() → startEngine() → setActive(true) + engine.start().
+        // Only called when beginBatchLoad() actually stopped the engine (song load / style
+        // change paths). Route-change path: restartAudio() already stopped the engine before
+        // calling this, so beginBatchLoad() returned false — restartAudio() handles the
+        // engine restart itself after this callback returns.
         if batchWasRunning { playback.endBatchLoad() }
         #endif
 
@@ -804,6 +807,12 @@ final class AppState: ObservableObject {
         playback.onEngineError = { [weak self] msg in
             guard let self else { return }
             self.appendToLog([GenerationLogEntry(tag: "ERROR", description: msg, isTitle: false)])
+        }
+        // iOS audio interruption (another app takes focus) or headphones pulled.
+        // PlaybackEngine.stop() has already fired; stop audioTexture (Chill background loop) too.
+        playback.onAudioInterrupted = { [weak self] in
+            guard let self else { return }
+            self.audioTexture.stop()
         }
 
         playback.onOutroStart = { [weak self] in
@@ -1133,9 +1142,39 @@ final class AppState: ObservableObject {
     func regenerateTrack(_ trackIndex: Int) {
         guard let current = songState, !isGenerating else { return }
         isGenerating = true
+        // In evolve mode the extended state has a minimal structure (sections: []) — generators
+        // that call structure.section(atBar:) return nil for every body bar, producing empty arrays.
+        //
+        // Fix: use the anchor state (full structure) as the generation source, then stitch the
+        // result back into the extended state:
+        //   • steps  0 ..< bodyEndStep : replaced with anchor-generated events
+        //   • steps  bodyEndStep ..    : existing pass events preserved as-is
+        //
+        // bodyEndStep is the step where pass content begins (= outroStartBar * 16), which is
+        // the same split point used by buildExtendedState to splice anchor body + pass events.
+        let sourceState: SongState
+        let evolveBodyEndStep: Int?
+        if playMode == .evolve, let anchor = evolveAnchorState {
+            sourceState       = anchor
+            evolveBodyEndStep = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars) * 16
+        } else {
+            sourceState       = current
+            evolveBodyEndStep = nil     // non-evolve: replace entire track as before
+        }
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let updated = SongGenerator.regenerateTrack(trackIndex, songState: current)
+            let regen        = SongGenerator.regenerateTrack(trackIndex, songState: sourceState)
+            let regenEntries = Array(regen.generationLog.dropFirst(sourceState.generationLog.count))
+            // Stitch anchor body events + preserved pass events (evolve) or use all events (song/endless).
+            let newEvents: [MIDIEvent]
+            if let bodyEnd = evolveBodyEndStep {
+                let anchorBody = regen.trackEvents[trackIndex].filter { $0.stepIndex <  bodyEnd }
+                let passEvents = current.trackEvents[trackIndex].filter { $0.stepIndex >= bodyEnd }
+                newEvents = (anchorBody + passEvents).sorted { $0.stepIndex < $1.stepIndex }
+            } else {
+                newEvents = regen.trackEvents[trackIndex]
+            }
+            let updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries)
             await MainActor.run {
                 self.songState    = updated
                 self.isGenerating = false
@@ -1145,7 +1184,6 @@ final class AppState: ObservableObject {
                     self.generationHistory[self.generationHistory.count - 1] = updated
                 }
                 // Append only the NEW regen entries to the flat status log (at the very bottom)
-                let regenEntries = Array(updated.generationLog.dropFirst(current.generationLog.count))
                 self.appendToLog(regenEntries)
                 // If a file-open arrived while we were regenerating, load it now.
                 self.consumePendingLoad()
@@ -1342,6 +1380,7 @@ final class AppState: ObservableObject {
         guard let anchor = evolveAnchorState else { return }
         let style = anchor.style
         var rng = SystemRandomNumberGenerator()
+        var entries: [GenerationLogEntry] = []
         for trackIndex in freshTracks {
             let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
             guard programs.count > 1 else { continue }
@@ -1355,8 +1394,13 @@ final class AppState: ObservableObject {
             guard newIdx != currentIdx else { continue }
             instrumentOverrides[trackIndex] = newIdx
             setProgram(programs[newIdx], forTrack: trackIndex)
+            let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
+            let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style)
+            let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
+            entries.append(GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(iName)", isTitle: false))
         }
         instrumentChangeToken += 1
+        if !entries.isEmpty { appendToLog(entries) }
     }
 
     private func startEvolveMode(from song: SongState, lockMoodToSong: Bool = true) {
@@ -2243,6 +2287,10 @@ final class AppState: ObservableObject {
         setProgram(programs[newIdx], forTrack: trackIndex)
         instrumentChangeToken += 1
         triggerVisualizerFlash(trackIndex: trackIndex)
+        let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle)
+        let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
+        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(iName)", isTitle: false)])
     }
 
     /// Sets a specific program on a track and records the override index.
@@ -2253,6 +2301,18 @@ final class AppState: ObservableObject {
         }
         setProgram(program, forTrack: trackIndex)
         instrumentChangeToken += 1
+        let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle)
+        if let idx = programs.firstIndex(of: program), idx < names.count {
+            appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(names[idx])", isTitle: false)])
+        }
+    }
+
+    /// Appends an instrument-change entry to the generation log.
+    /// Called by TrackRowView.cycleInstrument() which owns the display name.
+    func logInstrumentChange(trackIndex: Int, name: String) {
+        let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
+        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(name)", isTitle: false)])
     }
 
     /// Removes all active effects from a track.

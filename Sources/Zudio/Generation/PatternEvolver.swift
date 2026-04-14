@@ -214,9 +214,14 @@ struct PatternEvolver {
                 if rotateAccum != 0 {
                     barEvents = barEvents.map { ev in
                         let off = ev.stepIndex - barStart
-                        // Protect beat 1 (step 0) and beat 3 (step 8) — both are kick-drum
-                        // anchor positions in Motorik; shifting them off-grid causes desync.
+                        // Protect beat 1 (step 0) and beat 3 (step 8) — kick-drum anchors.
                         guard off != 0 && off != 8 else { return ev }
+                        // Protect all 8th-note grid positions (even offsets: 2,4,6,10,12,14).
+                        // Rotating them to 16th positions (odd steps) destroys the locked-groove
+                        // feel of Motorik: the bass would land between every hi-hat hit while the
+                        // kick/snare/hat all stay on the 8th-note grid (the "Apache beat" lock).
+                        // Only rotate events that are already at syncopated 16th positions.
+                        guard off % 2 != 0 else { return ev }
                         let newOff = max(1, min(15, off + rotateAccum))
                         return MIDIEvent(stepIndex: barStart + newOff, note: ev.note,
                                         velocity: ev.velocity, durationSteps: ev.durationSteps)

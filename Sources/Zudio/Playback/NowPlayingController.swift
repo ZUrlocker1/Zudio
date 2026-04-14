@@ -40,8 +40,9 @@ final class NowPlayingController {
 
     private static func makeArtwork() -> MPMediaItemArtwork? {
         #if os(iOS)
-        // AppIconImage is a regular 1024×1024 image set in the asset catalog — always loadable.
-        guard let image = UIImage(named: "AppIconImage") else { return nil }
+        // ZudioLogoSquare: square wordmark with yellow bolt — ideal for lock screen / Now Playing.
+        let image = UIImage(named: "ZudioLogoSquare") ?? UIImage(named: "AppIconImage")
+        guard let image else { return nil }
         return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         #elseif os(macOS)
         guard let image = NSApp.applicationIconImage else { return nil }

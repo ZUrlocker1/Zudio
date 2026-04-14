@@ -424,6 +424,7 @@ struct TrackRowView: View {
         if trackIndex == kTrackDrums && appState.selectedStyle == .ambient {
             appState.remapAmbientDrumNotes(instrumentIndex: instrumentIndex)
         }
+        appState.logInstrumentChange(trackIndex: trackIndex, name: instruments[instrumentIndex].name)
     }
 
     private static let effectActiveColor = Color(red: 0.18, green: 0.42, blue: 0.78) // dark blue
