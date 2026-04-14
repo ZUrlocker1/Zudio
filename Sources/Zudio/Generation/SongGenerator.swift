@@ -1152,7 +1152,7 @@ struct SongGenerator {
 
         // Chord progression — key/mode + progression family
         let progLabel = progressionFamilyLabel(frame.progressionFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(progLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progLabel)"))
 
         // Drums
         for ruleID in drumRules.sorted() {
@@ -1296,11 +1296,11 @@ struct SongGenerator {
 
     private static func progressionFamilyLabel(_ family: ProgressionFamily) -> String {
         switch family {
-        case .static_tonic:             return "Static tonic: I"
-        case .two_chord_I_bVII:         return "Two chord: I - ♭VII"
-        case .minor_loop_i_VII:         return "Minor loop: i - VII"
-        case .minor_loop_i_VI:          return "Minor loop: i - VI"
-        case .modal_cadence_bVI_bVII_I: return "Modal rock: ♭VI - ♭VII - I"
+        case .static_tonic:             return "Static tonic I"
+        case .two_chord_I_bVII:         return "Two chord I ♭VII"
+        case .minor_loop_i_VII:         return "Minor loop i VII"
+        case .minor_loop_i_VI:          return "Minor loop i VI"
+        case .modal_cadence_bVI_bVII_I: return "Modal rock ♭VI ♭VII I"
         }
     }
 
@@ -1485,10 +1485,10 @@ struct SongGenerator {
         switch ruleID {
         case "KOS-LEAD-001": return "Berlin school slow arc"
         case "KOS-LEAD-002": return "Eno floating tones"
-        case "KOS-LEAD-003": return "Pentatonic Drift — slow 5-note move"
+        case "KOS-LEAD-003": return "Pentatonic drift"
         case "KOS-LEAD-004": return "Echo melody"
         case "KOS-LEAD-005": return "Tangerine Dream arpeggio highlight"
-        case "KOS-LEAD-006": return "Jean Michel Jarre evolving phrase"
+        case "KOS-LEAD-006": return "JMJ evolving phrase"
         case "KOS-LEAD-007": return "Tangerine Dream skip sequence"
         case "KOS-LEAD-008": return "Caligari solo"
         case "KOS-LEAD-009": return "Dark Sun solo"
@@ -1500,12 +1500,12 @@ struct SongGenerator {
         switch ruleID {
         case "KOS-RTHM-001": return "Probabilistic Tangerine Dream sequencer"
         case "KOS-RTHM-002": return "Probabilistic JMJ melodic hook"
-        case "KOS-RTHM-003": return "Jean Michel Jarre ascending, descending oscillation"
-        case "KOS-RTHM-004": return "Probabilistic Electric Buddha pentatonic groove"
-        case "KOS-RTHM-005": return "Probabilistic Jean Michel Jarre dual arpeggio"
+        case "KOS-RTHM-003": return "JMJ oscillation"
+        case "KOS-RTHM-004": return "Electric Buddha groove"
+        case "KOS-RTHM-005": return "JMJ dual arpeggio"
         case "KOS-RTHM-006": return "Kraftwerk locked pulse"
         case "KOS-RTHM-007": return "Tangerine Dream pitch drift"
-        case "KOS-RTHM-008": return "Jean Michel Jarre Oxygen 8-bar arc"
+        case "KOS-RTHM-008": return "JMJ Oxygen 8-bar arc"
         case "KOS-RTHM-009": return "Craven Faults phase drift"
         case "KOS-RTHM-010": return "Craven Faults modular grit"
         default:            return ruleID
@@ -1525,9 +1525,9 @@ struct SongGenerator {
     private static func kosmicProgressionFamilyLabel(_ family: KosmicProgressionFamily) -> String {
         switch family {
         case .static_drone:          return "Static Drone"
-        case .two_chord_pendulum:    return "Vangelis two chord pendulum  i - bVI"
-        case .modal_drift:           return "Modal Drift — i - bVII - bVI"
-        case .suspended_resolution:  return "Suspended Resolution — sus4 - minor"
+        case .two_chord_pendulum:    return "Two chord pendulum i bVI"
+        case .modal_drift:           return "Modal Drift i bVII bVI"
+        case .suspended_resolution:  return "Suspended Resolution sus4 minor"
         case .quartal_stack:         return "Stacked fourths"
         }
     }
@@ -1594,7 +1594,7 @@ struct SongGenerator {
 
         // Chord progression — key/mode + progression family
         let progFamilyLabel = kosmicProgressionFamilyLabel(kosmicProgFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(progFamilyLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progFamilyLabel)"))
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {
@@ -1641,10 +1641,10 @@ struct SongGenerator {
     private static func ambientProgressionFamilyLabel(_ family: AmbientProgressionFamily) -> String {
         switch family {
         case .droneSingle:    return "Static drone"
-        case .droneTwo:       return "Two-chord drift  i - ♭VII"
-        case .modalDrift:     return "Modal drift  i - ♭VII - ♭VI"
-        case .suspendedDrone: return "suspended drone"
-        case .dissonantHaze:  return "Dissonant haze  m7"
+        case .droneTwo:       return "Two chord drift i ♭VII"
+        case .modalDrift:     return "Modal drift i ♭VII ♭VI"
+        case .suspendedDrone: return "Suspended drone"
+        case .dissonantHaze:  return "Dissonant haze m7"
         }
     }
 
@@ -1722,10 +1722,10 @@ struct SongGenerator {
 
         // Chord plan — key/mode + progression family
         let progLabel = ambientProgressionFamilyLabel(ambientProgFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(progLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progLabel)"))
 
         // Loop lengths (shows phase-shift structure)
-        let loopDesc = "pads \(loopLengths.pads)  lead1 \(loopLengths.lead1)  lead2 \(loopLengths.lead2)  rhythm \(loopLengths.rhythm)  tex \(loopLengths.texture)  bass \(loopLengths.bass)"
+        let loopDesc = "pd \(loopLengths.pads) l1 \(loopLengths.lead1) l2 \(loopLengths.lead2) ry \(loopLengths.rhythm) tx \(loopLengths.texture) bs \(loopLengths.bass)"
         log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
 
         // Per-track rules — append * to tag for any rule forced by the test pool
@@ -2119,7 +2119,7 @@ struct SongGenerator {
             guard beats > 1 else { continue }  // 1-beat fills are too brief to clutter the log with
             let name   = fillName(bar: fillBar, beats: beats)
             let locked = bassLocked(bar: fillBar)
-            let desc   = locked ? "\(beats) beat — \(name) — bass locked in" : "\(beats) beat — \(name)"
+            let desc   = locked ? "\(beats) beat \(name) bass lock" : "\(beats) beat \(name)"
             // fillRegionOffset: where in the bar the fill starts; fire 1/4 bar (4 steps) before that
             let fillRegionOffset = beats == 1 ? 12 : beats == 2 ? 8 : 4
             fire(fillBar * 16 + max(0, fillRegionOffset - 4), tag: "Drum fill", desc: desc)
@@ -2650,7 +2650,7 @@ struct SongGenerator {
         case .minor_blues:        familyLabel = "Minor blues"
         case .modal_drift:        familyLabel = "Modal drift"
         }
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue)  \(familyLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(familyLabel)"))
 
         // Audio texture
         let textureDesc = chillAudioTexture.map { name in

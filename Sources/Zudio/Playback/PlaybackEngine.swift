@@ -921,6 +921,7 @@ final class PlaybackEngine: ObservableObject {
         // between an effect being disabled and the timer being cancelled.
         guard tremEnabled.contains(true) || sweepEnabled.contains(true)
            || panEnabled.contains(true) || kosmicIntroSweepActive || kosmicIntroBassPanActive
+           || globalSweepTicksRemaining > 0
         else { return }
 
         lfoTickCount += 1

@@ -1023,7 +1023,6 @@ final class AppState: ObservableObject {
                 // From the second song onwards, pick 2 random non-drums tracks and assign
                 // each a random non-default instrument, so users hear the instrument variety.
                 // kTrackTexture is excluded for Chill — the generator already chose the texture.
-                var instrumentLogDesc: String? = nil
                 if !isFirstForStyle {
                     var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
                     var picks: [(trackIndex: Int, instIndex: Int, name: String)] = []
@@ -1039,8 +1038,6 @@ final class AppState: ObservableObject {
                     }
                     if !picks.isEmpty {
                         self.instrumentOverrides = Dictionary(uniqueKeysWithValues: picks.map { ($0.trackIndex, $0.instIndex) })
-                        let parts = picks.map { "\(Self.trackDisplayName[$0.trackIndex] ?? "Track"): \($0.name)" }
-                        instrumentLogDesc = parts.joined(separator: ",  ")
                     }
                 } else {
                     self.instrumentOverrides = [:]
@@ -1055,20 +1052,12 @@ final class AppState: ObservableObject {
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
 
-                // Build the batch to append: optional separator + generation log + instruments entry
+                // Build the batch to append: optional separator + generation log
                 var batch: [GenerationLogEntry] = []
                 if !self.statusLog.isEmpty {
                     batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
                 }
-                var logEntries = state.generationLog
-                if let desc = instrumentLogDesc, style != .chill && style != .ambient {
-                    let entry = GenerationLogEntry(tag: "Instruments", description: desc, isTitle: false)
-                    if let firstIdx = logEntries.firstIndex(where: { $0.tag == "Intro" || $0.tag == "Outro" }) {
-                        logEntries.insert(entry, at: firstIdx)
-                    } else {
-                        logEntries.append(entry)
-                    }
-                }
+                let logEntries = state.generationLog
                 batch.append(contentsOf: logEntries)
                 self.appendToLog(batch)
                 // Reset mute/solo so every new song starts with all parts audible

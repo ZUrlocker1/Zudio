@@ -15,16 +15,40 @@
 // Session API; we must set ours explicitly or browsers will always win.
 
 import MediaPlayer
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 final class NowPlayingController {
 
     private weak var appState: AppState?
 
+    // Artwork computed once at configure time — avoids re-allocating on every Now Playing update.
+    private var cachedArtwork: MPMediaItemArtwork?
+
     // MARK: - Setup
 
     func configure(appState: AppState) {
         self.appState = appState
+        cachedArtwork = Self.makeArtwork()
         setupRemoteCommands()
+    }
+
+    // MARK: - Artwork
+
+    private static func makeArtwork() -> MPMediaItemArtwork? {
+        #if os(iOS)
+        // AppIconImage is a regular 1024×1024 image set in the asset catalog — always loadable.
+        guard let image = UIImage(named: "AppIconImage") else { return nil }
+        return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        #elseif os(macOS)
+        guard let image = NSApp.applicationIconImage else { return nil }
+        return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        #else
+        return nil
+        #endif
     }
 
     // MARK: - Remote commands
@@ -117,7 +141,7 @@ final class NowPlayingController {
 
         if let song {
             let elapsed = Double(currentStep) * song.frame.secondsPerStep
-            center.nowPlayingInfo = [
+            var info: [String: Any] = [
                 MPMediaItemPropertyTitle:                    song.title,
                 MPMediaItemPropertyArtist:                   "Zudio",
                 MPMediaItemPropertyPlaybackDuration:         song.frame.totalDurationSeconds,
@@ -125,11 +149,15 @@ final class NowPlayingController {
                 MPNowPlayingInfoPropertyPlaybackRate:        isPlaying ? 1.0 : 0.0,
                 MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             ]
+            if let artwork = cachedArtwork { info[MPMediaItemPropertyArtwork] = artwork }
+            center.nowPlayingInfo = info
         } else {
-            center.nowPlayingInfo = [
+            var info: [String: Any] = [
                 MPMediaItemPropertyTitle:             "Zudio",
                 MPNowPlayingInfoPropertyPlaybackRate: 0.0,
             ]
+            if let artwork = cachedArtwork { info[MPMediaItemPropertyArtwork] = artwork }
+            center.nowPlayingInfo = info
         }
     }
 

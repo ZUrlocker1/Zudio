@@ -284,7 +284,7 @@ struct PhonePlayerView: View {
         }
         .font(.callout)
         .frame(maxWidth: .infinity)
-        .frame(height: 30)
+        .frame(height: 34)
         .background(Color(white: 0.18))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6)
@@ -317,9 +317,9 @@ struct PhonePlayerView: View {
             Divider().frame(height: 22)
             styleButton(.motorik,  label: "Motorik")
         }
-        .font(.system(size: 12, weight: .semibold))
+        .font(.callout)
         .frame(maxWidth: .infinity)
-        .frame(height: 30)
+        .frame(height: 34)
         .background(Color(white: 0.18))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6)
