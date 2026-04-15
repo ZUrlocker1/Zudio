@@ -785,7 +785,7 @@ private struct PhoneInfoView: View {
 
 // MARK: - Canvas gesture recognizer (UIViewRepresentable)
 
-private struct CanvasGestureView: UIViewRepresentable {
+struct CanvasGestureView: UIViewRepresentable {
     var notes: [VisualizerNote]
     var onTapOrb:          (Int) -> Void
     var onDoubleTapOrb:    (Int) -> Void

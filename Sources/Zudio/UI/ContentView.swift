@@ -36,6 +36,21 @@ struct ContentView: View {
     @State private var iPadVisualizerPaused: Bool = false
     @State private var iPadShowVisualsOffLabel = false
 
+    // iPad canvas gesture state
+    @State private var iPadDryTracks: Set<Int> = []
+    @State private var iPadLastShuffledTrack: Int? = nil
+    @State private var iPadLastShuffledInstrument: UInt8? = nil
+
+    // iPad haptic triggers
+    @State private var iPadHapticImpactMedium = false
+    @State private var iPadHapticImpactLight  = false
+    @State private var iPadHapticImpactHeavy  = false
+    @State private var iPadHapticImpactSoft   = false
+    @State private var iPadHapticImpactRigid  = false
+    @State private var iPadHapticSelection    = false
+    @State private var iPadHapticSuccess      = false
+    @State private var iPadHapticWarning      = false
+
     // iPad mini landscape: contentWidth ~1133pt (portrait mini is ~744pt).
     // iPad Air/Pro 13" portrait is ~1024pt — must not be caught by this range.
     // In this orientation there isn't enough vertical room to show all 7 track rows
@@ -100,6 +115,14 @@ struct ContentView: View {
                     .onAppear      { contentWidth = geo.size.width }
                     .onChange(of: geo.size) { size in contentWidth = size.width }
             }
+            .sensoryFeedback(.impact(weight: .medium), trigger: iPadHapticImpactMedium)
+            .sensoryFeedback(.impact(weight: .light),  trigger: iPadHapticImpactLight)
+            .sensoryFeedback(.impact(weight: .heavy),  trigger: iPadHapticImpactHeavy)
+            .sensoryFeedback(.impact(flexibility: .soft,  intensity: 0.8), trigger: iPadHapticImpactSoft)
+            .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1.0), trigger: iPadHapticImpactRigid)
+            .sensoryFeedback(.selection, trigger: iPadHapticSelection)
+            .sensoryFeedback(.success,   trigger: iPadHapticSuccess)
+            .sensoryFeedback(.warning,   trigger: iPadHapticWarning)
         }
         #else
         // macOS — existing layout unchanged
@@ -480,7 +503,7 @@ struct ContentView: View {
                         VisualizerView(style: appState.selectedStyle)
                             .environmentObject(appState.playback)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .onTapGesture(count: 2) { appState.resetEffectsToDefaults() }
+                            .overlay(iPadCanvasGestureLayer)
                     } else {
                         ZStack(alignment: .bottomLeading) {
                             Color(white: 0.04)
@@ -818,6 +841,104 @@ struct ContentView: View {
         }
         .background(Color(white: 0.08))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - iPad canvas gesture layer
+
+    private var iPadCanvasGestureLayer: some View {
+        CanvasGestureView(
+            notes: appState.playback.activeVisualizerNotes,
+            onTapOrb:         { orbTrack in iPadHandleTapOrb(orbTrack) },
+            onDoubleTapOrb:   { orbTrack in iPadHandleDoubleTapOrb(orbTrack) },
+            onLongPressOrb:   { orbTrack in iPadHandleLongPressOrb(orbTrack) },
+            onTapEmpty:       { iPadHandleTapEmpty() },
+            onDoubleTapEmpty: { iPadHandleDoubleTapEmpty() },
+            onLongPressEmpty: { iPadHandleLongPressEmpty() },
+            onSwipeRight:     { iPadHandleSwipeRight() },
+            onSwipeLeft:      { iPadHandleSwipeLeft() },
+            onTwoFinger:      { iPadHandleTwoFinger() }
+        )
+    }
+
+    // MARK: - iPad gesture handlers
+
+    private func iPadHandleTapOrb(_ trackIndex: Int) {
+        appState.toggleMute(trackIndex)
+        iPadHapticImpactLight.toggle()
+        let bpm = Double(appState.songState?.frame.tempo ?? 120)
+        let twoBarsSeconds = 2.0 * 4.0 * (60.0 / bpm)
+        DispatchQueue.main.asyncAfter(deadline: .now() + twoBarsSeconds) {
+            if appState.muteState[trackIndex] {
+                appState.toggleMute(trackIndex)
+                appState.regenInstrument(forTrack: trackIndex)
+            }
+        }
+    }
+
+    private func iPadHandleDoubleTapOrb(_ trackIndex: Int) {
+        let wasSoloed = appState.soloState[trackIndex]
+        appState.toggleSolo(trackIndex)
+        iPadHapticImpactMedium.toggle()
+        guard !wasSoloed else { return }
+        let bpm = Double(appState.songState?.frame.tempo ?? 120)
+        let twoBarsSeconds = 2.0 * 4.0 * (60.0 / bpm)
+        DispatchQueue.main.asyncAfter(deadline: .now() + twoBarsSeconds) {
+            if appState.soloState[trackIndex] { appState.toggleSolo(trackIndex) }
+        }
+    }
+
+    private func iPadHandleLongPressOrb(_ trackIndex: Int) {
+        if iPadDryTracks.contains(trackIndex) {
+            appState.restoreDefaultEffects(forTrack: trackIndex)
+            iPadDryTracks.remove(trackIndex)
+            iPadHapticSuccess.toggle()
+        } else {
+            appState.clearAllEffects(forTrack: trackIndex)
+            iPadDryTracks.insert(trackIndex)
+            iPadHapticImpactHeavy.toggle()
+        }
+    }
+
+    private func iPadHandleTapEmpty() {
+        appState.playback.triggerGlobalFilterSweep()
+        iPadHapticImpactMedium.toggle()
+    }
+
+    private func iPadHandleDoubleTapEmpty() {
+        appState.resetEffectsToDefaults()
+        iPadDryTracks.removeAll()
+        iPadHapticImpactLight.toggle()
+    }
+
+    private func iPadHandleLongPressEmpty() {
+        appState.regenRandomNonDrumTrack()
+        iPadHapticImpactHeavy.toggle()
+    }
+
+    private func iPadHandleSwipeRight() {
+        let eligible = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass]
+        guard let track = eligible.randomElement() else { return }
+        iPadLastShuffledTrack = track
+        iPadLastShuffledInstrument = appState.currentInstrument(forTrack: track)
+        appState.regenInstrument(forTrack: track)
+        iPadHapticSelection.toggle()
+    }
+
+    private func iPadHandleSwipeLeft() {
+        guard let track = iPadLastShuffledTrack,
+              let instrument = iPadLastShuffledInstrument else {
+            iPadHapticWarning.toggle()
+            return
+        }
+        appState.setInstrument(instrument, forTrack: track)
+        iPadLastShuffledTrack      = nil
+        iPadLastShuffledInstrument = nil
+        iPadHapticImpactSoft.toggle()
+    }
+
+    private func iPadHandleTwoFinger() {
+        appState.playback.triggerGlobalFilterSweep()
+        iPadHapticImpactRigid.toggle()
     }
 
     #endif

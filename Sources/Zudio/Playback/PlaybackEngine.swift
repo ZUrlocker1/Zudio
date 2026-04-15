@@ -83,6 +83,7 @@ final class PlaybackEngine: ObservableObject {
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
+    private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
 
     // Endless / Evolve callbacks — set by AppState.init(); all called on main actor.
     var onApproachingEnd:   (() -> Void)? = nil
@@ -964,7 +965,7 @@ final class PlaybackEngine: ObservableObject {
     private func startSharedLFO() {
         guard lfoTimer == nil else { return }
         lfoTickCount = 0
-        let src = DispatchSource.makeTimerSource(queue: .main)
+        let src = DispatchSource.makeTimerSource(queue: lfoQueue)
         src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
         src.setEventHandler { [weak self] in
             self?.lfoTick()

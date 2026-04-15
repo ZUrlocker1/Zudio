@@ -85,10 +85,97 @@ A custom document icon (`zudio-doc.icns`) showing a styled "Z!" is implemented a
 
 ---
 
-## iPad/iOS Distribution (future)
+## Pricing Strategy
 
-- **Testing on simulator**: Xcode includes iPad simulators (Pro, Air, mini, multiple iOS versions) — just change the build target. Good for layout; real device is better for audio.
-- **Testing on a real iPad**: connect via USB, select it as the Xcode target, click Run. Direct install, no App Store or TestFlight needed. First time requires trusting your developer certificate on the iPad under Settings → General → VPN & Device Management.
-- **iPads cannot open DMG files** — that format is macOS only.
-- **Sharing with testers**: use TestFlight (free with Developer account). Testers install the TestFlight app and accept an email invite. Much simpler than any alternative.
-- **Public release**: App Store, requires Apple review (typically 1–2 days for a new app).
+### Comparable apps
+
+- **Brian Eno's Reflection** — single generative ambient style, priced around $30 (fan/artist premium)
+- **Jean Michel Jarre's EON** — single generative style, ~$9 at launch, possibly higher previously
+- Both are single-style apps with a famous artist's name driving the price
+
+### Zudio's position
+
+Zudio is a continuous background music app in the same category — generative, non-looping, intended for focus/ambient listening. It has no famous name attached but offers four distinct styles (Ambient, Chill, Kosmic, Motorik) vs the single-style approach of the comp apps. Target audience is casual listeners who want interesting background music, not music production professionals.
+
+### Conclusion: $4.99 universal purchase
+
+- One purchase covers iPhone + iPad + Mac (Apple Universal Purchase)
+- $4.99 is an impulse buy — no hesitation for someone browsing ambient apps
+- Leaves room for promotional sales at $1.99 to spike the App Store algorithm
+- At 30% Apple cut, net per sale is ~$3.50; need ~29 sales to clear the $99/year developer fee
+- Subscription pricing is wrong for a "set it and forget it" background music app
+- Mac version sold separately via DMG on a landing page avoids App Store cut and sandboxing restrictions
+
+---
+
+## TestFlight Beta Status
+
+TestFlight is active for both iOS (iPhone/iPad) and Mac. External testing is underway — approximately a dozen testers have been invited so far. Additional testers are expected after a conference appearance on Thursday April 17, 2026.
+
+External TestFlight requires a one-time Apple review per build (typically a few hours). Once approved, testers receive a public link — no Apple Developer team membership required.
+
+---
+
+## App Store Release Checklist
+
+No dedicated website is required. The App Store listing is fully self-contained in App Store Connect. However two URLs are mandatory:
+
+- **Support URL** — can be a GitHub repo, a simple one-page site (Carrd.co is free), or even a mailto: link. Many indie apps just use their GitHub repo URL.
+- **Privacy Policy URL** — mandatory even if the app collects zero data. Use a free generator (iubenda, termsfeed) and host on GitHub Pages or Notion. Content is simple: "this app collects no personal data."
+
+### Already done
+- Apple Developer account ✓
+- Bundle ID registered ✓
+- TestFlight working ✓
+- App icons (no alpha channel) ✓
+- Version string valid (integers only) ✓
+- LSHandlerRank for .zudio document type ✓
+
+### Still needed before App Store submission
+
+- **Support URL** — any publicly accessible URL
+- **Privacy Policy URL** — required, even for zero-data apps
+- **App Store screenshots** — specific sizes required: iPhone 6.5" and 6.7" displays at minimum; iPad sizes if listing as universal. These are different from TestFlight screenshots.
+- **Age rating questionnaire** — short form in App Store Connect; Zudio is almost certainly 4+ (no objectionable content)
+- **App Review notes** — add a note for the reviewer explaining the app is generative: "Tap Generate to create a song, then tap Play. The app generates original music each time — this is expected behavior, not a bug." Without this a reviewer may think the app is broken.
+- **App description and keywords** — written by you; keywords affect search discoverability
+- **Pricing** — set to $4.99, select territories
+
+### App Store hook / key differentiator
+
+**Tagline:** "One generative app, four moods — Ambient, Chill, Kosmic, Motorik. Always different, never loops."
+
+**Visualizer hook:** "Generative music with a real-time visualizer that responds to every note."
+
+The visualizer is a graphic representation of the music as it plays — you can watch the notes unfold in real time and get a sense of which instruments are active and how busy the arrangement is. It is not a full interactive instrument, but it gives you a visual connection to the music that most background music apps don't offer.
+
+
+### App Store keyword strategy
+
+The 100-character keyword field in App Store Connect is the primary lever, but title and subtitle carry more search weight than keywords.
+
+**Title and subtitle (most important):**
+- "Zudio" is unique but ungoogled — the subtitle should carry genre terms like "Generative Ambient Music" or "Focus Music Generator"
+- Subtitle text is fully indexed and gets nearly title-level search weight
+
+**The 100-character keyword field** (no spaces after commas, no repeating words from title/subtitle):
+- `generative,ambient,focus,background,procedural,motorik,krautrock,electronic,meditation,lofi,study,work,chill,instrumental,drone`
+- Don't repeat words in title or subtitle — they're already indexed there, wasting the 100 chars
+- Commas only, no spaces — `ambient,focus` not `ambient, focus`
+- No competitor names — Apple will reject for it
+
+**What actually moves ranking after keywords are set:**
+- Conversion rate (ratio of taps vs. scrolls past) — first screenshot is enormous
+- Ratings volume and recency — prompt for review after a successful generate+play cycle, not on first launch
+- Download velocity in the first week
+
+**Categories:** Primary = Music, Secondary = Entertainment or Productivity. Some ambient apps list in Productivity to rank in a smaller pond.
+
+**Localization:** Keywords can be submitted in multiple languages even for an English-only app. Spanish and German locales for "ambient music" expand search surface with no extra work.
+
+### Review timeline
+
+New apps typically take 1–3 days for Apple review. Music/generative apps rarely get rejected unless there is a crash on launch or a content issue. The reviewer note above is important — generative apps have been rejected in the past because reviewers didn't understand that the output is supposed to vary.
+
+---
+

@@ -805,9 +805,14 @@ private struct LogoAreaView: View {
             .background { hiddenShortcuts }
     }
 
+    // Loaded once at startup — avoids a disk read on every SwiftUI render pass.
+    #if os(macOS)
+    private static let cachedLogoImage: NSImage? = loadLogoImage()
+    #endif
+
     @ViewBuilder private var logoImage: some View {
         #if os(macOS)
-        if let nsImg = loadLogoImage() {
+        if let nsImg = Self.cachedLogoImage {
             Image(nsImage: nsImg)
                 .resizable()
                 .scaledToFit()
