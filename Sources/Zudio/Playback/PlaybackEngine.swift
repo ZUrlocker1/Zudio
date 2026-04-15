@@ -483,6 +483,11 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
 
+    /// Thread-safe snapshot of the audio engine's last render time.
+    /// StepScheduler reads this on the timer thread to anchor step deadlines
+    /// to the audio hardware crystal clock rather than to mach_absolute_time alone.
+    nonisolated var lastRenderTime: AVAudioTime? { engine.outputNode.lastRenderTime }
+
     nonisolated func onStep(_ step: Int, bar: Int, schedulerID: Int) {
         guard currentSchedulerID == schedulerID else { return }
         // Bind both maps once — eliminates 4 redundant re-lookups in the main.async block.
@@ -811,8 +816,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.6    // Rhodes runs soft in GM — boost for Chill rhythm presence
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 5 {
                 vol = 0.75   // Wurlitzer runs hot on Chill rhythm — pull back
+            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 17 {
+                vol = 0.75   // B3 Organ runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
                 vol = 0.48   // Mono Synth runs hot on Kosmic bass — pull back more
+            } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
+                vol = 1.6    // Celesta runs soft on Ambient Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && chillPadsMode {
                 vol = 1.25   // Chill Lead 2 instruments run soft — boost for presence
             } else if trackIndex == kTrackLead2 && motorikStyle && program == 39 {
@@ -1718,6 +1727,8 @@ final class PlaybackEngine: ObservableObject {
         #if os(iOS)
         // Session must be active before the engine starts — starting on an inactive session
         // causes the engine to open onto a dead route, producing silence even though isRunning=true.
+        // Re-assert the preferred buffer duration here in case it was cleared by an interruption.
+        try? AVAudioSession.sharedInstance().setPreferredIOBufferDuration(0.023)
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif
         do { try engine.start() }

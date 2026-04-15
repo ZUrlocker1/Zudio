@@ -1343,7 +1343,7 @@ struct SongGenerator {
         // Kosmic bass rules (shared lookup for regen log)
         case "KOS-BASS-001": return "Berlin School drone"
         case "KOS-BASS-002": return "Root-Fifth Slow Walk"
-        case "KOS-BASS-003": return "Tangerine Dream pulse"
+        case "KOS-BASS-003": return "TD pulse"
         case "KOS-BASS-004": return "Moroder Drift"
         case "KOS-BASS-005": return "No bass"
         case "KOS-BASS-006": return "Additive dual bass"
@@ -1487,9 +1487,9 @@ struct SongGenerator {
         case "KOS-LEAD-002": return "Eno floating tones"
         case "KOS-LEAD-003": return "Pentatonic drift"
         case "KOS-LEAD-004": return "Echo melody"
-        case "KOS-LEAD-005": return "Tangerine Dream arpeggio highlight"
+        case "KOS-LEAD-005": return "TD arp highlight"
         case "KOS-LEAD-006": return "JMJ evolving phrase"
-        case "KOS-LEAD-007": return "Tangerine Dream skip sequence"
+        case "KOS-LEAD-007": return "TD skip sequence"
         case "KOS-LEAD-008": return "Caligari solo"
         case "KOS-LEAD-009": return "Dark Sun solo"
         default:             return ruleID
@@ -1498,13 +1498,13 @@ struct SongGenerator {
 
     private static func kosmicRthmRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "KOS-RTHM-001": return "Probabilistic Tangerine Dream sequencer"
+        case "KOS-RTHM-001": return "Probabilistic TD sequencer"
         case "KOS-RTHM-002": return "Probabilistic JMJ melodic hook"
         case "KOS-RTHM-003": return "JMJ oscillation"
         case "KOS-RTHM-004": return "Electric Buddha groove"
         case "KOS-RTHM-005": return "JMJ dual arpeggio"
         case "KOS-RTHM-006": return "Kraftwerk locked pulse"
-        case "KOS-RTHM-007": return "Tangerine Dream pitch drift"
+        case "KOS-RTHM-007": return "TD pitch drift"
         case "KOS-RTHM-008": return "JMJ Oxygen 8-bar arc"
         case "KOS-RTHM-009": return "Craven Faults phase drift"
         case "KOS-RTHM-010": return "Craven Faults modular grit"
@@ -2170,9 +2170,9 @@ struct SongGenerator {
                             fireBar(bar, tag: "Drums", desc: "switching to ride")
                         }
                     case "crash":
-                        fireBar(bar, tag: "Drums", desc: "crash on beat 1, open hat colour")
+                        fireBar(bar, tag: "Drums", desc: "crash + open hat")
                     case "openHat":
-                        fireBar(bar, tag: "Drums", desc: "open hat on the 'and of 4'")
+                        fireBar(bar, tag: "Drums", desc: "open hat on & of 4")
                     case "hat":
                         // Only announce the switch back if we were in a named variation
                         if prevCymbalMode != nil && prevCymbalMode != "hat" {
@@ -2639,7 +2639,7 @@ struct SongGenerator {
         case .bassOstinato:  breakdownLabel = "bass ostinato"
         case .harmonicDrone: breakdownLabel = "harmonic drone"
         }
-        let formDesc = hasBreakdown ? "Groove - breakdown (\(breakdownLabel))" : "Groove"
+        let formDesc = hasBreakdown ? "Groove - breakdown" : "Groove"
         log.append(GenerationLogEntry(tag: "Form", description: formDesc))
 
         // Chords — key/mode + family

@@ -14,8 +14,13 @@ final class IOSPlatformHost: ZudioPlatformHost {
 
     func configureAudioSession() {
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
-            try AVAudioSession.sharedInstance().setActive(true)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [])
+            // Pin the IO buffer to ~1024 frames (~23ms at 44.1kHz). Without this iOS picks
+            // 256 frames when the screen is on and silently jumps to 4096 when the screen locks,
+            // causing a render-thread frequency spike at exactly the screen-off moment.
+            try session.setPreferredIOBufferDuration(0.023)
+            try session.setActive(true)
         } catch {
             print("AVAudioSession setup failed: \(error)")
         }

@@ -1939,7 +1939,15 @@ I want to simplify how the Next Track button works for Mac and iPad. Currently i
 For the Previous Track button, it takes you to the beginning of the song. But if you\'92re in the first 2 bars, it goes to the previous generated track if there is one, otherwise basso beep.  Make it the 3 first bars instead. \
 Please review all related code and look for anything that can be simplified.\
 \
+I have added a new image zudio-logo-square.png which you should use for the Now Playing mode on iphone, ipad or wherever a square image is expected.\
+\
+Also, Zudio works great in the background on iphone and ipad. But, when another audio application starts  playing (eg Apple Music, Audible etc) it should stop playing.  Right now Zudio continues to play but it is silent.  How do we ensure it actually stops playing?  Similarly, if Zudio starts playing on iphone, ipad, then any other audio app should stop.  Tell me the logic behind this before coding it.\
 \
 \
+\
+There is another motorik song Zudio-E-Pulse which I'd like you to analyze very carefully in accodance with how the "Apache beat" works in Motorik.  The song overall works, but bars 73-97 seem suspicious to me. In vague musical terms it feels like the bass part has evolved so that it is no longer "in lock step" with the drums.  I tried regenerating the drum tracks, and it feels like its the bass wandering which is a problem rather than the drums.   I wonder if you can check whether this is the case and why. And if it sounds wrong in terms of the Appache beat for Motorik, give me a suggestion on how to restrict the bass from getting out of sync.  \
+\
+\
+I have noticed on iphone background playback (when in lock screen) sometimes the tempo slows down when the iphone screen turns off and then speeds up before getting back to the proper tempo. Similarly when the screen turns on Zudio speeds up sightly before adjusting to normal. I assume this is related to how the iphone is managing things. But do some research to see if this is a known issue and if there are any suggested workarounds. It is most noticeable for Motorik and Kosmic which run at higher tempos.  Don't make code changes just do some research.\
 \
 }

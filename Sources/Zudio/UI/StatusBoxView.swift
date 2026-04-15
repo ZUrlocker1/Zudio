@@ -61,18 +61,6 @@ struct StatusBoxView: View {
                     Text("Generation Log")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.70))
-                    if let onReset {
-                        Button(action: onReset) {
-                            Text("Reset")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.red)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color(white: 0.20), in: RoundedRectangle(cornerRadius: 4))
-                                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.red.opacity(0.5), lineWidth: 0.5))
-                        }
-                        .buttonStyle(.plain)
-                    }
                     Button {
                         appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
                         minusFlash = true
@@ -107,7 +95,27 @@ struct StatusBoxView: View {
                     .foregroundStyle(Color.white.opacity(0.85))
                     .font(.system(size: 11, weight: .medium))
                     .disabled(appState.statusLogFontOffset >= 8)
+                    if appState.songState != nil {
+                        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                            Text(String(format: "Bar: %03d", appState.playback.currentBar + 1))
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Color.white.opacity(0.90))
+                        }
+                        .padding(.leading, 8)
+                    }
                     Spacer()
+                    if let onReset {
+                        Button(action: onReset) {
+                            Text("Reset")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.red)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color(white: 0.20), in: RoundedRectangle(cornerRadius: 4))
+                                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.red.opacity(0.5), lineWidth: 0.5))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 34)

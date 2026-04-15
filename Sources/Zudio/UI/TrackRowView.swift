@@ -451,27 +451,25 @@ struct TrackRowView: View {
 
         let defaults: [TrackEffect]
         if activeStyle == .ambient {
-            // Plan 14.3: deep reverb on everything; selective delay; no boost/comp/lowShelf
             defaults = switch trackIndex {
-            case kTrackLead1:   [.delay, .space]   // dotted-half delay, cathedral 82%
-            case kTrackLead2:   [.delay, .space]   // dotted-quarter delay, cathedral 78%
-            case kTrackPads:    [.space, .tremolo] // cathedral 88% + breath tremolo; sweep available but off
-            case kTrackRhythm:  [.delay, .reverb]  // distant bell; large chamber 65%
-            case kTrackTexture: [.space, .pan]     // cathedral 90% + slow tempo-synced pan; delay available but off
-            case kTrackBass:    [.reverb, .sweep]  // large chamber 62% + slow filter sweep
-            case kTrackDrums:   [.delay, .reverb]  // plate 70%; 1-beat delay for texture
+            case kTrackLead1:   [.delay, .space]
+            case kTrackLead2:   [.space]
+            case kTrackPads:    [.space]
+            case kTrackRhythm:  [.reverb]
+            case kTrackTexture: [.space, .pan]
+            case kTrackBass:    [.reverb, .sweep]
+            case kTrackDrums:   [.delay]
             default:            []
             }
         } else if activeStyle == .chill {
-            // Plan 14.3: tighter/less wet than Ambient; tremolo on Rhodes defines the style
             defaults = switch trackIndex {
-            case kTrackLead1:   [.space, .delay, .compression]   // Large Chamber + dotted-quarter delay + comp
-            case kTrackLead2:   [.space, .delay]                  // Large Chamber + quarter-note delay
-            case kTrackRhythm:  [.tremolo, .space]                // Trem 3.5 Hz + Plate reverb
-            case kTrackPads:    [.sweep, .tremolo]                    // slow filter sweep + slow volume swell
-            case kTrackTexture: [.lowShelf, .reverb]              // Low shelf + large chamber ON by default
-            case kTrackBass:    [.reverb]                         // Medium Room; Comp and Boost available off
-            case kTrackDrums:   [.space]                          // Plate only; Comp and Low removed
+            case kTrackLead1:   [.space, .delay]
+            case kTrackLead2:   [.space, .delay]
+            case kTrackRhythm:  [.space]
+            case kTrackPads:    [.sweep, .tremolo]
+            case kTrackTexture: [.lowShelf, .reverb]
+            case kTrackBass:    [.reverb]
+            case kTrackDrums:   [.space]
             default:            []
             }
         } else if activeStyle == .kosmic {

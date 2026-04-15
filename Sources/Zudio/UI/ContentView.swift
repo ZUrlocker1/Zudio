@@ -36,11 +36,12 @@ struct ContentView: View {
     @State private var iPadVisualizerPaused: Bool = false
     @State private var iPadShowVisualsOffLabel = false
 
-    // iPad mini landscape: contentWidth 900–1150pt (portrait mini is <800pt).
+    // iPad mini landscape: contentWidth ~1133pt (portrait mini is ~744pt).
+    // iPad Air/Pro 13" portrait is ~1024pt — must not be caught by this range.
     // In this orientation there isn't enough vertical room to show all 7 track rows
     // (441pt) plus the generation log, so the log is hidden on the Tracks tab.
     private var isIPadMiniLandscape: Bool {
-        contentWidth >= 900 && contentWidth < 1150
+        contentWidth >= 1050 && contentWidth < 1150
     }
     #endif
 
