@@ -12,6 +12,10 @@ final class PlaybackEngine: ObservableObject {
     @Published var currentBar: Int = 0
     @Published var currentStep: Int = 0
     @Published var activeVisualizerNotes: [VisualizerNote] = []
+    // Buffer flushed into activeVisualizerNotes at most 12×/sec — collapses append+prune
+    // into one @Published mutation per frame, reducing AppKit layout scans at step rate.
+    private var pendingVisualizerNotes: [VisualizerNote] = []
+    private var lastVisualizerFlush: Date = .distantPast
 
     // MARK: - Audio graph
 
@@ -33,14 +37,17 @@ final class PlaybackEngine: ObservableObject {
     // Chill pads mode — per-note audio fade-in/fade-out on kTrackPads boost node (same mechanism as Ambient)
     nonisolated(unsafe) var chillPadsMode: Bool = false
 
+    // Tracks with zero MIDI events in the current song — effects suppressed to avoid processing silence.
+    private var emptyTrackSet: Set<Int> = []
+
     // Per-track Ambient reverb wet values (cathedral for Lead/Pads/Texture, largeChamber for rest)
     // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums
-    private let ambientReverbWet: [Float]    = [82, 78, 88, 65, 90, 62, 70, 82]  // LeadSynth: same as Lead1
+    private let ambientReverbWet: [Float]    = [82, 78, 88, 65, 75, 62, 70, 82]  // LeadSynth: same as Lead1; Texture 90→75
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
     private let ambientDelayWet:      [Float] = [40,  55, -1, 48, 18, -1, 28, -1]   // -1 = no delay
-    private let ambientDelayFeedback: [Float] = [55,  65, -1, 55, 35, -1, 18,  0]
+    private let ambientDelayFeedback: [Float] = [55,  50, -1, 55, 35, -1, 18,  0]  // Lead2: 65→50
     private let ambientDelayLowpass:  [Float] = [4000, 4500, -1, 3500, 2500, -1, 3000, -1]
     // Delay times in beats: Lead1=dotted-quarter(0.75), Lead2=dotted-quarter(0.75),
     //                       Rhythm=dotted-half(1.5), Texture=1-beat, Drums=1-beat
@@ -83,6 +90,7 @@ final class PlaybackEngine: ObservableObject {
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
+    private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
     private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
 
     // Endless / Evolve callbacks — set by AppState.init(); all called on main actor.
@@ -276,6 +284,11 @@ final class PlaybackEngine: ObservableObject {
         approachingEndFired = false
         outroStartFired     = false
         activeVisualizerNotes = []
+        pendingVisualizerNotes.removeAll()
+        lastVisualizerFlush = .distantPast
+        emptyTrackSet = Set((0..<min(state.trackEvents.count, kTrackCount)).filter {
+            state.trackEvents[$0].isEmpty
+        })
         buildStepEventMap(state: state)
         // Cancel any in-progress note fades before restoring volumes.
         stopAmbientNoteFades()
@@ -480,6 +493,8 @@ final class PlaybackEngine: ObservableObject {
         currentStep = 0
         currentBar  = 0
         activeVisualizerNotes = []
+        pendingVisualizerNotes.removeAll()
+        lastVisualizerFlush = .distantPast
     }
 
     // MARK: - Step callback (called by StepScheduler on a background queue)
@@ -520,23 +535,29 @@ final class PlaybackEngine: ObservableObject {
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             if bar != self.currentBar { self.currentBar = bar }
-            // Visualizer note spawning — append new notes, prune expired every 16 steps
+            // Accumulate note-ons into pending buffer; flush to @Published array at ≤12fps.
+            // This collapses append + prune into one objectWillChange per frame instead of
+            // firing separately on every step — eliminates AppKit layout scans at step rate.
             if !noteOns.isEmpty {
                 let now = Date()
-                self.activeVisualizerNotes.append(contentsOf: noteOns.map { (trackIdx, ev) in
+                self.pendingVisualizerNotes.append(contentsOf: noteOns.map { (trackIdx, ev) in
                     VisualizerNote(trackIndex: trackIdx, note: ev.note,
                                    velocity: ev.velocity, birthDate: now,
                                    durationSteps: ev.durationSteps)
                 })
-                // Cap at 80 entries — dense songs can accumulate 200+ orbs; oldest are
-                // already nearly transparent (cosine fade) so dropping them is imperceptible.
-                if self.activeVisualizerNotes.count > 80 {
-                    self.activeVisualizerNotes.removeFirst(self.activeVisualizerNotes.count - 80)
-                }
             }
-            if step % 4 == 0 {
-                let cutoff = Date().addingTimeInterval(-8.0)  // max orb lifetime is 7s
-                self.activeVisualizerNotes.removeAll { $0.birthDate < cutoff }
+            let flushNow = Date()
+            if flushNow.timeIntervalSince(self.lastVisualizerFlush) >= (1.0 / 12.0) {
+                self.lastVisualizerFlush = flushNow
+                var notes = self.activeVisualizerNotes
+                if !self.pendingVisualizerNotes.isEmpty {
+                    notes.append(contentsOf: self.pendingVisualizerNotes)
+                    self.pendingVisualizerNotes.removeAll(keepingCapacity: true)
+                }
+                let cutoff = flushNow.addingTimeInterval(-8.0)  // max orb lifetime is 7s
+                notes.removeAll { $0.birthDate < cutoff }
+                if notes.count > 80 { notes.removeFirst(notes.count - 80) }
+                self.activeVisualizerNotes = notes  // single assignment = single objectWillChange
             }
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
@@ -714,6 +735,8 @@ final class PlaybackEngine: ObservableObject {
         currentStep = 0
         currentBar  = 0
         activeVisualizerNotes = []
+        pendingVisualizerNotes.removeAll()
+        lastVisualizerFlush = .distantPast
         currentSchedulerID += 1
         // Always restart — switchToPass is called mid-Evolve; onSongEnd sets isPlaying=false
         // before the callback fires, so we can't rely on that flag here.
@@ -865,6 +888,8 @@ final class PlaybackEngine: ObservableObject {
         for i in 0..<reverbs.count {
             if i == kTrackDrums {
                 reverbs[i].loadFactoryPreset(.plate)
+            } else if i == kTrackRhythm {
+                reverbs[i].loadFactoryPreset(.mediumHall)   // was largeChamber — lighter, adequate tail
             } else if atmosphericTracks.contains(i) {
                 reverbs[i].loadFactoryPreset(.cathedral)
             } else {
@@ -893,8 +918,16 @@ final class PlaybackEngine: ObservableObject {
         chillPadsMode = enabled
         if !enabled {
             stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
+            reverbs[kTrackPads].loadFactoryPreset(.cathedral)  // restore Pads to init preset
             return
         }
+        // Pads: medium hall is lighter than cathedral and adequate for slow, soft Chill pads.
+        reverbs[kTrackPads].loadFactoryPreset(.mediumHall)
+        // kTrackTexture sampler is unused in Chill — bypass its entire effect chain.
+        // (setEffect guards against re-enabling it; this covers the init low-shelf which is always on.)
+        lowEQs[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
+        reverbs[kTrackTexture].auAudioUnit.shouldBypassEffect = true
+        delays[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
         // Tempo-synced delay for Chill Lead 1 (dotted-quarter) and Lead 2 (quarter note).
         // Without this, both tracks default to the init value of 0.125 s (fixed 16th-note).
         let tempo    = songState?.frame.tempo ?? 80
@@ -911,6 +944,16 @@ final class PlaybackEngine: ObservableObject {
 
     func setEffect(_ effect: TrackEffect, enabled: Bool, forTrack trackIndex: Int) {
         guard trackIndex < samplers.count else { return }
+        // Chill: kTrackTexture sampler never receives MIDI events (AudioTexturePlayer handles texture).
+        // Suppress its entire effect chain — no signal flows through it.
+        if chillPadsMode && trackIndex == kTrackTexture { return }
+        // Ambient: suppress reverb and delay on tracks with no events — eliminates DSP on silence.
+        if ambientMode && emptyTrackSet.contains(trackIndex) {
+            switch effect {
+            case .reverb, .space, .delay: return
+            default: break
+            }
+        }
         switch effect {
         case .boost:
             boosts[trackIndex].outputVolume = enabled ? 1.7 : 1.0  // 1.7 ≈ +4.6 dB
@@ -977,6 +1020,7 @@ final class PlaybackEngine: ObservableObject {
     private func stopSharedLFOIfIdle() {
         let anyActive = tremEnabled.contains(true) || sweepEnabled.contains(true)
                      || panEnabled.contains(true)  || kosmicIntroSweepActive || kosmicIntroBassPanActive
+        anyLFOActive = anyActive
         guard !anyActive else { return }
         lfoTimer?.cancel()
         lfoTimer     = nil
@@ -986,10 +1030,7 @@ final class PlaybackEngine: ObservableObject {
     private func lfoTick() {
         // Skip all work if no effect is currently running — handles the brief window
         // between an effect being disabled and the timer being cancelled.
-        guard tremEnabled.contains(true) || sweepEnabled.contains(true)
-           || panEnabled.contains(true) || kosmicIntroSweepActive || kosmicIntroBassPanActive
-           || globalSweepTicksRemaining > 0
-        else { return }
+        guard anyLFOActive || globalSweepTicksRemaining > 0 else { return }
 
         lfoTickCount += 1
         let do20fps   = (lfoTickCount % 3 == 0)
@@ -1066,6 +1107,7 @@ final class PlaybackEngine: ObservableObject {
         }
         tremEnabled[i] = true
         tremPhase[i]   = 0.0
+        anyLFOActive   = true
         startSharedLFO()
     }
 
@@ -1085,6 +1127,7 @@ final class PlaybackEngine: ObservableObject {
         sweepEnabled[i] = true
         sweepPhase[i]   = ambientMode ? ambientSweepOffset[i] : 0.0
         sweepFilters[i].auAudioUnit.shouldBypassEffect = false
+        anyLFOActive   = true
         startSharedLFO()
     }
 
@@ -1124,6 +1167,7 @@ final class PlaybackEngine: ObservableObject {
         panEnabled[i]  = true
         panPhase[i]    = 0.0
         panPhaseInc[i] = 2.0 * Double.pi * hz / 20.0  // increment per 20fps tick
+        anyLFOActive   = true
         startSharedLFO()
     }
 
@@ -1586,6 +1630,7 @@ final class PlaybackEngine: ObservableObject {
             kosmicIntroSweepPhase  = 0.0
             kosmicIntroSweepActive = true
             sweepFilters[kTrackPads].auAudioUnit.shouldBypassEffect = false
+            anyLFOActive = true
             startSharedLFO()
         }
 
@@ -1593,6 +1638,7 @@ final class PlaybackEngine: ObservableObject {
         if !panEnabled[kTrackBass] {
             kosmicIntroBassPanPhase  = 0.0
             kosmicIntroBassPanActive = true
+            anyLFOActive = true
             startSharedLFO()
         }
     }

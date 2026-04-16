@@ -89,7 +89,7 @@ final class AudioTexturePlayer {
             eqNode.bands[0].bypass = !enabled
         case .reverb, .space:
             reverbNode.auAudioUnit.shouldBypassEffect = !enabled
-            reverbNode.wetDryMix = enabled ? 35 : 0
+            reverbNode.wetDryMix = enabled ? 22 : 0
         default:
             break
         }
@@ -117,9 +117,9 @@ final class AudioTexturePlayer {
 
         eqNode.auAudioUnit.shouldBypassEffect = false
 
-        // Reverb: large chamber at 35% wet (ON by default)
-        reverbNode.loadFactoryPreset(.largeChamber)
-        reverbNode.wetDryMix = 35
+        // Reverb: medium hall at 22% wet — lighter than large chamber, adequate for background texture
+        reverbNode.loadFactoryPreset(.mediumHall)
+        reverbNode.wetDryMix = 22
         reverbNode.auAudioUnit.shouldBypassEffect = false
 
         // Pitch node: unity; set at play time for subtle variation
@@ -220,9 +220,9 @@ final class AudioTexturePlayer {
         stopPan()
         panPhase = Double.random(in: 0 ..< .pi * 2)
         let period = Double.random(in: 20...40)        // 20–40 s full left-right cycle
-        panTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        panTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.panPhase += 0.1 * 2 * .pi / period
+            self.panPhase += 1.0 * 2 * .pi / period   // 1 s tick — imperceptible at 20–40 s period
             self.playerNode.pan = Float(sin(self.panPhase) * 0.30)  // max ±30% stereo spread
         }
     }

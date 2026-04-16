@@ -38,8 +38,6 @@ struct ContentView: View {
 
     // iPad canvas gesture state
     @State private var iPadDryTracks: Set<Int> = []
-    @State private var iPadLastShuffledTrack: Int? = nil
-    @State private var iPadLastShuffledInstrument: UInt8? = nil
 
     // iPad haptic triggers
     @State private var iPadHapticImpactMedium = false
@@ -905,8 +903,8 @@ struct ContentView: View {
     }
 
     private func iPadHandleDoubleTapEmpty() {
-        appState.resetEffectsToDefaults()
-        iPadDryTracks.removeAll()
+        appState.regenInstrument(forTrack: kTrackLead1)
+        appState.regenInstrument(forTrack: kTrackRhythm)
         iPadHapticImpactLight.toggle()
     }
 
@@ -916,28 +914,20 @@ struct ContentView: View {
     }
 
     private func iPadHandleSwipeRight() {
-        let eligible = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass]
-        guard let track = eligible.randomElement() else { return }
-        iPadLastShuffledTrack = track
-        iPadLastShuffledInstrument = appState.currentInstrument(forTrack: track)
-        appState.regenInstrument(forTrack: track)
+        appState.regenInstrument(forTrack: kTrackRhythm)
+        appState.regenInstrument(forTrack: kTrackPads)
         iPadHapticSelection.toggle()
     }
 
     private func iPadHandleSwipeLeft() {
-        guard let track = iPadLastShuffledTrack,
-              let instrument = iPadLastShuffledInstrument else {
-            iPadHapticWarning.toggle()
-            return
-        }
-        appState.setInstrument(instrument, forTrack: track)
-        iPadLastShuffledTrack      = nil
-        iPadLastShuffledInstrument = nil
+        appState.regenInstrument(forTrack: kTrackLead1)
+        appState.regenInstrument(forTrack: kTrackLead2)
         iPadHapticImpactSoft.toggle()
     }
 
     private func iPadHandleTwoFinger() {
-        appState.playback.triggerGlobalFilterSweep()
+        appState.regenInstrument(forTrack: kTrackBass)
+        appState.regenInstrument(forTrack: kTrackDrums)
         iPadHapticImpactRigid.toggle()
     }
 

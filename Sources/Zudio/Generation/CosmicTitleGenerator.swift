@@ -1,12 +1,14 @@
 // KosmicTitleGenerator.swift — Kosmic / space-themed song title generator
 //
-// Six patterns:
+// Eight patterns:
 //   1. Single JMJ-X word            — Vortexe, Proxima, Equinoxe
 //   2. JMJ-X word + Roman numeral   — Galaxie II, Paradoxe IV
 //   3. Prefix + JMJ-X word          — Inner Orbite, Neo Equinoxe, Trans Galaxie
 //   4. Two-word English kosmic       — Dark Nebula, Solar Arc, Void Pulse
-//   5. Faux-German adj + noun        — Ewig Kosmos, Dunkel Stern, Tief Welle
+//   5. Space adj + deep-space noun  — Eternal Cosmos, Vast Aether, Cold Nimbus
 //   6. Prefix + kosmic noun          — Exo Helix, Sub Horizon, Ultra Parallax
+//   7. Fake-Greek single word        — Empyrion, Zephyron, Hesperon
+//   8. Fake-Greek + Roman numeral    — Orpheon II, Elyseon IV
 
 struct KosmicTitleGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
@@ -52,15 +54,25 @@ struct KosmicTitleGenerator {
         "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra", "Zorvaak"
     ]
 
-    private static let germanAdjectives = [
-        "Ewig", "Tief", "Dunkel", "Fern", "Kalt", "Weit", "Still",
-        "Schwarz", "Leer", "Uralt", "Gross", "Sanft", "Trage", "Fahl"
+    /// Invented Greek-style words — Tangerine Dream aesthetic (-on, -eon, -ax endings)
+    private static let greekStyleWords = [
+        "Empyrion", "Orpheon", "Elyseon", "Zephyron", "Kroneon",
+        "Aureon",   "Hezperon", "Logion",  "Pneumex",  "Aionex",
+        "Zatarax",   "Pyreon",   "Zodeon",  "Hypereon", "Chthonon",
+        "Eideon",   "Zopheon",  "Zaerion", "Thyreon",  "Aztraeon", "Zorvaak"
     ]
 
-    private static let germanKosmicNouns = [
-        "Kosmos", "Nebel", "Stern", "Raum", "Welle", "Licht", "Aether",
-        "Ferne", "Himmel", "Strom", "Feld", "Leere", "Geist", "Tiefe", "Zorvaak",
-        "Schwere", "Dunkel", "Stille", "Weite", "Schein", "Hauch", "Basso"
+    /// Poetic space adjectives — atmospheric, distinct from Motorik's German register
+    private static let spaceAdjectives = [
+        "Eternal", "Vast", "Cold", "Still", "Remote", "Pale",
+        "Dense", "Slow", "Soft", "Absolute", "Infinite", "Formless",
+        "Faint", "Lone", "Serene", "Boundless", "Timeless"
+    ]
+
+    private static let deepSpaceNouns = [
+        "Cosmos", "Aether", "Nimbus", "Stratus", "Orbit",
+        "Gravity", "Matter", "Spectrum", "Crystal", "Gravitas",
+        "Expanse", "Silence", "Interval", "Cascade", "Canopy", "Zorvaak", "Basso"
     ]
 
     // MARK: - Patterns
@@ -99,15 +111,15 @@ struct KosmicTitleGenerator {
             return "\(adj) \(noun)"
         },
 
-        // 5. Faux-German adj + kosmic noun  (weight ×2 — TD flavour)
+        // 5. Space adj + deep-space noun  (weight ×2)
         { _, rng in
-            let adj  = germanAdjectives[rng.nextInt(upperBound: germanAdjectives.count)]
-            let noun = germanKosmicNouns[rng.nextInt(upperBound: germanKosmicNouns.count)]
+            let adj  = spaceAdjectives[rng.nextInt(upperBound: spaceAdjectives.count)]
+            let noun = deepSpaceNouns[rng.nextInt(upperBound: deepSpaceNouns.count)]
             return "\(adj) \(noun)"
         },
         { _, rng in
-            let adj  = germanAdjectives[rng.nextInt(upperBound: germanAdjectives.count)]
-            let noun = germanKosmicNouns[rng.nextInt(upperBound: germanKosmicNouns.count)]
+            let adj  = spaceAdjectives[rng.nextInt(upperBound: spaceAdjectives.count)]
+            let noun = deepSpaceNouns[rng.nextInt(upperBound: deepSpaceNouns.count)]
             return "\(adj) \(noun)"
         },
 
@@ -116,6 +128,17 @@ struct KosmicTitleGenerator {
             let pre  = kosmicPrefixes[rng.nextInt(upperBound: kosmicPrefixes.count)]
             let noun = kosmicNouns[rng.nextInt(upperBound: kosmicNouns.count)]
             return "\(pre) \(noun)"
+        },
+
+        // 7. Fake-Greek single word  (weight ×2 — TD aesthetic)
+        { _, rng in greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)] },
+        { _, rng in greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)] },
+
+        // 8. Fake-Greek + Roman numeral  — "Orpheon II", "Elyseon IV"
+        { _, rng in
+            let word = greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)]
+            let num  = romanNumerals[rng.nextInt(upperBound: romanNumerals.count)]
+            return "\(word) \(num)"
         },
     ]
 }

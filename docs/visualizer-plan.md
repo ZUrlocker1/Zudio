@@ -3,7 +3,7 @@
 ## Overview
 
 `VisualizerView` (`Sources/Zudio/UI/VisualizerView.swift`) is a cross-platform SwiftUI `Canvas`
-inside a `TimelineView(.animation(minimumInterval: 1/30))` that redraws at ~30 fps.
+inside a `TimelineView(.animation(minimumInterval: 1/12))` that redraws at ~12 fps.
 Aesthetic reference: Brian Eno *Reflection* / JMJ *Eon* — ambient orbs drifting and fading.
 No stored particle history; every orb position and shape is computed mathematically from note metadata.
 
@@ -19,15 +19,19 @@ No stored particle history; every orb position and shape is computed mathematica
 
 ## Orb Rendering Layers (per note, drawn in order)
 
-- **Comet tail** — for notes with `durationSteps >= 8`: 3 ghost orbs trailing behind (4 ghosts if `>= 32`), each dimmer and smaller.
+- **Comet tail** — for notes with `durationSteps >= 8`: 1 ghost orb trailing behind; 2 ghosts if `>= 32`. Each ghost is dimmer and smaller.
 - **Sonar ring** — for notes with `durationSteps >= 32`: an expanding ring that grows outward and fades over the orb's lifetime.
-- **Halo** — large dim ellipse at 2.2× radius (or wider during unmute flash).
-- **Core** — bright ellipse at 1× radius.
+- **Radial gradient fill** — single `ctx.fill` with a 3-stop radial gradient: bright core → dim halo → transparent. Halo radius is 2.2× the orb radius (wider during unmute flash).
 
 ### Orb Size
 
-- Base radius: 8–28 pt driven by velocity (`8 + velocity/127 × 20`).
-- Long notes (`durationSteps >= 8`): 2× the base radius.
+Four tiers based on note duration, applied as a multiplier to a velocity-driven base:
+
+- Base radius: `12 + velocity/127 × 16` → **12–28 pt**
+- Spark (≤ 4 steps): base × **1.0** → 12–28 pt radius, ~53–123 pt halo diameter
+- Medium (≤ 8 steps): base × **1.4** → 17–39 pt radius, ~75–172 pt halo diameter
+- Comet (≤ 16 steps): base × **1.8** → 22–50 pt radius, ~97–220 pt halo diameter
+- Sustained (> 16 steps): base × **2.2** → 26–62 pt radius, ~114–273 pt halo diameter
 
 ### Orb Lifetime
 
@@ -91,15 +95,29 @@ Pitch offsets y: high notes appear toward the top of the canvas, low notes towar
 
 ## Gesture / Interaction Reference
 
-| Action | Mac | iPhone · iPad |
-|---|---|---|
-| On orb — primary | **Click** → mute track for ~2 bars, then auto-unmute and regen instrument | **Tap** → same |
-| On orb — secondary | **Double-click** → solo track for ~2 bars, then auto-release | **Double-tap** → same |
-| On orb — context | **Right-click** or **Cmd+click** → toggle dry signal (strip all effects / restore) | **Long press** → same |
-| On canvas — primary | **Click** → global filter sweep (3 s cutoff sweep + canvas white flash) | **Tap** → same |
-| On canvas — secondary | **Double-click** → reset all effects and instruments to song defaults | **Double-tap** → same |
-| On canvas — context | **Right-click** or **Cmd+click** → regen a random non-drum track | **Long press** → same |
-| Cursor (Mac only) | Pointer hand when hovering over an orb | n/a |
+### On an orb
+
+- **Tap / Click** — mute track for ~2 bars, then auto-unmute and regen instrument
+- **Double-tap / Double-click** — solo track for ~2 bars, then auto-release
+- **Long press / Right-click** — toggle dry signal (strip all effects on track / restore)
+
+### On empty canvas
+
+- **Tap / Click** — global filter sweep (3 s cutoff sweep + canvas white flash)
+- **Double-tap / Double-click** — regen Lead 1 and Rhythm
+- **Long press / Right-click** — regen a random non-drum track
+
+### iPhone and iPad swipe / multi-touch (no Mac equivalent)
+
+- **Swipe right** — regen Rhythm and Pads
+- **Swipe left** — regen Lead 1 and Lead 2
+- **Two-finger tap** — regen Bass and Drums
+
+### Mac only
+
+- Pointer changes to a hand cursor when hovering over an orb.
+- Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click.
+- Cmd+click routes directly to the right-click handler.
 
 ### Auto-Release Timing
 
@@ -114,4 +132,4 @@ If the track is already un-muted/un-soloed when the timer fires, no action is ta
 - **Mac gesture handling** is in `MacVisualizerGestureView` (NSViewRepresentable overlay). Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click. Cmd+click routes directly to the right-click handler, bypassing the single/double dispatch.
 - **iOS gesture handling** is in `CanvasGestureView` (UIViewRepresentable overlay) inside `PhonePlayerView`.
 - `muteState` and `soloState` are `[Bool]` arrays on `AppState` indexed by track.
-- `isAnySolo` on `AppState` is a computed property that drives the solo-out dim logic.
+- `isAnySolo` on `AppState` is a plain `private(set) var Bool` (precomputed at all `soloState` mutation sites) that drives the solo-out dim logic.

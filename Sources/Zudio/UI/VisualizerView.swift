@@ -5,6 +5,12 @@
 
 import SwiftUI
 
+// Reusable per-frame storage for track home positions — avoids two heap allocations every 83ms.
+private final class OrbFrameCache {
+    var hx = [Double](repeating: 0.5, count: kTrackCount)
+    var hy = [Double](repeating: 0.5, count: kTrackCount)
+}
+
 struct VisualizerView: View {
     @EnvironmentObject var playback: PlaybackEngine
     @EnvironmentObject var appState: AppState
@@ -13,6 +19,9 @@ struct VisualizerView: View {
     // Tracks which tracks currently have effects stripped via right-click (macOS only).
     // Mirrors dryTracks in PhonePlayerView — right-click toggles dry, right-click again restores.
     @State private var macDryTracks: Set<Int> = []
+
+    // Allocated once; hx/hy filled each frame in drawOrbs (class reference — no heap alloc per frame).
+    @State private var orbCache = OrbFrameCache()
 
     // Keyed by trackIndex → timestamp of the most recent mute→unmute transition.
     // drawOrbs reads this to render a bright burst when the track comes back in.
@@ -86,9 +95,8 @@ struct VisualizerView: View {
     }
 
     private func handleDoubleClickEmpty() {
-        // Reset effects — same as iPhone double-tap-empty
-        appState.resetEffectsToDefaults()
-        macDryTracks.removeAll()
+        appState.regenInstrument(forTrack: kTrackLead1)
+        appState.regenInstrument(forTrack: kTrackRhythm)
     }
 
     private func handleRightClickOrb(_ trackIndex: Int) {
@@ -156,14 +164,14 @@ struct VisualizerView: View {
         let soloSnap = appState.soloState
         let wallTime = now.timeIntervalSinceReferenceDate
 
-        // Cache all 7 track home positions once per frame — avoids redundant sin/cos for
+        // Fill reusable home-position cache once per frame — avoids redundant sin/cos for
         // comet-tail ghost passes (each long note calls orbPosition 3–4× per frame).
-        var hx = [Double](repeating: 0.5, count: kTrackCount)
-        var hy = [Double](repeating: 0.5, count: kTrackCount)
         for i in 0..<kTrackCount {
             let h = trackHome(trackIndex: i, wallTime: wallTime)
-            hx[i] = h.x; hy[i] = h.y
+            orbCache.hx[i] = h.x; orbCache.hy[i] = h.y
         }
+        // Read after filling — CoW: shares the buffer without a copy (neither alias is mutated below).
+        let hx = orbCache.hx, hy = orbCache.hy
 
         for orb in playback.activeVisualizerNotes {
             let age = now.timeIntervalSince(orb.birthDate)
@@ -313,8 +321,13 @@ struct VisualizerView: View {
     // MARK: - Radius (half notes and whole notes 2x)
 
     func orbRadius(_ orb: VisualizerNote) -> Double {
-        let base = 8.0 + Double(orb.velocity) / 127.0 * 20.0
-        return orb.durationSteps >= 8 ? base * 2.0 : base
+        let base = 12.0 + Double(orb.velocity) / 127.0 * 16.0  // 12–28pt (floor up from 8)
+        switch orb.durationSteps {
+        case ...4:  return base           // spark     1.0×
+        case ...8:  return base * 1.4    // medium    1.4×
+        case ...16: return base * 1.8    // comet     1.8×
+        default:    return base * 2.2    // sustained 2.2×
+        }
     }
 
     // MARK: - Track home position (slow sinusoidal drift, unique per track)
@@ -464,8 +477,13 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
             return 7.0
         }
         private func orbRadius(_ orb: VisualizerNote) -> Double {
-            let base = 8.0 + Double(orb.velocity) / 127.0 * 20.0
-            return orb.durationSteps >= 8 ? base * 2.0 : base
+            let base = 12.0 + Double(orb.velocity) / 127.0 * 16.0
+            switch orb.durationSteps {
+            case ...4:  return base
+            case ...8:  return base * 1.4
+            case ...16: return base * 1.8
+            default:    return base * 2.2
+            }
         }
         private func trackHome(_ idx: Int, wallTime: Double) -> (Double, Double) {
             switch idx {

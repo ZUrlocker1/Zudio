@@ -21,8 +21,6 @@ struct PhonePlayerView: View {
 
     // Gesture state
     @State private var dryTracks: Set<Int> = []
-    @State private var lastShuffledTrack: Int? = nil
-    @State private var lastShuffledInstrument: UInt8? = nil
 
     // Haptic triggers (each toggles to fire sensoryFeedback)
     @State private var hapticImpactMedium = false
@@ -414,7 +412,7 @@ struct PhonePlayerView: View {
                 guard appState.songState != nil && !appState.isExportingAudio else { return }
                 appState.requestExport()
             } label: {
-                Label("Export", systemImage: "waveform")
+                Image(systemName: "square.and.arrow.up")
             }
             .buttonStyle(.bordered)
             .frame(width: 100)
@@ -436,7 +434,7 @@ struct PhonePlayerView: View {
                 showInfo = true
                 hapticImpactLight.toggle()
             } label: {
-                Label("Info", systemImage: "info.circle")
+                Image(systemName: "info.circle")
             }
             .buttonStyle(.bordered)
             .frame(width: 90)
@@ -465,7 +463,7 @@ struct PhonePlayerView: View {
                     guard appState.songState != nil && !appState.isExportingAudio else { return }
                     appState.requestExport()
                 } label: {
-                    Label("Export", systemImage: "waveform")
+                    Image(systemName: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -475,7 +473,7 @@ struct PhonePlayerView: View {
                     showInfo = true
                     hapticImpactLight.toggle()
                 } label: {
-                    Label("Info", systemImage: "info.circle")
+                    Image(systemName: "info.circle")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -667,9 +665,8 @@ struct PhonePlayerView: View {
     }
 
     private func handleDoubleTapEmpty() {
-        // Reset effects — clears mutes/solos and restores style defaults
-        appState.resetEffectsToDefaults()
-        dryTracks.removeAll()
+        appState.regenInstrument(forTrack: kTrackLead1)
+        appState.regenInstrument(forTrack: kTrackRhythm)
         hapticImpactLight.toggle()
     }
 
@@ -679,28 +676,20 @@ struct PhonePlayerView: View {
     }
 
     private func handleSwipeRight() {
-        let eligible = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass]
-        guard let track = eligible.randomElement() else { return }
-        lastShuffledTrack = track
-        lastShuffledInstrument = appState.currentInstrument(forTrack: track)
-        appState.regenInstrument(forTrack: track)
+        appState.regenInstrument(forTrack: kTrackRhythm)
+        appState.regenInstrument(forTrack: kTrackPads)
         hapticSelection.toggle()
     }
 
     private func handleSwipeLeft() {
-        guard let track = lastShuffledTrack,
-              let instrument = lastShuffledInstrument else {
-            hapticWarning.toggle()
-            return
-        }
-        appState.setInstrument(instrument, forTrack: track)
-        lastShuffledTrack      = nil
-        lastShuffledInstrument = nil
+        appState.regenInstrument(forTrack: kTrackLead1)
+        appState.regenInstrument(forTrack: kTrackLead2)
         hapticImpactSoft.toggle()
     }
 
     private func handleTwoFinger() {
-        playback.triggerGlobalFilterSweep()
+        appState.regenInstrument(forTrack: kTrackBass)
+        appState.regenInstrument(forTrack: kTrackDrums)
         hapticImpactRigid.toggle()
     }
 }
@@ -870,8 +859,13 @@ struct CanvasGestureView: UIViewRepresentable {
         }
 
         private func orbRadius(_ orb: VisualizerNote) -> Double {
-            let base = 8.0 + Double(orb.velocity) / 127.0 * 20.0
-            return orb.durationSteps >= 8 ? base * 2.0 : base
+            let base = 12.0 + Double(orb.velocity) / 127.0 * 16.0
+            switch orb.durationSteps {
+            case ...4:  return base
+            case ...8:  return base * 1.4
+            case ...16: return base * 1.8
+            default:    return base * 2.2
+            }
         }
 
         private func trackHome(trackIndex: Int, wallTime: Double) -> (x: Double, y: Double) {
