@@ -613,7 +613,8 @@ struct PhonePlayerView: View {
             onLongPressEmpty: { handleLongPressEmpty() },
             onSwipeRight:     { handleSwipeRight() },
             onSwipeLeft:      { handleSwipeLeft() },
-            onTwoFinger:      { handleTwoFinger() }
+            onTwoFinger:      { handleTwoFinger() },
+            onTapPoint:       { pt in appState.recordOrbTap(at: pt) }
         )
     }
 
@@ -700,73 +701,77 @@ private struct PhoneInfoView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
-
-                // Zudio wordmark logo with text fallback
-                Group {
-                    if let url = Bundle.main.url(forResource: "zudio-logo", withExtension: "png"),
-                       let data = try? Data(contentsOf: url),
-                       let uiImg = UIImage(data: data) {
-                        Image(uiImage: uiImg)
-                            .resizable().scaledToFit()
-                            .frame(width: 140)
-                    } else {
-                        Text("Zudio")
-                            .font(.system(size: 36, weight: .black, design: .rounded))
-                            .foregroundStyle(.primary)
-                    }
-                }
-                Text("Generative music · v0.99d")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 8)
-
-                Text("Zudio was vibe coded in just over a week, inspired by Brian Eno, Moby, St Germain, Jean-Michel Jarre, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Each style is driven by rules extracted from analyzing songs in that genre. Those rules were iteratively refined with Claude until it sounded like actual music!")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 3)
-                Text("Tap to change instruments or effects.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 3)
-                Text("Also available for iPad and Mac.")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.primary)
-                    .padding(.top, 3)
-                Text("Source code and design docs on Github")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.primary)
-                    .padding(.top, 3)
-                Link("github.com/ZUrlocker1/Zudio",
-                     destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
-                    .font(.system(size: 16))
-                    .padding(.top, 1)
-                Text("© 2026 Zack Urlocker")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.secondary)
-                    .padding(.top, 3)
-
+        VStack(spacing: 0) {
+            // Custom header — no NavigationStack overhead
+            HStack {
                 Spacer()
+                Button("Done") { dismiss() }
+                    .font(.system(size: 17))
+                    .padding(.trailing, 20)
             }
-            .padding(.horizontal, 20)
             .padding(.top, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+            .padding(.bottom, 8)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+
+                    // Zudio wordmark logo with text fallback
+                    Group {
+                        if let url = Bundle.main.url(forResource: "zudio-logo", withExtension: "png"),
+                           let data = try? Data(contentsOf: url),
+                           let uiImg = UIImage(data: data) {
+                            Image(uiImage: uiImg)
+                                .resizable().scaledToFit()
+                                .frame(width: 140)
+                        } else {
+                            Text("Zudio")
+                                .font(.system(size: 36, weight: .black, design: .rounded))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                    Text("Generative music · v1.0")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 8)
+
+                    Text("Zudio was vibe coded with AI, inspired by Brian Eno, Moby, St Germain, Jean-Michel Jarre, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Each style is driven by rules extracted from analyzing songs in that genre. Rules were iteratively refined with Claude until it sounded like real music!")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 5)
+                    Text("Tap or swipe to change instruments. Log view shows the rules firing behind the scenes.")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 5)
+                    Text("Available for iPad Mac with track view and MIDI export.")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 5)
+                    Text("Source code and design docs on Github")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.primary)
+                        .padding(.top, 5)
+                    Link("github.com/ZUrlocker1/Zudio",
+                         destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
+                        .font(.system(size: 16))
+                        .padding(.top, 1)
+                    Text("© 2026 Zack Urlocker")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.secondary)
+                        .padding(.top, 3)
+                        .padding(.bottom, 32)
                 }
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
 
@@ -785,6 +790,7 @@ struct CanvasGestureView: UIViewRepresentable {
     var onSwipeRight:      () -> Void
     var onSwipeLeft:       () -> Void
     var onTwoFinger:       () -> Void
+    var onTapPoint:        (CGPoint) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
@@ -930,6 +936,7 @@ struct CanvasGestureView: UIViewRepresentable {
         @objc func handleSingleTap(_ gr: UITapGestureRecognizer) {
             guard gr.state == .ended else { return }
             let pt = gr.location(in: gr.view)
+            parent.onTapPoint(pt)
             if let track = hitOrb(at: pt, in: gr.view!) {
                 parent.onTapOrb(track)
             } else {
@@ -940,6 +947,7 @@ struct CanvasGestureView: UIViewRepresentable {
         @objc func handleDoubleTap(_ gr: UITapGestureRecognizer) {
             guard gr.state == .ended else { return }
             let pt = gr.location(in: gr.view)
+            parent.onTapPoint(pt)
             if let track = hitOrb(at: pt, in: gr.view!) {
                 parent.onDoubleTapOrb(track)
             } else {

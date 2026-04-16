@@ -93,6 +93,12 @@ final class PlaybackEngine: ObservableObject {
     private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
     private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
 
+    // Guard flag: wired CarPlay fires BOTH routeChangeNotification(.newDeviceAvailable) AND
+    // AVAudioEngineConfigurationChange simultaneously on the main queue, producing two sequential
+    // restartAudio() calls. The second call finds the engine mid-restart and crashes when
+    // loadSoundBankInstrument() or engine.start() collides with the first call's engine.stop().
+    private var isRestartingAudio = false
+
     // Endless / Evolve callbacks — set by AppState.init(); all called on main actor.
     var onApproachingEnd:   (() -> Void)? = nil
     var onSongEndNaturally: (() -> Void)? = nil
@@ -433,14 +439,21 @@ final class PlaybackEngine: ObservableObject {
     /// Stop and restart the AVAudioEngine so it re-enumerates the output device.
     /// Call this when the user connects or disconnects headphones or Bluetooth audio.
     func restartAudio() {
-        allNotesOff()
+        // Wired CarPlay triggers BOTH routeChangeNotification(.newDeviceAvailable) AND
+        // AVAudioEngineConfigurationChange on the main queue in the same event loop cycle.
+        // The second call would find the engine mid-restart and crash — guard against it.
+        guard !isRestartingAudio else { return }
+        isRestartingAudio = true
+        defer { isRestartingAudio = false }
+
         #if os(iOS)
-        // Capture playing state before stopping — beginBatchLoad() inside
-        // applyCurrentInstrumentsToPlayback() checks engine.isRunning, but the engine
-        // is already stopped here, so it returns false and endBatchLoad() is never called.
-        // We restart the engine ourselves below if playback was active.
+        // Capture playing state before stopSchedulerOnly() clears isPlaying.
         let wasPlaying = isPlaying
         #endif
+        // Stop the scheduler first — prevents startNote/stopNote calls on the stepTimerQueue
+        // thread from racing with engine.stop() and loadSoundBankInstrument() below.
+        // stopSchedulerOnly() calls allNotesOff() internally, so no separate call needed.
+        stopSchedulerOnly()
         engine.stop()
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
@@ -451,11 +464,13 @@ final class PlaybackEngine: ObservableObject {
         #endif
         onAudioEngineRestarted?()
         #if os(iOS)
-        // iOS: restart the engine after instruments are loaded if we were playing.
-        // (.oldDeviceUnavailable calls stopSchedulerOnly() first → isPlaying = false
-        //  → stays stopped so the user must press Play to resume through the speaker.
-        //  .newDeviceAvailable while playing → wasPlaying = true → restarts here.)
-        if wasPlaying { startEngine() }
+        // iOS: restart the engine and scheduler if we were playing.
+        // .oldDeviceUnavailable: stopSchedulerOnly() called before restartAudio() → wasPlaying=false
+        //   → stays stopped; user must press Play to resume through the built-in speaker.
+        // .newDeviceAvailable (Bluetooth, wired CarPlay): wasPlaying=true → auto-resume.
+        //   play() finds engine.isRunning=true (just started) and isPlaying=false (cleared by
+        //   stopSchedulerOnly()), so it skips startEngine() and goes straight to the scheduler.
+        if wasPlaying { startEngine(); play() }
         #endif
     }
 
@@ -1028,6 +1043,9 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func lfoTick() {
+        // Guard against route-change engine restarts: restartAudio() stops the engine
+        // without cancelling lfoTimer, so this tick can fire while the engine is down.
+        guard engine.isRunning else { return }
         // Skip all work if no effect is currently running — handles the brief window
         // between an effect being disabled and the timer being cancelled.
         guard anyLFOActive || globalSweepTicksRemaining > 0 else { return }

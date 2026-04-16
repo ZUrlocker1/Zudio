@@ -854,7 +854,8 @@ struct ContentView: View {
             onLongPressEmpty: { iPadHandleLongPressEmpty() },
             onSwipeRight:     { iPadHandleSwipeRight() },
             onSwipeLeft:      { iPadHandleSwipeLeft() },
-            onTwoFinger:      { iPadHandleTwoFinger() }
+            onTwoFinger:      { iPadHandleTwoFinger() },
+            onTapPoint:       { pt in appState.recordOrbTap(at: pt) }
         )
     }
 

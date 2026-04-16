@@ -2,7 +2,7 @@
 
 ## Platform View Inventory
 
-Current shipped state as of v0.99c. For visualizer details see [visualizer-plan.md](visualizer-plan.md).
+Current shipped state as of v1.0. For visualizer details see [visualizer-plan.md](visualizer-plan.md).
 
 ### macOS
 

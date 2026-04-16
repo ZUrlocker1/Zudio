@@ -47,7 +47,8 @@ struct VisualizerView: View {
                 onClickEmpty:       { handleClickEmpty() },
                 onDoubleClickEmpty: { handleDoubleClickEmpty() },
                 onRightClickOrb:    { handleRightClickOrb($0) },
-                onRightClickEmpty:  { handleRightClickEmpty() }
+                onRightClickEmpty:  { handleRightClickEmpty() },
+                onTapPoint:         { appState.recordOrbTap(at: $0) }
             )
         }
         #endif
@@ -192,7 +193,7 @@ struct VisualizerView: View {
             // Direct mute ghosts at 6%; solo-out ghosts at 5%.
             let directlyMuted = muteSnap[orb.trackIndex]
             let soloedOut     = anySolo && !soloSnap[orb.trackIndex]
-            let muteScale: Double = directlyMuted ? 0.06 : (soloedOut ? 0.05 : 1.0)
+            let muteScale: Double = directlyMuted ? 0.10 : (soloedOut ? 0.10 : 1.0)
 
             // Compute radius and color once — reused for all ghost passes and the live orb.
             let radius = orbRadius(orb)
@@ -267,6 +268,19 @@ struct VisualizerView: View {
             var ring = Path(ellipseIn: orbRect(center, flashR + rw))
             ring.addEllipse(in: orbRect(center, max(0, flashR - rw)))
             ctx.fill(ring, with: .color(Color.white.opacity(flashOp)))
+        }
+
+        // Tap-point flash rings — immediate green ring at the exact click/tap position.
+        for flash in appState.orbTapFlashes {
+            let flashAge = now.timeIntervalSince(flash.date)
+            guard flashAge < flash.duration else { continue }
+            let fp      = flashAge / flash.duration
+            let flashR  = 10.0 + fp * (flash.maxRadius - 10.0)
+            let flashOp = (1.0 - fp) * flash.maxOpacity
+            let rw: CGFloat = 2.0
+            var ring = Path(ellipseIn: orbRect(flash.pos, flashR + rw))
+            ring.addEllipse(in: orbRect(flash.pos, max(0, flashR - rw)))
+            ctx.fill(ring, with: .color(Color(hue: 0.38, saturation: 0.85, brightness: 0.95).opacity(flashOp)))
         }
 
         // Canvas-wide white flash for filter-sweep gesture — fades over 3 s.
@@ -422,6 +436,7 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
     var onDoubleClickEmpty: ()    -> Void
     var onRightClickOrb:    (Int) -> Void
     var onRightClickEmpty:  ()    -> Void
+    var onTapPoint:         (CGPoint) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     func makeNSView(context: Context) -> MacGestureNSView {
@@ -438,6 +453,8 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
     final class Coordinator: NSObject {
         var parent: MacVisualizerGestureView
         init(parent: MacVisualizerGestureView) { self.parent = parent }
+
+        func fireTapPoint(at pt: CGPoint) { parent.onTapPoint(pt) }
 
         func dispatchSingle(at pt: CGPoint, size: CGSize) {
             if let t = hitOrb(at: pt, size: size) { parent.onClickOrb(t) }
@@ -567,6 +584,8 @@ private final class MacGestureNSView: NSView {
     override func mouseDown(with event: NSEvent) {
         let pt   = convert(event.locationInWindow, from: nil)
         let size = CGSize(width: bounds.width, height: bounds.height)
+        // Immediate visual feedback at the tap point (fires for every left click).
+        coordinator?.fireTapPoint(at: pt)
         // Cmd+click acts identically to right-click (dry/wet on orb, regen on empty).
         if event.modifierFlags.contains(.command) {
             pendingClick?.cancel()

@@ -138,6 +138,16 @@ final class StepScheduler {
 
         if !clockReady {
             // First successful tick: anchor nextStepSample to current audio position.
+            // Guard against a zero sample rate — can occur briefly after a route change
+            // (e.g. wired CarPlay forcing 48 kHz) before the engine has produced its first
+            // valid render buffer. Dividing by zero below would produce Infinity and trap
+            // on Int() conversion. Fall back to wall-clock scheduling for this one tick.
+            guard renderTime.sampleRate > 0 else {
+                let ns = Int(songState.frame.secondsPerStep * 1_000_000_000)
+                timer?.schedule(deadline: .now() + .nanoseconds(ns),
+                                repeating: .never, leeway: leeway)
+                return
+            }
             audioSampleRate = renderTime.sampleRate
             samplesPerStep  = audioSampleRate * songState.frame.secondsPerStep
             nextStepSample  = Double(renderTime.sampleTime) + samplesPerStep

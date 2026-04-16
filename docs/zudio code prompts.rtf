@@ -1943,11 +1943,22 @@ I have added a new image zudio-logo-square.png which you should use for the Now 
 \
 Also, Zudio works great in the background on iphone and ipad. But, when another audio application starts  playing (eg Apple Music, Audible etc) it should stop playing.  Right now Zudio continues to play but it is silent.  How do we ensure it actually stops playing?  Similarly, if Zudio starts playing on iphone, ipad, then any other audio app should stop.  Tell me the logic behind this before coding it.\
 \
-\
-\
 There is another motorik song Zudio-E-Pulse which I'd like you to analyze very carefully in accodance with how the "Apache beat" works in Motorik.  The song overall works, but bars 73-97 seem suspicious to me. In vague musical terms it feels like the bass part has evolved so that it is no longer "in lock step" with the drums.  I tried regenerating the drum tracks, and it feels like its the bass wandering which is a problem rather than the drums.   I wonder if you can check whether this is the case and why. And if it sounds wrong in terms of the Appache beat for Motorik, give me a suggestion on how to restrict the bass from getting out of sync.  \
 \
-\
+
+\f0\b iPhone Bugs
+\f2\b0 \
 I have noticed on iphone background playback (when in lock screen) sometimes the tempo slows down when the iphone screen turns off and then speeds up before getting back to the proper tempo. Similarly when the screen turns on Zudio speeds up sightly before adjusting to normal. I assume this is related to how the iphone is managing things. But do some research to see if this is a known issue and if there are any suggested workarounds. It is most noticeable for Motorik and Kosmic which run at higher tempos.  Don't make code changes just do some research.\
 \
+please research the carplay or other audio device unplugging as that issue from yesterday is still nto fixed.  When I play Zudio and then plug into a USBC cable for carplay, it stops. When I hit play Zudio crashes.  Same if I do the opposite e.g. if I'm connected to carplay via cable and then unplug the cable, Zudio stops. If I hit Play it crashes.  Please research this thorougly to find a solution\
+\
+Same crash as before.  But now the bluetooth change is not as smooth.  (e.g. putting on bluetooth headset was continuous play handed automatically. Now it stops and I have to hit play.) \
+I have xcode crashes visible. But I think this is just showing crash logs from other users via test flight. How do I see my own crashes that happened on iphone 15 pro recent builds.\
+\
+there is one subtle bug and I want you to look at fixing it but please review the code carefully so we are not making it overly complicated and do not regress elsewhere. \
+when I switch from iphone playing through the speaker to using a bluetooth headset, the Audio Texture file (if there is one) continues to play, but the MIDI does not play. I have to hit Play again.  It used to contnue playing with no stop. \
+\
+When my Mac and iphone both have bluetooth enabled (to find the same headset) the iPhone does not seem to get the bluetooth connection, it plays but is silent. I often have to quite Zudio, turn off bluetooth on my Mac and restart.  However, other applications like Apple Music or Audible do not have this kind of problem. \
+\
+pls update the version number everywhere to 1.0  everywhere in help, readme, internal, external and the build number to 100 where you can.\
 }

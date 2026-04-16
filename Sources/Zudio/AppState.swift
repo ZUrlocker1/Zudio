@@ -652,6 +652,21 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Tap-point flash: a white ring drawn at the raw tap/click position. Not @Published —
+    /// canvas reads it each frame via TimelineView, same as visualizerFlashEvents.
+    var orbTapFlashes: [(pos: CGPoint, date: Date, duration: Double, maxRadius: Double, maxOpacity: Double)] = []
+
+    func recordOrbTap(at pos: CGPoint) {
+        let duration   = Double.random(in: 0.20...0.40)
+        let maxRadius  = Double.random(in: 30...70)
+        let maxOpacity = Double.random(in: 0.25...0.60)
+        orbTapFlashes.append((pos: pos, date: Date(), duration: duration, maxRadius: maxRadius, maxOpacity: maxOpacity))
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.05) { [weak self] in
+            let cutoff = Date().addingTimeInterval(-(duration + 0.03))
+            self?.orbTapFlashes.removeAll { $0.date < cutoff }
+        }
+    }
+
     // MARK: - Live playback feed (Now Playing strip)
 
     @Published var livePlaybackFeed: [GenerationLogEntry] = []

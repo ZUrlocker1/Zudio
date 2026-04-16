@@ -774,19 +774,6 @@ private struct LogoAreaView: View {
                             .background(Color.orange)
                             .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
-                    if !compact {
-                        #if os(iOS)
-                        if contentWidth >= 900 {
-                            Text("V 0.99d")
-                                .font(.callout)
-                                .foregroundStyle(.white.opacity(0.55))
-                        }
-                        #else
-                        Text("V 0.99d")
-                            .font(.callout)
-                            .foregroundStyle(.white.opacity(0.55))
-                        #endif
-                    }
                 }
                 .padding(4)
                 #if os(macOS)
@@ -1017,7 +1004,7 @@ struct AboutView: View {
                     .frame(width: 48, height: 48)
                 Text("Zudio").font(.title.bold())
             }
-            Text("Generative music application vibe coded in a week with Claude!")
+            Text("Generative music application vibe coded with AI!")
                 .foregroundStyle(.secondary)
             Divider()
 
@@ -1026,7 +1013,7 @@ struct AboutView: View {
             #if os(iOS)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Version: 0.99d").font(.system(size: 14))
+                    Text("Version: 1.0").font(.system(size: 14))
                     Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
                 }
@@ -1034,7 +1021,7 @@ struct AboutView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 0.99d").font(.system(size: 14))
+                Text("Version: 1.0").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
@@ -1042,6 +1029,10 @@ struct AboutView: View {
             }
             Spacer()
             #endif
+
+            Text("Also available for iPhone, iPad.")
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
 
             HStack(spacing: 4) {
                 Text("Design docs and source code:")
