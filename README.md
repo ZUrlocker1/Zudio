@@ -27,6 +27,7 @@ Current release: `1.0`. Universal binary — runs natively on both Apple Silicon
 
 ### Core
 
+- [Zudio preso.pdf](docs/Zudio%20preso.pdf) — 5 min presentation slides on Zudio created by Claude.
 - [Zudio-article-v09.docx](docs/Zudio-article-v09.docx) — Overview article covering the project motivation, genre research methodology, AI-assisted specification process, iterative development, and honest assessment of the results.
 - [architecture.md](docs/architecture.md) — System overview, technology stack, generation pipeline, playback engine, UI architecture, and musical foundations. Start here.
 - [development-plan.md](docs/development-plan.md) — Staged development roadmap from v0.1 through future versions.
