@@ -174,6 +174,8 @@
 		TT000000000000000000003 /* MotorikBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000003 /* MotorikBatchTests.swift */; };
 		TT000000000000000000009 /* KosmicBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000005 /* KosmicBatchTests.swift */; };
 		TT000000000000000000010 /* AmbientBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000010 /* AmbientBatchTests.swift */; };
+		AA000000000000000000111 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
+		IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -219,6 +221,7 @@
 		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		BB00000000000000000001F /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BB000000000000000000099 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB000000000000000000021 /* Zudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB000000000000000000022 /* MIDIFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIFileExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000023 /* FirstMouseFix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstMouseFix.swift; sourceTree = "<group>"; };
@@ -426,6 +429,7 @@
 				BB000000000000000000001 /* ZudioApp.swift */,
 				BB000000000000000000002 /* AppState.swift */,
 				BB000000000000000000020 /* Info.plist */,
+				BB000000000000000000099 /* PrivacyInfo.xcprivacy */,
 				BB000000000000000000100 /* Assets.xcassets */,
 				DD000000000000000000003 /* Models */,
 				DD000000000000000000004 /* Generation */,
@@ -643,6 +647,7 @@
 				AA000000000000000000029 /* assets/images/zudio-doc.icns in Resources */,
 				AA000000000000000000069 /* Sources/Zudio/Resources/Textures in Resources */,
 				AA000000000000000000100 /* Assets.xcassets in Resources */,
+				AA000000000000000000111 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -654,6 +659,7 @@
 				IR000000000000000000002 /* assets/GeneralUser_GS_v1.471.sf2 in Resources */,
 				IR000000000000000000003 /* assets/images/zudio-logo.png in Resources */,
 				IR000000000000000000004 /* Sources/Zudio/Resources/Textures in Resources */,
+				IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -3,6 +3,7 @@
 import SwiftUI
 import Combine
 import MediaPlayer
+import StoreKit
 
 // MARK: - Play mode
 
@@ -1132,7 +1133,10 @@ final class AppState: ObservableObject {
                 // programs are loaded before the first note fires.
                 self.defaultsResetToken += 1
                 self.applyCurrentInstrumentsToPlayback()
-                if thenPlay || wasPlaying { self.playback.play() }
+                if thenPlay || wasPlaying {
+                    self.playback.play()
+                    self.incrementPlayCountAndRequestReviewIfNeeded()
+                }
                 // Resign first responder so BPM TextField doesn't hold focus
                 self.platformHost?.dismissKeyboard()
                 // If a file-open arrived while we were generating, load it now.
@@ -1245,6 +1249,25 @@ final class AppState: ObservableObject {
     func stop() {
         playback.stop()
         audioTexture.stop()
+    }
+
+    // MARK: - App Store review
+
+    private func incrementPlayCountAndRequestReviewIfNeeded() {
+        let key = "completedGeneratePlayCount"
+        let count = UserDefaults.standard.integer(forKey: key) + 1
+        UserDefaults.standard.set(count, forKey: key)
+        guard count == 5 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            #if os(iOS)
+            guard let scene = UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+            else { return }
+            SKStoreReviewController.requestReview(in: scene)
+            #elseif os(macOS)
+            SKStoreReviewController.requestReview()
+            #endif
+        }
     }
 
     // MARK: - Seek
