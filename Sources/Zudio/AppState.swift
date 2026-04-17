@@ -119,12 +119,23 @@ final class AppState: ObservableObject {
 
     // MARK: - Style selector
 
-    @Published var selectedStyle: MusicStyle = .chill
+    @Published var selectedStyle: MusicStyle = {
+        guard let raw = UserDefaults.standard.string(forKey: "selectedStyle"),
+              let style = MusicStyle(rawValue: raw) else { return .chill }
+        return style
+    }() {
+        didSet { UserDefaults.standard.set(selectedStyle.rawValue, forKey: "selectedStyle") }
+    }
 
     // MARK: - Play mode (Song / Endless)
 
-    @Published var playMode: PlayMode = .song {
+    @Published var playMode: PlayMode = {
+        guard let raw = UserDefaults.standard.string(forKey: "playMode"),
+              let mode = PlayMode(rawValue: raw) else { return .song }
+        return mode
+    }() {
         didSet {
+            UserDefaults.standard.set(playMode.rawValue, forKey: "playMode")
             guard playMode != oldValue else { return }
             if oldValue == .evolve { tearDownEvolve() }
             switch playMode {

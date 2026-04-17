@@ -48,7 +48,13 @@ struct VisualizerView: View {
                 onDoubleClickEmpty: { handleDoubleClickEmpty() },
                 onRightClickOrb:    { handleRightClickOrb($0) },
                 onRightClickEmpty:  { handleRightClickEmpty() },
-                onTapPoint:         { appState.recordOrbTap(at: $0) }
+                onTapPoint:         { appState.recordOrbTap(at: $0) },
+                onSwipeRight:       { appState.regenInstrument(forTrack: kTrackRhythm)
+                                      appState.regenInstrument(forTrack: kTrackPads) },
+                onSwipeLeft:        { appState.regenInstrument(forTrack: kTrackLead1)
+                                      appState.regenInstrument(forTrack: kTrackLead2) },
+                onRegenBassDrums:   { appState.regenInstrument(forTrack: kTrackBass)
+                                      appState.regenInstrument(forTrack: kTrackDrums) }
             )
         }
         #endif
@@ -437,11 +443,17 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
     var onRightClickOrb:    (Int) -> Void
     var onRightClickEmpty:  ()    -> Void
     var onTapPoint:         (CGPoint) -> Void
+    var onSwipeRight:       ()    -> Void
+    var onSwipeLeft:        ()    -> Void
+    var onRegenBassDrums:   ()    -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     func makeNSView(context: Context) -> MacGestureNSView {
         let v = MacGestureNSView()
         v.coordinator = context.coordinator
+        let pinch = NSMagnificationGestureRecognizer(target: context.coordinator,
+                                                     action: #selector(Coordinator.handlePinch(_:)))
+        v.addGestureRecognizer(pinch)
         return v
     }
     func updateNSView(_ v: MacGestureNSView, context: Context) {
@@ -455,6 +467,14 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
         init(parent: MacVisualizerGestureView) { self.parent = parent }
 
         func fireTapPoint(at pt: CGPoint) { parent.onTapPoint(pt) }
+        func fireSwipeRight()     { parent.onSwipeRight() }
+        func fireSwipeLeft()      { parent.onSwipeLeft() }
+        func fireRegenBassDrums() { parent.onRegenBassDrums() }
+
+        @objc func handlePinch(_ gr: NSMagnificationGestureRecognizer) {
+            guard gr.state == .began else { return }
+            parent.onRegenBassDrums()
+        }
 
         func dispatchSingle(at pt: CGPoint, size: CGSize) {
             if let t = hitOrb(at: pt, size: size) { parent.onClickOrb(t) }
@@ -593,6 +613,15 @@ private final class MacGestureNSView: NSView {
             coordinator?.dispatchRightClick(at: pt, size: size)
             return
         }
+        // Option+click on empty canvas → regen Bass & Drums.
+        if event.modifierFlags.contains(.option) {
+            pendingClick?.cancel()
+            pendingClick = nil
+            if coordinator?.hitOrb(at: pt, size: size) == nil {
+                coordinator?.fireRegenBassDrums()
+            }
+            return
+        }
         if event.clickCount == 2 {
             pendingClick?.cancel()
             pendingClick = nil
@@ -612,6 +641,14 @@ private final class MacGestureNSView: NSView {
                 execute: work
             )
         }
+    }
+
+    // MARK: Scroll — horizontal swipe maps to regen gestures (threshold avoids accidental triggers)
+
+    override func scrollWheel(with event: NSEvent) {
+        let dx = event.scrollingDeltaX
+        if dx > 10  { coordinator?.fireSwipeRight() }
+        else if dx < -10 { coordinator?.fireSwipeLeft() }
     }
 
     // MARK: Right click — dry/wet toggle on orb, regen on empty
