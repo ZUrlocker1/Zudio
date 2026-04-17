@@ -161,6 +161,34 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Sleep timer
+
+    @Published var sleepTimerDuration: SleepTimerDuration = {
+        guard let raw = UserDefaults.standard.string(forKey: "sleepTimerDuration"),
+              let d = SleepTimerDuration(rawValue: raw) else { return .twoHours }
+        return d
+    }() {
+        didSet { UserDefaults.standard.set(sleepTimerDuration.rawValue, forKey: "sleepTimerDuration") }
+    }
+
+    private(set) var sleepTimerExpiresAt: Date? = nil
+
+    var sleepTimerIsActive: Bool { sleepTimerExpiresAt != nil }
+
+    func setSleepTimer(_ duration: SleepTimerDuration) {
+        sleepTimerDuration = duration
+        if let mins = duration.minutes {
+            sleepTimerExpiresAt = Date().addingTimeInterval(mins * 60)
+        } else {
+            sleepTimerExpiresAt = nil
+        }
+    }
+
+    private var sleepTimerShouldStop: Bool {
+        guard let exp = sleepTimerExpiresAt else { return false }
+        return exp.timeIntervalSinceNow <= 3 * 60
+    }
+
     // MARK: - Persisted song history (survives app restarts — stored in UserDefaults)
 
     /// Minimal record needed to reproduce a song exactly. Codable so it can be
@@ -1351,6 +1379,7 @@ final class AppState: ObservableObject {
 
     private func handleSongEndedNaturally() {
         guard playMode == .endless else { return }
+        if sleepTimerShouldStop { sleepTimerExpiresAt = nil; return }
         if let next = nextSongState {
             // "Up next" was already logged when pre-gen completed
             nextSongState   = nil
@@ -1808,6 +1837,7 @@ final class AppState: ObservableObject {
     }
 
     private func transitionToEvolveNextSong() {
+        if sleepTimerShouldStop { sleepTimerExpiresAt = nil; return }
         // Discard pre-generated next song if its style no longer matches the user's selection.
         if let next = evolveNextSongState, next.style != selectedStyle {
             evolveNextSongState  = nil

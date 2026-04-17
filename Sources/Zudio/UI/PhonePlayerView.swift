@@ -16,8 +16,9 @@ struct PhonePlayerView: View {
     @State private var activeTab: PhoneTab = .visuals
     @State private var visualizerPaused: Bool = false   // tap Visuals tab while on it to stop animation
     @State private var showVisualsOffLabel = false       // "Visuals off" toast, auto-hides after 8s
-    @State private var stopFlash = false
-    @State private var showInfo  = false
+    @State private var stopFlash       = false
+    @State private var showInfo        = false
+    @State private var showSleepPicker = false
 
     // Gesture state
     @State private var dryTracks: Set<Int> = []
@@ -403,20 +404,29 @@ struct PhonePlayerView: View {
 
     // MARK: - Export + Info row
 
-    // MARK: - Portrait action row: Export | Generate (centre, brighter) | Info
+    // MARK: - Portrait action row: [Export + Sleep] | Generate (centre) | Info
     private var portraitActionRow: some View {
         HStack(spacing: 8) {
-            // Export — fixed narrow width; no .disabled() so SwiftUI doesn't grey it out.
-            // Instead use reduced opacity for subtle "not yet available" look.
-            Button {
-                guard appState.songState != nil && !appState.isExportingAudio else { return }
-                appState.requestExport()
-            } label: {
-                Image(systemName: "square.and.arrow.up")
+            // Left group: Export + Sleep moon (equal total width to Info button on right)
+            HStack(spacing: 4) {
+                Button {
+                    guard appState.songState != nil && !appState.isExportingAudio else { return }
+                    appState.requestExport()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .opacity(appState.songState == nil || appState.isExportingAudio ? 0.40 : 1.0)
+
+                Button { showSleepPicker = true } label: {
+                    Image(systemName: appState.sleepTimerIsActive ? "moon.fill" : "moon")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(appState.sleepTimerIsActive ? .yellow : .white)
             }
-            .buttonStyle(.bordered)
-            .frame(width: 100)
-            .opacity(appState.songState == nil || appState.isExportingAudio ? 0.40 : 1.0)
+            .frame(width: 104)
 
             Button {
                 appState.generateNew(thenPlay: true)
@@ -437,10 +447,18 @@ struct PhonePlayerView: View {
                 Image(systemName: "info.circle")
             }
             .buttonStyle(.bordered)
-            .frame(width: 90)
+            .frame(width: 104)
         }
         .font(.callout)
         .sheet(isPresented: $showInfo) { PhoneInfoView() }
+        .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
+            ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                Button(dur == appState.sleepTimerDuration && appState.sleepTimerIsActive
+                       ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                    appState.setSleepTimer(dur)
+                }
+            }
+        }
     }
 
     // MARK: - Landscape action rows: Generate full-width, then Export + Info below
@@ -469,6 +487,13 @@ struct PhonePlayerView: View {
                 .buttonStyle(.bordered)
                 .opacity(appState.songState == nil || appState.isExportingAudio ? 0.40 : 1.0)
 
+                Button { showSleepPicker = true } label: {
+                    Image(systemName: appState.sleepTimerIsActive ? "moon.fill" : "moon")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(appState.sleepTimerIsActive ? .yellow : .white)
+
                 Button {
                     showInfo = true
                     hapticImpactLight.toggle()
@@ -481,6 +506,14 @@ struct PhonePlayerView: View {
         }
         .font(.callout)
         .sheet(isPresented: $showInfo) { PhoneInfoView() }
+        .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
+            ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                Button(dur == appState.sleepTimerDuration && appState.sleepTimerIsActive
+                       ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                    appState.setSleepTimer(dur)
+                }
+            }
+        }
     }
 
     // MARK: - Tab strip (Visuals / Log / Songs)

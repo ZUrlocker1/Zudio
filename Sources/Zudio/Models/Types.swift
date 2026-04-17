@@ -155,6 +155,24 @@ enum MusicStyle: String, CaseIterable, Codable, Sendable {
     case chill   = "Chill"
 }
 
+enum SleepTimerDuration: String, CaseIterable {
+    case thirtyMin  = "30 min"
+    case oneHour    = "1 hour"
+    case ninetyMin  = "90 min"
+    case twoHours   = "2 hours"
+    case never      = "Never"
+
+    var minutes: Double? {
+        switch self {
+        case .thirtyMin:  return 30
+        case .oneHour:    return 60
+        case .ninetyMin:  return 90
+        case .twoHours:   return 120
+        case .never:      return nil
+        }
+    }
+}
+
 // MARK: - Chill progression families
 
 enum ChillProgressionFamily: String, Codable, Sendable {

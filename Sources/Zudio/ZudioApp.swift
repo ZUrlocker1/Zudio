@@ -285,6 +285,19 @@ struct ZudioApp: App {
                 Button("Export Audio") { appState.requestExport() }
                     .keyboardShortcut("e", modifiers: .command)
                     .disabled(appState.songState == nil || appState.isExportingAudio)
+
+                Divider()
+
+                Menu("Sleep Timer") {
+                    ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                        Button {
+                            appState.setSleepTimer(dur)
+                        } label: {
+                            let active = appState.sleepTimerIsActive && appState.sleepTimerDuration == dur
+                            Label(dur.rawValue, systemImage: active ? "moon.fill" : "moon")
+                        }
+                    }
+                }
             }
 
             // View menu — uses .toolbar slot so it injects into the existing system View menu.
