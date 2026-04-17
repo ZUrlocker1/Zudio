@@ -189,6 +189,16 @@ final class AppState: ObservableObject {
         return exp.timeIntervalSinceNow <= 3 * 60
     }
 
+    private func logSleepTimerStop() {
+        let mins = Int((sleepTimerDuration.minutes ?? 120))
+        let label = mins >= 120 ? "2 hours" : "\(mins) min"
+        appendToLog([GenerationLogEntry(
+            tag: "Sleep",
+            description: "Playback paused after \(label)",
+            isTitle: false
+        )])
+    }
+
     // MARK: - Persisted song history (survives app restarts — stored in UserDefaults)
 
     /// Minimal record needed to reproduce a song exactly. Codable so it can be
@@ -724,6 +734,11 @@ final class AppState: ObservableObject {
     init() {
         persistedHistory = Self.loadPersistedHistory()
         preloadPersistedSongs()
+        // Arm sleep timer from launch using saved preference (default 2 hours).
+        // Never → expiresAt stays nil; any other option arms immediately.
+        if let mins = sleepTimerDuration.minutes {
+            sleepTimerExpiresAt = Date().addingTimeInterval(mins * 60)
+        }
 
         // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
         // Removing the blanket objectWillChange cascade breaks the per-step chain:
@@ -1379,7 +1394,7 @@ final class AppState: ObservableObject {
 
     private func handleSongEndedNaturally() {
         guard playMode == .endless else { return }
-        if sleepTimerShouldStop { sleepTimerExpiresAt = nil; return }
+        if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
         if let next = nextSongState {
             // "Up next" was already logged when pre-gen completed
             nextSongState   = nil
@@ -1837,7 +1852,7 @@ final class AppState: ObservableObject {
     }
 
     private func transitionToEvolveNextSong() {
-        if sleepTimerShouldStop { sleepTimerExpiresAt = nil; return }
+        if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
         // Discard pre-generated next song if its style no longer matches the user's selection.
         if let next = evolveNextSongState, next.style != selectedStyle {
             evolveNextSongState  = nil

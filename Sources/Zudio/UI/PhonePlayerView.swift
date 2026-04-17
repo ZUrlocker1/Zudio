@@ -424,7 +424,7 @@ struct PhonePlayerView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(appState.sleepTimerIsActive ? .yellow : .white)
+                .tint(.blue)
             }
             .frame(width: 104)
 
@@ -453,8 +453,7 @@ struct PhonePlayerView: View {
         .sheet(isPresented: $showInfo) { PhoneInfoView() }
         .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
             ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                Button(dur == appState.sleepTimerDuration && appState.sleepTimerIsActive
-                       ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
                     appState.setSleepTimer(dur)
                 }
             }
@@ -492,7 +491,7 @@ struct PhonePlayerView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .tint(appState.sleepTimerIsActive ? .yellow : .white)
+                .tint(.blue)
 
                 Button {
                     showInfo = true
@@ -508,8 +507,7 @@ struct PhonePlayerView: View {
         .sheet(isPresented: $showInfo) { PhoneInfoView() }
         .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
             ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                Button(dur == appState.sleepTimerDuration && appState.sleepTimerIsActive
-                       ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
                     appState.setSleepTimer(dur)
                 }
             }

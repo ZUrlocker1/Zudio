@@ -289,14 +289,16 @@ struct ZudioApp: App {
                 Divider()
 
                 Menu("Sleep Timer") {
-                    ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                        Button {
-                            appState.setSleepTimer(dur)
-                        } label: {
-                            let active = appState.sleepTimerIsActive && appState.sleepTimerDuration == dur
-                            Label(dur.rawValue, systemImage: active ? "moon.fill" : "moon")
+                    Picker("Sleep Timer", selection: Binding(
+                        get: { appState.sleepTimerDuration },
+                        set: { appState.setSleepTimer($0) }
+                    )) {
+                        ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                            Text(dur.rawValue).tag(dur)
                         }
                     }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
                 }
             }
 
