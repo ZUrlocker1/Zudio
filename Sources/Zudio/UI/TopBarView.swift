@@ -106,6 +106,7 @@ struct TopBarView: View {
     @State private var saveFlash = false
     #if os(iOS)
     @State private var showFileImporter = false
+    @State private var showSleepPicker  = false
     #endif
 
     @StateObject private var reverseRepeater = HoldRepeater()
@@ -654,11 +655,21 @@ struct TopBarView: View {
                 VStack(alignment: .trailing, spacing: 6) {
                     Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: kHelpButtonWidth) }
                     Button { showAbout = true } label: { Text("About").frame(width: kHelpButtonWidth) }
+                    Button { showSleepPicker = true } label: { Text("Sleep").frame(width: kHelpButtonWidth) }
                 }
                 .font(.callout)
-                .padding(.top, 5)
+                .padding(.top, -5)
                 .padding(.trailing, 8)
                 .buttonStyle(.bordered)
+                .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker,
+                                   titleVisibility: .visible) {
+                    ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                        Button(dur == appState.sleepTimerDuration
+                               ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                            appState.setSleepTimer(dur)
+                        }
+                    }
+                }
                 #endif
             }
             .padding(.horizontal, 2)

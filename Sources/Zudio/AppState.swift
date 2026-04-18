@@ -175,6 +175,8 @@ final class AppState: ObservableObject {
 
     var sleepTimerIsActive: Bool { sleepTimerExpiresAt != nil }
 
+    @Published var sleepTimerEndedVisible: Bool = false
+
     func setSleepTimer(_ duration: SleepTimerDuration) {
         sleepTimerDuration = duration
         if let mins = duration.minutes {
@@ -189,14 +191,25 @@ final class AppState: ObservableObject {
         return exp.timeIntervalSinceNow <= 3 * 60
     }
 
+    private func rearmSleepTimerIfNeeded() {
+        guard sleepTimerDuration != .never, sleepTimerExpiresAt == nil else { return }
+        if let mins = sleepTimerDuration.minutes {
+            sleepTimerExpiresAt = Date().addingTimeInterval(mins * 60)
+        }
+    }
+
     private func logSleepTimerStop() {
-        let mins = Int((sleepTimerDuration.minutes ?? 120))
-        let label = mins >= 120 ? "2 hours" : "\(mins) min"
         appendToLog([GenerationLogEntry(
             tag: "Sleep",
-            description: "Playback paused after \(label)",
+            description: "Playback paused after \(sleepTimerDuration.rawValue)",
             isTitle: false
         )])
+        withAnimation(.easeIn(duration: 0.3)) { sleepTimerEndedVisible = true }
+    }
+
+    private func clearSleepTimerMessage() {
+        guard sleepTimerEndedVisible else { return }
+        withAnimation(.easeOut(duration: 0.4)) { sleepTimerEndedVisible = false }
     }
 
     // MARK: - Persisted song history (survives app restarts — stored in UserDefaults)
@@ -1002,6 +1015,7 @@ final class AppState: ObservableObject {
     }
 
     func generateNew(thenPlay: Bool = false) {
+        clearSleepTimerMessage()
         guard !isGenerating else { return }
         isGenerating = true
         let style = selectedStyle
@@ -1177,6 +1191,7 @@ final class AppState: ObservableObject {
                 self.defaultsResetToken += 1
                 self.applyCurrentInstrumentsToPlayback()
                 if thenPlay || wasPlaying {
+                    self.rearmSleepTimerIfNeeded()
                     self.playback.play()
                     self.incrementPlayCountAndRequestReviewIfNeeded()
                 }
@@ -1267,6 +1282,8 @@ final class AppState: ObservableObject {
     // MARK: - Transport
 
     func play() {
+        clearSleepTimerMessage()
+        rearmSleepTimerIfNeeded()
         if songState == nil {
             generateNew(thenPlay: true)
         } else {
@@ -1290,6 +1307,7 @@ final class AppState: ObservableObject {
     }
 
     func stop() {
+        clearSleepTimerMessage()
         playback.stop()
         audioTexture.stop()
     }
@@ -1731,6 +1749,7 @@ final class AppState: ObservableObject {
 
     private func handleEvolveOutroStart() {
         guard evolvePhase == .original else { return }
+        guard !sleepTimerShouldStop else { return }  // don't extend; original outro plays out naturally
         if let pass1 = evolvePass1State {
             doSwitchToEvolvePass1(pass1)
         } else {
@@ -1791,6 +1810,7 @@ final class AppState: ObservableObject {
     private func handleEvolveApproachingEnd() {
         switch evolvePhase {
         case .original:
+            if sleepTimerShouldStop { break }  // don't add pass1 bars; original outro plays normally
             // 12 bars before Outro: if pass1 is ready, show the extended bars now and log (once only)
             guard let pass1 = evolvePass1State, let anchor = evolveAnchorState,
                   (songState?.frame.totalBars ?? 0) <= anchor.frame.totalBars else { break }
@@ -1802,6 +1822,7 @@ final class AppState: ObservableObject {
                 description: "Evolving section \(evolvePass1Bars) bars with new leads",
                 isTitle: false)])
         case .pass1:
+            if sleepTimerShouldStop { break }  // don't generate pass2
             preGeneratePassContent(pass: 2)
             preGenerateEvolveNextSong()   // start next-song gen early so it's ready at the 12-bar mark
         case .pass2, .outro:
@@ -1825,9 +1846,11 @@ final class AppState: ObservableObject {
     private func handleEvolvePhaseEnded() {
         switch evolvePhase {
         case .original:
+            if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
             // Song ended without triggering outro start (e.g. no outro section)
             handleEvolveOutroStart()
         case .pass1:
+            if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
             if let pass2 = evolvePass2State {
                 doSwitchToEvolvePass2(pass2)
             } else {

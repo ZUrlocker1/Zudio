@@ -58,6 +58,15 @@ struct VisualizerView: View {
             )
         }
         #endif
+        .overlay(alignment: .bottomLeading) {
+            Text("Sleep timer ended playback")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.green.opacity(0.80))
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+                .opacity(appState.sleepTimerEndedVisible ? 1 : 0)
+                .allowsHitTesting(false)
+        }
         // Detect mute → unmute transitions; stamp a flash date so drawOrbs can burst that track.
         .onChange(of: appState.muteState) { oldMute, newMute in
             let now = Date()

@@ -126,6 +126,20 @@ If the track is already un-muted/un-soloed when the timer fires, no action is ta
 
 ---
 
+## Sleep Timer
+
+Zudio includes a sleep timer with options 30 min, 1 hour, 90 min, 2 hours, and Never. The default is 2 hours, armed automatically on launch. The selected option persists across sessions via `UserDefaults`.
+
+The timer does not cut off a song mid-play. When the timer expires (or is within 3 minutes of expiring), the current song finishes its natural ending and then playback stops — no next song is queued. Actual stop time may therefore be a few minutes longer or shorter than the chosen interval. In Evolve mode, any pending song extension (pass 1, pass 2) is skipped so the original song plays out its normal outro.
+
+When the sleep timer ends playback:
+- A green "Sleep timer ended playback" message appears at the bottom-left of the Visualizer canvas (same style as the "Visuals off" label). It stays until the user presses Play, Generate, or Stop.
+- A `Sleep` entry is appended to the generation log: *Playback paused after X min*.
+
+If the user resumes playback after a sleep stop, the timer re-arms from that moment using the saved duration.
+
+---
+
 ## Implementation Notes
 
 - `VisualizerView` has no `.ignoresSafeArea()` — safe-area handling is the responsibility of the parent (`PhonePlayerView` ZStack on iPhone; panel bounds on iPad).
