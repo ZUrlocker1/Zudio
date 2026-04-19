@@ -10,20 +10,24 @@ struct AudioFileExporter {
 
     // MARK: - URL generation
 
+    /// ~/Downloads on macOS, ~/Documents on iOS — the user-visible folder for saved songs.
+    static func exportDirectory() -> URL {
+        #if os(macOS)
+        return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        #else
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        #endif
+    }
+
     /// Returns ~/Downloads/Zudio-{songName}.m4a (or Zudio-{songName}-Sample.m4a),
     /// appending -2/-3/... if the file already exists.
     static func nextURL(songName: String, sampleMode: Bool = false) -> URL {
-        #if os(macOS)
-        let dir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
-        #else
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        #endif
         let safe = sanitizedName(songName)
-        let base = sampleMode ? "Zudio-\(safe)-Sample" : "Zudio-\(safe)"
-        return incrementingURL(in: dir, base: base, ext: "m4a")
+        let base = sampleMode ? "\(safe)-Sample" : safe
+        return incrementingURL(in: exportDirectory(), base: base, ext: "m4a")
     }
 
-    private static func incrementingURL(in dir: URL, base: String, ext: String) -> URL {
+    static func incrementingURL(in dir: URL, base: String, ext: String) -> URL {
         let fm = FileManager.default
         var candidate = dir.appendingPathComponent("\(base).\(ext)")
         var n = 2

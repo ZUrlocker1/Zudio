@@ -139,7 +139,7 @@ struct ChillLeadGenerator {
             if handoffBarSet.contains(bar) { bar += 1; continue }
 
             // Brass and blues leads occasionally "lay out" for a full 4 or 8 bars — jazz breathing room
-            if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone),
+            if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone || leadInstrument == .tenorSax),
                label == .A || label == .B,
                rng.nextDouble() < 0.12 {
                 bar += rng.nextDouble() < 0.60 ? 4 : 8
@@ -176,8 +176,9 @@ struct ChillLeadGenerator {
             case .mutedTrumpet:  phraseLen = 2                                 // 2 bars (punchy)
             case .vibraphone:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             case .saxophone:     phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
-            case .sopranoSax:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars (similar to tenor)
-            case .trumpet:       phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars (slightly more spacious than muted)
+            case .tenorSax:      phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars (slightly longer than alto)
+            case .sopranoSax:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
+            case .trumpet:       phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             case .trombone:      phraseLen = 2 + rng.nextInt(upperBound: 3)   // 2–4 bars (smooth, longer lines)
             }
 
@@ -221,7 +222,7 @@ struct ChillLeadGenerator {
         handoffBars: Set<Int> = [],
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
-    ) -> [MIDIEvent] {
+    ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
         usedRuleIDs.insert("CHL-LD2-001")
 
         var events: [MIDIEvent] = []
@@ -235,24 +236,30 @@ struct ChillLeadGenerator {
         case .vibraphone:
             inst2 = .flute          // flute lightens the texture when vibe is primary
         case .saxophone:
-            // Alto Sax Lead 1: vibraphone (50%) or trombone (50%) — different timbre family
-            inst2 = rng.nextDouble() < 0.50 ? .vibraphone : .trombone
+            // Alto Sax Lead 1: vibraphone 50%, trombone 35%, flute 10%, soprano sax 5%
+            let r0 = rng.nextDouble()
+            if r0 < 0.50      { inst2 = .vibraphone }
+            else if r0 < 0.85 { inst2 = .trombone }
+            else if r0 < 0.95 { inst2 = .flute }
+            else              { inst2 = .sopranoSax }
         case .flute:
             // Flute Lead 1: vibraphone (50%) or trombone (50%) — warm bass counterpoint
             inst2 = rng.nextDouble() < 0.50 ? .vibraphone : .trombone
         default:
-            // Brass Lead 1 (muted trumpet, trumpet): soprano sax (40%), vibraphone (40%), flute (20%)
+            // Brass Lead 1 (muted trumpet, trumpet, tenor sax): vibraphone 35%, soprano sax 30%, flute 30%, trombone 5%
             let r = rng.nextDouble()
-            if r < 0.40      { inst2 = .sopranoSax }
-            else if r < 0.80 { inst2 = .vibraphone }
-            else             { inst2 = .flute }
+            if r < 0.35      { inst2 = .vibraphone }
+            else if r < 0.65 { inst2 = .sopranoSax }
+            else if r < 0.95 { inst2 = .flute }
+            else             { inst2 = .trombone }
         }
-        let (regLow1, _) = register(for: lead1Instrument)
+        let (regLow1, regHigh1) = register(for: lead1Instrument)
         let (rawLow2, rawHigh2) = register(for: inst2)
-        // Lead 2 must sit below the bottom of Lead 1's register (CHL-RULE-12).
-        // Capping at regLow1 - 2 ensures clear separation regardless of how high Lead 1
-        // actually plays within its range (avoids median-based cap being too generous).
-        let regHigh2 = min(rawHigh2, regLow1 - 2)
+        // Lead 2 sits below the midpoint of Lead 1's register (CHL-RULE-12).
+        // Using the midpoint (not regLow1) prevents degenerate one-note pools when Lead 1
+        // has a low bottom register (e.g. tenor sax regLow=47 → cap=45 → only one scale note).
+        let regMid1  = (regLow1 + regHigh1) / 2
+        let regHigh2 = min(rawHigh2, regMid1 - 2)
         let regLow2  = max(36, min(rawLow2, regHigh2 - 12))
 
         // Lead 2 responds in gaps between Lead 1 phrases (call-and-response)
@@ -298,7 +305,7 @@ struct ChillLeadGenerator {
             events += phraseNotes
             bar += phraseLen  // Lead 2 fills gaps; Lead 1 bars provide natural spacing
         }
-        return events
+        return (events, inst2)
     }
 
     // MARK: - Phrase builder
@@ -336,11 +343,12 @@ struct ChillLeadGenerator {
         } else {
             switch leadInstrument {
             case .flute:        notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3
-            case .mutedTrumpet: notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4 (min 3 ensures ≥3 pitch classes per phrase)
-            case .trumpet:      notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4 (open trumpet: punchy like muted)
+            case .mutedTrumpet: notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4
+            case .trumpet:      notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4
             case .vibraphone:   notesPerBar = 3 + rng.nextInt(upperBound: 3)   // 3–5
             case .saxophone:    notesPerBar = 3 + rng.nextInt(upperBound: 3)   // 3–5
-            case .sopranoSax:   notesPerBar = 2 + rng.nextInt(upperBound: 3)   // 2–4 (brighter reed, medium density)
+            case .tenorSax:     notesPerBar = 3 + rng.nextInt(upperBound: 3)   // 3–5 (rich, bluesy lines)
+            case .sopranoSax:   notesPerBar = 2 + rng.nextInt(upperBound: 3)   // 2–4
             case .trombone:     notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3 (smooth legato, fewer notes)
             }
         }
@@ -350,10 +358,11 @@ struct ChillLeadGenerator {
         switch leadInstrument {
         case .flute:        noteDurSteps = 8 + rng.nextInt(upperBound: 5)   // 8–12 steps (legato)
         case .mutedTrumpet: noteDurSteps = 2 + rng.nextInt(upperBound: 3)   // 2–4 steps (staccato)
-        case .trumpet:      noteDurSteps = 3 + rng.nextInt(upperBound: 3)   // 3–5 steps (slightly longer than muted)
+        case .trumpet:      noteDurSteps = 3 + rng.nextInt(upperBound: 3)   // 3–5 steps
         case .vibraphone:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
         case .saxophone:    noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
-        case .sopranoSax:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps (similar to tenor)
+        case .tenorSax:     noteDurSteps = 5 + rng.nextInt(upperBound: 5)   // 5–9 steps (slightly longer, warmer tone)
+        case .sopranoSax:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
         case .trombone:     noteDurSteps = 6 + rng.nextInt(upperBound: 7)   // 6–12 steps (long legato slides)
         }
 
@@ -465,7 +474,7 @@ struct ChillLeadGenerator {
         // Phrase-split: saxophone and trumpet (wide-interval / blues lead) phrases longer than 7 notes
         // are broken into two shorter sub-phrases by dropping 1–2 notes near the middle. This creates
         // a brief rest that makes long lines breathe rather than run continuously.
-        if (leadInstrument == .saxophone || leadInstrument == .trumpet),
+        if (leadInstrument == .saxophone || leadInstrument == .tenorSax || leadInstrument == .trumpet),
            slots.count > 7 {
             // Aim for the break at 45–55% through the phrase
             let breakCenter = Int(Double(slots.count) * (0.45 + rng.nextDouble() * 0.10))
@@ -526,19 +535,21 @@ struct ChillLeadGenerator {
         case .saxophone:    return "CHL-LD1-004"
         case .sopranoSax:   return "CHL-LD1-006"
         case .trumpet:      return "CHL-LD1-007"
-        case .trombone:     return "CHL-LD2-002"  // trombone is Lead 2 only; rule ID for completeness
+        case .tenorSax:     return "CHL-LD1-008"
+        case .trombone:     return "CHL-LD2-002"  // Lead 2 only
         }
     }
 
     private static func register(for instrument: ChillLeadInstrument) -> (low: Int, high: Int) {
         switch instrument {
         case .flute:        return (65, 85)
-        case .mutedTrumpet: return (53, 80)  // widened: jazz leads span 2.5+ octaves with big leaps
-        case .trumpet:      return (55, 79)  // open trumpet: slightly higher ceiling than muted
+        case .mutedTrumpet: return (53, 80)
+        case .trumpet:      return (55, 79)
         case .vibraphone:   return (60, 80)
-        case .saxophone:    return (50, 70)
-        case .sopranoSax:   return (58, 80)  // soprano sits higher than alto/tenor
-        case .trombone:     return (45, 65)  // warm low brass — Lead 2 counter-melody register
+        case .saxophone:    return (50, 70)   // alto sax
+        case .tenorSax:     return (47, 67)   // tenor sits a minor 3rd lower than alto
+        case .sopranoSax:   return (58, 80)   // soprano sits higher than alto/tenor
+        case .trombone:     return (45, 65)   // warm low brass — Lead 2 counter-melody register
         }
     }
 

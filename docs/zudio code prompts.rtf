@@ -1961,4 +1961,57 @@ when I switch from iphone playing through the speaker to using a bluetooth heads
 When my Mac and iphone both have bluetooth enabled (to find the same headset) the iPhone does not seem to get the bluetooth connection, it plays but is silent. I often have to quite Zudio, turn off bluetooth on my Mac and restart.  However, other applications like Apple Music or Audible do not have this kind of problem. \
 \
 pls update the version number everywhere to 1.0  everywhere in help, readme, internal, external and the build number to 100 where you can.\
+\
+\
+upload to github with any modified files. Release notes:  minor improvements to mac visualization gestures. Also restores users last settings in music style, play mode, preferred view.\
+\
+
+\f0\b New Sleep Timer
+\f2\b0 \
+given your understanding of the Zudio app (and perhaps a ook at the comps.md  and the distirbution-plan .md doc ) are there any other features you think I should implement before we publish Zudio Mac, ipad, iphone on the apple store.  I'm not looking for major work here, more like any somewhat easy to implement convenience features or minor capabilities.\
+	\
+Lets also do the privacy statement.  I don't use any privacy APIs to access user data. \
+And lets definitely add the in-app review prompt after let's make it 5 generate + plays. \
+I think we have haptics on the iphone already. The lock screen now playing also shows logo and song title. \
+\
+After that Tell me how the sleep timer would work exactly, what's the user interface on Mac.  Do we just have it automatically stop after 90 mins of no interaction?  Or only if the sets that? but more importantly how do we present that feature on iphone, ipad which don't really have menus.\
+\
+Lets keep it simple. If the current duration is within 3 mins of when the sleep timer would kick-in, we end with that song, ending normally, but not playing another. Most songs are going to be under 5 mins and with evolve mode just a bit longer. So it might run a bit longer or shorter than the exact 90 mins or whatever period the user has set, but  this is fine. Lets add the moon button to the right of the Export Audio button on iphone in both portrain and landscape. But keep the Generate button centered. The options should be 30 min, 60 min, 90 mins, 2 hours and Never.  By default, lets have 2 hours selected.  If the user does not want it to ever stop, they can set never.  Remember whatever setting the user has selected alogn with other user settings like Style selected and Play mode.  \
+Any questions?\
+\
+Don't show moons in the Mac menu choice. Also, lets have 2 hours checked so by default Zudio stops after 2 hours of continuous play.  This is true for all platforms. On the iphone, please make the sleep timer button blue on black, no outline, similar to the export and Info buttons, rather than grey.  Please also show 2 hours on the iphone as the default choice that is selected.  \
+How do we surface this functionality on iphone.\
+ALso where is the privacy statement stored? Is it visible to the user or only to Apple?\
+\
+for mac add a menu choice under File ->  what is the best name?  File - Sleep timer?  Or something else\
+\
+Ok. Let's move the ipad Sleep button. Instead of where it is, put a regular grey button with the label Sleep below the About button and the same size as Help and About.   Move the Help and ABout button up 10 pt. But make sure you don't mess up the layout otherwise.\
+\
+when the sleep timer pauses, show in the log file (all versions)\
+Sleep   Playback paused after xx mins\
+\
+When the sleep timer stops play, in addition to the Log entry, if the visualizer is visible, please display in green "Sleep time ended playback."\
+So I can test this on the Mac, please add a 10 minute sleep timer option.\
+\
+please make sure that once play has stopped due to a sleep timer, if the user starts playing again, the sleep timer restarts from 0.  \
+\
+Remove the 10 minute sleep timer option on all platforms\
+\
+\
+
+\f0\b iPhone Save, Load and Share 
+\f2\b0 \
+Lets add Save and Load buttons on the iPhone Songs list view, at the top. The behavior should be identifcal to the ipad version. \
+\
+If i wanted to add a share button that sent the current zudio song via imessage, how would this work? is it a good idea?\
+\
+Also one minor thing before we do this. Please make the iphone (portrait and landscape) Log view header with the text Generation Log + - buttons and Reset button 50% taller and make the text and buttons larger also. \
+Then Lets add a share button to the iphone version to the rigth of Load and Save buttons.\
+Also add a File -> Share menu choice to the Mac that does the same thing.	\
+\
+on the ipad add a Share button below the Sleep button. Make all of the Help, About, Sleep buttons a bit shorter so they are no taller than teh Generate, Save, Load, Export buttons.\
+\
+\
+\
+\
 }

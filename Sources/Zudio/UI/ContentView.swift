@@ -1047,7 +1047,7 @@ struct ExportConfirmationView: View {
             VStack(spacing: 6) {
                 Text("Export to an M4A Audio file will take approximately \(songMinutes).")
                     .multilineTextAlignment(.center)
-                Text("Alternatively, we can save a 60 second sample.")
+                Text("Alternatively, you can save a 60 second sample.")
                     .multilineTextAlignment(.center)
             }
             .frame(width: 300)

@@ -90,8 +90,8 @@ final class PlaybackEngine: ObservableObject {
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
-    private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
     private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
+    private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
 
     // Guard flag: wired CarPlay fires BOTH routeChangeNotification(.newDeviceAvailable) AND
     // AVAudioEngineConfigurationChange simultaneously on the main queue, producing two sequential
@@ -415,6 +415,34 @@ final class PlaybackEngine: ObservableObject {
         // the engine and can clear AUSampler soundbank state, causing silence on the next Play.
         // The session is only deactivated by the OS when another app takes audio focus
         // (interruptionNotification .began), which is the correct trigger.
+    }
+
+    /// Instantly silences master output without stopping the scheduler or resetting audio units.
+    /// Use before presenting a system sheet (share, document picker) to avoid the click that
+    /// reverb.reset() + allNotesOff() would cause. The scheduler keeps running silently.
+    func muteOutput() { engine.mainMixerNode.outputVolume = 0 }
+
+    /// Restores master volume after a sheet is dismissed. Ramps up over one render cycle.
+    func unmuteOutput() { engine.mainMixerNode.outputVolume = 1 }
+
+    /// Fades master volume 1→0 over `duration` seconds then stops playback.
+    /// Called by the sleep timer. Uses 50 evenly-spaced main-queue dispatches —
+    /// negligible CPU, same pattern as the Motorik/Ambient outro fades.
+    func fadeOutAndStop(duration: TimeInterval) {
+        let steps = 50
+        let interval = duration / Double(steps)
+        let startVolume = engine.mainMixerNode.outputVolume
+        for i in 1...steps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + interval * Double(i)) { [weak self] in
+                guard let self else { return }
+                let t = Float(i) / Float(steps)
+                self.engine.mainMixerNode.outputVolume = startVolume * (1.0 - t)
+                if i == steps {
+                    self.stop()
+                    self.engine.mainMixerNode.outputVolume = 1.0  // ready for next Play
+                }
+            }
+        }
     }
 
     /// Stop the scheduler and clean up playback state without touching the AVAudioSession.

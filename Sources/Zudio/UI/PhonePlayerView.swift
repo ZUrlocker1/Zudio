@@ -2,6 +2,11 @@
 // Apple Music-style layout: visuals on top, controls at the bottom within thumb reach.
 
 import SwiftUI
+import UniformTypeIdentifiers
+import LinkPresentation
+#if os(iOS)
+import MessageUI
+#endif
 
 #if os(iOS)
 
@@ -19,6 +24,9 @@ struct PhonePlayerView: View {
     @State private var stopFlash       = false
     @State private var showInfo        = false
     @State private var showSleepPicker = false
+    @State private var showFileImporter    = false
+    @State private var showDocumentExporter = false
+    @State private var pendingExportURL: URL? = nil
 
     // Gesture state
     @State private var dryTracks: Set<Int> = []
@@ -199,7 +207,7 @@ struct PhonePlayerView: View {
                     }
                 }
             case .log:
-                StatusBoxView(contentWidth: geo.size.width, showHeader: true,
+                StatusBoxView(contentWidth: geo.size.width, showHeader: true, largeHeader: true,
                               onReset: {
                                   appState.resetTrackDefaults()
                                   dryTracks.removeAll()
@@ -571,64 +579,134 @@ struct PhonePlayerView: View {
     // MARK: - Song history list
 
     private var songHistoryList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Newest at top — reverse the persisted list for display
-                    let songs = Array(appState.persistedHistory.reversed())
-                    if songs.isEmpty {
-                        Text("No songs generated yet")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                            .padding(.horizontal, 16)
-                            .padding(.top, 24)
-                    } else {
-                        ForEach(songs) { song in
-                            Button {
-                                appState.loadFromPersistedSong(song)
-                                activeTab = .visuals
-                                hapticImpactLight.toggle()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    if song.seed == appState.songState?.globalSeed {
-                                        Image(systemName: "speaker.wave.2.fill")
-                                            .foregroundStyle(.green)
-                                            .font(.system(size: 12))
-                                    } else {
-                                        Image(systemName: "speaker.wave.2.fill")
-                                            .font(.system(size: 12))
-                                            .hidden()
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(song.title)
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                            .lineLimit(1)
-                                        Text(song.style.rawValue.capitalized)
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(Color.white.opacity(0.50))
-                                    }
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 11)
-                                .contentShape(Rectangle())
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button {
+                    hapticImpactLight.toggle()
+                    guard let song = appState.songState else { return }
+                    Task.detached(priority: .userInitiated) {
+                        let url = PhonePlayerView.buildShareURL(song: song)
+                        await MainActor.run {
+                            if let url {
+                                pendingExportURL = url
+                                showDocumentExporter = true
                             }
-                            .id(song.seed)
-                            .buttonStyle(.plain)
-                            Divider()
-                                .overlay(Color(white: 0.25))
+                        }
+                    }
+                } label: {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(appState.songState == nil)
+                .sheet(isPresented: $showDocumentExporter) {
+                    if let url = pendingExportURL {
+                        DocumentExporter(url: url) {
+                            appState.savedSongSeed = appState.songState?.globalSeed
+                            showDocumentExporter = false
                         }
                     }
                 }
+
+                Button {
+                    hapticImpactLight.toggle()
+                    showFileImporter = true
+                } label: {
+                    Label("Load", systemImage: "doc.text")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    hapticImpactLight.toggle()
+                    guard let song = appState.songState else { return }
+                    PhonePlayerView.presentShare(song: song)
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(appState.songState == nil)
             }
-            .onAppear {
-                if let seed = appState.songState?.globalSeed {
-                    proxy.scrollTo(seed, anchor: .center)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(white: 0.10))
+
+            Divider().overlay(Color(white: 0.25))
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        let songs = Array(appState.persistedHistory.reversed())
+                        if songs.isEmpty {
+                            Text("No songs generated yet")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .padding(.horizontal, 16)
+                                .padding(.top, 24)
+                        } else {
+                            ForEach(songs) { song in
+                                Button {
+                                    appState.loadFromPersistedSong(song)
+                                    activeTab = .visuals
+                                    hapticImpactLight.toggle()
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        if song.seed == appState.songState?.globalSeed {
+                                            Image(systemName: "speaker.wave.2.fill")
+                                                .foregroundStyle(.green)
+                                                .font(.system(size: 12))
+                                        } else {
+                                            Image(systemName: "speaker.wave.2.fill")
+                                                .font(.system(size: 12))
+                                                .hidden()
+                                        }
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(song.title)
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                                .lineLimit(1)
+                                            Text(song.style.rawValue.capitalized)
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(Color.white.opacity(0.50))
+                                        }
+                                        Spacer()
+                                        if song.seed == appState.savedSongSeed {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(.green)
+                                                .font(.system(size: 15))
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 11)
+                                    .contentShape(Rectangle())
+                                }
+                                .id(song.seed)
+                                .buttonStyle(.plain)
+                                Divider().overlay(Color(white: 0.25))
+                            }
+                        }
+                    }
+                }
+                .onAppear {
+                    if let seed = appState.songState?.globalSeed {
+                        proxy.scrollTo(seed, anchor: .center)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(white: 0.06))
         }
         .background(Color(white: 0.06))
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [UTType("com.zudio.song") ?? .data]
+        ) { result in
+            guard case .success(let url) = result else { return }
+            _ = url.startAccessingSecurityScopedResource()
+            appState.loadFromLogURL(url)
+            url.stopAccessingSecurityScopedResource()
+        }
     }
 
     // MARK: - Canvas gesture layer
@@ -765,16 +843,16 @@ private struct PhoneInfoView: View {
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
 
-                    Text("Zudio was vibe coded with AI, inspired by Brian Eno, Moby, St Germain, Jean-Michel Jarre, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
+                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, St Germain, Jean-Michel Jarre, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Each style is driven by rules extracted from analyzing songs in that genre. Rules were iteratively refined with Claude until it sounded like real music!")
+                    Text("Each style is driven by rules built by analyzing songs in that genre. Rules were iteratively refined with Claude until it sounded like music!")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Text("Tap or swipe to change instruments. Log view shows the rules firing behind the scenes.")
+                    Text("Tap or swipe to change instruments. Save, Load or Share songs from the Song list view. Log view shows the rules firing behind the scenes.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1002,6 +1080,97 @@ struct CanvasGestureView: UIViewRepresentable {
         @objc func handlePinch(_ gr: UIPinchGestureRecognizer) {
             guard gr.state == .began else { return }
             parent.onTwoFinger()
+        }
+    }
+}
+
+private class ZudioShareItem: NSObject, UIActivityItemSource {
+    let item: Any
+    let title: String
+
+    init(item: Any, title: String) { self.item = item; self.title = title; super.init() }
+
+    func activityViewControllerPlaceholderItem(_ vc: UIActivityViewController) -> Any { item }
+    func activityViewController(_ vc: UIActivityViewController, itemForActivityType type: UIActivity.ActivityType?) -> Any? { item }
+    func activityViewControllerLinkMetadata(_ vc: UIActivityViewController) -> LPLinkMetadata? {
+        // iOS ignores iconProvider/imageProvider for custom file types — only title is used.
+        let meta = LPLinkMetadata()
+        meta.title = title
+        return meta
+    }
+}
+
+private final class MessageComposeDelegate: NSObject, MFMessageComposeViewControllerDelegate {
+    static var retainKey = 0
+    func messageComposeViewController(_ controller: MFMessageComposeViewController,
+                                       didFinishWith result: MessageComposeResult) {
+        controller.dismiss(animated: true)
+    }
+}
+
+// MARK: - Share helpers
+
+extension PhonePlayerView {
+    static func buildShareURL(song: SongState) -> URL? {
+        SongLogExporter.shareURL(for: song)
+    }
+
+    /// Opens Messages compose directly with the .zudio file attached.
+    static func presentShare(song: SongState) {
+        Task.detached(priority: .userInitiated) {
+            let url = buildShareURL(song: song)
+            await MainActor.run {
+                guard let url,
+                      MFMessageComposeViewController.canSendText(),
+                      MFMessageComposeViewController.canSendAttachments(),
+                      let top = shareTopViewController() else { return }
+                let mc = MFMessageComposeViewController()
+                mc.addAttachmentURL(url, withAlternateFilename: url.lastPathComponent)
+                let delegate = MessageComposeDelegate()
+                mc.messageComposeDelegate = delegate
+                objc_setAssociatedObject(mc, &MessageComposeDelegate.retainKey, delegate,
+                                         .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+                top.present(mc, animated: true)
+            }
+        }
+    }
+
+    private static func shareTopViewController() -> UIViewController? {
+        guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+                ?? UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first,
+              let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first,
+              let root = window.rootViewController else { return nil }
+        var top = root
+        while let pvc = top.presentedViewController { top = pvc }
+        return top
+    }
+}
+
+// MARK: - Document exporter (Save → Files picker so file appears in Recents)
+
+struct DocumentExporter: UIViewControllerRepresentable {
+    let url: URL
+    var onSuccess: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(onSuccess: onSuccess) }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
+        picker.delegate = context.coordinator
+        picker.shouldShowFileExtensions = true
+        return picker
+    }
+
+    func updateUIViewController(_ vc: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let onSuccess: () -> Void
+        init(onSuccess: @escaping () -> Void) { self.onSuccess = onSuccess }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            onSuccess()
         }
     }
 }

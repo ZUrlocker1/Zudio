@@ -8,10 +8,9 @@ struct MIDIFileExporter {
     // MARK: - Public entry point
 
     static func export(_ song: SongState) throws -> URL {
-        let dir = zudioDocumentsDir()
+        let dir = AudioFileExporter.exportDirectory()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let filename = nextFilename(for: song.title, in: dir)
-        let url = dir.appendingPathComponent(filename)
+        let url = AudioFileExporter.incrementingURL(in: dir, base: AudioFileExporter.sanitizedName(song.title), ext: "MID")
         try buildMIDIFile(song).write(to: url)
         return url
     }
@@ -19,29 +18,6 @@ struct MIDIFileExporter {
     /// Write MIDI data to a caller-specified URL (used by batch test generator).
     static func export(_ song: SongState, to url: URL) throws {
         try buildMIDIFile(song).write(to: url)
-    }
-
-    // MARK: - File naming
-
-    private static func zudioDocumentsDir() -> URL {
-        #if os(macOS)
-        return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
-        #else
-        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        #endif
-    }
-
-    private static func nextFilename(for songName: String, in dir: URL) -> String {
-        let safe = AudioFileExporter.sanitizedName(songName)
-        let base = "Zudio-\(safe)"
-        let fm   = FileManager.default
-        var candidate = "\(base).MID"
-        var n = 2
-        while fm.fileExists(atPath: dir.appendingPathComponent(candidate).path) {
-            candidate = "\(base)-\(n).MID"
-            n += 1
-        }
-        return candidate
     }
 
     // MARK: - MIDI file construction

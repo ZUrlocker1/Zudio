@@ -17,6 +17,10 @@ struct StatusBoxView: View {
     /// sitting below the scrollbar strip that already contains these controls.
     var showHeader: Bool = false
 
+    /// When true, the header row is rendered at 1.5× height with larger text/buttons.
+    /// Used by PhonePlayerView on iPhone; iPad and Mac use the default compact size.
+    var largeHeader: Bool = false
+
     /// Optional reset action — when provided, a red "Reset" button appears in the
     /// header to the left of the − and + font-size buttons.
     var onReset: (() -> Void)? = nil
@@ -57,9 +61,14 @@ struct StatusBoxView: View {
             // Only shown when embedded as a standalone Log tab panel (not below the
             // scrollbar strip in the Tracks tab, which already contains these controls).
             if showHeader {
-                HStack(spacing: 8) {
+                let hdrFontSize: CGFloat  = largeHeader ? 15 : 11
+                let btnSize: CGFloat      = largeHeader ? 18 : 13
+                let btnPadH: CGFloat      = largeHeader ? 6  : 4
+                let btnPadV: CGFloat      = largeHeader ? 4  : 2
+                let hdrHeight: CGFloat    = largeHeader ? 51 : 34
+                HStack(spacing: largeHeader ? 12 : 8) {
                     Text("Generation Log")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(.system(size: hdrFontSize, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.70))
                     Button {
                         appState.statusLogFontOffset = max(-4, appState.statusLogFontOffset - 1)
@@ -67,16 +76,16 @@ struct StatusBoxView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { minusFlash = false }
                     } label: {
                         Image(systemName: "minus")
-                            .frame(width: 13, height: 13)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
+                            .frame(width: btnSize, height: btnSize)
+                            .padding(.horizontal, btnPadH)
+                            .padding(.vertical, btnPadV)
                             .background(minusFlash ? Color.white.opacity(0.55) : Color(white: 0.30),
                                         in: RoundedRectangle(cornerRadius: 4))
                             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(white: 0.55), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.white.opacity(0.85))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: hdrFontSize, weight: .medium))
                     .disabled(appState.statusLogFontOffset <= -4)
                     Button {
                         appState.statusLogFontOffset = min(8, appState.statusLogFontOffset + 1)
@@ -84,33 +93,33 @@ struct StatusBoxView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { plusFlash = false }
                     } label: {
                         Image(systemName: "plus")
-                            .frame(width: 13, height: 13)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
+                            .frame(width: btnSize, height: btnSize)
+                            .padding(.horizontal, btnPadH)
+                            .padding(.vertical, btnPadV)
                             .background(plusFlash ? Color.white.opacity(0.55) : Color(white: 0.30),
                                         in: RoundedRectangle(cornerRadius: 4))
                             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color(white: 0.55), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(Color.white.opacity(0.85))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: hdrFontSize, weight: .medium))
                     .disabled(appState.statusLogFontOffset >= 8)
                     if appState.songState != nil {
                         TimelineView(.periodic(from: .now, by: 1.0)) { _ in
                             Text(String(format: "Bar: %03d", appState.playback.currentBar + 1))
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .font(.system(size: hdrFontSize, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Color.white.opacity(0.90))
                         }
-                        .padding(.leading, 8)
+                        .padding(.leading, largeHeader ? 12 : 8)
                     }
                     Spacer()
                     if let onReset {
                         Button(action: onReset) {
                             Text("Reset")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: hdrFontSize, weight: .semibold))
                                 .foregroundStyle(Color.red)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
+                                .padding(.horizontal, largeHeader ? 10 : 6)
+                                .padding(.vertical, btnPadV)
                                 .background(Color(white: 0.20), in: RoundedRectangle(cornerRadius: 4))
                                 .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.red.opacity(0.5), lineWidth: 0.5))
                         }
@@ -118,7 +127,7 @@ struct StatusBoxView: View {
                     }
                 }
                 .padding(.horizontal, 12)
-                .frame(height: 34)
+                .frame(height: hdrHeight)
                 .dynamicTypeSize(.large)
                 .background(Color(white: 0.13))
             }

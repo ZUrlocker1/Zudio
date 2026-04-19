@@ -382,22 +382,45 @@ struct ChillBassGenerator {
                     }
                 }
             case .intro:
-                // Intro: 3–4 punchy 8th-note hits — same shape as groove but softer.
-                // Root on beat 1, optional passing root, 5th on AND of 2, root on beat 3.
-                let introRoot  = clampBass(chordRoot)
-                let introFifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
-                events.append(MIDIEvent(stepIndex: base,     note: UInt8(introRoot),
-                                        velocity: UInt8(60 + rng.nextInt(upperBound: 8)), durationSteps: 2))
-                if rng.nextDouble() < 0.40 {
-                    events.append(MIDIEvent(stepIndex: base + 2, note: UInt8(introRoot),
-                                            velocity: UInt8(53 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                // Intro: punchy 8th-note hits — same shape as groove but softer.
+                // Colour note: 5th (50%), b7 (30%), or 3rd (20%) for variety across songs.
+                // Two rhythmic shapes: base (65%) starts on beat 1; late-entry (35%) starts on beat 2.
+                let introRoot   = clampBass(chordRoot)
+                let introFifth  = clampBass(snapToScale(chordRoot + 7,  scale: scale))
+                let introBb7    = clampBass(snapToScale(chordRoot + 10, scale: scale))
+                let introThird  = clampBass(snapToScale(chordRoot + 4,  scale: scale))
+                let colourNote: Int = {
+                    let r = rng.nextDouble()
+                    if r < 0.50 { return introFifth }
+                    if r < 0.80 { return introBb7 }
+                    return introThird
+                }()
+
+                if rng.nextDouble() < 0.35 {
+                    // Late-entry variant: beat 1 silent, root enters on beat 2 — laid-back pickup feel
+                    events.append(MIDIEvent(stepIndex: base + 4,  note: UInt8(introRoot),
+                                            velocity: UInt8(62 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                    if rng.nextDouble() < 0.60 {
+                        events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(colourNote),
+                                                velocity: UInt8(54 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                    }
+                    events.append(MIDIEvent(stepIndex: base + 8,  note: UInt8(introRoot),
+                                            velocity: UInt8(58 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                } else {
+                    // Base shape: root on beat 1, optional passing root, colour note on 2-AND, root on beat 3
+                    events.append(MIDIEvent(stepIndex: base,     note: UInt8(introRoot),
+                                            velocity: UInt8(60 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                    if rng.nextDouble() < 0.40 {
+                        events.append(MIDIEvent(stepIndex: base + 2, note: UInt8(introRoot),
+                                                velocity: UInt8(53 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                    }
+                    if rng.nextDouble() < 0.65 {
+                        events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(colourNote),
+                                                velocity: UInt8(52 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                    }
+                    events.append(MIDIEvent(stepIndex: base + 8,  note: UInt8(introRoot),
+                                            velocity: UInt8(57 + rng.nextInt(upperBound: 8)), durationSteps: 2))
                 }
-                if rng.nextDouble() < 0.65 {
-                    events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(introFifth),
-                                            velocity: UInt8(52 + rng.nextInt(upperBound: 8)), durationSteps: 2))
-                }
-                events.append(MIDIEvent(stepIndex: base + 8,  note: UInt8(introRoot),
-                                        velocity: UInt8(57 + rng.nextInt(upperBound: 8)), durationSteps: 2))
             case .outro:
                 // Outro: same 8th-note shape as intro, diminishing velocity bar by bar.
                 let outroBar   = bar - (section?.startBar ?? bar)

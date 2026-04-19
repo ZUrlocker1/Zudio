@@ -156,7 +156,7 @@ enum MusicStyle: String, CaseIterable, Codable, Sendable {
 }
 
 enum SleepTimerDuration: String, CaseIterable {
-    case thirtyMin  = "30 min"
+    case twentyFiveMin = "25 min"
     case oneHour    = "1 hour"
     case ninetyMin  = "90 min"
     case twoHours   = "2 hours"
@@ -164,11 +164,11 @@ enum SleepTimerDuration: String, CaseIterable {
 
     var minutes: Double? {
         switch self {
-        case .thirtyMin:  return 30
-        case .oneHour:    return 60
-        case .ninetyMin:  return 90
-        case .twoHours:   return 120
-        case .never:      return nil
+        case .twentyFiveMin: return 25
+        case .oneHour:       return 60
+        case .ninetyMin:     return 90
+        case .twoHours:      return 120
+        case .never:         return nil
         }
     }
 }
@@ -185,13 +185,27 @@ enum ChillProgressionFamily: String, Codable, Sendable {
 // MARK: - Chill lead instrument
 
 enum ChillLeadInstrument: String, Codable, Sendable {
-    case flute         // GM 73 — Bright/Free; Lead 2 default
+    case flute         // GM 73 — Lead 2 default
     case mutedTrumpet  // GM 59 — Deep/Dream primary
     case vibraphone    // GM 11 — Lead 2 default
-    case saxophone     // GM 65 — Deep/Dream secondary
-    case sopranoSax    // GM 64 — brighter reed; Lead 1
-    case trumpet       // GM 56 — open horn; brighter than muted; Lead 1
+    case saxophone     // GM 65 — Alto Sax; Lead 1
+    case tenorSax      // GM 66 — warmer, lower than alto; Lead 1
+    case sopranoSax    // GM 64 — brighter reed; Lead 2
+    case trumpet       // GM 56 — open horn; Lead 1
     case trombone      // GM 57 — warm low brass; Lead 2
+
+    var gmProgram: UInt8 {
+        switch self {
+        case .flute:        return 73
+        case .mutedTrumpet: return 59
+        case .vibraphone:   return 11
+        case .saxophone:    return 65
+        case .tenorSax:     return 66
+        case .sopranoSax:   return 64
+        case .trumpet:      return 56
+        case .trombone:     return 57
+        }
+    }
 }
 
 // MARK: - Chill beat style

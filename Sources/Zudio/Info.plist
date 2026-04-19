@@ -7,7 +7,7 @@
     <key>CFBundleIdentifier</key>
     <string>com.zudio.app</string>
     <key>CFBundleVersion</key>
-    <string>102</string>
+    <string>103</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
     <key>CFBundlePackageType</key>
@@ -58,7 +58,6 @@
             <string>Zudio Song</string>
             <key>UTTypeConformsTo</key>
             <array>
-                <string>public.plain-text</string>
                 <string>public.data</string>
             </array>
             <key>UTTypeIconFile</key>

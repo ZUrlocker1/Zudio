@@ -105,8 +105,8 @@ struct TopBarView: View {
     @State private var stopFlash = false
     @State private var saveFlash = false
     #if os(iOS)
-    @State private var showFileImporter = false
-    @State private var showSleepPicker  = false
+    @State private var showFileImporter  = false
+    @State private var showSleepPicker   = false
     #endif
 
     @StateObject private var reverseRepeater = HoldRepeater()
@@ -656,16 +656,20 @@ struct TopBarView: View {
                     Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: kHelpButtonWidth) }
                     Button { showAbout = true } label: { Text("About").frame(width: kHelpButtonWidth) }
                     Button { showSleepPicker = true } label: { Text("Sleep").frame(width: kHelpButtonWidth) }
+                    Button {
+                        guard let song = appState.songState else { return }
+                        PhonePlayerView.presentShare(song: song)
+                    } label: { Text("Share").frame(width: kHelpButtonWidth) }
+                    .disabled(appState.songState == nil)
                 }
                 .font(.callout)
+                .controlSize(.small)
                 .padding(.top, -5)
                 .padding(.trailing, 8)
                 .buttonStyle(.bordered)
-                .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker,
-                                   titleVisibility: .visible) {
+                .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
                     ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                        Button(dur == appState.sleepTimerDuration
-                               ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                        Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
                             appState.setSleepTimer(dur)
                         }
                     }

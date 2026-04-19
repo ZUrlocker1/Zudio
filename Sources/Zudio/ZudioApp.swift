@@ -257,6 +257,12 @@ struct ZudioApp: App {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(appState.playback)
+                #if os(iOS)
+                .onOpenURL { url in
+                    _ = url.startAccessingSecurityScopedResource()
+                    appState.loadFromLogURL(url)
+                }
+                #endif
         }
         .handlesExternalEvents(matching: [])
         #if os(macOS)
@@ -285,6 +291,9 @@ struct ZudioApp: App {
                 Button("Export Audio") { appState.requestExport() }
                     .keyboardShortcut("e", modifiers: .command)
                     .disabled(appState.songState == nil || appState.isExportingAudio)
+
+                Button("Share Song…") { appState.shareSongMac() }
+                    .disabled(appState.songState == nil)
 
                 Divider()
 

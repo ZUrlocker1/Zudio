@@ -4,6 +4,9 @@ import SwiftUI
 import Combine
 import MediaPlayer
 import StoreKit
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Play mode
 
@@ -172,30 +175,38 @@ final class AppState: ObservableObject {
     }
 
     private(set) var sleepTimerExpiresAt: Date? = nil
+    private var sleepTimerFire: Timer? = nil
 
     var sleepTimerIsActive: Bool { sleepTimerExpiresAt != nil }
 
     @Published var sleepTimerEndedVisible: Bool = false
 
     func setSleepTimer(_ duration: SleepTimerDuration) {
+        sleepTimerFire?.invalidate()
+        sleepTimerFire = nil
         sleepTimerDuration = duration
-        if let mins = duration.minutes {
-            sleepTimerExpiresAt = Date().addingTimeInterval(mins * 60)
-        } else {
-            sleepTimerExpiresAt = nil
+        sleepTimerExpiresAt = nil
+        guard let mins = duration.minutes else { return }
+        let expiresAt = Date().addingTimeInterval(mins * 60)
+        sleepTimerExpiresAt = expiresAt
+        sleepTimerFire = Timer.scheduledTimer(withTimeInterval: mins * 60, repeats: false) { [weak self] _ in
+            self?.executeSleepTimerStop()
         }
     }
 
-    private var sleepTimerShouldStop: Bool {
-        guard let exp = sleepTimerExpiresAt else { return false }
-        return exp.timeIntervalSinceNow <= 3 * 60
+    private func executeSleepTimerStop() {
+        sleepTimerExpiresAt = nil
+        sleepTimerFire = nil
+        logSleepTimerStop()
+        playback.fadeOutAndStop(duration: 5)
     }
 
+    // Re-arms the timer after the user presses Play following a sleep stop.
+    // Guard ensures it only fires when the timer has expired (expiresAt is nil)
+    // and a duration is actually selected — never resets a running timer.
     private func rearmSleepTimerIfNeeded() {
         guard sleepTimerDuration != .never, sleepTimerExpiresAt == nil else { return }
-        if let mins = sleepTimerDuration.minutes {
-            sleepTimerExpiresAt = Date().addingTimeInterval(mins * 60)
-        }
+        setSleepTimer(sleepTimerDuration)
     }
 
     private func logSleepTimerStop() {
@@ -579,7 +590,7 @@ final class AppState: ObservableObject {
 
     /// MIDI program numbers for each slot in instrumentPoolNames — same order, same count.
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
-    static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
+    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56]
         case (kTrackLead1, .ambient):  return [73, 79, 75, 78, 74, 100, 94, 88, 82]
@@ -683,7 +694,11 @@ final class AppState: ObservableObject {
                 parts.append("\(shortNames[i]):\(p)")
             }
         }
-        appendToLog([GenerationLogEntry(tag: "Instruments", description: parts.joined(separator: " "), isTitle: false)])
+        let instrumentsEntry = GenerationLogEntry(tag: "Instruments", description: parts.joined(separator: " "), isTitle: false)
+        appendToLog([instrumentsEntry])
+        // Also store in songState.generationLog so SongLogExporter writes it to .zudio files.
+        songState?.generationLog.removeAll { $0.tag == "Instruments" }
+        songState?.generationLog.append(instrumentsEntry)
 
         if !warnings.isEmpty { appendToLog(warnings) }
     }
@@ -692,6 +707,7 @@ final class AppState: ObservableObject {
     @Published var triggerShowHelp  = false
     @Published var triggerShowAbout = false
     @Published var saveFlashCounter = 0   // incremented each save; TopBarView flashes Save button
+    @Published var savedSongSeed: UInt64? = nil  // seed of last saved song; drives green checkmark
 
     // MARK: - Per-track UI state
 
@@ -748,9 +764,13 @@ final class AppState: ObservableObject {
         persistedHistory = Self.loadPersistedHistory()
         preloadPersistedSongs()
         // Arm sleep timer from launch using saved preference (default 2 hours).
-        // Never → expiresAt stays nil; any other option arms immediately.
+        // Set directly to avoid triggering sleepTimerDuration.didSet (no UserDefaults write at init).
         if let mins = sleepTimerDuration.minutes {
-            sleepTimerExpiresAt = Date().addingTimeInterval(mins * 60)
+            let expiresAt = Date().addingTimeInterval(mins * 60)
+            sleepTimerExpiresAt = expiresAt
+            sleepTimerFire = Timer.scheduledTimer(withTimeInterval: mins * 60, repeats: false) { [weak self] _ in
+                self?.executeSleepTimerStop()
+            }
         }
 
         // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
@@ -1412,7 +1432,6 @@ final class AppState: ObservableObject {
 
     private func handleSongEndedNaturally() {
         guard playMode == .endless else { return }
-        if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
         if let next = nextSongState {
             // "Up next" was already logged when pre-gen completed
             nextSongState   = nil
@@ -1749,7 +1768,6 @@ final class AppState: ObservableObject {
 
     private func handleEvolveOutroStart() {
         guard evolvePhase == .original else { return }
-        guard !sleepTimerShouldStop else { return }  // don't extend; original outro plays out naturally
         if let pass1 = evolvePass1State {
             doSwitchToEvolvePass1(pass1)
         } else {
@@ -1810,7 +1828,6 @@ final class AppState: ObservableObject {
     private func handleEvolveApproachingEnd() {
         switch evolvePhase {
         case .original:
-            if sleepTimerShouldStop { break }  // don't add pass1 bars; original outro plays normally
             // 12 bars before Outro: if pass1 is ready, show the extended bars now and log (once only)
             guard let pass1 = evolvePass1State, let anchor = evolveAnchorState,
                   (songState?.frame.totalBars ?? 0) <= anchor.frame.totalBars else { break }
@@ -1822,7 +1839,6 @@ final class AppState: ObservableObject {
                 description: "Evolving section \(evolvePass1Bars) bars with new leads",
                 isTitle: false)])
         case .pass1:
-            if sleepTimerShouldStop { break }  // don't generate pass2
             preGeneratePassContent(pass: 2)
             preGenerateEvolveNextSong()   // start next-song gen early so it's ready at the 12-bar mark
         case .pass2, .outro:
@@ -1846,11 +1862,9 @@ final class AppState: ObservableObject {
     private func handleEvolvePhaseEnded() {
         switch evolvePhase {
         case .original:
-            if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
             // Song ended without triggering outro start (e.g. no outro section)
             handleEvolveOutroStart()
         case .pass1:
-            if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
             if let pass2 = evolvePass2State {
                 doSwitchToEvolvePass2(pass2)
             } else {
@@ -1875,7 +1889,6 @@ final class AppState: ObservableObject {
     }
 
     private func transitionToEvolveNextSong() {
-        if sleepTimerShouldStop { logSleepTimerStop(); sleepTimerExpiresAt = nil; return }
         // Discard pre-generated next song if its style no longer matches the user's selection.
         if let next = evolveNextSongState, next.style != selectedStyle {
             evolveNextSongState  = nil
@@ -2051,6 +2064,26 @@ final class AppState: ObservableObject {
 
     @Published var lastSaveURL: URL? = nil
 
+    /// Writes the current song to a temp .zudio file and returns its URL for sharing.
+    func buildShareURL() -> URL? {
+        guard let song = songState else { return nil }
+        return SongLogExporter.shareURL(for: song)
+    }
+
+#if os(macOS)
+    func shareSongMac() {
+        guard let url = buildShareURL() else { return }
+        let picker = NSSharingServicePicker(items: [url])
+        let delegate = MacSharePickerDelegate()
+        picker.delegate = delegate
+        if let window = NSApp.keyWindow, let view = window.contentView {
+            withExtendedLifetime(delegate) {
+                picker.show(relativeTo: .zero, of: view, preferredEdge: .minY)
+            }
+        }
+    }
+#endif
+
     func saveMIDI() {
         guard let song = songState else { return }
         saveFlashCounter += 1
@@ -2062,6 +2095,7 @@ final class AppState: ObservableObject {
             appendToLog([
                 GenerationLogEntry(tag: "FILE", description: "Saved as MIDI \(url.lastPathComponent)")
             ])
+            savedSongSeed = songState?.globalSeed
         } catch {
             print("MIDI export error: \(error)")
         }
@@ -2182,6 +2216,8 @@ final class AppState: ObservableObject {
                 self.moodOverride     = loadMood
                 if !loadTitle.isEmpty { state.title = loadTitle }
                 self.songState        = state
+                self.savedSongSeed    = state.globalSeed  // loaded from file → mark as saved
+                self.appendPersistedSong(from: state)
                 self.generationHistory.append(state)
                 if self.generationHistory.count > 10 { self.generationHistory.removeFirst() }
                 self.isGenerating     = false
@@ -2585,6 +2621,24 @@ final class AppState: ObservableObject {
             }
         }
     }
+
+    // MARK: - Mac share filter
+
+#if os(macOS)
+    /// Limits the Mac share sheet to AirDrop, Mail, and Messages only.
+    private final class MacSharePickerDelegate: NSObject, NSSharingServicePickerDelegate {
+        func sharingServicePicker(_ picker: NSSharingServicePicker,
+                                  sharingServicesForItems items: [Any],
+                                  proposedSharingServices services: [NSSharingService]) -> [NSSharingService] {
+            let wantedNames: [NSSharingService.Name] = [
+                .sendViaAirDrop,
+                .composeEmail,
+                .composeMessage,
+            ]
+            return wantedNames.compactMap { NSSharingService(named: $0) }
+        }
+    }
+#endif
 
     /// Clears all mutes, solos, manual effect changes, and instrument overrides —
     /// restores the song to the exact state it was in right after generation/load.

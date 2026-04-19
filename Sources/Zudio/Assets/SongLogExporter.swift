@@ -6,10 +6,27 @@ import Foundation
 
 struct SongLogExporter {
 
-    // MARK: - Public entry point
+    // MARK: - Public entry points
+
+    /// Writes a temp .zudio file and returns its URL for sharing (nil on failure).
+    static func shareURL(for song: SongState) -> URL? {
+        let tmpBase = FileManager.default.temporaryDirectory
+            .appendingPathComponent(song.title)
+            .appendingPathExtension("midi")
+        try? export(song, midiURL: tmpBase)
+        let shareURL = tmpBase.deletingPathExtension().appendingPathExtension("zudio")
+        return FileManager.default.fileExists(atPath: shareURL.path) ? shareURL : nil
+    }
 
     /// Writes a .zudio log file next to `midiURL` (same stem, .zudio extension).
     static func export(_ song: SongState, midiURL: URL) throws {
+        // Batch tests never call applyCurrentInstrumentsToPlayback(), so the Instruments entry
+        // won't be in generationLog yet. Compute it from SongState so batch files match app files.
+        var song = song
+        if !song.generationLog.contains(where: { $0.tag == "Instruments" }) {
+            song.generationLog.append(GenerationLogEntry(
+                tag: "Instruments", description: generationInstrumentsLine(song), isTitle: false))
+        }
         let logURL = midiURL.deletingPathExtension().appendingPathExtension("zudio")
         guard let data = buildLog(song).data(using: .utf8) else { return }
         try data.write(to: logURL, options: .atomic)
@@ -106,6 +123,7 @@ struct SongLogExporter {
         lines.append("")
 
         // ── Generation log ───────────────────────────────────────────────────────
+        // Includes the "Instruments" entry written by applyCurrentInstrumentsToPlayback().
         lines.append("--- Generation Log ---")
         for entry in song.generationLog where !entry.tag.isEmpty || !entry.description.isEmpty {
             lines.append("  \(col(entry.tag, 16)) \(entry.description)")
@@ -140,6 +158,34 @@ struct SongLogExporter {
     /// 1-based bar number as a 3-digit string.
     private static func barStr(_ bar: Int) -> String {
         String(format: "%3d", bar + 1)
+    }
+
+    /// Derives the Instruments line from SongState without requiring PlaybackEngine.
+    /// Used by batch tests which never call applyCurrentInstrumentsToPlayback().
+    /// Chill Lead 1/2 use the generation instrument (chillLeadInstrument/chillLead2Instrument);
+    /// all other tracks use pool[0] from instrumentPoolPrograms — the same default the app loads.
+    private static func generationInstrumentsLine(_ song: SongState) -> String {
+        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
+        var parts: [String] = []
+        for i in 0..<kTrackCount {
+            if i == kTrackTexture && song.style == .chill {
+                parts.append("Tx:audio")
+                continue
+            }
+            let p = generationProgram(forTrack: i, song: song)
+            if p != 255 { parts.append("\(shortNames[i]):\(p)") }
+        }
+        return parts.joined(separator: " ")
+    }
+
+    private static func generationProgram(forTrack i: Int, song: SongState) -> UInt8 {
+        if song.style == .chill {
+            if i == kTrackLead1 { return song.chillLeadInstrument.gmProgram }
+            if i == kTrackLead2 { return song.chillLead2Instrument.gmProgram }
+        }
+        if i == kTrackLeadSynth { return kDefaultGMPrograms[kTrackLeadSynth] ?? 90 }
+        let pool = AppState.instrumentPoolPrograms(trackIndex: i, style: song.style)
+        return pool.first ?? 255
     }
 
 }

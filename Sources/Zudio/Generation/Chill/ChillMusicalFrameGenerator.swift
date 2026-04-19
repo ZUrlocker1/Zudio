@@ -98,19 +98,18 @@ struct ChillMusicalFrameGenerator {
     }
 
     private static func pickLeadInstrument(mood: Mood, rng: inout SeededRNG) -> ChillLeadInstrument {
-        // Muted trumpet is the signature Chill lead voice — heavily preferred across all moods.
-        // Soprano Sax moved to Lead 2 pool; Alto Sax (.saxophone) replaces it in Lead 1.
-        // Vibraphone is Lead 2 only.
+        // Lead 1 pool: muted trumpet, tenor sax, alto sax, trumpet — ~30% muted trumpet across moods.
+        // Soprano sax, vibraphone, trombone, flute are Lead 2 only.
         switch mood {
         case .Deep, .Dream:
-            // Muted Trumpet 55%, Alto Sax 25%, Trumpet 20%
-            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet]
-            let weights: [Double]              = [0.55,          0.25,       0.20]
+            // Muted Trumpet 30%, Alto Sax 20%, Trumpet 25%, Tenor Sax 25%
+            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax]
+            let weights: [Double]              = [0.30,          0.20,       0.25,     0.25]
             return insts[rng.weightedPick(weights)]
         case .Free, .Bright:
-            // Muted Trumpet 40%, Trumpet 30%, Flute 15%, Alto Sax 15%
-            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .trumpet, .flute, .saxophone]
-            let weights: [Double]              = [0.40,          0.30,     0.15,   0.15]
+            // Muted Trumpet 30%, Trumpet 25%, Tenor Sax 35%, Alto Sax 10%
+            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .trumpet, .tenorSax, .saxophone]
+            let weights: [Double]              = [0.30,          0.25,     0.35,      0.10]
             return insts[rng.weightedPick(weights)]
         }
     }

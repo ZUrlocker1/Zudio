@@ -545,6 +545,14 @@ def analyze_song(midi_path, zudio_path):
 
     # ── 8. Lead voice overlap ────────────────────────────────────────────────
     l2_notes = track_notes.get('Lead 2', [])
+    if l2_notes:
+        l2_groove = [n for n in l2_notes if tick_to_bar(n[0]) in groove_bars_set]
+        if l2_groove:
+            l2_unique = set(n[1] for n in l2_groove)
+            stats['lead2_unique_pitches'] = len(l2_unique)
+            if len(l2_unique) <= 2:
+                flags.append(f'!! LEAD2-ONE-NOTE: Lead 2 uses only {len(l2_unique)} unique pitch(es) in groove — one-note rut bug')
+
     if l1_notes and l2_notes:
         l1_steps = set(tick_to_step(t) for t, _, _, _ in
                        [n for n in l1_notes if tick_to_bar(n[0]) in groove_bars_set])

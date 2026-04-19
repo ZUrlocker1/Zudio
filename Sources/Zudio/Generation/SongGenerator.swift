@@ -1043,7 +1043,7 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     lead1Instrument: songState.chillLeadInstrument,
                     lead1Onsets: lead1Onsets,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules).events
             } else {
                 events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
             }
@@ -2422,6 +2422,7 @@ struct SongGenerator {
             case "CHL-LD1-004": return .saxophone
             case "CHL-LD1-006": return .sopranoSax
             case "CHL-LD1-007": return .trumpet
+            case "CHL-LD1-008": return .tenorSax
             default:            return nil
             }
         }()
@@ -2494,11 +2495,12 @@ struct SongGenerator {
         trackEvents[kTrackLead1] = lead1Events
 
         var lead2Rules: Set<String> = []
-        trackEvents[kTrackLead2] = ChillLeadGenerator.generateLead2(
+        let (lead2Events, chillLead2Instrument) = ChillLeadGenerator.generateLead2(
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
             lead1Onsets: lead1Onsets, handoffBars: lead1HandoffBars,
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
+        trackEvents[kTrackLead2] = lead2Events
 
         // Step 7 — Rhythm (Rhodes active comping)
         var rhythmRules: Set<String> = []
@@ -2582,6 +2584,7 @@ struct SongGenerator {
             generationLog: log, stepAnnotations: stepAnnotations,
             chillProgFamily: chillProgFamily,
             chillLeadInstrument: chillLeadInstrument,
+            chillLead2Instrument: chillLead2Instrument,
             chillBeatStyle: chillBeatStyle,
             chillBreakdownStyle: chillBreakdownStyle,
             chillSwingFeel: chillSwingFeel,
@@ -2693,6 +2696,7 @@ struct SongGenerator {
         case "CHL-LD1-005":  return "St Germain staccato burst"
         case "CHL-LD1-006":  return "Soprano sax lead"
         case "CHL-LD1-007":  return "Wide interval solo"
+        case "CHL-LD1-008":  return "Tenor sax lead"
         case "CHL-LD2-001":  return "Counter-melody"
         case "CHL-LD2-002":  return "Trombone counter-melody"
         case "CHL-RHY-001":  return "St Germain beat 1 + and-of-2"
