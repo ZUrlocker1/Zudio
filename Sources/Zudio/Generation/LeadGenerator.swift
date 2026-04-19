@@ -94,7 +94,6 @@ struct LeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceLeadRuleID: String? = nil,
-        testMode: Bool = false,
         passBodyBars: Int? = nil
     ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
 
@@ -169,7 +168,7 @@ struct LeadGenerator {
         let isSoloRule = aRule == "MOT-LD1-007" || aRule == "MOT-LD1-008"
         let soloLen    = aRule == "MOT-LD1-007" ? 10 : 9
         let soloWindow: Range<Int>? = isSoloRule
-            ? pickSoloStartBar(structure: structure, soloLength: soloLen, rng: &rng, testMode: testMode, passBodyBars: passBodyBars)
+            ? pickSoloStartBar(structure: structure, soloLength: soloLen, rng: &rng, passBodyBars: passBodyBars)
             : nil
         let soloRange: Range<Int>? = soloWindow
 
@@ -1303,14 +1302,9 @@ struct LeadGenerator {
     /// first passBodyBars of the body so it is always audible in the evolved bars, regardless
     /// of how long the A section is.
     private static func pickSoloStartBar(
-        structure: SongStructure, soloLength: Int, rng: inout SeededRNG, testMode: Bool = false,
+        structure: SongStructure, soloLength: Int, rng: inout SeededRNG,
         passBodyBars: Int? = nil
     ) -> Range<Int> {
-        // Test mode: place solo 2 bars into the body so the tester hears it immediately.
-        if testMode {
-            let bodyStart = (structure.bodySections.first?.startBar ?? 0) + 2
-            return bodyStart ..< bodyStart + soloLength
-        }
         if let a = structure.sections.first(where: { $0.label == .A }),
            a.lengthBars >= soloLength + 8 {
             let earliest: Int

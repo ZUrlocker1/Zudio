@@ -328,6 +328,9 @@ final class AppState: ObservableObject {
     // Pre-generated next song for seamless Endless transitions
     private var nextSongState:         SongState? = nil
     private var isPreGenerating:       Bool       = false
+    // Incremented each time a new pre-gen is started; stale task completions that carry an old
+    // token are discarded so they can't overwrite nextSongState with the wrong style.
+
     // Set by onApproachingEnd so preGenerateNextSong() logs "Up next" when it finishes.
     // Kept false for silent pre-gen calls (generateNew, startEndlessSong).
     private var shouldLogNextUpWhenReady = false
@@ -420,120 +423,6 @@ final class AppState: ObservableObject {
     @Published var keyOverride:   String? = nil
     @Published var tempoOverride: Int?    = nil
     @Published var moodOverride:  Mood?   = nil
-
-    // MARK: - Test mode (shorter songs cycling through recently-introduced rules)
-    // Each generation advances to the next slot in testCycle.
-    // Slot 0: ARP-005*, BASS-010*, PADS-007*   (all three new rules together)
-    // Slot 1: ARP-001*, free BASS, free PADS    (ARP retrofit, everything else random)
-    // Slot 2: ARP-002*, BASS-010*, PADS-007*    (second ARP retrofit + BASS/PADS repeat)
-
-    struct TestModeConfig {
-        var forceArpRuleID:        String?
-        var forceBassRuleID:       String?
-        var forceDrumRuleID:       String?
-        var forcePadsRuleID:       String?
-        var forceLeadRuleID:       String?
-        var forceTexRuleID:        String?
-        var forcePercussionStyle:  PercussionStyle?
-        // Bridge testing: forceBridge=true guarantees a bridge fires (bypasses 35% gate).
-        // forceBridgeArchetype: nil=random, "drum"=A-1 escalating, "drumAlt"=A-2 call+response, "melody"=Archetype B
-        var forceBridge:           Bool    = false
-        var forceBridgeArchetype:  String? = nil
-    }
-
-    @Published var testModeEnabled: Bool = false
-    private var testCycleIndex: Int = 0
-
-    func toggleTestMode() {
-        testModeEnabled.toggle()
-        testCycleIndex = 0
-    }
-
-    // Motorik 10-slot cycle: alternates MOT-LD1-003 (Punch Solo) and MOT-LD1-006 (Long Arc).
-    // Slot 0: MOT-LD1-003* lead   [Punch solo]
-    // Slot 1: MOT-LD1-006* lead   [Long arc solo]
-    // Slot 2: MOT-LD1-003* lead   [Punch solo]
-    // Slot 3: MOT-LD1-006* lead   [Long arc solo]
-    // Slot 4: MOT-LD1-003* lead   [Punch solo]
-    // Slot 5: MOT-LD1-006* lead   [Long arc solo]
-    // Slot 6: MOT-LD1-003* lead   [Punch solo]
-    // Slot 7: MOT-LD1-006* lead   [Long arc solo]
-    // Slot 8: MOT-LD1-003* lead   [Punch solo]
-    // Slot 9: MOT-LD1-006* lead   [Long arc solo]
-    private static let testCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-003", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: "MOT-LD1-006", forceTexRuleID: nil, forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-    ]
-
-    // Ambient 12-slot cycle: exercises all lead rules, bass rules, and rhythm rules.
-    // Slots 0–4: Lead 1 rules (floating, echo, shimmer, lyric fragment, returning motif)
-    // Slot  5:   AMB-BASS-001* — root drone with Plan L neighbour-tone inflections
-    // Slot  6:   AMB-BASS-003* — root+fifth drone
-    // Slot  7:   AMB-RTHM-005* — celestial phrase (ascending pentatonic on Rhythm)
-    // Slot  8:   AMB-RTHM-006* — Craven Faults bell cell (root/fifth/octave)
-    // Slot  9:   softPulse drums / floating lead (drum style variation)
-    // Slot 10:   absent drums (confirms pads+bass+lead carry the song without percussion)
-    // Slot 11:   all random (let the generator pick freely)
-    private static let ambientTestCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-010", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-010", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-002", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-007", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-008", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: "AMB-BASS-001", forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-009", forceTexRuleID: nil, forcePercussionStyle: .textural,  forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: "AMB-LEAD-001", forceTexRuleID: nil, forcePercussionStyle: .softPulse, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: .absent,    forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil,            forceBassRuleID: nil,            forcePadsRuleID: nil, forceLeadRuleID: nil,            forceTexRuleID: nil, forcePercussionStyle: nil,         forceBridge: false, forceBridgeArchetype: nil),
-    ]
-
-    // Kosmic 10-slot cycle: high rotation on the two new texture rules only. All other
-    // fields free (nil) so the generator picks leads, bass, arp, drums naturally.
-    // Slot 0: KOS-TEXT-002*  [Distant Pulse]
-    // Slot 1: KOS-TEXT-004*  [Loscil Drip]
-    // Slot 2: KOS-TEXT-002*  [Distant Pulse]
-    // Slot 3: KOS-TEXT-004*  [Loscil Drip]
-    // Slot 4: KOS-TEXT-002*  [Distant Pulse]
-    // Slot 5: KOS-TEXT-004*  [Loscil Drip]
-    // Slot 6: KOS-TEXT-002*  [Distant Pulse]
-    // Slot 7: KOS-TEXT-004*  [Loscil Drip]
-    // Slot 8: KOS-TEXT-002*  [Distant Pulse]
-    // Slot 9: KOS-TEXT-004*  [Loscil Drip]
-    private static let kosmicTestCycle: [TestModeConfig] = [
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-002", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-        TestModeConfig(forceArpRuleID: nil, forceBassRuleID: nil, forcePadsRuleID: nil, forceLeadRuleID: nil, forceTexRuleID: "KOS-TEXT-004", forcePercussionStyle: nil, forceBridge: false, forceBridgeArchetype: nil),
-    ]
-
-    private func nextTestConfig() -> TestModeConfig? {
-        guard testModeEnabled else { return nil }
-        let cycle: [TestModeConfig]
-        switch selectedStyle {
-        case .ambient: cycle = Self.ambientTestCycle
-        case .kosmic:  cycle = Self.kosmicTestCycle
-        default:       cycle = Self.testCycle
-        }
-        let config = cycle[testCycleIndex % cycle.count]
-        testCycleIndex += 1
-        return config
-    }
 
     // MARK: - Instrument randomization
     // After the first generation (all-defaults), each new song picks 2 random non-drums tracks
@@ -1038,8 +927,9 @@ final class AppState: ObservableObject {
         clearSleepTimerMessage()
         guard !isGenerating else { return }
         isGenerating = true
-        let style = selectedStyle
-        let testConfig = nextTestConfig()
+        // In Endless mode use the rotation's current style, not selectedStyle.
+        // selectedStyle stays fixed on whatever the user last picked; only the rotation axis moves.
+        let style = (playMode == .endless) ? endlessStyleAxis[endlessStyleIndex] : selectedStyle
         let isFirstForStyle = !stylesWithGeneratedSongs.contains(style)
         // Brush Kit is index 1 in the Ambient drum pool ["Percussion Kit", "Brush Kit"]
         let useBrushKit = style == .ambient && (instrumentOverrides[kTrackDrums] ?? 0) == 1
@@ -1096,16 +986,13 @@ final class AppState: ObservableObject {
                 tempoOverride:   await self.tempoOverride,
                 moodOverride:    await self.moodOverride,
                 style:           style,
-                testMode:        await self.testModeEnabled,
-                forceBassRuleID:      testConfig?.forceBassRuleID      ?? (useBest ? bestBass   : nil),
-                forceDrumRuleID:      testConfig?.forceDrumRuleID      ?? (useBest ? bestDrum   : nil),
-                forceArpRuleID:       testConfig?.forceArpRuleID       ?? (useBest ? bestArp    : nil),
-                forcePadsRuleID:      testConfig?.forcePadsRuleID,
-                forceLeadRuleID:      testConfig?.forceLeadRuleID      ?? (useBest ? bestLead   : nil),
-                forceTexRuleID:       testConfig?.forceTexRuleID       ?? (useBest ? bestTex    : nil),
-                forcePercussionStyle: testConfig?.forcePercussionStyle ?? (useBest ? bestPerc   : nil),
-                forceBridge:          testConfig?.forceBridge ?? (useBest ? bestBridge : false),
-                forceBridgeArchetype: testConfig?.forceBridgeArchetype,
+                forceBassRuleID:      useBest ? bestBass   : nil,
+                forceDrumRuleID:      useBest ? bestDrum   : nil,
+                forceArpRuleID:       useBest ? bestArp    : nil,
+                forceLeadRuleID:      useBest ? bestLead   : nil,
+                forceTexRuleID:       useBest ? bestTex    : nil,
+                forcePercussionStyle: useBest ? bestPerc   : nil,
+                forceBridge:          useBest ? bestBridge : false,
                 useBrushKit:          useBrushKit
             )
             await MainActor.run {
@@ -1116,12 +1003,10 @@ final class AppState: ObservableObject {
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
-                // Endless: reset stream counters to current style; start pre-gen for song after next
+                // Endless: sync selectedStyle to the rotation style that was just played,
+                // discard stale pre-gen, and let preGenerateNextSong advance the counter.
                 if self.playMode == .endless {
-                    self.songsInCurrentStyle = 1
-                    if let idx = self.endlessStyleAxis.firstIndex(of: style) {
-                        self.endlessStyleIndex = idx
-                    }
+                    self.selectedStyle   = style
                     self.nextSongState   = nil
                     self.isPreGenerating = false
                     self.preGenerateNextSong()
@@ -1414,7 +1299,7 @@ final class AppState: ObservableObject {
         let nextStyle = decideNextStyle()
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
-            let state = SongGenerator.generate(style: nextStyle, testMode: false)
+            let state = SongGenerator.generate(style: nextStyle)
             await MainActor.run {
                 guard self.playMode == .endless else { return }
                 self.nextSongState   = state
@@ -1461,7 +1346,7 @@ final class AppState: ObservableObject {
         let nextStyle = decideNextStyle()
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let state = SongGenerator.generate(style: nextStyle, testMode: false)
+            let state = SongGenerator.generate(style: nextStyle)
             await MainActor.run {
                 self.appendToLog([GenerationLogEntry(tag: "Up next",
                     description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
@@ -1751,7 +1636,7 @@ final class AppState: ObservableObject {
             guard let self else { return }
             let newTempo: Int? = tempo.map { max(20, min(200, $0 + Int.random(in: -5...5))) }
             let state = SongGenerator.generate(tempoOverride: newTempo, moodOverride: mood,
-                                               style: style, testMode: false)
+                                               style: style)
             await MainActor.run {
                 guard self.playMode == .evolve else { return }
                 self.evolveNextSongState   = state
@@ -1917,7 +1802,7 @@ final class AppState: ObservableObject {
                 guard let self else { return }
                 let newTempo: Int? = tempo.map { max(20, min(200, $0 + Int.random(in: -5...5))) }
                 let state = SongGenerator.generate(tempoOverride: newTempo, moodOverride: mood,
-                                                   style: style, testMode: false)
+                                                   style: style)
                 await MainActor.run {
                     guard self.playMode == .evolve else { return }
                     if !self.evolveNextSongLogged {
@@ -2073,7 +1958,7 @@ final class AppState: ObservableObject {
 #if os(macOS)
     func shareSongMac() {
         guard let url = buildShareURL() else { return }
-        let picker = NSSharingServicePicker(items: [url])
+        let picker = NSSharingServicePicker(items: [url, "Here's a cool song I created with Zudio."])
         let delegate = MacSharePickerDelegate()
         picker.delegate = delegate
         if let window = NSApp.keyWindow, let view = window.contentView {
@@ -2630,12 +2515,11 @@ final class AppState: ObservableObject {
         func sharingServicePicker(_ picker: NSSharingServicePicker,
                                   sharingServicesForItems items: [Any],
                                   proposedSharingServices services: [NSSharingService]) -> [NSSharingService] {
-            let wantedNames: [NSSharingService.Name] = [
-                .sendViaAirDrop,
-                .composeEmail,
-                .composeMessage,
-            ]
-            return wantedNames.compactMap { NSSharingService(named: $0) }
+            var result: [NSSharingService] = []
+            if let s = NSSharingService(named: .sendViaAirDrop)   { result.append(s) }
+            if let s = NSSharingService(named: .composeEmail)      { s.subject = "Check out Zudio"; result.append(s) }
+            if let s = NSSharingService(named: .composeMessage)    { result.append(s) }
+            return result
         }
     }
 #endif

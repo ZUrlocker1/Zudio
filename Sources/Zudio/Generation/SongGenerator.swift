@@ -12,7 +12,6 @@ struct SongGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         style: MusicStyle = .kosmic,
-        testMode: Bool = false,
         forceBassRuleID:      String? = nil,
         forceDrumRuleID:      String? = nil,
         forceArpRuleID:       String? = nil,
@@ -21,17 +20,16 @@ struct SongGenerator {
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil,
         useBrushKit:          Bool    = false
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                        moodOverride: moodOverride, style: style, testMode: testMode,
+                        moodOverride: moodOverride, style: style,
                         forceBassRuleID: forceBassRuleID, forceDrumRuleID: forceDrumRuleID,
                         forceArpRuleID: forceArpRuleID,
                         forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                         forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
-                        forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype,
+                        forceBridge: forceBridge,
                         useBrushKit: useBrushKit)
     }
 
@@ -42,7 +40,6 @@ struct SongGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         style: MusicStyle = .kosmic,
-        testMode: Bool = false,
         forceBassRuleID:      String? = nil,
         forceDrumRuleID:      String? = nil,
         forceArpRuleID:       String? = nil,
@@ -51,35 +48,34 @@ struct SongGenerator {
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil,
         useBrushKit:          Bool    = false
     ) -> SongState {
         switch style {
         case .kosmic:
             return generateKosmic(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                                  moodOverride: moodOverride, testMode: testMode,
+                                  moodOverride: moodOverride,
                                   forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
                                   forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                                   forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
-                                  forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
+                                  forceBridge: forceBridge)
         case .motorik:
             return generateMotorik(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                                   moodOverride: moodOverride, testMode: testMode,
+                                   moodOverride: moodOverride,
                                    forceBassRuleID:   forceBassRuleID,
                                    forceDrumRuleID:   forceDrumRuleID,
                                    forceRhythmRuleID: forceArpRuleID,
                                    forceLeadRuleID:   forceLeadRuleID)
         case .ambient:
             return generateAmbient(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                                   moodOverride: moodOverride, testMode: testMode,
+                                   moodOverride: moodOverride,
                                    forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
                                    forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                                    forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
-                                   forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype,
+                                   forceBridge: forceBridge,
                                    useBrushKit: useBrushKit)
         case .chill:
             return generateChill(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                                 moodOverride: moodOverride, testMode: testMode,
+                                 moodOverride: moodOverride,
                                  forceBassRuleID: forceBassRuleID,
                                  forceDrumRuleID: forceDrumRuleID,
                                  forcePadsRuleID: forcePadsRuleID,
@@ -96,7 +92,6 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false,
         forceBassRuleID:   String? = nil,
         forceDrumRuleID:   String? = nil,
         forceRhythmRuleID: String? = nil,
@@ -109,8 +104,7 @@ struct SongGenerator {
             rng: &rng,
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,
-            moodOverride: moodOverride,
-            testMode: testMode
+            moodOverride: moodOverride
         )
 
         // Step 2 — Song structure + chord plan
@@ -146,7 +140,7 @@ struct SongGenerator {
         // Step 7 — Leads
         var lead1Rules: Set<String> = []
         var lead2Rules: Set<String> = []
-        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, testMode: testMode)
+        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID)
         trackEvents[kTrackLead1] = lead1Events
         trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange)
 
@@ -199,7 +193,7 @@ struct SongGenerator {
             title: title, frame: frame, structure: structure, form: form,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules, texRules: texRules, testMode: testMode
+            rhythmRules: rhythmRules, texRules: texRules
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }))
@@ -238,15 +232,13 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false,
         forceBassRuleID:      String? = nil,
         forceArpRuleID:       String? = nil,
         forcePadsRuleID:      String? = nil,
         forceLeadRuleID:      String? = nil,
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
-        forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil
+        forceBridge:          Bool    = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -255,8 +247,7 @@ struct SongGenerator {
             rng: &rng,
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,
-            moodOverride: moodOverride,
-            testMode: testMode
+            moodOverride: moodOverride
         )
 
         let percussionStyle = forcePercussionStyle ?? percussionStylePicked
@@ -277,8 +268,7 @@ struct SongGenerator {
             kosmicProgFamily: kosmicProgFamily,
             percussionStyle: percussionStyle,
             rng: &rng,
-            forceBridge: forceBridge,
-            forceBridgeArchetype: forceBridgeArchetype
+            forceBridge: forceBridge
         )
 
         // Step 3 — Tonal governance map (reused as-is)
@@ -427,8 +417,7 @@ struct SongGenerator {
             kosmicProgFamily: kosmicProgFamily,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules, texRules: texRules,
-            testMode: testMode
+            rhythmRules: rhythmRules, texRules: texRules
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
@@ -471,7 +460,6 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false,
         forceBassRuleID:      String? = nil,
         forceArpRuleID:       String? = nil,
         forcePadsRuleID:      String? = nil,
@@ -479,7 +467,6 @@ struct SongGenerator {
         forceTexRuleID:       String? = nil,
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
-        forceBridgeArchetype: String? = nil,
         useBrushKit:          Bool    = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
@@ -487,7 +474,7 @@ struct SongGenerator {
         // Step 1 — Ambient musical frame (tempo, key, mood, loop lengths, prog family)
         let (frame, percStylePicked, ambientProgFamily, loopLengths) = AmbientMusicalFrameGenerator.generate(
             rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
-            moodOverride: moodOverride, testMode: testMode
+            moodOverride: moodOverride
         )
         let percussionStyle = forcePercussionStyle ?? percStylePicked
 
@@ -765,7 +752,7 @@ struct SongGenerator {
         // 5% chance (75% in test mode) of appearing once in the 30–60 second window.
         // Plays once, starting at bar 2 of the block; phrase spills into bar 3 (bars 1 and 4 silent).
         var ambientXFilesBars: [Int] = []
-        let xFilesProb = testMode ? 0.75 : 0.05
+        let xFilesProb = 0.05
         if lead1RNG.nextDouble() < xFilesProb {
             let stepsPerSec = (Double(frame.tempo) / 60.0) * 4.0
             let bar30 = max(0, Int(stepsPerSec * 30.0) / 16)
@@ -851,7 +838,7 @@ struct SongGenerator {
             percussionStyle: percussionStyle, ambientProgFamily: ambientProgFamily,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules, texRules: texRules, testMode: testMode,
+            rhythmRules: rhythmRules, texRules: texRules,
             forceBassRuleID: forceBassRuleID, forceArpRuleID: forceArpRuleID,
             forceLeadRuleID: forceLeadRuleID, forcePercussionStyle: forcePercussionStyle
         )
@@ -1139,8 +1126,7 @@ struct SongGenerator {
         lead1Rules: Set<String>,
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
-        texRules: Set<String>,
-        testMode: Bool = false
+        texRules: Set<String>
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -1156,7 +1142,7 @@ struct SongGenerator {
 
         // Drums
         for ruleID in drumRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: drumRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: drumRuleDescription(ruleID)))
         }
         if drumRules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-DRUM-001", description: drumRuleDescription("MOT-DRUM-001")))
@@ -1165,8 +1151,7 @@ struct SongGenerator {
         // Bass
         for ruleID in bassRules.sorted() {
             let baseTag = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID
-            let tag = ruleTag(baseTag, testMode: testMode)
-            log.append(GenerationLogEntry(tag: tag, description: bassRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: baseTag, description: bassRuleDescription(ruleID)))
         }
         if bassRules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-BASS-001", description: bassRuleDescription("MOT-BASS-001")))
@@ -1175,7 +1160,7 @@ struct SongGenerator {
         // Pads — may be multiple rules
         let sortedPadRules = padRules.sorted()
         for ruleID in sortedPadRules {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: padRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: padRuleDescription(ruleID)))
         }
         if sortedPadRules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-PADS-001",
@@ -1184,7 +1169,7 @@ struct SongGenerator {
 
         // Lead 1
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: lead1RuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: lead1RuleDescription(ruleID)))
         }
         if lead1Rules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-LD1-001", description: lead1RuleDescription("MOT-LD1-001")))
@@ -1192,7 +1177,7 @@ struct SongGenerator {
 
         // Lead 2
         for ruleID in lead2Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: lead2RuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: lead2RuleDescription(ruleID)))
         }
         if lead2Rules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-LD2-001", description: lead2RuleDescription("MOT-LD2-001")))
@@ -1201,7 +1186,7 @@ struct SongGenerator {
         // Rhythm — may be multiple rules
         let sortedRhythmRules = rhythmRules.sorted()
         for ruleID in sortedRhythmRules {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: rhythmRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: rhythmRuleDescription(ruleID)))
         }
         if sortedRhythmRules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-RTHM-001",
@@ -1210,7 +1195,7 @@ struct SongGenerator {
 
         // Texture
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: textureRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: textureRuleDescription(ruleID)))
         }
         if texRules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-TEXT-001",
@@ -1536,21 +1521,6 @@ struct SongGenerator {
 
     /// Rule IDs introduced recently — shown with a " *" suffix in the status log.
     /// Capped at 6; retire oldest when adding new ones.
-    private static let newRuleIDs: Set<String> = [
-        "KOS-RTHM-002",     // JMJ Hook — density cap added (max 6 notes/bar)
-        "KOS-RTHM-003",     // Oxygène — density cap added (max 6 notes/bar)
-        "KOS-TEXT-001",     // Orbital Motive — 70% bar gate added (was firing every bar)
-        "KOS-DRUM-002",     // Basic Channel minimal dub — hats reduced 8th→quarter with 75% gate
-        "KOS-PADS-008",     // bIII Colour Chord — density guard added (skips if primary ≥ 4 notes/bar)
-        "KOS-BASS-004",     // Moroder Drift — ghost note added on silent cycle bar
-        "MOT-LD1-007",      // Vanishing solo — pre-echo ghost notes added; body silence except solo window
-        "MOT-LD1-008",      // Visiting solo — pre-echo ghost notes added; body silence except solo window
-    ]
-
-    private static func ruleTag(_ ruleID: String, testMode: Bool) -> String {
-        testMode && newRuleIDs.contains(ruleID) ? "\(ruleID) *" : ruleID
-    }
-
     private static func buildKosmicLog(
         title: String,
         frame: GlobalMusicalFrame,
@@ -1565,8 +1535,7 @@ struct SongGenerator {
         lead1Rules: Set<String>,
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
-        texRules: Set<String>,
-        testMode: Bool = false
+        texRules: Set<String>
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -1588,8 +1557,7 @@ struct SongGenerator {
         // Append bridge note if one was inserted
         let hasBridge = structure.sections.contains { $0.label == .bridge || $0.label == .bridgeAlt || $0.label == .bridgeMelody }
         let bridgeSuffix = hasBridge ? " + bridge" : ""
-        let formTag = (hasBridge && testMode) ? "Form *" : "Form"
-        log.append(GenerationLogEntry(tag: formTag, description: kosmicFormLabel + bridgeSuffix))
+        log.append(GenerationLogEntry(tag: "Form", description: kosmicFormLabel + bridgeSuffix))
 
 
         // Chord progression — key/mode + progression family
@@ -1598,39 +1566,39 @@ struct SongGenerator {
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicRthmRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicRthmRuleDescription(ruleID)))
         }
 
         // Lead 1
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicLeadRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicLeadRuleDescription(ruleID)))
         }
 
         // Lead 2 — skip any rule already shown under Lead 1 (same rule = Lead 2 mirrors Lead 1
         // with a timing offset; logging it twice is redundant and looks like a bug).
         for ruleID in lead2Rules.sorted() {
             guard !lead1Rules.contains(ruleID) else { continue }
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicLeadRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicLeadRuleDescription(ruleID)))
         }
 
         // Pads
         for ruleID in padRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicPadRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicPadRuleDescription(ruleID)))
         }
 
         // Texture
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicTexRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicTexRuleDescription(ruleID)))
         }
 
         // Bass
         for ruleID in bassRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicBassRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicBassRuleDescription(ruleID)))
         }
 
         // Drums
         for ruleID in drumRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode), description: kosmicDrumRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicDrumRuleDescription(ruleID)))
         }
 
         return log
@@ -1679,28 +1647,11 @@ struct SongGenerator {
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
         texRules: Set<String>,
-        testMode: Bool = false,
         forceBassRuleID: String? = nil,
         forceArpRuleID: String? = nil,
         forceLeadRuleID: String? = nil,
         forcePercussionStyle: PercussionStyle? = nil
     ) -> [GenerationLogEntry] {
-        // Build the set of rule IDs that were forced by the test pool — these get a * marker.
-        var forcedRuleIDs: Set<String> = []
-        if testMode {
-            if let bass = forceBassRuleID  { forcedRuleIDs.insert(bass) }
-            if let rthm = forceArpRuleID   { forcedRuleIDs.insert(rthm) }
-            if let lead = forceLeadRuleID  { forcedRuleIDs.insert(lead) }
-            if let perc = forcePercussionStyle {
-                switch perc {
-                case .handPercussion: forcedRuleIDs.insert("AMB-DRUM-004")
-                case .absent:         forcedRuleIDs.insert("AMB-DRUM-003")
-                case .textural:       forcedRuleIDs.insert("AMB-DRUM-001")
-                case .softPulse:      forcedRuleIDs.insert("AMB-DRUM-002")
-                default: break
-                }
-            }
-        }
         var log: [GenerationLogEntry] = []
 
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
@@ -1728,28 +1679,26 @@ struct SongGenerator {
         let loopDesc = "pd \(loopLengths.pads) l1 \(loopLengths.lead1) l2 \(loopLengths.lead2) ry \(loopLengths.rhythm) tx \(loopLengths.texture) bs \(loopLengths.bass)"
         log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
 
-        // Per-track rules — append * to tag for any rule forced by the test pool
-        func ruleTag(_ id: String) -> String { forcedRuleIDs.contains(id) ? id + "*" : id }
         for ruleID in padRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead2Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in rhythmRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in bassRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in drumRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID), description: ambientRuleDescription(ruleID)))
+            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
 
         return log
@@ -2399,7 +2348,6 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false,
         forceBassRuleID:    String? = nil,
         forceDrumRuleID:    String? = nil,
         forcePadsRuleID:    String? = nil,
@@ -2431,7 +2379,7 @@ struct SongGenerator {
         let (frame, chillProgFamily, pickedLeadInstrument, chillBeatStyle, chillSwingFeel) =
             ChillMusicalFrameGenerator.generate(
                 rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
-                moodOverride: moodOverride, testMode: testMode, forceBeatStyle: forceBeatStyle
+                moodOverride: moodOverride, forceBeatStyle: forceBeatStyle
             )
         let chillLeadInstrument = forceLeadInstrument ?? pickedLeadInstrument
 
@@ -2557,7 +2505,7 @@ struct SongGenerator {
             chillSwingFeel: chillSwingFeel, chillAudioTexture: chillAudioTexture,
             drumRules: drumRules, bassRules: bassRules, padRules: padRules,
             lead1Rules: lead1Rules, lead2Rules: lead2Rules, rhythmRules: rhythmRules,
-            drumFillBars: drumFillBars, testMode: testMode
+            drumFillBars: drumFillBars
         )
 
         let stepAnnotations = buildStepAnnotations(
@@ -2627,8 +2575,7 @@ struct SongGenerator {
         lead1Rules: Set<String>,
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
-        drumFillBars: [Int],
-        testMode: Bool
+        drumFillBars: [Int]
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
         log.append(GenerationLogEntry(tag: "SONG",  description: title, isTitle: true))
@@ -2664,7 +2611,7 @@ struct SongGenerator {
         // Per-track rules with descriptions
         for ruleID in (drumRules.union(bassRules).union(padRules)
                         .union(lead1Rules).union(lead2Rules).union(rhythmRules)).sorted() {
-            log.append(GenerationLogEntry(tag: ruleTag(ruleID, testMode: testMode),
+            log.append(GenerationLogEntry(tag: ruleID,
                                           description: chillRuleDescription(ruleID)))
         }
 

@@ -8,15 +8,14 @@ struct MusicalFrameGenerator {
         rng: inout SeededRNG,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil,
-        testMode: Bool = false
+        moodOverride: Mood? = nil
     ) -> GlobalMusicalFrame {
         let key    = keyOverride   ?? pickKey(rng: &rng)
         let tempo  = tempoOverride ?? pickTempo(rng: &rng)
         let mood   = moodOverride  ?? pickMood(rng: &rng)
         let mode   = modeForMood(mood, rng: &rng)
         let family = pickProgressionFamily(rng: &rng)
-        let total  = pickTotalBars(tempo: tempo, rng: &rng, testMode: testMode)
+        let total  = pickTotalBars(tempo: tempo, rng: &rng)
 
         return GlobalMusicalFrame(
             key: key,
@@ -82,11 +81,10 @@ struct MusicalFrameGenerator {
     }
 
     /// Triangular distribution: min=150s, peak=210s, max=270s → mostly 3-4 min songs.
-    /// In test mode: min=60s, peak=75s, max=90s → ~1 minute songs for rapid audition.
-    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG, testMode: Bool = false) -> Int {
-        let minS: Double  = testMode ? 60.0  : 150.0
-        let peakS: Double = testMode ? 75.0  : 210.0
-        let maxS: Double  = testMode ? 90.0  : 270.0
+    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
+        let minS: Double  = 150.0
+        let peakS: Double = 210.0
+        let maxS: Double  = 270.0
         let r = rng.nextDouble()
         let fc = (peakS - minS) / (maxS - minS)
         let secs: Double

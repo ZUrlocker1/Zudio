@@ -779,7 +779,7 @@ struct PhonePlayerView: View {
         appState.regenInstrument(forTrack: kTrackRhythm)
         hapticImpactLight.toggle()
     }
-
+    
     private func handleLongPressEmpty() {
         appState.regenRandomNonDrumTrack()
         hapticImpactHeavy.toggle()
@@ -857,17 +857,18 @@ private struct PhoneInfoView: View {
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Text("Available for iPad Mac with track view and MIDI export.")
+                    Text("Uses GeneralUser GS MIDI sound bank by S. Christian Collins.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Text("Source code and design docs on Github")
+                    Text("Available for iPad, Mac with MIDI track view.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Link("github.com/ZUrlocker1/Zudio",
-                         destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
+                    Link("https://www.mzurlocker.com/zudio",
+                         destination: URL(string: "https://www.mzurlocker.com/zudio")!)
                         .font(.system(size: 16))
                         .padding(.top, 1)
                     Text("© 2026 Zack Urlocker")
@@ -1125,6 +1126,7 @@ extension PhonePlayerView {
                       MFMessageComposeViewController.canSendAttachments(),
                       let top = shareTopViewController() else { return }
                 let mc = MFMessageComposeViewController()
+                mc.body = "Here's a cool song I created with Zudio."
                 mc.addAttachmentURL(url, withAlternateFilename: url.lastPathComponent)
                 let delegate = MessageComposeDelegate()
                 mc.messageComposeDelegate = delegate

@@ -16,8 +16,7 @@ struct KosmicMusicalFrameGenerator {
         rng: inout SeededRNG,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil,
-        testMode: Bool = false
+        moodOverride: Mood? = nil
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily) {
 
         let key    = keyOverride   ?? pickKey(rng: &rng)
@@ -25,7 +24,7 @@ struct KosmicMusicalFrameGenerator {
         let mood   = moodOverride  ?? pickMood(rng: &rng)
         let mode   = pickMode(rng: &rng)
         let family = pickProgressionFamilyMotarik(rng: &rng)  // standard ProgressionFamily for StructureGenerator
-        let total  = pickTotalBars(tempo: tempo, rng: &rng, testMode: testMode)
+        let total  = pickTotalBars(tempo: tempo, rng: &rng)
         let percStyle = pickPercussionStyle(tempo: tempo, rng: &rng)
         let kosmicFamily = pickKosmicProgressionFamily(rng: &rng)
 
@@ -125,10 +124,10 @@ struct KosmicMusicalFrameGenerator {
     }
 
     /// Song length: triangular min=225s (3:45), peak=250s, max=270s (4:30) — slightly longer than Motorik
-    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG, testMode: Bool = false) -> Int {
-        let minS: Double  = testMode ? 120.0 : 225.0
-        let peakS: Double = testMode ? 150.0 : 250.0
-        let maxS: Double  = testMode ? 170.0 : 270.0
+    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
+        let minS: Double  = 225.0
+        let peakS: Double = 250.0
+        let maxS: Double  = 270.0
         let r = rng.nextDouble()
         let fc = (peakS - minS) / (maxS - minS)
         let secs: Double

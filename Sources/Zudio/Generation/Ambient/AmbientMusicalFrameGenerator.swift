@@ -1,7 +1,7 @@
 // AmbientMusicalFrameGenerator.swift — Ambient generation step 1
 // Produces a GlobalMusicalFrame tuned for Eno/Loscil/Craven Faults style.
 // Tempo: beatless 62–78 (50%), slowPulse 72–92 (35%), midPulse 95–110 (15%).
-// Song length: triangular min=180s, peak=240s, max=315s/5:15 (test mode 60–120s).
+// Song length: triangular min=180s, peak=240s, max=315s/5:15.
 
 import Foundation
 
@@ -11,8 +11,7 @@ struct AmbientMusicalFrameGenerator {
         rng: inout SeededRNG,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
-        moodOverride: Mood? = nil,
-        testMode: Bool = false
+        moodOverride: Mood? = nil
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle,
           ambientProgFamily: AmbientProgressionFamily, loopLengths: AmbientLoopLengths) {
 
@@ -20,7 +19,7 @@ struct AmbientMusicalFrameGenerator {
         let tempo      = tempoOverride ?? pickTempo(rng: &rng)
         let mood       = moodOverride  ?? pickMood(rng: &rng)
         let mode       = pickMode(rng: &rng)
-        let total      = pickTotalBars(tempo: tempo, rng: &rng, testMode: testMode)
+        let total      = pickTotalBars(tempo: tempo, rng: &rng)
         let percStyle  = pickPercussionStyle(rng: &rng)
         let ambFamily  = pickAmbientProgressionFamily(rng: &rng)
         let loops      = pickLoopLengths(rng: &rng)
@@ -96,10 +95,10 @@ struct AmbientMusicalFrameGenerator {
                                    texture: remaining[3], bass: remaining[2])
     }
 
-    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG, testMode: Bool) -> Int {
-        let minS: Double  = testMode ? 60.0  : 180.0
-        let peakS: Double = testMode ? 90.0  : 240.0
-        let maxS: Double  = testMode ? 120.0 : 315.0   // hard cap 5:15
+    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
+        let minS: Double  = 180.0
+        let peakS: Double = 240.0
+        let maxS: Double  = 315.0   // hard cap 5:15
         let secs = Double(triangularInt(min: minS, peak: peakS, max: maxS, rng: &rng))
         let secondsPerBar = 60.0 / Double(tempo) * 4.0
         let maxBars = Int((315.0 / secondsPerBar).rounded())   // enforce 5:15 at any tempo

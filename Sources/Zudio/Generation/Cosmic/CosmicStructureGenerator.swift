@@ -14,16 +14,14 @@ struct KosmicStructureGenerator {
         kosmicProgFamily: KosmicProgressionFamily,
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
-        forceBridge: Bool = false,
-        forceBridgeArchetype: String? = nil
+        forceBridge: Bool = false
     ) -> SongStructure {
         let (sections, introStyle, outroStyle) = buildSections(
             form: kosmicForm,
             totalBars: frame.totalBars,
             percussionStyle: percussionStyle,
             rng: &rng,
-            forceBridge: forceBridge,
-            forceBridgeArchetype: forceBridgeArchetype
+            forceBridge: forceBridge
         )
         let chordPlan = buildChordPlan(
             frame: frame,
@@ -42,8 +40,7 @@ struct KosmicStructureGenerator {
         totalBars: Int,
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
-        forceBridge: Bool = false,
-        forceBridgeArchetype: String? = nil
+        forceBridge: Bool = false
     ) -> (sections: [SongSection], introStyle: IntroStyle, outroStyle: OutroStyle) {
 
         // Kosmic intro: 2 bars (25%), 4 bars (62.5%), 8 bars (12.5%)
@@ -67,7 +64,7 @@ struct KosmicStructureGenerator {
         // Body — build raw sections then optionally insert bridge
         var bodySections = buildBodySections(form: form, bodyBars: bodyBars, cursor: cursor, rng: &rng)
         bodySections = insertBridgeIfNeeded(form: form, sections: bodySections, rng: &rng,
-                                            forceBridge: forceBridge, forceBridgeArchetype: forceBridgeArchetype)
+                                            forceBridge: forceBridge)
         sections.append(contentsOf: bodySections)
         cursor += bodyBars
 
@@ -178,13 +175,13 @@ struct KosmicStructureGenerator {
     /// Only for ab/aba forms. 35% chance. Bars are taken from the preceding A section.
     private static func insertBridgeIfNeeded(
         form: KosmicSongForm, sections: [SongSection], rng: inout SeededRNG,
-        forceBridge: Bool = false, forceBridgeArchetype: String? = nil
+        forceBridge: Bool = false
     ) -> [SongSection] {
         // Only ab/aba forms get bridges
         guard form == .ab || form == .two_world || form == .aba || form == .build_and_dissolve else {
             return sections
         }
-        // In normal generation: 35% chance. When forced (test mode): always insert.
+        // 35% chance normally; always insert when forced.
         guard forceBridge || rng.nextDouble() < 0.35 else { return sections }
 
         // Find the index of the first A→B boundary
@@ -194,13 +191,7 @@ struct KosmicStructureGenerator {
 
         let aSection = sections[aIdx]
 
-        // Choose archetype — honour forceBridgeArchetype when set
-        let archetype: String
-        if let forced = forceBridgeArchetype {
-            archetype = (forced == "melody") ? "melodyBridge" : "drumBridge"
-        } else {
-            archetype = rng.nextDouble() < 0.50 ? "drumBridge" : "melodyBridge"
-        }
+        let archetype: String = rng.nextDouble() < 0.50 ? "drumBridge" : "melodyBridge"
 
         let minARemain = forceBridge ? 12 : 24
 
@@ -209,14 +200,7 @@ struct KosmicStructureGenerator {
             let bridgeBars = rng.nextDouble() < 0.70 ? 4 : 8
             guard aSection.lengthBars - bridgeBars >= minARemain else { return sections }
 
-            let subVariant: SectionLabel
-            if forceBridgeArchetype == "drumAlt" {
-                subVariant = .bridgeAlt
-            } else if forceBridgeArchetype == "drum" {
-                subVariant = .bridge
-            } else {
-                subVariant = rng.nextDouble() < 0.50 ? .bridge : .bridgeAlt
-            }
+            let subVariant: SectionLabel = rng.nextDouble() < 0.50 ? .bridge : .bridgeAlt
             let newALen  = aSection.lengthBars - bridgeBars
             let bridgeStart = aSection.startBar + newALen
 

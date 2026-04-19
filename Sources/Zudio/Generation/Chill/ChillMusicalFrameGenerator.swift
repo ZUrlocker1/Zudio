@@ -13,7 +13,6 @@ struct ChillMusicalFrameGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        testMode: Bool = false,
         forceBeatStyle: ChillBeatStyle? = nil
     ) -> (frame: GlobalMusicalFrame,
           chillProgFamily: ChillProgressionFamily,
@@ -27,13 +26,13 @@ struct ChillMusicalFrameGenerator {
 
         let progFamily   = pickProgressionFamily(rng: &rng)
         let leadInst     = pickLeadInstrument(mood: mood, rng: &rng)
-        // forceBeatStyle overrides generation (used by best-first-song and test mode)
-        let beatStyle    = forceBeatStyle ?? (testMode ? ChillBeatStyle.stGermain : pickBeatStyle(mood: mood, rng: &rng))
+        // forceBeatStyle overrides generation (used by best-first-song)
+        let beatStyle    = forceBeatStyle ?? pickBeatStyle(mood: mood, rng: &rng)
         let swingFeel    = false  // swing not yet implemented (requires sub-step timing)
 
         // Tempo picked after beat style so stGermain can bias toward its faster range
         let tempo  = tempoOverride ?? pickTempo(mood: mood, rng: &rng, beatStyle: beatStyle)
-        let total  = pickTotalBars(tempo: tempo, rng: &rng, testMode: testMode)
+        let total  = pickTotalBars(tempo: tempo, rng: &rng)
 
         let frame = GlobalMusicalFrame(
             key: key, mode: mode, tempo: tempo, mood: mood,
@@ -80,10 +79,10 @@ struct ChillMusicalFrameGenerator {
         return modes[rng.weightedPick(weights)]
     }
 
-    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG, testMode: Bool) -> Int {
-        let minS: Double  = testMode ?  60.0 : 180.0
-        let peakS: Double = testMode ?  90.0 : 240.0
-        let maxS: Double  = testMode ? 120.0 : 315.0
+    private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
+        let minS: Double  = 180.0
+        let peakS: Double = 240.0
+        let maxS: Double  = 315.0
         let secs = Double(triangularInt(min: Int(minS), peak: Int(peakS), max: Int(maxS), rng: &rng))
         let secondsPerBar = 60.0 / Double(tempo) * 4.0
         let rawBars = Int((secs / secondsPerBar).rounded())

@@ -778,26 +778,6 @@ private struct LogoAreaView: View {
 
     var body: some View {
         logoImage
-            .overlay(alignment: .bottomTrailing) {
-                VStack(alignment: .trailing, spacing: 2) {
-                    if appState.testModeEnabled {
-                        Text("TEST")
-                            .font(.system(size: compact ? 7 : 9, weight: .bold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.orange)
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                    }
-                }
-                .padding(4)
-                #if os(macOS)
-                .offset(x: compact ? 5 : 20)
-                #else
-                .offset(x: 5, y: 25)
-                #endif
-            }
-            .onTapGesture { appState.toggleTestMode() }
             .frame(width: compact ? 100 : kLogoFrameWidth, alignment: .center)
             #if os(macOS)
             .padding(.leading, compact ? 4 : 8)
@@ -842,8 +822,6 @@ private struct LogoAreaView: View {
 
     @ViewBuilder private var hiddenShortcuts: some View {
         Group {
-            Button("") { appState.toggleTestMode() }
-                .keyboardShortcut("t", modifiers: .command)
             Button("") { appState.selectedStyle = .motorik }
                 .keyboardShortcut("m", modifiers: .command)
             Button("") { appState.selectedStyle = .kosmic }
@@ -1029,31 +1007,31 @@ struct AboutView: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Version: 1.0").font(.system(size: 14))
-                    Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
-                    Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
+                    Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
+                    Text("Uses GeneralUser GS MIDI sound bank created by S. Christian Collins, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are audio effects for reverb, delay, tremolo and auto-pan.").font(.system(size: 14))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
                 Text("Version: 1.0").font(.system(size: 14))
-                Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had Claude analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
+                Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("V1.0 uses GS MIDI instruments, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are per track audio effects for boost, reverb, delay, tremolo, auto-pan and space echo.").font(.system(size: 14))
+                Text("Uses GeneralUser GS MIDI sound bank created by S. Christian Collins, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are audio effects for reverb, delay, tremolo and auto-pan.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             #endif
 
-            Text("Also available for iPhone, iPad.")
+            Text("Available for iPhone, iPad and Mac.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
 
             HStack(spacing: 4) {
-                Text("Design docs and source code:")
+                Text("More information:")
                     .foregroundStyle(.white)
-                Link("https://github.com/ZUrlocker1/Zudio",
-                     destination: URL(string: "https://github.com/ZUrlocker1/Zudio")!)
+                Link("https://www.mzurlocker.com/zudio",
+                     destination: URL(string: "https://www.mzurlocker.com/zudio")!)
                     #if os(macOS)
                     .onHover { isHovering in
                         if isHovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
