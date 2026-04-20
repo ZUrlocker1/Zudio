@@ -74,7 +74,7 @@ struct AmbientTextureGenerator {
         for i in 0..<count {
             let start = slot * i + rng.nextInt(upperBound: Swift.max(1, slot / 2))
             if start >= loopSteps { break }
-            let dur = Swift.min(slot - 4, loopSteps - start)
+            let dur = Swift.min(slot - 4, loopSteps - start, 8 * 16)  // 8 bar max
             if dur >= 8 {
                 var idx = rng.nextInt(upperBound: pool.count)
                 if pool.count >= 2 && idx == lastIdx {

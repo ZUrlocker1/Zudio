@@ -77,22 +77,29 @@ struct AmbientMusicalFrameGenerator {
         return families[rng.weightedPick(weights)]
     }
 
-    /// Co-prime loop length assignment from {5, 7, 11, 13, 17, 19, 23}.
-    /// Pads gets one of the largest (17/19/23), Rhythm one of the smallest (5/7).
-    /// Bass, Lead 1, Lead 2, Texture each get an independent prime from the remainder
-    /// (one of the 5 remaining primes is left unused so all 6 tracks differ).
+    /// Co-prime loop lengths. Texture/Rhythm use longer primes so their patterns
+    /// almost never repeat within a song. Lead 1/2/Pads/Bass use shorter primes.
+    /// All six values are guaranteed distinct.
     static func pickLoopLengths(rng: inout SeededRNG) -> AmbientLoopLengths {
-        let primes = [5, 7, 11, 13, 17, 19, 23]
-        let pads   = primes[4 + rng.nextInt(upperBound: 3)]  // 17, 19, or 23
-        let rhythm = primes[rng.nextInt(upperBound: 2)]       // 5 or 7
-        // Shuffle the 5 remaining primes; bass/lead1/lead2/texture each take one (one left unused)
-        var remaining = primes.filter { $0 != pads && $0 != rhythm }
+        let texturePool: [Int] = [17, 19, 23]
+        let texture = texturePool[rng.nextInt(upperBound: texturePool.count)]
+
+        // Rhythm: medium-long prime — never equal to texture
+        let rhythmPool: [Int] = [23, 29, 31]
+        let rhythm = rhythmPool[rng.nextInt(upperBound: rhythmPool.count)]
+
+        // Pads: largest short prime, excluding rhythm to avoid collision
+        let padPool = [17, 19, 23].filter { $0 != rhythm }
+        let pads = padPool[rng.nextInt(upperBound: padPool.count)]
+
+        // Lead 1, Lead 2, Bass: shuffle remaining short primes
+        var remaining = [5, 7, 11, 13, 17, 19, 23].filter { $0 != pads && $0 != rhythm }
         for i in stride(from: remaining.count - 1, through: 1, by: -1) {
             remaining.swapAt(i, rng.nextInt(upperBound: i + 1))
         }
         return AmbientLoopLengths(lead1: remaining[0], lead2: remaining[1],
                                    pads: pads, rhythm: rhythm,
-                                   texture: remaining[3], bass: remaining[2])
+                                   texture: texture, bass: remaining[2])
     }
 
     private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {

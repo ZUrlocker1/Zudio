@@ -638,7 +638,25 @@ struct SongGenerator {
             texRules.formUnion(texRulesH)
         }
 
-        // Hollow guard B: section solos (009/010) only play in two narrow 8-bar windows —
+        // Hollow guard B: rhythm and texture both absent — ensure bass is present.
+        if trackEvents[kTrackRhythm].isEmpty
+            && trackEvents[kTrackTexture].isEmpty
+            && trackEvents[kTrackBass].isEmpty {
+            var bassRulesH: Set<String> = []
+            let bassLoopH = AmbientBassGenerator.generate(frame: frame, tonalMap: tonalMap,
+                                                           rng: &bassRNG,
+                                                           loopBars: loopLengths.bass,
+                                                           usedRuleIDs: &bassRulesH,
+                                                           forceRuleID: "AMB-BASS-001",
+                                                           silentBars: dropoutZones[kTrackBass] ?? [])
+            trackEvents[kTrackBass] = AmbientLoopTiler.tile(events: bassLoopH,
+                                                              loopBars: loopLengths.bass,
+                                                              totalBars: frame.totalBars,
+                                                              silentBars: dropoutZones[kTrackBass] ?? [])
+            bassRules.formUnion(bassRulesH)
+        }
+
+        // Hollow guard C: section solos (009/010) only play in two narrow 8-bar windows —
         // the rest of the song is nearly silent without rhythmic support.
         // If bass and rhythm are both absent and the lead is a section solo, force sparse arpeggio.
         if isAmbSectionSolo

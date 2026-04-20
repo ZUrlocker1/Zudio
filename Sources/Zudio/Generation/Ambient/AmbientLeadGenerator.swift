@@ -5,7 +5,7 @@
 //               AMB-LEAD-009 Magnetik solo (9%), AMB-LEAD-010 Oxygenerator solo (7%)
 // AMB-LEAD-009 and AMB-LEAD-010 are section-level solos: they bypass the loop tiler and
 // return full-song events (require structure != nil; degrade gracefully to silence if absent).
-// Lead 2: AMB-SYNC-001 (ghost echo, 40%), AMB-LEAD-005 (fill silent windows), AMB-LEAD-006 (absent).
+// Lead 2: AMB-LEAD-005 (fill Lead 1 silent windows), AMB-LEAD-006 (absent when no windows).
 // AMB-RULE-02 enforced: rest ≥ 2× note duration after each note event.
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
 
@@ -112,28 +112,7 @@ struct AmbientLeadGenerator {
         let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        // AMB-SYNC-001 (40%): ghost echo — delay Lead 1 notes by 4–8 steps at 60–65% velocity.
-        // Creates a natural echo/shadow effect; only fires when Lead 1 has content.
-        if !lead1Events.isEmpty && rng.nextDouble() < 0.40 {
-            usedRuleIDs.insert("AMB-SYNC-001")
-            var echoEvents: [MIDIEvent] = []
-            for ev in lead1Events where ev.stepIndex < loopSteps {
-                let offset = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
-                let step   = ev.stepIndex + offset
-                guard step < loopSteps else { continue }
-                let vel = UInt8(Swift.max(20, Int(Double(ev.velocity) * 0.62)))
-                let dur = Swift.min(ev.durationSteps, loopSteps - step)
-                if dur >= 2 {
-                    echoEvents.append(MIDIEvent(stepIndex: step, note: ev.note,
-                                                velocity: vel, durationSteps: dur))
-                }
-            }
-            if !echoEvents.isEmpty {
-                return echoEvents.sorted { $0.stepIndex < $1.stepIndex }
-            }
-        }
-
-        // AMB-SYNC-003: fill Lead 1 silent windows
+        // AMB-LEAD-005: fill Lead 1 silent windows only — Lead 2 never overlaps Lead 1
         // Build set of steps occupied by lead1 (within loop)
         var occupied = Set<Int>()
         for ev in lead1Events where ev.stepIndex < loopSteps {

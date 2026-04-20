@@ -1,5 +1,5 @@
 // AmbientPadsGenerator.swift — Ambient pads generation
-// AMB-PAD-001: Primary sustained chord layer (velocity 55–70 base, re-attack every 32–64 steps / 2–4 bars)
+// AMB-PAD-001: Primary sustained chord layer (velocity 55–70 base, re-attack every 96–128 steps / 6–8 bars)
 // AMB-PAD-002: Secondary shimmer layer (velocity 25–55, offset 2–4 steps after primary)
 // AMB-PAD-006: Bell accent layer (~0.07 notes/bar, staccato, velocity 35–55, high register)
 // Generates a short loop (loopBars); AmbientLoopTiler tiles it to full song length.
@@ -30,7 +30,7 @@ struct AmbientPadsGenerator {
         // Duration is shorter than reattack so each chord fades before the next arrives (breathing).
         // 30% chance any given re-attack is skipped to add organic gaps.
         // Voicing varies per reattack: note count (2–4) and inversion rotate for variety.
-        let reattack  = 32 + rng.nextInt(upperBound: 33)   // 32–64 steps (2–4 bars)
+        let reattack  = 96 + rng.nextInt(upperBound: 33)   // 96–128 steps (6–8 bars)
         let duration  = reattack - 4 - rng.nextInt(upperBound: 9)  // slightly shorter = brief gap
         let baseVel   = 55 + rng.nextInt(upperBound: 16)    // 55–70, consistent base per loop
         var invOffset = 0   // rotates through inversions

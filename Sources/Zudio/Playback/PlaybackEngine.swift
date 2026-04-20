@@ -855,8 +855,10 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.40   // Lead Bass runs hot on Kosmic bass — pull back further
             } else if trackIndex == kTrackBass && program == 87 {
                 vol = 0.56   // Lead Bass runs hot
+            } else if trackIndex == kTrackLead2 && program == 93 {
+                vol = 1.8    // Metal Pad runs soft in GM — boost for Lead 2 audibility
             } else if trackIndex == kTrackLead2 && program == 0 {
-                vol = 1.4    // Grand Piano runs soft in GM
+                vol = 0.75   // Grand Piano runs loud on Ambient Lead 2 — pull back
             } else if trackIndex == kTrackLead2 && program == 8 {
                 vol = 1.8    // Celesta runs soft in GM
             } else if trackIndex == kTrackLead2 && program == 99 {

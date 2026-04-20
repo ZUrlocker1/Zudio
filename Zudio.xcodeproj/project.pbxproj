@@ -89,12 +89,14 @@
 		AA000000000000000000080 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000080 /* VisualizerView.swift */; };
 		AA000000000000000000081 /* PhonePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000081 /* PhonePlayerView.swift */; };
 		AA000000000000000000100 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
+		AA000000000000000000111 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
 		IF000000000000000000001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
 		IF000000000000000000002 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007A /* MediaPlayer.framework */; };
 		IR000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
 		IR000000000000000000002 /* assets/GeneralUser_GS_v1.471.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 */; };
 		IR000000000000000000003 /* assets/images/zudio-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006D /* assets/images/zudio-logo.png */; };
 		IR000000000000000000004 /* Sources/Zudio/Resources/Textures in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Sources/Zudio/Resources/Textures */; };
+		IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
 		IS000000000000000000001 /* ZudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* ZudioApp.swift */; };
 		IS000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000002 /* AppState.swift */; };
 		IS000000000000000000003 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* Types.swift */; };
@@ -174,8 +176,6 @@
 		TT000000000000000000003 /* MotorikBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000003 /* MotorikBatchTests.swift */; };
 		TT000000000000000000009 /* KosmicBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000005 /* KosmicBatchTests.swift */; };
 		TT000000000000000000010 /* AmbientBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000010 /* AmbientBatchTests.swift */; };
-		AA000000000000000000111 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
-		IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -221,7 +221,6 @@
 		BB00000000000000000001E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		BB00000000000000000001F /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = "<group>"; };
 		BB000000000000000000020 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		BB000000000000000000099 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB000000000000000000021 /* Zudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB000000000000000000022 /* MIDIFileExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIFileExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000023 /* FirstMouseFix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstMouseFix.swift; sourceTree = "<group>"; };
@@ -274,6 +273,7 @@
 		BB00000000000000000007F /* IOSPlatformHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSPlatformHost.swift; sourceTree = "<group>"; };
 		BB000000000000000000080 /* VisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerView.swift; sourceTree = "<group>"; };
 		BB000000000000000000081 /* PhonePlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhonePlayerView.swift; sourceTree = "<group>"; };
+		BB000000000000000000099 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		BB000000000000000000100 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BB000000000000000000101 /* ZudioiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZudioiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		UU000000000000000000001 /* ZudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioTests.swift; sourceTree = "<group>"; };
@@ -550,6 +550,7 @@
 				CC000000000000000000002 /* Sources */,
 				CC000000000000000000001 /* Frameworks */,
 				CC000000000000000000003 /* Resources */,
+				CC000000000000000000005 /* Strip Quarantine */,
 			);
 			buildRules = (
 			);
@@ -584,6 +585,7 @@
 				CC000000000000000000021 /* Sources */,
 				CC000000000000000000020 /* Frameworks */,
 				CC000000000000000000022 /* Resources */,
+				CC000000000000000000024 /* Strip Quarantine */,
 			);
 			buildRules = (
 			);
@@ -664,6 +666,45 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		CC000000000000000000005 /* Strip Quarantine */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Quarantine";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "xattr -cr \"${CODESIGNING_FOLDER_PATH}\" 2>/dev/null || true\n";
+		};
+		CC000000000000000000024 /* Strip Quarantine */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Quarantine";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "xattr -cr \"${CODESIGNING_FOLDER_PATH}\" 2>/dev/null || true\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		CC000000000000000000002 /* Sources */ = {
@@ -1071,10 +1112,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 105;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = K66MA9TR8Z;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Sources/Zudio/iOS-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1086,7 +1128,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -1100,10 +1142,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 105;
+				CURRENT_PROJECT_VERSION = 108;
 				DEVELOPMENT_TEAM = K66MA9TR8Z;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Sources/Zudio/iOS-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1115,7 +1158,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;

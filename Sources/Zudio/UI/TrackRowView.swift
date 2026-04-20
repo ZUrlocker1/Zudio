@@ -92,7 +92,7 @@ struct TrackRowView: View {
             }
             if isAmbient {
                 return [.init(name:"Celesta",       program:8),   .init(name:"Grand Piano",    program:0),
-                        .init(name:"Warm Pad",     program:89),  .init(name:"Space Voice",    program:91),
+                        .init(name:"Metal Pad",    program:93),  .init(name:"Space Voice",    program:91),
                         .init(name:"FX Atmosphere",program:99)]
             }
             if isKosmic {
