@@ -583,10 +583,12 @@ final class PlaybackEngine: ObservableObject {
             // firing separately on every step — eliminates AppKit layout scans at step rate.
             if !noteOns.isEmpty {
                 let now = Date()
+                let sps = self.songState?.frame.secondsPerStep ?? 0.1
                 self.pendingVisualizerNotes.append(contentsOf: noteOns.map { (trackIdx, ev) in
                     VisualizerNote(trackIndex: trackIdx, note: ev.note,
                                    velocity: ev.velocity, birthDate: now,
-                                   durationSteps: ev.durationSteps)
+                                   durationSteps: ev.durationSteps,
+                                   noteDurationSecs: Double(ev.durationSteps) * sps)
                 })
             }
             let flushNow = Date()
@@ -597,7 +599,7 @@ final class PlaybackEngine: ObservableObject {
                     notes.append(contentsOf: self.pendingVisualizerNotes)
                     self.pendingVisualizerNotes.removeAll(keepingCapacity: true)
                 }
-                let cutoff = flushNow.addingTimeInterval(-8.0)  // max orb lifetime is 7s
+                let cutoff = flushNow.addingTimeInterval(-34.0) // max orb lifetime is 32s + 2s buffer
                 notes.removeAll { $0.birthDate < cutoff }
                 if notes.count > 80 { notes.removeFirst(notes.count - 80) }
                 self.activeVisualizerNotes = notes  // single assignment = single objectWillChange

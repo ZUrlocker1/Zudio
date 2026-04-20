@@ -11,6 +11,7 @@ TEAM_ID="K66MA9TR8Z"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
 OUTPUT_DMG="${HOME}/Downloads/Zudio-${VERSION}.dmg"
 
+rm -f "${HOME}/Downloads/Zudio-${VERSION}.dmg"
 DMG_WORK="/tmp/ZudioDMG"
 DMG_STAGING="${DMG_WORK}/staging"
 DMG_BACKGROUND="${DMG_WORK}/background.png"

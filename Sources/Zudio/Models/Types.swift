@@ -442,12 +442,13 @@ let kRegisterBounds: [Int: RegisterBounds] = [
 
 /// A note event captured during playback for the iPhone abstract visualizer.
 struct VisualizerNote: Identifiable, Sendable {
-    let id          = UUID()
+    let id             = UUID()
     let trackIndex:    Int
     let note:          UInt8   // MIDI pitch 0–127
     let velocity:      UInt8   // 0–127 → drives orb size/brightness
     let birthDate:     Date    // wall-clock spawn time
-    let durationSteps: Int     // gate length → drives orb lifetime and comet tail
+    let durationSteps: Int     // gate length → drives orb shape (comet tail, sonar ring)
+    let noteDurationSecs: Double // actual gate duration in wall-clock seconds — drives orb lifetime
 }
 
 // MARK: - GM program numbers per track (v1 defaults)

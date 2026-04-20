@@ -5,10 +5,20 @@
 
 import SwiftUI
 
-// Reusable per-frame storage for track home positions — avoids two heap allocations every 83ms.
+// Reusable per-frame storage — avoids heap allocations every 83ms.
 private final class OrbFrameCache {
-    var hx = [Double](repeating: 0.5, count: kTrackCount)
-    var hy = [Double](repeating: 0.5, count: kTrackCount)
+    var hx       = [Double](repeating: 0.5,  count: kTrackCount)
+    var hy       = [Double](repeating: 0.5,  count: kTrackCount)
+    var unmuteAge = [Double](repeating: -1.0, count: kTrackCount) // -1 = no active flash
+}
+
+// File-scope so VisualizerView and MacVisualizerGestureView.Coordinator share one copy.
+private func orbLifetime(_ orb: VisualizerNote) -> Double {
+    if orb.durationSteps <= 4  { return 1.6 }
+    if orb.durationSteps <= 8  { return 3.0 }
+    if orb.durationSteps <= 16 { return 5.0 }
+    // Long notes: stay visible for their full audio duration plus a 2 s fade tail, capped at 32 s.
+    return min(max(7.0, orb.noteDurationSecs + 2.0), 32.0)
 }
 
 struct VisualizerView: View {
@@ -185,9 +195,16 @@ struct VisualizerView: View {
         for i in 0..<kTrackCount {
             let h = trackHome(trackIndex: i, wallTime: wallTime)
             orbCache.hx[i] = h.x; orbCache.hy[i] = h.y
+            // Snapshot unmuteFlash ages — array index in the hot loop is cheaper than dict lookup.
+            if let fd = trackUnmuteFlash[i] {
+                let a = now.timeIntervalSince(fd)
+                orbCache.unmuteAge[i] = a < 0.6 ? a : -1.0
+            } else {
+                orbCache.unmuteAge[i] = -1.0
+            }
         }
         // Read after filling — CoW: shares the buffer without a copy (neither alias is mutated below).
-        let hx = orbCache.hx, hy = orbCache.hy
+        let hx = orbCache.hx, hy = orbCache.hy, unmuteAge = orbCache.unmuteAge
 
         for orb in playback.activeVisualizerNotes {
             let age = now.timeIntervalSince(orb.birthDate)
@@ -245,13 +262,8 @@ struct VisualizerView: View {
             // Gradient: bright at centre → dim at coreR → transparent at haloR.
             let pos = orbPos(orb: orb, age: age, size: size, hx: ox, hy: oy)
 
-            var flashBoost = 0.0
-            if let flashDate = trackUnmuteFlash[orb.trackIndex] {
-                let flashAge = now.timeIntervalSince(flashDate)
-                if flashAge < 0.6 {
-                    flashBoost = 0.5 * (1.0 + cos(flashAge / 0.6 * .pi))
-                }
-            }
+            let fa = unmuteAge[orb.trackIndex]
+            let flashBoost = fa >= 0 ? 0.5 * (1.0 + cos(fa / 0.6 * .pi)) : 0.0
 
             let haloR    = radius * (2.2 + flashBoost * 2.5)
             let coreR    = radius * (1.0 + flashBoost * 0.45)
@@ -311,7 +323,7 @@ struct VisualizerView: View {
     }
 
     /// Canvas-path variant of orbPosition that takes pre-cached home coordinates.
-    /// Avoids redundant trackHome() sin/cos calls in the 15fps draw loop.
+    /// Avoids redundant trackHome() sin/cos calls in the 12fps draw loop.
     /// The original orbPosition(orb:age:size:now:) is preserved for the Mac gesture
     /// Coordinator, which is only called on click — not on the hot draw path.
     private func orbPos(orb: VisualizerNote, age: Double, size: CGSize,
@@ -336,15 +348,6 @@ struct VisualizerView: View {
         let x = size.width  * clamp(hx + driftX / size.width,  0.02, 0.98)
         let y = size.height * clamp(hy + pitchOffset + driftY / size.height, 0.02, 0.98)
         return CGPoint(x: x, y: y)
-    }
-
-    // MARK: - Lifetime (doubled from original)
-
-    func orbLifetime(_ orb: VisualizerNote) -> Double {
-        if orb.durationSteps <= 4  { return 1.6 }   // spark (was 0.8)
-        if orb.durationSteps <= 8  { return 3.0 }   // medium (was 1.5)
-        if orb.durationSteps <= 16 { return 5.0 }   // comet (was 2.5)
-        return 7.0                                   // comet+sonar (was 3.5)
     }
 
     // MARK: - Radius (half notes and whole notes 2x)
@@ -516,12 +519,6 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
 
         // -- Position helpers kept in sync with VisualizerView --
 
-        private func orbLifetime(_ orb: VisualizerNote) -> Double {
-            if orb.durationSteps <= 4  { return 1.6 }
-            if orb.durationSteps <= 8  { return 3.0 }
-            if orb.durationSteps <= 16 { return 5.0 }
-            return 7.0
-        }
         private func orbRadius(_ orb: VisualizerNote) -> Double {
             let base = 12.0 + Double(orb.velocity) / 127.0 * 16.0
             switch orb.durationSteps {
