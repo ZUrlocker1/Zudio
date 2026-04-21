@@ -1278,9 +1278,13 @@ final class PlaybackEngine: ObservableObject {
 
         // --- Intro boost ramp (only when playhead is inside the intro) ---
         if inIntro, let intro = intro {
-            let startProg    = (currentStep == 0) ? Float(0) : Float(currentStep) / Float(max(1, introEndStep))
+            let longIntroFloor: Float = intro.lengthBars >= 4 ? 0.15 : 0.0
+            let startProg    = (currentStep == 0) ? longIntroFloor : Float(currentStep) / Float(max(1, introEndStep))
             let remSteps     = max(1, introEndStep - currentStep)
-            let durationSecs = Double(remSteps) * state.frame.secondsPerStep
+            // 8-bar intro: complete the fade in the first 4 bars so audio is fully up at the midpoint
+            let fadeBars     = intro.lengthBars >= 8 ? intro.lengthBars / 2 : intro.lengthBars
+            let fadeSteps    = min(remSteps, fadeBars * 16)
+            let durationSecs = Double(fadeSteps) * state.frame.secondsPerStep
             let startNanos   = DispatchTime.now().uptimeNanoseconds
 
             let fadeSrc = DispatchSource.makeTimerSource(queue: lfoQueue)

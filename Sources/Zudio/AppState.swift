@@ -761,10 +761,8 @@ final class AppState: ObservableObject {
             switch self.playMode {
             case .endless:
                 if let next = self.nextSongState {
-                    // Already pre-genned — log "Up next" now, at the 12-bar mark
-                    self.appendToLog([GenerationLogEntry(tag: "Up next",
-                        description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
                     self.upNextLogged = true
+                    _ = next
                 } else {
                     // Not ready yet — set flag so preGenerateNextSong() logs when it finishes
                     self.shouldLogNextUpWhenReady = true
@@ -1640,7 +1638,7 @@ final class AppState: ObservableObject {
                         pass2Events: state.trackEvents, pass2Bars: passBars)
                     self.songState = extended
                     self.appendToLog([GenerationLogEntry(tag: "Upcoming",
-                        description: "Evolving section \(passBars) bars with new pads, rhythm",
+                        description: "Evolving \(passBars) bars, new pads, rhythm",
                         isTitle: false)])
                 }
             }
@@ -1668,8 +1666,6 @@ final class AppState: ObservableObject {
                 if self.evolveNextSongShouldLog && !self.evolveNextSongLogged {
                     self.evolveNextSongShouldLog = false
                     self.evolveNextSongLogged    = true
-                    self.appendToLog([GenerationLogEntry(tag: "Up next",
-                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
                 }
             }
         }
@@ -1745,7 +1741,7 @@ final class AppState: ObservableObject {
                                                    pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars)
             songState = extended
             appendToLog([GenerationLogEntry(tag: "Upcoming",
-                description: "Evolving section \(evolvePass1Bars) bars with new leads",
+                description: "Evolving \(evolvePass1Bars) bars, new leads",
                 isTitle: false)])
         case .pass1:
             preGeneratePassContent(pass: 2)
