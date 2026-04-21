@@ -839,6 +839,18 @@ final class AppState: ObservableObject {
         statusLogVersion += 1
     }
 
+    /// Appends a blank separator (if the log isn't empty) followed by the generation log entries.
+    /// Use this whenever a new song's Style/Form/Chords/rules block is written to the log.
+    private func appendGenerationLog(_ entries: [GenerationLogEntry]) {
+        guard !entries.isEmpty else { return }
+        var batch: [GenerationLogEntry] = []
+        if !statusLog.isEmpty {
+            batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
+        }
+        batch.append(contentsOf: entries)
+        appendToLog(batch)
+    }
+
     // MARK: - Live annotation feed
 
     private func emitStepAnnotations(upTo step: Int) {
@@ -1021,24 +1033,35 @@ final class AppState: ObservableObject {
                 // From the second song onwards, pick 2 random non-drums tracks and assign
                 // each a random non-default instrument, so users hear the instrument variety.
                 // kTrackTexture is excluded for Chill — the generator already chose the texture.
-                if !isFirstForStyle {
-                    var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
-                    var picks: [(trackIndex: Int, instIndex: Int, name: String)] = []
+                // Instrument randomization: first song per style uses all defaults (index 0).
+                // Subsequent songs: pick 2 random tracks and assign each a new instrument drawn
+                // uniformly from the full pool, skipping if it would repeat the current choice.
+                // The overrides dict is updated (not replaced) so the other tracks keep their
+                // current instruments — giving a feeling of gradual change song to song.
+                // kTrackTexture for Chill is handled separately below.
+                if isFirstForStyle {
+                    self.instrumentOverrides = [:]
+                } else {
                     var rng = SystemRandomNumberGenerator()
-                    while picks.count < 2, !eligible.isEmpty {
+                    var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
+                    var pickedCount = 0
+                    while pickedCount < 2, !eligible.isEmpty {
                         let pos = eligible.indices.randomElement(using: &rng)!
                         let trackIdx = eligible.remove(at: pos)
                         let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style)
-                        if pool.count > 1 {
-                            let instIdx = Int.random(in: 1..<pool.count, using: &rng)
-                            picks.append((trackIdx, instIdx, pool[instIdx]))
+                        guard pool.count > 1 else { continue }
+                        let currentIdx = self.instrumentOverrides[trackIdx] ?? 0
+                        var newIdx = currentIdx
+                        var attempts = 0
+                        repeat {
+                            newIdx = Int.random(in: 0..<pool.count, using: &rng)
+                            attempts += 1
+                        } while newIdx == currentIdx && attempts < 3
+                        if newIdx != currentIdx {
+                            self.instrumentOverrides[trackIdx] = newIdx
+                            pickedCount += 1
                         }
                     }
-                    if !picks.isEmpty {
-                        self.instrumentOverrides = Dictionary(uniqueKeysWithValues: picks.map { ($0.trackIndex, $0.instIndex) })
-                    }
-                } else {
-                    self.instrumentOverrides = [:]
                 }
                 // Chill texture: always applied last so randomization can't overwrite it.
                 if style == .chill {
@@ -1050,14 +1073,7 @@ final class AppState: ObservableObject {
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
 
-                // Build the batch to append: optional separator + generation log
-                var batch: [GenerationLogEntry] = []
-                if !self.statusLog.isEmpty {
-                    batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
-                }
-                let logEntries = state.generationLog
-                batch.append(contentsOf: logEntries)
-                self.appendToLog(batch)
+                self.appendGenerationLog(state.generationLog)
                 // Reset mute/solo so every new song starts with all parts audible
                 self.muteState = Array(repeating: false, count: kTrackCount)
                 self.soloState = Array(repeating: false, count: kTrackCount)
@@ -1253,10 +1269,25 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Rewind to bar 0. In Song mode within the first 3 bars: load the previous song instead.
+    /// Rewind to bar 0. Within the first 3 bars: load the previous song instead (all modes).
     func seekToStart() {
-        if playMode == .song && playback.currentBar < 3 {
-            loadPreviousFromHistory()
+        if playback.currentBar < 3 {
+            if playMode == .song {
+                loadPreviousFromHistory()
+            } else {
+                // Endless / Evolve: walk back through in-memory generation history
+                guard let current = songState,
+                      let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
+                      idx > 0 else {
+                    seekTo(step: 0)
+                    visibleBarOffset = 0
+                    return
+                }
+                let prev = generationHistory[idx - 1]
+                appendToLog([GenerationLogEntry(tag: "Rewind",
+                    description: "\(prev.style.rawValue) - \(prev.title)", isTitle: true)])
+                loadFromGenerationHistory(prev)
+            }
         } else {
             seekTo(step: 0)
             visibleBarOffset = 0
@@ -1304,12 +1335,9 @@ final class AppState: ObservableObject {
                 guard self.playMode == .endless else { return }
                 self.nextSongState   = state
                 self.isPreGenerating = false
-                // Only log "Up next" if the approaching-end trigger requested it
                 if self.shouldLogNextUpWhenReady {
                     self.shouldLogNextUpWhenReady = false
                     self.upNextLogged = true
-                    self.appendToLog([GenerationLogEntry(tag: "Up next",
-                        description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
                 }
             }
         }
@@ -1337,6 +1365,9 @@ final class AppState: ObservableObject {
         // 500 ms silence between songs
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self, self.playMode == .endless else { return }
+            // Generation log first (Style, Form, Chords, rules), then finishLoadingSong
+            // appends Instruments — matching the order the Generate button produces.
+            self.appendGenerationLog(state.generationLog)
             self.finishLoadingSong(state, thenPlay: true)
         }
     }
@@ -1348,8 +1379,6 @@ final class AppState: ObservableObject {
             guard let self else { return }
             let state = SongGenerator.generate(style: nextStyle)
             await MainActor.run {
-                self.appendToLog([GenerationLogEntry(tag: "Up next",
-                    description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
                 self.startEndlessSong(state)
             }
         }
@@ -1359,11 +1388,6 @@ final class AppState: ObservableObject {
     func skipToNextSong() {
         guard playMode == .endless else { return }
         if let next = nextSongState {
-            // Log "Up next" now if the 12-bar trigger hadn't fired yet
-            if !upNextLogged {
-                appendToLog([GenerationLogEntry(tag: "Up next",
-                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
-            }
             nextSongState   = nil
             isPreGenerating = false
             startEndlessSong(next)
@@ -1734,8 +1758,6 @@ final class AppState: ObservableObject {
             // fires exactly once per loadAndPlay and the .pass2 case handles it first.
             if let next = evolveNextSongState, !evolveNextSongLogged {
                 evolveNextSongLogged = true
-                appendToLog([GenerationLogEntry(tag: "Up next",
-                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
             } else if !evolveNextSongLogged {
                 evolveNextSongShouldLog = true
                 preGenerateEvolveNextSong()
@@ -1782,17 +1804,12 @@ final class AppState: ObservableObject {
         }
         if let next = evolveNextSongState {
             evolveNextSongState = nil
-            if !evolveNextSongLogged {
-                appendToLog([GenerationLogEntry(tag: "Up next",
-                    description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
-            }
             // 500 ms silence between songs
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self, self.playMode == .evolve else { return }
                 self.finishLoadingEvolveSong(next)
             }
         } else {
-            appendToLog([GenerationLogEntry(tag: "Evolve", description: "Loading next song...", isTitle: false)])
             let style        = selectedStyle   // use currently selected style, not anchor's
             let styleChanged = style != (evolveAnchorState?.style ?? style)
             // If style changed, generate fresh — no BPM, mood, key or scale from the previous song.
@@ -1805,10 +1822,6 @@ final class AppState: ObservableObject {
                                                    style: style)
                 await MainActor.run {
                     guard self.playMode == .evolve else { return }
-                    if !self.evolveNextSongLogged {
-                        self.appendToLog([GenerationLogEntry(tag: "Up next",
-                            description: "\(state.style.rawValue) - \(state.title)", isTitle: true)])
-                    }
                     // 500 ms silence between songs
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                         guard let self, self.playMode == .evolve else { return }
@@ -1822,15 +1835,10 @@ final class AppState: ObservableObject {
     private func finishLoadingEvolveSong(_ state: SongState) {
         tearDownEvolve()           // resets evolveMoodAnchor to nil
         selectedStyle = state.style
+        // Generation log first (Style, Form, Chords, rules), then finishLoadingSong
+        // appends Instruments — matching the order the Generate button produces.
+        appendGenerationLog(state.generationLog)
         finishLoadingSong(state, thenPlay: true)
-        // Append the full generation log (title, key, mode, rules) for the new song,
-        // same as generateNew does — so the status area shows all the song details.
-        var batch: [GenerationLogEntry] = []
-        if !statusLog.isEmpty {
-            batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
-        }
-        batch.append(contentsOf: state.generationLog)
-        appendToLog(batch)
         // Song 2 already matched song 1's mood (enforced at pre-gen time via evolveMoodAnchor).
         // From song 3 onward, lockMoodToSong: false so mood is picked freely each time.
         startEvolveMode(from: state, lockMoodToSong: false)

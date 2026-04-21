@@ -599,8 +599,7 @@ final class PlaybackEngine: ObservableObject {
                     notes.append(contentsOf: self.pendingVisualizerNotes)
                     self.pendingVisualizerNotes.removeAll(keepingCapacity: true)
                 }
-                let cutoff = flushNow.addingTimeInterval(-34.0) // max orb lifetime is 32s + 2s buffer
-                notes.removeAll { $0.birthDate < cutoff }
+                notes.removeAll { flushNow.timeIntervalSince($0.birthDate) > $0.orbLifetime + 0.5 }
                 if notes.count > 80 { notes.removeFirst(notes.count - 80) }
                 self.activeVisualizerNotes = notes  // single assignment = single objectWillChange
             }
@@ -1284,8 +1283,8 @@ final class PlaybackEngine: ObservableObject {
             let durationSecs = Double(remSteps) * state.frame.secondsPerStep
             let startNanos   = DispatchTime.now().uptimeNanoseconds
 
-            let fadeSrc = DispatchSource.makeTimerSource(queue: .main)
-            fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            let fadeSrc = DispatchSource.makeTimerSource(queue: lfoQueue)
+            fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
             fadeSrc.setEventHandler { [weak self] in
                 guard let self, self.currentSchedulerID == schedulerID else { return }
                 let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
@@ -1344,8 +1343,8 @@ final class PlaybackEngine: ObservableObject {
                 self.boosts[kTrackPads].outputVolume = startProgress
                 self.startKosmicIntroEffects()
 
-                let src = DispatchSource.makeTimerSource(queue: .main)
-                src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+                let src = DispatchSource.makeTimerSource(queue: lfoQueue)
+                src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
                 src.setEventHandler { [weak self] in
                     guard let self, self.currentSchedulerID == schedulerID else { return }
                     let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
@@ -1429,7 +1428,7 @@ final class PlaybackEngine: ObservableObject {
             let startNanos   = DispatchTime.now().uptimeNanoseconds
 
             let fadeSrc = DispatchSource.makeTimerSource(queue: .main)
-            fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+            fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
             fadeSrc.setEventHandler { [weak self] in
                 guard let self, self.currentSchedulerID == schedulerID else { return }
                 let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
@@ -1472,7 +1471,7 @@ final class PlaybackEngine: ObservableObject {
                 self.engine.mainMixerNode.outputVolume = startProgress
 
                 let src = DispatchSource.makeTimerSource(queue: .main)
-                src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+                src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
                 src.setEventHandler { [weak self] in
                     guard let self, self.currentSchedulerID == schedulerID else { return }
                     let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
@@ -1519,7 +1518,7 @@ final class PlaybackEngine: ObservableObject {
 
         // Start shared timer only if not already running
         guard ambientFadeTimer == nil else { return }
-        let src = DispatchSource.makeTimerSource(queue: .main)
+        let src = DispatchSource.makeTimerSource(queue: lfoQueue)
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(10))
         src.setEventHandler { [weak self] in self?.tickAmbientFades() }
         src.resume()
@@ -1533,7 +1532,8 @@ final class PlaybackEngine: ObservableObject {
         for idx in 0..<2 {
             guard ambientNoteFadeActive[idx] else { continue }
             let trackIndex = idx == 0 ? kTrackBass : kTrackPads
-            let elapsed = Double(now - ambientNoteFadeStartNanos[idx]) / 1_000_000_000.0
+            let startNanos = ambientNoteFadeStartNanos[idx]
+            let elapsed = startNanos <= now ? Double(now - startNanos) / 1_000_000_000.0 : 0.0
             let t       = Float(min(1.0, elapsed / ambientNoteFadeDuration[idx]))
             let vol     = ambientNoteFadeFromVol[idx] + t * (ambientNoteFadeToVol[idx] - ambientNoteFadeFromVol[idx])
             let muted   = muteState[trackIndex] || (anySoloActive && !soloState[trackIndex])
@@ -1593,7 +1593,7 @@ final class PlaybackEngine: ObservableObject {
                 self.engine.mainMixerNode.outputVolume = startProgress
 
                 let src = DispatchSource.makeTimerSource(queue: .main)
-                src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+                src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
                 src.setEventHandler { [weak self] in
                     guard let self, self.currentSchedulerID == schedulerID else { return }
                     let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
@@ -1645,7 +1645,7 @@ final class PlaybackEngine: ObservableObject {
         let startNanos = DispatchTime.now().uptimeNanoseconds
 
         let src = DispatchSource.makeTimerSource(queue: .main)
-        src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(5))
+        src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
         src.setEventHandler { [weak self] in
             guard let self, self.currentSchedulerID == schedulerID else { return }
             let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0

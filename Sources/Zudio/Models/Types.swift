@@ -448,7 +448,15 @@ struct VisualizerNote: Identifiable, Sendable {
     let velocity:      UInt8   // 0–127 → drives orb size/brightness
     let birthDate:     Date    // wall-clock spawn time
     let durationSteps: Int     // gate length → drives orb shape (comet tail, sonar ring)
-    let noteDurationSecs: Double // actual gate duration in wall-clock seconds — drives orb lifetime
+    let noteDurationSecs: Double // actual gate duration in wall-clock seconds
+
+    /// How long the orb stays visible. Single source of truth used by both the draw loop and pruning.
+    var orbLifetime: Double {
+        if durationSteps <= 4  { return 1.6 }
+        if durationSteps <= 8  { return 3.0 }
+        if durationSteps <= 16 { return 5.0 }
+        return min(max(7.0, noteDurationSecs + 2.0), 32.0)
+    }
 }
 
 // MARK: - GM program numbers per track (v1 defaults)

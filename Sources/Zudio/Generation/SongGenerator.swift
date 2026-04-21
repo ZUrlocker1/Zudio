@@ -1385,7 +1385,7 @@ struct SongGenerator {
         case "MOT-LD2-006": return "Neu! harmony"
         // Ambient Lead 2 rules
         case "AMB-SYNC-001": return "Ghost echo lead"
-        case "AMB-LEAD-005": return "Silent-window fill lead"
+        case "AMB-LEAD-005": return "Silent-window fill"
         case "AMB-LEAD-006": return "No lead 2"
         default:            return ruleID
         }
@@ -1747,7 +1747,7 @@ struct SongGenerator {
         case "AMB-LEAD-005":     return "Silent-window fill"
         case "AMB-LEAD-006":     return "No lead 2"
         case "AMB-LEAD-004":    return "Echo lead phrase"
-        case "AMB-XFILES-001":  return "Spooky  X-Files theme"
+        case "AMB-XFILES-001":  return "Spooky X-Files theme"
         // Rhythm
         case "AMB-RTHM-001": return "Single-tone pulse"
         case "AMB-RTHM-002": return "Sparse arpeggio"
@@ -1762,7 +1762,7 @@ struct SongGenerator {
         case "AMB-TEXT-004": return "No texture"
         // Drums
         case "AMB-DRUM-004": return "Claude hand percussion"
-        case "AMB-DRUM-001": return "Sparse ride/hat with cymbal shimmer"
+        case "AMB-DRUM-001": return "Sparse ride, cymbals"
         case "AMB-DRUM-002": return "Soft pulse"
         case "AMB-DRUM-003": return "No percussion"
         default:                   return ruleID

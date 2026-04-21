@@ -55,6 +55,11 @@ struct StatusBoxView: View {
     @State private var minusFlash: Bool = false
     @State private var plusFlash:  Bool = false
 
+    // Pinch-to-zoom state — captures the offset at gesture start so successive
+    // onChanged values (always relative to gesture origin) apply cleanly.
+    @State private var pinchBaseOffset: Int = 0
+    @State private var pinching: Bool = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header — "Generation Log" label + font-size ±buttons.
@@ -165,6 +170,25 @@ struct StatusBoxView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .scrollIndicators(.visible)
+                #if os(iOS)
+                .simultaneousGesture(
+                    MagnificationGesture()
+                        .onChanged { scale in
+                            guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+                            if !pinching {
+                                pinching = true
+                                pinchBaseOffset = appState.statusLogFontOffset
+                            }
+                            let delta = Int(round((scale - 1.0) * 6))
+                            appState.statusLogFontOffset = max(-4, min(8, pinchBaseOffset + delta))
+                        }
+                        .onEnded { _ in
+                            guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+                            pinching = false
+                            pinchBaseOffset = appState.statusLogFontOffset
+                        }
+                )
+                #endif
                 #if os(iOS)
                 // iPad mini (portrait <800pt, landscape 900–1150pt): smaller minimum so
                 // track rows get their full 7×63pt. Other iPads get ≥3 lines.

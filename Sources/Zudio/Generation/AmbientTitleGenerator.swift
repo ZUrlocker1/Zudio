@@ -61,9 +61,9 @@ struct AmbientTitleGenerator {
         "Damp Pavement", "Mist", "Drizzle", "Light Rain",
         "A Persistent Drizzle", "Low Cloud", "Grey Skies",
         "Morning Fog", "The Smell of Rain on Tarmac",
-        "Unremarkable Haze", "Fine Mist", "Intermittent Showers",
+        "Unremarkable Haze", "Fine Mist", "Intermittent Rain",
         "Overcast Conditions", "Residual Dampness",
-        "A Mild Weather Warning", "Patchy Fog"
+        "Mild Weather", "Patchy Fog"
     ]
 
     private static let weatherPrepositions = ["at", "over", "near", "above", "outside", "beyond"]
@@ -76,7 +76,7 @@ struct AmbientTitleGenerator {
         "Hemel Hempstead", "the NCP Car Park", "a Suburban Cul-de-Sac",
         "the Service Station", "the B2047", "the Overflow Car Park",
         "an Industrial Unit", "the Dual Carriageway",
-        "the Goods Entrance", "a Medium-Sized Retail Park"
+        "the Goods Entrance", "a Medium-Sized Mall"
     ]
 
     private static let abstractNouns = [
@@ -86,18 +86,18 @@ struct AmbientTitleGenerator {
         "The Structural Integrity", "The Gradual Decay",
         "The Fading Echo", "The Quiet Insistence",
         "The Phenomenology", "The Specific Gravity",
-        "The Bearing Capacity", "The Half-Life"
+        "The Bearing Load", "The Half-Life"
     ]
 
     private static let tepidSubjects = [
         "a Beige Wall", "Tepid Tea", "the Waiting Room",
         "a Slightly Damp Coat", "Mildly Warm Coffee",
-        "an Unread Email", "a Forgotten Password", "the Under-Secretary",
-        "a Partially Eaten Sandwich", "the Suspended Ceiling","WOOC(P)",
+        "an Unread Email", "a Lost Password", "the Under-Secretary",
+        "a Cold Sandwich", "the Suspended Ceiling","WOOC(P)",
         "a Persistent Hum", "a Lukewarm Radiator",
         "the Beige Carpet", "a Receding Hairline",
-        "an Unanswered Voicemail", "the Fire Exit", "a Bad Investment", "the Reign of Zorvaak",
-        "a Nearly Empty Stapler", "Mild Disappointment", "the Forrest Connection"
+        "a Deleted Voicemail", "the Fire Exit", "a Bad Investment", "the Reign of Zorvaak",
+        "an Empty Stapler", "Disappointment", "the Forrest Connection"
     ]
 
     private static let technicalAdjectives = [
@@ -117,24 +117,24 @@ struct AmbientTitleGenerator {
     private static let mundaneActivities = [
         "a Slow Elevator", "the Monday Commute",
         "a Career Rethink", "an Uneventful Tuesday",
-        "an Administrative Error", "an Unscheduled Meeting",
-        "Forms in Triplicate", "a Lukewarm Room",
-        "the Lower Suburbs", "a Slight Change of Plans",
-        "a Poorly Attended Meeting", "a Delayed Reply",
-        "an Uneventful Friday", "an Expired Parking Permit",
-        "a Very Slow Download", "a Mildly Odd Error Message"
+        "a Clerical Error", "a Missed Meeting",
+        "Forms in Triplicate", "a Warm Room",
+        "the Lower Suburbs", "a Change of Plans",
+        "a Too Long Meeting", "a Delayed Reply",
+        "a Busy Friday", "an Expired Permit",
+        "a Slow Download", "an Odd Error Message"
     ]
 
     private static let weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Sunday"]
 
     private static let mundaneEvents = [
         "Afternoon", "Lunch", "Morning", "Evening",
-        "the 3pm Meeting", "a Routine Dental Checkup",
+        "the 3pm Meeting", "a Dental Checkup",
         "a Mild Disagreement", "a Brief Drizzle", "Persistent Drizzle",
         "a Slight Delay", "a Tepid Coffee", "a Cancelled Meeting",
         "Nothing in Particular", "the Usual", "a Light Lunch",
-        "a Slightly Long Queue", "an Awkward Silence",
-        "a Missed Connection", "a Gentle Inconvenience"
+        "a Too Long Queue", "an Awkward Silence",
+        "a Missed Connection", "an Inconvenience"
     ]
 
     private static let pretentiousAdjectives = [
@@ -155,7 +155,7 @@ struct AmbientTitleGenerator {
     private static let ambientSubtitles = [
         "Music for Spreadsheets", "Day of Moderate Rain",
         "On the Ring Road", "The Plateaux of the Car Park",
-        "On Beige", "Thinking Music III", "Mild Weather",
+        "On Beige", "Bland Music III", "Mild Weather",
         "Thursday Afternoon (Revised)", "On Hold",
         "Music for the DMV", "Studies in Low Effort",
         "Atmospheres of the M25", "On Tepid", "Day of Low Motivation"
@@ -164,11 +164,11 @@ struct AmbientTitleGenerator {
     private static let drabSettings = [
         "Translucent Curtains", "a Net Curtain", "a Frosted Window",
         "the Gap Under the Door", "a Stairwell",
-        "a Fluorescent-Lit Corridor", "a Partially Open Office Door",
-        "a Fogged Car Window", "the Suspended Ceiling Tiles",
+        "a Dim Corridor", "a Closed Office Door",
+        "a Fogged Car Window", "the Suspended Ceiling",
         "a Venetian Blind", "a Fire Door (Ajar)",
         "the Window of a Conference Room",
-        "a Revolving Door That Is Stuck"
+        "a Stuck Revolving Door"
     ]
 
     private static let frenchWords   = ["Deuxieme", "Troisieme", "Quatrieme", "Fragment", "Suite", "Reprise"]
@@ -263,21 +263,21 @@ struct AmbientTitleGenerator {
         "Hyper-Hypo-Lydian", "Pseudo-Phrygian Dominant-ish", "Locrian-Shmocrian",
         "Neapolitan Major", "Aeroplanian", "Mixerlydian",
         "Cheddar-Chromatic", "Espressolydian", "Lasagnian Minor",
-        "Mid-Life-Crisis-Major", "Passive-Aggressive-Pentatonic",
-        "Existential-Dread-Diminished", "3:00 AM Ionian",
+        "Mid-Life-Crisis-Major", "Possibly-Pentatonic",
+        "Existential-Dread-Dim.", "3:00 AM Ionian",
         "Pre-Coffee Harmonic Minor", "Synthesized Regret Major",
         "Quantum-Superposition-C",
         // Originals
-        "Vaguely Phrygian", "Accidentally Octatonic", "Ionian (With Mistakes)",
+        "Vaguely Phrygian", "Accidental Octatonic", "Ionian w/ Mistakes",
         "Dorian Mode (The Sad One)", "Wonky Bebop Diminished",
-        "Ukrainian Dorian (Misremembered)", "Reverse-Dorian Approx.",
-        "Debatably Pentatonic", "Post-Lydian (Flat 7)",
+        "Ukrainian Dorian", "Reverse-Polish Approx.",
+        "Partly Pentatonic", "Post-Lydian (Flat 7)",
         "Hypo-Mixolydian-Adjacent", "Sub-Lydian (Nearly)",
         "B-Flat Existential", "Augmented Disappointment",
         "Double-Harmonic-ish", "Byzantine (Probably)",
         "Chromatic but Sad", "Slightly Sharp Ionian",
-        "Dim. Self-Esteem Scale", "Whole Tone (Half Remembered)",
-        "Octatonic (Missing One Note)", "Altered (Barely)"
+        "Dim. Self-Esteem Scale", "Whole Tone (Not Remembered)",
+        "Octatonic (Maybe)", "Altered (Barely)"
     ]
 
     // Classical music forms — used in tech-grief pattern
@@ -351,7 +351,7 @@ struct AmbientTitleGenerator {
         "a Pitch Deck", "a Pre-Seed Round",
         "the Catered Office", "the Off-Site",
         "an Unconference", "the Open Plan",
-        "a Standing Meeting", "the All-Hands"
+        "a Meeting", "the All-Hands"
     ]
 
     // Fake musical terms — corruptions of Italian/Spanish performance directions

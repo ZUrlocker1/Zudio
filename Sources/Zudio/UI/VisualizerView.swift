@@ -12,14 +12,6 @@ private final class OrbFrameCache {
     var unmuteAge = [Double](repeating: -1.0, count: kTrackCount) // -1 = no active flash
 }
 
-// File-scope so VisualizerView and MacVisualizerGestureView.Coordinator share one copy.
-private func orbLifetime(_ orb: VisualizerNote) -> Double {
-    if orb.durationSteps <= 4  { return 1.6 }
-    if orb.durationSteps <= 8  { return 3.0 }
-    if orb.durationSteps <= 16 { return 5.0 }
-    // Long notes: stay visible for their full audio duration plus a 2 s fade tail, capped at 32 s.
-    return min(max(7.0, orb.noteDurationSecs + 2.0), 32.0)
-}
 
 struct VisualizerView: View {
     @EnvironmentObject var playback: PlaybackEngine
@@ -206,10 +198,21 @@ struct VisualizerView: View {
         // Read after filling — CoW: shares the buffer without a copy (neither alias is mutated below).
         let hx = orbCache.hx, hy = orbCache.hy, unmuteAge = orbCache.unmuteAge
 
+        // Limit Pads to 2 visible orbs at any time — skip oldest, keep newest 2.
+        // Pre-count avoids birthDate grouping, which fails for arpeggiated chords
+        // (each note fires on a different step and gets a different birthDate).
+        var activePadsCount = 0
+        for n in playback.activeVisualizerNotes where n.trackIndex == kTrackPads {
+            if now.timeIntervalSince(n.birthDate) < n.orbLifetime { activePadsCount += 1 }
+        }
+        var padsToSkip = max(0, activePadsCount - 2)
+
         for orb in playback.activeVisualizerNotes {
             let age = now.timeIntervalSince(orb.birthDate)
-            let lifetime = orbLifetime(orb)
+            let lifetime = orb.orbLifetime
             guard age < lifetime else { continue }
+
+            if orb.trackIndex == kTrackPads && padsToSkip > 0 { padsToSkip -= 1; continue }
 
             let isLong     = orb.durationSteps >= 8
             let isVeryLong = orb.durationSteps >= 32
@@ -232,10 +235,9 @@ struct VisualizerView: View {
             let color  = Self.kTrackColors[min(orb.trackIndex, Self.kTrackColors.count - 1)]
             let ox = hx[orb.trackIndex], oy = hy[orb.trackIndex]
 
-            // Comet tail ghosts — 1 pass for long notes, 2 for very long (was 3/4).
-            // Keeps the comet-tail feel at half the fill cost.
+            // Comet tail: 1 ghost pass for all long notes regardless of length.
             if isLong && muteScale > 0.1 {
-                let ghostCount = isVeryLong ? 2 : 1
+                let ghostCount = 1
                 for g in 1...ghostCount {
                     let ghostAge = max(0, age - Double(g) * 0.08)
                     let pos = orbPos(orb: orb, age: ghostAge, size: size, hx: ox, hy: oy)
@@ -265,7 +267,7 @@ struct VisualizerView: View {
             let fa = unmuteAge[orb.trackIndex]
             let flashBoost = fa >= 0 ? 0.5 * (1.0 + cos(fa / 0.6 * .pi)) : 0.0
 
-            let haloR    = radius * (2.2 + flashBoost * 2.5)
+            let haloR    = radius * (1.5 + flashBoost * 2.5)
             let coreR    = radius * (1.0 + flashBoost * 0.45)
             let coreOp   = opacity * (0.85 + flashBoost * 0.60) * muteScale
             let haloOp   = opacity * (0.22 + flashBoost * 0.55) * muteScale
@@ -298,6 +300,7 @@ struct VisualizerView: View {
         }
 
         // Tap-point flash rings — immediate green ring at the exact click/tap position.
+        appState.orbTapFlashes.removeAll { now.timeIntervalSince($0.date) >= $0.duration }
         for flash in appState.orbTapFlashes {
             let flashAge = now.timeIntervalSince(flash.date)
             guard flashAge < flash.duration else { continue }
@@ -507,7 +510,7 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
             let now = Date()
             for orb in parent.notes.reversed() {
                 let age = now.timeIntervalSince(orb.birthDate)
-                guard age < orbLifetime(orb) else { continue }
+                guard age < orb.orbLifetime else { continue }
                 let pos    = orbPosition(orb: orb, age: age, size: size, now: now)
                 let radius = orbRadius(orb) * 1.5   // generous hit target
                 let dx = point.x - pos.x
