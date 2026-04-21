@@ -31,30 +31,30 @@ struct AmbientTitleGenerator {
 
     private static let mundanePlaces = [
         "Dentist Waiting Rooms", "a Drafty Hallway", "the Lower Deck of a Ferry",
-        "an Inadequate Conference Room", "the Queue at Boots",
+        "a Locked Conference Room", "the Queue at Boots",
         "Browsing IKEA on a Sunday", "a Cancelled Train",
         "the Tyre Centre Queue",
         "the Bus that Was Full", "Supermarket Self-Checkout",
-        "an Uneventful Tuesday", "a Slightly Too Long Meeting",
+        "an Uneventful Tuesday", "a Too Long Meeting",
         "the Unused Changing Room", "a Business Park in January",
         "the Post-Lunch Deadzone",
         "the NCP Car Park at Dusk", "a Mildly Warm Office",
-        "a Regional Distribution Centre", "the Holdmusic",
+        "a Distribution Centre", "the Holdmusic",
         "a Slowly Loading Web Page", "an Unattended Printer",
-        "the Outside of a Petrol Station", "Reconsidering Life Choices",
+        "the Petrol Station", "Reconsidering Life Choices",
         "Returning Without Receipt"
     ]
 
     private static let endingParentheticals = [
         "That Never Ends", "Possibly", "Eventually",
-        "In Which Nothing Happens", "Awaiting Confirmation",
+        "Where Nothing Happens", "Awaiting Confirmation",
         "TBC", "Already Happened", "Subject to Availability",
         "Pending", "More or Less", "See Previous Notes",
-        "Under Review", "Not Really", "Gradually, Then All at Once",
-        "To Be Rescheduled", "Which Was Really the Middle",
-        "Descending Slowly", "In Which the Tape Runs Out",
+        "Under Review", "Not Really", "Gradually All at Once",
+        "To Be Rescheduled", "Which Was the Middle",
+        "Descending Slowly", "When the Tape Runs Out",
         "Pt. II of I", "Do Not Distribute", "Final Version (3)",
-        "The One Where Nothing Resolves"
+        "Where Nothing Resolves"
     ]
 
     private static let weatherConditions = [
@@ -72,10 +72,10 @@ struct AmbientTitleGenerator {
         "Slough", "Stevenage", "the Retail Park", "Milton Keynes", "Luton",
         "the Industrial Estate", "the Business Park", "a Roundabout", "Bristol",
         "the Lower Car Park", "a Disused Underpass", "Basingstoke", "Guilford",
-        "the Ring Road", "a Disused Gravel Pit", "the Trading Estate",
-        "Hemel Hempstead", "the NCP Car Park", "a Suburban Cul-de-Sac",
-        "the Service Station", "the B2047", "the Overflow Car Park",
-        "an Industrial Unit", "the Dual Carriageway",
+        "the Ring Road", "a Gravel Pit", "the Trading Estate",
+        "Hemel Hempstead", "the NCP Car Park", "a Cul-de-Sac",
+        "the Service Station", "the B2047", "the Car Park",
+        "an Industrial Unit", "the Carriageway",
         "the Goods Entrance", "a Medium-Sized Mall"
     ]
 
@@ -83,44 +83,44 @@ struct AmbientTitleGenerator {
         "The Memory", "The Properties", "The Persistence",
         "The Thermodynamics", "The Geometry",
         "The Topology", "The Absence", "The Curvature",
-        "The Structural Integrity", "The Gradual Decay",
+        "The Integrity", "The Gradual Decay",
         "The Fading Echo", "The Quiet Insistence",
-        "The Phenomenology", "The Specific Gravity",
+        "The Essence", "The Density",
         "The Bearing Load", "The Half-Life"
     ]
 
     private static let tepidSubjects = [
         "a Beige Wall", "Tepid Tea", "the Waiting Room",
-        "a Slightly Damp Coat", "Mildly Warm Coffee",
+        "a Damp Coat", "Cold Coffee",
         "an Unread Email", "a Lost Password", "the Under-Secretary",
         "a Cold Sandwich", "the Suspended Ceiling","WOOC(P)",
-        "a Persistent Hum", "a Lukewarm Radiator",
+        "a Persistent Hum", "a Cold Radiator",
         "the Beige Carpet", "a Receding Hairline",
         "a Deleted Voicemail", "the Fire Exit", "a Bad Investment", "the Reign of Zorvaak",
         "an Empty Stapler", "Disappointment", "the Forrest Connection"
     ]
 
     private static let technicalAdjectives = [
-        "Stochastic", "Recursive", "Algorithmic", "Probabilistic",
-        "Thermodynamic", "Entropic", "Parametric", "Non-Deterministic",
-        "Emergent", "Iterative", "Tautological", "Self-Referential",
-        "Asymptotic", "Non-Euclidean", "Heuristic", "Brownian"
+        "Stochastic", "Recursive", "Systemic", "Bayesian",
+        "Kinetic", "Entropic", "Parametric", "Chaotic",
+        "Emergent", "Iterative", "Tautological", "Circular",
+        "Asymptotic", "Hyperbolic", "Heuristic", "Brownian"
     ]
 
     private static let technicalNouns = [
         "Patterns", "Textures", "Fragments", "Functions",
         "Oscillations", "Drifts", "Sequences", "Feedback",
-        "Processes", "Permutations", "Data", "Decay Functions",
-        "Error Rates", "Gradient Descent", "Signal Loss", "Connection"
+        "Processes", "Variants", "Data", "Entropy",
+        "Error Rates", "Decay", "Signal Loss", "Connection"
     ]
 
     private static let mundaneActivities = [
         "a Slow Elevator", "the Monday Commute",
-        "a Career Rethink", "an Uneventful Tuesday",
+        "a Career Rethink", "an Slow Tuesday",
         "a Clerical Error", "a Missed Meeting",
-        "Forms in Triplicate", "a Warm Room",
-        "the Lower Suburbs", "a Change of Plans",
-        "a Too Long Meeting", "a Delayed Reply",
+        "Paperwork", "a Warm Room",
+        "the Suburbs", "a Change of Plans",
+        "a Long Meeting", "a Delayed Reply",
         "a Busy Friday", "an Expired Permit",
         "a Slow Download", "an Odd Error Message"
     ]

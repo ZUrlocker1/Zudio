@@ -160,9 +160,9 @@ struct ContentView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                    infoChip("Mood",   song.frame.mood.rawValue.capitalized)
-                    infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)")
-                    infoChip("BPM",    "\(song.frame.tempo)")
+                    if contentWidth >= 800 { infoChip("Mood",   song.frame.mood.rawValue.capitalized) }
+                    if contentWidth >= 950 { infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)") }
+                    if contentWidth >= 1100 { infoChip("BPM",    "\(song.frame.tempo)") }
                     infoChip("Length", songLength(song))
                     infoChip("Bar", String(format: "%03d", appState.playback.currentBar + 1))
                 } else if !appState.isGenerating {

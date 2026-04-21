@@ -88,12 +88,13 @@ struct TrackRowView: View {
         case kTrackLead2:
             if isChill {
                 return [.init(name:"Vibraphone",   program:11),  .init(name:"Flute",          program:73),
-                        .init(name:"Soprano Sax",  program:64),  .init(name:"Trombone",       program:57)]
+                        .init(name:"Soprano Sax",  program:64),  .init(name:"Trombone",       program:57),
+                        .init(name:"Xylophone",    program:13)]
             }
             if isAmbient {
-                return [.init(name:"Celesta",       program:8),   .init(name:"Grand Piano",    program:0),
-                        .init(name:"Metal Pad",    program:93),  .init(name:"Space Voice",    program:91),
-                        .init(name:"FX Atmosphere",program:99)]
+                return [.init(name:"Harp",           program:46),  .init(name:"Grand Piano",   program:0),
+                        .init(name:"Acoustic Guitar",program:24), .init(name:"FX Crystal",     program:98),
+                        .init(name:"Space Voice",  program:91),  .init(name:"FX Atmosphere",  program:99)]
             }
             if isKosmic {
                 return [.init(name:"Brightness",  program:100), .init(name:"Bassoon",    program:70),
@@ -122,9 +123,8 @@ struct TrackRowView: View {
                         .init(name:"B3 Organ",    program:17)]
             }
             if isAmbient {
-                return [.init(name:"Vibraphone",   program:11),  .init(name:"Marimba",        program:12),
-                        .init(name:"Tubular Bells",program:14),  .init(name:"Glockenspiel",   program:9),
-                        .init(name:"FX Crystal",   program:98),  .init(name:"FX Echoes",      program:102)]
+                return [.init(name:"Glockenspiel",  program:9),   .init(name:"Steel Drums",   program:114),
+                        .init(name:"Marimba",       program:12),  .init(name:"Tubular Bells", program:14)]
             }
             if isKosmic {
                 return [.init(name:"Moog Lead",    program:39), .init(name:"Wurlitzer",   program:5),

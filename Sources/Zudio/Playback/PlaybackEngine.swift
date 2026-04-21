@@ -848,6 +848,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.3    // Muted Trumpet runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead2 && program == 11 {
                 vol = 1.45   // Vibraphone runs soft in GM — boost for presence
+            } else if trackIndex == kTrackLead2 && program == 13 {
+                vol = 1.90   // Xylophone runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
             } else if trackIndex == kTrackLead1 && program == 80 {
@@ -859,9 +861,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead2 && program == 93 {
                 vol = 1.8    // Metal Pad runs soft in GM — boost for Lead 2 audibility
             } else if trackIndex == kTrackLead2 && program == 0 {
-                vol = 0.75   // Grand Piano runs loud on Ambient Lead 2 — pull back
-            } else if trackIndex == kTrackLead2 && program == 8 {
-                vol = 1.8    // Celesta runs soft in GM
+                vol = 0.50   // Grand Piano runs loud on Ambient Lead 2 — pull back
             } else if trackIndex == kTrackLead2 && program == 99 {
                 vol = 2.0    // FX Atmosphere runs very soft in GM
             } else if trackIndex == kTrackTexture && (program == 90 || program == 86) {
