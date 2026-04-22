@@ -84,7 +84,7 @@ struct TrackRowView: View {
                         .init(name:"Oboe",         program:68),  .init(name:"Recorder",       program:74)]
             }
             return [.init(name:"Mono Synth",       program:81), .init(name:"Soft Brass",      program:62),
-                    .init(name:"Pad 3 Poly",       program:90), .init(name:"Square Lead",      program:80)]
+                    .init(name:"Pad 3 Poly",       program:90), .init(name:"Chiff Lead",       program:83)]
         case kTrackLead2:
             if isChill {
                 return [.init(name:"Vibraphone",   program:11),  .init(name:"Flute",          program:73),
@@ -164,7 +164,8 @@ struct TrackRowView: View {
             }
             if isAmbient {
                 return [.init(name:"Cello",        program:42),  .init(name:"French Horn",    program:60),
-                        .init(name:"Contrabass",   program:43),  .init(name:"Fretless Bass",  program:35)]
+                        .init(name:"Contrabass",   program:43),  .init(name:"Voice Oohs",     program:54),
+                        .init(name:"English Horn", program:69)]
             }
             if isKosmic {
                 return [.init(name:"Moog Bass",    program:39), .init(name:"Fretless Bass",  program:35),
@@ -404,7 +405,7 @@ struct TrackRowView: View {
             return [.boost, .delay, .reverb]
         case kTrackTexture:
             if isChill   { return [.boost, .lowShelf, .reverb] }
-            if isAmbient { return [.pan, .delay, .space] }
+            if isAmbient { return [.pan, .sweep, .space] }
             return isKosmic ? [.pan, .delay, .space] : [.pan, .delay, .reverb]
         case kTrackBass:
             if isChill   { return [.lowShelf, .compression, .reverb] }
@@ -454,9 +455,9 @@ struct TrackRowView: View {
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]
             case kTrackLead2:   [.space]
-            case kTrackPads:    [.space]
+            case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
-            case kTrackTexture: [.space, .pan]
+            case kTrackTexture: [.space, .pan, .sweep]
             case kTrackBass:    [.reverb, .sweep]
             case kTrackDrums:   [.delay]
             default:            []

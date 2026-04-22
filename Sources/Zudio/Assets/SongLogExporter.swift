@@ -37,6 +37,13 @@ struct SongLogExporter {
 
     // MARK: - Log construction
 
+    private static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build   = info?["CFBundleVersion"]            as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
     private static func buildLog(_ song: SongState) -> String {
         var lines: [String] = []
 
@@ -49,7 +56,7 @@ struct SongLogExporter {
             "=== Zudio Song Analysis Log ===",
             col("Title:",          16) + song.title,
             col("Generated:",      16) + dateStr,
-            col("Zudio Version:",  16) + "1.0",
+            col("Zudio Version:",  16) + versionString,
             col("Seed:",           16) + "\(song.globalSeed)",
             col("Style:",          16) + song.style.rawValue.capitalized,
         ]

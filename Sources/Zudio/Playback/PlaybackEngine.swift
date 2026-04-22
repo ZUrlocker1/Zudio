@@ -40,9 +40,15 @@ final class PlaybackEngine: ObservableObject {
     // Tracks with zero MIDI events in the current song — effects suppressed to avoid processing silence.
     private var emptyTrackSet: Set<Int> = []
 
-    // Per-track Ambient reverb wet values (cathedral for Lead/Pads/Texture, largeChamber for rest)
-    // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums
-    private let ambientReverbWet: [Float]    = [82, 78, 88, 65, 75, 62, 70, 82]  // LeadSynth: same as Lead1; Texture 90→75
+    // Per-track Ambient reverb wet values — mediumHall for leads/pads/rhythm, largeRoom for texture, mediumRoom for bass
+    // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums, LeadSynth
+    private let ambientReverbWet: [Float]    = [65, 60, 72, 50, 60, 45, 70, 65]
+    // Per-track Chill reverb wet values — mediumHall for leads/rhythm/drums, mediumRoom for bass
+    private let chillReverbWet:   [Float]    = [45, 40, 55, 40,  0, 35, 40, 45]
+    // Per-track Motorik reverb wet values — mediumHall for most, mediumRoom for bass
+    private let motorikReverbWet: [Float]    = [55, 50, 50, 45, 50, 40, 45, 55]
+    // Per-track Kosmic reverb wet values — largeHall for leads/bass, cathedral for pads, mediumHall for texture
+    private let kosmicReverbWet:  [Float]    = [60, 55, 62, 50, 55, 45, 45, 60]
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
@@ -119,13 +125,17 @@ final class PlaybackEngine: ObservableObject {
     private var outroStartFired     = false
 
     // Kosmic drone fade (intro 0→1, outro 1→0 on boosts[bass] and boosts[pads])
-    var kosmicStyle: Bool = false
+    var kosmicStyle: Bool = false {
+        didSet { if kosmicStyle && kosmicStyle != oldValue { applyKosmicAudio() } }
+    }
     private var droneFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
     // Body entrance fade: tracks with no intro notes fade in over 1 bar at the body downbeat
     private var bodyEntranceFadeTimer: DispatchSourceTimer? = nil
 
     // Motorik fade (intro 0→1, outro 1→0 on engine.mainMixerNode — all tracks together)
-    var motorikStyle: Bool = false
+    var motorikStyle: Bool = false {
+        didSet { if motorikStyle && motorikStyle != oldValue { applyMotorikAudio() } }
+    }
     var chillFade: Bool = false
     private var motorikFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
 
@@ -324,8 +334,13 @@ final class PlaybackEngine: ObservableObject {
         } else if motorikStyle {
             // Pads and Rhythm panned for separation; Texture rarely used so stays centre
             trackStaticPan = [-0.07, 0.07, -0.20, 0.20, 0, 0, 0, 0]
+        } else if ambientMode {
+            // Texture stays 0 — auto-pan LFO controls it dynamically
+            trackStaticPan = [-0.20, 0.20, 0.10, -0.15, 0, 0, 0, 0]
+        } else if chillPadsMode {
+            trackStaticPan = [-0.20, 0.15, -0.10, 0.15, 0, 0, 0, 0]
         } else {
-            trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]   // Ambient: no static spread
+            trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]
         }
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
@@ -930,16 +945,16 @@ final class PlaybackEngine: ObservableObject {
             return
         }
         // Set per-track reverb presets for Ambient
-        let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture]
         for i in 0..<reverbs.count {
-            if i == kTrackDrums {
+            switch i {
+            case kTrackDrums:
                 reverbs[i].loadFactoryPreset(.plate)
-            } else if i == kTrackRhythm {
-                reverbs[i].loadFactoryPreset(.mediumHall)   // was largeChamber — lighter, adequate tail
-            } else if atmosphericTracks.contains(i) {
-                reverbs[i].loadFactoryPreset(.cathedral)
-            } else {
-                reverbs[i].loadFactoryPreset(.largeChamber)
+            case kTrackTexture:
+                reverbs[i].loadFactoryPreset(.largeRoom)
+            case kTrackBass:
+                reverbs[i].loadFactoryPreset(.mediumRoom)
+            default:  // Lead1, Lead2, Pads, Rhythm, LeadSynth
+                reverbs[i].loadFactoryPreset(.mediumHall)
             }
         }
         // Set Ambient delay times based on current song tempo
@@ -967,8 +982,13 @@ final class PlaybackEngine: ObservableObject {
             reverbs[kTrackPads].loadFactoryPreset(.cathedral)  // restore Pads to init preset
             return
         }
-        // Pads: medium hall is lighter than cathedral and adequate for slow, soft Chill pads.
+        // Chill reverb presets — lighter than the cathedral/largeChamber init defaults.
+        reverbs[kTrackLead1].loadFactoryPreset(.mediumHall)
+        reverbs[kTrackLead2].loadFactoryPreset(.mediumHall)
         reverbs[kTrackPads].loadFactoryPreset(.mediumHall)
+        reverbs[kTrackRhythm].loadFactoryPreset(.mediumHall)
+        reverbs[kTrackBass].loadFactoryPreset(.mediumRoom)
+        reverbs[kTrackDrums].loadFactoryPreset(.mediumHall)
         // kTrackTexture sampler is unused in Chill — bypass its entire effect chain.
         // (setEffect guards against re-enabling it; this covers the init low-shelf which is always on.)
         lowEQs[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
@@ -979,11 +999,53 @@ final class PlaybackEngine: ObservableObject {
         let tempo    = songState?.frame.tempo ?? 80
         let beatSecs = 60.0 / Double(tempo)
         delays[kTrackLead1].delayTime     = Swift.min(2.0, beatSecs * 0.75)  // dotted-quarter
-        delays[kTrackLead1].feedback      = 55
-        delays[kTrackLead1].lowPassCutoff = 5000
+        delays[kTrackLead1].feedback      = 35   // 2–3 audible echoes (was 55 → too many repeats)
+        delays[kTrackLead1].lowPassCutoff = 3000 // darker echoes — shadows, not copies (was 5000)
         delays[kTrackLead2].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // quarter note
         delays[kTrackLead2].feedback      = 40
         delays[kTrackLead2].lowPassCutoff = 5500
+    }
+
+    private func applyMotorikAudio() {
+        // Reverb presets — lighter than cathedral/largeChamber init defaults
+        for i in 0..<reverbs.count {
+            reverbs[i].loadFactoryPreset(i == kTrackBass ? .mediumRoom : .mediumHall)
+        }
+        // Tempo-synced delays: Lead 1 = 16th note (tight doubling), Rhythm = 8th note (syncopated echo)
+        let tempo    = songState?.frame.tempo ?? 120
+        let beatSecs = 60.0 / Double(tempo)
+        delays[kTrackLead1].delayTime     = Swift.min(2.0, beatSecs * 0.25) // 16th note
+        delays[kTrackLead1].feedback      = 35
+        delays[kTrackLead1].lowPassCutoff = 4000
+        delays[kTrackRhythm].delayTime    = Swift.min(2.0, beatSecs * 0.5)  // 8th note
+        delays[kTrackRhythm].feedback     = 30
+        delays[kTrackRhythm].lowPassCutoff = 3500
+    }
+
+    private func applyKosmicAudio() {
+        // Reverb presets — lighter than cathedral/largeChamber init defaults
+        reverbs[kTrackLead1].loadFactoryPreset(.largeHall)
+        reverbs[kTrackLead2].loadFactoryPreset(.largeHall)
+        reverbs[kTrackPads].loadFactoryPreset(.cathedral)   // keep cathedral — main droning element
+        reverbs[kTrackTexture].loadFactoryPreset(.mediumHall)
+        reverbs[kTrackBass].loadFactoryPreset(.largeHall)   // body preset; startKosmicIntroEffects overrides to cathedral
+        reverbs[kTrackRhythm].loadFactoryPreset(.mediumHall)
+        reverbs[kTrackDrums].loadFactoryPreset(.mediumHall)
+        // Tempo-synced delays
+        let tempo    = songState?.frame.tempo ?? 110
+        let beatSecs = 60.0 / Double(tempo)
+        delays[kTrackLead1].delayTime      = Swift.min(2.0, beatSecs * 0.75)  // dotted quarter
+        delays[kTrackLead1].feedback       = 38
+        delays[kTrackLead1].lowPassCutoff  = 4000
+        delays[kTrackPads].delayTime       = Swift.min(2.0, beatSecs * 2.0)   // half note
+        delays[kTrackPads].feedback        = 25
+        delays[kTrackPads].lowPassCutoff   = 3000
+        delays[kTrackTexture].delayTime    = Swift.min(2.0, beatSecs * 0.75)  // dotted quarter
+        delays[kTrackTexture].feedback     = 28
+        delays[kTrackTexture].lowPassCutoff = 3500
+        delays[kTrackRhythm].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // 8th note
+        delays[kTrackRhythm].feedback      = 30
+        delays[kTrackRhythm].lowPassCutoff = 4000
     }
 
     // MARK: - Per-track effect toggle
@@ -1007,6 +1069,12 @@ final class PlaybackEngine: ObservableObject {
             delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
                 delays[trackIndex].wetDryMix = enabled ? ambientDelayWet[trackIndex] : 0
+            } else if chillPadsMode && trackIndex == kTrackLead1 {
+                delays[trackIndex].wetDryMix = enabled ? 30 : 0  // St. Germain echo: subtle shadow
+            } else if motorikStyle && trackIndex == kTrackLead1 {
+                delays[trackIndex].wetDryMix = enabled ? 35 : 0  // tight doubling — present but behind dry
+            } else if kosmicStyle && trackIndex == kTrackLead1 {
+                delays[trackIndex].wetDryMix = enabled ? 35 : 0  // spacious echo — present but diffuse
             } else {
                 delays[trackIndex].wetDryMix = enabled ? 40 : 0
             }
@@ -1034,14 +1102,19 @@ final class PlaybackEngine: ObservableObject {
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb:
             reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            let wet: Float = ambientMode && trackIndex < ambientReverbWet.count
-                ? ambientReverbWet[trackIndex] : 50
+            let wet: Float = ambientMode   && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
+                : chillPadsMode            && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
+                : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
+                : kosmicStyle              && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
+                : 50
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         case .space:
             reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            let wet: Float = ambientMode && trackIndex < ambientReverbWet.count
-                ? ambientReverbWet[trackIndex]
-                : (chillPadsMode ? 55 : 70)
+            let wet: Float = ambientMode   && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
+                : chillPadsMode            && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
+                : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
+                : kosmicStyle              && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
+                : 70
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         }
     }
@@ -1098,8 +1171,11 @@ final class PlaybackEngine: ObservableObject {
 
         // Sweep — ~20fps, all active tracks (skipped for tracks overridden by global sweep)
         for i in 0..<kTrackCount where sweepEnabled[i] && globalSweepTicksRemaining == 0 {
-            sweepPhase[i] += 0.02199  // 2π × 0.07 Hz / 20 fps
-            let cutoff = Float(300 + 1600 * (1 + sin(sweepPhase[i])))
+            let inc   = ambientMode && i < ambientSweepPhaseInc.count  ? ambientSweepPhaseInc[i]  : 0.02199
+            let floor = ambientMode && i < ambientSweepFloor.count     ? ambientSweepFloor[i]     : Float(300)
+            let half  = ambientMode && i < ambientSweepHalfRange.count ? ambientSweepHalfRange[i] : Float(1600)
+            sweepPhase[i] += inc
+            let cutoff = floor + half * Float(1 + sin(sweepPhase[i]))
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
         }
 
@@ -1167,10 +1243,15 @@ final class PlaybackEngine: ObservableObject {
         stopSharedLFOIfIdle()
     }
 
-    // MARK: - Sweep LFO (0.07 Hz sine, cutoff 300–3500 Hz, slight resonance)
-    // Ambient phase offsets: Lead1=0°, Lead2=90°, Pads=180°, Bass=270° — keeps all sweeps
-    // permanently out of phase so the texture breathes rather than pumping as a single block.
-    private let ambientSweepOffset: [Double] = [0.0, 1.5708, 3.1416, 0.0, 0.0, 4.7124, 0.0, 0.0]  // LeadSynth: 0°
+    // MARK: - Sweep LFO
+    // Ambient phase offsets (radians): Lead1=0°, Lead2=90°, Pads=180°, Texture=90°, Bass=270°
+    // Staggered so tracks never all open/close simultaneously.
+    private let ambientSweepOffset:    [Double] = [0.0,    1.5708, 3.1416, 0.0,    1.5708, 4.7124, 0.0, 0.0]
+    // Pads/Texture: high-shelf sweep (1500–7000 Hz, 0.035 Hz) — body intact, only shimmer breathes.
+    // Leads/Bass/Rhythm: full sweep (300–3500 Hz, 0.07 Hz).
+    private let ambientSweepFloor:     [Float]  = [300,    300,    1500,   300,    1500,   300,    300, 300]
+    private let ambientSweepHalfRange: [Float]  = [1600,   1600,   2750,   1600,   2750,   1600,   1600, 1600]
+    private let ambientSweepPhaseInc:  [Double] = [0.02199,0.02199,0.011,  0.02199,0.011,  0.02199,0.02199, 0.02199]
 
     private func startSweep(forTrack i: Int) {
         sweepEnabled[i] = true
@@ -1713,9 +1794,9 @@ final class PlaybackEngine: ObservableObject {
             boosts[kTrackBass].pan = 0.0
         }
         stopSharedLFOIfIdle()
-        // Revert bass reverb to Large Chamber for the body
-        reverbs[kTrackBass].loadFactoryPreset(.largeChamber)
-        reverbs[kTrackBass].wetDryMix = 50
+        // Revert bass reverb to Large Hall for the body (lighter than the intro cathedral)
+        reverbs[kTrackBass].loadFactoryPreset(.largeHall)
+        reverbs[kTrackBass].wetDryMix = 45
     }
 
     // MARK: - All-notes-off (used by stop())

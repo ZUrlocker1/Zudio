@@ -111,9 +111,9 @@ final class MacPlatformHost: ZudioPlatformHost {
                     Task { @MainActor [weak target] in target?.selectedStyle = .ambient }
                 case 8:  // 'c' — Chill
                     Task { @MainActor [weak target] in target?.selectedStyle = .chill }
-                case 11: // 'b' — beginning
+                case 11: // 'b' — beginning of current track only, never rewinds to prior track
                     guard target.songState != nil else { return event }
-                    Task { @MainActor [weak target] in target?.seekToStart() }
+                    Task { @MainActor [weak target] in target?.seekTo(step: 0) }
                 case 6:  // 'z' — next song (or generate if at top of stack)
                     guard target.songState != nil else { return event }
                     Task { @MainActor [weak target] in target?.loadNextFromHistory() }

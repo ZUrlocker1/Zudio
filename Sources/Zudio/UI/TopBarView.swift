@@ -1023,7 +1023,7 @@ struct AboutView: View {
             Spacer()
             #endif
 
-            Text("Available for iPhone, iPad and Mac.")
+            Text("Available for iPhone, iPad and macOS.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
 

@@ -862,7 +862,7 @@ private struct PhoneInfoView: View {
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Text("Available for iPad, Mac with MIDI track view.")
+                    Text("Available for iPad and macOS with MIDI track view.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
