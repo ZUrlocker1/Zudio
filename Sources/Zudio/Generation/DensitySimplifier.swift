@@ -1,4 +1,5 @@
 // DensitySimplifier.swift — generation step 10
+// Copyright (c) 2026 Zack Urlocker
 // Collision / density simplification pass.
 // Rules: if Lead 1 conflicts with pads → thin Lead 1; if Lead 1 conflicts with Lead 2 → thin Lead 2.
 // Never allow high-fill drums and high-density Lead 1 in the same 8-bar window.

@@ -1,4 +1,5 @@
 // AmbientHelpers.swift — Shared utilities for Ambient generators.
+// Copyright (c) 2026 Zack Urlocker
 
 /// Returns all MIDI notes in [low…high] whose pitch class is in `pitchClasses`.
 func notesInRegister(pitchClasses: Set<Int>, low: Int, high: Int) -> [UInt8] {

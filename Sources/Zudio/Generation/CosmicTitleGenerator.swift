@@ -1,4 +1,5 @@
 // KosmicTitleGenerator.swift — Kosmic / space-themed song title generator
+// Copyright (c) 2026 Zack Urlocker
 //
 // Eight patterns:
 //   1. Single JMJ-X word            — Vortexe, Proxima, Equinoxe

@@ -1,4 +1,5 @@
 // ZudioPlatformHost.swift — platform abstraction protocol for AppState
+// Copyright (c) 2026 Zack Urlocker
 //
 // AppState calls through this protocol for all platform-specific behavior.
 // MacPlatformHost provides the macOS implementation; IOSPlatformHost provides iOS.

@@ -1,4 +1,5 @@
 // AudioTexturePlayer.swift — ambient texture loop player for Chill style
+// Copyright (c) 2026 Zack Urlocker
 // Uses AVAudioEngine + AVAudioPlayerNode for full DSP effect support.
 // Effects: Boost, Low shelf (+5 dB at 80 Hz), Reverb (large chamber).
 // Hidden: slow stereo pan LFO + random high-pass or pitch shift per play-through.

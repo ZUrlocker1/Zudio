@@ -1,4 +1,5 @@
 // MacPlatformHost.swift — macOS implementation of ZudioPlatformHost
+// Copyright (c) 2026 Zack Urlocker
 
 #if os(macOS)
 import AppKit

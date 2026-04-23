@@ -1,4 +1,5 @@
 // DrumGenerator.swift — generation step 4
+// Copyright (c) 2026 Zack Urlocker
 //
 // Rule catalog:
 //   DRM-001: Classic Motorik — kick 1+3, snare 2+4, 16th-hat velocity gradient (Apache beat)

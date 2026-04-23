@@ -1,4 +1,5 @@
 // TitleGenerator.swift — Motorik title generator (spec §Motorik Title Generator)
+// Copyright (c) 2026 Zack Urlocker
 //
 // Seven patterns:
 //   1. German noun compound         — MaschineBahn, KraftWelle

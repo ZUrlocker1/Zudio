@@ -293,3 +293,6 @@ Two viable models for the iOS/iPadOS release.
 - Pros: zero-friction discovery, users hear the value before paying, natural upsell when they want to keep a song
 - Cons: StoreKit integration, entitlement checks at export and style-switch points, sandbox test environment — meaningful extra development time
 - Key principle: never limit the number of generations; the generative loop is the core value; only gate export and style access
+
+---
+Copyright (c) 2026 Zack Urlocker

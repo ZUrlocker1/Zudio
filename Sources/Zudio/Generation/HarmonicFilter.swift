@@ -1,4 +1,5 @@
 // HarmonicFilter.swift — generation step 11
+// Copyright (c) 2026 Zack Urlocker
 // Three-pass musicality pass; runs after ArrangementFilter.
 //
 // Pass A — Harmonic clash guard (Lead 1, Lead 2):

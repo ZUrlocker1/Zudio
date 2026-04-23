@@ -1,4 +1,5 @@
 # Zudio Implementation Reference
+Copyright (c) 2026 Zack Urlocker
 
 This document is the detailed implementation reference for Zudio's generation engine, musical
 rules, and UX behavior. It is intended for contributors working on generators, rule design, or

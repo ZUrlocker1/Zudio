@@ -1,4 +1,5 @@
 // LeadGenerator.swift — generation step 7
+// Copyright (c) 2026 Zack Urlocker
 // LD1-001: Phrase-first — v2 starter phrases (4 bars, 8 phrases), cycling with directional mutation
 // LD1-002: Pentatonic Cell — short driving cell, locked 16 bars then one-interval mutation
 // LD1-003: Punch Solo — 3–4 note melodic bursts, pentatonic, 4–8 bar silence between solos

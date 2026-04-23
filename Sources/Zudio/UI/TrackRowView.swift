@@ -1,4 +1,5 @@
 // TrackRowView.swift — track controls + MIDI lane + effects column
+// Copyright (c) 2026 Zack Urlocker
 // Track colors: Lead 1/2 = red, Pads/Rhythm/Texture = blue, Bass = purple, Drums = yellow
 
 import SwiftUI

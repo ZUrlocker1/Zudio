@@ -1,4 +1,5 @@
 // PhonePlayerView.swift — Minimal player UI for iPhone.
+// Copyright (c) 2026 Zack Urlocker
 // Apple Music-style layout: visuals on top, controls at the bottom within thumb reach.
 
 import SwiftUI

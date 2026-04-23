@@ -1,4 +1,5 @@
 // KosmicDrumGenerator.swift — Kosmic drum / percussion generation
+// Copyright (c) 2026 Zack Urlocker
 // Implements KOS-RULE-08 and KOS-RULE-18 with all four percussionStyle options.
 // KOS-RULE-22: hi-hat velocity swing (ghost/accent alternation)
 // KOS-RULE-21: decomposed drum voice streams

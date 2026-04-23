@@ -240,3 +240,6 @@ Second pass through the Study 03 batch — same 19 Kosmic songs — using the sa
 - Log files land in the same Downloads folder as MIDI files: `~/Downloads/Zudio-SongName.txt`
 - Bar numbers in the log are 1-based for readability
 - Playback annotations in the log are sorted by bar position, not emission order
+
+---
+Copyright (c) 2026 Zack Urlocker

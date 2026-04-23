@@ -1,4 +1,5 @@
 // PatternEvolver.swift — generation step 12
+// Copyright (c) 2026 Zack Urlocker
 // Applies gradual pattern mutation to the bass track across evolution windows.
 //
 // Inspired by Glass/Reich additive-subtractive process, Tangerine Dream sequencer drift,

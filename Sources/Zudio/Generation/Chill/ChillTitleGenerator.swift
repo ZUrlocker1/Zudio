@@ -1,4 +1,5 @@
 // ChillTitleGenerator.swift — Chill generation step 8
+// Copyright (c) 2026 Zack Urlocker
 // Urban/nocturnal/cosmopolitan title vocabulary.
 // Five pools: city phrase (50%), French word, English two-word, adj+noun, time-of-day.
 // City phrases use three sub-patterns: prefix+city, city+suffix, or "The [City] [Suffix]".

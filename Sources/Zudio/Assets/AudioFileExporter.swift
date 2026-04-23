@@ -1,4 +1,5 @@
 // AudioFileExporter.swift — song-named M4A filenames + metadata writing
+// Copyright (c) 2026 Zack Urlocker
 
 import Foundation
 import AVFoundation

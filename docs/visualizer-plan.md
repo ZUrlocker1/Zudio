@@ -1,4 +1,5 @@
 # Visualizer Plan
+Copyright (c) 2026 Zack Urlocker
 
 ## Overview
 

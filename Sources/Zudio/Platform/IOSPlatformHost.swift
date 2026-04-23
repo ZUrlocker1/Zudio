@@ -1,4 +1,5 @@
 // IOSPlatformHost.swift — iOS implementation of ZudioPlatformHost
+// Copyright (c) 2026 Zack Urlocker
 // Full implementation wired up in Phase 1 of the iOS port.
 
 #if os(iOS)

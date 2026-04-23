@@ -1,4 +1,5 @@
 // ContentView.swift — root layout: top bar + song info+zoom strip + track rows + h-scroll + status box
+// Copyright (c) 2026 Zack Urlocker
 
 import SwiftUI
 

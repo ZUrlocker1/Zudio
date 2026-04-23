@@ -1,4 +1,5 @@
 // SeededRNG.swift — SplitMix64 deterministic PRNG
+// Copyright (c) 2026 Zack Urlocker
 // Same seed + same controls => same output. Do not substitute arc4random or SystemRandomNumberGenerator.
 
 struct SeededRNG: Sendable {

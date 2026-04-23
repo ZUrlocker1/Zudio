@@ -1,4 +1,5 @@
 // SongLogExporter.swift — writes a companion analysis log alongside a saved MIDI file.
+// Copyright (c) 2026 Zack Urlocker
 // Output: same base name as the MIDI file, .txt extension.
 // Used by the Musical Coherence analysis workflow (docs/musical-coherence-plan.md).
 
@@ -179,6 +180,7 @@ struct SongLogExporter {
                 parts.append("Tx:audio")
                 continue
             }
+            if i == kTrackLeadSynth && song.style != .kosmic { continue }
             let p = generationProgram(forTrack: i, song: song)
             if p != 255 { parts.append("\(shortNames[i]):\(p)") }
         }

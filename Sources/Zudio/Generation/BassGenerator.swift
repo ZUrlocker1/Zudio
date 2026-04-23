@@ -1,4 +1,5 @@
 // BassGenerator.swift — generation step 5
+// Copyright (c) 2026 Zack Urlocker
 //
 // Rule catalog:
 //   BAS-001: Root Anchor — root beat 1 (long), chord tone beat 3, clean and locked

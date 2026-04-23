@@ -1,4 +1,5 @@
 // KosmicMusicalFrameGenerator.swift — Kosmic generation step 1
+// Copyright (c) 2026 Zack Urlocker
 // Produces a GlobalMusicalFrame tuned for Berlin School / Kosmic style.
 // Reuses GlobalMusicalFrame (same struct as Motorik) with Kosmic distributions.
 

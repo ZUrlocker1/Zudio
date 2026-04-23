@@ -1,4 +1,5 @@
 // PadsGenerator.swift — generation step 6
+// Copyright (c) 2026 Zack Urlocker
 // Harmonic bed using open chord voicings. Register: MIDI 48–84.
 //
 // Rule catalog (one primary style selected per song):

@@ -1,4 +1,5 @@
 // StepScheduler.swift — DispatchSourceTimer at 16th-note resolution
+// Copyright (c) 2026 Zack Urlocker
 // Spec §Playback timeline and step timer
 
 import Foundation

@@ -1,4 +1,5 @@
 // MusicalFrameGenerator.swift — generation step 1
+// Copyright (c) 2026 Zack Urlocker
 // Produces a GlobalMusicalFrame. Key/tempo come from UI overrides when set.
 
 import Foundation

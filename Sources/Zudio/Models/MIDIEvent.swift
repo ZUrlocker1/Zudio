@@ -1,4 +1,5 @@
 // MIDIEvent.swift — one MIDI note event, step-addressed
+// Copyright (c) 2026 Zack Urlocker
 
 struct MIDIEvent: Equatable, Hashable, Sendable {
     /// Absolute step index within the full song (bar × 16 + step-within-bar).

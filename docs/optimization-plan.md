@@ -94,3 +94,6 @@ let hasIntroNotes = state.trackEvents[i].contains { $0.stepIndex < introEndStep 
 ### E. DensitySimplifier count-in-place (DONE)
 
 Replace `events.filter { ... }.count` with a loop variable, avoiding temporary array allocation.
+
+---
+Copyright (c) 2026 Zack Urlocker

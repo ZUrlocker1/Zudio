@@ -1,4 +1,5 @@
 // KosmicBassGenerator.swift — Kosmic bass generation
+// Copyright (c) 2026 Zack Urlocker
 // Implements KOS-BAS-001 through KOS-BAS-005 and KOS-RULE-17 (dual bass layers)
 // KOS-RULE-06: bass range MIDI 40–55
 // KOS-RULE-05: synth-bass patterns use velocity = 100 flat

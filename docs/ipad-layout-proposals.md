@@ -393,3 +393,6 @@ Build three SwiftUI preview targets before writing the full iPad port:
 3. `ZudioPadTrackInspectorPreview`
 
 That will let you validate spacing, hit targets, and information density before touching the full production layout logic.
+
+---
+Copyright (c) 2026 Zack Urlocker

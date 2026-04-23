@@ -1,4 +1,5 @@
 # Zudio Development Stages
+Copyright (c) 2026 Zack Urlocker
 
 - This document describes the stages of development for Zudio, a generative music application
 - More details are defined in `implementation.md`.

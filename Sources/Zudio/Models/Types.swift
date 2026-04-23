@@ -1,4 +1,5 @@
 // Types.swift — all enums and track-index constants (authoritative per prototype spec)
+// Copyright (c) 2026 Zack Urlocker
 
 import Foundation
 

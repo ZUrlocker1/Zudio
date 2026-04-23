@@ -1,4 +1,5 @@
 // KosmicStructureGenerator.swift — Kosmic generation step 2
+// Copyright (c) 2026 Zack Urlocker
 // Produces a SongStructure for Kosmic style with long sections and glacial pacing.
 //
 // Supported song forms: single_evolving, ab, aba, abab, abba

@@ -1,4 +1,5 @@
 // ChillRhythmGenerator.swift — Chill generation step 7 (Rhythm track)
+// Copyright (c) 2026 Zack Urlocker
 // Rhythm = Rhodes active comping (Electric Piano 1, program 4).
 // Four comping modes: St Germain syncopated (Bright/Free), Moby backbeat (Deep/Dream),
 // Bosa Moon arpeggiated (Bright/Free), Acid jazz stab groove (hipHopJazz).

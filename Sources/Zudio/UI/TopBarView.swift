@@ -1,4 +1,5 @@
 // TopBarView.swift — compact 3-row header
+// Copyright (c) 2026 Zack Urlocker
 // Row 1: blank spacer | Row 2: transport + controls | Row 3: Export Audio + Save Song
 
 import SwiftUI
@@ -997,7 +998,7 @@ struct AboutView: View {
                     .frame(width: 48, height: 48)
                 Text("Zudio").font(.title.bold())
             }
-            Text("Generative music application vibe coded with AI!")
+            Text("Generative music application built with AI!")
                 .foregroundStyle(.secondary)
             Divider()
 

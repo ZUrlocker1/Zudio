@@ -1,4 +1,5 @@
 // StructureGenerator.swift — generation step 2
+// Copyright (c) 2026 Zack Urlocker
 // Produces a SongStructure: ordered sections + chord plan.
 
 struct StructureGenerator {

@@ -1,4 +1,5 @@
 // CosmicHelpers.swift — Shared pitch and velocity utilities for Kosmic generators.
+// Copyright (c) 2026 Zack Urlocker
 // These free functions are visible to all Kosmic generator structs in the module.
 
 // Clamp a MIDI note number to a target register by transposing up or down in octaves.

@@ -178,4 +178,4 @@ The 100-character keyword field in App Store Connect is the primary lever, but t
 New apps typically take 1–3 days for Apple review. Music/generative apps rarely get rejected unless there is a crash on launch or a content issue. The reviewer note above is important — generative apps have been rejected in the past because reviewers didn't understand that the output is supposed to vary.
 
 ---
-
+Copyright (c) 2026 Zack Urlocker

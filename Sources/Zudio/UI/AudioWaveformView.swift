@@ -1,4 +1,5 @@
 // AudioWaveformView.swift — Looping audio waveform display for the Chill Texture track.
+// Copyright (c) 2026 Zack Urlocker
 // Replaces MIDILaneView on kTrackTexture when an audio texture is selected.
 // Same 3-layer ZStack pattern as MIDILaneView: static waveform layer (Equatable,
 // skipped on playhead ticks) + playhead Canvas (O(1) per tick) + drag-to-seek.

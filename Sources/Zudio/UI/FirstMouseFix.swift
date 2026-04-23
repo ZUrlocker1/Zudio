@@ -1,4 +1,5 @@
 #if os(macOS)
+// Copyright (c) 2026 Zack Urlocker
 // FirstMouseFix.swift — makes a region accept mouse events without requiring window focus first.
 // Apply as .background(FirstMouseFix()) to any area that should respond on first click.
 

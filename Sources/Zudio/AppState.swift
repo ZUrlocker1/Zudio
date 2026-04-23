@@ -1,4 +1,5 @@
 // AppState.swift — global observable app state, shared across all views
+// Copyright (c) 2026 Zack Urlocker
 
 import SwiftUI
 import Combine
@@ -352,6 +353,7 @@ final class AppState: ObservableObject {
     private var evolveIsPreGenerating:     Bool        = false
     private var evolveNextSongShouldLog:   Bool        = false  // set at 12-bar mark; tells preGen to log when ready
     private var evolveNextSongLogged:      Bool        = false  // prevents duplicate "Up next" at transition
+    private var evolveInstrumentsChanged:  Bool        = false  // true if both evolve passes ran before song end
     // Incremented on each evolve phase switch so the scrollbar recreates itself even when
     // totalBars hasn't changed (e.g. preGeneratePassContent(pass: 2) already extended songState).
     @Published var evolvePhaseToken: Int = 0
@@ -438,6 +440,23 @@ final class AppState: ObservableObject {
     private var songInstrumentOverrides: [Int: Int] = [:]
 
     private static let randomizableTrackIndices = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass, kTrackDrums]
+
+    // Instruments that should not carry over into a consecutive song.
+    // If still selected when a new song loads, they are replaced with a different random pick.
+    private static let onceOnlyInstruments: [(track: Int, style: MusicStyle, poolIndex: Int)] = [
+        (kTrackLead2,  .kosmic,  3),  // Vox Solo        patch 85
+        (kTrackBass,   .kosmic,  2),  // Lead Bass        patch 87
+        (kTrackRhythm, .kosmic,  2),  // Rock Organ       patch 18
+        (kTrackBass,   .motorik, 2),  // Rock Bass        patch 34
+        (kTrackLead2,  .motorik, 1),  // Brightness       patch 100
+        (kTrackLead1,  .ambient, 1),  // Ocarina          patch 79
+        (kTrackLead2,  .ambient, 0),  // Harp             patch 46
+        (kTrackLead2,  .ambient, 1),  // Grand Piano      patch 0
+        (kTrackLead2,  .ambient, 2),  // Acoustic Guitar  patch 24
+        (kTrackBass,   .ambient, 3),  // Voice Oohs       patch 54
+        (kTrackBass,   .ambient, 4),  // English Horn     patch 69
+        (kTrackRhythm, .ambient, 1),  // Steel Drums      patch 114
+    ]
 
     private static let trackDisplayName: [Int: String] = [
         kTrackLead1: "Lead 1", kTrackLead2: "Lead 2", kTrackPads: "Pads",
@@ -1042,27 +1061,9 @@ final class AppState: ObservableObject {
                 if isFirstForStyle {
                     self.instrumentOverrides = [:]
                 } else {
-                    var rng = SystemRandomNumberGenerator()
-                    var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
-                    var pickedCount = 0
-                    while pickedCount < 2, !eligible.isEmpty {
-                        let pos = eligible.indices.randomElement(using: &rng)!
-                        let trackIdx = eligible.remove(at: pos)
-                        let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style)
-                        guard pool.count > 1 else { continue }
-                        let currentIdx = self.instrumentOverrides[trackIdx] ?? 0
-                        var newIdx = currentIdx
-                        var attempts = 0
-                        repeat {
-                            newIdx = Int.random(in: 0..<pool.count, using: &rng)
-                            attempts += 1
-                        } while newIdx == currentIdx && attempts < 3
-                        if newIdx != currentIdx {
-                            self.instrumentOverrides[trackIdx] = newIdx
-                            pickedCount += 1
-                        }
-                    }
+                    self.randomizeTwoInstruments(style: style)
                 }
+                self.replaceOnceOnlyInstruments(style: style)
                 // Chill texture: always applied last so randomization can't overwrite it.
                 if style == .chill {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
@@ -1355,6 +1356,42 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func replaceOnceOnlyInstruments(style: MusicStyle) {
+        var rng = SystemRandomNumberGenerator()
+        for entry in Self.onceOnlyInstruments where entry.style == style {
+            let current = instrumentOverrides[entry.track] ?? 0
+            guard current == entry.poolIndex else { continue }
+            let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style)
+            guard pool.count > 1 else { continue }
+            var newIdx = current
+            repeat { newIdx = Int.random(in: 0..<pool.count, using: &rng) } while newIdx == current
+            instrumentOverrides[entry.track] = newIdx
+        }
+    }
+
+    private func randomizeTwoInstruments(style: MusicStyle) {
+        var rng = SystemRandomNumberGenerator()
+        var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
+        var pickedCount = 0
+        while pickedCount < 2, !eligible.isEmpty {
+            let pos = eligible.indices.randomElement(using: &rng)!
+            let trackIdx = eligible.remove(at: pos)
+            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style)
+            guard pool.count > 1 else { continue }
+            let currentIdx = instrumentOverrides[trackIdx] ?? 0
+            var newIdx = currentIdx
+            var attempts = 0
+            repeat {
+                newIdx = Int.random(in: 0..<pool.count, using: &rng)
+                attempts += 1
+            } while newIdx == currentIdx && attempts < 3
+            if newIdx != currentIdx {
+                instrumentOverrides[trackIdx] = newIdx
+                pickedCount += 1
+            }
+        }
+    }
+
     private func startEndlessSong(_ state: SongState) {
         selectedStyle            = state.style
         shouldLogNextUpWhenReady = false   // reset — next pre-gen is silent until trigger fires
@@ -1368,6 +1405,8 @@ final class AppState: ObservableObject {
             // Generation log first (Style, Form, Chords, rules), then finishLoadingSong
             // appends Instruments — matching the order the Generate button produces.
             self.appendGenerationLog(state.generationLog)
+            self.randomizeTwoInstruments(style: state.style)
+            self.replaceOnceOnlyInstruments(style: state.style)
             self.finishLoadingSong(state, thenPlay: true)
         }
     }
@@ -1411,6 +1450,7 @@ final class AppState: ObservableObject {
         evolveIsPreGenerating    = false
         evolveNextSongShouldLog  = false
         evolveNextSongLogged     = false
+        evolveInstrumentsChanged = false
         evolvePhaseToken        += 1   // ensure scrollbar recreates even if next song has same totalBars
     }
 
@@ -1439,7 +1479,10 @@ final class AppState: ObservableObject {
             entries.append(GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(iName)", isTitle: false))
         }
         instrumentChangeToken += 1
-        if !entries.isEmpty { appendToLog(entries) }
+        if !entries.isEmpty {
+            appendToLog(entries)
+            evolveInstrumentsChanged = true
+        }
     }
 
     private func startEvolveMode(from song: SongState, lockMoodToSong: Bool = true) {
@@ -1831,11 +1874,14 @@ final class AppState: ObservableObject {
     }
 
     private func finishLoadingEvolveSong(_ state: SongState) {
-        tearDownEvolve()           // resets evolveMoodAnchor to nil
+        let alreadyEvolved = evolveInstrumentsChanged
+        tearDownEvolve()           // resets evolveMoodAnchor and evolveInstrumentsChanged to false
         selectedStyle = state.style
         // Generation log first (Style, Form, Chords, rules), then finishLoadingSong
         // appends Instruments — matching the order the Generate button produces.
         appendGenerationLog(state.generationLog)
+        if !alreadyEvolved { randomizeTwoInstruments(style: state.style) }
+        replaceOnceOnlyInstruments(style: state.style)
         finishLoadingSong(state, thenPlay: true)
         // Song 2 already matched song 1's mood (enforced at pre-gen time via evolveMoodAnchor).
         // From song 3 onward, lockMoodToSong: false so mood is picked freely each time.

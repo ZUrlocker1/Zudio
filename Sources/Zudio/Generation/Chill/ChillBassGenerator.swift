@@ -1,4 +1,5 @@
 // ChillBassGenerator.swift — Chill generation step 4
+// Copyright (c) 2026 Zack Urlocker
 // Four patterns (CHL-BASS-001 to CHL-BASS-004), section-aware.
 // All notes snapped to active scale (CHL-SYNC-001).
 // Bass root lands on chord root at bar boundaries (CHL-SYNC-008).

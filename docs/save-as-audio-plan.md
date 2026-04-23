@@ -171,3 +171,6 @@ Idle/playing  →  requestExport()  →  confirmation sheet
 7. During export, press Cancel → overlay dismisses, partial `.m4a` remains in Downloads
 8. After export completes, confirm live playback works normally (engine not damaged)
 9. Verify file size for a 4-minute song is approximately 3.8 MB
+
+---
+Copyright (c) 2026 Zack Urlocker

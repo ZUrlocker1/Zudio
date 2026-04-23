@@ -1,4 +1,5 @@
 // AmbientLeadGenerator.swift — Lead 1 and Lead 2 generators for Ambient style
+// Copyright (c) 2026 Zack Urlocker
 // Lead 1 rules: silence (20%), AMB-LEAD-001 floating tone (15%),
 //               AMB-LEAD-002 echo phrase (15%), AMB-LEAD-003 pentatonic shimmer (15%),
 //               AMB-LEAD-007 lyric fragment (9%), AMB-LEAD-008 returning motif (10%),

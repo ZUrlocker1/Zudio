@@ -1,4 +1,5 @@
 // VisualizerView.swift — Abstract generative visual for iPhone Player Mode.
+// Copyright (c) 2026 Zack Urlocker
 // Brian Eno Reflection / JMJ Eon aesthetic: per-note orbs drift and fade.
 // Comet tails and sonar rings for long notes, calculated mathematically (no stored history).
 // Each track's home position drifts slowly in its own direction using sinusoidal oscillation.

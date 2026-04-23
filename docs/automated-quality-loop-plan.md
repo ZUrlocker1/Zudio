@@ -978,3 +978,6 @@ Focus: tonal clashes, muddy texture, register overlap.
 
 Zero `!!` flags in the tonal clash section; register overlap below threshold in ≥ 8/10
 songs; simultaneous density ≤ 4 tracks in all body bars.
+
+---
+Copyright (c) 2026 Zack Urlocker

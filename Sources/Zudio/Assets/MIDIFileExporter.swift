@@ -1,4 +1,5 @@
 // MIDIFileExporter.swift — writes a Type-1 MIDI file from a SongState
+// Copyright (c) 2026 Zack Urlocker
 // Spec §Save button: ~/Documents/Zudio/Zudio-NNNN-MM-DD-YYYY.MID
 
 import Foundation

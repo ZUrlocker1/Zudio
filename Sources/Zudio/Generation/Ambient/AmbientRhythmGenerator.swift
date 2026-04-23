@@ -1,4 +1,5 @@
 // AmbientRhythmGenerator.swift — Ambient rhythm/arpeggio generation
+// Copyright (c) 2026 Zack Urlocker
 // AMB-RTHM-004 (60%): silent
 // AMB-RTHM-001 (18%): single tone pulse — sparse repeated note, velocity 30–54
 // AMB-RTHM-002 (9%):  sparse arpeggio — 3–4 chord tones cycled slowly

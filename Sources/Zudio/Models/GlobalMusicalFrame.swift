@@ -1,4 +1,5 @@
 // GlobalMusicalFrame.swift — generation step 1 output
+// Copyright (c) 2026 Zack Urlocker
 
 struct GlobalMusicalFrame: Equatable, Sendable {
     /// Key name e.g. "E", "C#", "Bb"

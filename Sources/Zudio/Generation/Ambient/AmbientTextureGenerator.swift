@@ -1,4 +1,5 @@
 // AmbientTextureGenerator.swift — Ambient texture generation
+// Copyright (c) 2026 Zack Urlocker
 // AMB-TEXT-004 (40%): silent
 // AMB-TEXT-001 (30%): orbital shimmer — sparse high notes, velocity 42–62
 // AMB-TEXT-002 (20%): ghost tone — 1–2 long-held notes, velocity 38–58

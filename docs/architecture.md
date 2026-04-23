@@ -1,4 +1,5 @@
 # Zudio Architecture
+Copyright (c) 2026 Zack Urlocker
 
 Zudio is a native macOS application that generates original music in three styles — Motorik,
 Kosmic, and Ambient — using a rule-based generation engine. Every song is built from a set of

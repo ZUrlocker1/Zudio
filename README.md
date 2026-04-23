@@ -13,9 +13,9 @@ The app includes built-in effects such as reverb, delay, auto-pan and sweep. You
 
 This repository contains the macOS app source, implementation notes, and supporting design documentation all developed using Claude. 
 
-**Listen to a sample (Ambient style):** [The-ChatGPT-Meditations](https://soundcloud.com/zurlocker/zudio-ambient) on SoundCloud
+**Listen to a sample (Chill style):** [Cadillac Memorandum](https://soundcloud.com/zurlocker/chill) on SoundCloud
 
-**Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=xWLq9HVswmo) on YouTube
+**Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.0.2/Zudio-1.0.dmg)
 

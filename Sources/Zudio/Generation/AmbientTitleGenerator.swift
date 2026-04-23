@@ -1,4 +1,5 @@
 // AmbientTitleGenerator.swift — Satirical ambient song title generator
+// Copyright (c) 2026 Zack Urlocker
 //
 // Targets the specific pomposity of generative ambient music naming conventions:
 //   1. Music for [mundane place]       — parodies Eno "Music for Airports"
@@ -180,7 +181,7 @@ struct AmbientTitleGenerator {
 
     // Craven Faults style — terse obscure geological/topographical single words
     private static let cravenFaultsTerms = [
-        "Drumlins", "Grykes", "Clints", "Shakeholes", "Erratics",
+        "Drumlins", "Grykes", "Zorvaaks", "Shakeholes", "Erratics", "Zacks",
         "Soughs", "Rakes", "Screes", "Swales", "Kettle Holes",
         "Alluvium", "Corries", "Runnels", "Loess", "Ghylls",
         "Moraines", "Eskers", "Tarns", "Kames", "Outwash",
@@ -249,7 +250,7 @@ struct AmbientTitleGenerator {
     ]
 
     private static let philosophicalEvents = [
-        "Meeting About Quarterly Targets", "Moment in a Pointless Process",
+        "Meeting About Quarterly Goals", "Moment in a Pointless Process",
         "the Car Park Discussion", "Pause Before Next Slide",
         "Reflection on the Cake Selection", "Contribution to the Team Day",
         "Response to the Previous Email", "Consideration of the New Policy",
@@ -260,16 +261,16 @@ struct AmbientTitleGenerator {
     // openly absurd combinations of real theory jargon with mundane life
     private static let fakeScaleNames = [
         // User's examples (selected good ones)
-        "Hyper-Hypo-Lydian", "Pseudo-Phrygian Dominant-ish", "Locrian-Shmocrian",
+        "Hyper-Hypo-Lydian", "Pseudo-Phrygian Dominant", "Locrian-Shmocrian",
         "Neapolitan Major", "Aeroplanian", "Mixerlydian",
-        "Cheddar-Chromatic", "Espressolydian", "Lasagnian Minor",
-        "Mid-Life-Crisis-Major", "Possibly-Pentatonic",
+        "Tres-Chromatic", "Espressolydian", "Lasagnian Minor",
+        "Pentacostal-Major", "Possibly-Pentatonic",
         "Existential-Dread-Dim.", "3:00 AM Ionian",
-        "Pre-Coffee Harmonic Minor", "Synthesized Regret Major",
-        "Quantum-Superposition-C",
+        "Pre-Coffee Minor", "Synthesized Regret Major",
+        "Quantum-Minor-C",
         // Originals
         "Vaguely Phrygian", "Accidental Octatonic", "Ionian w/ Mistakes",
-        "Dorian Mode (The Sad One)", "Wonky Bebop Diminished",
+        "Dorian Mode (The Sad One)", "Bebop Diminished",
         "Ukrainian Dorian", "Reverse-Polish Approx.",
         "Partly Pentatonic", "Post-Lydian (Flat 7)",
         "Hypo-Mixolydian-Adjacent", "Sub-Lydian (Nearly)",
@@ -289,26 +290,26 @@ struct AmbientTitleGenerator {
 
     // Tech/SaaS/midlife tragedies — "for/from a ___"
     private static let techTragedies = [
-        "SaaS Funeral", "Failed Pivot", "Midlife Crisis",
+        "Sad Funeral", "Failed Pivot", "Midlife Crisis",
         "Forced Restructuring", "Dying Startup",
         "Redundancy Notice", "Failed MVP",
         "Abandoned Roadmap", "Post-Acquisition Reorg",
-        "Series C That Didn't Close", "Pivot That Wasn't",
+        "Series C Didn't Close", "Pivot That Wasn't",
         "Missed Runway", "Down Round", "Strategic Reset",
         "Quiet Layoff", "Vision Misalignment"
     ]
 
     // People who are suffering — "Tears/Lament of a ___"
     private static let techVictims = [
-        "SaaS Investor", "Product Manager",
+        "Investor", "Product Manager",
         "Burned-Out Founder", "Pivoting CEO",
         "Bootstrapped Developer", "Laid-Off Engineer",
-        "Venture Partner (Ret.)", "Thought Leader",
+        "Venture Partner", "Thought Leader",
         "Pre-Revenue Startup", "Disruptive Innovator",
         "Chief AI Officer",
-        "First-Time Angel Investor",
+        "First-Time Investor",
         "Head of Growth (Redundant)",
-        "Technical Co-Founder (Diluted)", 
+        "Technical Co-Founder",
         "Series A Optimist"
     ]
 
@@ -321,8 +322,8 @@ struct AmbientTitleGenerator {
     // AI entities — for "The ___ Arrangements" style
     private static let aiEntities = [
         "Claude", "ChatGPT", "Copilot", "Gemini",
-        "LLM", "Foundation Model", "Transformer",
-        "Inference Engine", "GPT", "Prompt", "Buddha"
+        "Code", "Foundation Model", "Transformer",
+        "Inference Engine", "Software", "Prompt", "Buddha"
     ]
 
     // Words that follow an AI entity name
@@ -334,13 +335,13 @@ struct AmbientTitleGenerator {
 
     // AI-specific tragedies and concepts
     private static let aiTragedies = [
-        "a Failed AI Pivot", "a Hallucinated Roadmap",
-        "a Deprecated Model", "an Orphaned Prompt",
+        "a Failed Pivot", "a Hallucinated Roadmap",
+        "a Deprecated Model", "an Failed Proposal",
         "a Token Limit", "the Context Window",
         "Fine-Tuned Anger", "a Vibe-Coded Startup",
-        "the Alignment Problem", "an AI Wrapper",
+        "the Alignment Problem", "an AI Bubble",
         "a Feature That Never Shipped",
-        "Prompt Engineering", "a Missed Inference",
+        "Bad Engineering", "a Missed Inference",
         "a Confident Wrong Answer", "Latency"
     ]
 
@@ -358,18 +359,18 @@ struct AmbientTitleGenerator {
     // that sound plausible until you think about them
     private static let fakeMusicalTerms = [
         // User's examples (selected good ones)
-        "Slipsando", "Derpeggio", "Stuckinato", "Lazygato",
-        "Jitterato", "Screamscendo", "Fumblando", "Blunderando",
-        "Burpeggio", "Hiccupato", "Panicatto", "Oopsando",
-        "Snorato", "Mumblando", "Grumblato", "Spillando",
+        "Chinotto", "Birreria", "Trattoria", "Taverna",
+        "Cannolo", "Pomodoro", "Meringa", "Finestra",
+        "Crostino", "Limone", "Panicatto", "Polenta",
+        "Snorato", "Allora", "Farfalla", "Zucchero",
         // Originals
-        "Forgettissimo", "Vaguissimo", "Dozecrescendo", "Shufflando",
-        "Driftissimo", "Hesitando", "Wanderissimo", "Procrasticando",
-        "Meanderato", "Tepidissimo", "Shruggendo", "Spiralando",
-        "Distresscendo", "Noodleando", "Lurchicato", "Collapsicato",
-        "Flumblicato", "Befuddlicato", "Teetrando", "Squirmicato",
-        "Evaporando", "Dissolvicato", "Dithericato", "Splutterando",
-        "Wheezicato", "Mutterlando", "Frownissimo", "Blankissimo"
+        "Crescendo", "Glissando", "Forte", "Very Forte",
+        "Drifting", "Calimari", "Mazerati", "Ostinado",
+        "Allegro", "Tepidissimo", "Piano Forte",
+        "Adagio", "Al Dente", "Presto", "Hocus Pocus",
+        "Pianissimo", "Fortissimo", "Legato", "Dolce",
+        "Fermata", "Bruschetta", "Tutti-Frutti",
+        "Senza", "Credenza", "Largo", "Solo"
     ]
 
     // MARK: - Patterns
@@ -406,13 +407,7 @@ struct AmbientTitleGenerator {
             return "An Ending (\(p))"
         },
 
-        // 3. Weather + UK drab geography  (weight ×3)
-        { rng in
-            let w  = weatherConditions[rng.nextInt(upperBound: weatherConditions.count)]
-            let pr = weatherPrepositions[rng.nextInt(upperBound: weatherPrepositions.count)]
-            let l  = drabLocations[rng.nextInt(upperBound: drabLocations.count)]
-            return "\(w) \(pr) \(l)"
-        },
+        // 3. Weather + UK drab geography  (weight ×2)
         { rng in
             let w  = weatherConditions[rng.nextInt(upperBound: weatherConditions.count)]
             let pr = weatherPrepositions[rng.nextInt(upperBound: weatherPrepositions.count)]
@@ -438,14 +433,7 @@ struct AmbientTitleGenerator {
             return "\(a) of \(t)"
         },
 
-        // 5. [Technical adj] [noun] for/in [mundane activity]  (weight ×3)
-        { rng in
-            let adj  = technicalAdjectives[rng.nextInt(upperBound: technicalAdjectives.count)]
-            let noun = technicalNouns[rng.nextInt(upperBound: technicalNouns.count)]
-            let act  = mundaneActivities[rng.nextInt(upperBound: mundaneActivities.count)]
-            let prep = rng.nextInt(upperBound: 2) == 0 ? "for" : "in"
-            return "\(adj) \(noun) \(prep) \(act)"
-        },
+        // 5. [Technical adj] [noun] for/in [mundane activity]  (weight ×2)
         { rng in
             let adj  = technicalAdjectives[rng.nextInt(upperBound: technicalAdjectives.count)]
             let noun = technicalNouns[rng.nextInt(upperBound: technicalNouns.count)]
@@ -483,12 +471,7 @@ struct AmbientTitleGenerator {
             }
         },
 
-        // 7. A [pretentious adj] [banal sound/noun]  (weight ×2)
-        { rng in
-            let adj  = pretentiousAdjectives[rng.nextInt(upperBound: pretentiousAdjectives.count)]
-            let noun = mundaneSounds[rng.nextInt(upperBound: mundaneSounds.count)]
-            return "A \(adj) \(noun)"
-        },
+        // 7. A [pretentious adj] [banal sound/noun]  (weight ×1)
         { rng in
             let adj  = pretentiousAdjectives[rng.nextInt(upperBound: pretentiousAdjectives.count)]
             let noun = mundaneSounds[rng.nextInt(upperBound: mundaneSounds.count)]
@@ -502,13 +485,7 @@ struct AmbientTitleGenerator {
             return "Ambient \(n): \(st)"
         },
 
-        // 9. Through/In/Near [drab setting]  (weight ×2)
-        { rng in
-            let preps = ["Through", "In", "Above", "Beyond", "Near", "Outside", "Beside"]
-            let prep  = preps[rng.nextInt(upperBound: preps.count)]
-            let s     = drabSettings[rng.nextInt(upperBound: drabSettings.count)]
-            return "\(prep) \(s)"
-        },
+        // 9. Through/In/Near [drab setting]  (weight ×1)
         { rng in
             let preps = ["Through", "In", "Above", "Beyond", "Near", "Outside", "Beside"]
             let prep  = preps[rng.nextInt(upperBound: preps.count)]
@@ -565,7 +542,12 @@ struct AmbientTitleGenerator {
             return "\(geo) & \(admin)"
         },
 
-        // 15. JMJ concept + mundane deflator  (weight ×2)
+        // 15. JMJ concept + mundane deflator  (weight ×3)
+        { rng in
+            let concept  = jmjConcepts[rng.nextInt(upperBound: jmjConcepts.count)]
+            let deflator = jmjDeflators[rng.nextInt(upperBound: jmjDeflators.count)]
+            return "\(concept) \(deflator)"
+        },
         { rng in
             let concept  = jmjConcepts[rng.nextInt(upperBound: jmjConcepts.count)]
             let deflator = jmjDeflators[rng.nextInt(upperBound: jmjDeflators.count)]
@@ -577,7 +559,12 @@ struct AmbientTitleGenerator {
             return "\(concept) \(deflator)"
         },
 
-        // 16. Fake scale name + fake musical term  (weight ×2)
+        // 16. Fake scale name + fake musical term  (weight ×3)
+        { rng in
+            let scale = fakeScaleNames[rng.nextInt(upperBound: fakeScaleNames.count)]
+            let term  = fakeMusicalTerms[rng.nextInt(upperBound: fakeMusicalTerms.count)]
+            return "\(scale) \(term)"
+        },
         { rng in
             let scale = fakeScaleNames[rng.nextInt(upperBound: fakeScaleNames.count)]
             let term  = fakeMusicalTerms[rng.nextInt(upperBound: fakeMusicalTerms.count)]
@@ -608,19 +595,14 @@ struct AmbientTitleGenerator {
 
         // 17c. [Event] in [tech place] — "Funeral in Silicon Valley"
         { rng in
-            let events = ["Funeral", "Wake", "Merger", "Pivot", "Reorg", "Acqui-hire",
+            let events = ["Funeral", "Wake", "Merger", "Pivot", "Reorg", "Down Round",
                           "Liquidation Event", "Soft Landing", "Strategic Reset"]
             let event  = events[rng.nextInt(upperBound: events.count)]
             let place  = techPlaces[rng.nextInt(upperBound: techPlaces.count)]
             return "\(event) in \(place)"
         },
 
-        // 17d. "The [AI entity] [arrangement word]" — "The Claude Arrangements"  (weight ×2)
-        { rng in
-            let entity = aiEntities[rng.nextInt(upperBound: aiEntities.count)]
-            let word   = aiArrangementWords[rng.nextInt(upperBound: aiArrangementWords.count)]
-            return "The \(entity) \(word)"
-        },
+        // 17d. "The [AI entity] [arrangement word]" — "The Claude Arrangements"  (weight ×1)
         { rng in
             let entity = aiEntities[rng.nextInt(upperBound: aiEntities.count)]
             let word   = aiArrangementWords[rng.nextInt(upperBound: aiArrangementWords.count)]

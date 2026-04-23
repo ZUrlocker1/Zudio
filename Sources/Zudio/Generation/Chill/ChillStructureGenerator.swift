@@ -1,4 +1,5 @@
 // ChillStructureGenerator.swift — Chill generation step 2
+// Copyright (c) 2026 Zack Urlocker
 // Song form: INTRO → GROOVE-A → BREAKDOWN → GROOVE-B → OUTRO (default)
 // Simple form: INTRO → BODY → OUTRO (30% of Deep/Dream songs)
 // Chord plan derived from ChillProgressionFamily (CHL-SYNC-002/003/010/013).

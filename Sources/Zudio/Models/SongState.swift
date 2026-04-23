@@ -1,4 +1,5 @@
 // SongState.swift — complete song state held in memory while a song is loaded
+// Copyright (c) 2026 Zack Urlocker
 
 // MARK: - Generation log
 

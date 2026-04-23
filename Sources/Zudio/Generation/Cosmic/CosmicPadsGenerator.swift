@@ -1,4 +1,5 @@
 // KosmicPadsGenerator.swift — Kosmic pads generation
+// Copyright (c) 2026 Zack Urlocker
 // Implements KOS-PADS-001 through KOS-PADS-008
 //   001 Eno Long Drone · 002 Swell Chord · 003 Unsync Layers · 004 Suspended Resolution
 //   005 Quartal Stack  · 006 Shimmer Layer · 007 Gated Chord Pulse · 008 bIII Colour Chord

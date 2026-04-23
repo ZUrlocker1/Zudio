@@ -268,3 +268,6 @@ private var evolveTempoAnchor: Int = 0     // locked for the session
 - Style selector: enabled; shows current evolving style; change takes effect on next Generate
 - Status log: "Up next  Ambient - Dark Honey" (same format as Endless)
 - ⏭ in Evolve: skips current evolution pass, advances to next pass (or Outro if on Pass 2)
+
+---
+Copyright (c) 2026 Zack Urlocker

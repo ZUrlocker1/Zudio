@@ -1,4 +1,5 @@
 // AmbientLoopTiler.swift — tiles a short loop across the full song length
+// Copyright (c) 2026 Zack Urlocker
 // Each track in Ambient style is generated as a short co-prime loop, then tiled
 // to fill totalBars. Different loop lengths create Eno-style phase shifting.
 

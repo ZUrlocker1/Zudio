@@ -1,4 +1,5 @@
 // AmbientBassGenerator.swift — Ambient bass generation
+// Copyright (c) 2026 Zack Urlocker
 // AMB-BASS-001: Root-held drone — long holds using the active chord root, with silences.
 // AMB-BASS-002: Bass absent (30% chance).
 // AMB-BASS-003: Root+fifth drone — holds alternate root / fifth; occasional major third (10%).

@@ -1,4 +1,5 @@
 // StatusBoxView.swift — scrollable generation log.
+// Copyright (c) 2026 Zack Urlocker
 // Accumulates entries across all generations; newest at bottom.
 // Renders as a single Text view so selection spans the entire log
 // exactly like a word processor — drag to select across any lines,

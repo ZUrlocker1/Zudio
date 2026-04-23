@@ -1,4 +1,5 @@
 // TextureGenerator.swift — generation step 9
+// Copyright (c) 2026 Zack Urlocker
 // Sparse atmosphere: boundary-weighted events plus occasional one-off colour moments.
 // Register: TEXT-001/TEXT-003–TEXT-008: MIDI 72–108 (high)
 //           TEXT-002: MIDI 60–84 (warm mid register for depth and warmth)

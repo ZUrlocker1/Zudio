@@ -1,4 +1,5 @@
 // RhythmGenerator.swift — generation step 8
+// Copyright (c) 2026 Zack Urlocker
 // Pulse embellishment: melodic ostinato that follows chord changes.
 // Register: MIDI 45–76 (low-mid to mid).
 //

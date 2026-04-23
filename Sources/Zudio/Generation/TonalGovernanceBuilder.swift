@@ -1,4 +1,5 @@
 // TonalGovernanceBuilder.swift — generation step 3
+// Copyright (c) 2026 Zack Urlocker
 // Builds the TonalGovernanceMap from the SongStructure.
 // All non-drum tracks query this at render time to get active pitch-class sets.
 

@@ -1,4 +1,5 @@
 // NowPlayingController.swift — Mac media key support (F7 / F8 / F9 and Control-Center strip).
+// Copyright (c) 2026 Zack Urlocker
 //
 // Uses MPRemoteCommandCenter — entirely separate from NSEvent.addLocalMonitorForEvents,
 // so it cannot conflict with Space, B, Z, arrow keys or any existing Zudio hotkey.

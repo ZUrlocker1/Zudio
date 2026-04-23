@@ -1,4 +1,5 @@
 // KosmicLeadGenerator.swift — Kosmic lead melody generation
+// Copyright (c) 2026 Zack Urlocker
 // Implements KOS-LEAD-001 through KOS-LEAD-009
 // KOS-LEAD-006  JMJ Phrase Loop: 4–6 note melodic phrase built with arch contour (peaks at ~65%),
 //              repeated identically for 4 bars, then one note shifts a scale step on bar 5,

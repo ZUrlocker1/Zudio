@@ -411,3 +411,6 @@ This positioning is authentic, differentiated from AI-based tools and Endel, and
 - Songen: Free + $149.99 lifetime, iOS only, subscription, 4.1★ (212 US), est. 10K–38K downloads, MIDI loop generator, semi-active
 - Apple Ambient Music: Free (iOS 18.4+), iPhone+iPad, built-in, static playlists
 - Zudio: **$4.99, Mac only (iOS coming), one-time, human-curated algorithmic songs, 4 styles, MIDI+M4A export, seeds, active**
+
+---
+Copyright (c) 2026 Zack Urlocker

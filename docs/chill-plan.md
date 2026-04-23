@@ -1,4 +1,5 @@
 # Chill Style Generator — Research & Design Plan
+Copyright (c) 2026 Zack Urlocker
 
 ## Context
 

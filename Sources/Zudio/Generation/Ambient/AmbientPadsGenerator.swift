@@ -1,4 +1,5 @@
 // AmbientPadsGenerator.swift — Ambient pads generation
+// Copyright (c) 2026 Zack Urlocker
 // AMB-PAD-001: Primary sustained chord layer (velocity 55–70 base, re-attack every 96–128 steps / 6–8 bars)
 // AMB-PAD-002: Secondary shimmer layer (velocity 25–55, offset 2–4 steps after primary)
 // AMB-PAD-006: Bell accent layer (~0.07 notes/bar, staccato, velocity 35–55, high register)

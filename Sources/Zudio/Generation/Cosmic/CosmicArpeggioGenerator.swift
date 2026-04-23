@@ -1,4 +1,5 @@
 // KosmicArpeggioGenerator.swift — Kosmic generation step 3 (Rhythm track slot)
+// Copyright (c) 2026 Zack Urlocker
 // The most important Kosmic generator — replaces RhythmGenerator for Kosmic style.
 //
 // Rules:

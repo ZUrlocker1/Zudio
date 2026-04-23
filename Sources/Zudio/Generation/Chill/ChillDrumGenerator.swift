@@ -1,4 +1,5 @@
 // ChillDrumGenerator.swift — Chill generation step 3
+// Copyright (c) 2026 Zack Urlocker
 // Three beat styles:
 //   electronic  — syncopated 808/standard kit, 2–4 events/bar (Deep/Dream)
 //   neoSoul     — programmed ghost-note kit, 5–9 events/bar (Bright/Free)

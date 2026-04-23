@@ -1,4 +1,5 @@
     // PlaybackEngine.swift — AVAudioEngine + 7 AVAudioUnitSampler nodes
+// Copyright (c) 2026 Zack Urlocker
 // Spec §AVAudioEngine playback architecture
 
 import AVFoundation

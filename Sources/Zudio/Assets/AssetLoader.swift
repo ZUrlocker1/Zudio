@@ -1,4 +1,5 @@
 // AssetLoader.swift — loads bundled JSON starter packs and MIDI assets from Resources/
+// Copyright (c) 2026 Zack Urlocker
 
 import Foundation
 

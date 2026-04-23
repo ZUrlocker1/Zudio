@@ -1,4 +1,5 @@
 # Motorik Style — Research & Implementation
+Copyright (c) 2026 Zack Urlocker
 
 ## Context
 

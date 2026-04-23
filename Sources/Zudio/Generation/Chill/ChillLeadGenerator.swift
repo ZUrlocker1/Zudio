@@ -1,4 +1,5 @@
 // ChillLeadGenerator.swift — Chill generation step 6
+// Copyright (c) 2026 Zack Urlocker
 // Lead 1: primary solo voice (flute, muted trumpet, vibraphone, saxophone).
 // Lead 2: counter-melody; call-and-response with Lead 1 (CHL-LD2-001, CHL-LD2-002).
 // Phrases: 2–4 bars with deliberate rests (CHL-RULE-06).

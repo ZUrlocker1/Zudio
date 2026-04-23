@@ -1,4 +1,5 @@
 // TonalGovernanceMap.swift — generation step 3 output
+// Copyright (c) 2026 Zack Urlocker
 // Every non-drum track queries this at render time to get the active pitch-class sets.
 
 struct TonalGovernanceEntry: Equatable, Sendable {

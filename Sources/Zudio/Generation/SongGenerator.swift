@@ -1,4 +1,5 @@
 // SongGenerator.swift — top-level 10-step generation pipeline
+// Copyright (c) 2026 Zack Urlocker
 // All steps must complete in order. Outputs a fully populated SongState.
 
 import Foundation

@@ -1,4 +1,5 @@
 // ChillMusicalFrameGenerator.swift — Chill generation step 1
+// Copyright (c) 2026 Zack Urlocker
 // Produces a GlobalMusicalFrame tuned for nu-jazz / acid jazz / chill-out style.
 // Tempo: Deep/Dream 72–92 BPM (peak 83), Bright/Free 88–110 BPM (peak 96).
 // Four moods: Deep 35%, Dream 30%, Free 20%, Bright 15%.

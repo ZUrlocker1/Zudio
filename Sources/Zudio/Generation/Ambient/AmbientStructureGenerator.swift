@@ -1,4 +1,5 @@
 // AmbientStructureGenerator.swift — Ambient generation step 2
+// Copyright (c) 2026 Zack Urlocker
 // Three forms: pureDrone 40% (no intro/outro), minimalArc 45% (4-bar), breathingArc 15% (6-bar).
 // Chord plan built from AmbientProgressionFamily.
 

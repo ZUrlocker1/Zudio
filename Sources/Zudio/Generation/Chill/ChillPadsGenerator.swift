@@ -1,4 +1,5 @@
 // ChillPadsGenerator.swift — Chill generation step 5 (Pads track)
+// Copyright (c) 2026 Zack Urlocker
 // Pads = sustained harmonic layer (Warm Pad default) — NOT Rhodes comping.
 // Three pad modes: chord sustain (70%), staggered entry (20%), absent (10%).
 // All voicings snapped to scale (CHL-SYNC-004).

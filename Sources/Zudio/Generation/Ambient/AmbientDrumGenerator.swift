@@ -1,4 +1,5 @@
 // AmbientDrumGenerator.swift — Ambient percussion generation (stochastic, no tiling)
+// Copyright (c) 2026 Zack Urlocker
 // AMB-DRUM-004 (45%): hand percussion — congas, bongos, shakers, maracas, claves
 // AMB-DRUM-001 (30%): brush kit — sparse ride/hat hits + occasional cymbal shimmer
 // AMB-DRUM-003 (20%): no percussion

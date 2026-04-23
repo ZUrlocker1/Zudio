@@ -1,4 +1,5 @@
 // SongStructure.swift — generation step 2 output
+// Copyright (c) 2026 Zack Urlocker
 
 // MARK: - ChordWindow
 

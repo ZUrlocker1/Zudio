@@ -1,4 +1,5 @@
 // AmbientMusicalFrameGenerator.swift — Ambient generation step 1
+// Copyright (c) 2026 Zack Urlocker
 // Produces a GlobalMusicalFrame tuned for Eno/Loscil/Craven Faults style.
 // Tempo: beatless 62–78 (50%), slowPulse 72–92 (35%), midPulse 95–110 (15%).
 // Song length: triangular min=180s, peak=240s, max=315s/5:15.

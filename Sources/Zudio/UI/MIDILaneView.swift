@@ -1,4 +1,5 @@
 // MIDILaneView.swift — Canvas-based piano-roll with DAW visible window + drag-to-seek.
+// Copyright (c) 2026 Zack Urlocker
 // Drag anywhere in the lane to reposition the playhead.
 //
 // Performance split: note drawing is isolated in NoteLayerView (Equatable).

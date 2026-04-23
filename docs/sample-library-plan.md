@@ -196,3 +196,6 @@ Reference links:
   - `docs/prototype.md` -> `Apple DLS General MIDI presets (v1 core sound source)`
 - This document does not redefine v1 GM mappings.
 - Use this file only for post-v1 sample-library sourcing decisions.
+
+---
+Copyright (c) 2026 Zack Urlocker

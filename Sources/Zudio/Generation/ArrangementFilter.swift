@@ -1,4 +1,5 @@
 // ArrangementFilter.swift — generation step 10.5
+// Copyright (c) 2026 Zack Urlocker
 // "Spotlight" arrangement: when 3+ melodic tracks are active in the same
 // N-bar block, some step back so one performer can lead.
 //

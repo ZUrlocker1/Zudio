@@ -1,4 +1,5 @@
 // KosmicTextureGenerator.swift — Kosmic texture generation
+// Copyright (c) 2026 Zack Urlocker
 // Implements KOS-TEXT-001 through KOS-TEXT-004
 // KOS-RULE-11: Bluebird/secondary arpeggio in MIDI 33–59, quarter-note durations
 // Register separation from main arpeggio (55–72) is CRITICAL
