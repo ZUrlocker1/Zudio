@@ -530,7 +530,8 @@ struct SongGenerator {
         var padRules: Set<String> = []
         let padLoop = AmbientPadsGenerator.generate(frame: frame, tonalMap: tonalMap,
                                                      loopBars: loopLengths.pads, rng: &padsRNG,
-                                                     usedRuleIDs: &padRules)
+                                                     usedRuleIDs: &padRules,
+                                                     forceRuleID: forcePadsRuleID)
         trackEvents[kTrackPads] = AmbientLoopTiler.tile(events: padLoop,
                                                          loopBars: loopLengths.pads,
                                                          totalBars: frame.totalBars,
@@ -590,7 +591,7 @@ struct SongGenerator {
                                                               silentBars: dropoutZones[kTrackLead1] ?? [])
         }
 
-        // Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows) — no dropout zone; it fills gaps already
+        // Lead 2 (AMB-LEAD-005: sparse tonal cell from Lead 1 pitch classes) — no dropout zone; already very sparse
         var lead2Rules: Set<String> = []
         let lead2Loop = AmbientLeadGenerator.generateLead2(frame: frame, tonalMap: tonalMap,
                                                             lead1Events: lead1Loop,
@@ -791,7 +792,7 @@ struct SongGenerator {
                     bar: blockStart + 1, frame: frame, tonalMap: tonalMap, rng: &lead1RNG)
                 trackEvents[kTrackLead1] = (trackEvents[kTrackLead1] + whistleEvents)
                     .sorted { $0.stepIndex < $1.stepIndex }
-                // Annotate only the first whistle bar at runtime
+                lead1Rules.insert("AMB-XFILES-001")
                 ambientXFilesBars = [blockStart + 1]
             }
         }
@@ -1385,7 +1386,6 @@ struct SongGenerator {
         case "MOT-LD2-005": return "Descending line"
         case "MOT-LD2-006": return "Neu! harmony"
         // Ambient Lead 2 rules
-        case "AMB-SYNC-001": return "Ghost echo lead"
         case "AMB-LEAD-005": return "Silent-window fill"
         case "AMB-LEAD-006": return "No lead 2"
         default:            return ruleID
@@ -1729,8 +1729,8 @@ struct SongGenerator {
         switch ruleID {
         // Pads
         case "AMB-PADS-001":    return "Sustained chord layer"
-        case "AMB-PADS-002":    return "Electric Buddha shimmer layer"
-        case "AMB-PADS-006":    return "Ambient bell accents"
+        case "AMB-PADS-002":    return "Slow cascade"
+        case "AMB-PADS-003":    return "Modal cloud"
         // Bass
         case "AMB-BASS-001":  return "Loscil drone root"
         case "AMB-BASS-002":  return "No bass"
@@ -1744,7 +1744,6 @@ struct SongGenerator {
         case "AMB-LEAD-009":  return "Magnetik solo"
         case "AMB-LEAD-010":  return "Oxygenerator solo"
         // Lead 2
-        case "AMB-SYNC-001":     return "Ghost echo lead"
         case "AMB-LEAD-005":     return "Silent-window fill"
         case "AMB-LEAD-006":     return "No lead 2"
         case "AMB-LEAD-004":    return "Echo lead phrase"
@@ -1759,7 +1758,6 @@ struct SongGenerator {
         // Texture
         case "AMB-TEXT-001": return "Orbital shimmer"
         case "AMB-TEXT-002": return "Ghost tone"
-        case "AMB-TEXT-003": return "Chime scatter"
         case "AMB-TEXT-004": return "No texture"
         // Drums
         case "AMB-DRUM-004": return "Claude hand percussion"

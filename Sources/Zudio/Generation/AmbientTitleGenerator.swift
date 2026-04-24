@@ -117,7 +117,7 @@ struct AmbientTitleGenerator {
 
     private static let mundaneActivities = [
         "a Slow Elevator", "the Monday Commute",
-        "a Career Rethink", "an Slow Tuesday",
+        "a Career Rethink", "a Slow Tuesday",
         "a Clerical Error", "a Missed Meeting",
         "Paperwork", "a Warm Room",
         "the Suburbs", "a Change of Plans",
@@ -140,17 +140,17 @@ struct AmbientTitleGenerator {
 
     private static let pretentiousAdjectives = [
         "Discreet", "Mild", "Brief", "Persistent", "Gentle",
-        "Lukewarm", "Quiet", "Gradual", "Unremarkable",
-        "Faint", "Vague", "Indeterminate", "Hollow", "Ambient"
+        "Lukewarm", "Quiet", "Gradual", "Negligible",
+        "Faint", "Vague", "Flat", "Hollow", "Damp"
     ]
 
     private static let mundaneSounds = [
         "Humming", "Droning", "Hiss", "Ticking", "Background Noise",
         "Fan Noise", "Rattling", "Gurgling", "Beeping", "Whirring",
         "Air Conditioning", "Distant Traffic", "Lift Music",
-        "The Sound of a Building", "Printer Noise",
-        "A Fluorescent Flickering", "A Tap Dripping",
-        "The Noise the Boiler Makes"
+        "Building Sounds", "Printer Noise",
+        "Fluorescent Flickering", "Tap Dripping",
+        "Boiler Noise"
     ]
 
     private static let ambientSubtitles = [
@@ -200,7 +200,7 @@ struct AmbientTitleGenerator {
         "Oxygene", "Equinoxe", "Magnetique", "Kronologie", "Electrique",
         "Metamorphoses", "Electronique", "Atmosphere", "Crezendo",
         "Cozmique", "Solstice", "Meridien", "Lumineux", "Zorvaak",
-        "Telephonie", "Zenith", "Isotrope", "Maladoxe", "Zut alors"
+        "Telephonie", "Zenith", "Isotrope", "Maladoxe", "Zut Alors"
     ]
 
     // JMJ mundane deflating suffixes
@@ -293,7 +293,7 @@ struct AmbientTitleGenerator {
         "Sad Funeral", "Failed Pivot", "Midlife Crisis",
         "Forced Restructuring", "Dying Startup",
         "Redundancy Notice", "Failed MVP",
-        "Abandoned Roadmap", "Post-Acquisition Reorg",
+        "Collapsed Roadmap", "Post-Acquisition Reorg",
         "Series C Didn't Close", "Pivot That Wasn't",
         "Missed Runway", "Down Round", "Strategic Reset",
         "Quiet Layoff", "Vision Misalignment"
@@ -301,7 +301,7 @@ struct AmbientTitleGenerator {
 
     // People who are suffering — "Tears/Lament of a ___"
     private static let techVictims = [
-        "Investor", "Product Manager",
+        "Lead Investor", "Product Manager",
         "Burned-Out Founder", "Pivoting CEO",
         "Bootstrapped Developer", "Laid-Off Engineer",
         "Venture Partner", "Thought Leader",
@@ -336,7 +336,7 @@ struct AmbientTitleGenerator {
     // AI-specific tragedies and concepts
     private static let aiTragedies = [
         "a Failed Pivot", "a Hallucinated Roadmap",
-        "a Deprecated Model", "an Failed Proposal",
+        "a Deprecated Model", "a Failed Proposal",
         "a Token Limit", "the Context Window",
         "Fine-Tuned Anger", "a Vibe-Coded Startup",
         "the Alignment Problem", "an AI Bubble",

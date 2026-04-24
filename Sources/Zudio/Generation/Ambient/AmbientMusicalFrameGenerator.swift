@@ -78,29 +78,23 @@ struct AmbientMusicalFrameGenerator {
         return families[rng.weightedPick(weights)]
     }
 
-    /// Co-prime loop lengths. Texture/Rhythm use longer primes so their patterns
-    /// almost never repeat within a song. Lead 1/2/Pads/Bass use shorter primes.
-    /// All six values are guaranteed distinct.
+    /// Co-prime loop lengths. Rhythm/Texture use long primes; Lead1/Lead2/Pads/Bass
+    /// use medium primes. All six values are guaranteed distinct (pools don't overlap).
     static func pickLoopLengths(rng: inout SeededRNG) -> AmbientLoopLengths {
-        let texturePool: [Int] = [17, 19, 23]
-        let texture = texturePool[rng.nextInt(upperBound: texturePool.count)]
+        // Rhythm and Texture: pick 2 distinct values from [23, 29, 31]
+        var longPool: [Int] = [23, 29, 31]
+        longPool.swapAt(0, rng.nextInt(upperBound: 3))
+        let texture = longPool[0]
+        let rhythm  = longPool[1]
 
-        // Rhythm: medium-long prime — never equal to texture
-        let rhythmPool: [Int] = [23, 29, 31]
-        let rhythm = rhythmPool[rng.nextInt(upperBound: rhythmPool.count)]
-
-        // Pads: largest short prime, excluding rhythm to avoid collision
-        let padPool = [17, 19, 23].filter { $0 != rhythm }
-        let pads = padPool[rng.nextInt(upperBound: padPool.count)]
-
-        // Lead 1, Lead 2, Bass: shuffle remaining short primes
-        var remaining = [5, 7, 11, 13, 17, 19, 23].filter { $0 != pads && $0 != rhythm }
-        for i in stride(from: remaining.count - 1, through: 1, by: -1) {
-            remaining.swapAt(i, rng.nextInt(upperBound: i + 1))
+        // Lead1, Lead2, Pads, Bass: shuffle all of [11, 13, 17, 19] and assign in order
+        var medPool: [Int] = [11, 13, 17, 19]
+        for i in stride(from: medPool.count - 1, through: 1, by: -1) {
+            medPool.swapAt(i, rng.nextInt(upperBound: i + 1))
         }
-        return AmbientLoopLengths(lead1: remaining[0], lead2: remaining[1],
-                                   pads: pads, rhythm: rhythm,
-                                   texture: texture, bass: remaining[2])
+        return AmbientLoopLengths(lead1: medPool[0], lead2: medPool[1],
+                                   pads: medPool[2], rhythm: rhythm,
+                                   texture: texture, bass: medPool[3])
     }
 
     private static func pickTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {

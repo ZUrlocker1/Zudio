@@ -6,7 +6,7 @@
 //               AMB-LEAD-009 Magnetik solo (9%), AMB-LEAD-010 Oxygenerator solo (7%)
 // AMB-LEAD-009 and AMB-LEAD-010 are section-level solos: they bypass the loop tiler and
 // return full-song events (require structure != nil; degrade gracefully to silence if absent).
-// Lead 2: AMB-LEAD-005 (fill Lead 1 silent windows), AMB-LEAD-006 (absent when no windows).
+// Lead 2: AMB-LEAD-005 (sparse tonal cell, pitch classes derived from Lead 1's actual notes).
 // AMB-RULE-02 enforced: rest ≥ 2× note duration after each note event.
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
 
@@ -97,7 +97,11 @@ struct AmbientLeadGenerator {
         return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
     }
 
-    // MARK: - Lead 2 (AMB-SYNC-003: fills Lead 1 silent windows)
+    // MARK: - Lead 2 (AMB-LEAD-005: Eno-style tonal cell derived from Lead 1 pitch classes)
+    // Lead 2 is an independent sparse loop whose pitches are drawn from the same pitch
+    // classes as Lead 1's actual notes (transposed into Lead 2's lower register).
+    // The two loops use co-prime lengths and phase against each other — overlap is harmonic
+    // rather than avoided, matching how Eno's tape loops worked on Music for Airports.
 
     static func generateLead2(
         frame: GlobalMusicalFrame,
@@ -109,48 +113,33 @@ struct AmbientLeadGenerator {
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackLead2]!  // low:55, high:81
         let loopSteps = loopBars * 16
-        let scalePCs  = frame.scalePCs
-        let notes     = notesInRegister(pitchClasses: scalePCs, low: bounds.low, high: bounds.high)
+
+        // Derive pitch pool from Lead 1's actual pitch classes, placed in Lead 2's register.
+        // Falls back to full scale if Lead 1 is silent.
+        let lead1PCs = Set(lead1Events.map { Int($0.note) % 12 })
+        let pitchPCs = lead1PCs.isEmpty ? frame.scalePCs : lead1PCs
+        let notes    = notesInRegister(pitchClasses: pitchPCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        // AMB-LEAD-005: fill Lead 1 silent windows only — Lead 2 never overlaps Lead 1
-        // Build set of steps occupied by lead1 (within loop)
-        var occupied = Set<Int>()
-        for ev in lead1Events where ev.stepIndex < loopSteps {
-            let end = Swift.min(ev.stepIndex + ev.durationSteps, loopSteps)
-            for s in ev.stepIndex..<end { occupied.insert(s) }
-        }
-
-        // Find contiguous silent windows ≥ 8 steps
-        var windows: [(start: Int, length: Int)] = []
-        var winStart: Int? = nil
-        for s in 0..<loopSteps {
-            if !occupied.contains(s) {
-                if winStart == nil { winStart = s }
-            } else if let ws = winStart {
-                if s - ws >= 8 { windows.append((ws, s - ws)) }
-                winStart = nil
-            }
-        }
-        if let ws = winStart, loopSteps - ws >= 8 { windows.append((ws, loopSteps - ws)) }
-
-        if windows.isEmpty { usedRuleIDs.insert("AMB-LEAD-006"); return [] }
         usedRuleIDs.insert("AMB-LEAD-005")
 
+        // Place 2–4 sparse sustained notes across the loop.
+        // Generous rests (≥ 2× note duration) keep it spacious — AMB-RULE-02.
         var events: [MIDIEvent] = []
-        for window in windows {
-            guard rng.nextDouble() < 0.65 else { continue }
-            let note  = notes[rng.nextInt(upperBound: notes.count)]
-            let half  = Swift.max(1, window.length / 2)
-            let start = window.start + rng.nextInt(upperBound: half)
-            let maxDur = window.start + window.length - start
-            let dur    = Swift.min(Swift.max(4, maxDur - 2), 16)
-            if dur >= 2 {
-                let vel = UInt8(40 + rng.nextInt(upperBound: 35))  // 40–74
-                events.append(MIDIEvent(stepIndex: start, note: note, velocity: vel, durationSteps: dur))
-            }
+        let noteCount = 2 + rng.nextInt(upperBound: 3)
+        var cursor    = rng.nextInt(upperBound: Swift.max(1, loopSteps / 4))
+
+        for _ in 0..<noteCount {
+            guard cursor < loopSteps else { break }
+            let note    = notes[rng.nextInt(upperBound: notes.count)]
+            let dur     = Swift.min(8 + rng.nextInt(upperBound: 17), loopSteps - cursor)  // 8–24 steps
+            guard dur >= 4 else { break }
+            let vel     = UInt8(35 + rng.nextInt(upperBound: 28))  // 35–62, softer than Lead 1
+            events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
+            // Rest ≥ 2× note duration, plus random spacing so notes don't cluster
+            cursor += dur + dur + rng.nextInt(upperBound: Swift.max(1, loopSteps / 4))
         }
-        return events.sorted { $0.stepIndex < $1.stepIndex }
+        return events   // cursor only advances — events are already in step order
     }
 
     // MARK: - Lead 1 rule implementations
@@ -214,7 +203,7 @@ struct AmbientLeadGenerator {
             let phraseDur = cursor - phraseStart
             cursor += phraseDur + rng.nextInt(upperBound: 8)
         }
-        return events.sorted { $0.stepIndex < $1.stepIndex }
+        return events   // cursor only advances — events are already in step order
     }
 
     /// AMB-LEAD-003: Pentatonic shimmer — short ascending run, then long rest.
@@ -378,6 +367,8 @@ struct AmbientLeadGenerator {
         guard !windows.isEmpty else { return [] }
 
         let scalePCs = frame.scalePCs
+        let allNotes = notesInRegister(pitchClasses: scalePCs, low: 62, high: 78)
+        guard !allNotes.isEmpty else { return [] }
         var events: [MIDIEvent] = []
 
         for window in windows {
@@ -387,8 +378,6 @@ struct AmbientLeadGenerator {
 
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
-                let allNotes = notesInRegister(pitchClasses: scalePCs, low: 62, high: 78)
-                guard !allNotes.isEmpty else { continue }
 
                 // Prefer chord tones (60% bias)
                 let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
@@ -438,6 +427,8 @@ struct AmbientLeadGenerator {
         guard !windows.isEmpty else { return [] }
 
         let scalePCs = frame.scalePCs
+        let allNotes = notesInRegister(pitchClasses: scalePCs, low: 64, high: 80)
+        guard allNotes.count >= 4 else { return [] }
         var events: [MIDIEvent] = []
 
         for window in windows {
@@ -447,8 +438,6 @@ struct AmbientLeadGenerator {
 
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
-                let allNotes = notesInRegister(pitchClasses: scalePCs, low: 64, high: 80)
-                guard allNotes.count >= 4 else { continue }
 
                 let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
                 let chordNotes   = allNotes.filter { chordTonePCs.contains(Int($0) % 12) }

@@ -51,6 +51,8 @@ struct AmbientBassGenerator {
         guard !template.isEmpty else { return [] }
 
         // Tile the template across the full song, resolving pitch from the tonal map at each step.
+        // Pre-compute scale notes once — scalePCs and bounds are constant across all cursor positions.
+        let scaleNotes = (bounds.low...bounds.high).filter { frame.scalePCs.contains($0 % 12) }
         var events:    [MIDIEvent] = []
         var cursor     = 0
         var slotIdx    = 0
@@ -90,8 +92,6 @@ struct AmbientBassGenerator {
                 // Splits hold: root (60%) → scale neighbour (25%) → root (15%).
                 var didNeighbour = false
                 if !useRootFifth && noteToPlay == rootNote && dur >= 12 && rng.nextDouble() < 0.20 {
-                    let scalePCs   = frame.scalePCs
-                    let scaleNotes = (bounds.low...bounds.high).filter { scalePCs.contains($0 % 12) }
                     if let rootIdx = scaleNotes.firstIndex(of: rootNote) {
                         let neighbour: Int? = rootIdx > 0 && rootIdx < scaleNotes.count - 1
                             ? (rng.nextDouble() < 0.5 ? scaleNotes[rootIdx - 1] : scaleNotes[rootIdx + 1])

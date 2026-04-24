@@ -13,7 +13,7 @@
 //              One sustained note per bar, stepwise ascent then descent through scale.
 //              Occasional chromatic trill ornament. Lower register (MIDI 60–76).
 //              Plays in 2–3 windows of 10 bars with ≥8-bar gaps between repeats.
-// Lead 1 register: MIDI 60–96 (celestial, higher than arpeggio's 55–72)
+// Lead 1 register: MIDI 60–84 (C4–C6, one octave lower ceiling than original 96)
 // Lead 2 register: MIDI 55–80 (lower/darker than Lead 1; counter-melody role)
 // Lead 2 rule pool: KOS-LEAD-001 through 005 only — KOS-LEAD-006/007/008/009 are Lead 1 exclusive
 // Velocity: 45–72 (softer than Motorik — kosmic is never aggressive)
@@ -139,7 +139,7 @@ struct KosmicLeadGenerator {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
                 let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
-                                                      low: 60, high: 96)
+                                                      low: 60, high: 84)
                 events += emitLeadBar(rule: activeRule, barStart: barStart, bar: bar,
                                       scaleNotes: scaleNotes, entry: entry, frame: frame,
                                       useWideInterval: useWideInterval, rng: &rng)
@@ -571,7 +571,7 @@ struct KosmicLeadGenerator {
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         // Build pentatonic subset from scale notes
-        let penta = pentatonicNotes(entry: entry, frame: frame, low: 60, high: 96)
+        let penta = pentatonicNotes(entry: entry, frame: frame, low: 60, high: 84)
         guard !penta.isEmpty else { return [] }
 
         // Move one step every 3 bars

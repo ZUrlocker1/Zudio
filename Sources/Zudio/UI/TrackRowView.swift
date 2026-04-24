@@ -60,142 +60,22 @@ struct TrackRowView: View {
     }
     #endif
 
-    // MARK: - Instrument definitions (no "Auto" — always show real name)
+    // MARK: - Instrument list — single source of truth is AppState pool definitions
 
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
-        let isKosmic  = activeStyle == .kosmic
-        let isAmbient = activeStyle == .ambient
-        let isChill   = activeStyle == .chill
-        switch trackIndex {
-        case kTrackLead1:
-            if isChill {
-                return [.init(name:"Muted Trumpet", program:59),  .init(name:"Tenor Sax",     program:66),
-                        .init(name:"Alto Sax",       program:65),  .init(name:"Trumpet",       program:56)]
-            }
-            if isAmbient {
-                return [.init(name:"Flute",         program:73),  .init(name:"Ocarina",       program:79),
-                        .init(name:"Pan Flute",     program:75),  .init(name:"Whistle",       program:78),
-                        .init(name:"Recorder",      program:74),  .init(name:"Brightness",    program:100),
-                        .init(name:"Calliope Lead", program:82)]
-            }
-            if isKosmic {
-                return [.init(name:"Flute",        program:73),  .init(name:"Brightness",     program:100),
-                        .init(name:"Oboe",         program:68),  .init(name:"Recorder",       program:74)]
-            }
-            return [.init(name:"Mono Synth",       program:81), .init(name:"Soft Brass",      program:62),
-                    .init(name:"Pad 3 Poly",       program:90), .init(name:"Chiff Lead",       program:83)]
-        case kTrackLead2:
-            if isChill {
-                return [.init(name:"Vibraphone",   program:11),  .init(name:"Flute",          program:73),
-                        .init(name:"Soprano Sax",  program:64),  .init(name:"Trombone",       program:57),
-                        .init(name:"Xylophone",    program:13)]
-            }
-            if isAmbient {
-                return [.init(name:"Harp",           program:46),  .init(name:"Grand Piano",   program:0),
-                        .init(name:"Acoustic Guitar",program:24), .init(name:"FX Crystal",     program:98),
-                        .init(name:"Space Voice",  program:91),  .init(name:"FX Atmosphere",  program:99)]
-            }
-            if isKosmic {
-                return [.init(name:"Brightness",  program:100), .init(name:"Bassoon",    program:70),
-                        .init(name:"Charang",     program:84),  .init(name:"Vox Solo",   program:85)]
-            }
-            return [.init(name:"Polysynth",   program:90),  .init(name:"Brightness",  program:100),
-                    .init(name:"Minimoog",    program:39),  .init(name:"Elec Guitar", program:30)]
-        case kTrackPads:
-            if isAmbient {
-                return [.init(name:"Sweep Pad",    program:95), .init(name:"Synth Strings",program:50),
-                        .init(name:"Halo Pad",     program:94), .init(name:"New Age Pad",  program:88)]
-            }
-            if isKosmic {
-                return [.init(name:"Sweep Pad",    program:95), .init(name:"Synth Strings", program:50),
-                        .init(name:"Warm Pad",     program:89), .init(name:"Space Voice",   program:91)]
-            }
-            if isChill {
-                return [.init(name:"Warm Pad",     program:89), .init(name:"Synth Strings", program:50),
-                        .init(name:"String Pad",   program:48), .init(name:"Sweep Pad",     program:95)]
-            }
-            return [.init(name:"Halo Pad",        program:94), .init(name:"Sweep Pad",       program:95),
-                    .init(name:"Bowed Glass",     program:92), .init(name:"Synth Strings",   program:50)]
-        case kTrackRhythm:
-            if isChill {
-                return [.init(name:"Rhodes",       program:4),  .init(name:"Wurlitzer",   program:5),
-                        .init(name:"B3 Organ",    program:17)]
-            }
-            if isAmbient {
-                return [.init(name:"Glockenspiel",  program:9),   .init(name:"Steel Drums",   program:114),
-                        .init(name:"Marimba",       program:12),  .init(name:"Tubular Bells", program:14)]
-            }
-            if isKosmic {
-                return [.init(name:"Moog Lead",    program:39), .init(name:"Wurlitzer",   program:5),
-                        .init(name:"Rock Organ",   program:18)]
-            }
-            return [.init(name:"Guitar Pulse",  program:28), .init(name:"Moog Lead",   program:39),
-                    .init(name:"Fuzz Guitar",   program:29)]
-        case kTrackTexture:
-            if isChill {
-                // Pseudo-programs 240–250 map to audio texture files (intercepted in AppState.setProgram).
-                return [.init(name:"None",           program:240),
-                        .init(name:"Another bar",    program:241),
-                        .init(name:"Bar sounds",     program:242),
-                        .init(name:"City at night",  program:243),
-                        .init(name:"Harbor",         program:245),
-                        .init(name:"Light rain",     program:246),
-                        .init(name:"Ocean waves",    program:247),
-                        .init(name:"Urban rain",     program:248),
-                        .init(name:"Vinyl crackle",  program:250)]
-            }
-            if isAmbient {
-                return [.init(name:"Strings",       program:49), .init(name:"Bowed Glass",    program:92),
-                        .init(name:"Choir Aahs",    program:52), .init(name:"FX Atmosphere",  program:99),
-                        .init(name:"Pad 3 Poly",    program:90)]
-            }
-            if isKosmic {
-                return [.init(name:"FX Atmosphere", program:99), .init(name:"Pad 3 Poly",    program:90),
-                        .init(name:"Fifths Lead",    program:86)]
-            }
-            return [.init(name:"Fifths Lead",   program:86), .init(name:"Halo Pad",      program:94),
-                    .init(name:"Warm Pad",      program:89), .init(name:"FX Atmosphere", program:99),
-                    .init(name:"FX Echoes",     program:102)]
-        case kTrackBass:
-            if isChill {
-                return [.init(name:"Fretless Bass",  program:35), .init(name:"Acoustic Bass",  program:32),
-                        .init(name:"Elec Bass",      program:33)]
-            }
-            if isAmbient {
-                return [.init(name:"Cello",        program:42),  .init(name:"French Horn",    program:60),
-                        .init(name:"Contrabass",   program:43),  .init(name:"Voice Oohs",     program:54),
-                        .init(name:"English Horn", program:69)]
-            }
-            if isKosmic {
-                return [.init(name:"Moog Bass",    program:39), .init(name:"Fretless Bass",  program:35),
-                        .init(name:"Lead Bass",    program:87), .init(name:"Mono Synth",     program:81)]
-            }
-            return [.init(name:"Moog Bass",   program:39), .init(name:"Lead Bass",  program:87),
-                    .init(name:"Rock Bass",   program:34), .init(name:"Elec Bass",  program:33)]
-        case kTrackDrums:
-            if isChill {
-                return [.init(name:"Brush Kit",    program:40), .init(name:"808 Kit",       program:25),
-                        .init(name:"Standard Kit", program:0)]
-            }
-            if isAmbient {
-                return [.init(name:"Percussion Kit", program:0),
-                        .init(name:"Brush Kit",      program:40)]
-            }
-            if isKosmic {
-                return [.init(name:"Brush Kit",    program:40), .init(name:"808 Kit",      program:25),
-                        .init(name:"Machine Kit",  program:24), .init(name:"Standard Kit", program:0)]
-            }
-            return [.init(name:"Rock Kit",       program:8),  .init(name:"808 Kit",         program:25),
-                    .init(name:"Brush Kit",       program:40)]
-        default:
-            return [.init(name:"Synth",          program:0)]
-        }
+        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle)
+        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle)
+        return zip(names, programs).map { Instrument(name: $0, program: $1) }
     }
 
     @State private var instrumentIndex: Int = 0
     @State private var activeEffects: Set<String> = []
+
+    private var isInstrumentLocked: Bool {
+        trackIndex == kTrackLead2 && appState.lead2MirrorName != nil
+    }
     // Snapshot of the style currently applied to this track's instruments + effects.
     // Only updated when defaultsResetToken fires (generate or Reset button) — NOT on live
     // selectedStyle changes — so switching the picker mid-song doesn't touch anything.
@@ -230,11 +110,12 @@ struct TrackRowView: View {
                                 .font(.system(size: 10, weight: .medium))
                         }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isInstrumentLocked ? Color.secondary.opacity(0.35) : .secondary)
+                        .disabled(isInstrumentLocked)
 
-                        Text(instruments[instrumentIndex].name)
+                        Text(trackIndex == kTrackLead2 ? (appState.lead2MirrorName ?? instruments[instrumentIndex].name) : instruments[instrumentIndex].name)
                             .font(.system(size: 11))
-                            .foregroundStyle(Color.white.opacity(0.8))
+                            .foregroundStyle(isInstrumentLocked ? Color.white.opacity(0.35) : Color.white.opacity(0.8))
                             .lineLimit(1)
                             .frame(width: 82, alignment: .center)
 
@@ -243,7 +124,8 @@ struct TrackRowView: View {
                                 .font(.system(size: 10, weight: .medium))
                         }
                         .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(isInstrumentLocked ? Color.secondary.opacity(0.35) : .secondary)
+                        .disabled(isInstrumentLocked)
                     }
 
                     // Row 2: [M] [S] [⚡]
@@ -396,7 +278,7 @@ struct TrackRowView: View {
             return isKosmic ? [.boost, .delay, .space] : [.boost, .delay, .tremolo]
         case kTrackLead2:
             if isChill   { return [.space, .delay, .compression] }
-            if isAmbient { return [.tremolo, .delay, .space] }
+            if isAmbient { return [.tremolo, .delay, .space] }   // delay chip visible whether locked or not
             return isKosmic ? [.boost, .delay, .space] : [.boost, .delay, .reverb]
         case kTrackPads:
             if isChill   { return [.space, .sweep, .boost] }
@@ -455,7 +337,7 @@ struct TrackRowView: View {
         if activeStyle == .ambient {
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]
-            case kTrackLead2:   [.space]
+            case kTrackLead2:   isInstrumentLocked ? [.delay, .space] : [.space]
             case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
             case kTrackTexture: [.space, .pan, .sweep]

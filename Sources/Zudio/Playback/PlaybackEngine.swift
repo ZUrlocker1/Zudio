@@ -98,6 +98,8 @@ final class PlaybackEngine: ObservableObject {
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
     private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
+    // Per-track pending instrument loads — used to coalesce rapid setProgram calls on macOS.
+    private var programLoadWork: [Int: DispatchWorkItem] = [:]
     private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
 
     // Guard flag: wired CarPlay fires BOTH routeChangeNotification(.newDeviceAvailable) AND
@@ -474,6 +476,10 @@ final class PlaybackEngine: ObservableObject {
         stopMotorikFades()
         stopAmbientNoteFades()
         stopAmbientOutroFade()
+        // Stop any active pan LFOs so phase state doesn't bleed into the next song.
+        for i in 0..<kTrackCount where panEnabled[i] { stopPan(forTrack: i) }
+        kosmicIntroBassPanActive = false
+        kosmicIntroBassPanPhase  = 0.0
         // Clear reverb/delay buffers so tails don't bleed through when volume
         // is restored for the next song — applies to all styles.
         for rev in reverbs { rev.reset() }
@@ -501,7 +507,9 @@ final class PlaybackEngine: ObservableObject {
         engine.stop()
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
-        cachedDrumProgram = 255
+        cachedDrumProgram  = 255
+        cachedLead1Program = 255
+        cachedLead2Program = 255
         #if !os(iOS)
         // macOS: start now; setProgram() works with the engine running.
         startEngine()
@@ -525,7 +533,9 @@ final class PlaybackEngine: ObservableObject {
     func invalidateProgramCache() {
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
-        cachedDrumProgram = 255
+        cachedDrumProgram  = 255
+        cachedLead1Program = 255
+        cachedLead2Program = 255
     }
 
     /// Stop the engine once before a batch of setProgram() calls.
@@ -578,10 +588,15 @@ final class PlaybackEngine: ObservableObject {
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
         for (trackIndex, ev) in noteOns {
             let channel = gmChannel(trackIndex)
-            // Machine Kit (GM program 24) has harsh kick/snare at full velocity — scale down
+            // Machine Kit (GM program 24) has harsh kick/snare at full velocity — scale down.
+            // Grand Piano (program 0) on lead tracks sounds thin below vel~48 in GeneralUser GS;
+            // apply a 52-floor so soft ambient phrases remain musical rather than click-y.
             let fireVelocity: UInt8
             if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 78 / 100))
+            } else if (trackIndex == kTrackLead1 && cachedLead1Program == 0) ||
+                      (trackIndex == kTrackLead2 && cachedLead2Program == 0) {
+                fireVelocity = UInt8(max(52, Int(ev.velocity)))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -594,12 +609,12 @@ final class PlaybackEngine: ObservableObject {
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             if bar != self.currentBar { self.currentBar = bar }
+            let sps = self.songState?.frame.secondsPerStep ?? 0.1
             // Accumulate note-ons into pending buffer; flush to @Published array at ≤12fps.
             // This collapses append + prune into one objectWillChange per frame instead of
             // firing separately on every step — eliminates AppKit layout scans at step rate.
             if !noteOns.isEmpty {
                 let now = Date()
-                let sps = self.songState?.frame.secondsPerStep ?? 0.1
                 self.pendingVisualizerNotes.append(contentsOf: noteOns.map { (trackIdx, ev) in
                     VisualizerNote(trackIndex: trackIdx, note: ev.note,
                                    velocity: ev.velocity, birthDate: now,
@@ -623,8 +638,6 @@ final class PlaybackEngine: ObservableObject {
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
             // The chosen duration is stored per-track and reused for the matching note-off.
             if hasEvents, self.ambientMode {
-                // sps is constant for the life of a song; computed here so silent steps skip it.
-                let sps = self.songState?.frame.secondsPerStep ?? 0.1
                 for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackBass || trackIndex == kTrackPads {
                         let noteSecs  = Double(ev.durationSteps) * sps
@@ -646,7 +659,6 @@ final class PlaybackEngine: ObservableObject {
             // Also resets sweep phase to bottom of cycle (filter fully closed) on each note-on,
             // so every chord starts dark and sweeps upward — then back down before it ends.
             if self.chillPadsMode {
-                let sps = self.songState?.frame.secondsPerStep ?? 0.1
                 for (trackIndex, ev) in noteOns {
                     if trackIndex == kTrackPads {
                         let noteSecs = Double(ev.durationSteps) * sps
@@ -833,6 +845,7 @@ final class PlaybackEngine: ObservableObject {
         sched.start()
         // Pass states have no intro/outro — set volume directly to full.
         engine.mainMixerNode.outputVolume = 1.0
+        if ambientMode { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
     }
 
     // MARK: - Instrument program change (called from TrackRowView via AppState)
@@ -842,10 +855,15 @@ final class PlaybackEngine: ObservableObject {
     // TrackRowView always resets to program index 0 on generate — the same program every time.
     private var currentProgram: [UInt8] = Array(repeating: 255, count: kTrackCount)   // 255 = "not yet loaded"
     private var currentBankMSB: [UInt8] = Array(repeating: 0,   count: kTrackCount)
-    // Cached drum program for nonisolated onStep (written on main actor in setProgram, read from timer thread)
-    nonisolated(unsafe) private var cachedDrumProgram: UInt8 = 255
+    // Cached programs for nonisolated onStep (written on main actor in setProgram, read from timer thread)
+    nonisolated(unsafe) private var cachedDrumProgram:  UInt8 = 255
+    nonisolated(unsafe) private var cachedLead1Program: UInt8 = 255
+    nonisolated(unsafe) private var cachedLead2Program: UInt8 = 255
 
-    func setProgram(_ program: UInt8, forTrack trackIndex: Int) {
+    /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
+    /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls
+    /// and stops the Mac audio engine around the load to prevent EXC_BAD_ACCESS on the IOThread.
+    func setProgram(_ program: UInt8, forTrack trackIndex: Int, immediate: Bool = false) {
         guard trackIndex < samplers.count else { return }
         let isDrum = (trackIndex == kTrackDrums)
         let bankMSB: UInt8 = isDrum ? 0x78 : 0x79
@@ -853,14 +871,48 @@ final class PlaybackEngine: ObservableObject {
         if program == currentProgram[trackIndex] && bankMSB == currentBankMSB[trackIndex] { return }
         currentProgram[trackIndex] = program
         currentBankMSB[trackIndex] = bankMSB
-        if trackIndex == kTrackDrums { cachedDrumProgram = program }
+        if trackIndex == kTrackDrums  { cachedDrumProgram  = program }
+        if trackIndex == kTrackLead1  { cachedLead1Program = program }
+        if trackIndex == kTrackLead2  { cachedLead2Program = program }
+
+        // Cancel any pending debounced load for this track (covers rapid interactive changes).
+        programLoadWork[trackIndex]?.cancel()
+        programLoadWork[trackIndex] = nil
+
+        #if os(macOS)
+        // On macOS the AVAudioEngine stays running between songs. loadSoundBankInstrument() is
+        // safe to call while the engine is running from the main thread. For interactive changes,
+        // debounce 80 ms to coalesce rapid taps — the dedup check above already short-circuits
+        // same-program calls. engine stop/start is NOT used here: it resets all other samplers.
+        if immediate {
+            try? samplers[trackIndex].loadSoundBankInstrument(
+                at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
+            )
+        } else {
+            let work = DispatchWorkItem { [weak self, program, bankMSB, trackIndex] in
+                guard let self else { return }
+                try? self.samplers[trackIndex].loadSoundBankInstrument(
+                    at: self.gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
+                )
+                self.programLoadWork[trackIndex] = nil
+            }
+            programLoadWork[trackIndex] = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
+        }
+        #else
         try? samplers[trackIndex].loadSoundBankInstrument(
             at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
         )
-        // Per-track default volumes; tremolo overrides this via LFO
-        if !tremEnabled[trackIndex] {
+        #endif
+        // Per-track default volumes; tremolo overrides live sampler volume via LFO.
+        // trackBaseVolume is always updated so stopTremolo restores the correct new value.
+        do {
             let vol: Float
-            if trackIndex == kTrackLead1 && program == 59 {
+            if trackIndex == kTrackLead1 && program == 0 {
+                vol = 0.62   // Grand Piano on Ambient Lead 1 — keep it soft
+            } else if trackIndex == kTrackLead1 && program == 46 {
+                vol = 1.35   // Harp runs soft in GM on Lead 1 — boost for presence
+            } else if trackIndex == kTrackLead1 && program == 59 {
                 vol = 1.3    // Muted Trumpet runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead2 && program == 11 {
                 vol = 1.45   // Vibraphone runs soft in GM — boost for presence
@@ -871,9 +923,17 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead1 && program == 80 {
                 vol = 0.78   // Square Lead on Lead 1
             } else if trackIndex == kTrackBass && kosmicStyle && program == 87 {
-                vol = 0.40   // Lead Bass runs hot on Kosmic bass — pull back further
+                vol = 0.30   // Lead Bass runs hot on Kosmic bass — pull back further
+            } else if trackIndex == kTrackLead1 && motorikStyle && program == 63 {
+                vol = 0.36   // FM Lead (Synth Brass 2) runs loud on Motorik Lead 1 — pull back
+            } else if trackIndex == kTrackLead1 && motorikStyle && program == 83 {
+                vol = 1.3    // Chiff Lead runs soft on Motorik Lead 1 — boost
+            } else if trackIndex == kTrackBass && motorikStyle && program == 87 {
+                vol = 0.30   // Lead Bass runs hot on Motorik bass — pull back
             } else if trackIndex == kTrackBass && program == 87 {
                 vol = 0.56   // Lead Bass runs hot
+            } else if trackIndex == kTrackLead2 && program == 46 {
+                vol = 1.30   // Harp runs soft in GM on Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && program == 93 {
                 vol = 1.8    // Metal Pad runs soft in GM — boost for Lead 2 audibility
             } else if trackIndex == kTrackLead2 && program == 0 {
@@ -898,6 +958,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.4    // Texture pads are quiet
             } else if trackIndex == kTrackDrums && ambientMode {
                 vol = 2.2    // Drums sit under heavy Ambient reverb — boost so they're audible
+            } else if trackIndex == kTrackBass && ambientMode && program == 62 {
+                vol = 0.40   // FM Synth (Synth Brass 1) runs loud on Ambient bass — pull back
+            } else if trackIndex == kTrackRhythm && ambientMode && program == 8 {
+                vol = 1.5    // Celesta runs soft on Ambient rhythm — boost
+            } else if trackIndex == kTrackRhythm && ambientMode && program == 96 {
+                vol = 0.75   // Rain runs loud on Ambient rhythm — pull back
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 4 {
                 vol = 1.6    // Rhodes runs soft in GM — boost for Chill rhythm presence
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 5 {
@@ -905,7 +971,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 17 {
                 vol = 0.75   // B3 Organ runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
-                vol = 0.48   // Mono Synth runs hot on Kosmic bass — pull back more
+                vol = 0.32   // Mono Synth runs hot on Kosmic bass — pull back more
             } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
                 vol = 1.6    // Celesta runs soft on Ambient Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && chillPadsMode {
@@ -922,7 +988,7 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.0
             }
             trackBaseVolume[trackIndex] = vol
-            samplers[trackIndex].volume = vol
+            if !tremEnabled[trackIndex] { samplers[trackIndex].volume = vol }
         }
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
         applyMuteState()
@@ -943,6 +1009,7 @@ final class PlaybackEngine: ObservableObject {
         if !enabled {
             // Restore HPF bypass for all tracks when leaving Ambient mode
             for i in 0..<lowEQs.count { lowEQs[i].bands[1].bypass = true }
+            applyStaticPans()
             return
         }
         // Set per-track reverb presets for Ambient
@@ -972,6 +1039,7 @@ final class PlaybackEngine: ObservableObject {
         for i in 0..<lowEQs.count {
             lowEQs[i].bands[1].bypass = !hpfTracks.contains(i)
         }
+        applyStaticPans()
     }
 
     /// Set Chill pads mode — enables per-note audio fade-in/fade-out on the Pads boost node.
@@ -981,6 +1049,7 @@ final class PlaybackEngine: ObservableObject {
         if !enabled {
             stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
             reverbs[kTrackPads].loadFactoryPreset(.cathedral)  // restore Pads to init preset
+            applyStaticPans()
             return
         }
         // Chill reverb presets — lighter than the cathedral/largeChamber init defaults.
@@ -1005,6 +1074,7 @@ final class PlaybackEngine: ObservableObject {
         delays[kTrackLead2].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // quarter note
         delays[kTrackLead2].feedback      = 40
         delays[kTrackLead2].lowPassCutoff = 5500
+        applyStaticPans()
     }
 
     private func applyMotorikAudio() {
@@ -1021,6 +1091,7 @@ final class PlaybackEngine: ObservableObject {
         delays[kTrackRhythm].delayTime    = Swift.min(2.0, beatSecs * 0.5)  // 8th note
         delays[kTrackRhythm].feedback     = 30
         delays[kTrackRhythm].lowPassCutoff = 3500
+        applyStaticPans()
     }
 
     private func applyKosmicAudio() {
@@ -1047,6 +1118,7 @@ final class PlaybackEngine: ObservableObject {
         delays[kTrackRhythm].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // 8th note
         delays[kTrackRhythm].feedback      = 30
         delays[kTrackRhythm].lowPassCutoff = 4000
+        applyStaticPans()
     }
 
     // MARK: - Per-track effect toggle
@@ -1172,11 +1244,22 @@ final class PlaybackEngine: ObservableObject {
 
         // Sweep — ~20fps, all active tracks (skipped for tracks overridden by global sweep)
         for i in 0..<kTrackCount where sweepEnabled[i] && globalSweepTicksRemaining == 0 {
-            let inc   = ambientMode && i < ambientSweepPhaseInc.count  ? ambientSweepPhaseInc[i]  : 0.02199
-            let floor = ambientMode && i < ambientSweepFloor.count     ? ambientSweepFloor[i]     : Float(300)
-            let half  = ambientMode && i < ambientSweepHalfRange.count ? ambientSweepHalfRange[i] : Float(1600)
-            sweepPhase[i] += inc
-            let cutoff = floor + half * Float(1 + sin(sweepPhase[i]))
+            let cutoff: Float
+            if ambientMode && i == kTrackBass {
+                // Amplitude-coupled: cutoff tracks the boost node volume (300 Hz closed → 3500 Hz open).
+                cutoff = 300 + 3200 * boosts[kTrackBass].outputVolume
+            } else {
+                let inc:   Double
+                let floor: Float
+                let half:  Float
+                if ambientMode {
+                    (inc, floor, half) = (ambientSweepPhaseInc[i], ambientSweepFloor[i], ambientSweepHalfRange[i])
+                } else {
+                    (inc, floor, half) = (0.02199, 300, 1600)
+                }
+                sweepPhase[i] += inc
+                cutoff = floor + half * Float(1 + sin(sweepPhase[i]))
+            }
             AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
         }
 
@@ -1202,8 +1285,9 @@ final class PlaybackEngine: ObservableObject {
             }
         }
 
-        // Pan — ~20fps, all active tracks
-        for i in 0..<kTrackCount where panEnabled[i] {
+        // Pan — ~20fps, all active tracks.
+        // Skip Bass when the Kosmic intro bass pan is running — it owns that node.
+        for i in 0..<kTrackCount where panEnabled[i] && !(i == kTrackBass && kosmicIntroBassPanActive) {
             panPhase[i] += panPhaseInc[i]
             boosts[i].pan = Float(sin(panPhase[i]))
         }
@@ -1334,12 +1418,12 @@ final class PlaybackEngine: ObservableObject {
             // Song start: zero everything; a master ramp + intro boost ramp will open audio.
             boosts[kTrackBass].outputVolume      = 0.0
             boosts[kTrackPads].outputVolume      = 0.0
-            engine.mainMixerNode.outputVolume    = 0.0
-            // Master mixer 0→1 over ~100 ms to absorb any DSP-init transient.
+            engine.mainMixerNode.outputVolume    = 0.15
+            // Master mixer 0.15→1 over ~100 ms to absorb any DSP-init transient.
             for i in 1...5 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.020) { [weak self] in
                     guard let self, self.currentSchedulerID == schedulerID else { return }
-                    self.engine.mainMixerNode.outputVolume = Float(i) / 5.0
+                    self.engine.mainMixerNode.outputVolume = 0.15 + Float(i) / 5.0 * 0.85
                 }
             }
         } else if inIntro {
@@ -1649,17 +1733,14 @@ final class PlaybackEngine: ObservableObject {
         ambientOutroFadeTimer = nil
 
         let totalBars = state.frame.totalBars
-        let outroStartStep: Int
-        let outroEndStep: Int
-        if let outro = state.structure.outroSection, outro.endBar > outro.startBar {
-            outroStartStep = outro.startBar * 16
-            outroEndStep   = outro.endBar   * 16
-        } else {
-            // Fallback for pureDrone (no outro section): fade over last 4 bars
-            outroStartStep = max(0, totalBars - 4) * 16
-            outroEndStep   = totalBars * 16
-        }
-        let totalSteps = outroEndStep - outroStartStep
+        // Always fade the last 8 bars regardless of structural outro length.
+        // 8 bars = 17–27 seconds at ambient BPM, long enough to overlap the final
+        // notes of any loop tile (loop tiling can leave silence before the structural
+        // outro start if the last tile's notes end early).
+        let fadeBars       = min(8, max(1, totalBars / 2))
+        let outroStartStep = max(0, totalBars - fadeBars) * 16
+        let outroEndStep   = totalBars * 16
+        let totalSteps     = outroEndStep - outroStartStep
         guard totalSteps > 0, currentStep < outroEndStep else { return }
 
         let sps             = state.frame.secondsPerStep

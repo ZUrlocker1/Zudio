@@ -239,17 +239,28 @@ final class AppState: ObservableObject {
         let moodOverride:   Mood?
         // [Int: UInt64] → [String: UInt64]: JSON requires String keys in dictionaries.
         let trackOverrides: [String: UInt64]
+        // Instrument pool indices per track. Optional so old persisted data decodes as nil.
+        let instrumentOverrides: [String: Int]?
 
-        init(from state: SongState) {
-            seed           = state.globalSeed
-            style          = state.style
-            title          = state.title
-            forcedRules    = state.forcedRules
-            keyOverride    = state.keyOverride
-            tempoOverride  = state.tempoOverride
-            moodOverride   = state.moodOverride
-            trackOverrides = Dictionary(uniqueKeysWithValues:
+        init(from state: SongState, instrumentOverrides: [Int: Int] = [:]) {
+            seed                    = state.globalSeed
+            style                   = state.style
+            title                   = state.title
+            forcedRules             = state.forcedRules
+            keyOverride             = state.keyOverride
+            tempoOverride           = state.tempoOverride
+            moodOverride            = state.moodOverride
+            trackOverrides          = Dictionary(uniqueKeysWithValues:
                 state.trackOverrides.map { (String($0.key), $0.value) })
+            self.instrumentOverrides = instrumentOverrides.isEmpty ? nil :
+                Dictionary(uniqueKeysWithValues: instrumentOverrides.map { (String($0.key), $0.value) })
+        }
+
+        /// Decodes `instrumentOverrides` (String keys) back to `[Int: Int]`.
+        var decodedInstrumentOverrides: [Int: Int] {
+            guard let ovr = instrumentOverrides else { return [:] }
+            return Dictionary(uniqueKeysWithValues: ovr.compactMap { k, v -> (Int, Int)? in
+                guard let i = Int(k) else { return nil }; return (i, v) })
         }
     }
 
@@ -276,7 +287,7 @@ final class AppState: ObservableObject {
     /// No-op if this seed is already present (deduplicates reloads).
     private func appendPersistedSong(from state: SongState) {
         guard !persistedHistory.contains(where: { $0.seed == state.globalSeed }) else { return }
-        persistedHistory.append(PersistedSong(from: state))
+        persistedHistory.append(PersistedSong(from: state, instrumentOverrides: instrumentOverrides))
         if persistedHistory.count > Self.kPersistedHistoryMax { persistedHistory.removeFirst() }
         savePersistedHistory()
     }
@@ -316,6 +327,11 @@ final class AppState: ObservableObject {
                     if self.generationHistory.count > Self.kPersistedHistoryMax {
                         self.generationHistory.removeFirst()
                     }
+                    // Restore instrument overrides so ⏮ navigation gets the right instruments.
+                    let ovr = song.decodedInstrumentOverrides
+                    if !ovr.isEmpty {
+                        self.sessionInstrumentOverrides[finalState.globalSeed] = ovr
+                    }
                 }
             }
         }
@@ -354,6 +370,7 @@ final class AppState: ObservableObject {
     private var evolveNextSongShouldLog:   Bool        = false  // set at 12-bar mark; tells preGen to log when ready
     private var evolveNextSongLogged:      Bool        = false  // prevents duplicate "Up next" at transition
     private var evolveInstrumentsChanged:  Bool        = false  // true if both evolve passes ran before song end
+    private var lead2MirroredProgram: UInt8?            = nil    // non-nil = Lead 2 plays Lead 1's program
     // Incremented on each evolve phase switch so the scrollbar recreates itself even when
     // totalBars hasn't changed (e.g. preGeneratePassContent(pass: 2) already extended songState).
     @Published var evolvePhaseToken: Int = 0
@@ -363,6 +380,7 @@ final class AppState: ObservableObject {
     // Incremented to signal TrackRowViews to reset instruments + effects to style defaults.
     // Fired on generateNew() and on the manual Reset button.
     @Published var defaultsResetToken: Int = 0
+    @Published var lead2MirrorName: String? = nil   // non-nil = Lead 2 display name is overridden to match Lead 1
 
     /// Full clean-state reset — equivalent to a fresh app launch.
     /// Resets style, clears song, clears history, restores first-best-song behavior,
@@ -438,24 +456,31 @@ final class AppState: ObservableObject {
     /// Snapshot of instrumentOverrides taken right after each song finishes generating or loading.
     /// resetEffectsToDefaults() restores from this so instruments return to their song-original state.
     private var songInstrumentOverrides: [Int: Int] = [:]
+    /// Per-song instrument overrides keyed by globalSeed. Lets ⏮ navigation restore the
+    /// exact instruments that were playing when the song was first generated this session.
+    private var sessionInstrumentOverrides: [UInt64: [Int: Int]] = [:]
+    /// Last pool index used per (track, style) for no-repeat instruments.
+    /// Keyed by trackIndex → style → poolIndex. Nil entry = no previous song in that style.
+    private var lastUsedInstrumentIndex: [Int: [MusicStyle: Int]] = [:]
 
     private static let randomizableTrackIndices = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture, kTrackBass, kTrackDrums]
 
-    // Instruments that should not carry over into a consecutive song.
-    // If still selected when a new song loads, they are replaced with a different random pick.
-    private static let onceOnlyInstruments: [(track: Int, style: MusicStyle, poolIndex: Int)] = [
-        (kTrackLead2,  .kosmic,  3),  // Vox Solo        patch 85
+    // Instruments that should not play in two consecutive songs.
+    // If the SAME instrument was used in the previous song, a different one is chosen.
+    // All instruments remain equally available — this only prevents back-to-back repeats.
+    private static let noRepeatInstruments: [(track: Int, style: MusicStyle, poolIndex: Int)] = [
+        (kTrackLead1,  .ambient, 1),  // Ocarina          patch 79
+        (kTrackLead1,  .ambient, 5),  // Grand Piano      patch 0
+        (kTrackLead2,  .kosmic,  2),  // Charang          patch 84
+        (kTrackLead2,  .kosmic,  3),  // Vox Solo         patch 85
         (kTrackBass,   .kosmic,  2),  // Lead Bass        patch 87
         (kTrackRhythm, .kosmic,  2),  // Rock Organ       patch 18
         (kTrackBass,   .motorik, 2),  // Rock Bass        patch 34
         (kTrackLead2,  .motorik, 1),  // Brightness       patch 100
-        (kTrackLead1,  .ambient, 1),  // Ocarina          patch 79
         (kTrackLead2,  .ambient, 0),  // Harp             patch 46
-        (kTrackLead2,  .ambient, 1),  // Grand Piano      patch 0
-        (kTrackLead2,  .ambient, 2),  // Acoustic Guitar  patch 24
-        (kTrackBass,   .ambient, 3),  // Voice Oohs       patch 54
-        (kTrackBass,   .ambient, 4),  // English Horn     patch 69
-        (kTrackRhythm, .ambient, 1),  // Steel Drums      patch 114
+        (kTrackLead2,  .ambient, 1),  // Acoustic Guitar  patch 24
+        (kTrackBass,   .ambient, 2),  // Voice Oohs       patch 54
+        (kTrackBass,   .ambient, 3),  // FM Synth         patch 62
     ]
 
     private static let trackDisplayName: [Int: String] = [
@@ -466,19 +491,20 @@ final class AppState: ObservableObject {
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
-        case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Pan Flute","Whistle","Recorder","Brightness","Calliope Lead"]
+        case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Whistle","Brightness","Calliope Lead","Grand Piano","Harp"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
+        case (kTrackLead1,   .motorik): return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead","FM Lead"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Xylophone"]
-        case (kTrackLead2,   .ambient): return ["Harp","Grand Piano","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
-        case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo"]
+        case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
+        case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal"]
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","New Age Pad"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ"]
-        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Steel Drums","Marimba","Tubular Bells"]
+        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Tubular Bells","Celesta","Crystal","Rain"]
         case (kTrackRhythm,  .kosmic):   return ["Moog Lead","Wurlitzer","Rock Organ"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
@@ -487,8 +513,8 @@ final class AppState: ObservableObject {
         case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Fifths Lead"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
-        case (kTrackBass,    .ambient): return ["Cello","French Horn","Contrabass","Voice Oohs","English Horn"]
-        case (kTrackBass,    .kosmic):  return ["Moog Bass","Fretless Bass","Lead Bass","Mono Synth"]
+        case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
+        case (kTrackBass,    .kosmic):  return ["Moog Bass","Lead Bass","Mono Synth","Rock Bass"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Standard Kit"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
@@ -503,18 +529,19 @@ final class AppState: ObservableObject {
     nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56]
-        case (kTrackLead1, .ambient):  return [73, 79, 75, 78, 74, 100, 82]
+        case (kTrackLead1, .ambient):  return [73, 79, 78, 100, 82, 0, 46]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74]
+        case (kTrackLead1, .motorik):  return [81, 62, 90, 83, 63]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 13]
-        case (kTrackLead2, .ambient):  return [46, 0, 24, 98, 91, 99]
-        case (kTrackLead2, .kosmic):   return [100, 70, 84, 85]
+        case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
+        case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 88]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91]
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
-        case (kTrackRhythm, .ambient): return [9, 114, 12, 14]
+        case (kTrackRhythm, .ambient): return [9, 14, 8, 98, 96]
         case (kTrackRhythm, .chill):   return [4, 5, 17]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18]
         case (kTrackRhythm, _):        return [28, 39, 29]
@@ -523,8 +550,8 @@ final class AppState: ObservableObject {
         case (kTrackTexture, .kosmic): return [99, 90, 86]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
-        case (kTrackBass, .ambient):   return [42, 60, 43, 54, 69]
-        case (kTrackBass, .kosmic):    return [39, 35, 87, 81]
+        case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
+        case (kTrackBass, .kosmic):    return [39, 87, 81, 34]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 0]
         case (kTrackDrums, .ambient):  return [0, 40]
@@ -560,8 +587,9 @@ final class AppState: ObservableObject {
             // Drums always use percussion bank — no meaningful "default MIDI" concept
             if trackIndex == kTrackDrums { continue }
             let idx = instrumentOverrides[trackIndex] ?? 0
-            let program = programs[min(idx, programs.count - 1)]
-            playback.setProgram(program, forTrack: trackIndex)
+            let poolProgram = programs[min(idx, programs.count - 1)]
+            let program = (trackIndex == kTrackLead2 ? lead2MirroredProgram : nil) ?? poolProgram
+            playback.setProgram(program, forTrack: trackIndex, immediate: true)
             // Check that the load was confirmed (currentProgram updated only on success)
             let loaded = playback.loadedProgram(forTrack: trackIndex)
             if loaded != program {
@@ -577,7 +605,7 @@ final class AppState: ObservableObject {
         let drumPrograms = Self.instrumentPoolPrograms(trackIndex: kTrackDrums, style: style)
         if !drumPrograms.isEmpty {
             let drumIdx = instrumentOverrides[kTrackDrums] ?? 0
-            playback.setProgram(drumPrograms[min(drumIdx, drumPrograms.count - 1)], forTrack: kTrackDrums)
+            playback.setProgram(drumPrograms[min(drumIdx, drumPrograms.count - 1)], forTrack: kTrackDrums, immediate: true)
         }
 
         #if os(iOS)
@@ -1071,10 +1099,14 @@ final class AppState: ObservableObject {
                 }
                 // Snapshot the final overrides — resetEffectsToDefaults() restores from here.
                 self.songInstrumentOverrides = self.instrumentOverrides
+                self.sessionInstrumentOverrides[state.globalSeed] = self.instrumentOverrides
+                self.saveLastUsedInstruments(style: style)
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
 
                 self.appendGenerationLog(state.generationLog)
+                self.restoreLead2Mirror()
+                self.applyLead2Mirror(for: state)
                 // Reset mute/solo so every new song starts with all parts audible
                 self.muteState = Array(repeating: false, count: kTrackCount)
                 self.soloState = Array(repeating: false, count: kTrackCount)
@@ -1356,17 +1388,61 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Saves the current instrumentOverrides for no-repeat tracking.
+    /// Call this after a song's instruments are fully determined so the NEXT song
+    /// can avoid repeating any no-repeat instrument that was just heard.
+    private func saveLastUsedInstruments(style: MusicStyle) {
+        for entry in Self.noRepeatInstruments where entry.style == style {
+            var dict = lastUsedInstrumentIndex[entry.track] ?? [:]
+            dict[style] = instrumentOverrides[entry.track] ?? 0
+            lastUsedInstrumentIndex[entry.track] = dict
+        }
+    }
+
+    /// If the freshly-randomized song picked the same no-repeat instrument as the
+    /// previous song, swap it for a different random pick. All instruments remain
+    /// equally available — this only prevents two consecutive songs from sharing
+    /// the same distinctive instrument.
     private func replaceOnceOnlyInstruments(style: MusicStyle) {
         var rng = SystemRandomNumberGenerator()
-        for entry in Self.onceOnlyInstruments where entry.style == style {
+        for entry in Self.noRepeatInstruments where entry.style == style {
             let current = instrumentOverrides[entry.track] ?? 0
             guard current == entry.poolIndex else { continue }
+            // Only swap if the previous song also used this instrument.
+            guard lastUsedInstrumentIndex[entry.track]?[style] == entry.poolIndex else { continue }
             let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style)
             guard pool.count > 1 else { continue }
             var newIdx = current
-            repeat { newIdx = Int.random(in: 0..<pool.count, using: &rng) } while newIdx == current
+            var attempts = 0
+            repeat {
+                newIdx = Int.random(in: 0..<pool.count, using: &rng)
+                attempts += 1
+            } while newIdx == current && attempts < 8
             instrumentOverrides[entry.track] = newIdx
         }
+    }
+
+    // When Ambient Lead 1 uses a sparse/melodic rule, mirror Lead 2's program to match
+    // Lead 1 so both leads share the same timbre.
+    // Stored as a raw MIDI program number so it survives pool-index lookup differences.
+    private func applyLead2Mirror(for state: SongState) {
+        let mirrorRules: Set<String> = ["AMB-LEAD-001", "AMB-LEAD-002", "AMB-LEAD-006", "AMB-LEAD-007", "AMB-LEAD-008"]
+        guard state.style == .ambient,
+              state.generationLog.contains(where: { mirrorRules.contains($0.tag) })
+        else { return }
+        let lead1Idx      = instrumentOverrides[kTrackLead1] ?? 0
+        let lead1Names    = Self.instrumentPoolNames(trackIndex: kTrackLead1, style: .ambient)
+        let lead1Programs = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .ambient)
+        guard !lead1Programs.isEmpty else { return }
+        lead2MirroredProgram = lead1Programs[min(lead1Idx, lead1Programs.count - 1)]
+        let name = lead1Idx < lead1Names.count ? lead1Names[lead1Idx] : "Lead 1"
+        lead2MirrorName = name
+        appendToLog([GenerationLogEntry(tag: "Instrument", description: "Lead 2  \(name) locked to L1", isTitle: false)])
+    }
+
+    private func restoreLead2Mirror() {
+        lead2MirroredProgram = nil
+        lead2MirrorName      = nil
     }
 
     private func randomizeTwoInstruments(style: MusicStyle) {
@@ -1407,6 +1483,8 @@ final class AppState: ObservableObject {
             self.appendGenerationLog(state.generationLog)
             self.randomizeTwoInstruments(style: state.style)
             self.replaceOnceOnlyInstruments(style: state.style)
+            self.restoreLead2Mirror()
+            self.applyLead2Mirror(for: state)
             self.finishLoadingSong(state, thenPlay: true)
         }
     }
@@ -1882,6 +1960,8 @@ final class AppState: ObservableObject {
         appendGenerationLog(state.generationLog)
         if !alreadyEvolved { randomizeTwoInstruments(style: state.style) }
         replaceOnceOnlyInstruments(style: state.style)
+        restoreLead2Mirror()
+        applyLead2Mirror(for: state)
         finishLoadingSong(state, thenPlay: true)
         // Song 2 already matched song 1's mood (enforced at pre-gen time via evolveMoodAnchor).
         // From song 3 onward, lockMoodToSong: false so mood is picked freely each time.
@@ -1898,6 +1978,8 @@ final class AppState: ObservableObject {
     /// Shared song-loading kernel for Endless transitions and ⏮ rewind.
     /// Stops current playback, loads `state`, and plays if `thenPlay` is true.
     private func finishLoadingSong(_ state: SongState, thenPlay: Bool) {
+        saveLastUsedInstruments(style: state.style)
+        sessionInstrumentOverrides[state.globalSeed] = instrumentOverrides
         playback.stop()
         audioTexture.stop()
         songState = state
@@ -2270,6 +2352,22 @@ final class AppState: ObservableObject {
     // MARK: - Instrument
 
     func setProgram(_ program: UInt8, forTrack trackIndex: Int) {
+        // If Lead 1 changes while the mirror is active, keep Lead 2 in sync.
+        if trackIndex == kTrackLead1, lead2MirroredProgram != nil {
+            lead2MirroredProgram = program
+            let lead1Programs = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: selectedStyle)
+            let lead1Names    = Self.instrumentPoolNames(trackIndex: kTrackLead1, style: selectedStyle)
+            if let idx = lead1Programs.firstIndex(of: program), idx < lead1Names.count {
+                lead2MirrorName = lead1Names[idx]
+            }
+            playback.setProgram(program, forTrack: kTrackLead2)
+            // Fall through — Lead 1 still gets its own program applied below.
+        }
+        // While Lead 2 is mirrored to Lead 1's instrument, ignore any other program change for it.
+        if trackIndex == kTrackLead2, let mirrored = lead2MirroredProgram {
+            playback.setProgram(mirrored, forTrack: trackIndex)
+            return
+        }
         // Chill texture track uses pseudo-programs 240–247 that map to M4A filenames.
         if trackIndex == kTrackTexture && selectedStyle == .chill {
             let filename = Self.chillTextureFilename(forProgram: program)
@@ -2490,13 +2588,19 @@ final class AppState: ObservableObject {
         songState        = state
         visibleBarOffset = 0
         lastEmittedStep  = -1
-        instrumentOverrides = [:]
-        if state.style == .chill {
-            let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
-            instrumentOverrides[kTrackTexture] = Int(prog) - 240
+        // Restore the exact instruments that were playing when this song was first generated.
+        if let cached = sessionInstrumentOverrides[state.globalSeed] {
+            instrumentOverrides = cached
+        } else {
+            instrumentOverrides = [:]
+            if state.style == .chill {
+                let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
+                instrumentOverrides[kTrackTexture] = Int(prog) - 240
+            }
         }
-        // Snapshot so resetEffectsToDefaults() can restore to this song's original instruments.
         songInstrumentOverrides = instrumentOverrides
+        restoreLead2Mirror()
+        applyLead2Mirror(for: state)
         muteState = Array(repeating: false, count: kTrackCount)
         soloState = Array(repeating: false, count: kTrackCount)
         playback.muteState    = muteState
@@ -2554,6 +2658,14 @@ final class AppState: ObservableObject {
                 self.keyOverride   = song.keyOverride
                 self.tempoOverride = song.tempoOverride
                 self.moodOverride  = song.moodOverride
+                self.instrumentOverrides = song.decodedInstrumentOverrides
+                if song.style == .chill && self.instrumentOverrides[kTrackTexture] == nil {
+                    let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
+                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                }
+                self.songInstrumentOverrides = self.instrumentOverrides
+                self.restoreLead2Mirror()
+                self.applyLead2Mirror(for: state)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
             }
         }

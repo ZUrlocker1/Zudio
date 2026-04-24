@@ -23,8 +23,13 @@ func pickSoloWindows(
         guard !section.label.isBridge && section.label != .bridgeMelody else { continue }
         for b in section.startBar..<section.endBar { bodyBarSet.insert(b) }
     }
-    let validStarts = bodyBarSet.sorted().filter { start in
-        (start..<(start + soloLength)).allSatisfy { bodyBarSet.contains($0) }
+    // O(n): scan sorted bars once, tracking run length to find windows that fit soloLength.
+    let sortedBars = bodyBarSet.sorted()
+    var validStarts: [Int] = []
+    var runStart = 0
+    for i in 0..<sortedBars.count {
+        if i > 0 && sortedBars[i] != sortedBars[i - 1] + 1 { runStart = i }
+        if i - runStart + 1 >= soloLength { validStarts.append(sortedBars[i - soloLength + 1]) }
     }
     guard !validStarts.isEmpty else { return [] }
 
