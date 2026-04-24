@@ -19,7 +19,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.01/Zudio-1.01.dmg)
 
-Current release: `1.01` (build 112). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `1.01` (build 113). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 ---
 

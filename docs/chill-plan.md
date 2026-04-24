@@ -1057,41 +1057,38 @@ Song length: 68–116 bars ≈ 3:00–5:00 min
 ## Part 6: Instrument Presets
 
 Lead 1 (ChillLead1, primary solo):
-- Flute (program 73) — Bright/Free primary; register 65–85
-- Muted Trumpet (program 59) — Deep/Dream primary; register 53–80
-- Trumpet (program 56) — Deep/Dream alternate; register 55–79
-- Alto Sax (program 65) — Deep/Dream secondary; register 50–70
-- Soprano Sax (program 64) — alternate; register 58–80
-- Vibraphone (program 11) — all moods; register 60–80
-- Trombone (program 57) — Lead 2 counter-melody register; register 45–65
+- Muted Trumpet (program 59) — primary; register 53–80
+- Tenor Sax (program 66) — alternate
+- Alto Sax (program 65) — alternate; register 50–70
+- Trumpet (program 56) — alternate; register 55–79
 
 Lead 2 (ChillLead2, counter-melody):
-- Vibraphone (program 11) — default when Lead 1 is not vibraphone
-- Flute (program 73) — when Lead 1 is trumpet or saxophone
+- Vibraphone (program 11) — default
+- Flute (program 73)
+- Soprano Sax (program 64)
 - Trombone (program 57) — low counter-melody voice
+- Xylophone (program 13)
 
 Pads (sustained harmonic layer):
 - Warm Pad (program 89) — default
-- String Ensemble 1 (program 48) — alternate (acoustic feel)
-- String Ensemble 2 (program 49) — alternate (lower strings; Deep moods)
-- Synth Strings 1 (program 50) — Bright/Free (brighter attack)
-- Choir Aahs (program 52) — optional atmospheric Deep/Dream
-- Pad 3 Poly Synth (program 90) — optional electronic Deep/Dream
+- Synth Strings 1 (program 50)
+- String Pad / String Ensemble 1 (program 48) — acoustic feel
+- Sweep Pad (program 95)
 
 Rhythm (Rhodes active comping):
 - Rhodes (program 4) — default (primary harmonic voice)
 - Wurlitzer (program 5) — alternate
-- Grand Piano (program 0) — deepest Deep/Dream moods
+- B3 Organ (program 17)
 
 Bass:
 - Fretless Bass (program 35) — default (upright-adjacent warmth)
-- Acoustic Bass (program 32) — Deep moods (warmest upright tone)
-- Electric Bass finger (program 33) — Bright/Free moods (round, punchy)
+- Acoustic Bass (program 32) — warmest upright tone
+- Elec Bass (program 33) — round, punchy
 
 Drums:
-- 808 Kit (program 25) — Deep/Dream moods (electronic)
-- Standard Kit for neo soul mode — Bright/Free moods
-- Brush Kit (program 40) — Bright/Free moods (acoustic feel)
+- Brush Kit (program 40)
+- 808 Kit (program 25)
+- Standard Kit (program 0)
 
 Texture (audio mode only, ~30% of songs):
 - Soft rain, Cafe murmur, Vinyl crackle, Late night city, Tape hiss,

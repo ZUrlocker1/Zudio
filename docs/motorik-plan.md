@@ -781,3 +781,17 @@ Specific clashes fixed in Round 2:
 - sus2 on Aeolian root=5 (M2 above the 5th = raised 6th, not in natural minor)
 - dom7 on Mixolydian root=4 and on Ionian root=4 (the m7 interval lands on a chromatic pitch)
 - Also added new diatonic allowances: IV7 in Dorian (blues colour), bVII7 in Aeolian, V7 in Ionian.
+
+---
+
+## Instrument Presets (TrackRowView)
+
+Track assignments per kTrack index:
+
+- **kTrackLead1 (Lead 1):** Mono Synth (81), Soft Brass (62), Pad 3 Poly (90), Chiff Lead (83), FM Lead (63) — sequencer/synth lead voices; FM Lead volume reduced (0.36×) as it runs loud; Chiff Lead boosted (1.3×) as it runs soft
+- **kTrackLead2 (Lead 2):** Polysynth (90), Brightness (100), Minimoog (39), Elec Guitar (30) — Brightness is noRepeat (once per song only)
+- **kTrackPads (Pads):** Halo Pad (94), Sweep Pad (95), Bowed Glass (92), Synth Strings (50)
+- **kTrackRhythm (Rhythm):** Guitar Pulse (28), Moog Lead (39), Fuzz Guitar (29)
+- **kTrackTexture (Texture):** Fifths Lead (86), Halo Pad (94), Warm Pad (89), FX Atmosphere (99), FX Echoes (102)
+- **kTrackBass (Bass):** Moog Bass (39), Lead Bass (87), Rock Bass (34), Elec Bass (33) — Lead Bass and Rock Bass volume reduced (0.30×) as they run hot
+- **kTrackDrums (Drums):** Rock Kit (8), 808 Kit (25), Brush Kit (40)

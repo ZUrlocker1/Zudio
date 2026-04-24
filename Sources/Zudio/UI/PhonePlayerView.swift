@@ -104,6 +104,11 @@ struct PhonePlayerView: View {
         .onChange(of: appState.isGenerating) { _, generating in
             if !generating { hapticSuccess.toggle() }
         }
+        // TrackRowView handles this on macOS/iPad via its own onChange(of: defaultsResetToken).
+        // On iPhone TrackRowView is never in the hierarchy, so effects would never be applied.
+        .onChange(of: appState.defaultsResetToken) { _, _ in
+            for i in 0..<kTrackCount { appState.restoreDefaultEffects(forTrack: i) }
+        }
     }
 
     // MARK: - Portrait (Apple Music style: art on top, controls below)

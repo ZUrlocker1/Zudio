@@ -386,45 +386,31 @@ This is what makes Ambient different from Kosmic at an engine level.
 
 **Implementation approach:** Rather than truly independent loop lengths (complex to implement in the current MIDI step engine), approximate using co-prime bar counts for each track. Each track's event pattern repeats at its own loop length. The master song length (totalBars) is set to LCM/4 so the song captures one full phase cycle at reduced resolution.
 
-**Practical values for implementation:**
-- 3-loop system: loop lengths 11, 13, 15 bars (LCM = 2145; use 48-bar song = first portion of the phase)
-- 4-loop system: loop lengths 7, 11, 13, 17 bars (LCM = 17017; use 64-bar song)
-- Loop lengths should be multiples of 2 for simpler MIDI alignment: 10, 14, 16, 22 bars (all even co-primes)
+**Implemented values:**
+- Lead 1, Lead 2, Pads, Bass: each assigned one of [11, 13, 17, 19] bars at song-generation time (shuffled, no repeats)
+- Rhythm, Texture: each assigned one of [23, 29, 31] bars (shuffled, no repeats)
+- Because all lengths are prime and distinct, no two tracks realign at the same bar until their LCM — which far exceeds any song length
 
 **Track→loop assignment (Zudio 7-track model, track indices 0–6):**
-- kTrackLead1 (0): loop length B (e.g. 13 bars)
-- kTrackLead2 (1): loop length C (e.g. 11 bars)
-- kTrackPads (2): loop length A (longest prime, e.g. 17 bars)
-- kTrackRhythm (3): loop length E (e.g. 5 bars if used; absent in 60% of songs)
-- kTrackTexture (4): loop length D (e.g. 7 bars — shortest for most frequent texture cycling)
-- kTrackBass (5): loop length A or B (share with pads for harmonic consistency)
+- kTrackLead1 (0): one of [11, 13, 17, 19]
+- kTrackLead2 (1): one of [11, 13, 17, 19]
+- kTrackPads (2): one of [11, 13, 17, 19]
+- kTrackBass (5): one of [11, 13, 17, 19]
+- kTrackRhythm (3): one of [23, 29, 31]
+- kTrackTexture (4): one of [23, 29, 31]
 - kTrackDrums (6): no loop length (stochastic per-step probability; not a repeating loop)
-
-In a 3-loop system (Pads + Lead 1 + Texture), assign the remaining tracks (Lead 2, Bass, Rhythm) to the nearest matching loop length or generate their content from the same loop pattern with minor variation.
 
 ---
 
 ### 5.3 AmbientPadsGenerator
 
-Pads are the primary voice in Ambient. They carry all the harmonic content. Track: kTrackPads (register MIDI 48–84).
+Pads are the primary harmonic voice in Ambient. Track: kTrackPads (register MIDI 48–84). One rule is chosen per song:
 
-**AMB-PADS-001: Primary sustained chord layer** — spread chord, long holds, re-attack every 2–4 bars
-- Re-attack interval: 32–64 steps (2–4 bars); 70% fire rate (30% dropout for organic gaps)
-- Note duration: re-attack interval minus a small gap (brief breathing space between attacks)
-- Voicing: 2–4 notes spread across chord tones with inversion rotation per attack
-- 60% chance of arpeggiated harp-roll onset (notes spread 1–2 steps apart low→high)
-- Velocity: 55–70 base; individual notes ±5 variation
-- Register: MIDI 48–84
+**AMB-PADS-001: Sustained chord** (45%) — spread chord voicing, 2–4 notes, re-attacks every ~6 bars (96–128 steps); 70% fire rate per re-attack; 60% chance of harp-roll onset (notes staggered 1–2 steps low→high); inversion rotates each attack; velocity 55–70
 
-**AMB-PADS-002: Secondary shimmer layer** (40% chance) — upper chord tones, very soft, slightly offset
-- Upper two chord tones only; offset 4–8 steps after primary attack
-- 65% fire rate; velocity 20–45 (very soft, underneath primary)
-- Drift ±0–7 steps from primary re-attack timing
+**AMB-PADS-002: Slow cascade** (35%) — three notes (low / mid / high from chord pool) staggered 10–20 steps apart; sustain held to loop boundary; re-attacks every 8–12 bars (128–192 steps); velocity 35–55
 
-**AMB-PADS-006: Bell accent layer** (50% chance) — sparse staccato in high register
-- Density: ~0.07 notes/bar; avoids steps within ±8 of any primary chord attack
-- Register: MIDI 72–100 (high register chord tones)
-- Velocity: 35–55; duration: 4 steps (staccato)
+**AMB-PADS-003: Modal cloud** (20%) — clusters of 3–5 consecutive scale tones from all 7 mode degrees; upper-middle register (MIDI 63–84); re-attacks every 5–7 bars; 80% fire rate; velocity 40–55
 
 ---
 
@@ -444,10 +430,7 @@ Lead in Ambient is sparse to the point of near-absence. Track: kTrackLead1 (regi
 
 AMB-LEAD-009 and AMB-LEAD-010 are section-level solos that bypass the loop tiler and require structure != nil.
 
-**Lead 2 rules:**
-- AMB-SYNC-001: Ghost echo (40% when Lead 1 has content) — delay Lead 1 notes by 4–8 steps at 62% velocity
-- AMB-LEAD-005: Fill silent windows — notes in Lead 1 gaps ≥8 steps, velocity 40–74
-- AMB-LEAD-006: Absent
+**Lead 2 (AMB-LEAD-005: Eno-style tonal cell)** — always active; 2–4 sparse sustained notes placed across the loop; pitches are drawn from the same pitch classes as Lead 1's actual notes (transposed into Lead 2's register MIDI 55–81); velocity 35–62 (softer than Lead 1); rests ≥ 2× note duration. Because Lead 1 and Lead 2 run on co-prime loop lengths, the two voices phase against each other — overlap is harmonic coincidence, not coordination.
 
 ---
 
@@ -518,17 +501,11 @@ In Ambient, the rhythm track is nearly silent or absent. Track: kTrackRhythm (re
 
 Texture is a supporting layer in Ambient. Track: kTrackTexture (register MIDI 36–96).
 
-**AMB-TEXT-004: Silent** (40%) — empty track; pad shimmer provides texture instead
+**AMB-TEXT-004: Silent** (40%) — empty track
 
-**AMB-TEXT-001: Orbital shimmer** (30%) — sparse high notes cycling slowly
-- Notes from upper portion of register (≥72); 45% hit rate per 8–15 step window
-- Velocity: 18–39; duration: 6–16 steps
+**AMB-TEXT-001: Orbital shimmer** (30%) — sparse mid-register scale tones (MIDI 55–75); 30% hit rate per window; held 20–40 steps; velocity 18–32
 
-**AMB-TEXT-002: Ghost tone** (20%) — 1–2 very low-velocity long-held chord-tone notes
-- Velocity: 12–29; duration: fills most of the loop slot; extremely soft
-
-**AMB-TEXT-003: Chime scatter** (10%) — 2–5 staccato scale-tone notes at random positions
-- Velocity: 25–54; duration: 3 steps
+**AMB-TEXT-002: Ghost tone** (30%) — 2–3 long-held chord tones filling nearly each loop slot; mid register (MIDI 48–79); velocity 22–38
 
 ---
 
@@ -564,39 +541,32 @@ Example pairing (too uniform): Pads=Warm Pad + Texture=Halo Pad + Lead=Space Voi
 Each track lists instruments in two families. At song generation time, AMB-SYNC-007 (see Part 13) requires at least one acoustic and one electronic instrument across the 7-track assignment. Instruments marked (A) are acoustic family; (E) are electronic.
 
 **Lead 1 — primary floating melody**
-- Acoustic: Flute (73) (A), Ocarina (79) (A), Pan Flute (75) (A), Whistle (78) (A), Recorder (74) (A)
-- Electronic: Brightness (100) (E), Halo Pad (94) (E), New Age Pad (88) (E), Calliope Lead (82) (E)
-- Design note: Lead 1 is the primary melody voice. Woodwind and breath timbres give it an organic, slightly imperfect quality that contrasts with the electronic pad sustain underneath.
+- Flute (73) (A), Ocarina (79) (A), Whistle (78) (A), Brightness (100) (E), Calliope Lead (82) (E), Grand Piano (0) (A), Harp (46) (A)
+- Design note: Lead 1 is the primary melody voice. Woodwind and breath timbres give it an organic quality that contrasts with the electronic pad sustain underneath. Pan Flute and Recorder were removed as too similar to Flute.
 
 **Lead 2 — shimmer / echo response**
-- Acoustic: Vibraphone (11) (A), Celesta (8) (A), Glockenspiel (9) (A), Grand Piano (0) (A)
-- Electronic: Warm Pad (89) (E), Space Voice (91) (E), FX Atmosphere (99) (E)
-- Design note: Lead 2 never exceeds Lead 1 in note count. Metallic-bell and keyboard timbres make a natural acoustic foil to the electronic pad choices. Grand Piano is valid here provided it is used as Lead 2 requires: single sparse notes at velocity 40–65, never chords, never melodic runs. Under heavy reverb a soft single piano note becomes a tuned-percussion event rather than a piano performance — this is exactly Eno's technique in Music for Airports 1/2 (8 individual piano notes looped with reverb) and Harold Budd's approach on The Plateaux of Mirror. The "no new age piano" constraint is about usage pattern, not the instrument. Bright Acoustic Piano (1) is a valid alternative — marginally more percussive attack, integrates cleanly at low velocity. If Lead 1 is acoustic (flute, ocarina), Lead 2 should favour electronic (warm pad), and vice versa.
+- Harp (46) (A), Acoustic Guitar (24) (A), FX Crystal (98) (E), Space Voice (91) (E), FX Atmosphere (99) (E)
+- Design note: Lead 2 never exceeds Lead 1 in note count. When Lead 1 is assigned a sparse or melodic rule (floating tone, echo phrase, lyric fragment, returning motif), Lead 2's instrument is locked to match Lead 1's instrument exactly. Both leads then play the same timbre on their own independent co-prime loop lengths, so the two voices drift in and out of phase with each other — Eno's *Music for Airports* tape-loop technique. This is implemented in `AppState.applyLead2Mirror()`.
 
 **Pads — harmonic foundation**
-- Acoustic: String Ensemble 1 (48) (A), Choir Aahs (52) (A), Synth Strings 1 (50) (A/E), Bowed Glass (92) (A/E)
-- Electronic: Warm Pad (89) (E), Halo Pad (94) (E), New Age Pad (88) (E), Sweep Pad (95) (E)
-- Design note: Pads are the foreground voice in Ambient (primary layer velocity 85–100). String Ensemble with heavy reverb becomes nearly indistinguishable from a synth pad — this blurring of the acoustic/electronic boundary is the target texture.
+- Sweep Pad (95) (E), Synth Strings (50) (A/E), Halo Pad (94) (E), New Age Pad (88) (E)
+- Design note: Pads are a primary harmonic voice in Ambient. String Ensemble with heavy reverb becomes nearly indistinguishable from a synth pad — blurring the acoustic/electronic boundary is the target texture.
 
 **Rhythm — sparse accent / arpeggio when used**
-- Acoustic: Vibraphone (11) (A), Marimba (12) (A), Tubular Bells (14) (A), Glockenspiel (9) (A)
-- Electronic: FX Crystal (98) (E), FX Echoes (102) (E), Church Organ (19) (E)
-- Design note: Rhythm track is absent in 60% of Ambient songs. When present, metallic-percussive timbres (vibraphone, tubular bells) pair well with the drone foundation — they mark time without creating a groove. FX Echoes provides a purely electronic counterpart.
+- Glockenspiel (9) (A), Tubular Bells (14) (A), Celesta (8) (A), Crystal (98) (E), Rain (96) (E)
+- Design note: Rhythm track is absent in 60% of Ambient songs. When present, metallic-percussive timbres mark time without creating a groove.
 
 **Texture — sustain / shimmer mass**
-- Acoustic: String Ensemble 2 (49) (A), Bowed Glass (92) (A/E), Choir Aahs (52) (A)
-- Electronic: Space Voice (91) (E), FX Atmosphere (99) (E), Sweep Pad (95) (E), Pad 3 Poly (90) (E)
-- Design note: Texture is at very low velocity (20–45) — it adds harmonic mass, not melody. Bowed Glass sits at the acoustic/electronic boundary intentionally: it sounds like a wine glass or glass harmonica under heavy reverb, bridging both families.
+- Strings (49) (A), Bowed Glass (92) (A/E), Choir Aahs (52) (A), FX Atmosphere (99) (E), Pad 3 Poly (90) (E)
+- Design note: Texture runs at very low velocity (20–45) — harmonic mass, not melody. Bowed Glass straddles the acoustic/electronic boundary intentionally.
 
 **Bass — sub-presence**
-- Acoustic: Cello (42) (A) — low register only (MIDI 28–48), Contrabass (43) (A)
-- Electronic: Moog Bass (39) (E), Synth Bass 1 (38) (E), Fretless Bass (35) (E)
-- Design note: Bass is sub-presence only (velocity 55–65, root held 4–8 bars). Cello or Contrabass in the low register with reverb creates an organic low-end that contrasts strongly with Moog Bass's synthetic character — this is one of the most effective acoustic/electronic pairings in the entire style.
+- Cello (42) (A), French Horn (60) (A), Voice Oohs (54) (A), FM Synth (62) (E), Metallic Pad (93) (E)
+- Design note: Bass is sub-presence only (velocity 55–65, root held 4–8 bars). FM Synth volume is reduced (0.40×) as it runs loud. The bass sweep is amplitude-coupled: filter cutoff tracks the boost node output volume directly, so every note fades in dark and opens up as volume rises — zero extra CPU cost and automatic per-note behaviour.
 
 **Drums — textural or absent**
-- Brush Kit (40) (A) — used for textural percussion (30% of songs); absent in 20%
-- Hand percussion instruments (GM pitches 60–75): congas, bongos, shakers, maracas, claves (45% of songs)
-- Design note: Hand percussion and Brush Kit both suit the organic, non-mechanical quality of ambient percussion. Velocities are moderate (25–65 range).
+- Percussion Kit (0), Brush Kit (40)
+- Design note: Hand percussion suits the organic, non-mechanical quality of ambient. Velocities are moderate (25–65 range).
 
 ---
 

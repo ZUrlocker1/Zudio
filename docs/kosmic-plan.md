@@ -359,7 +359,7 @@ Lead melody in Kosmic is sparse and long-note-oriented. Not absent, but not rhyt
 
 **KOS-LD-005: Arpeggio Highlight** — picks one note from the underlying arpeggio pattern and holds it for a full bar. Changes which note it highlights every 4 bars. Ties melody to arpeggio without duplicating it.
 
-**Register:** MIDI 60–96 (higher than Motorik leads, more "celestial")
+**Register:** MIDI 60–84 (C4–C6; ceiling lowered from 96 to prevent phrases going too high/thin)
 **Velocity:** 45–72 (softer than Motorik — kosmic is never aggressive)
 
 ---
@@ -442,13 +442,13 @@ The Zudio generator architecture is well-suited to extension. All of these work 
 
 Track assignments per kTrack index:
 
-- **kTrackLead1 (Lead 1):** Brightness (100), Vibraphone (11), Ocarina (79), Flute (73), Whistle (78) — celestial, sparse
-- **kTrackLead2 (Lead 2):** Warm Pad (89), Halo Pad (94), New Age Pad (88) — pads acting as secondary melody
-- **kTrackPads (Pads):** Choir Aahs (52), String Ensemble (48), Synth Strings (50), Warm Pad (89), Space Voice (91)
-- **kTrackRhythm (Rhythm/Arpeggio):** Square Lead (80) for JMJ-style sequences, Vibraphone (11), Marimba (12), Kalimba (108); register MIDI 45–76
-- **kTrackTexture (Texture):** FX Crystal (98), FX Echoes (102), Space Voice (91), Sweep Pad (95) — orbital motives, shimmer holds
-- **kTrackBass (Bass):** Moog Bass (39), Synth Bass 1 (38) — drone root, narrow register MIDI 40–64
-- **kTrackDrums (Drums):** Brush Kit (40) for sparse percussion, or absent (pitched synth percussion on root/fifth per KOS-RULE-08)
+- **kTrackLead1 (Lead 1):** Flute (73), Brightness (100), Oboe (68), Recorder (74) — woodwind/breath tones for a celestial quality; register MIDI 60–84
+- **kTrackLead2 (Lead 2):** Brightness (100), Bassoon (70), Charang (84), Vox Solo (85), Crystal (98)
+- **kTrackPads (Pads):** Sweep Pad (95), Synth Strings (50), Warm Pad (89), Space Voice (91)
+- **kTrackRhythm (Rhythm/Arpeggio):** Moog Lead (39), Wurlitzer (5), Rock Organ (18); register MIDI 45–76
+- **kTrackTexture (Texture):** FX Atmosphere (99), Pad 3 Poly (90), Fifths Lead (86)
+- **kTrackBass (Bass):** Moog Bass (39), Lead Bass (87), Mono Synth (81), Rock Bass (34) — register MIDI 40–64
+- **kTrackDrums (Drums):** Brush Kit (40), 808 Kit (25), Machine Kit (24), Standard Kit (0)
 
 ---
 
