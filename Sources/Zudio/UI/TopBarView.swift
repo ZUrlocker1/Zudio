@@ -1009,7 +1009,7 @@ struct AboutView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Version: 1.01").font(.system(size: 14))
                     Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
-                    Text("Uses GeneralUser GS MIDI sound bank created by S. Christian Collins, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are audio effects for reverb, delay, tremolo and auto-pan.").font(.system(size: 14))
+                    Text("Zudio is built with GeneralUser GS MIDI sound bank by S. Christian Collins, arpeggios, pads, co-prime loops, tubular bells, ripped off riffs, Berlin school bass, muted trumpets, modal drift, spooky X-Files, Dinger beat and tons of reverb!").font(.system(size: 14))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -1018,7 +1018,7 @@ struct AboutView: View {
                 Text("Version: 1.01").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Uses GeneralUser GS MIDI sound bank created by S. Christian Collins, arpeggios, pads, textures, sweeps, pans, ripped off riffs, Berlin school bass, muted trumpets and Dinger beat. There are audio effects for reverb, delay, tremolo and auto-pan.").font(.system(size: 14))
+                Text("Zudio is built with GeneralUser GS MIDI sound bank by S. Christian Collins, arpeggios, pads, co-prime loops, tubular bells, ripped off riffs, Berlin school bass, muted trumpets, modal drift, spooky X-Files, Dinger beat and tons of reverb!").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()

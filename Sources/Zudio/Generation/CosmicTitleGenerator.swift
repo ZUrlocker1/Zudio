@@ -29,7 +29,7 @@ struct KosmicTitleGenerator {
         "Polarite", "Dimensione", "Algorhythme", "Spectrion", "Resonanse",
         // Invented in JMJ style
         "Vortexe", "Galaxene", "Solaxe", "Nexione", "Hexalon", "Flexure",
-        "Auxese", "Plexion", "Oxidane", "Luxieme", "Helixe", "Vectore",
+        "Auxese", "Plexion", "Oxidane", "Luxieme", "Helixe", "Vectore", "Tikkenzeboxes",
         "Morphione", "Catalyxe", "Synapxe", "Aetheron", "Transcendome"
     ]
 
@@ -43,13 +43,13 @@ struct KosmicTitleGenerator {
     ]
 
     private static let kosmicAdjectives = [
-        "Solar", "Dark", "Deep", "Void", "Stellar", "Astral", "Polar",
+        "Solar", "Dark", "Deep", "Void", "Stellar", "Astral", "Polar", "Bad",
         "Silent", "Orbital", "Distant", "Ancient", "Frozen", "Hollow",
         "Radiant", "Spectral", "Liminal", "Oblique", "Inert", "Ambient", "Forest"
     ]
 
     private static let kosmicNouns = [
-        "Arc", "Field", "Drift", "Pulse", "Nebula", "Void", "Ether",
+        "Arc", "Field", "Drift", "Pulse", "Nebula", "Void", "Ether", "Gear",
         "Flux", "Prism", "Helix", "Vortex", "Horizon", "Signal", "Connection",
         "Current", "Phase", "Lattice", "Aurora", "Apex", "Zenith", "Crescendo",
         "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra", "Zorvaak"
@@ -59,7 +59,7 @@ struct KosmicTitleGenerator {
     private static let greekStyleWords = [
         "Empyrion", "Orpheon", "Elyseon", "Zephyron", "Kroneon",
         "Aureon",   "Hezperon", "Logion",  "Pneumex",  "Aionex",
-        "Zatarax",   "Pyreon",   "Zodeon",  "Hypereon", "Chthonon",
+        "Zatarax",  "Pyreon",   "Zodeon",  "Hypereon", "Chthonon",
         "Eideon",   "Zopheon",  "Zaerion", "Thyreon",  "Aztraeon", "Zorvaak"
     ]
 

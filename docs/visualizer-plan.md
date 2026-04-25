@@ -96,29 +96,32 @@ Pitch offsets y: high notes appear toward the top of the canvas, low notes towar
 
 ## Gesture / Interaction Reference
 
+The same actions are available on all platforms; only the input method differs.
+
 ### On an orb
 
 - **Tap / Click** — mute track for ~2 bars, then auto-unmute and regen instrument
 - **Double-tap / Double-click** — solo track for ~2 bars, then auto-release
-- **Long press / Right-click** — toggle dry signal (strip all effects on track / restore)
+- **Long press** (iPhone/iPad) / **Right-click or Cmd+click** (Mac) — toggle dry signal (strip all effects on track / restore defaults)
 
 ### On empty canvas
 
 - **Tap / Click** — global filter sweep (3 s cutoff sweep + canvas white flash)
 - **Double-tap / Double-click** — regen Lead 1 and Rhythm
-- **Long press / Right-click** — regen a random non-drum track
+- **Long press** (iPhone/iPad) / **Right-click or Cmd+click** (Mac) — regen a random non-drum track
 
-### iPhone and iPad swipe / multi-touch (no Mac equivalent)
+### Swipe and pinch — all platforms
 
 - **Swipe right** — regen Rhythm and Pads
 - **Swipe left** — regen Lead 1 and Lead 2
-- **Two-finger tap** — regen Bass and Drums
+- **Pinch** — regen Bass and Drums
 
-### Mac only
+On iPhone/iPad these are `UISwipeGestureRecognizer` and `UIPinchGestureRecognizer`. On Mac, horizontal trackpad scroll (scrollWheel `deltaX > 10`) fires swipe right/left, and `NSMagnificationGestureRecognizer` fires the pinch/regen-bass-drums action.
+
+### Mac-specific behaviour
 
 - Pointer changes to a hand cursor when hovering over an orb.
-- Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click.
-- Cmd+click routes directly to the right-click handler.
+- Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click (no such delay on iOS — single tap requires double-tap to fail, which is immediate).
 
 ### Auto-Release Timing
 
@@ -144,7 +147,7 @@ If the user resumes playback after a sleep stop, the timer re-arms from that mom
 ## Implementation Notes
 
 - `VisualizerView` has no `.ignoresSafeArea()` — safe-area handling is the responsibility of the parent (`PhonePlayerView` ZStack on iPhone; panel bounds on iPad).
-- **Mac gesture handling** is in `MacVisualizerGestureView` (NSViewRepresentable overlay). Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click. Cmd+click routes directly to the right-click handler, bypassing the single/double dispatch.
-- **iOS gesture handling** is in `CanvasGestureView` (UIViewRepresentable overlay) inside `PhonePlayerView`.
+- **Mac gesture handling** is in `MacVisualizerGestureView` (NSViewRepresentable overlay) inside `VisualizerView`. Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click. Cmd+click routes to the right-click handler. Swipes are detected via `scrollWheel` deltaX; pinch via `NSMagnificationGestureRecognizer`.
+- **iPhone gesture handling** is in `CanvasGestureView` (UIViewRepresentable overlay) inside `PhonePlayerView`. **iPad** uses the same `CanvasGestureView` wired through `iPadCanvasGestureLayer` in `ContentView`. Both use `UISwipeGestureRecognizer` for swipes and `UIPinchGestureRecognizer` for the pinch/bass-drums regen.
 - `muteState` and `soloState` are `[Bool]` arrays on `AppState` indexed by track.
 - `isAnySolo` on `AppState` is a plain `private(set) var Bool` (precomputed at all `soloState` mutation sites) that drives the solo-out dim logic.

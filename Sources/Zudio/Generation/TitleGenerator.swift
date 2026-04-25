@@ -25,8 +25,10 @@ struct TitleGenerator {
         // Expanded — mechanical, rhythmic, spatial
         "Takt", "Rad", "Spur", "Puls", "Motor", "Ring", "Gleis", "Trieb",
         "Dampf", "Blitz", "Knall", "Kreis", "Schiene",
+        // Beer terms
+        "Pils", "Schaum", "Bier", "BierGarten", "Helles", "Dunkels","Altbier", "Kolsch", "Radler","Bock",
         // Fake / comic — sounds plausibly German
-        "Wumms", "Schnork", "Klonk", "Blinken",
+        "Wumms", "Schnork", "Klonk", "Blinken", "Zeig", 
         // Yiddish — Germanic roots, fits right in
         "Schlep", "Schmutz", "Schmaltz", "Gonif", "Mishegoss",
         "Luftmensh", "Nudnik", "Chutzpah", "Plotz", "Shtick",
@@ -34,13 +36,13 @@ struct TitleGenerator {
         "Wunderwaffe", "Wunderwaffen",
         "Stollen", "Tunnel", "Zwillinge", "Zwilling",
         "V2", "Vergeltung",
-        "Zeitmaschine", "Z-Maschine", "Z-Machine",
+        "Zeitmaschine", "Z-Maschine", "Z-Machine", "Gear"
     ]
 
     private static let motorikAdjectives = [
         // Core
-        "Ewig", "Dunkel", "Hell", "Klar", "Tief", "Weit", "Stark", "Ruhig",
-        "Endlos", "Frei", "Neu", "Alt", "Gross", "Klein", "Schnell", "Langsam",
+        "Ewig", "Dunkel", "Hell", "Klar", "Tief", "Weit", "Stark", "Ruhig", "Schiaches",
+        "Endlos", "Frei", "Neu", "Alt", "Gross", "Klein", "Schnell", "Langsam","Bad",
         // Expanded — cold, mechanical, precise
         "Kalt", "Leise", "Hart", "Grau", "Leer", "Stetig", "Rein", "Scharf", "Blank",
         // Comic — greasy, rusty, rickety
@@ -76,7 +78,7 @@ struct TitleGenerator {
     private static let motorikCities = [
         "Bochum", "Berlin", "Koln", "Hamburg", "Dusseldorf", "Frankfurt",
         "Munchen", "Essen", "Wuppertal", "Dortmund", "Bremen",
-        "Hannover", "Leipzig", "Dresden",
+        "Hannover", "Leipzig", "Dresden","Vienna",
         "Nordhausen", "Dora", "Middelbrau", "Mittelwerk",
     ]
 

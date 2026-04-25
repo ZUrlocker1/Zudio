@@ -30,14 +30,16 @@ struct VisualizerView: View {
     // drawOrbs reads this to render a bright burst when the track comes back in.
     @State private var trackUnmuteFlash: [Int: Date] = [:]
 
-    // Background gradient — rebuilt only when style changes, not every frame.
-    @State private var cachedBgGradient: Gradient = Gradient(colors: [.black, .black])
+    // Stamped on each new song; drives a 3 s brightness flash 4× → 0 (black).
+    @State private var bgFadeStart: Date? = nil
+    // Random gradient angle (radians) chosen per song — varies which direction the colour sweeps.
+    @State private var bgGradientAngle: Double = .pi / 2
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 12,
                                 paused: !playback.isPlaying && playback.activeVisualizerNotes.isEmpty)) { tl in
             Canvas { ctx, size in
-                drawBackground(ctx: &ctx, size: size)
+                drawBackground(ctx: &ctx, size: size, now: tl.date)
                 drawOrbs(ctx: &ctx, size: size, now: tl.date)
             }
         }
@@ -79,8 +81,14 @@ struct VisualizerView: View {
                 }
             }
         }
-        .onAppear { rebuildBgGradient() }
-        .onChange(of: style) { _, _ in rebuildBgGradient() }
+        .onChange(of: appState.defaultsResetToken) { _, _ in
+            bgFadeStart = Date()
+            bgGradientAngle = Double.random(in: 0 ..< .pi * 2)
+        }
+        .onChange(of: appState.evolvePhaseToken) { _, _ in
+            bgFadeStart = Date()
+            bgGradientAngle = Double.random(in: 0 ..< .pi * 2)
+        }
     }
 
     // MARK: - Mac gesture handlers (mirrors iPhone tap/double-tap-orb, tap-empty)
@@ -137,29 +145,38 @@ struct VisualizerView: View {
 
     // MARK: - Background
 
-    private func drawBackground(ctx: inout GraphicsContext, size: CGSize) {
+    private func drawBackground(ctx: inout GraphicsContext, size: CGSize, now: Date) {
+        let mult: Double
+        if let start = bgFadeStart {
+            let t = min(now.timeIntervalSince(start) / 3.0, 1.0)
+            mult = 2.5 * (1.0 - t)   // 2.5× → 0 (black) over 3 seconds
+        } else {
+            mult = 0.0
+        }
+        guard mult > 0.001 else {
+            ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+            return
+        }
+        // Random gradient direction — angle chosen per song in onChange(defaultsResetToken).
+        let cx = size.width / 2, cy = size.height / 2
+        let startPoint = CGPoint(x: cx - cos(bgGradientAngle) * cx, y: cy - sin(bgGradientAngle) * cy)
+        let endPoint   = CGPoint(x: cx + cos(bgGradientAngle) * cx, y: cy + sin(bgGradientAngle) * cy)
         ctx.fill(
             Path(CGRect(origin: .zero, size: size)),
-            with: .linearGradient(cachedBgGradient,
-                startPoint: CGPoint(x: size.width / 2, y: 0),
-                endPoint:   CGPoint(x: size.width / 2, y: size.height))
+            with: .linearGradient(Gradient(colors: bgColors(mult: mult)),
+                startPoint: startPoint, endPoint: endPoint)
         )
     }
 
-    private func rebuildBgGradient() {
-        cachedBgGradient = Gradient(colors: bgColors)
-    }
-
-    private var bgColors: [Color] {
+    private func bgColors(mult: Double) -> [Color] {
+        func c(_ h: Double, _ s: Double, _ b: Double) -> Color {
+            Color(hue: h, saturation: s, brightness: min(b * mult, 1.0))
+        }
         switch style {
-        case .ambient:  return [Color(hue: 0.67, saturation: 0.8, brightness: 0.09),
-                                Color(hue: 0.70, saturation: 0.6, brightness: 0.03)]
-        case .chill:    return [Color(hue: 0.55, saturation: 0.3, brightness: 0.10),
-                                Color(hue: 0.05, saturation: 0.2, brightness: 0.04)]
-        case .kosmic:   return [Color(hue: 0.75, saturation: 0.9, brightness: 0.08),
-                                Color(hue: 0.78, saturation: 0.7, brightness: 0.02)]
-        case .motorik:  return [Color(hue: 0.33, saturation: 0.25, brightness: 0.09),
-                                Color(hue: 0.33, saturation: 0.1,  brightness: 0.03)]
+        case .ambient:  return [c(0.54, 0.85, 0.11), c(0.54, 0.65, 0.03)]
+        case .chill:    return [c(0.02, 0.85, 0.10), c(0.02, 0.70, 0.04)]
+        case .kosmic:   return [c(0.75, 0.90, 0.08), c(0.78, 0.70, 0.02)]
+        case .motorik:  return [c(0.60, 0.90, 0.14), c(0.60, 0.70, 0.05)]
         }
     }
 

@@ -2120,6 +2120,39 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Saves the current song as a .zudio file to the user-visible Documents folder
+    /// (~/Documents on iOS — appears as "On My iPhone/iPad > Zudio" in Files).
+    /// Silent save: no picker, same pattern as saveMIDI().
+    func saveZudio() {
+        guard var song = songState else { return }
+        // Refresh the Instruments log entry from the current instrumentOverrides so a
+        // post-regen save captures the active instruments, not the generation-time defaults.
+        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
+        var parts: [String] = []
+        for i in 0..<kTrackCount {
+            if i == kTrackLeadSynth && selectedStyle != .kosmic { continue }
+            if i == kTrackTexture && selectedStyle == .chill { parts.append("Tx:audio"); continue }
+            let pool = Self.instrumentPoolPrograms(trackIndex: i, style: selectedStyle)
+            guard !pool.isEmpty else { continue }
+            let prog = pool[min(instrumentOverrides[i] ?? 0, pool.count - 1)]
+            if prog != 255 { parts.append("\(shortNames[i]):\(prog)") }
+        }
+        song.generationLog.removeAll { $0.tag == "Instruments" }
+        song.generationLog.append(GenerationLogEntry(tag: "Instruments",
+                                                     description: parts.joined(separator: " "),
+                                                     isTitle: false))
+        let dir = AudioFileExporter.exportDirectory()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = AudioFileExporter.incrementingURL(in: dir, base: AudioFileExporter.sanitizedName(song.title), ext: "zudio")
+        do {
+            try SongLogExporter.export(song, midiURL: url)
+            print("Zudio saved: \(url.path)")
+            savedSongSeed = songState?.globalSeed
+        } catch {
+            print("Zudio save error: \(error)")
+        }
+    }
+
     // MARK: - Load from log
 
     func loadFromLog() {
@@ -2146,9 +2179,11 @@ final class AppState: ObservableObject {
         var forcedRules: [String: String] = [:]
         var songTitle: String = ""
         var zudioVersion: String = "0.91a"   // inferred for logs that pre-date version field
-        var loadedKeyOverride:   String? = nil
-        var loadedTempoOverride: Int?    = nil
-        var loadedMoodOverride:  Mood?   = nil
+        var loadedKeyOverride:      String? = nil
+        var loadedTempoOverride:    Int?    = nil
+        var loadedMoodOverride:     Mood?   = nil
+        var loadedInstrumentOverrides: [Int: Int] = [:]
+        let instrumentShortNames = ["L1": 0, "L2": 1, "Pd": 2, "Ry": 3, "Tx": 4, "Bs": 5, "Dr": 6, "LS": 7]
 
         for line in content.components(separatedBy: "\n") {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -2189,6 +2224,23 @@ final class AppState: ObservableObject {
                         forcedRules[parts[0]] = parts[1]
                     }
                 }
+            } else if trimmed.hasPrefix("Instruments") {
+                // "Instruments      L1:73 L2:100 Pd:95 Ry:39 Tx:audio Bs:39 Dr:40 LS:90"
+                // Map each program number back to its pool index so instruments are restored on load.
+                let tokens = trimmed.dropFirst("Instruments".count)
+                    .trimmingCharacters(in: .whitespaces)
+                    .components(separatedBy: .whitespaces)
+                    .filter { !$0.isEmpty }
+                for token in tokens {
+                    let parts = token.components(separatedBy: ":")
+                    guard parts.count == 2,
+                          let trackIdx = instrumentShortNames[parts[0]],
+                          let prog = UInt8(parts[1]) else { continue }
+                    let pool = Self.instrumentPoolPrograms(trackIndex: trackIdx, style: style)
+                    if let poolIdx = pool.firstIndex(of: prog) {
+                        loadedInstrumentOverrides[trackIdx] = poolIdx
+                    }
+                }
             }
         }
 
@@ -2203,13 +2255,14 @@ final class AppState: ObservableObject {
         playback.stop()
         audioTexture.switchTexture(nil)
         isGenerating = true
-        let overrides     = trackOverrides
-        let loadForced    = forcedRules
-        let loadTitle     = songTitle
-        let loadVersion   = zudioVersion
-        let loadKey       = loadedKeyOverride
-        let loadTempo     = loadedTempoOverride
-        let loadMood      = loadedMoodOverride
+        let overrides         = trackOverrides
+        let loadForced        = forcedRules
+        let loadTitle         = songTitle
+        let loadVersion       = zudioVersion
+        let loadKey           = loadedKeyOverride
+        let loadTempo         = loadedTempoOverride
+        let loadMood          = loadedMoodOverride
+        let loadedInstOverrides = loadedInstrumentOverrides
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             var state = SongGenerator.generate(
@@ -2242,8 +2295,8 @@ final class AppState: ObservableObject {
                 self.isGenerating     = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
-                self.instrumentOverrides = [:]
-                // Restore the Chill texture picker to reflect the loaded song's texture.
+                self.instrumentOverrides = loadedInstOverrides
+                // Chill texture is an audio file, not a MIDI program — restore from song state.
                 if style == .chill {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240

@@ -38,8 +38,8 @@ struct AmbientTitleGenerator {
         "the Bus that Was Full", "Supermarket Self-Checkout",
         "an Uneventful Tuesday", "a Too Long Meeting",
         "the Unused Changing Room", "a Business Park in January",
-        "the Post-Lunch Deadzone",
-        "the NCP Car Park at Dusk", "a Mildly Warm Office", 
+        "the Post-Lunch Deadzone", "a Bad Gear Review",
+        "the NCP Car Park at Dusk", "a Mildly Warm Office",
         "a Distribution Centre", "the Holdmusic",
         "a Slowly Loading Web Page", "an Unattended Printer",
         "the Petrol Station", "Reconsidering Life Choices",
@@ -55,7 +55,7 @@ struct AmbientTitleGenerator {
         "To Be Rescheduled", "Which Was the Middle",
         "Descending Slowly", "When the Tape Runs Out",
         "Pt. II of I", "Do Not Distribute", "Final Version (3)",
-        "Where Nothing Resolves"
+        "Where Nothing Resolves", "Which Crashes"
     ]
 
     private static let weatherConditions = [
@@ -94,9 +94,9 @@ struct AmbientTitleGenerator {
         "a Beige Wall", "Tepid Tea", "the Waiting Room",
         "a Damp Coat", "Cold Coffee",
         "an Unread Email", "a Lost Password", "the Under-Secretary",
-        "a Cold Sandwich", "the Suspended Ceiling","WOOC(P)",
-        "a Persistent Hum", "a Cold Radiator",
-        "the Beige Carpet", "a Receding Hairline",
+        "a Cold Sandwich", "the Suspended Ceiling","WOOC(P)", "MI5",
+        "a Persistent Hum", "a Cold Radiator", "a Dangling Participle",
+        "the Beige Carpet", "a Receding Hairline", "a Bass Solo",
         "a Deleted Voicemail", "the Fire Exit", "a Bad Investment", "the Reign of Zorvaak",
         "an Empty Stapler", "Disappointment", "the Forrest Connection"
     ]
@@ -119,11 +119,11 @@ struct AmbientTitleGenerator {
         "a Slow Elevator", "the Monday Commute",
         "a Career Rethink", "a Slow Tuesday",
         "a Clerical Error", "a Missed Meeting",
-        "Paperwork", "a Warm Room",
-        "the Suburbs", "a Change of Plans",
+        "Paperwork", "a Warm Room", "a Clashing Bass",
+        "the Suburbs", "a Change of Plans", "a Bad Solo",
         "a Long Meeting", "a Delayed Reply",
         "a Busy Friday", "an Expired Permit",
-        "a Slow Download", "an Odd Error Message"
+        "a Slow Download", "an Broken App"
     ]
 
     private static let weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Sunday"]
@@ -134,21 +134,21 @@ struct AmbientTitleGenerator {
         "a Mild Disagreement", "a Brief Drizzle", "Persistent Drizzle",
         "a Slight Delay", "a Tepid Coffee", "a Cancelled Meeting",
         "Nothing in Particular", "the Usual", "a Light Lunch",
-        "a Too Long Queue", "an Awkward Silence",
+        "a Too Long Queue", "an Awkward Silence", "a Morning Flight",
         "a Missed Connection", "an Inconvenience"
     ]
 
     private static let pretentiousAdjectives = [
         "Discreet", "Mild", "Brief", "Persistent", "Gentle",
-        "Lukewarm", "Quiet", "Gradual", "Negligible",
-        "Faint", "Vague", "Flat", "Hollow", "Damp"
+        "Lukewarm", "Quiet", "Gradual", "Negligible", "Worn", "Out of Sync",
+        "Faint", "Vague", "Flat", "Hollow", "Damp", "Off-Key", "Meandering"
     ]
 
     private static let mundaneSounds = [
         "Humming", "Droning", "Hiss", "Ticking", "Background Noise",
         "Fan Noise", "Rattling", "Gurgling", "Beeping", "Whirring",
         "Air Conditioning", "Distant Traffic", "Lift Music",
-        "Building Sounds", "Printer Noise",
+        "Building Sounds", "Printer Noise", "Clanging",
         "Fluorescent Flickering", "Tap Dripping",
         "Boiler Noise"
     ]
@@ -156,8 +156,8 @@ struct AmbientTitleGenerator {
     private static let ambientSubtitles = [
         "Music for Spreadsheets", "Day of Moderate Rain",
         "On the Ring Road", "The Plateaux of the Car Park",
-        "On Beige", "Bland Music III", "Mild Weather",
-        "Thursday Afternoon (Revised)", "On Hold",
+        "On Beige", "Bland Music III", "Mild Weather", "Endless Loop",
+        "Thursday Afternoon (Revised)", "On Hold", "Infinite Notes",
         "Music for the DMV", "Studies in Low Effort",
         "Atmospheres of the M25", "On Tepid", "Day of Low Motivation"
     ]
@@ -174,16 +174,16 @@ struct AmbientTitleGenerator {
 
     private static let frenchWords   = ["Deuxieme", "Troisieme", "Quatrieme", "Fragment", "Suite", "Reprise"]
     private static let frenchTargets = [
-        "Part Deux", "Pensees", "Pour le Car Park", "Numero Trois",
+        "Part Deux", "Pensees", "Pour le Car Park", "Numero Trois", "Oy Vay", "Merde",
         "Pour la Salle d'Attente", "Studies", "Encore Un Fois (Reluctant)",
-        "Interlude (Unnecessary)", "Coda (Unresolved)"
+        "Interlude (Unnecessary)", "Coda (Unresolved)", "Zut Alors!"
     ]
 
     // Craven Faults style — terse obscure geological/topographical single words
     private static let cravenFaultsTerms = [
         "Drumlins", "Grykes", "Zorvaaks", "Shakeholes", "Erratics", "Zacks",
         "Soughs", "Rakes", "Screes", "Swales", "Kettle Holes",
-        "Alluvium", "Corries", "Runnels", "Loess", "Ghylls",
+        "Alluvium", "Corries", "Runnels", "Loess", "Ghylls", "Tikkenboxes",
         "Moraines", "Eskers", "Tarns", "Kames", "Outwash",
         "Unconformities", "Striations", "Pavements", "Drumlins"
     ]
@@ -206,7 +206,7 @@ struct AmbientTitleGenerator {
     // JMJ mundane deflating suffixes
     private static let jmjDeflators = [
         "Part 47", "Part 23 (Revised)", "For One Person",
-        "In a Slightly Stuffy Office", "Without the Good Synthesizer",
+        "In a Slightly Stuffy Office", "Without the Synth",
         "Pt. II (The Sad One)", "En Route to the Car Park",
         "Suite for Overhead Projector", "Live from Basildon",
         "The Director's Cut (Too Long)", "Pour le Ring Road",
@@ -246,13 +246,13 @@ struct AmbientTitleGenerator {
 
     private static let philosophicalOpeners = [
         "A Meaningful", "An Important", "A Significant", "A Decisive",
-        "A Transformative", "A Pivotal", "A Nuanced"
+        "A Transformative", "A Pivotal", "A Nuanced", "A Lengthy", "A Short"
     ]
 
     private static let philosophicalEvents = [
         "Meeting About Quarterly Goals", "Moment in a Pointless Process",
-        "the Car Park Discussion", "Pause Before Next Slide",
-        "Reflection on the Cake Selection", "Contribution to the Team Day",
+        "Car Park Discussion", "Pause Before Next Slide", "Zoom Call",
+        "Reflection on the Cake Selection", "Contribution to Team Day",
         "Response to the Previous Email", "Consideration of the New Policy",
         "Situation Acknowledgement", "Ongoing Situation Review"
     ]
@@ -291,12 +291,12 @@ struct AmbientTitleGenerator {
     // Tech/SaaS/midlife tragedies — "for/from a ___"
     private static let techTragedies = [
         "Sad Funeral", "Failed Pivot", "Midlife Crisis",
-        "Forced Restructuring", "Dying Startup",
-        "Redundancy Notice", "Failed MVP",
-        "Collapsed Roadmap", "Post-Acquisition Reorg",
-        "Series C Didn't Close", "Pivot That Wasn't",
-        "Missed Runway", "Down Round", "Strategic Reset",
-        "Quiet Layoff", "Vision Misalignment"
+        "Forced Restructuring", "Dying Startup", "Canceled Project",
+        "Redundancy Notice", "Failed MVP", "Blue Screen of Death",
+        "Missing Roadmap", "Post-Acquisition Reorg",
+        "Bankruptcy", "Product Failure", "Pivot That Wasn't",
+        "Resignation", "Disruption", "Strategic Reset",
+        "Quiet Layoff", "Vision Misalignment", "Crashed App"
     ]
 
     // People who are suffering — "Tears/Lament of a ___"
@@ -306,23 +306,23 @@ struct AmbientTitleGenerator {
         "Bootstrapped Developer", "Laid-Off Engineer",
         "Venture Partner", "Thought Leader",
         "Pre-Revenue Startup", "Disruptive Innovator",
-        "Chief AI Officer",
-        "First-Time Investor",
-        "Head of Growth (Redundant)",
-        "Technical Co-Founder",
-        "Series A Optimist"
+        "Chief AI Officer", "Lonely Intern",
+        "First-Time Investor", "Solo Founder",
+        "Senior VP (Redundant)", "Absent Programmer",
+        "Technical Co-Founder", "Obsolete Developer",
+        "Series A Optimist", "Retired Exec"
     ]
 
     // Tech grief emotions — "Tears/Lament/Requiem of ___"
     private static let techGriefNouns = [
         "Tears", "Regrets", "Lament", "Dirge",
-        "Elegy", "Eulogy", "Last Words", "Notes"
+        "Elegy", "Eulogy", "Last Words", "Notes", "Loop"
     ]
 
     // AI entities — for "The ___ Arrangements" style
     private static let aiEntities = [
-        "Claude", "ChatGPT", "Copilot", "Gemini",
-        "Code", "Foundation Model", "Transformer",
+        "Claude", "ChatGPT", "Copilot", "Gemini", "Model",
+        "Code", "Foundation Model", "Transformer", "AI", "Agentic",
         "Inference Engine", "Software", "Prompt", "Buddha"
     ]
 
@@ -330,18 +330,18 @@ struct AmbientTitleGenerator {
     private static let aiArrangementWords = [
         "Arrangements", "Sessions", "Variations", "Studies",
         "Meditations", "Transcriptions", "Improvisations",
-        "Sketches", "Compositions", "Directives"
+        "Sketches", "Compositions", "Directives", "Loops"
     ]
 
     // AI-specific tragedies and concepts
     private static let aiTragedies = [
         "a Failed Pivot", "a Hallucinated Roadmap",
         "a Deprecated Model", "a Failed Proposal",
-        "a Token Limit", "the Context Window",
+        "a CPU Limit", "the Closed Window",
         "Fine-Tuned Anger", "a Vibe-Coded Startup",
         "the Alignment Problem", "an AI Bubble",
         "a Feature That Never Shipped",
-        "Bad Engineering", "a Missed Inference",
+        "Weak Architecture", "a Missed Inference",
         "a Confident Wrong Answer", "Latency"
     ]
 
@@ -349,8 +349,8 @@ struct AmbientTitleGenerator {
     private static let techPlaces = [
         "Silicon Valley", "Palo Alto", "San Francisco",
         "Shoreditch", "a WeWork", "a Hot-Desk",
-        "a Pitch Deck", "a Pre-Seed Round",
-        "the Catered Office", "the Off-Site",
+        "a Pitch Deck", "a Pre-Seed Round", "a Tech Incubator",
+        "the Catered Office", "the Off-Site", "a Music Studio",
         "an Unconference", "the Open Plan",
         "a Meeting", "the All-Hands"
     ]

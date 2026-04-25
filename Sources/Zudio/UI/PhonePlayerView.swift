@@ -26,8 +26,6 @@ struct PhonePlayerView: View {
     @State private var showInfo        = false
     @State private var showSleepPicker = false
     @State private var showFileImporter    = false
-    @State private var showDocumentExporter = false
-    @State private var pendingExportURL: URL? = nil
 
     // Gesture state
     @State private var dryTracks: Set<Int> = []
@@ -66,6 +64,28 @@ struct PhonePlayerView: View {
         .sheet(isPresented: $appState.showExportConfirmation) {
             ExportConfirmationView()
                 .environmentObject(appState)
+        }
+        // Info sheet — single instance at root so both portrait and landscape buttons work.
+        .sheet(isPresented: $showInfo) {
+            PhoneInfoView()
+        }
+        // Sleep timer picker — single instance at root.
+        .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
+            ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                    appState.setSleepTimer(dur)
+                }
+            }
+        }
+        // File importer for loading .zudio songs — single instance at root.
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [UTType("com.zudio.song") ?? .data]
+        ) { result in
+            guard case .success(let url) = result else { return }
+            _ = url.startAccessingSecurityScopedResource()
+            appState.loadFromLogURL(url)
+            url.stopAccessingSecurityScopedResource()
         }
         // Export progress overlay
         .overlay {
@@ -464,14 +484,6 @@ struct PhonePlayerView: View {
             .frame(width: 104)
         }
         .font(.callout)
-        .sheet(isPresented: $showInfo) { PhoneInfoView() }
-        .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
-            ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
-                    appState.setSleepTimer(dur)
-                }
-            }
-        }
     }
 
     // MARK: - Landscape action rows: Generate full-width, then Export + Info below
@@ -518,14 +530,6 @@ struct PhonePlayerView: View {
             }
         }
         .font(.callout)
-        .sheet(isPresented: $showInfo) { PhoneInfoView() }
-        .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
-            ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
-                    appState.setSleepTimer(dur)
-                }
-            }
-        }
     }
 
     // MARK: - Tab strip (Visuals / Log / Songs)
@@ -588,31 +592,14 @@ struct PhonePlayerView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Button {
-                    hapticImpactLight.toggle()
-                    guard let song = appState.songState else { return }
-                    Task.detached(priority: .userInitiated) {
-                        let url = PhonePlayerView.buildShareURL(song: song)
-                        await MainActor.run {
-                            if let url {
-                                pendingExportURL = url
-                                showDocumentExporter = true
-                            }
-                        }
-                    }
+                    appState.saveZudio()
+                    hapticSuccess.toggle()
                 } label: {
                     Label("Save", systemImage: "square.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.songState == nil)
-                .sheet(isPresented: $showDocumentExporter) {
-                    if let url = pendingExportURL {
-                        DocumentExporter(url: url) {
-                            appState.savedSongSeed = appState.songState?.globalSeed
-                            showDocumentExporter = false
-                        }
-                    }
-                }
 
                 Button {
                     hapticImpactLight.toggle()
@@ -704,15 +691,6 @@ struct PhonePlayerView: View {
             .background(Color(white: 0.06))
         }
         .background(Color(white: 0.06))
-        .fileImporter(
-            isPresented: $showFileImporter,
-            allowedContentTypes: [UTType("com.zudio.song") ?? .data]
-        ) { result in
-            guard case .success(let url) = result else { return }
-            _ = url.startAccessingSecurityScopedResource()
-            appState.loadFromLogURL(url)
-            url.stopAccessingSecurityScopedResource()
-        }
     }
 
     // MARK: - Canvas gesture layer
@@ -1154,32 +1132,6 @@ extension PhonePlayerView {
         var top = root
         while let pvc = top.presentedViewController { top = pvc }
         return top
-    }
-}
-
-// MARK: - Document exporter (Save → Files picker so file appears in Recents)
-
-struct DocumentExporter: UIViewControllerRepresentable {
-    let url: URL
-    var onSuccess: () -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(onSuccess: onSuccess) }
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
-        picker.delegate = context.coordinator
-        picker.shouldShowFileExtensions = true
-        return picker
-    }
-
-    func updateUIViewController(_ vc: UIDocumentPickerViewController, context: Context) {}
-
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onSuccess: () -> Void
-        init(onSuccess: @escaping () -> Void) { self.onSuccess = onSuccess }
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            onSuccess()
-        }
     }
 }
 
