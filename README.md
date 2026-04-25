@@ -17,7 +17,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.01/Zudio-1.01.dmg)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.01/Zudio-1.01.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
 Current release: `1.01` (build 113). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
