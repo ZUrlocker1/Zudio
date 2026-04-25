@@ -1724,9 +1724,21 @@ final class AppState: ObservableObject {
                          copyingStyleFieldsFrom: anchor)
     }
 
+    // Returns indices from `candidates` that have no events in the anchor's body section.
+    // Used to detect bass/drum tracks that are absent so evolve passes can add them.
+    private func absentBodyTracks(_ anchor: SongState, candidates: [Int]) -> [Int] {
+        let bodyStartStep  = (anchor.structure.introSection?.endBar  ?? 0) * 16
+        let outroStartStep = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars) * 16
+        return candidates.filter { idx in
+            !anchor.trackEvents[idx].contains {
+                $0.stepIndex >= bodyStartStep && $0.stepIndex < outroStartStep
+            }
+        }
+    }
+
     private func preGeneratePassContent(pass: Int) {
         guard let anchor = evolveAnchorState, !evolveIsPreGenerating else { return }
-        let freshTracks: [Int]
+        var freshTracks: [Int]
         let passBars: Int
         switch pass {
         case 1:
@@ -1739,6 +1751,9 @@ final class AppState: ObservableObject {
             passBars    = evolvePass2Bars
         default: return
         }
+        // If bass or drums are absent from the anchor body, add them to freshTracks so the
+        // evolve pass introduces them. Both passes do this so bass/drums persist through pass 2.
+        freshTracks += absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
         evolveIsPreGenerating = true
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
@@ -1801,10 +1816,12 @@ final class AppState: ObservableObject {
         } else {
             appendToLog([GenerationLogEntry(tag: "Evolve", description: "Generating pass...", isTitle: false)])
             guard let anchor = evolveAnchorState else { return }
-            let passBars = evolvePass1Bars
+            let passBars     = evolvePass1Bars
+            let absentTracks = absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
-                let state = Self.buildPassState(anchor: anchor, freshTracks: [kTrackLead1, kTrackLead2],
+                let state = Self.buildPassState(anchor: anchor,
+                                                freshTracks: [kTrackLead1, kTrackLead2] + absentTracks,
                                                 passBars: passBars)
                 await MainActor.run {
                     guard self.playMode == .evolve, self.evolvePhase == .original else { return }

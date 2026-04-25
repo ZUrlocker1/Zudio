@@ -55,6 +55,9 @@ struct ChillStructureGenerator {
         case .harmonicDrone:
             // Always 4 bars: absence-then-reentry arc needs exactly 4 bars to breathe
             breakdownBars = 4
+        case .groovePocket:
+            // 4 or 8 bars — 8 gives more room for fill escalation
+            breakdownBars = rng.nextDouble() < 0.50 ? 4 : 8
         }
         let grooveTotal   = Swift.max(20, total - introBars - outroBars - breakdownBars)
         // Split groove total across A and B; B slightly longer (more active)

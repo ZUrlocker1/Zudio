@@ -181,6 +181,39 @@ struct ChillDrumGenerator {
                         let vel = UInt8(30 + rng.nextInt(upperBound: 15))
                         events.append(MIDIEvent(stepIndex: base + 2, note: hat, velocity: vel, durationSteps: 1))
                     }
+                case .groovePocket:
+                    // Full groove continues throughout; fills on every odd bar + always on last bar.
+                    // Kick: beat 1 always; beat 3 at 60% (slightly higher than normal to push the pocket)
+                    events.append(MIDIEvent(stepIndex: base, note: kick,
+                                            velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    if rng.nextDouble() < 0.60 {
+                        events.append(MIDIEvent(stepIndex: base + 8, note: kick,
+                                                velocity: UInt8(60 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    }
+                    // Snare: beat 2 at 70%, beat 4 at 95%
+                    if rng.nextDouble() < 0.70 {
+                        events.append(MIDIEvent(stepIndex: base + 4, note: snare,
+                                                velocity: UInt8(60 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    }
+                    events.append(MIDIEvent(stepIndex: base + 12, note: snare,
+                                            velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    // Hi-hat: 8th-note off-beats at 65% each
+                    for step in [2, 6, 10, 14] {
+                        if rng.nextDouble() < 0.65 {
+                            events.append(MIDIEvent(stepIndex: base + step, note: hat,
+                                                    velocity: UInt8(42 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                        }
+                    }
+                    // Open hi-hat crack on beat 4 of last bar of 8-bar pocket — signals groove return
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base + 12, note: GMDrum.openHat.rawValue,
+                                                velocity: UInt8(82 + rng.nextInt(upperBound: 12)), durationSteps: 2))
+                    }
+                    // Fill on every odd breakdown bar and always on the last bar
+                    if breakdownBar % 2 == 1 || isLastBDBar {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    }
                 }
                 continue
             }
@@ -300,6 +333,30 @@ struct ChillDrumGenerator {
                     } else if rng.nextDouble() < 0.50 {
                         let vel = UInt8(40 + rng.nextInt(upperBound: 20))
                         events.append(MIDIEvent(stepIndex: base + 2, note: hat16, velocity: vel, durationSteps: 1))
+                    }
+                case .groovePocket:
+                    // Full groove + fills every odd bar and last bar
+                    events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    if rng.nextDouble() < 0.60 {
+                        events.append(MIDIEvent(stepIndex: base + 8, note: kick, velocity: UInt8(60 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    }
+                    if rng.nextDouble() < 0.70 {
+                        events.append(MIDIEvent(stepIndex: base + 4, note: snare, velocity: UInt8(60 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    }
+                    events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    for step in stride(from: 0, to: 16, by: 1) {
+                        if rng.nextDouble() < 0.65 {
+                            let vel = UInt8(42 + rng.nextInt(upperBound: 16))
+                            events.append(MIDIEvent(stepIndex: base + step, note: hat16, velocity: vel, durationSteps: 1))
+                        }
+                    }
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base + 12, note: GMDrum.openHat.rawValue,
+                                                velocity: UInt8(82 + rng.nextInt(upperBound: 12)), durationSteps: 2))
+                    }
+                    if breakdownBar % 2 == 1 || isLastBDBar {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat16, rng: &rng)
                     }
                 }
                 continue
@@ -485,6 +542,25 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base + 8, note: snare, velocity: UInt8(42 + rng.nextInt(upperBound: 14)), durationSteps: 1))
                         }
                     }
+                case .groovePocket:
+                    // Full four-on-the-floor groove + fills every odd bar and last bar
+                    for step in [0, 4, 8, 12] {
+                        events.append(MIDIEvent(stepIndex: base + step, note: kick, velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    }
+                    events.append(MIDIEvent(stepIndex: base + 4,  note: snare, velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    for step in stride(from: 0, to: 16, by: 2) {
+                        let vel = UInt8(48 + rng.nextInt(upperBound: 16))
+                        events.append(MIDIEvent(stepIndex: base + step, note: ride, velocity: vel, durationSteps: 1))
+                    }
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base + 12, note: GMDrum.openHat.rawValue,
+                                                velocity: UInt8(82 + rng.nextInt(upperBound: 12)), durationSteps: 2))
+                    }
+                    if breakdownBar % 2 == 1 || isLastBDBar {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    }
                 }
                 continue
             }
@@ -653,6 +729,26 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base, note: ride, velocity: vel, durationSteps: 1))
                         }
                     }
+                case .groovePocket:
+                    // Quarter-note ride groove + snare brush 2+4 + kick on 1 (and 3 at 40%) + fills
+                    for step in [0, 4, 8, 12] {
+                        let vel = UInt8(45 + rng.nextInt(upperBound: 16))
+                        events.append(MIDIEvent(stepIndex: base + step, note: ride, velocity: vel, durationSteps: 1))
+                    }
+                    events.append(MIDIEvent(stepIndex: base + 4,  note: snare, velocity: UInt8(60 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: UInt8(60 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    if rng.nextDouble() < 0.40 {
+                        events.append(MIDIEvent(stepIndex: base + 8, note: kick, velocity: UInt8(55 + rng.nextInt(upperBound: 14)), durationSteps: 1))
+                    }
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base + 12, note: GMDrum.openHat.rawValue,
+                                                velocity: UInt8(82 + rng.nextInt(upperBound: 12)), durationSteps: 2))
+                    }
+                    if breakdownBar % 2 == 1 || isLastBDBar {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    }
                 }
                 continue
             }
@@ -794,6 +890,30 @@ struct ChillDrumGenerator {
                             let vel = UInt8(28 + rng.nextInt(upperBound: 12))
                             events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
                         }
+                    }
+                case .groovePocket:
+                    // Full hip-hop groove: kick 1+3, snare 2+4, 8th-note hat, 16th tambourine + fills
+                    events.append(MIDIEvent(stepIndex: base,      note: kick,  velocity: UInt8(72 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 8,  note: kick,  velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 4,  note: snare, velocity: UInt8(68 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: UInt8(68 + rng.nextInt(upperBound: 16)), durationSteps: 1))
+                    for step in stride(from: 0, to: 16, by: 2) {
+                        let vel = UInt8(45 + rng.nextInt(upperBound: 16))
+                        events.append(MIDIEvent(stepIndex: base + step, note: hat, velocity: vel, durationSteps: 1))
+                    }
+                    for step in stride(from: 0, to: 16, by: 1) {
+                        if rng.nextDouble() < 0.75 {
+                            let vel = UInt8(35 + rng.nextInt(upperBound: 14))
+                            events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
+                        }
+                    }
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base + 12, note: GMDrum.openHat.rawValue,
+                                                velocity: UInt8(82 + rng.nextInt(upperBound: 12)), durationSteps: 2))
+                    }
+                    if breakdownBar % 2 == 1 || isLastBDBar {
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
                     }
                 }
                 continue

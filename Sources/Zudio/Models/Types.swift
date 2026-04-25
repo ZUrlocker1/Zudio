@@ -225,6 +225,7 @@ enum ChillBreakdownStyle: String, Codable, Sendable {
     case stopTime       // Unison stabs on beat 1 of every other bar; lead plays freely in the gaps
     case bassOstinato   // Syncopated bass riff only; drums and harmonic instruments silent
     case harmonicDrone  // Beat continues at full density; bass simplifies to root pulse; lead plays over drone
+    case groovePocket   // Bass and leads drop; pads/rhythm/texture hold; drums play full groove with fills every 2 bars
 }
 
 // MARK: - Percussion style (Kosmic + future Ambient)

@@ -133,6 +133,10 @@ struct ChillLeadGenerator {
                 case .harmonicDrone:
                     // Lead plays freely over the drone — treat like a groove section
                     break  // fall through to normal phrase generation
+                case .groovePocket:
+                    // Lead silent — pads and drums carry the section
+                    bar += 1
+                    continue
                 }
             }
 
@@ -653,6 +657,8 @@ struct ChillLeadGenerator {
                     bar += 1; continue
                 case .harmonicDrone:
                     break  // treat like a groove bar (fall through to active period logic)
+                case .groovePocket:
+                    bar += 1; continue  // lead 2 silent
                 }
             }
             if label == .intro || label == .outro {

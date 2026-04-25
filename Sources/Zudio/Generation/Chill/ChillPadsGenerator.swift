@@ -158,6 +158,7 @@ struct ChillPadsGenerator {
     /// - stopTime: staccato chord stab (4 steps) on beat 1 of every other bar (the unison hit)
     /// - bassOstinato: completely silent — bass carries the groove alone
     /// - harmonicDrone: whisper sustain vel 25–40, renewed every 4 bars (barely there warmth)
+    /// - groovePocket: full-strength sustain vel 55–70 — pads are prominent since bass/leads are absent
     private static func breakdownPad(frame: GlobalMusicalFrame, structure: SongStructure,
                                       breakdownStyle: ChillBreakdownStyle,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
@@ -221,6 +222,16 @@ struct ChillPadsGenerator {
                 let holdSteps = holdBars * 16 - 2
                 for note in voiceNotes {
                     let vel = UInt8(Swift.max(18, Swift.min(40, 25 + rng.nextInt(upperBound: 15))))
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel,
+                                            durationSteps: holdSteps))
+                }
+            case .groovePocket:
+                // Full-strength sustain, renewed every 2 bars — pads are prominent since bass and leads are out
+                guard breakdownBar % 2 == 0 else { continue }
+                let holdBars  = Swift.min(2, frame.totalBars - bar)
+                let holdSteps = holdBars * 16 - 2
+                for note in voiceNotes {
+                    let vel = UInt8(55 + rng.nextInt(upperBound: 16))
                     events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel,
                                             durationSteps: holdSteps))
                 }

@@ -2051,6 +2051,7 @@ struct SongGenerator {
                     case .stopTime:      styleLabel = "stop-time solo"
                     case .bassOstinato:  styleLabel = "bass ostinato"
                     case .harmonicDrone: styleLabel = "harmonic drone"
+                    case .groovePocket:  styleLabel = "groove pocket"
                     }
                     fireBar(bar, tag: "Breakdown", desc: "\(section.lengthBars) bars — \(styleLabel)")
                 } else {
@@ -2567,11 +2568,12 @@ struct SongGenerator {
     ) -> ChillBreakdownStyle {
         guard hasBreakdown else { return .bassOstinato }  // no breakdown section — value unused
         // Breakdown style is independent of drum beat style (instruments are set separately).
-        // stopTime 35%, bassOstinato 35%, harmonicDrone 30%
+        // stopTime 25%, bassOstinato 25%, harmonicDrone 25%, groovePocket 25%
         let r = rng.nextDouble()
-        if r < 0.35 { return .stopTime }
-        if r < 0.70 { return .bassOstinato }
-        return .harmonicDrone
+        if r < 0.25 { return .stopTime }
+        if r < 0.50 { return .bassOstinato }
+        if r < 0.75 { return .harmonicDrone }
+        return .groovePocket
     }
 
     // MARK: - Chill log builder
@@ -2605,6 +2607,7 @@ struct SongGenerator {
         case .stopTime:      breakdownLabel = "stop-time"
         case .bassOstinato:  breakdownLabel = "bass ostinato"
         case .harmonicDrone: breakdownLabel = "harmonic drone"
+        case .groovePocket:  breakdownLabel = "groove pocket"
         }
         let formDesc = hasBreakdown ? "Groove - breakdown" : "Groove"
         log.append(GenerationLogEntry(tag: "Form", description: formDesc))

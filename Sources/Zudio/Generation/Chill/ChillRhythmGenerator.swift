@@ -94,10 +94,31 @@ struct ChillRhythmGenerator {
                 let breakdownBar = bar - (section?.startBar ?? bar)
                 let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
                 let base    = bar * 16
+                let sectionLen = section?.lengthBars ?? 4
 
-                if breakdownStyle == .stopTime && breakdownBar % 2 == 1 {
+                if breakdownStyle == .groovePocket {
+                    // Rhythm plays straight through — fall through to normal comping below.
+                    // For 8-bar pockets, overlay escalating tension stabs in bars 6–8.
+                    if sectionLen >= 8 && breakdownBar >= 5 {
+                        let voicing    = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                        let tensionBar = breakdownBar - 5   // 0 = bar 6, 1 = bar 7, 2 = bar 8
+                        let stabSteps: [Int]
+                        switch tensionBar {
+                        case 0:  stabSteps = [8]           // bar 6: beat 3
+                        case 1:  stabSteps = [8, 12]       // bar 7: beats 3+4
+                        default: stabSteps = [4, 8, 12]    // bar 8: beats 2+3+4
+                        }
+                        for step in stabSteps {
+                            let vel = UInt8(Swift.min(95, 68 + tensionBar * 8 + rng.nextInt(upperBound: 10)))
+                            for note in voicing {
+                                events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
+                                                        velocity: vel, durationSteps: 3))
+                            }
+                        }
+                    }
+                    // Fall through — normal comping runs below
+                } else if breakdownStyle == .stopTime && breakdownBar % 2 == 1 {
                     // Odd (silence) bars: chord reveal — play voicing bottom to top on beats 2, 3, 4.
-                    // Tonal buildup that converges on the full chord hit in the next bar.
                     let sorted = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable).sorted()
                     let n = sorted.count
                     if n >= 1 {
@@ -110,12 +131,12 @@ struct ChillRhythmGenerator {
                     }
                     if n >= 3 {
                         let vel = UInt8(80 + rng.nextInt(upperBound: 10))
-                        // Top one or two notes on beat 4
                         for note in sorted.suffix(n > 3 ? 2 : 1) {
                             events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(note),
                                                     velocity: vel, durationSteps: 3))
                         }
                     }
+                    continue
                 } else if breakdownStyle == .bassOstinato {
                     // Bass ostinato: one beat-2 chord stab keeps harmonic context
                     let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
@@ -123,8 +144,10 @@ struct ChillRhythmGenerator {
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: vel, durationSteps: 4))
                     }
+                    continue
+                } else {
+                    continue  // .harmonicDrone and .stopTime even bars: silent
                 }
-                continue
             }
 
             let chord     = structure.chordPlan.first { $0.contains(bar: bar) }

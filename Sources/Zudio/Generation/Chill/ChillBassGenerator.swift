@@ -140,6 +140,18 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 45, durationSteps: 12))
                     }
                     // Bars 1-2 (breakdownBar 0-1): bass silent — pad holds the void alone
+                case .groovePocket:
+                    // Last bar of 8-bar pocket: ascending pickup into groove return
+                    let sectionLen = section?.lengthBars ?? 4
+                    guard breakdownBar == sectionLen - 1 else { break }
+                    let root  = clampBass(chordRoot)
+                    let third = clampBass(snapToScale(chordRoot + 3, scale: scale))
+                    let fifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
+                    let oct   = clampBass(chordRoot + 12)
+                    for (i, note) in [root, third, fifth, oct].enumerated() {
+                        events.append(MIDIEvent(stepIndex: base + 8 + i * 2, note: UInt8(note),
+                                                velocity: UInt8(50 + i * 12), durationSteps: 2))
+                    }
                 }
 
             case .intro:
@@ -381,6 +393,16 @@ struct ChillBassGenerator {
                     if bar < frame.totalBars - 1 {
                         events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(approach), velocity: 72, durationSteps: 2))
                     }
+                case .groovePocket:
+                    let sectionLen = section?.lengthBars ?? 4
+                    guard breakdownBar == sectionLen - 1 else { break }
+                    let third  = clampBass(snapToScale(chordRoot + 3, scale: scale))
+                    let fifth2 = clampBass(snapToScale(chordRoot + 7, scale: scale))
+                    let oct    = clampBass(chordRoot + 12)
+                    for (i, note) in [root, third, fifth2, oct].enumerated() {
+                        events.append(MIDIEvent(stepIndex: base + 8 + i * 2, note: UInt8(note),
+                                                velocity: UInt8(50 + i * 12), durationSteps: 2))
+                    }
                 }
             case .intro:
                 // Intro: punchy 8th-note hits — same shape as groove but softer.
@@ -592,6 +614,14 @@ struct ChillBassGenerator {
                 case .harmonicDrone:
                     for step in [0, 4, 8, 12] {
                         events.append(MIDIEvent(stepIndex: base + step, note: UInt8(root), velocity: 76, durationSteps: 3))
+                    }
+                case .groovePocket:
+                    let sectionLen = section?.lengthBars ?? 4
+                    guard breakdownBar == sectionLen - 1 else { break }
+                    let oct = clampBass(chordRoot + 12)
+                    for (i, note) in [root, third, fifth, oct].enumerated() {
+                        events.append(MIDIEvent(stepIndex: base + 8 + i * 2, note: UInt8(note),
+                                                velocity: UInt8(50 + i * 12), durationSteps: 2))
                     }
                 }
             case .intro:
