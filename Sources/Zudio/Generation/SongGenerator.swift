@@ -612,20 +612,42 @@ struct SongGenerator {
                                                             totalBars: frame.totalBars,
                                                             silentBars: dropoutZones[kTrackRhythm] ?? [])
 
+        // Ambient audio texture: when drums are absent, replace the MIDI texture track with an
+        // audio file. No effects applied — raw ambient sound fills the texture slot.
+        let ambientAudioFiles = ["light_rain.m4a", "rain-and-thunder.m4a", "ocean_waves.m4a",
+                                  "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a"]
+        let ambientAudioTexture: String? = (percussionStyle == .absent)
+            ? ambientAudioFiles[texRNG.nextInt(upperBound: ambientAudioFiles.count)] : nil
+        let ambientAudioTextureOffset = ambientAudioTexture != nil ? [0, 15, 30, 45][texRNG.nextInt(upperBound: 4)] : 0
+
         // Texture
         var texRules: Set<String> = []
-        let texLoop = AmbientTextureGenerator.generate(frame: frame, tonalMap: tonalMap,
-                                                        loopBars: loopLengths.texture, rng: &texRNG,
-                                                        usedRuleIDs: &texRules)
-        trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoop,
-                                                             loopBars: loopLengths.texture,
-                                                             totalBars: frame.totalBars,
-                                                             silentBars: dropoutZones[kTrackTexture] ?? [])
+        if let audioFile = ambientAudioTexture {
+            // Audio texture replaces MIDI — leave track empty, mark with a per-file rule ID for the log.
+            switch audioFile {
+            case "light_rain.m4a":   texRules.insert("AMB-TEXT-003")
+            case "rain-and-thunder.m4a":   texRules.insert("AMB-TEXT-005")
+            case "ocean_waves.m4a":  texRules.insert("AMB-TEXT-006")
+            case "zen-bells.m4a":    texRules.insert("AMB-TEXT-007")
+            case "wind-stoorm.m4a":  texRules.insert("AMB-TEXT-008")
+            case "desert-winds.m4a": texRules.insert("AMB-TEXT-009")
+            default:                 texRules.insert("AMB-TEXT-003")
+            }
+        } else {
+            let texLoop = AmbientTextureGenerator.generate(frame: frame, tonalMap: tonalMap,
+                                                            loopBars: loopLengths.texture, rng: &texRNG,
+                                                            usedRuleIDs: &texRules)
+            trackEvents[kTrackTexture] = AmbientLoopTiler.tile(events: texLoop,
+                                                                 loopBars: loopLengths.texture,
+                                                                 totalBars: frame.totalBars,
+                                                                 silentBars: dropoutZones[kTrackTexture] ?? [])
+        }
 
-        // Hollow guard A: if bass, rhythm, and texture are all absent, the song will sound hollow —
-        // pads re-attack every 2–4 bars, leaving long empty stretches in between.
+        // Hollow guard A: if bass, rhythm, and texture are all absent (and no audio texture),
+        // the song will sound hollow — pads re-attack every 2–4 bars, leaving long empty stretches.
         // Force texture non-silent to provide movement regardless of drum presence.
-        if trackEvents[kTrackBass].isEmpty
+        if ambientAudioTexture == nil
+            && trackEvents[kTrackBass].isEmpty
             && trackEvents[kTrackRhythm].isEmpty
             && trackEvents[kTrackTexture].isEmpty {
             var texRulesH: Set<String> = []
@@ -890,7 +912,10 @@ struct SongGenerator {
             generationLog: log, stepAnnotations: stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: loopLengths,
             ambientXFilesBlockRange: ambientXFilesBlockRange,
-            ambientUseBrushKit: useBrushKit, forcedRules: forced,
+            ambientUseBrushKit: useBrushKit,
+            ambientAudioTexture: ambientAudioTexture,
+            ambientAudioTextureOffset: ambientAudioTextureOffset,
+            forcedRules: forced,
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,
             moodOverride: moodOverride
@@ -906,11 +931,15 @@ struct SongGenerator {
         var rng = SeededRNG(seed: newTrackSeed)
         var usedRules: Set<String> = []
 
-        let events: [MIDIEvent]
+        var events: [MIDIEvent]
         let isKosmic  = songState.style == .kosmic
         let isAmbient = songState.style == .ambient
         let isChill   = songState.style == .chill
         let ambLoopLengths = songState.ambientLoopLengths
+        // For Ambient texture regen: may switch between audio and MIDI texture.
+        var regenAmbientAudioTexture: String? = songState.ambientAudioTexture
+        var regenAmbientAudioOffset:  Int     = songState.ambientAudioTextureOffset
+        var ambientAudioTextureChanged = false
         switch trackIndex {
         case kTrackDrums:
             if isAmbient {
@@ -1078,10 +1107,34 @@ struct SongGenerator {
         case kTrackTexture:
             if isAmbient {
                 let loopBars = ambLoopLengths?.texture ?? 7
-                let loop = AmbientTextureGenerator.generate(
-                    frame: songState.frame, tonalMap: songState.tonalMap,
-                    loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
-                events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                let ambientFiles = ["light_rain.m4a", "rain-and-thunder.m4a", "ocean_waves.m4a",
+                                    "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a"]
+                ambientAudioTextureChanged = true
+                if rng.nextDouble() < 0.45 {
+                    // Audio texture path (45%)
+                    let file = ambientFiles[rng.nextInt(upperBound: ambientFiles.count)]
+                    let offset = [0, 15, 30, 45][rng.nextInt(upperBound: 4)]
+                    events = []
+                    regenAmbientAudioTexture = file
+                    regenAmbientAudioOffset  = offset
+                    switch file {
+                    case "light_rain.m4a":   usedRules.insert("AMB-TEXT-003")
+                    case "rain-and-thunder.m4a":   usedRules.insert("AMB-TEXT-005")
+                    case "ocean_waves.m4a":  usedRules.insert("AMB-TEXT-006")
+                    case "zen-bells.m4a":    usedRules.insert("AMB-TEXT-007")
+                    case "wind-stoorm.m4a":  usedRules.insert("AMB-TEXT-008")
+                    case "desert-winds.m4a": usedRules.insert("AMB-TEXT-009")
+                    default:                usedRules.insert("AMB-TEXT-003")
+                    }
+                } else {
+                    // MIDI texture path (55%)
+                    let loop = AmbientTextureGenerator.generate(
+                        frame: songState.frame, tonalMap: songState.tonalMap,
+                        loopBars: loopBars, rng: &rng, usedRuleIDs: &usedRules)
+                    events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
+                    regenAmbientAudioTexture = nil
+                    regenAmbientAudioOffset  = 0
+                }
             } else if isKosmic {
                 events = KosmicTextureGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1112,6 +1165,9 @@ struct SongGenerator {
         }
 
         var updated = songState.replacingEvents(events, forTrack: trackIndex, appendingLog: regenLog)
+        if ambientAudioTextureChanged {
+            updated = updated.withAmbientAudioTexture(regenAmbientAudioTexture, offset: regenAmbientAudioOffset)
+        }
         updated.trackOverrides[trackIndex] = newTrackSeed
         return updated
     }
@@ -1758,7 +1814,13 @@ struct SongGenerator {
         // Texture
         case "AMB-TEXT-001": return "Orbital shimmer"
         case "AMB-TEXT-002": return "Ghost tone"
+        case "AMB-TEXT-003": return "Audio: Light Rain"
         case "AMB-TEXT-004": return "No texture"
+        case "AMB-TEXT-005": return "Audio: Rain & Thunder"
+        case "AMB-TEXT-006": return "Audio: Ocean Waves"
+        case "AMB-TEXT-007": return "Audio: Zen Bells"
+        case "AMB-TEXT-008": return "Audio: Wind Storm"
+        case "AMB-TEXT-009": return "Audio: Desert Winds"
         // Drums
         case "AMB-DRUM-004": return "Claude hand percussion"
         case "AMB-DRUM-001": return "Sparse ride, cymbals"
@@ -2491,15 +2553,13 @@ struct SongGenerator {
             trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, chillMode: true)
         }
 
-        // Audio texture: 70% chance of selecting one of the bundled M4A files.
-        // High-tempo songs (≥100 BPM) skip calm nature textures; low-tempo songs
-        // (≤82 BPM) skip busy city textures that clash with the slower mood.
-        var chillTextureFiles = ["another_bar.m4a", "bar_sounds.m4a",
+        // Audio texture: 60% chance of selecting one of the bundled M4A files.
+        // High-tempo songs (≥100 BPM) skip harbor; low-tempo songs (≤82 BPM) skip city.
+        var chillTextureFiles = ["another_bar.m4a", "another-pub.m4a", "bar_sounds.m4a",
                                   "city_at_night.m4a", "harbor.m4a",
-                                  "light_rain.m4a", "ocean_waves.m4a", "urban_rain.m4a",
                                   "vinyl_crackle.m4a"]
         if frame.tempo >= 100 {
-            chillTextureFiles.removeAll { $0 == "ocean_waves.m4a" || $0 == "harbor.m4a" }
+            chillTextureFiles.removeAll { $0 == "harbor.m4a" }
         }
         if frame.tempo <= 82 {
             chillTextureFiles.removeAll { $0 == "city_at_night.m4a" }

@@ -508,7 +508,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  .kosmic):   return ["Moog Lead","Wurlitzer","Rock Organ"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
-        case (kTrackTexture, .chill):   return ["None","Another bar","Bar sounds","City at night","Harbor","Light rain","Ocean waves","Urban rain","Vinyl crackle"]
+        case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Fifths Lead"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
@@ -545,7 +545,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm, .chill):   return [4, 5, 17]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18]
         case (kTrackRhythm, _):        return [28, 39, 29]
-        case (kTrackTexture, .chill):  return [240, 241, 242, 243, 245, 246, 247, 248, 250]
+        case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
         case (kTrackTexture, .kosmic): return [99, 90, 86]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
@@ -582,8 +582,9 @@ final class AppState: ObservableObject {
         for trackIndex in 0..<kTrackCount {
             let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
             guard !programs.isEmpty else { continue }
-            // Chill texture pseudo-programs (240+) are handled by audioTexture.start() — skip
+            // Chill/Ambient audio texture tracks are handled by audioTexture.start() — skip MIDI load
             if trackIndex == kTrackTexture && style == .chill { continue }
+            if trackIndex == kTrackTexture && style == .ambient && songState?.ambientAudioTexture != nil { continue }
             // Drums always use percussion bank — no meaningful "default MIDI" concept
             if trackIndex == kTrackDrums { continue }
             let idx = instrumentOverrides[trackIndex] ?? 0
@@ -628,6 +629,10 @@ final class AppState: ObservableObject {
             let p = playback.loadedProgram(forTrack: i)
             if i == kTrackTexture && style == .chill {
                 parts.append("Tx:audio")
+            } else if i == kTrackTexture && style == .ambient,
+                      let texFile = songState?.ambientAudioTexture {
+                let displayName = Self.ambientAudioDisplayName(texFile)
+                parts.append("Tx:\(displayName)")
             } else if p != 255 {   // omit tracks that weren't loaded (e.g. LeadSynth in non-Kosmic)
                 parts.append("\(shortNames[i]):\(p)")
             }
@@ -1097,6 +1102,11 @@ final class AppState: ObservableObject {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
                 }
+                // Ambient audio texture: set picker index to match the chosen file.
+                if style == .ambient, let audioTex = state.ambientAudioTexture {
+                    let prog = Self.ambientAudioProgram(forFilename: audioTex)
+                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
+                }
                 // Snapshot the final overrides — resetEffectsToDefaults() restores from here.
                 self.songInstrumentOverrides = self.instrumentOverrides
                 self.sessionInstrumentOverrides[state.globalSeed] = self.instrumentOverrides
@@ -1147,6 +1157,11 @@ final class AppState: ObservableObject {
                 if thenPlay || wasPlaying {
                     self.rearmSleepTimerIfNeeded()
                     self.playback.play()
+                    // Start ambient audio texture directly (Chill is handled via setProgram/switchTexture).
+                    if state.style == .ambient, let texFile = state.ambientAudioTexture {
+                        self.audioTexture.start(style: .ambient, texture: texFile,
+                                                offsetSeconds: state.ambientAudioTextureOffset)
+                    }
                     self.incrementPlayCountAndRequestReviewIfNeeded()
                 }
                 // Resign first responder so BPM TextField doesn't hold focus
@@ -1216,7 +1231,12 @@ final class AppState: ObservableObject {
             } else {
                 newEvents = regen.trackEvents[trackIndex]
             }
-            let updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries)
+            var updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries)
+            // For Ambient texture regen: carry the new audio texture choice (may differ from current).
+            if trackIndex == kTrackTexture && current.style == .ambient {
+                updated = updated.withAmbientAudioTexture(regen.ambientAudioTexture,
+                                                          offset: regen.ambientAudioTextureOffset)
+            }
             await MainActor.run {
                 self.songState    = updated
                 self.isGenerating = false
@@ -1224,6 +1244,21 @@ final class AppState: ObservableObject {
                 // Keep generationHistory in sync for SongState tracking
                 if !self.generationHistory.isEmpty {
                     self.generationHistory[self.generationHistory.count - 1] = updated
+                }
+                // Restart ambient audio texture if the regen changed it; sync picker index.
+                if trackIndex == kTrackTexture && updated.style == .ambient {
+                    self.audioTexture.start(style: .ambient, texture: updated.ambientAudioTexture,
+                                            offsetSeconds: updated.ambientAudioTextureOffset)
+                    if let audioTex = updated.ambientAudioTexture {
+                        let prog = Self.ambientAudioProgram(forFilename: audioTex)
+                        self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
+                        // Audio texture: turn off Pan and Sweep in playback engine
+                        self.playback.setEffect(.pan,   enabled: false, forTrack: kTrackTexture)
+                        self.playback.setEffect(.sweep, enabled: false, forTrack: kTrackTexture)
+                    } else {
+                        self.instrumentOverrides[kTrackTexture] = nil
+                    }
+                    self.instrumentChangeToken += 1
                 }
                 // Append only the NEW regen entries to the flat status log (at the very bottom)
                 self.appendToLog(regenEntries)
@@ -1255,8 +1290,9 @@ final class AppState: ObservableObject {
                 }()
             }
             playback.play()
-            audioTexture.start(style: selectedStyle, texture: songState?.chillAudioTexture,
-                               offsetSeconds: songState?.chillAudioTextureOffset ?? 0)
+            let texFile   = selectedStyle == .ambient ? songState?.ambientAudioTexture : songState?.chillAudioTexture
+            let texOffset = selectedStyle == .ambient ? (songState?.ambientAudioTextureOffset ?? 0) : (songState?.chillAudioTextureOffset ?? 0)
+            audioTexture.start(style: selectedStyle, texture: texFile, offsetSeconds: texOffset)
         }
     }
 
@@ -2024,8 +2060,9 @@ final class AppState: ObservableObject {
         applyCurrentInstrumentsToPlayback()
         if thenPlay {
             playback.play()
-            audioTexture.start(style: state.style, texture: state.chillAudioTexture,
-                               offsetSeconds: state.chillAudioTextureOffset)
+            let texFile2   = state.style == .ambient ? state.ambientAudioTexture : state.chillAudioTexture
+            let texOffset2 = state.style == .ambient ? state.ambientAudioTextureOffset : state.chillAudioTextureOffset
+            audioTexture.start(style: state.style, texture: texFile2, offsetSeconds: texOffset2)
         }
         platformHost?.dismissKeyboard()
     }
@@ -2313,10 +2350,14 @@ final class AppState: ObservableObject {
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
                 self.instrumentOverrides = loadedInstOverrides
-                // Chill texture is an audio file, not a MIDI program — restore from song state.
+                // Chill/Ambient audio texture — restore picker index from song state.
                 if style == .chill {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                }
+                if style == .ambient, let audioTex = state.ambientAudioTexture {
+                    let prog = Self.ambientAudioProgram(forFilename: audioTex)
+                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
                 }
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
@@ -2447,6 +2488,16 @@ final class AppState: ObservableObject {
             }
             return
         }
+        // Ambient texture track uses pseudo-programs 231–233 that map to audio filenames.
+        if trackIndex == kTrackTexture && selectedStyle == .ambient,
+           let filename = Self.ambientAudioFilename(forProgram: program) {
+            let offset = songState?.ambientAudioTextureOffset ?? 0
+            songState = songState?.withAmbientAudioTexture(filename, offset: offset)
+            if playback.isPlaying {
+                audioTexture.start(style: .ambient, texture: filename, offsetSeconds: offset)
+            }
+            return
+        }
         playback.setProgram(program, forTrack: trackIndex)
     }
 
@@ -2457,13 +2508,9 @@ final class AppState: ObservableObject {
         case 241: return "another_bar.m4a"
         case 242: return "bar_sounds.m4a"
         case 243: return "city_at_night.m4a"
-        case 244: return nil  // removed
         case 245: return "harbor.m4a"
-        case 246: return "light_rain.m4a"
-        case 247: return "ocean_waves.m4a"
-        case 248: return "urban_rain.m4a"
-        case 249: return nil  // removed
         case 250: return "vinyl_crackle.m4a"
+        case 251: return "another-pub.m4a"
         default:  return nil
         }
     }
@@ -2475,14 +2522,49 @@ final class AppState: ObservableObject {
         case "another_bar.m4a":    return 241
         case "bar_sounds.m4a":     return 242
         case "city_at_night.m4a":  return 243
-        // 244 removed (city_sounds)
         case "harbor.m4a":         return 245
-        case "light_rain.m4a":     return 246
-        case "ocean_waves.m4a":    return 247
-        case "urban_rain.m4a":     return 248
-        // 249 removed (urban_sounds)
         case "vinyl_crackle.m4a":  return 250
+        case "another-pub.m4a":    return 251
         default:                    return 240
+        }
+    }
+
+    /// Maps an Ambient audio texture filename to a short display name.
+    static func ambientAudioDisplayName(_ filename: String) -> String {
+        switch filename {
+        case "light_rain.m4a":    return "Light Rain"
+        case "rain-and-thunder.m4a":    return "Rain & Thunder"
+        case "ocean_waves.m4a":   return "Ocean Waves"
+        case "zen-bells.m4a":     return "Zen Bells"
+        case "wind-stoorm.m4a":   return "Wind Storm"
+        case "desert-winds.m4a":  return "Desert Winds"
+        default:                  return "Audio"
+        }
+    }
+
+    /// Maps an Ambient audio texture pseudo-program (231–236) to an M4A filename.
+    static func ambientAudioFilename(forProgram program: UInt8) -> String? {
+        switch program {
+        case 231: return "light_rain.m4a"
+        case 232: return "rain-and-thunder.m4a"
+        case 233: return "ocean_waves.m4a"
+        case 234: return "zen-bells.m4a"
+        case 235: return "wind-stoorm.m4a"
+        case 236: return "desert-winds.m4a"
+        default:  return nil
+        }
+    }
+
+    /// Maps an Ambient audio texture filename to its pseudo-program number.
+    static func ambientAudioProgram(forFilename filename: String?) -> UInt8 {
+        switch filename {
+        case "light_rain.m4a":   return 231
+        case "rain-and-thunder.m4a":   return 232
+        case "ocean_waves.m4a":  return 233
+        case "zen-bells.m4a":    return 234
+        case "wind-stoorm.m4a":  return 235
+        case "desert-winds.m4a": return 236
+        default:                 return 231
         }
     }
 
@@ -2667,6 +2749,10 @@ final class AppState: ObservableObject {
                 let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                 instrumentOverrides[kTrackTexture] = Int(prog) - 240
             }
+            if state.style == .ambient, let audioTex = state.ambientAudioTexture {
+                let prog = Self.ambientAudioProgram(forFilename: audioTex)
+                instrumentOverrides[kTrackTexture] = Int(prog) - 231
+            }
         }
         songInstrumentOverrides = instrumentOverrides
         restoreLead2Mirror()
@@ -2732,6 +2818,11 @@ final class AppState: ObservableObject {
                 if song.style == .chill && self.instrumentOverrides[kTrackTexture] == nil {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                }
+                if song.style == .ambient, let audioTex = state.ambientAudioTexture,
+                   self.instrumentOverrides[kTrackTexture] == nil {
+                    let prog = Self.ambientAudioProgram(forFilename: audioTex)
+                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
                 }
                 self.songInstrumentOverrides = self.instrumentOverrides
                 self.restoreLead2Mirror()

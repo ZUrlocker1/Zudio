@@ -507,6 +507,10 @@ Texture is a supporting layer in Ambient. Track: kTrackTexture (register MIDI 36
 
 **AMB-TEXT-002: Ghost tone** (30%) — 2–3 long-held chord tones filling nearly each loop slot; mid register (MIDI 48–79); velocity 22–38
 
+### 5.9 Audio Texture (percussionStyle == .absent only)
+
+When drums are absent, the texture track may play a looping M4A file instead of MIDI. Current pool: `light_rain.m4a`, `urban_rain.m4a`, `ocean_waves.m4a` (Ambient-exclusive; not available in Chill). Played via `AudioTexturePlayer` with a gentle low-pass at 3.5 kHz and small-room reverb at 10% wet to push the file into the background. Probability at generation time: 45% audio, 55% MIDI texture. Regen honours the same split. The ◀▶ picker cycles between files using pseudo-programs 231–233. Effects chips show Reverb only when audio texture is active (Pan and Sweep hidden). Stored in `SongState.ambientAudioTexture`.
+
 ---
 
 ## Part 6: Instrument Presets for Ambient Style (TrackRowView)

@@ -65,6 +65,18 @@ struct TrackRowView: View {
     private struct Instrument { let name: String; let program: UInt8 }
 
     private var instruments: [Instrument] {
+        // Ambient texture with audio active: picker shows audio file names (pseudo-programs 231–236)
+        if trackIndex == kTrackTexture, activeStyle == .ambient,
+           appState.songState?.ambientAudioTexture != nil {
+            return [
+                Instrument(name: "Light Rain",   program: 231),
+                Instrument(name: "Rain & Thunder", program: 232),
+                Instrument(name: "Ocean Waves",  program: 233),
+                Instrument(name: "Zen Bells",    program: 234),
+                Instrument(name: "Wind Storm",   program: 235),
+                Instrument(name: "Desert Winds", program: 236),
+            ]
+        }
         let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle)
         let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle)
         return zip(names, programs).map { Instrument(name: $0, program: $1) }
@@ -72,6 +84,14 @@ struct TrackRowView: View {
 
     @State private var instrumentIndex: Int = 0
     @State private var activeEffects: Set<String> = []
+
+    /// Safe name for the current instrument picker position. Guards against the brief window
+    /// where songState switches the instruments array (e.g. MIDI→audio texture) before
+    /// instrumentChangeToken fires and clamps instrumentIndex to the new pool size.
+    private var currentInstrumentName: String {
+        guard !instruments.isEmpty else { return "—" }
+        return instruments[min(instrumentIndex, instruments.count - 1)].name
+    }
 
     private var isInstrumentLocked: Bool {
         trackIndex == kTrackLead2 && appState.lead2MirrorName != nil
@@ -113,7 +133,7 @@ struct TrackRowView: View {
                         .foregroundStyle(isInstrumentLocked ? Color.secondary.opacity(0.35) : .secondary)
                         .disabled(isInstrumentLocked)
 
-                        Text(trackIndex == kTrackLead2 ? (appState.lead2MirrorName ?? instruments[instrumentIndex].name) : instruments[instrumentIndex].name)
+                        Text(trackIndex == kTrackLead2 ? (appState.lead2MirrorName ?? currentInstrumentName) : currentInstrumentName)
                             .font(.system(size: 11))
                             .foregroundStyle(isInstrumentLocked ? Color.white.opacity(0.35) : Color.white.opacity(0.8))
                             .lineLimit(1)
@@ -159,7 +179,8 @@ struct TrackRowView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
 
-                // MIDI lane (or audio waveform for Chill Texture track)
+                // MIDI lane (or audio waveform for Chill/Ambient Texture track when audio texture active)
+                let ambientTextureFile = appState.songState?.ambientAudioTexture
                 if trackIndex == kTrackTexture && activeStyle == .chill {
                     AudioWaveformView(
                         filename: appState.songState?.chillAudioTexture,
@@ -168,6 +189,18 @@ struct TrackRowView: View {
                         visibleBars: visibleBars,
                         barOffset: barOffset,
                         offsetSeconds: appState.songState?.chillAudioTextureOffset ?? 0,
+                        onSeek: onSeek
+                    )
+                    .frame(height: 63)
+                    .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
+                } else if trackIndex == kTrackTexture && activeStyle == .ambient && ambientTextureFile != nil {
+                    AudioWaveformView(
+                        filename: ambientTextureFile,
+                        totalBars: max(totalBars, 1),
+                        tempo: Double(appState.songState?.frame.tempo ?? 92),
+                        visibleBars: visibleBars,
+                        barOffset: barOffset,
+                        offsetSeconds: appState.songState?.ambientAudioTextureOffset ?? 0,
                         onSeek: onSeek
                     )
                     .frame(height: 63)
@@ -213,6 +246,11 @@ struct TrackRowView: View {
             let override = appState.instrumentOverrides[trackIndex]
             let newIdx = override.map { min($0, instruments.count - 1) } ?? 0
             if newIdx != instrumentIndex { instrumentIndex = newIdx }
+            // Ambient texture regen may switch between audio and MIDI — re-apply effect defaults
+            // so Pan/Sweep chips show the correct active state without a full song regeneration.
+            if trackIndex == kTrackTexture && activeStyle == .ambient {
+                applyDefaultEffects()
+            }
         }
     }
 
@@ -288,7 +326,10 @@ struct TrackRowView: View {
             return [.boost, .delay, .reverb]
         case kTrackTexture:
             if isChill   { return [.boost, .lowShelf, .reverb] }
-            if isAmbient { return [.pan, .sweep, .space] }
+            if isAmbient {
+                // Audio texture: only reverb chip (pan/sweep have no effect on the audio player)
+                return [.pan, .sweep, .space]
+            }
             return isKosmic ? [.pan, .delay, .space] : [.pan, .delay, .reverb]
         case kTrackBass:
             if isChill   { return [.lowShelf, .compression, .reverb] }
@@ -313,8 +354,14 @@ struct TrackRowView: View {
 
     private static let effectActiveColor = Color(red: 0.18, green: 0.42, blue: 0.78) // dark blue
 
+    // "Hall" is relabelled "Reverb" on the Ambient Texture track for clarity.
+    private func effectChipLabel(_ fx: TrackEffect) -> String {
+        if fx == .space && trackIndex == kTrackTexture && activeStyle == .ambient { return "Reverb" }
+        return fx.rawValue
+    }
+
     private func effectChip(_ fx: TrackEffect, active: Bool) -> some View {
-        Text(fx.rawValue)
+        Text(effectChipLabel(fx))
             .font(.system(size: 10, weight: active ? .bold : .medium))
             .frame(width: 44, height: 20)
             .background(active ? Self.effectActiveColor : Color(white: 0.28))
@@ -340,7 +387,7 @@ struct TrackRowView: View {
             case kTrackLead2:   isInstrumentLocked ? [.delay, .space] : [.space]
             case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
-            case kTrackTexture: [.space, .pan, .sweep]
+            case kTrackTexture: appState.songState?.ambientAudioTexture != nil ? [.space] : [.space, .pan, .sweep]
             case kTrackBass:    [.reverb, .sweep]
             case kTrackDrums:   [.delay]
             default:            []
