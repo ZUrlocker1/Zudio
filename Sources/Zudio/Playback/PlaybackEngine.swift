@@ -1759,6 +1759,10 @@ final class PlaybackEngine: ObservableObject {
 
                 self.engine.mainMixerNode.outputVolume = startProgress
 
+                // Fire allNotesOff() early so Ambient release envelopes (up to 2s) complete
+                // and the reverb drains before the fade reaches 0.  By the time outputVolume
+                // is restored for the next song there is nothing left in the reverb buffers.
+                var notesOffFired = false
                 let src = DispatchSource.makeTimerSource(queue: .main)
                 src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
                 src.setEventHandler { [weak self] in
@@ -1766,12 +1770,13 @@ final class PlaybackEngine: ObservableObject {
                     let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
                     let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
                     self.engine.mainMixerNode.outputVolume = startProgress * linearFade
+                    if linearFade <= 0.15 && !notesOffFired {
+                        notesOffFired = true
+                        self.allNotesOff()
+                    }
                     if linearFade <= 0.0 {
                         self.ambientOutroFadeTimer?.cancel()
                         self.ambientOutroFadeTimer = nil
-                        // Clear effect buffers so reverb/delay tails don't bleed through
-                        // when mainMixerNode volume is restored for the next song.
-                        self.allNotesOff()
                         for rev in self.reverbs { rev.reset() }
                         for del in self.delays  { del.reset() }
                     }

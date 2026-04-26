@@ -113,20 +113,22 @@ struct PhonePlayerView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .sensoryFeedback(.impact(weight: .medium), trigger: hapticImpactMedium)
-        .sensoryFeedback(.impact(weight: .light),  trigger: hapticImpactLight)
-        .sensoryFeedback(.impact(weight: .heavy),  trigger: hapticImpactHeavy)
-        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.8), trigger: hapticImpactSoft)
-        .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1.0), trigger: hapticImpactRigid)
-        .sensoryFeedback(.selection, trigger: hapticSelection)
-        .sensoryFeedback(.success,   trigger: hapticSuccess)
-        .sensoryFeedback(.warning,   trigger: hapticWarning)
-        .onChange(of: appState.isGenerating) { _, generating in
+        .modifier(ZudioHapticsModifier(
+            impactMedium: hapticImpactMedium,
+            impactLight:  hapticImpactLight,
+            impactHeavy:  hapticImpactHeavy,
+            impactSoft:   hapticImpactSoft,
+            impactRigid:  hapticImpactRigid,
+            selection:    hapticSelection,
+            success:      hapticSuccess,
+            warning:      hapticWarning
+        ))
+        .onChangeCompat(of: appState.isGenerating) { generating in
             if !generating { hapticSuccess.toggle() }
         }
         // TrackRowView handles this on macOS/iPad via its own onChange(of: defaultsResetToken).
         // On iPhone TrackRowView is never in the hierarchy, so effects would never be applied.
-        .onChange(of: appState.defaultsResetToken) { _, _ in
+        .onChangeCompat(of: appState.defaultsResetToken) { _ in
             for i in 0..<kTrackCount { appState.restoreDefaultEffects(forTrack: i) }
         }
     }
@@ -484,6 +486,7 @@ struct PhonePlayerView: View {
             .frame(width: 104)
         }
         .font(.callout)
+        .dynamicTypeSize(.large)
     }
 
     // MARK: - Landscape action rows: Generate full-width, then Export + Info below
@@ -530,6 +533,7 @@ struct PhonePlayerView: View {
             }
         }
         .font(.callout)
+        .dynamicTypeSize(.large)
     }
 
     // MARK: - Tab strip (Visuals / Log / Songs)
@@ -621,6 +625,8 @@ struct PhonePlayerView: View {
                 .buttonStyle(.bordered)
                 .disabled(appState.songState == nil)
             }
+            .font(.callout)
+            .dynamicTypeSize(.large)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color(white: 0.10))

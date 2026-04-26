@@ -114,14 +114,16 @@ struct ContentView: View {
                     .onAppear      { contentWidth = geo.size.width }
                     .onChange(of: geo.size) { size in contentWidth = size.width }
             }
-            .sensoryFeedback(.impact(weight: .medium), trigger: iPadHapticImpactMedium)
-            .sensoryFeedback(.impact(weight: .light),  trigger: iPadHapticImpactLight)
-            .sensoryFeedback(.impact(weight: .heavy),  trigger: iPadHapticImpactHeavy)
-            .sensoryFeedback(.impact(flexibility: .soft,  intensity: 0.8), trigger: iPadHapticImpactSoft)
-            .sensoryFeedback(.impact(flexibility: .rigid, intensity: 1.0), trigger: iPadHapticImpactRigid)
-            .sensoryFeedback(.selection, trigger: iPadHapticSelection)
-            .sensoryFeedback(.success,   trigger: iPadHapticSuccess)
-            .sensoryFeedback(.warning,   trigger: iPadHapticWarning)
+            .modifier(ZudioHapticsModifier(
+                impactMedium: iPadHapticImpactMedium,
+                impactLight:  iPadHapticImpactLight,
+                impactHeavy:  iPadHapticImpactHeavy,
+                impactSoft:   iPadHapticImpactSoft,
+                impactRigid:  iPadHapticImpactRigid,
+                selection:    iPadHapticSelection,
+                success:      iPadHapticSuccess,
+                warning:      iPadHapticWarning
+            ))
         }
         #else
         // macOS — existing layout unchanged
@@ -536,7 +538,7 @@ struct ContentView: View {
         .frame(minHeight: 500)
         .background(Color(white: 0.20))
         .preferredColorScheme(.dark)
-        .onChange(of: iPadTab) { _, tab in
+        .onChangeCompat(of: iPadTab) { tab in
             // Only persist visuals/tracks — log and songs are session-transient
             if tab == .visuals || tab == .tracks {
                 UserDefaults.standard.set(tab.rawValue, forKey: "iPadTabPersist")

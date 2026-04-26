@@ -73,7 +73,7 @@ struct VisualizerView: View {
                 .allowsHitTesting(false)
         }
         // Detect mute → unmute transitions; stamp a flash date so drawOrbs can burst that track.
-        .onChange(of: appState.muteState) { oldMute, newMute in
+        .onChangeCompat(of: appState.muteState) { oldMute, newMute in
             let now = Date()
             for i in 0..<min(oldMute.count, newMute.count) {
                 if oldMute[i] && !newMute[i] {
@@ -81,11 +81,11 @@ struct VisualizerView: View {
                 }
             }
         }
-        .onChange(of: appState.defaultsResetToken) { _, _ in
+        .onChangeCompat(of: appState.defaultsResetToken) { _ in
             bgFadeStart = Date()
             bgGradientAngle = Double.random(in: 0 ..< .pi * 2)
         }
-        .onChange(of: appState.evolvePhaseToken) { _, _ in
+        .onChangeCompat(of: appState.evolvePhaseToken) { _ in
             bgFadeStart = Date()
             bgGradientAngle = Double.random(in: 0 ..< .pi * 2)
         }

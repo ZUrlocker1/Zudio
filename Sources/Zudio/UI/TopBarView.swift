@@ -1054,7 +1054,7 @@ struct AboutView: View {
         #if os(iOS)
         .frame(width: 580)
         .presentationDetents([.height(490)])
-        .presentationContentInteraction(.scrolls)
+        .presentationScrollsCompat()
         #else
         .frame(width: 580, height: 440)
         #endif

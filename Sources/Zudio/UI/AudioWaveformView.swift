@@ -66,7 +66,7 @@ struct AudioWaveformView: View {
             expectedFilename = filename
             if let f = filename { Task { await loadWaveform(filename: f) } }
         }
-        .onChange(of: filename) { _, newName in
+        .onChangeCompat(of: filename) { newName in
             expectedFilename = newName
             if let f = newName {
                 Task { await loadWaveform(filename: f) }
@@ -75,7 +75,7 @@ struct AudioWaveformView: View {
                 audioDurationBars = 0
             }
         }
-        .onChange(of: tempo) { _, newTempo in
+        .onChangeCompat(of: tempo) { newTempo in
             // Recalculate bar duration from cached seconds — no file re-read needed
             guard audioDurationSeconds > 0 else { return }
             audioDurationBars = audioDurationSeconds / (240.0 / max(newTempo, 1))

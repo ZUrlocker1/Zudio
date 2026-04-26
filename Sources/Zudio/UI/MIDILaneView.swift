@@ -82,7 +82,7 @@ struct MIDILaneView: View {
         .background(Color(white: 0.09))
         .clipShape(RoundedRectangle(cornerRadius: 3))
         .onAppear { buildCache() }
-        .onChange(of: events) { _, _ in buildCache() }
+        .onChangeCompat(of: events) { _ in buildCache() }
     }
 
     // MARK: - Cache
