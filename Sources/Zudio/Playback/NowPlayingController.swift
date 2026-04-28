@@ -145,7 +145,7 @@ final class NowPlayingController {
             let elapsed = Double(currentStep) * song.frame.secondsPerStep
             var info: [String: Any] = [
                 MPMediaItemPropertyTitle:                    song.title,
-                MPMediaItemPropertyArtist:                   "Zudio",
+                MPMediaItemPropertyArtist:                   song.style.rawValue.capitalized,
                 MPMediaItemPropertyPlaybackDuration:         song.frame.totalDurationSeconds,
                 MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
                 MPNowPlayingInfoPropertyPlaybackRate:        isPlaying ? 1.0 : 0.0,
@@ -161,6 +161,17 @@ final class NowPlayingController {
             if let artwork = cachedArtwork { info[MPMediaItemPropertyArtwork] = artwork }
             center.nowPlayingInfo = info
         }
+
+        // iOS only: re-assert paused state after a short delay to win the race against
+        // AVAudioSession deactivation that occurs when audio ends naturally. Without this,
+        // the lock screen transport stays in "playing" state after a song finishes on its own.
+        #if os(iOS)
+        if !isPlaying {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                MPNowPlayingInfoCenter.default().playbackState = .paused
+            }
+        }
+        #endif
     }
 
     /// Claim Now Playing routing from other apps (e.g. a browser with a playing tab).

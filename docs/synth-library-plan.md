@@ -1,4 +1,4 @@
-# Zudio / Zenio Synth Library Plan
+# Future Zenio Synth Library Plan
 
 **Shipped sound bank (Zudio):** Zudio uses the **GeneralUser GS** soundfont by S. Christian Collins, adopted for the v1.0 release and current across all platforms (Mac, iPad, iPhone).
 

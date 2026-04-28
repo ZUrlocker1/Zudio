@@ -1,8 +1,8 @@
 // AudioTexturePlayer.swift — ambient texture loop player for Chill and Ambient styles
 // Copyright (c) 2026 Zack Urlocker
 // Uses AVAudioEngine + AVAudioPlayerNode for full DSP effect support.
-// Chill effects: Boost, Low shelf (+5 dB at 80 Hz), Reverb (large chamber), pitch/HP variation.
-// Ambient: no effects — raw audio only (EQ/reverb/pitch bypassed).
+// Chill effects: Boost, Low shelf (+5 dB at 80 Hz), Reverb (medium hall 22%), pitch/HP variation.
+// Ambient effects: LP at 3.5 kHz + small-room reverb 10% wet (pushes file into background).
 // Hidden: slow stereo pan LFO + random high-pass or pitch shift per play-through (Chill only).
 // Silent for all non-Chill/non-Ambient styles and when texture is nil.
 
@@ -30,8 +30,10 @@ final class AudioTexturePlayer {
     private var currentFilename: String? = nil
     /// True while a stop()-initiated fade-out is running (don't treat as "playing normally").
     private var isFadingOut: Bool = false
-    /// True for Ambient textures — bypasses EQ, reverb, pitch variation.
+    /// True for Ambient textures — uses LP+light reverb instead of Chill DSP chain.
     private var bypassEffects: Bool = false
+    /// Tracks which effect mode was last configured so loadFactoryPreset is skipped when unchanged.
+    private var lastEffectsMode: Bool? = nil
 
     init() {
         setupEngine()
@@ -167,23 +169,29 @@ final class AudioTexturePlayer {
         currentFilename = filename
         currentTargetVolume = volumeForTexture(filename)
         if bypassEffects {
-            // Ambient: gentle LP at 3.5 kHz to push into background + light reverb for depth.
-            eqNode.bands[0].bypass = true                        // no low-shelf boost
-            eqNode.bands[1].filterType = .lowPass
-            eqNode.bands[1].frequency  = 3500
-            eqNode.bands[1].bypass     = false
-            eqNode.auAudioUnit.shouldBypassEffect = false
-            reverbNode.loadFactoryPreset(.smallRoom)
-            reverbNode.wetDryMix = 10
-            reverbNode.auAudioUnit.shouldBypassEffect = false
-            pitchNode.pitch = 0
-            pitchNode.rate  = 1.0
+            // Ambient: gentle LP at 3.5 kHz + light reverb to push file into background.
+            if lastEffectsMode != true {
+                eqNode.bands[0].bypass     = true
+                eqNode.bands[1].filterType = .lowPass
+                eqNode.bands[1].frequency  = 3500
+                eqNode.bands[1].bypass     = false
+                eqNode.auAudioUnit.shouldBypassEffect = false
+                reverbNode.loadFactoryPreset(.smallRoom)
+                reverbNode.wetDryMix = 10
+                reverbNode.auAudioUnit.shouldBypassEffect = false
+                pitchNode.pitch = 0
+                pitchNode.rate  = 1.0
+                lastEffectsMode = true
+            }
         } else {
-            eqNode.bands[0].bypass = false
-            eqNode.auAudioUnit.shouldBypassEffect = false
-            reverbNode.loadFactoryPreset(.mediumHall)
-            reverbNode.wetDryMix = 22
-            reverbNode.auAudioUnit.shouldBypassEffect = false
+            if lastEffectsMode != false {
+                eqNode.bands[0].bypass = false
+                eqNode.auAudioUnit.shouldBypassEffect = false
+                reverbNode.loadFactoryPreset(.mediumHall)
+                reverbNode.wetDryMix = 22
+                reverbNode.auAudioUnit.shouldBypassEffect = false
+                lastEffectsMode = false
+            }
             applyRandomVariation()
         }
         if !engine.isRunning { try? engine.start() }

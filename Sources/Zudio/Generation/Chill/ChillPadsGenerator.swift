@@ -37,9 +37,9 @@ struct ChillPadsGenerator {
             events = events.filter { $0.stepIndex >= 16 }
         }
 
-        // Cold stop: last 2 outro bars are drums-only, pads silent
+        // Cold stop: final bar silent; crash bar lets any sustained chord ring naturally.
         if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-            let silenceFrom = (outroEnd - 2) * 16
+            let silenceFrom = (outroEnd - 1) * 16
             events = events.filter { $0.stepIndex < silenceFrom }
         }
 

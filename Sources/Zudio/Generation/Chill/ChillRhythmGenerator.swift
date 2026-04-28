@@ -82,9 +82,19 @@ struct ChillRhythmGenerator {
             // Cold start: bar 0 is drums-only, rhythm silent
             if case .coldStart = structure.introStyle, bar == 0 { continue }
 
-            // Cold stop: last 2 outro bars are drums-only, rhythm silent
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar,
-               bar >= outroEnd - 2 { continue }
+            // Cold stop: final bar silent; crash bar gets a chord stab landing with the crash.
+            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
+                if bar >= outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                    let base    = bar * 16
+                    for note in voicing {
+                        events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: 92, durationSteps: 3))
+                    }
+                    continue
+                }
+            }
 
             // Intro and outro: silent
             if label == .intro || label == .outro { continue }

@@ -89,13 +89,18 @@ struct ChillDrumGenerator {
         return events
     }
 
-    /// Cold stop: 1-beat snare roll on steps 12–15 (used in penultimate outro bar).
+    /// Cold stop: 2-beat snare crescendo on steps 8–15 (beats 3+4 of the fill bar).
+    /// Fills lead into the crash on beat 1 of the next bar.
     private static func chillColdStopFill(barStart: Int) -> [MIDIEvent] {
         return [
-            MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 60, durationSteps: 1),
-            MIDIEvent(stepIndex: barStart + 13, note: GMDrum.snare.rawValue, velocity: 72, durationSteps: 1),
-            MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: 86, durationSteps: 1),
-            MIDIEvent(stepIndex: barStart + 15, note: GMDrum.snare.rawValue, velocity: 100, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart +  8, note: GMDrum.snare.rawValue, velocity: 45,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart +  9, note: GMDrum.snare.rawValue, velocity: 52,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 10, note: GMDrum.snare.rawValue, velocity: 60,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 11, note: GMDrum.snare.rawValue, velocity: 68,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 76,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 13, note: GMDrum.snare.rawValue, velocity: 86,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue, velocity: 96,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 15, note: GMDrum.snare.rawValue, velocity: 108, durationSteps: 1),
         ]
     }
 
@@ -111,6 +116,8 @@ struct ChillDrumGenerator {
         let snare = GMDrum.snare.rawValue
         let hat   = GMDrum.closedHat.rawValue
         let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
+        let coldStopOutroEnd: Int? = { if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }; return nil }()
+        let coldStopOutroLength = coldStopOutroEnd.flatMap { _ in structure.outroSection?.lengthBars } ?? 0
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -125,19 +132,16 @@ struct ChillDrumGenerator {
                 continue
             }
 
-            // Cold stop: final bar is crash+kick only; penultimate bar gets normal generation then 1-beat fill
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar == outroEnd - 1 {
+            // Cold stop: last bar silent; crash+kick 1 bar earlier; 2-beat fill in bar before that.
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.crash1.rawValue, velocity: 110, durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.kick.rawValue,   velocity: 105, durationSteps: 1))
                     continue
                 }
             }
-
-            var isColdStopPenultimate = false
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar, bar == outroEnd - 2 {
-                isColdStopPenultimate = true
-            }
+            let isColdStopPenultimate = coldStopOutroLength >= 3 && coldStopOutroEnd == bar + 3
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
@@ -245,7 +249,7 @@ struct ChillDrumGenerator {
             }
 
             if isColdStopPenultimate {
-                events = events.filter { $0.stepIndex < base + 12 }
+                events.removeAll { $0.stepIndex >= base + 8 }
                 events += chillColdStopFill(barStart: base)
             }
         }
@@ -268,6 +272,8 @@ struct ChillDrumGenerator {
 
         // Track section-start bars for crash
         let sectionStartBars = Set(structure.sections.map { $0.startBar })
+        let coldStopOutroEnd: Int? = { if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }; return nil }()
+        let coldStopOutroLength = coldStopOutroEnd.flatMap { _ in structure.outroSection?.lengthBars } ?? 0
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -281,19 +287,16 @@ struct ChillDrumGenerator {
                 continue
             }
 
-            // Cold stop: final bar is crash+kick only; penultimate bar gets normal generation then 1-beat fill
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar == outroEnd - 1 {
+            // Cold stop: last bar silent; crash+kick 1 bar earlier; 2-beat fill in bar before that.
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.crash1.rawValue, velocity: 110, durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.kick.rawValue,   velocity: 105, durationSteps: 1))
                     continue
                 }
             }
-
-            var isColdStopPenultimate = false
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar, bar == outroEnd - 2 {
-                isColdStopPenultimate = true
-            }
+            let isColdStopPenultimate = coldStopOutroLength >= 3 && coldStopOutroEnd == bar + 3
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
@@ -401,7 +404,7 @@ struct ChillDrumGenerator {
             }
 
             if isColdStopPenultimate {
-                events = events.filter { $0.stepIndex < base + 12 }
+                events.removeAll { $0.stepIndex >= base + 8 }
                 events += chillColdStopFill(barStart: base)
             }
         }
@@ -454,6 +457,8 @@ struct ChillDrumGenerator {
         let grooveStartBar = structure.sections.first { $0.label == .A || $0.label == .B }?.startBar ?? 0
         let rampBars = 4  // ramp velocities up over this many bars after intro ends
         let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
+        let coldStopOutroEnd: Int? = { if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }; return nil }()
+        let coldStopOutroLength = coldStopOutroEnd.flatMap { _ in structure.outroSection?.lengthBars } ?? 0
 
         for bar in 0..<frame.totalBars {
             let section     = structure.section(atBar: bar)
@@ -467,19 +472,16 @@ struct ChillDrumGenerator {
                 continue
             }
 
-            // Cold stop: final bar is crash+kick only; penultimate bar gets normal generation then 1-beat fill
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar == outroEnd - 1 {
+            // Cold stop: last bar silent; crash+kick 1 bar earlier; 2-beat fill in bar before that.
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.crash1.rawValue, velocity: 110, durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.kick.rawValue,   velocity: 105, durationSteps: 1))
                     continue
                 }
             }
-
-            var isColdStopPenultimate = false
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar, bar == outroEnd - 2 {
-                isColdStopPenultimate = true
-            }
+            let isColdStopPenultimate = coldStopOutroLength >= 3 && coldStopOutroEnd == bar + 3
 
             // Ramp factor: 0.0 at grooveStartBar, 1.0 at grooveStartBar+rampBars
             let rampFactor: Double
@@ -639,7 +641,7 @@ struct ChillDrumGenerator {
             }
 
             if isColdStopPenultimate {
-                events = events.filter { $0.stepIndex < base + 12 }
+                events.removeAll { $0.stepIndex >= base + 8 }
                 events += chillColdStopFill(barStart: base)
             }
         }
@@ -658,6 +660,8 @@ struct ChillDrumGenerator {
         let kick  = GMDrum.kick.rawValue
         let hat   = GMDrum.closedHat.rawValue
         let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
+        let coldStopOutroEnd: Int? = { if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }; return nil }()
+        let coldStopOutroLength = coldStopOutroEnd.flatMap { _ in structure.outroSection?.lengthBars } ?? 0
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -671,19 +675,16 @@ struct ChillDrumGenerator {
                 continue
             }
 
-            // Cold stop: final bar is crash+kick only; penultimate bar gets normal generation then 1-beat fill
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar == outroEnd - 1 {
+            // Cold stop: last bar silent; crash+kick 1 bar earlier; 2-beat fill in bar before that.
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.crash1.rawValue, velocity: 110, durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.kick.rawValue,   velocity: 105, durationSteps: 1))
                     continue
                 }
             }
-
-            var isColdStopPenultimate = false
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar, bar == outroEnd - 2 {
-                isColdStopPenultimate = true
-            }
+            let isColdStopPenultimate = coldStopOutroLength >= 3 && coldStopOutroEnd == bar + 3
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
@@ -796,7 +797,7 @@ struct ChillDrumGenerator {
             }
 
             if isColdStopPenultimate {
-                events = events.filter { $0.stepIndex < base + 12 }
+                events.removeAll { $0.stepIndex >= base + 8 }
                 events += chillColdStopFill(barStart: base)
             }
         }
@@ -826,6 +827,8 @@ struct ChillDrumGenerator {
         // grooveDropout: within a tambourine-on run, occasionally 1–2 bars play tambourine only
         // (groove drops out). Happens ~once per 10 bars on average.
         let fillOpt = rng.nextInt(upperBound: 3)   // A/B/C fill used across all breakdown styles
+        let coldStopOutroEnd: Int? = { if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }; return nil }()
+        let coldStopOutroLength = coldStopOutroEnd.flatMap { _ in structure.outroSection?.lengthBars } ?? 0
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -840,17 +843,16 @@ struct ChillDrumGenerator {
                 continue
             }
 
-            // Cold stop: final outro bar = crash+kick; penultimate = normal then 1-beat fill
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar == outroEnd - 1 {
+            // Cold stop: last bar silent; crash+kick 1 bar earlier; 2-beat fill in bar before that.
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
                     events.append(MIDIEvent(stepIndex: base, note: GMDrum.crash1.rawValue, velocity: 108, durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base, note: kick, velocity: 100, durationSteps: 1))
                     continue
                 }
             }
-            var isColdStopPenultimate = false
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar,
-               bar == outroEnd - 2 { isColdStopPenultimate = true }
+            let isColdStopPenultimate = coldStopOutroLength >= 3 && coldStopOutroEnd == bar + 3
 
             if isBreakdown {
                 let breakdownBar = bar - (section?.startBar ?? bar)
@@ -965,7 +967,7 @@ struct ChillDrumGenerator {
             }
 
             if isColdStopPenultimate {
-                events = events.filter { $0.stepIndex < base + 12 }
+                events.removeAll { $0.stepIndex >= base + 8 }
                 events += chillColdStopFill(barStart: base)
             }
         }

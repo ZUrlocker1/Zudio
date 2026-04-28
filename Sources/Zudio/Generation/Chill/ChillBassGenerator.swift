@@ -63,9 +63,15 @@ struct ChillBassGenerator {
             // Cold start: bar 0 is drums-only, bass silent
             if case .coldStart = structure.introStyle, bar == 0 { continue }
 
-            // Cold stop: last 2 outro bars are drums-only, bass silent
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar,
-               bar >= outroEnd - 2 { continue }
+            // Cold stop: final bar silent; crash bar gets a root stab landing with the crash.
+            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
+                if bar >= outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
+                                            velocity: 80, durationSteps: 3))
+                    continue
+                }
+            }
 
             switch label {
             case .bridge:
@@ -338,9 +344,15 @@ struct ChillBassGenerator {
             // Cold start: bar 0 is drums-only, bass silent
             if case .coldStart = structure.introStyle, bar == 0 { continue }
 
-            // Cold stop: last 2 outro bars are drums-only, bass silent
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar,
-               bar >= outroEnd - 2 { continue }
+            // Cold stop: final bar silent; crash bar gets a root stab landing with the crash.
+            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
+                if bar >= outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
+                                            velocity: 80, durationSteps: 3))
+                    continue
+                }
+            }
 
             switch label {
             case .bridge:
@@ -589,8 +601,14 @@ struct ChillBassGenerator {
 
             // Cold start/stop guards
             if case .coldStart = structure.introStyle, bar == 0 { continue }
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar,
-               bar >= outroEnd - 2 { continue }
+            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
+                if bar >= outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
+                                            velocity: 80, durationSteps: 3))
+                    continue
+                }
+            }
 
             let root  = clampBass(chordRoot)
             let fifth = clampBass(snapToScale(chordRoot + 7,  scale: scale))

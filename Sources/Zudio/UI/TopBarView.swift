@@ -551,10 +551,18 @@ struct TopBarView: View {
                                 .padding(.leading, -4)  // tighten: menu picker has ~8pt internal leading inset
                             }
 
-                            Text("BPM").foregroundStyle(.white).fixedSize()
-                            TextField("Auto", text: tempoBinding)
-                            .frame(width: kBPMFieldWidth)
-                            .textFieldStyle(.roundedBorder)
+                            HStack(spacing: 6) {
+                                Text("BPM").foregroundStyle(.white).fixedSize()
+                                TextField("Auto", text: tempoBinding)
+                                    .frame(width: kBPMFieldWidth)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(size: 12))
+                                Stepper("", value: Binding(
+                                    get: { appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120 },
+                                    set: { appState.tempoOverride = max(20, min(200, $0)) }
+                                ), in: 20...200)
+                                .labelsHidden()
+                            }
                         }
                     }
                     .padding(.leading, 5)
@@ -922,8 +930,12 @@ struct HelpView: View {
                 Divider()
                 helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback.")
                 helpLine("⏮ ⏭ Previous / Next track", "Go to the previous or next generated song.")
-                helpLine("Export Audio (⌘E)", "Exports the song as an M4A audio file to /Downloads.")
-                helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to /Downloads. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
+                #if os(iOS)
+                helpLine("Export Audio (⌘E)", "Exports to an M4A audio file accessible from the Files app.")
+                #else
+                helpLine("Export Audio (⌘E)", "Exports to an M4A audio file to the default folder e.g /Downloads on a Mac.")
+                #endif
+                helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to the default folder. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
                 helpLine("Reset (⌘R)", "Reset audio, and all tracks and settings to initial state.")
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
@@ -939,7 +951,7 @@ struct HelpView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 helpLine("◀ Name ▶", "Cycle through MIDI instruments for that track.")
-                helpLine("⚡ Lightning", "Regenerates a track and its     instrument. Structure and key are preserved.")
+                helpLine("⚡ Lightning", "Regenerates a track and its instrument. Structure and key are preserved.")
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 5) {
                         Text("M")
@@ -1007,7 +1019,7 @@ struct AboutView: View {
             #if os(iOS)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Version: 1.01").font(.system(size: 14))
+                    Text("Version: 1.02").font(.system(size: 14))
                     Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     Text("Zudio is built with GeneralUser GS MIDI sound bank by S. Christian Collins, arpeggios, pads, co-prime loops, tubular bells, ripped off riffs, Berlin school bass, muted trumpets, modal drift, spooky X-Files, Dinger beat and tons of reverb!").font(.system(size: 14))
                 }
@@ -1015,7 +1027,7 @@ struct AboutView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 1.01").font(.system(size: 14))
+                Text("Version: 1.02").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Zudio is built with GeneralUser GS MIDI sound bank by S. Christian Collins, arpeggios, pads, co-prime loops, tubular bells, ripped off riffs, Berlin school bass, muted trumpets, modal drift, spooky X-Files, Dinger beat and tons of reverb!").font(.system(size: 14))

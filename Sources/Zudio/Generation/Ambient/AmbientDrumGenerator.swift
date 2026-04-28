@@ -80,7 +80,7 @@ struct AmbientDrumGenerator {
                     positions.swapAt(i, rng.nextInt(upperBound: i + 1))
                 }
                 for h in 0..<min(numHits, positions.count) {
-                    let vel = UInt8(42 + rng.nextInt(upperBound: 22))  // 42–63
+                    let vel = UInt8(36 + rng.nextInt(upperBound: 16))  // 36–51
                     let note: UInt8 = [hiConga, midConga, lowConga][rng.nextInt(upperBound: 3)]
                     events.append(MIDIEvent(stepIndex: bar * 16 + positions[h],
                                             note: note, velocity: vel, durationSteps: 1))
@@ -90,7 +90,7 @@ struct AmbientDrumGenerator {
             // Bongos: accent hit ~20% of bars, on beat 1 or beat 3
             if rng.nextDouble() < 0.20 {
                 let beat = (rng.nextDouble() < 0.5) ? 0 : 8
-                let vel  = UInt8(38 + rng.nextInt(upperBound: 24))  // 38–61
+                let vel  = UInt8(32 + rng.nextInt(upperBound: 18))  // 32–49
                 let note: UInt8 = rng.nextDouble() < 0.6 ? hiBongo : lowBongo
                 events.append(MIDIEvent(stepIndex: bar * 16 + beat,
                                         note: note, velocity: vel, durationSteps: 1))
@@ -161,7 +161,7 @@ struct AmbientDrumGenerator {
         for bar in 0..<frame.totalBars {
             guard structure.section(atBar: bar)?.label == .A else { continue }
             if rng.nextDouble() < 0.50 {
-                let vel = UInt8(32 + rng.nextInt(upperBound: 20))  // 32–51
+                let vel = UInt8(22 + rng.nextInt(upperBound: 14))  // 22–35
                 events.append(MIDIEvent(stepIndex: bar * 16,
                                         note: GMDrum.kick.rawValue, velocity: vel, durationSteps: 1))
             }

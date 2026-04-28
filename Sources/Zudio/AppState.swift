@@ -833,7 +833,7 @@ final class AppState: ObservableObject {
             switch self.playMode {
             case .endless: self.handleSongEndedNaturally()
             case .evolve:  self.handleEvolvePhaseEnded()
-            case .song:    break
+            case .song:    self.audioTexture.stop()
             }
         }
         // Re-apply instruments when the audio engine restarts after a route change.
@@ -1062,7 +1062,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.songState    = state
                 self.generationHistory.append(state)
-                if self.generationHistory.count > 10 { self.generationHistory.removeFirst() }
+                if self.generationHistory.count > Self.kPersistedHistoryMax { self.generationHistory.removeFirst() }
                 self.appendPersistedSong(from: state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
@@ -1537,9 +1537,25 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// If the user has navigated back through generation history, steps forward to the next
+    /// entry and loads it without re-generating. Returns true when a history entry was loaded.
+    @discardableResult
+    private func stepForwardInGenerationHistory() -> Bool {
+        guard let current = songState,
+              let idx = generationHistory.firstIndex(where: { $0.globalSeed == current.globalSeed }),
+              idx + 1 < generationHistory.count else { return false }
+        let next = generationHistory[idx + 1]
+        appendToLog([GenerationLogEntry(tag: "Forward",
+            description: "\(next.style.rawValue) - \(next.title)", isTitle: true)])
+        loadFromGenerationHistory(next, forcePlay: true)
+        return true
+    }
+
     /// Skip immediately to the next song (Endless mode ⏭ button).
     func skipToNextSong() {
         guard playMode == .endless else { return }
+        if stepForwardInGenerationHistory() { return }
+        // At the most recent song — use pre-generated or generate new.
         if let next = nextSongState {
             nextSongState   = nil
             isPreGenerating = false
@@ -2025,6 +2041,7 @@ final class AppState: ObservableObject {
     /// Uses pre-generated next song if available, otherwise generates one — same as Endless skipToNextSong.
     func skipEvolvePass() {
         guard playMode == .evolve else { return }
+        if stepForwardInGenerationHistory() { return }
         transitionToEvolveNextSong()
     }
 
@@ -2040,7 +2057,7 @@ final class AppState: ObservableObject {
         // Duplicate globalSeeds break ForEach identity in the Songs tab UI.
         if !generationHistory.contains(where: { $0.globalSeed == state.globalSeed }) {
             generationHistory.append(state)
-            if generationHistory.count > 10 { generationHistory.removeFirst() }
+            if generationHistory.count > Self.kPersistedHistoryMax { generationHistory.removeFirst() }
             appendPersistedSong(from: state)
         }
         visibleBarOffset = 0
@@ -2345,7 +2362,7 @@ final class AppState: ObservableObject {
                 self.savedSongSeed    = state.globalSeed  // loaded from file → mark as saved
                 self.appendPersistedSong(from: state)
                 self.generationHistory.append(state)
-                if self.generationHistory.count > 10 { self.generationHistory.removeFirst() }
+                if self.generationHistory.count > Self.kPersistedHistoryMax { self.generationHistory.removeFirst() }
                 self.isGenerating     = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1

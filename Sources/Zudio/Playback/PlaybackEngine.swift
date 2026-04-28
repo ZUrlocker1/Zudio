@@ -967,7 +967,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 4 {
                 vol = 1.6    // Rhodes runs soft in GM — boost for Chill rhythm presence
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 5 {
-                vol = 0.75   // Wurlitzer runs hot on Chill rhythm — pull back
+                vol = 0.65   // Wurlitzer runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 17 {
                 vol = 0.75   // B3 Organ runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {

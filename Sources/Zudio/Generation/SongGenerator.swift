@@ -5,6 +5,14 @@
 import Foundation
 
 struct SongGenerator {
+
+    /// Single source of truth for Ambient audio texture filenames.
+    /// Referenced in both generateAmbient and regenerateTrack — add new files here only.
+    static let ambientAudioFilePool: [String] = [
+        "light_rain.m4a", "rain-and-thunder.m4a", "ocean_waves.m4a",
+        "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a"
+    ]
+
     // MARK: - Public entry points
 
     /// Full generation from scratch. Key/tempo overrides from UI selectors (nil = random).
@@ -613,11 +621,9 @@ struct SongGenerator {
                                                             silentBars: dropoutZones[kTrackRhythm] ?? [])
 
         // Ambient audio texture: when drums are absent, replace the MIDI texture track with an
-        // audio file. No effects applied — raw ambient sound fills the texture slot.
-        let ambientAudioFiles = ["light_rain.m4a", "rain-and-thunder.m4a", "ocean_waves.m4a",
-                                  "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a"]
+        // audio file. LP + light reverb applied by AudioTexturePlayer for Ambient style.
         let ambientAudioTexture: String? = (percussionStyle == .absent)
-            ? ambientAudioFiles[texRNG.nextInt(upperBound: ambientAudioFiles.count)] : nil
+            ? Self.ambientAudioFilePool[texRNG.nextInt(upperBound: Self.ambientAudioFilePool.count)] : nil
         let ambientAudioTextureOffset = ambientAudioTexture != nil ? [0, 15, 30, 45][texRNG.nextInt(upperBound: 4)] : 0
 
         // Texture
@@ -1107,8 +1113,7 @@ struct SongGenerator {
         case kTrackTexture:
             if isAmbient {
                 let loopBars = ambLoopLengths?.texture ?? 7
-                let ambientFiles = ["light_rain.m4a", "rain-and-thunder.m4a", "ocean_waves.m4a",
-                                    "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a"]
+                let ambientFiles = Self.ambientAudioFilePool
                 ambientAudioTextureChanged = true
                 if rng.nextDouble() < 0.45 {
                     // Audio texture path (45%)
