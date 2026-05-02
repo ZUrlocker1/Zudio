@@ -51,8 +51,18 @@ struct ChillRhythmGenerator {
 
     private static func pickCompingMode(mood: Mood, rng: inout SeededRNG) -> CompingMode {
         switch mood {
-        case .Deep, .Dream:
-            return .mobyBackbeat
+        case .Deep:
+            // Backbeat 50%, Syncopated 25%, Arpeggiated 25%
+            let roll = rng.nextDouble()
+            if roll < 0.50 { return .mobyBackbeat }
+            if roll < 0.75 { return .stGermainSyncopated }
+            return .bosaMoonArpeggiated
+        case .Dream:
+            // Backbeat 50%, Arpeggiated 30%, Syncopated 20%
+            let roll = rng.nextDouble()
+            if roll < 0.50 { return .mobyBackbeat }
+            if roll < 0.80 { return .bosaMoonArpeggiated }
+            return .stGermainSyncopated
         case .Free:
             // Syncopated 50%, Arpeggiated 50%
             return rng.nextDouble() < 0.50 ? .stGermainSyncopated : .bosaMoonArpeggiated

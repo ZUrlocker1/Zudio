@@ -796,7 +796,7 @@ struct PhonePlayerView: View {
 
 // MARK: - Info sheet
 
-private struct PhoneInfoView: View {
+struct PhoneInfoView: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -828,7 +828,7 @@ private struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.0")
+                    Text("Generative music · v1.03")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)

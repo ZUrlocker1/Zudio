@@ -229,8 +229,15 @@ final class AudioTexturePlayer {
     }
 
     /// Each play-through: randomly apply subtle high-pass filter OR subtle pitch shift.
-    /// Gives each texture session a slightly different character.
+    /// Voice/music-containing files skip all variation — pitch and filter both reset to baseline.
     private func applyRandomVariation() {
+        let noEffectFiles: Set<String> = ["another-pub.m4a", "bar_sounds.m4a", "city_at_night.m4a"]
+        if let fn = currentFilename, noEffectFiles.contains(fn) {
+            pitchNode.pitch        = 0
+            pitchNode.rate         = 1.0
+            eqNode.bands[1].bypass = true
+            return
+        }
         if Bool.random() {
             // Option A: pitch shift ±30–70 cents (about a quarter-tone; barely noticeable)
             let sign: Float = Bool.random() ? 1 : -1

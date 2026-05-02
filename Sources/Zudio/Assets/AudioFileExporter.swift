@@ -5,6 +5,7 @@ import Foundation
 import AVFoundation
 #if os(macOS)
 import AppKit
+import UniformTypeIdentifiers
 #endif
 
 struct AudioFileExporter {
@@ -47,6 +48,120 @@ struct AudioFileExporter {
             .trimmingCharacters(in: .whitespaces)
             .replacingOccurrences(of: " ", with: "-")
     }
+
+    // MARK: - macOS Save Panels
+
+    #if os(macOS)
+
+    // Coordinator for the radio buttons inside the Export panel.
+    // Must be a class so the @objc target-action pattern compiles.
+    private final class ExportPanelCoordinator: NSObject {
+        let panel: NSSavePanel
+        let songName: String
+        private(set) var isSampleMode = false
+        // Held so radioChanged can flip both buttons without traversing the view tree.
+        weak var radioFull: NSButton?
+        weak var radioSample: NSButton?
+
+        init(panel: NSSavePanel, songName: String) {
+            self.panel = panel
+            self.songName = songName
+        }
+
+        @objc func radioChanged(_ sender: NSButton) {
+            isSampleMode = sender.tag == 1
+            radioFull?.state   = isSampleMode ? .off : .on
+            radioSample?.state = isSampleMode ? .on  : .off
+            let base = AudioFileExporter.sanitizedName(songName)
+            let stem = isSampleMode ? "\(base)-Sample" : base
+            panel.nameFieldStringValue = "\(stem).m4a"
+        }
+    }
+
+    /// Export Audio panel — 900 pt wide, resizable, with Full Song / 60-sec Sample radio buttons.
+    /// Returns (url, isSampleMode) or nil if the user cancelled.
+    @MainActor
+    static func presentExportPanel(songName: String, songDuration: String) -> (url: URL, sampleMode: Bool)? {
+        let panel = NSSavePanel()
+        panel.title = "Export Audio"
+        panel.prompt = "Export"
+        panel.message = "Export to an M4A audio file will take approximately \(songDuration). Alternatively you can save a 60-second sample."
+        panel.allowedContentTypes = [UTType.mpeg4Audio]
+        panel.canCreateDirectories = true
+        panel.directoryURL = exportDirectory()
+        panel.nameFieldStringValue = "\(sanitizedName(songName)).m4a"
+
+        let coord = ExportPanelCoordinator(panel: panel, songName: songName)
+        panel.accessoryView = makeExportAccessoryView(coordinator: coord)
+        panel.minSize = NSSize(width: 400, height: panel.minSize.height)
+        // Resize during the modal runloop — main-queue async blocks run inside the nested runloop.
+        DispatchQueue.main.async { setPanelWidth(900, panel: panel) }
+
+        // withExtendedLifetime keeps coord alive for the entire synchronous runModal() call
+        // (NSButton.target is a weak reference, so coord would otherwise be freed).
+        let response = withExtendedLifetime(coord) { panel.runModal() }
+        guard response == .OK, let url = panel.url else { return nil }
+        return (url, coord.isSampleMode)
+    }
+
+    private static func makeExportAccessoryView(coordinator: ExportPanelCoordinator) -> NSView {
+        // Sized to fit content only; panel width is controlled separately via setPanelWidth.
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 380, height: 44))
+
+        let label = NSTextField(labelWithString: "Mode:")
+        label.font = .systemFont(ofSize: 13)
+        label.frame = NSRect(x: 0, y: 12, width: 50, height: 20)
+        label.alignment = .right
+
+        let radioFull = NSButton(radioButtonWithTitle: "Full Song",
+                                 target: coordinator,
+                                 action: #selector(ExportPanelCoordinator.radioChanged(_:)))
+        radioFull.tag   = 0
+        radioFull.state = .on   // default selection
+        radioFull.frame = NSRect(x: 58, y: 10, width: 110, height: 22)
+
+        let radioSample = NSButton(radioButtonWithTitle: "60-sec Sample",
+                                   target: coordinator,
+                                   action: #selector(ExportPanelCoordinator.radioChanged(_:)))
+        radioSample.tag   = 1
+        radioSample.state = .off
+        radioSample.frame = NSRect(x: 176, y: 10, width: 140, height: 22)
+
+        coordinator.radioFull   = radioFull
+        coordinator.radioSample = radioSample
+
+        container.addSubview(label)
+        container.addSubview(radioFull)
+        container.addSubview(radioSample)
+        return container
+    }
+
+    /// Save Song panel — shows .zudio as the primary filename; saveMIDI() derives the .MID path.
+    /// Returns the chosen .zudio URL, or nil if the user cancelled.
+    @MainActor
+    static func presentSaveSongPanel(songName: String) -> URL? {
+        let panel = NSSavePanel()
+        panel.title = "Save Song"
+        panel.prompt = "Save"
+        panel.message = "Saves a Zudio song and a MIDI file you can open in any DAW to the same folder."
+        panel.canCreateDirectories = true
+        panel.directoryURL = exportDirectory()
+        panel.nameFieldStringValue = "\(sanitizedName(songName)).zudio"
+        panel.minSize = NSSize(width: 400, height: panel.minSize.height)
+        DispatchQueue.main.async { setPanelWidth(900, panel: panel) }
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    /// Centers the panel on screen at the given width. Called async during the modal runloop.
+    private static func setPanelWidth(_ width: CGFloat, panel: NSSavePanel) {
+        var f = panel.frame
+        guard abs(f.size.width - width) > 1 else { return }
+        f.origin.x += (f.size.width - width) / 2
+        f.size.width = width
+        panel.setFrame(f, display: true, animate: false)
+    }
+
+    #endif
 
     // MARK: - Metadata
 

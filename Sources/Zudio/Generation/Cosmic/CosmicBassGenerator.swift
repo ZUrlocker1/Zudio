@@ -937,6 +937,25 @@ struct KosmicBassGenerator {
 
         let posInSection = bar - sectionStartBar
 
+        // Era-stable passing-tone substitution: rotates through three states every 8 bars.
+        //   era%3 == 0: pure riff (identity)
+        //   era%3 == 1: pos 3 (b7)    → second — descends one step, walking toward fifth
+        //   era%3 == 2: pos 6 (third) → fourth — ascends one step, lifts the phrase end
+        // Deterministic from era index (no rng) so the colour holds steady for the full 8 bars.
+        var subPitches = Array(pitches)
+        let eraIdx = posInSection / 8
+        if eraIdx >= 1 {
+            switch eraIdx % 3 {
+            case 1:
+                let sub = bassPC(2)  // second above root
+                if sub != pitches[3] { subPitches[3] = sub }
+            case 2:
+                let sub = bassPC(5)  // fourth above root
+                if sub != pitches[6] { subPitches[6] = sub }
+            default: break
+            }
+        }
+
         // After 16 bars: ~20% of bars drop to root-only — the bass briefly breathes
         if posInSection >= 16 && rng.nextDouble() < 0.20 {
             return [MIDIEvent(stepIndex: barStart, note: root, velocity: 85, durationSteps: 4)]
@@ -944,8 +963,24 @@ struct KosmicBassGenerator {
 
         // First 16 bars: play only the first 4 notes — pattern builds gradually
         let activeCount = posInSection < 16 ? 4 : pitches.count
-        var evs = pitches.prefix(activeCount).enumerated().map { i, note in
+        var evs = subPitches.prefix(activeCount).enumerated().map { i, note in
             MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: vels[i], durationSteps: 2)
+        }
+
+        // Probabilistic sequencer: once the full 8-note pattern is established, run an 8-bar
+        // cycle — first 4 bars full, next 4 bars drop 1–2 random inner steps.
+        // Beat 1 (index 0) is never dropped; it is the rhythmic anchor.
+        if activeCount == pitches.count && (posInSection % 8) >= 4 {
+            let dropCount = 1 + rng.nextInt(upperBound: 2)   // 1 or 2 drops
+            var candidates = Array(1..<evs.count)
+            var dropSet = Set<Int>()
+            for _ in 0..<dropCount {
+                guard !candidates.isEmpty else { break }
+                let pick = rng.nextInt(upperBound: candidates.count)
+                dropSet.insert(candidates[pick])
+                candidates.remove(at: pick)
+            }
+            evs = evs.enumerated().filter { !dropSet.contains($0.offset) }.map { $0.element }
         }
 
         // B-section: add an approach note on step 14 (one 16th before next bar).

@@ -369,33 +369,77 @@ struct KosmicPadsGenerator {
     }
 
     // MARK: - KOS-PAD-002: Swell Chord
-    // Velocity ramps 20→80 over the bar (Vangelis brass swell)
+    // Three escalating hits per bar (35→55→70) — the Vangelis brass swell signature.
+    //
+    // Evolution model (prevents drone):
+    //   8-bar cycle: bars 0–5 play, bars 6–7 are silent (reverb cannot fill 2 bars)
+    //   Voicing rotates every 8 bars across three phases:
+    //     phase 0: root + fifth (classic swell)
+    //     phase 1: root + fifth + third (warmer chord)
+    //     phase 2: root + octave (stripped, sparse)
+    //   A 16-bar slow volume swell (0.65 → 1.0 → 0.65) scales all velocities for long-range shape
 
     private static func swellChordBar(
         barStart: Int, bar: Int, sectionStartBar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG
     ) -> [MIDIEvent] {
+        let posInSection = bar - sectionStartBar
+        let cyclePos     = posInSection % 8
+
+        // Breath window: bars 6–7 of each 8-bar cycle are silent
+        if cyclePos >= 6 { return [] }
+
         let scalePCs  = frame.scalePCs
         let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
         let root      = noteInPadsRegister(pc: rootPC, targetOct: 2)
         let fifth     = noteInPadsRegister(pc: snapToScale((rootPC + 7) % 12, scalePCs: scalePCs), targetOct: 2)
 
-        // Rotate attack step every 8 bars to break identical fingerprint runs.
-        // Shifts the swell onset by 0, 2, 4, or 6 steps across consecutive 8-bar windows.
-        let posInSection = bar - sectionStartBar
-        let stepShift    = ((posInSection / 8) % 4) * 2   // 0, 2, 4, 6
-        let s0 = stepShift
-        let s4 = stepShift + 4
-        let s8 = (stepShift + 8) % 16
+        // 16-bar slow volume swell (quiet → full → quiet)
+        let swellFrac = sin(Double.pi * Double(posInSection % 16) / 16.0)
+        let swellMult = 0.65 + 0.35 * swellFrac  // 0.65 → 1.0 → 0.65
 
-        return [
-            MIDIEvent(stepIndex: barStart + s0, note: UInt8(root),  velocity: 35, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + s4, note: UInt8(root),  velocity: 55, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + s8, note: UInt8(root),  velocity: 70, durationSteps: 8),
-            MIDIEvent(stepIndex: barStart + s0, note: UInt8(fifth), velocity: 30, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + s4, note: UInt8(fifth), velocity: 45, durationSteps: 6),
-            MIDIEvent(stepIndex: barStart + s8, note: UInt8(fifth), velocity: 60, durationSteps: 8),
-        ]
+        func sv(_ v: Int) -> UInt8 { UInt8(max(1, min(127, Int(Double(v) * swellMult)))) }
+
+        // Per-bar Vangelis swell — three escalating hits at beat 1, 2, 3
+        let (s0, s4, s8) = (0, 4, 8)
+
+        let voicingPhase = (posInSection / 8) % 3
+
+        switch voicingPhase {
+        case 0:
+            // Classic: root + fifth
+            return [
+                MIDIEvent(stepIndex: barStart + s0, note: UInt8(root),  velocity: sv(35), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s4, note: UInt8(root),  velocity: sv(55), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s8, note: UInt8(root),  velocity: sv(70), durationSteps: 8),
+                MIDIEvent(stepIndex: barStart + s0, note: UInt8(fifth), velocity: sv(30), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s4, note: UInt8(fifth), velocity: sv(45), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s8, note: UInt8(fifth), velocity: sv(60), durationSteps: 8),
+            ]
+        case 1:
+            // Fuller: add third for harmonic warmth
+            let thirdPC = snapToScale((rootPC + frame.mode.nearestInterval(4)) % 12, scalePCs: scalePCs)
+            let third   = noteInPadsRegister(pc: thirdPC, targetOct: 2)
+            return [
+                MIDIEvent(stepIndex: barStart + s0, note: UInt8(root),  velocity: sv(35), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s4, note: UInt8(root),  velocity: sv(55), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s8, note: UInt8(root),  velocity: sv(70), durationSteps: 8),
+                MIDIEvent(stepIndex: barStart + s0, note: UInt8(third), velocity: sv(26), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s4, note: UInt8(third), velocity: sv(40), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s8, note: UInt8(third), velocity: sv(52), durationSteps: 8),
+            ]
+        default:
+            // Stripped: root + octave above (same pitch class, different register)
+            let octave = noteInPadsRegister(pc: rootPC, targetOct: 3)
+            return [
+                MIDIEvent(stepIndex: barStart + s0, note: UInt8(root),   velocity: sv(35), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s4, note: UInt8(root),   velocity: sv(55), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s8, note: UInt8(root),   velocity: sv(70), durationSteps: 8),
+                MIDIEvent(stepIndex: barStart + s0, note: UInt8(octave), velocity: sv(22), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s4, note: UInt8(octave), velocity: sv(34), durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + s8, note: UInt8(octave), velocity: sv(46), durationSteps: 8),
+            ]
+        }
     }
 
     // MARK: - KOS-PAD-003: Unsync Layers
@@ -486,14 +530,31 @@ struct KosmicPadsGenerator {
 
     // MARK: - KOS-PAD-005: Quartal Stack
     // Stacked fourths: 0, 5, 10 semitones (very spacious)
+    //
+    // Evolution model (prevents drone):
+    //   8-bar cycle: bars 0–5 play, bars 6–7 are silent (breath gap — reverb cannot fill 2 bars)
+    //   Voicing rotates every 8 bars across three phases:
+    //     phase 0: full quartal — root + fourth + b7
+    //     phase 1: stripped     — root + fifth only (open, spacious contrast)
+    //     phase 2: inverted     — fourth in bass + root + b7 above (same tones, shifted weight)
+    //   Velocity follows a sinusoidal swell over 16 bars (42→68→42)
 
     private static func quartalStackBar(
         barStart: Int, bar: Int, sectionStartBar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
+        let posInSection = bar - sectionStartBar
+        let cyclePos     = posInSection % 8
+
+        // Breath window: bars 6 and 7 of each 8-bar cycle are silent.
+        // Reverb tails from the preceding bars decay naturally; the re-attack at bar 0
+        // of the next cycle lands on silence, making the repetition audible as rhythm.
+        if cyclePos >= 6 { return [] }
+
         let scalePCs  = frame.scalePCs
         let rawRootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)  // snap borrowed/chromatic roots
-        // b7 above chord root may be outside scale when chord is non-tonic; snap to scale.
+        let rootPC    = snapToScale(rawRootPC, scalePCs: scalePCs)
+
+        // b7 and fourth snapped to scale for non-tonic roots
         let b7raw    = (rootPC + 10) % 12
         let b7pc     = scalePCs.contains(b7raw) ? b7raw : {
             for d in 1...6 {
@@ -502,32 +563,53 @@ struct KosmicPadsGenerator {
             }
             return b7raw
         }()
-        // Fourth above chord root may also be outside scale for non-tonic roots; snap it.
         let fourthPC = snapToScale((rootPC + 5) % 12, scalePCs: scalePCs)
+        let fifthPC  = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
+
         var root   = noteInPadsRegister(pc: rootPC,   targetOct: 2)
         var fourth = noteInPadsRegister(pc: fourthPC, targetOct: 2)
         var flat7  = noteInPadsRegister(pc: b7pc,     targetOct: 2)
+        let fifth  = noteInPadsRegister(pc: fifthPC,  targetOct: 2)
 
-        // Spread any note pair that lands within 2 semitones — the scale-snapped b7 can
-        // produce a near-unison with the root (e.g. Db→D in F Ionian, giving D2 and Eb2
-        // as a grinding minor second). Move the lower of the colliding pair up an octave.
+        // Spread colliding note pairs (scale-snap can produce near-unisons)
         var notes = [root, fourth, flat7].sorted()
         if notes[1] - notes[0] <= 2 { notes[0] += 12 }
         if notes[2] - notes[1] <= 2 { notes[1] += 12 }
-        // Re-sort after spreading and clamp to ceiling
         notes = notes.sorted().map { min($0, 72) }
         (root, fourth, flat7) = (notes[0], notes[1], notes[2])
 
-        // Rotate attack step every 8 bars to break identical fingerprint runs.
-        // Shifts the chord onset by 0, 4, 8, or 12 steps (quarter-note offsets).
-        let posInSection = bar - sectionStartBar
-        let stepShift    = ((posInSection / 8) % 4) * 4   // 0, 4, 8, 12
+        // Sinusoidal velocity swell over 16 bars (42 quiet → 68 peak → 42 quiet)
+        let swellFrac = sin(Double.pi * Double(posInSection % 16) / 16.0)
+        let velBase   = UInt8(42 + Int(26.0 * swellFrac))
 
-        return [
-            MIDIEvent(stepIndex: barStart + stepShift, note: UInt8(root),   velocity: 65, durationSteps: 14),
-            MIDIEvent(stepIndex: barStart + stepShift, note: UInt8(fourth), velocity: 60, durationSteps: 14),
-            MIDIEvent(stepIndex: barStart + stepShift, note: UInt8(flat7),  velocity: 57, durationSteps: 14),
-        ]
+        // Voicing phase rotates every 8 bars — three distinct shapes
+        let voicingPhase = (posInSection / 8) % 3
+
+        switch voicingPhase {
+        case 0:
+            // Full quartal: root + fourth + b7 — the signature sound
+            return [
+                MIDIEvent(stepIndex: barStart, note: UInt8(root),   velocity: velBase,                          durationSteps: 14),
+                MIDIEvent(stepIndex: barStart, note: UInt8(fourth), velocity: UInt8(max(1, Int(velBase) - 5)),  durationSteps: 14),
+                MIDIEvent(stepIndex: barStart, note: UInt8(flat7),  velocity: UInt8(max(1, Int(velBase) - 8)),  durationSteps: 14),
+            ]
+        case 1:
+            // Stripped: root + fifth only — open and spacious, contrast with dense quartal
+            return [
+                MIDIEvent(stepIndex: barStart, note: UInt8(root),  velocity: velBase,                         durationSteps: 14),
+                MIDIEvent(stepIndex: barStart, note: UInt8(fifth), velocity: UInt8(max(1, Int(velBase) - 6)), durationSteps: 14),
+            ]
+        default:
+            // Inverted quartal: fourth in bass, root and b7 above — same tones, shifted weight
+            let fourthLow = noteInPadsRegister(pc: fourthPC, targetOct: 2)
+            let rootMid   = noteInPadsRegister(pc: rootPC,   targetOct: 3)
+            let flat7Mid  = noteInPadsRegister(pc: b7pc,     targetOct: 3)
+            return [
+                MIDIEvent(stepIndex: barStart, note: UInt8(fourthLow), velocity: velBase,                          durationSteps: 14),
+                MIDIEvent(stepIndex: barStart, note: UInt8(rootMid),   velocity: UInt8(max(1, Int(velBase) - 5)),  durationSteps: 14),
+                MIDIEvent(stepIndex: barStart, note: UInt8(flat7Mid),  velocity: UInt8(max(1, Int(velBase) - 8)),  durationSteps: 14),
+            ]
+        }
     }
 
     // MARK: - KOS-PADS-007: Gated Chord Pulse

@@ -26,8 +26,8 @@ struct DrumGenerator {
         if let forced = forceRuleID {
             ruleID = forced
         } else {
-            // Weighted rule selection: DRM-001 50%, DRM-002 20%, DRM-003 15%, DRM-004 15%
-            let ruleWeights: [Double] = [0.50, 0.20, 0.15, 0.15]
+            // Weighted rule selection: DRM-001 35%, DRM-002 25%, DRM-003 20%, DRM-004 20%
+            let ruleWeights: [Double] = [0.35, 0.25, 0.20, 0.20]
             let ruleIndex = rng.weightedPick(ruleWeights)
             switch ruleIndex {
             case 1:  ruleID = "MOT-DRUM-002"

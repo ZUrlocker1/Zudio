@@ -427,6 +427,8 @@ struct ContentView: View {
 
             fontSizeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak appState] event in
                 guard let appState else { return event }
+                // A modal window (NSSavePanel, NSOpenPanel) is running — give it full keyboard control.
+                guard NSApp.modalWindow == nil else { return event }
                 // Don't steal keys from focused text fields (e.g. BPM input)
                 if let fr = NSApp.keyWindow?.firstResponder,
                    (fr is NSTextField || fr is NSTextView) { return event }

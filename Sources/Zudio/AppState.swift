@@ -2177,6 +2177,22 @@ final class AppState: ObservableObject {
     func saveMIDI() {
         guard let song = songState else { return }
         saveFlashCounter += 1
+        #if os(macOS)
+        guard let zudioURL = AudioFileExporter.presentSaveSongPanel(songName: song.title) else { return }
+        let midiURL = zudioURL.deletingPathExtension().appendingPathExtension("MID")
+        do {
+            try MIDIFileExporter.export(song, to: midiURL)
+            try? SongLogExporter.export(song, midiURL: midiURL)  // writes .zudio alongside midiURL
+            lastSaveURL = zudioURL
+            print("Song saved: \(zudioURL.path)")
+            appendToLog([
+                GenerationLogEntry(tag: "FILE", description: "Saved \(zudioURL.lastPathComponent)")
+            ])
+            savedSongSeed = songState?.globalSeed
+        } catch {
+            print("MIDI export error: \(error)")
+        }
+        #else
         do {
             let url = try MIDIFileExporter.export(song)
             lastSaveURL = url
@@ -2189,6 +2205,7 @@ final class AppState: ObservableObject {
         } catch {
             print("MIDI export error: \(error)")
         }
+        #endif
     }
 
     /// Saves the current song as a .zudio file to the user-visible Documents folder
@@ -2431,19 +2448,35 @@ final class AppState: ObservableObject {
     /// Called from button/menu/keyboard — shows the confirmation dialog.
     func requestExport() {
         guard songState != nil, !isExportingAudio else { return }
+        #if os(macOS)
+        startExport()   // goes straight to NSSavePanel; sheet is iOS-only
+        #else
         showExportConfirmation = true
+        #endif
     }
 
-    /// Called when the user presses Full Song or Sample in the confirmation dialog.
+    /// On macOS: called directly from requestExport() — NSSavePanel provides file location and mode.
+    /// On iOS: called from ExportConfirmationView with a pre-chosen sampleMode.
     func startExport(sampleMode: Bool = false) {
         guard let song = songState, !isExportingAudio else { return }
+        #if os(macOS)
+        let exportSeconds = Double(song.frame.totalBars) * 4.0 * 60.0 / Double(song.frame.tempo)
+        let exportMinutes = Int((exportSeconds + 30) / 60)
+        let songDuration  = exportMinutes == 1 ? "1 minute" : "\(exportMinutes) minutes"
+        guard let result = AudioFileExporter.presentExportPanel(songName: song.title,
+                                                                songDuration: songDuration) else { return }
+        let url = result.url
+        let effectiveSampleMode = result.sampleMode
+        #else
         let url = AudioFileExporter.nextURL(songName: song.title, sampleMode: sampleMode)
+        let effectiveSampleMode = sampleMode
+        #endif
         audioExportFilename = url.lastPathComponent
         audioExportProgress = 0
         isExportingAudio    = true
         visibleBarOffset    = 0   // snap scroll back to bar 0 so display matches the render
         let style = selectedStyle.rawValue.capitalized
-        playback.exportAudio(url: url, state: song, sampleMode: sampleMode) { [weak self] progress in
+        playback.exportAudio(url: url, state: song, sampleMode: effectiveSampleMode) { [weak self] progress in
             Task { @MainActor [weak self] in self?.audioExportProgress = progress }
         } onComplete: { [weak self] error in
             Task { @MainActor [weak self] in

@@ -7,9 +7,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.zudio.app</string>
     <key>CFBundleVersion</key>
-    <string>115</string>
+    <string>116</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.02</string>
+    <string>1.03</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -62,7 +62,7 @@
             <string>Zudio Song</string>
             <key>UTTypeConformsTo</key>
             <array>
-                <string>public.data</string>
+                <string>public.json</string>
             </array>
             <key>UTTypeIconFile</key>
             <string>zudio-doc</string>

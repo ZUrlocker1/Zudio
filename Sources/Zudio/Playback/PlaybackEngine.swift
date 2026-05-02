@@ -600,7 +600,21 @@ final class PlaybackEngine: ObservableObject {
             } else {
                 fireVelocity = ev.velocity
             }
-            samplers[trackIndex].startNote(ev.note, withVelocity: fireVelocity, onChannel: channel)
+            // 808 Kit (GM program 25): tom slots have cheesy synthesized 808 toms — substitute
+            // with kick/snare/open-hat so Bonham-style cascades sound like 808-appropriate fills.
+            // Low/mid toms (≤45) → kick; hiMid tom (48) → snare; hi tom (50) → open hi-hat.
+            let fireNote: UInt8
+            if trackIndex == kTrackDrums && cachedDrumProgram == 25 {
+                switch ev.note {
+                case 41, 43, 45: fireNote = GMDrum.kick.rawValue
+                case 48:         fireNote = GMDrum.snare.rawValue
+                case 50:         fireNote = GMDrum.openHat.rawValue
+                default:         fireNote = ev.note
+                }
+            } else {
+                fireNote = ev.note
+            }
+            samplers[trackIndex].startNote(fireNote, withVelocity: fireVelocity, onChannel: channel)
         }
         // Minimal main-actor hop: update @Published playhead and handle X-Files delay mute.
         // Ambient fade loops are skipped on silent steps (~75% of steps have no events).

@@ -228,7 +228,8 @@ struct ChillLeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
-        usedRuleIDs.insert("CHL-LD2-001")
+        let useShadowHold = rng.nextDouble() < 0.50
+        usedRuleIDs.insert(useShadowHold ? "CHL-LD2-002" : "CHL-LD2-001")
 
         var events: [MIDIEvent] = []
         let scale      = scaleNotes(frame: frame)
@@ -267,8 +268,15 @@ struct ChillLeadGenerator {
         let regHigh2 = min(rawHigh2, regMid1 - 2)
         let regLow2  = max(36, min(rawLow2, regHigh2 - 12))
 
-        // Lead 2 responds in gaps between Lead 1 phrases (call-and-response)
-        // Find bars NOT covered by Lead 1 phrases in groove sections
+        // CHL-LD2-002: Shadow hold — long-held chord tones sounding under Lead 1 simultaneously
+        if useShadowHold {
+            let events = shadowHold(frame: frame, structure: structure,
+                                    lead1Onsets: lead1Onsets, scale: scale,
+                                    regLow: regLow2, regHigh: regHigh2, rng: &rng)
+            return (events, inst2)
+        }
+
+        // CHL-LD2-001: Call-and-response — responds in gaps between Lead 1 phrases
         var lead1BarSet = Set<Int>()
         for onset in lead1Onsets {
             for b in onset.startBar..<onset.endBar { lead1BarSet.insert(b) }
@@ -311,6 +319,62 @@ struct ChillLeadGenerator {
             bar += phraseLen  // Lead 2 fills gaps; Lead 1 bars provide natural spacing
         }
         return (events, inst2)
+    }
+
+    // MARK: - CHL-LD2-002: Shadow Hold
+
+    /// CHL-LD2-002: Long-held chord tones sounding underneath Lead 1 simultaneously.
+    /// Iterates all Lead 1 active bars across groove sections; places a hold whenever
+    /// ≥2 bars have elapsed since the last hold and a 50% roll clears. Each hold lasts
+    /// 16–28 steps. Notes are chord tones in the lower octave of Lead 2's register.
+    /// Velocity is soft (38–55) so the shadow sits under Lead 1 without competing.
+    private static func shadowHold(
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        lead1Onsets: [(startBar: Int, endBar: Int)],
+        scale: [Int],
+        regLow: Int,
+        regHigh: Int,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // Sorted Lead 1 active bars restricted to groove sections
+        let grooveBarSet = Set(structure.sections
+            .filter { $0.label == .A || $0.label == .B }
+            .flatMap { s in s.startBar..<(s.startBar + s.lengthBars) })
+        var lead1BarSet = Set<Int>()
+        for onset in lead1Onsets { for b in onset.startBar..<onset.endBar { lead1BarSet.insert(b) } }
+        let activeBars = lead1BarSet.intersection(grooveBarSet).sorted()
+        guard !activeBars.isEmpty else { return [] }
+
+        // Shadow notes sit in the lower octave of Lead 2's register
+        let shadowHigh = Swift.min(regLow + 13, regHigh)
+        var lastPlaced = -4
+
+        for bar in activeBars {
+            guard bar >= lastPlaced + 2 else { continue }   // minimum 2-bar spacing
+            guard rng.nextDouble() < 0.50 else { continue } // 50% chance when gap is met
+
+            let chord        = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chordTonePCs = chord?.chordTones ?? Set<Int>()
+            var pool = scale.filter { $0 >= regLow && $0 <= shadowHigh }
+            if !chordTonePCs.isEmpty {
+                let chordPool = pool.filter { chordTonePCs.contains($0 % 12) }
+                if !chordPool.isEmpty { pool = chordPool }
+            }
+            guard !pool.isEmpty else { continue }
+
+            let note   = UInt8(pool[rng.nextInt(upperBound: pool.count)])
+            let maxDur = frame.totalBars * 16 - bar * 16
+            let dur    = Swift.min(16 + rng.nextInt(upperBound: 13), maxDur)  // 16–28 steps
+            let vel    = UInt8(38 + rng.nextInt(upperBound: 18))              // 38–55
+
+            events.append(MIDIEvent(stepIndex: bar * 16, note: note,
+                                    velocity: vel, durationSteps: Swift.max(1, dur)))
+            lastPlaced = bar
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
     // MARK: - Phrase builder

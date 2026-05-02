@@ -18,6 +18,8 @@ final class MacPlatformHost: ZudioPlatformHost {
         // Return also guards against open sheets (Help/About use .defaultAction = Return on Close).
         keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak target] event in
             guard let target else { return event }
+            // A modal window (NSSavePanel, NSOpenPanel) is running — give it full keyboard control.
+            guard NSApp.modalWindow == nil else { return event }
             // Strip modifier keys irrelevant to our shortcuts (.numericPad/.function are set on arrows)
             let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
 

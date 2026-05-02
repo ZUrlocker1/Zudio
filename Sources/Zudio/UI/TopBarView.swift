@@ -481,7 +481,7 @@ struct TopBarView: View {
                         }
                         .disabled(appState.songState == nil || appState.isExportingAudio)
                         .keyboardShortcut("e", modifiers: .command)
-                        .help("Export song to M4A audio file in ~/Downloads/ (⌘E)")
+                        .help("Export song to M4A audio file (⌘E)")
                     }
                     #if os(iOS)
                     .buttonStyle(.bordered)
@@ -933,7 +933,7 @@ struct HelpView: View {
                 #if os(iOS)
                 helpLine("Export Audio (⌘E)", "Exports to an M4A audio file accessible from the Files app.")
                 #else
-                helpLine("Export Audio (⌘E)", "Exports to an M4A audio file to the default folder e.g /Downloads on a Mac.")
+                helpLine("Export Audio (⌘E)", "Exports to an M4A audio file. A save dialog lets you choose the destination folder.")
                 #endif
                 helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to the default folder. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
                 helpLine("Reset (⌘R)", "Reset audio, and all tracks and settings to initial state.")
@@ -1019,7 +1019,7 @@ struct AboutView: View {
             #if os(iOS)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Version: 1.02").font(.system(size: 14))
+                    Text("Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")").font(.system(size: 14))
                     Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     Text("Zudio is built with GeneralUser GS MIDI sound bank by S. Christian Collins, arpeggios, pads, co-prime loops, tubular bells, ripped off riffs, Berlin school bass, muted trumpets, modal drift, spooky X-Files, Dinger beat and tons of reverb!").font(.system(size: 14))
                 }
@@ -1027,7 +1027,7 @@ struct AboutView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version: 1.02").font(.system(size: 14))
+                Text("Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")").font(.system(size: 14))
                 Text("Built by analyzing classic Ambient, Chill, Kosmic and Motorik artists including Brian Eno, Loscil, Craven Faults, Moby, St Germain, Jean Michel Jarre, Tangerine Dream, Kraftwerk, Neu!, Deluxe, Harmonia, Electric Buddha Band and more.\n\nA set of rules was built for each style to keep the instruments locked-in playing together. Then I had AI analyze the songs in order to find bugs, identify musical clashes and update the rules to make things more coherent. Sometimes it even sounds like music! If not, try again and add more reverb.").font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Zudio is built with GeneralUser GS MIDI sound bank by S. Christian Collins, arpeggios, pads, co-prime loops, tubular bells, ripped off riffs, Berlin school bass, muted trumpets, modal drift, spooky X-Files, Dinger beat and tons of reverb!").font(.system(size: 14))
