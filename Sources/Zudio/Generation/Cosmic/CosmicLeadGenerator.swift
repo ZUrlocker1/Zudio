@@ -504,7 +504,7 @@ struct KosmicLeadGenerator {
         case "KOS-LEAD-003": return pentatonicDriftBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, entry: entry, rng: &rng)
         case "KOS-LEAD-004": return echoMelodyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         case "KOS-LEAD-005": return arpeggioHighlightBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, entry: entry, frame: frame, rng: &rng)
-        case "KOS-LEAD-007": return tdSkipSequenceBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
+        case "KOS-LEAD-007": return tdSkipSequenceBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, rng: &rng)
         default:           return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         }
     }
@@ -563,28 +563,55 @@ struct KosmicLeadGenerator {
     }
 
     // MARK: - KOS-LD-003: Pentatonic Drift
-    // Slow pentatonic movement, each step 2–4 bars
+    // Slow 2-note pentatonic figure every 4 bars, following a ping-pong arc through the pentatonic
+    // scale: ascends from lowest to highest position over several phrases, then descends back down.
+    // Key-derived offset staggers the starting point across songs.
+    // Attack at the "and" of beat 1 to avoid colliding with rules that fire on step 0.
 
     private static func pentatonicDriftBar(
         barStart: Int, bar: Int, scaleNotes: [Int],
         frame: GlobalMusicalFrame, entry: TonalGovernanceEntry,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        // Build pentatonic subset from scale notes
         let penta = pentatonicNotes(entry: entry, frame: frame, low: 60, high: 84)
-        guard !penta.isEmpty else { return [] }
+        guard penta.count >= 3 else { return [] }
 
-        // Move one step every 3 bars
-        guard bar % 3 == 0 else { return [] }
+        // Fire a 2-note figure every 4 bars
+        guard bar % 4 == 0 else { return [] }
 
-        let noteIdx = (bar / 3) % penta.count
-        let note    = penta[noteIdx]
-        let vel     = UInt8(48 + rng.nextInt(upperBound: 20))  // 48–67
+        // Ping-pong through pentatonic positions for a directional arc that bounces at the extremes.
+        // steps = number of upward moves in one half-cycle (e.g. 4 for a 5-note penta).
+        // Key offset ensures different songs start at different arc positions.
+        let steps  = penta.count - 1
+        let period = steps * 2
+        let keyOff = frame.keySemitoneValue % max(1, period)
+        let pos    = (bar / 4 + keyOff) % period
+        // pos ≤ steps → ascending half; pos > steps → descending half
+        let idx1      = pos <= steps ? pos : period - pos   // bounces in [0, steps]
+        let ascending = pos < steps
 
-        // Attack at step 2 (the "and" of beat 1) rather than beat 1 itself.
-        // This makes the drift feel like it answers after the downbeat — more call-and-response —
-        // and naturally avoids colliding with rules (like KOS-LEAD-006) that fire on step 0.
-        return [MIDIEvent(stepIndex: barStart + 2, note: UInt8(note), velocity: vel, durationSteps: 26)]
+        // Second note: one step further along the current arc direction
+        let idx2: Int
+        if ascending {
+            idx2 = min(idx1 + 1, steps)
+        } else {
+            idx2 = max(idx1 - 1, 0)
+        }
+
+        let note1 = penta[idx1]
+        let note2 = penta[idx2]
+        let vel1  = UInt8(50 + rng.nextInt(upperBound: 18))   // 50–67
+        let vel2  = UInt8(45 + rng.nextInt(upperBound: 18))   // 45–62, slightly softer
+
+        // First note on the "and" of beat 1 (step 2); second note on beat 3 (step 10)
+        var evs: [MIDIEvent] = [
+            MIDIEvent(stepIndex: barStart + 2,  note: UInt8(note1), velocity: vel1, durationSteps: 10)
+        ]
+        // Skip second note only at arc boundary turns where both pitches are identical
+        if note2 != note1 {
+            evs.append(MIDIEvent(stepIndex: barStart + 10, note: UInt8(note2), velocity: vel2, durationSteps: 10))
+        }
+        return evs
     }
 
     // MARK: - KOS-LD-004: Echo Melody
@@ -680,36 +707,58 @@ struct KosmicLeadGenerator {
     }
 
     // MARK: - KOS-LEAD-007: TD Skip Sequence
-    // Tangerine Dream ascending scale run: 6–8 evenly spaced notes climbing through the scale.
-    // 1–2 ghost notes (very soft, very short) create the characteristic "skip" drop — a note
-    // that drops out of the ascending line, leaving a gap before the run continues above it.
-    // Pattern advances one scale step every 2 bars for gradual harmonic drift.
-    // Occasional rest bars (25%) let the sequence breathe between phrases.
+    // Tangerine Dream ascending/descending scale run: 6–8 evenly spaced notes per bar.
+    // Start position is fixed for 4-bar phrase groups, then advances one step — so
+    // each phrase feels like a coherent unit before the sequence shifts.
+    // A ping-pong arc drives the start position up across phrases then back down, giving
+    // the sequence a long-range shape rather than a circular drift.
+    // In ascending phrases the run climbs the scale; in descending phrases it falls.
+    // 1–2 ghost notes (very soft, 1 step) preserve the characteristic TD "skip" texture.
+    // Rest probability rises at arc turnarounds to add breathing space at the phrase peak/valley.
 
     private static func tdSkipSequenceBar(
-        barStart: Int, bar: Int, scaleNotes: [Int], rng: inout SeededRNG
+        barStart: Int, bar: Int, scaleNotes: [Int],
+        frame: GlobalMusicalFrame, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         guard scaleNotes.count >= 4 else { return [] }
-        guard rng.nextDouble() > 0.25 else { return [] }   // 25% rest bar
+
+        // Ping-pong start position: fixed per 4-bar phrase, arcs up then down across all phrases.
+        let phraseNum = bar / 4
+        let maxStart  = max(1, scaleNotes.count - 1)
+        let period    = maxStart * 2
+        let keyOff    = frame.keySemitoneValue % max(1, period)
+        let pos       = (phraseNum + keyOff) % period
+        let startIdx  = pos <= maxStart ? pos : period - pos  // bounces in [0, maxStart]
+        let ascending = pos < maxStart
+
+        // Higher rest probability at arc turnarounds so the peak/valley has breathing space
+        let atTurn  = (pos == 0 || pos == maxStart)
+        let restGate = atTurn ? 0.45 : 0.25
+        guard rng.nextDouble() > restGate else { return [] }
 
         let seqLen      = 6 + rng.nextInt(upperBound: 3)   // 6–8 notes
-        let stepSpacing = max(1, 16 / seqLen)               // even distribution across bar
+        let stepSpacing = max(1, 16 / seqLen)
 
-        // Advance start position every 2 bars — sequence slowly climbs the scale
-        let startIdx = (bar / 2) % max(1, scaleNotes.count)
-
-        // Pick 1–2 ghost positions: very soft (vel 20–33), duration = 1 step
-        let ghost1 = rng.nextInt(upperBound: seqLen)
-        let ghost2 = (ghost1 + 2 + rng.nextInt(upperBound: max(1, seqLen - 3))) % seqLen
+        // Ghost positions: 1–2 very soft notes creating the characteristic skip texture
+        let ghost1    = rng.nextInt(upperBound: seqLen)
+        let ghost2    = (ghost1 + 2 + rng.nextInt(upperBound: max(1, seqLen - 3))) % seqLen
         let twoGhosts = rng.nextDouble() < 0.40
 
         var events: [MIDIEvent] = []
         for i in 0..<seqLen {
             let step = i * stepSpacing
             guard step < 16 else { break }
-            let noteIdx = (startIdx + i) % scaleNotes.count
+            // Direction-aware note index: ascending runs climb, descending runs fall.
+            // Swift's % preserves sign for negatives, so add scaleNotes.count before taking modulo.
+            let noteIdx: Int
+            if ascending {
+                noteIdx = (startIdx + i) % scaleNotes.count
+            } else {
+                noteIdx = ((startIdx - i) % scaleNotes.count + scaleNotes.count) % scaleNotes.count
+            }
             let isGhost = i == ghost1 || (twoGhosts && i == ghost2)
-            let vel = UInt8(isGhost ? 20 + rng.nextInt(upperBound: 14) : 50 + rng.nextInt(upperBound: 18))
+            let vel = UInt8(isGhost ? 20 + rng.nextInt(upperBound: 14)
+                                    : 50 + rng.nextInt(upperBound: 18))
             let dur = isGhost ? 1 : 3
             events.append(MIDIEvent(stepIndex: barStart + step,
                                     note: UInt8(scaleNotes[noteIdx]),

@@ -60,11 +60,10 @@ struct PhonePlayerView: View {
             .ignoresSafeArea()
         }
         .background(Color.black.ignoresSafeArea())
-        // Export confirmation sheet
-        .sheet(isPresented: $appState.showExportConfirmation) {
-            ExportConfirmationView()
-                .environmentObject(appState)
-        }
+        // OLD real-time export confirmation — disabled; fast export runs directly.
+        // .sheet(isPresented: $appState.showExportConfirmation) {
+        //     ExportConfirmationView().environmentObject(appState)
+        // }
         // Info sheet — single instance at root so both portrait and landscape buttons work.
         .sheet(isPresented: $showInfo) {
             PhoneInfoView()
@@ -76,6 +75,19 @@ struct PhonePlayerView: View {
                     appState.setSleepTimer(dur)
                 }
             }
+        }
+        // Low disk space warning before fast export
+        .alert("Low Disk Space", isPresented: $appState.showLowDiskSpaceAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Export Anyway") { appState.confirmLowDiskSpaceExport() }
+        } message: {
+            Text("Less than 500 MB is available. The export may fail.")
+        }
+        // Share sheet after fast export completes
+        .onChangeCompat(of: appState.fastExportedFileURL) { url in
+            guard let url else { return }
+            PhonePlayerView.presentShareForFile(url: url)
+            appState.fastExportedFileURL = nil
         }
         // File importer for loading .zudio songs — single instance at root.
         .fileImporter(
@@ -447,7 +459,7 @@ struct PhonePlayerView: View {
             HStack(spacing: 4) {
                 Button {
                     guard appState.songState != nil && !appState.isExportingAudio else { return }
-                    appState.requestExport()
+                    appState.requestFastExport()
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
@@ -507,7 +519,7 @@ struct PhonePlayerView: View {
             HStack(spacing: 10) {
                 Button {
                     guard appState.songState != nil && !appState.isExportingAudio else { return }
-                    appState.requestExport()
+                    appState.requestFastExport()
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
@@ -828,7 +840,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.03")
+                    Text("Generative music · v1.1")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
@@ -1113,10 +1125,10 @@ extension PhonePlayerView {
             await MainActor.run {
                 guard let url,
                       MFMessageComposeViewController.canSendText(),
-                      MFMessageComposeViewController.canSendAttachments(),
+                        MFMessageComposeViewController.canSendAttachments(),
                       let top = shareTopViewController() else { return }
                 let mc = MFMessageComposeViewController()
-                mc.body = "Here's a cool song I created with Zudio."
+                mc.body = "Here's a cool song from Zudio!"
                 mc.addAttachmentURL(url, withAlternateFilename: url.lastPathComponent)
                 let delegate = MessageComposeDelegate()
                 mc.messageComposeDelegate = delegate
@@ -1125,6 +1137,20 @@ extension PhonePlayerView {
                 top.present(mc, animated: true)
             }
         }
+    }
+
+    /// Presents a UIActivityViewController so the user can save or share the exported M4A file.
+    static func presentShareForFile(url: URL) {
+        guard let top = shareTopViewController() else { return }
+        let ac = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        // On iPad, popover anchor — use key window bounds as fallback
+        if let popover = ac.popoverPresentationController {
+            popover.sourceView = top.view
+            popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY,
+                                        width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        top.present(ac, animated: true)
     }
 
     private static func shareTopViewController() -> UIViewController? {

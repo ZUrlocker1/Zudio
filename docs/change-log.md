@@ -1,18 +1,23 @@
 # Zudio Change Log
 
-## 1.03 (Build 116)  Many musical improvements
+## V 1.1 (Build 116)  Fast audio export and musical improvements
 
-- **KOS-PADS-005 drone fix** — Kosmic Quartal Stack pads has more variation.
-- **KOS-PADS-002 drone fix** — Kosmic Vangelis Swell pads has more variation.
-- **Kosmic driving bass** — Improved Kosmic driving bass sequencer.
-- **808 kit drum fills** — Improved Kosmic and Motorik tom fills for 808 kit.
-- **Motorik drum variety** — More variation in Motorik drum tracks.
+- **Fast audio export** — Now uses an offline render 15–40× faster (about 15 sec) instead of real-time capture. On iOS, a share sheet appears so the file can be saved or shared.
+- **New Ambient bass rules** — ECM pluck, Octave Double Slow Pendulum.
+- **Ambient secondary lead** — New descending phrase form (AMB-LEAD-006).
+- **More melodic Chill solos** — Chill lead solos use recurring themes with a free-form middle.
 - **New Chill pad rules** — Moby Anchor, Open Fifth Hold, Slow Chord Build, String Hold.
 - **Chill rhythm variety** — More variation in Chill rhythm tracks.
-- **Chill secondary lead** — Added a new Chill secondary lead form.
+- **Chill secondary lead** — New Chill secondary lead form.
 - **Chill lead balance** — Decreased trumpet frequency in Chill lead selection.
-- **New Ambient bass rules** — ECM pluck, Octave Double Slow Pendulum.
 - **Chill audio texture bug fix** — Minor fix to texture playback variation.
+- **More melodic Kosmic leads** — Pentatonic Drift and TD Skip Sequence are improved.
+- **Kosmic pads variations** — Kosmic Quartal Stack pads has more variation.
+- **Kosmic pads variations** — Kosmic Vangelis Swell pads has more variation.
+- **Kosmic driving bass** — More evolving Kosmic driving bass sequencer.
+- **808 kit drum fills** — Improved Kosmic and Motorik tom fills for 808 kit.
+- **Motorik drum variety** — More variation in Motorik drum tracks.
+
 ---
 
 ## 1.02 (Build 115)  App Store fixes

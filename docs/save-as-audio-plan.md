@@ -2,12 +2,9 @@
 
 ## Overview
 
-Export the current song to an M4A audio file in the Downloads folder, capturing the fully-rendered
-output of all 7 tracks with all effects (reverb, EQ, delay, compression, filters, LFOs).
-
-A confirmation dialog shows the expected duration before export begins. A progress overlay tracks
-capture in real time. A Cancel button stops capture and keeps the partial file. No playback resumes
-after export.
+A fast export of the current song to an M4A audio file in the Downloads folder, capturing the fully-rendered
+output of all 7 tracks with an approximation of effects (reverb, EQ, delay, filters, LFOs).
+A progress overlay tracks export. 
 
 ---
 
@@ -28,9 +25,7 @@ Format comparison:
 
 ---
 
-## Approach: Real-time tap capture (NOT offline rendering)
-
-### Why offline rendering was rejected
+## First Approach: Slow Real-time tap capture 
 
 The original plan used `AVAudioEngine.enableManualRenderingMode(.offline, ...)`. This was
 implemented and produced severe clicking and stuttering artifacts in both the exported file
@@ -171,6 +166,65 @@ Idle/playing  →  requestExport()  →  confirmation sheet
 7. During export, press Cancel → overlay dismisses, partial `.m4a` remains in Downloads
 8. After export completes, confirm live playback works normally (engine not damaged)
 9. Verify file size for a 4-minute song is approximately 3.8 MB
+
+---
+
+## Fast Export (CPU-speed offline render)
+
+A second export path, `requestFastExport()`, renders the song 15–40× faster than real time
+using a two-phase offline render. It replaces the real-time tap export. However, it is not 100% accurate as some sweep, tremolo effects are not created. But its very fast! The old code is still in the app in case we need to revert, but it is no longer accessible. The fast export is about 600 new lines of code to recreate the tracks and export them with suitable effects in a two pass approach. Note it requires several hundred MB of temporary space to operate. 
+
+### Phase 1 — Dry per-track render via standalone AUSampler
+
+Each active track is rendered to a 16-bit PCM temp CAF file using a standalone `AudioUnit`
+(AUSampler loaded via `AudioComponentInstanceNew`). This bypasses `AVAudioEngine`'s hardware
+clock dependency. MIDI events are dispatched with `MusicDeviceMIDIEvent(inOffsetSampleFrame:)`
+for sample-accurate timing. Temp files are written to `$TMPDIR` and deleted on exit.
+
+Phase 1 = 0–50% of the progress bar.
+
+### Phase 2 — Offline effects engine
+
+An `AVAudioEngine` in `.offline` manual rendering mode reads the per-track CAF files and runs
+the full effects chain per track: sweep LP filter → delay → dynamics compressor → EQ →
+reverb → mainMixer. Effect settings are captured from `PlaybackEngine` via `effectSnapshots()`
+before the render begins. The Chill/Ambient audio texture (rain, vinyl, etc.) is also mixed in
+using a looping `AVAudioPlayerNode` with its own EQ and reverb. A 3-second tail beyond the last
+note captures reverb decay. Output is written directly as 128 kbps AAC M4A.
+
+Phase 2 = 50–100% of the progress bar.
+
+### Platform differences
+
+- **macOS**: shows an `NSSavePanel` before starting; low disk space triggers an `NSAlert`.
+- **iOS/iPadOS**: output URL is chosen automatically (`AudioFileExporter.nextURL()`); low disk
+  space (< 500 MB) shows an alert with Cancel / Export Anyway options; on completion a
+  `UIActivityViewController` share sheet appears so the file can be saved to Files or shared.
+
+### Known approximations
+
+Because the LFO-driven sweep filter and Chill Pads dynamic volume cannot be reproduced in a
+static offline pass, these are approximated:
+
+- Sweep filter: replaced with a static LP at the midpoint of the LFO range (1700 Hz for
+  non-ambient tracks; per-track midpoint for ambient).
+- Swept track volume: scaled by 0.75 to compensate for the always-open filter.
+- Chill Pads dynamic boost: uses the `boostEffectEnabled` flag (user toggle) rather than the
+  animated `outputVolume` so the export volume is stable.
+
+### Files
+
+- `Sources/Zudio/Assets/OfflineExport.swift` — `OfflineExport.render(...)`, Phase 1 + 2
+- `Sources/Zudio/AppState.swift` — `requestFastExport()`, `launchFastExport()`,
+  `hasSufficientDiskSpace()`, `confirmLowDiskSpaceExport()`;
+  published: `isFastExporting`, `fastExportedFileURL`, `showLowDiskSpaceAlert`
+- `Sources/Zudio/Playback/PlaybackEngine.swift` — `TrackEffectSnapshot`, `effectSnapshots()`,
+  `boostEffectEnabled[]`, `reverbPresets[]`
+- `Sources/Zudio/Playback/AudioTexturePlayer.swift` — `ExportSnapshot`, `exportSnapshot()`
+- `Sources/Zudio/UI/PhonePlayerView.swift` — export button, progress overlay, low-disk alert,
+  share sheet via `presentShareForFile(url:)`
+- `Sources/Zudio/UI/TopBarView.swift` — iPad export button calls `requestFastExport()`
+- `Sources/Zudio/ZudioApp.swift` — macOS menu: "Fast Export" (⌘F)
 
 ---
 Copyright (c) 2026 Zack Urlocker

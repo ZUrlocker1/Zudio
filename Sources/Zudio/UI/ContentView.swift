@@ -546,9 +546,22 @@ struct ContentView: View {
                 UserDefaults.standard.set(tab.rawValue, forKey: "iPadTabPersist")
             }
         }
-        .sheet(isPresented: $appState.showExportConfirmation) {
-            ExportConfirmationView()
-                .environmentObject(appState)
+        // OLD real-time export confirmation — disabled; fast export runs directly.
+        // .sheet(isPresented: $appState.showExportConfirmation) {
+        //     ExportConfirmationView().environmentObject(appState)
+        // }
+        // Low disk space warning before fast export
+        .alert("Low Disk Space", isPresented: $appState.showLowDiskSpaceAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Export Anyway") { appState.confirmLowDiskSpaceExport() }
+        } message: {
+            Text("Less than 500 MB is available. The export may fail.")
+        }
+        // Share sheet after fast export completes (iPad)
+        .onChangeCompat(of: appState.fastExportedFileURL) { url in
+            guard let url else { return }
+            PhonePlayerView.presentShareForFile(url: url)
+            appState.fastExportedFileURL = nil
         }
         .overlay {
             if appState.isExportingAudio {

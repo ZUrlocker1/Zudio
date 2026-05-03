@@ -289,7 +289,7 @@ struct ZudioApp: App {
                     .keyboardShortcut("s", modifiers: .command)
                     .disabled(appState.songState == nil)
 
-                Button("Export Audio") { appState.requestExport() }
+                Button("Export Audio") { appState.requestFastExport() }
                     .keyboardShortcut("e", modifiers: .command)
                     .disabled(appState.songState == nil || appState.isExportingAudio)
 

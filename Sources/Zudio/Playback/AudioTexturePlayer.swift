@@ -23,8 +23,9 @@ final class AudioTexturePlayer {
     private var panPhase:  Double = 0
 
     private var currentTargetVolume: Float = 0.18  // set per-texture in startFile
-    private let fadeDuration: Double = 3.0
-    private let fadeInterval: Double = 0.05
+    private let fadeDuration:     Double = 3.0   // fade-in
+    private let stopFadeDuration: Double = 0.5   // stop() fade-out — short so Stop feels responsive
+    private let fadeInterval:     Double = 0.05
 
     /// Filename that is currently scheduled/playing, so start() can detect a change.
     private var currentFilename: String? = nil
@@ -57,9 +58,8 @@ final class AudioTexturePlayer {
     /// Call when playback stops — fades out then releases.
     func stop() {
         isFadingOut = true
-        fadeOut {
+        fadeOut(duration: stopFadeDuration) {
             self.isFadingOut = false
-            self.currentFilename = nil
             self.playerNode.stop()
             self.stopPan()
         }
@@ -166,6 +166,8 @@ final class AudioTexturePlayer {
 
     private func startFile(filename: String, fastFadeIn: Bool = false, offsetSeconds: Int = 0) {
         guard let url = textureURL(filename: filename) else { return }
+        pitchNode.pitch = 0
+        pitchNode.rate  = 1.0
         currentFilename = filename
         currentTargetVolume = volumeForTexture(filename)
         if bypassEffects {
@@ -179,8 +181,6 @@ final class AudioTexturePlayer {
                 reverbNode.loadFactoryPreset(.smallRoom)
                 reverbNode.wetDryMix = 10
                 reverbNode.auAudioUnit.shouldBypassEffect = false
-                pitchNode.pitch = 0
-                pitchNode.rate  = 1.0
                 lastEffectsMode = true
             }
         } else {
@@ -228,26 +228,14 @@ final class AudioTexturePlayer {
         } catch { }   // Unreadable file — silent fallback, no crash.
     }
 
-    /// Each play-through: randomly apply subtle high-pass filter OR subtle pitch shift.
-    /// Voice/music-containing files skip all variation — pitch and filter both reset to baseline.
+    /// Each play-through: randomly apply a subtle high-pass filter for tonal variety.
+    /// Pitch node is never touched here — it stays at 0 cents set by startFile().
     private func applyRandomVariation() {
-        let noEffectFiles: Set<String> = ["another-pub.m4a", "bar_sounds.m4a", "city_at_night.m4a"]
-        if let fn = currentFilename, noEffectFiles.contains(fn) {
-            pitchNode.pitch        = 0
-            pitchNode.rate         = 1.0
-            eqNode.bands[1].bypass = true
-            return
-        }
         if Bool.random() {
-            // Option A: pitch shift ±30–70 cents (about a quarter-tone; barely noticeable)
-            let sign: Float = Bool.random() ? 1 : -1
-            pitchNode.pitch = Float.random(in: 30...70) * sign
-            eqNode.bands[1].bypass = true
-        } else {
-            // Option B: gentle high-pass at 80–200 Hz (trims low-end rumble, alters character)
             eqNode.bands[1].frequency = Float.random(in: 80...200)
             eqNode.bands[1].bypass    = false
-            pitchNode.pitch = 0
+        } else {
+            eqNode.bands[1].bypass = true
         }
     }
 
@@ -255,6 +243,32 @@ final class AudioTexturePlayer {
         guard let resourceURL = Bundle.main.resourceURL else { return nil }
         let url = resourceURL.appendingPathComponent("Textures").appendingPathComponent(filename)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    // MARK: - Export snapshot
+
+    struct ExportSnapshot {
+        let filename: String
+        let volume: Float
+        let boostEnabled: Bool
+        let lowShelfEnabled: Bool
+        let reverbWetDryMix: Float
+        let reverbBypassed: Bool
+        let isAmbient: Bool
+    }
+
+    /// Captures the current playback state for use by OfflineExport.
+    func exportSnapshot() -> ExportSnapshot? {
+        guard let filename = currentFilename else { return nil }
+        return ExportSnapshot(
+            filename:       filename,
+            volume:         currentTargetVolume,
+            boostEnabled:   boostNode.outputVolume > 1.1,
+            lowShelfEnabled: !eqNode.bands[0].bypass && !eqNode.auAudioUnit.shouldBypassEffect,
+            reverbWetDryMix: reverbNode.wetDryMix,
+            reverbBypassed: reverbNode.auAudioUnit.shouldBypassEffect,
+            isAmbient:      bypassEffects
+        )
     }
 
     // MARK: - Pan LFO (hidden, always active during playback)
@@ -306,12 +320,12 @@ final class AudioTexturePlayer {
         }
     }
 
-    private func fadeOut(completion: @escaping () -> Void) {
+    private func fadeOut(duration: Double = 3.0, completion: @escaping () -> Void) {
         cancelFade()
         guard playerNode.isPlaying else { completion(); return }
         let startVol = playerNode.volume
         guard startVol > 0 else { completion(); return }
-        let step = startVol / Float(fadeDuration / fadeInterval)
+        let step = startVol / Float(duration / fadeInterval)
         fadeTimer = Timer.scheduledTimer(withTimeInterval: fadeInterval, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); completion(); return }
             let next = max(self.playerNode.volume - step, 0.0)

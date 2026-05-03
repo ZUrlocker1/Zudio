@@ -343,8 +343,11 @@ final class AppState: ObservableObject {
     private var songsInCurrentStyle: Int = 0
 
     // Pre-generated next song for seamless Endless transitions
-    private var nextSongState:         SongState? = nil
-    private var isPreGenerating:       Bool       = false
+    private var nextSongState:            SongState? = nil
+    private var isPreGenerating:          Bool       = false
+    // Incremented by stop() so any 500ms-delayed finishLoadingSong from a just-ended song
+    // is cancelled when the user explicitly stops, preventing texture/music from restarting.
+    private var endlessTransitionToken:   Int        = 0
     // Incremented each time a new pre-gen is started; stale task completions that carry an old
     // token are discarded so they can't overwrite nextSongState with the wrong style.
 
@@ -1298,6 +1301,7 @@ final class AppState: ObservableObject {
 
     func stop() {
         clearSleepTimerMessage()
+        endlessTransitionToken += 1
         playback.stop()
         audioTexture.stop()
     }
@@ -1462,7 +1466,7 @@ final class AppState: ObservableObject {
     // Lead 1 so both leads share the same timbre.
     // Stored as a raw MIDI program number so it survives pool-index lookup differences.
     private func applyLead2Mirror(for state: SongState) {
-        let mirrorRules: Set<String> = ["AMB-LEAD-001", "AMB-LEAD-002", "AMB-LEAD-006", "AMB-LEAD-007", "AMB-LEAD-008"]
+        let mirrorRules: Set<String> = ["AMB-LEAD-001", "AMB-LEAD-002", "AMB-LEAD-007", "AMB-LEAD-008"]
         guard state.style == .ambient,
               state.generationLog.contains(where: { mirrorRules.contains($0.tag) })
         else { return }
@@ -1511,9 +1515,12 @@ final class AppState: ObservableObject {
         nextSongState   = nil
         isPreGenerating = false
         preGenerateNextSong()   // silently pre-gen the song after next; starts during the gap
-        // 500 ms silence between songs
+        // 500 ms silence between songs.
+        // Capture token so if the user presses Stop during the gap, the transition is cancelled.
+        let transitionToken = endlessTransitionToken
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self, self.playMode == .endless else { return }
+            guard let self, self.playMode == .endless,
+                  self.endlessTransitionToken == transitionToken else { return }
             // Generation log first (Style, Form, Chords, rules), then finishLoadingSong
             // appends Instruments — matching the order the Generate button produces.
             self.appendGenerationLog(state.generationLog)
@@ -1528,10 +1535,12 @@ final class AppState: ObservableObject {
     private func generateAndStartNextSong() {
         appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
         let nextStyle = decideNextStyle()
+        let transitionToken = endlessTransitionToken  // capture so a stop() during generation cancels this
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let state = SongGenerator.generate(style: nextStyle)
             await MainActor.run {
+                guard self.endlessTransitionToken == transitionToken else { return }
                 self.startEndlessSong(state)
             }
         }
@@ -2440,23 +2449,24 @@ final class AppState: ObservableObject {
 
     // MARK: - Audio export
 
+    @Published var isFastExporting:       Bool   = false
     @Published var isExportingAudio:      Bool   = false
     @Published var audioExportProgress:   Double = 0
     @Published var audioExportFilename:   String = ""
     @Published var showExportConfirmation: Bool  = false
+    /// Set to a non-nil URL on iOS after fast export completes — views observe this to present a share sheet.
+    @Published var fastExportedFileURL: URL? = nil
+    /// True when a fast export is pending due to low disk space confirmation.
+    @Published var showLowDiskSpaceAlert: Bool = false
+    nonisolated(unsafe) private var pendingExportURL: URL? = nil
 
-    /// Called from button/menu/keyboard — shows the confirmation dialog.
+    /// Called from button/menu/keyboard — routes to fast export on all platforms.
     func requestExport() {
-        guard songState != nil, !isExportingAudio else { return }
-        #if os(macOS)
-        startExport()   // goes straight to NSSavePanel; sheet is iOS-only
-        #else
-        showExportConfirmation = true
-        #endif
+        requestFastExport()
     }
 
     /// On macOS: called directly from requestExport() — NSSavePanel provides file location and mode.
-    /// On iOS: called from ExportConfirmationView with a pre-chosen sampleMode.
+    /// On iOS: kept for reference but disabled; iOS now uses requestFastExport().
     func startExport(sampleMode: Bool = false) {
         guard let song = songState, !isExportingAudio else { return }
         #if os(macOS)
@@ -2467,14 +2477,10 @@ final class AppState: ObservableObject {
                                                                 songDuration: songDuration) else { return }
         let url = result.url
         let effectiveSampleMode = result.sampleMode
-        #else
-        let url = AudioFileExporter.nextURL(songName: song.title, sampleMode: sampleMode)
-        let effectiveSampleMode = sampleMode
-        #endif
         audioExportFilename = url.lastPathComponent
         audioExportProgress = 0
         isExportingAudio    = true
-        visibleBarOffset    = 0   // snap scroll back to bar 0 so display matches the render
+        visibleBarOffset    = 0
         let style = selectedStyle.rawValue.capitalized
         playback.exportAudio(url: url, state: song, sampleMode: effectiveSampleMode) { [weak self] progress in
             Task { @MainActor [weak self] in self?.audioExportProgress = progress }
@@ -2490,7 +2496,6 @@ final class AppState: ObservableObject {
                     }
                     return
                 }
-                // Success — log and add metadata.
                 print("Audio saved: \(url.path)")
                 self?.appendToLog([
                     GenerationLogEntry(tag: "FILE", description: "Exported audio \(url.lastPathComponent)")
@@ -2503,11 +2508,56 @@ final class AppState: ObservableObject {
                 )
             }
         }
+        #else
+        // OLD REAL-TIME EXPORT (disabled — iOS now uses requestFastExport())
+        //
+        // let url = AudioFileExporter.nextURL(songName: song.title, sampleMode: sampleMode)
+        // audioExportFilename = url.lastPathComponent
+        // audioExportProgress = 0
+        // isExportingAudio    = true
+        // visibleBarOffset    = 0
+        // let style = selectedStyle.rawValue.capitalized
+        // playback.exportAudio(url: url, state: song, sampleMode: sampleMode) { [weak self] progress in
+        //     Task { @MainActor [weak self] in self?.audioExportProgress = progress }
+        // } onComplete: { [weak self] error in
+        //     Task { @MainActor [weak self] in
+        //         self?.isExportingAudio = false
+        //         if let error {
+        //             if error is CancellationError {
+        //                 try? FileManager.default.removeItem(at: url)
+        //             } else {
+        //                 print("Audio export error: \(error)")
+        //             }
+        //             return
+        //         }
+        //         print("Audio saved: \(url.path)")
+        //         self?.appendToLog([
+        //             GenerationLogEntry(tag: "FILE", description: "Exported audio \(url.lastPathComponent)")
+        //         ])
+        //         await AudioFileExporter.addMetadata(to: url, title: song.title, artist: "Zudio", genre: style)
+        //     }
+        // }
+        print("startExport(sampleMode:) — disabled on iOS; use requestFastExport()")
+        #endif
     }
 
     /// Cancels an in-progress export; the partial file is deleted.
     func cancelExport() {
+        if isFastExporting { fastExportCancelled = true; return }
         playback.cancelExport()
+    }
+
+    private func hasSufficientDiskSpace(_ minBytes: Int64 = 500 * 1024 * 1024) -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
+              let free = attrs[.systemFreeSize] as? Int64 else { return true }
+        return free >= minBytes
+    }
+
+    /// Called from the low-disk-space alert "Export Anyway" button.
+    func confirmLowDiskSpaceExport() {
+        guard let url = pendingExportURL, let song = songState else { return }
+        pendingExportURL = nil
+        launchFastExport(song: song, url: url)
     }
 
     // MARK: - Instrument
@@ -2878,6 +2928,90 @@ final class AppState: ObservableObject {
                 self.restoreLead2Mirror()
                 self.applyLead2Mirror(for: state)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
+            }
+        }
+    }
+
+    // MARK: - Fast export
+
+    // Written from main actor before launch; read from render thread via isCancelled closure.
+    nonisolated(unsafe) private var fastExportCancelled = false
+
+    func requestFastExport() {
+        guard let song = songState, !isFastExporting, !isExportingAudio else { return }
+
+        #if os(macOS)
+        if !hasSufficientDiskSpace() {
+            let alert = NSAlert()
+            alert.messageText = "Low Disk Space"
+            alert.informativeText = "Less than 500 MB is available. The export may fail. Continue anyway?"
+            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: "Export Anyway")
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+        }
+        guard let url = AudioFileExporter.presentFastExportPanel(songName: song.title) else { return }
+        launchFastExport(song: song, url: url)
+        #else
+        let url = AudioFileExporter.nextURL(songName: song.title)
+        if !hasSufficientDiskSpace() {
+            pendingExportURL = url
+            showLowDiskSpaceAlert = true
+        } else {
+            launchFastExport(song: song, url: url)
+        }
+        #endif
+    }
+
+    private func launchFastExport(song: SongState, url: URL) {
+        let programs        = (0..<kTrackCount).map { playback.loadedProgram(forTrack: $0) }
+        let snapshots       = playback.effectSnapshots()
+        let textureSnapshot = audioTexture.exportSnapshot()
+        let genre           = song.style.rawValue.capitalized
+
+        audioExportFilename = url.lastPathComponent
+        audioExportProgress = 0
+        isExportingAudio    = true
+        isFastExporting     = true
+        fastExportCancelled = false
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            do {
+                let (songSecs, elapsed) = try OfflineExport.render(
+                    state: song,
+                    programs: programs,
+                    snapshots: snapshots,
+                    textureSnapshot: textureSnapshot,
+                    outputURL: url,
+                    onProgress: { p in
+                        Task { @MainActor [weak self] in self?.audioExportProgress = p }
+                    },
+                    isCancelled: { [weak self] in self?.fastExportCancelled ?? true }
+                )
+                let speedup = songSecs / max(elapsed, 0.001)
+                print("[FastExport] ✅ \(String(format: "%.1f", songSecs))s rendered in " +
+                      "\(String(format: "%.2f", elapsed))s (\(String(format: "%.1f", speedup))×)")
+
+                await AudioFileExporter.addMetadata(to: url, title: song.title,
+                                                    artist: "Zudio", genre: genre)
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    self.isExportingAudio = false
+                    self.isFastExporting  = false
+                    self.appendToLog([GenerationLogEntry(tag: "FILE",
+                        description: "Fast export: \(url.lastPathComponent)")])
+                    #if !os(macOS)
+                    self.fastExportedFileURL = url
+                    #endif
+                }
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                await MainActor.run { [weak self] in
+                    self?.isExportingAudio = false
+                    self?.isFastExporting  = false
+                }
+                if !(error is CancellationError) {
+                    print("[FastExport] ❌ \(error.localizedDescription)")
+                }
             }
         }
     }

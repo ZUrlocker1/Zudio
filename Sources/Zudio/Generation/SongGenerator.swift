@@ -1181,6 +1181,11 @@ struct SongGenerator {
     private static func ruleDescription(_ ruleID: String, trackIndex: Int) -> String {
         if ruleID.hasPrefix("AMB-") { return ambientRuleDescription(ruleID) }
         if ruleID.hasPrefix("KOS-RTHM-") { return kosmicRthmRuleDescription(ruleID) }
+        if ruleID.hasPrefix("KOS-LEAD-") { return kosmicLeadRuleDescription(ruleID) }
+        if ruleID.hasPrefix("KOS-DRUM-") { return kosmicDrumRuleDescription(ruleID) }
+        if ruleID.hasPrefix("KOS-BASS-") { return kosmicBassRuleDescription(ruleID) }
+        if ruleID.hasPrefix("KOS-PADS-") { return kosmicPadRuleDescription(ruleID) }
+        if ruleID.hasPrefix("KOS-TEXT-") { return kosmicTexRuleDescription(ruleID) }
         if ruleID.hasPrefix("CHL-") { return chillRuleDescription(ruleID) }
         switch trackIndex {
         case kTrackDrums:   return drumRuleDescription(ruleID)
@@ -1447,8 +1452,8 @@ struct SongGenerator {
         case "MOT-LD2-005": return "Descending line"
         case "MOT-LD2-006": return "Neu! harmony"
         // Ambient Lead 2 rules
-        case "AMB-LEAD-005": return "Silent-window fill"
-        case "AMB-LEAD-006": return "No lead 2"
+        case "AMB-LEAD-005": return "Tonal cell"
+        case "AMB-LEAD-006": return "Descending phrase"
         default:            return ruleID
         }
     }
@@ -1808,8 +1813,8 @@ struct SongGenerator {
         case "AMB-LEAD-009":  return "Magnetik solo"
         case "AMB-LEAD-010":  return "Oxygenerator solo"
         // Lead 2
-        case "AMB-LEAD-005":     return "Silent-window fill"
-        case "AMB-LEAD-006":     return "No lead 2"
+        case "AMB-LEAD-005":     return "Tonal cell"
+        case "AMB-LEAD-006":     return "Descending phrase"
         case "AMB-LEAD-004":    return "Echo lead phrase"
         case "AMB-XFILES-001":  return "Spooky X-Files theme"
         // Rhythm
@@ -2733,9 +2738,9 @@ struct SongGenerator {
         case "CHL-LD1-003":  return "Sparse melodic solo"
         case "CHL-LD1-004":  return "Blues lead"
         case "CHL-LD1-005":  return "St Germain staccato burst"
-        case "CHL-LD1-006":  return "Soprano sax lead"
+        case "CHL-LD1-006":  return "Bright melodic solo"
         case "CHL-LD1-007":  return "Wide interval solo"
-        case "CHL-LD1-008":  return "Tenor sax lead"
+        case "CHL-LD1-008":  return "Warm jazz line"
         case "CHL-LD2-001":  return "Counter-melody"
         case "CHL-LD2-002":  return "Shadow hold"
         case "CHL-RHY-001":  return "St Germain beat 1 + and-of-2"

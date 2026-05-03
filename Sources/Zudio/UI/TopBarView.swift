@@ -468,7 +468,7 @@ struct TopBarView: View {
                         .keyboardShortcut("l", modifiers: .command)
                         .help("Reload a song from a saved .txt log file (⌘L)")
 
-                        Button(action: { appState.requestExport() }) {
+                        Button(action: { appState.requestFastExport() }) {
                             Label {
                                 #if os(iOS)
                                 Text("Export").fontWeight(.semibold)

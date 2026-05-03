@@ -91,6 +91,7 @@
 		AA000000000000000000082 /* Compat.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000082 /* Compat.swift */; };
 		AA000000000000000000100 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
 		AA000000000000000000111 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
+		AA000000000000000000112 /* OfflineExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000009A /* OfflineExport.swift */; };
 		IF000000000000000000001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000001E /* AVFoundation.framework */; };
 		IF000000000000000000002 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007A /* MediaPlayer.framework */; };
 		IR000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
@@ -173,6 +174,7 @@
 		IS000000000000000000080 /* VisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000080 /* VisualizerView.swift */; };
 		IS000000000000000000081 /* PhonePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000081 /* PhonePlayerView.swift */; };
 		IS000000000000000000082 /* Compat.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000082 /* Compat.swift */; };
+		IS000000000000000000083 /* OfflineExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000009A /* OfflineExport.swift */; };
 		TT000000000000000000001 /* ZudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000001 /* ZudioTests.swift */; };
 		TT000000000000000000002 /* ChillBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000002 /* ChillBatchTests.swift */; };
 		TT000000000000000000003 /* MotorikBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UU000000000000000000003 /* MotorikBatchTests.swift */; };
@@ -277,6 +279,7 @@
 		BB000000000000000000081 /* PhonePlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhonePlayerView.swift; sourceTree = "<group>"; };
 		BB000000000000000000082 /* Compat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compat.swift; sourceTree = "<group>"; };
 		BB000000000000000000099 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BB00000000000000000009A /* OfflineExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineExport.swift; sourceTree = "<group>"; };
 		BB000000000000000000100 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BB000000000000000000101 /* ZudioiOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZudioiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		UU000000000000000000001 /* ZudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioTests.swift; sourceTree = "<group>"; };
@@ -423,6 +426,7 @@
 				BB000000000000000000022 /* MIDIFileExporter.swift */,
 				BB000000000000000000039 /* AudioFileExporter.swift */,
 				BB000000000000000000040 /* SongLogExporter.swift */,
+				BB00000000000000000009A /* OfflineExport.swift */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -770,6 +774,7 @@
 				AA00000000000000000007F /* IOSPlatformHost.swift in Sources */,
 				AA000000000000000000039 /* AudioFileExporter.swift in Sources */,
 				AA000000000000000000040 /* SongLogExporter.swift in Sources */,
+				AA000000000000000000112 /* OfflineExport.swift in Sources */,
 				AA000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
 				AA000000000000000000051 /* AmbientStructureGenerator.swift in Sources */,
 				AA000000000000000000052 /* AmbientLoopTiler.swift in Sources */,
@@ -864,6 +869,7 @@
 				IS00000000000000000007F /* IOSPlatformHost.swift in Sources */,
 				IS000000000000000000039 /* AudioFileExporter.swift in Sources */,
 				IS000000000000000000040 /* SongLogExporter.swift in Sources */,
+				IS000000000000000000083 /* OfflineExport.swift in Sources */,
 				IS000000000000000000050 /* AmbientMusicalFrameGenerator.swift in Sources */,
 				IS000000000000000000051 /* AmbientStructureGenerator.swift in Sources */,
 				IS000000000000000000052 /* AmbientLoopTiler.swift in Sources */,
@@ -1133,7 +1139,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.02;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;
@@ -1163,7 +1169,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.02;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;

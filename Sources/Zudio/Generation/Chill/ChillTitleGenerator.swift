@@ -45,7 +45,7 @@ struct ChillTitleGenerator {
             // Quebec cities
             "Sherbrooke", "Trois-Rivieres", "Gatineau", "Saguenay",
             "Rimouski", "Chicoutimi", "Jonquiere", "Riviere-du-Loup",
-            "Magog", "Granby", "Drummondville",
+            "Magog", "Granby", "Drummondville", "Chibougamau", "Petawawa",
             "Shawinigan", "Val d'Or", "Hudson", "Sorel", "Sutton",
             // Quebec regions
             "Charlevoix", "Gaspesie", "Abitibi",

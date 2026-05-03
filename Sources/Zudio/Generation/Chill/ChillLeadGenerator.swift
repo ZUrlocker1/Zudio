@@ -74,6 +74,18 @@ struct ChillLeadGenerator {
         let stopTimeSoloMax = rng.nextDouble() < 0.50 ? 4 : 6
         var stopTimeSoloBarsUsed = 0
 
+        // Zone-based phrase repetition for all melodic Chill lead rules except CHL-LD1-005
+        // (St Germain staccato burst, which has its own active-period architecture).
+        // First 2 phrases in groove-A are stored as seeds; replayed once each in the
+        // opening, then freely developed, then recalled in the final 40% with a
+        // last-note flip so the ending sounds like a familiar motif with a fresh tail.
+        let activeRuleID  = forceRuleID ?? lead1RuleID(for: leadInstrument)
+        let useZoneRepeat = (activeRuleID != "CHL-LD1-005")
+        var seedPhrases:       [[MIDIEvent]] = []
+        var seedPhraseLengths: [Int]         = []
+        var openingReplaysDone = 0
+        let recapStartBar = (frame.totalBars * 3) / 5   // 60% — shorter free zone, longer recap
+
         var bar = 0
         while bar < frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -193,9 +205,67 @@ struct ChillLeadGenerator {
             let actualPhraseLen = Swift.min(maxPhraseLen, sectionEnd - bar)
             guard actualPhraseLen > 0 else { bar += 1; continue }
 
-            // Build phrase notes
-            let phraseBluePc = rng.nextDouble() < 0.15 ? blueNote : nil  // occasional blue note
-            // Use the chord at the END of the phrase for strong-landing calculation (not key root)
+            // Zone-based repetition: seed collection → opening replay → free development → recap
+            if useZoneRepeat, label == .A || label == .B {
+                let canReplayOpening = openingReplaysDone < 2 && seedPhrases.count == 2
+
+                if seedPhrases.count < 2 {
+                    // Seed zone: generate normally and store as relative-indexed motif
+                    let phraseBluePc = rng.nextDouble() < 0.15 ? blueNote : nil
+                    let phraseEndChord = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
+                    let phraseNotes = buildPhrase(frame: frame, bar: bar, bars: actualPhraseLen,
+                                                   leadInstrument: leadInstrument,
+                                                   pentatonic: pentatonic, scale: scale,
+                                                   blueNotePC: phraseBluePc,
+                                                   regLow: regLow, regHigh: regHigh,
+                                                   section: label, phraseEndChord: phraseEndChord, rng: &rng)
+                    events += phraseNotes
+                    phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
+                    let offset = bar * 16
+                    seedPhrases.append(phraseNotes.map {
+                        MIDIEvent(stepIndex: $0.stepIndex - offset, note: $0.note,
+                                  velocity: $0.velocity, durationSteps: $0.durationSteps)
+                    })
+                    seedPhraseLengths.append(actualPhraseLen)
+                    bar += actualPhraseLen
+                    bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
+                    continue
+                }
+
+                let canRecap = bar >= recapStartBar && rng.nextDouble() < 0.55
+                if canReplayOpening || canRecap {
+                    let seedIdx = canReplayOpening ? (openingReplaysDone % seedPhrases.count)
+                                                   : rng.nextInt(upperBound: seedPhrases.count)
+                    let seedLen = seedPhraseLengths[seedIdx]
+                    if bar + seedLen <= sectionEnd {
+                        let base = bar * 16
+                        var replayedNotes = seedPhrases[seedIdx].map {
+                            MIDIEvent(stepIndex: $0.stepIndex + base, note: $0.note,
+                                      velocity: $0.velocity, durationSteps: $0.durationSteps)
+                        }
+                        // Opening: 50% chance of last-note flip; recap: always flip
+                        if canRecap || rng.nextDouble() < 0.50 {
+                            replayedNotes = applyLastNoteFlip(replayedNotes, scale: scale,
+                                                               regLow: regLow, regHigh: regHigh)
+                        }
+                        // 50% chance of last-note duration variation (short→long or long→short)
+                        if rng.nextDouble() < 0.50 {
+                            replayedNotes = applyLastNoteDuration(replayedNotes, rng: &rng)
+                        }
+                        events += replayedNotes
+                        phraseOnsets.append((startBar: bar, endBar: bar + seedLen))
+                        if canReplayOpening { openingReplaysDone += 1 }
+                        bar += seedLen
+                        bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
+                        continue
+                    }
+                    // Seed doesn't fit remaining section — count replay as done to avoid getting stuck
+                    if canReplayOpening { openingReplaysDone += 1 }
+                }
+            }
+
+            // Normal phrase generation (non-blues lead, free development zone, or replay fallback)
+            let phraseBluePc = rng.nextDouble() < 0.15 ? blueNote : nil
             let phraseEndChord = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
             let phraseNotes = buildPhrase(
                 frame: frame, bar: bar, bars: actualPhraseLen,
@@ -263,7 +333,7 @@ struct ChillLeadGenerator {
         let (rawLow2, rawHigh2) = register(for: inst2)
         // Lead 2 sits below the midpoint of Lead 1's register (CHL-RULE-12).
         // Using the midpoint (not regLow1) prevents degenerate one-note pools when Lead 1
-        // has a low bottom register (e.g. tenor sax regLow=47 → cap=45 → only one scale note).
+        // has a low bottom register (e.g. regLow near 52 → midpoint cap → only a few scale notes).
         let regMid1  = (regLow1 + regHigh1) / 2
         let regHigh2 = min(rawHigh2, regMid1 - 2)
         let regLow2  = max(36, min(rawLow2, regHigh2 - 12))
@@ -616,7 +686,7 @@ struct ChillLeadGenerator {
         case .trumpet:      return (55, 79)
         case .vibraphone:   return (60, 80)
         case .saxophone:    return (50, 70)   // alto sax
-        case .tenorSax:     return (47, 67)   // tenor sits a minor 3rd lower than alto
+        case .tenorSax:     return (54, 71)   // raised floor avoids muddy lows; slightly tighter than alto
         case .sopranoSax:   return (58, 80)   // soprano sits higher than alto/tenor
         case .trombone:     return (45, 65)   // warm low brass — Lead 2 counter-melody register
         }
@@ -649,6 +719,61 @@ struct ChillLeadGenerator {
     private static func blueNotePC(frame: GlobalMusicalFrame) -> Int {
         // Blue note = b5 (+6 semitones from root) — spice, not scale degree
         return (frame.keySemitoneValue + 6) % 12
+    }
+
+    /// Blues lead variation: replace the last note of a phrase with the nearest scale note
+    /// that resolves in the OPPOSITE direction from the second-to-last note.
+    /// The phrase body stays identical; only the tail changes, creating the sense of a
+    /// familiar motif with a fresh ending.
+    private static func applyLastNoteFlip(_ notes: [MIDIEvent], scale: [Int],
+                                           regLow: Int, regHigh: Int) -> [MIDIEvent] {
+        guard notes.count >= 2 else { return notes }
+        let sorted     = notes.sorted { $0.stepIndex < $1.stepIndex }
+        let last       = sorted[sorted.count - 1]
+        let secondLast = sorted[sorted.count - 2]
+        let originalUp = Int(last.note) > Int(secondLast.note)
+        let pool       = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
+        let flipped: Int
+        if originalUp {
+            // Was ascending → resolve downward: highest scale note below secondLast
+            flipped = pool.filter { $0 < Int(secondLast.note) }.last ?? Int(last.note)
+        } else {
+            // Was descending → resolve upward: lowest scale note above secondLast
+            flipped = pool.filter { $0 > Int(secondLast.note) }.first ?? Int(last.note)
+        }
+        guard flipped != Int(last.note) else { return notes }
+        var result = notes
+        for i in result.indices.reversed() {
+            if result[i].stepIndex == last.stepIndex {
+                result[i] = MIDIEvent(stepIndex: result[i].stepIndex, note: UInt8(flipped),
+                                       velocity: result[i].velocity,
+                                       durationSteps: result[i].durationSteps)
+                break
+            }
+        }
+        return result
+    }
+
+    /// Blues lead duration variation: if the last note of a replayed phrase is short (≤4 steps /
+    /// quarter note), lengthen it; if long (≥8 steps), shorten it. Middle-range notes unchanged.
+    private static func applyLastNoteDuration(_ notes: [MIDIEvent], rng: inout SeededRNG) -> [MIDIEvent] {
+        guard !notes.isEmpty else { return notes }
+        guard let lastIdx = notes.indices.max(by: { notes[$0].stepIndex < notes[$1].stepIndex }) else { return notes }
+        let dur = Int(notes[lastIdx].durationSteps)
+        let newDur: Int
+        if dur <= 4 {
+            newDur = 6 + rng.nextInt(upperBound: 5)   // short → long: 6–10 steps
+        } else if dur >= 8 {
+            newDur = 3 + rng.nextInt(upperBound: 3)   // long → short: 3–5 steps
+        } else {
+            return notes                                // middle range — leave as-is
+        }
+        var result = notes
+        result[lastIdx] = MIDIEvent(stepIndex: result[lastIdx].stepIndex,
+                                    note:       result[lastIdx].note,
+                                    velocity:   result[lastIdx].velocity,
+                                    durationSteps: newDur)
+        return result
     }
 
     private static func snapToRegister(_ note: Int, pool: [Int], regLow: Int, regHigh: Int) -> Int {

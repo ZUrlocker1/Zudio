@@ -6,7 +6,10 @@
 //               AMB-LEAD-009 Magnetik solo (9%), AMB-LEAD-010 Oxygenerator solo (7%)
 // AMB-LEAD-009 and AMB-LEAD-010 are section-level solos: they bypass the loop tiler and
 // return full-song events (require structure != nil; degrade gracefully to silence if absent).
-// Lead 2: AMB-LEAD-005 (sparse tonal cell, pitch classes derived from Lead 1's actual notes).
+// Lead 2: AMB-LEAD-005 (sparse tonal cell, pitch classes derived from Lead 1's actual notes),
+//          AMB-LEAD-006 (descending phrase, 3–5 diatonic scale tones descending stepwise,
+//                        held 10–18 steps each, placed once per co-prime loop).
+//          50/50 rule selection; both loops tile at Lead 2's co-prime loop length.
 // AMB-RULE-02 enforced: rest ≥ 2× note duration after each note event.
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
 
@@ -97,11 +100,11 @@ struct AmbientLeadGenerator {
         return floatingTone(notes: notes, loopSteps: loopSteps, rng: &rng)
     }
 
-    // MARK: - Lead 2 (AMB-LEAD-005: Eno-style tonal cell derived from Lead 1 pitch classes)
-    // Lead 2 is an independent sparse loop whose pitches are drawn from the same pitch
-    // classes as Lead 1's actual notes (transposed into Lead 2's lower register).
-    // The two loops use co-prime lengths and phase against each other — overlap is harmonic
-    // rather than avoided, matching how Eno's tape loops worked on Music for Airports.
+    // MARK: - Lead 2
+    // Two rules, 50/50: AMB-LEAD-005 (tonal cell) or AMB-LEAD-006 (descending phrase).
+    // Both generate exactly loopBars of events; AmbientLoopTiler tiles to full song length.
+    // Pitches are seeded from Lead 1's pitch classes transposed into Lead 2's lower register,
+    // so the first harmonic encounter is related — subsequent encounters drift via co-prime phasing.
 
     static func generateLead2(
         frame: GlobalMusicalFrame,
@@ -109,7 +112,8 @@ struct AmbientLeadGenerator {
         lead1Events: [MIDIEvent],
         loopBars: Int,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        forceRuleID: String? = nil
     ) -> [MIDIEvent] {
         let bounds    = kRegisterBounds[kTrackLead2]!  // low:55, high:81
         let loopSteps = loopBars * 16
@@ -121,10 +125,15 @@ struct AmbientLeadGenerator {
         let notes    = notesInRegister(pitchClasses: pitchPCs, low: bounds.low, high: bounds.high)
         guard !notes.isEmpty else { return [] }
 
-        usedRuleIDs.insert("AMB-LEAD-005")
+        let validForce = forceRuleID.flatMap { ($0 == "AMB-LEAD-005" || $0 == "AMB-LEAD-006") ? $0 : nil }
+        let ruleID = validForce ?? (rng.nextDouble() < 0.70 ? "AMB-LEAD-005" : "AMB-LEAD-006")
+        usedRuleIDs.insert(ruleID)
 
-        // Place 2–4 sparse sustained notes across the loop.
-        // Generous rests (≥ 2× note duration) keep it spacious — AMB-RULE-02.
+        if ruleID == "AMB-LEAD-006" {
+            return descendingPhrase(notes: notes, loopSteps: loopSteps, rng: &rng)
+        }
+
+        // AMB-LEAD-005: sparse tonal cell — 2–4 sustained notes, generous rests (AMB-RULE-02).
         var events: [MIDIEvent] = []
         let noteCount = 2 + rng.nextInt(upperBound: 3)
         var cursor    = rng.nextInt(upperBound: Swift.max(1, loopSteps / 4))
@@ -136,10 +145,50 @@ struct AmbientLeadGenerator {
             guard dur >= 4 else { break }
             let vel     = UInt8(35 + rng.nextInt(upperBound: 28))  // 35–62, softer than Lead 1
             events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
-            // Rest ≥ 2× note duration, plus random spacing so notes don't cluster
             cursor += dur + dur + rng.nextInt(upperBound: Swift.max(1, loopSteps / 4))
         }
-        return events   // cursor only advances — events are already in step order
+        return events
+    }
+
+    // MARK: - AMB-LEAD-006: Descending phrase
+    // 3–5 diatonic scale tones descending stepwise from the upper register.
+    // Each note held 10–18 steps; velocity fades gently as the phrase descends (38→~26).
+    // Placed once per loop at a randomised offset so co-prime tiling phases it against
+    // Lead 1 differently on every pass — the Eno tape-loop effect.
+    private static func descendingPhrase(notes: [UInt8], loopSteps: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        guard notes.count >= 3 else { return [] }
+
+        let phraseLen  = 3 + rng.nextInt(upperBound: 3)     // 3–5 notes
+        let holdSteps  = 10 + rng.nextInt(upperBound: 9)    // 10–18 steps per note
+        let gapSteps   = 2  + rng.nextInt(upperBound: 3)    // 2–4 steps between notes
+        let phraseSpan = phraseLen * (holdSteps + gapSteps)
+        guard phraseSpan < loopSteps else { return [] }
+
+        // Start in upper third of register; walk downward 1–2 scale steps per note
+        let minStart = Swift.max(phraseLen - 1, (notes.count * 2) / 3)
+        let startIdx = minStart + rng.nextInt(upperBound: Swift.max(1, notes.count - minStart))
+        var indices  = [startIdx]
+        for _ in 1..<phraseLen {
+            let step = 1 + rng.nextInt(upperBound: 2)
+            indices.append(Swift.max(0, indices.last! - step))
+        }
+
+        // Offset spans full available range so different loop lengths phase at different positions
+        let offset = rng.nextInt(upperBound: Swift.max(1, loopSteps - phraseSpan))
+        var cursor = offset
+        var events: [MIDIEvent] = []
+
+        for (i, noteIdx) in indices.enumerated() {
+            guard cursor < loopSteps else { break }
+            let note = notes[Swift.max(0, Swift.min(notes.count - 1, noteIdx))]
+            let dur  = Swift.min(holdSteps, loopSteps - cursor)
+            guard dur >= 4 else { break }
+            let baseVel = Swift.max(22, 38 - i * 3)   // 38 at top, fades to ~26 at bottom
+            let vel = UInt8(baseVel + rng.nextInt(upperBound: 8))
+            events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: vel, durationSteps: dur))
+            cursor += holdSteps + gapSteps
+        }
+        return events
     }
 
     // MARK: - Lead 1 rule implementations

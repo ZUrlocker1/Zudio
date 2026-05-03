@@ -136,6 +136,22 @@ struct AudioFileExporter {
         return container
     }
 
+    /// Fast Export panel — simple save panel, no duration estimate or mode options.
+    /// Returns the chosen .m4a URL, or nil if the user cancelled.
+    @MainActor
+    static func presentFastExportPanel(songName: String) -> URL? {
+        let panel = NSSavePanel()
+        panel.title = "Fast Export Audio"
+        panel.prompt = "Export"
+        panel.allowedContentTypes = [UTType.mpeg4Audio]
+        panel.canCreateDirectories = true
+        panel.directoryURL = exportDirectory()
+        panel.nameFieldStringValue = "\(sanitizedName(songName)).m4a"
+        panel.minSize = NSSize(width: 400, height: panel.minSize.height)
+        DispatchQueue.main.async { setPanelWidth(900, panel: panel) }
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
     /// Save Song panel — shows .zudio as the primary filename; saveMIDI() derives the .MID path.
     /// Returns the chosen .zudio URL, or nil if the user cancelled.
     @MainActor
