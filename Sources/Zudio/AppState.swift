@@ -7,6 +7,8 @@ import MediaPlayer
 import StoreKit
 #if os(macOS)
 import AppKit
+#elseif os(iOS)
+import UIKit
 #endif
 
 // MARK: - Play mode
@@ -320,7 +322,8 @@ final class AppState: ObservableObject {
                 for idx in trackOvr.keys.sorted() {
                     state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOvr[idx])
                 }
-                let finalState = state
+                var finalState = state
+                finalState.title = song.title   // preserve the title from when the song was generated
                 await MainActor.run {
                     guard !self.generationHistory.contains(where: { $0.globalSeed == finalState.globalSeed }) else { return }
                     self.generationHistory.append(finalState)
@@ -750,6 +753,18 @@ final class AppState: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Update elapsed time on each bar change so the lock screen seek bar tracks
+        // scrubbing, and so the play/pause button re-syncs after Next Track transitions.
+        playback.$currentBar
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.nowPlaying.update(song: self.songState, isPlaying: self.playback.isPlaying,
+                                       currentStep: self.playback.currentStep)
+            }
+            .store(in: &cancellables)
+
         // Claim Now Playing routing whenever Zudio becomes the active app.
         // AppDelegate posts zudioClaimNowPlaying on applicationDidBecomeActive.
         // playbackState = .playing is a persistent, browser-tick-proof signal that
@@ -784,6 +799,20 @@ final class AppState: ObservableObject {
         platformHost = host
         host.configureAudioSession()
         host.registerKeyboardShortcuts(target: self)
+
+        // When the app backgrounds while stopped, deactivate AVAudioSession so iOS
+        // removes the active-audio inference that causes the lock screen to show ⏸/■.
+        // Both engines must be paused first (setActive(false) fails if any engine is running).
+        // On resume, play() reactivates the session and restarts the engines as needed.
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, !self.playback.isPlaying else { return }
+            self.audioTexture.pauseEngine()
+            self.playback.pauseEngine()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         #endif
 
         // Real-time tempo scrubbing: update live playback when BPM changes on a loaded song
@@ -2456,6 +2485,8 @@ final class AppState: ObservableObject {
     @Published var showExportConfirmation: Bool  = false
     /// Set to a non-nil URL on iOS after fast export completes — views observe this to present a share sheet.
     @Published var fastExportedFileURL: URL? = nil
+    /// Set on export failure so the UI can show an alert.
+    @Published var fastExportErrorMessage: String? = nil
     /// True when a fast export is pending due to low disk space confirmation.
     @Published var showLowDiskSpaceAlert: Bool = false
     nonisolated(unsafe) private var pendingExportURL: URL? = nil
@@ -2909,6 +2940,7 @@ final class AppState: ObservableObject {
                 state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOvr[idx])
             }
             await MainActor.run {
+                state.title = song.title   // preserve the title from when the song was generated
                 self.isGenerating  = false
                 self.selectedStyle = song.style
                 self.keyOverride   = song.keyOverride
@@ -2963,7 +2995,21 @@ final class AppState: ObservableObject {
     }
 
     private func launchFastExport(song: SongState, url: URL) {
-        let programs        = (0..<kTrackCount).map { playback.loadedProgram(forTrack: $0) }
+        var programs        = (0..<kTrackCount).map { playback.loadedProgram(forTrack: $0) }
+        // Lead Synth is a fixed Polysynth (90) doubler — it has no instrument pool and
+        // loadedProgram() returns 255 on iOS after cache invalidation. Restore the default
+        // so OfflineExport doesn't try to load a non-existent GM patch 255.
+        if programs[kTrackLeadSynth] == 255 {
+            programs[kTrackLeadSynth] = kDefaultGMPrograms[kTrackLeadSynth] ?? 90
+        }
+        // If instruments haven't loaded yet (program 255 = never loaded), don't attempt export.
+        // This can happen when an old saved song is loaded and the user taps Export immediately.
+        if programs.allSatisfy({ $0 == 255 }) {
+            let msg = "Song not ready — please wait a moment for instruments to load, then try again."
+            fastExportErrorMessage = msg
+            appendToLog([GenerationLogEntry(tag: "⚠️ EXPORT", description: msg)])
+            return
+        }
         let snapshots       = playback.effectSnapshots()
         let textureSnapshot = audioTexture.exportSnapshot()
         let genre           = song.style.rawValue.capitalized
@@ -3008,9 +3054,12 @@ final class AppState: ObservableObject {
                 await MainActor.run { [weak self] in
                     self?.isExportingAudio = false
                     self?.isFastExporting  = false
-                }
-                if !(error is CancellationError) {
-                    print("[FastExport] ❌ \(error.localizedDescription)")
+                    if !(error is CancellationError) {
+                        let msg = error.localizedDescription
+                        print("[FastExport] ❌ \(msg)")
+                        self?.fastExportErrorMessage = msg
+                        self?.appendToLog([GenerationLogEntry(tag: "⚠️ EXPORT", description: msg)])
+                    }
                 }
             }
         }

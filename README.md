@@ -17,11 +17,11 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.1/Zudio-1.1.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.3/Zudio-1.3.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `1.1` (build 116). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `1.3` (build 117). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v1.1:**
+**What's new in v1.3:**
 - **Fast audio export** — offline render completes in ~15 sec (15–40× faster than real-time); iOS share sheet for saving or sharing
 - **Chill** — more melodic solos with recurring themes, new pad textures, more rhythm and secondary lead variety
 - **Kosmic** — more melodic lead lines (directional arc phrasing), improved pad and bass sequencer variety

@@ -1,5 +1,12 @@
 # Zudio Change Log
 
+## V 1.3 (Build 117)  Bug fixes
+
+- **iPhone lock screen transport sync fix** — iOS Lock screen play/pause button now correctly reflects Zudio's playback state at all times.
+- **Kosmic audio export fix** — Fixed a bug where Kosmic songs did not export properly on iOS.
+
+---
+
 ## V 1.1 (Build 116)  Fast audio export and musical improvements
 
 - **Fast audio export** — Now uses an offline render 15–40× faster (about 15 sec) instead of real-time capture. On iOS, a share sheet appears so the file can be saved or shared.

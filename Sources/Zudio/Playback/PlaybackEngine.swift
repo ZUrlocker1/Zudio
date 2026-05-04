@@ -234,7 +234,14 @@ final class PlaybackEngine: ObservableObject {
 
     init() {
         setupEngine()
+        #if os(iOS)
+        // On iOS, defer engine start to the first play() call. Starting the engine at init
+        // activates AVAudioSession immediately, which makes iOS infer "audio in progress"
+        // and shows ⏸ on the lock screen transport before any song has played.
+        // play() calls setActive(true) + startEngine() when the user first taps Play.
+        #else
         startEngine()
+        #endif
         registerAudioNotifications()
     }
 
@@ -438,6 +445,16 @@ final class PlaybackEngine: ObservableObject {
         // The session is only deactivated by the OS when another app takes audio focus
         // (interruptionNotification .began), which is the correct trigger.
     }
+
+    #if os(iOS)
+    /// Pause the engine without releasing it (preserves AUSampler soundbank state).
+    /// Called when the app backgrounds while stopped so AppState can deactivate
+    /// AVAudioSession — an active session causes iOS to show ⏸ on the lock screen.
+    func pauseEngine() {
+        guard engine.isRunning else { return }
+        engine.pause()
+    }
+    #endif
 
     /// Instantly silences master output without stopping the scheduler or resetting audio units.
     /// Use before presenting a system sheet (share, document picker) to avoid the click that

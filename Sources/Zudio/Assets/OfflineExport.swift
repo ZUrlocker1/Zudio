@@ -70,7 +70,7 @@ enum OfflineExport {
         }
 
         let activeTracks = (0..<min(programs.count, state.trackEvents.count))
-            .filter { !state.trackEvents[$0].isEmpty }
+            .filter { !state.trackEvents[$0].isEmpty && programs[$0] != 255 }
 
         guard !activeTracks.isEmpty else {
             throw ExportError.auError(-1, "No active tracks to render")

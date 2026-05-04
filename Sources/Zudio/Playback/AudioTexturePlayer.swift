@@ -16,8 +16,6 @@ final class AudioTexturePlayer {
     private let boostNode  = AVAudioMixerNode()
     private let eqNode     = AVAudioUnitEQ(numberOfBands: 2)
     private let reverbNode = AVAudioUnitReverb()
-    private let pitchNode  = AVAudioUnitTimePitch()
-
     private var fadeTimer: Timer?
     private var panTimer:  Timer?
     private var panPhase:  Double = 0
@@ -65,6 +63,15 @@ final class AudioTexturePlayer {
         }
     }
 
+    #if os(iOS)
+    /// Pause the engine without releasing it. Called before AppState deactivates
+    /// AVAudioSession when the app backgrounds while stopped.
+    func pauseEngine() {
+        guard engine.isRunning else { return }
+        engine.pause()
+    }
+    #endif
+
     /// Live swap to a different texture (e.g. user cycling picker): fast crossfade ≤500 ms.
     func switchTexture(_ filename: String?, offsetSeconds: Int = 0) {
         guard let filename else { stopImmediate(); return }
@@ -109,7 +116,6 @@ final class AudioTexturePlayer {
         engine.attach(boostNode)
         engine.attach(eqNode)
         engine.attach(reverbNode)
-        engine.attach(pitchNode)
 
         // Band 0 — low shelf: +5 dB at 80 Hz (user "Low" effect, ON by default)
         eqNode.bands[0].filterType = .lowShelf
@@ -129,16 +135,11 @@ final class AudioTexturePlayer {
         reverbNode.wetDryMix = 22
         reverbNode.auAudioUnit.shouldBypassEffect = false
 
-        // Pitch node: unity; set at play time for subtle variation
-        pitchNode.pitch = 0
-        pitchNode.rate  = 1.0
-
-        // Chain: player → boost → eq → reverb → pitch → main
-        engine.connect(playerNode, to: boostNode,          format: nil)
-        engine.connect(boostNode,  to: eqNode,             format: nil)
-        engine.connect(eqNode,     to: reverbNode,         format: nil)
-        engine.connect(reverbNode, to: pitchNode,          format: nil)
-        engine.connect(pitchNode,  to: engine.mainMixerNode, format: nil)
+        // Chain: player → boost → eq → reverb → main
+        engine.connect(playerNode, to: boostNode,            format: nil)
+        engine.connect(boostNode,  to: eqNode,               format: nil)
+        engine.connect(eqNode,     to: reverbNode,           format: nil)
+        engine.connect(reverbNode, to: engine.mainMixerNode, format: nil)
 
         try? engine.start()
     }
@@ -166,8 +167,6 @@ final class AudioTexturePlayer {
 
     private func startFile(filename: String, fastFadeIn: Bool = false, offsetSeconds: Int = 0) {
         guard let url = textureURL(filename: filename) else { return }
-        pitchNode.pitch = 0
-        pitchNode.rate  = 1.0
         currentFilename = filename
         currentTargetVolume = volumeForTexture(filename)
         if bypassEffects {

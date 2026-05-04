@@ -85,12 +85,16 @@ final class NowPlayingController {
             return .success
         }
 
-        // Stop
+        // Stop — macOS only; on iOS stopCommand.isEnabled=true displays ■ instead of ▶/⏸
+        #if os(macOS)
         center.stopCommand.isEnabled = true
         center.stopCommand.addTarget { [weak self] _ in
             DispatchQueue.main.async { self?.appState?.stop() }
             return .success
         }
+        #else
+        center.stopCommand.isEnabled = false
+        #endif
 
         // Previous track (F7 / ⏮) → go to beginning
         center.previousTrackCommand.isEnabled = true
@@ -132,14 +136,13 @@ final class NowPlayingController {
     // MARK: - Now Playing info
 
     /// Call whenever song or play state changes.
-    ///
-    /// `playbackState` is the key signal: it is a first-class property separate from
-    /// `nowPlayingInfo` and is NOT overwritten by browser elapsed-time ticks. Setting it
-    /// explicitly is the macOS equivalent of iOS's AVAudioSession.setActive(true), and is
-    /// required for reliable media-key routing (IINA issue #3340, fix PR #3579).
     func update(song: SongState?, isPlaying: Bool, currentStep: Int) {
         let center = MPNowPlayingInfoCenter.default()
+        // playbackState is macOS-only for third-party apps; setting it on iOS requires
+        // a private Apple entitlement and is silently ignored.
+        #if os(macOS)
         center.playbackState = isPlaying ? .playing : .paused
+        #endif
 
         if let song {
             let elapsed = Double(currentStep) * song.frame.secondsPerStep
@@ -161,28 +164,18 @@ final class NowPlayingController {
             if let artwork = cachedArtwork { info[MPMediaItemPropertyArtwork] = artwork }
             center.nowPlayingInfo = info
         }
-
-        // iOS only: re-assert paused state after a short delay to win the race against
-        // AVAudioSession deactivation that occurs when audio ends naturally. Without this,
-        // the lock screen transport stays in "playing" state after a song finishes on its own.
-        #if os(iOS)
-        if !isPlaying {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                MPNowPlayingInfoCenter.default().playbackState = .paused
-            }
-        }
-        #endif
     }
 
     /// Claim Now Playing routing from other apps (e.g. a browser with a playing tab).
-    ///
-    /// Sets playbackState = .playing — a persistent signal that browsers cannot overwrite
-    /// (they only update their own nowPlayingInfo, not our playbackState). After 100 ms,
-    /// restores the true state. This is the approach used by IINA and VLC on macOS.
+    /// macOS only — on iOS this is never called (AppDelegate is macOS-only).
     func claimFocus(song: SongState?, isPlaying: Bool, currentStep: Int) {
+        #if os(macOS)
         MPNowPlayingInfoCenter.default().playbackState = .playing
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) { [weak self] in
             self?.update(song: song, isPlaying: isPlaying, currentStep: currentStep)
         }
+        #else
+        update(song: song, isPlaying: isPlaying, currentStep: currentStep)
+        #endif
     }
 }

@@ -89,6 +89,15 @@ struct PhonePlayerView: View {
             PhonePlayerView.presentShareForFile(url: url)
             appState.fastExportedFileURL = nil
         }
+        // Export error alert
+        .alert("Export Failed", isPresented: Binding(
+            get: { appState.fastExportErrorMessage != nil },
+            set: { if !$0 { appState.fastExportErrorMessage = nil } }
+        )) {
+            Button("OK") { appState.fastExportErrorMessage = nil }
+        } message: {
+            Text(appState.fastExportErrorMessage ?? "")
+        }
         // File importer for loading .zudio songs — single instance at root.
         .fileImporter(
             isPresented: $showFileImporter,
@@ -840,7 +849,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.1")
+                    Text("Generative music · v1.3")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
