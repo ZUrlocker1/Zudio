@@ -1,7 +1,7 @@
 // ChillMusicalFrameGenerator.swift — Chill generation step 1
 // Copyright (c) 2026 Zack Urlocker
 // Produces a GlobalMusicalFrame tuned for nu-jazz / acid jazz / chill-out style.
-// Tempo: Deep/Dream 72–92 BPM (peak 83), Bright/Free 88–110 BPM (peak 96).
+// Tempo: Deep/Dream 72–92 BPM (peak 83), Bright/Free 88–110 BPM (peak 96). Blues: always 85–92 BPM (peak 88).
 // Four moods: Deep 35%, Dream 30%, Free 20%, Bright 15%.
 // Four modes: Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%.
 
@@ -14,32 +14,56 @@ struct ChillMusicalFrameGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        forceBeatStyle: ChillBeatStyle? = nil
+        forceBeatStyle: ChillBeatStyle? = nil,
+        forceBluesVariation: Bool = false
     ) -> (frame: GlobalMusicalFrame,
           chillProgFamily: ChillProgressionFamily,
           chillLeadInstrument: ChillLeadInstrument,
           chillBeatStyle: ChillBeatStyle,
-          chillSwingFeel: Bool) {
+          chillSwingFeel: Bool,
+          chillBluesVariation: Bool) {
 
-        let mood   = moodOverride ?? pickMood(rng: &rng)
-        let key    = keyOverride  ?? pickKey(rng: &rng)
-        let mode   = pickMode(rng: &rng)
+        let mood = moodOverride ?? pickMood(rng: &rng)
+        let key  = keyOverride  ?? pickKey(rng: &rng)
 
-        let progFamily   = pickProgressionFamily(rng: &rng)
-        let leadInst     = pickLeadInstrument(mood: mood, rng: &rng)
-        // forceBeatStyle overrides generation (used by best-first-song)
-        let beatStyle    = forceBeatStyle ?? pickBeatStyle(mood: mood, rng: &rng)
-        let swingFeel    = false  // swing not yet implemented (requires sub-step timing)
+        // Blues Chill activation: 20% of Chill songs.
+        let bluesVariation = forceBluesVariation || rng.nextDouble() < 0.20
 
-        // Tempo picked after beat style so stGermain can bias toward its faster range
-        let tempo  = tempoOverride ?? pickTempo(mood: mood, rng: &rng, beatStyle: beatStyle)
-        let total  = pickTotalBars(tempo: tempo, rng: &rng)
+        // Blues forces Dorian (Im7 / IVm7 / V7 are diatonic to Dorian only).
+        let mode = bluesVariation ? Mode.Dorian : pickMode(rng: &rng)
+
+        let progFamily = pickProgressionFamily(rng: &rng)
+
+        // Blues uses a dedicated instrument pool (all blues-appropriate horns/reeds).
+        let leadInst = bluesVariation
+            ? pickLeadInstrumentBlues(rng: &rng)
+            : pickLeadInstrument(mood: mood, rng: &rng)
+
+        // Blues excludes stGermain and hipHopJazz beat styles.
+        // forceBeatStyle from best-first-song/load path takes priority in all cases.
+        let beatStyle = forceBeatStyle ?? (bluesVariation
+            ? pickBeatStyleBlues(mood: mood, rng: &rng)
+            : pickBeatStyle(mood: mood, rng: &rng))
+
+        let swingFeel = false  // swing not yet implemented (requires sub-step timing)
+
+        // Tempo picked after beat style so stGermain can bias toward its faster range.
+        // Blues range: 85–92 BPM. Re-roll once if the initial pick lands outside that window.
+        var tempo = tempoOverride ?? pickTempo(mood: mood, rng: &rng, beatStyle: beatStyle)
+        if bluesVariation && tempoOverride == nil && (tempo < 85 || tempo > 92) {
+            tempo = triangularInt(min: 85, peak: 88, max: 92, rng: &rng)
+        }
+
+        // Blues: cap total bars so grooveTotal stays within 4–5 complete 16-bar forms.
+        // 5 forms × 16 + max intro (4) + outro (2) = 86. Beyond that the form repeats too many times.
+        var total = pickTotalBars(tempo: tempo, rng: &rng)
+        if bluesVariation { total = Swift.min(total, 86) }
 
         let frame = GlobalMusicalFrame(
             key: key, mode: mode, tempo: tempo, mood: mood,
             progressionFamily: .static_tonic, totalBars: total
         )
-        return (frame, progFamily, leadInst, beatStyle, swingFeel)
+        return (frame, progFamily, leadInst, beatStyle, swingFeel, bluesVariation)
     }
 
     // MARK: - Private helpers
@@ -98,20 +122,36 @@ struct ChillMusicalFrameGenerator {
     }
 
     private static func pickLeadInstrument(mood: Mood, rng: inout SeededRNG) -> ChillLeadInstrument {
-        // Lead 1 pool: muted trumpet, tenor sax, alto sax, trumpet — ~25% muted trumpet across moods.
+        // Lead 1 pool: muted trumpet, tenor sax, alto sax, trumpet, clarinet.
         // Soprano sax, vibraphone, trombone, flute are Lead 2 only.
+        // Clarinet at 10% across moods — blues/jazz character; auditioning.
         switch mood {
         case .Deep, .Dream:
-            // Muted Trumpet 25%, Alto Sax 30%, Trumpet 20%, Tenor Sax 25%
-            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax]
-            let weights: [Double]              = [0.25,          0.30,       0.20,     0.25]
+            // Muted Trumpet 23%, Alto Sax 27%, Trumpet 20%, Tenor Sax 20%, Clarinet 10%
+            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
+            let weights: [Double]              = [0.23,          0.27,       0.20,     0.20,      0.10]
             return insts[rng.weightedPick(weights)]
         case .Free, .Bright:
-            // Muted Trumpet 25%, Trumpet 20%, Tenor Sax 35%, Alto Sax 20%
-            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .trumpet, .tenorSax, .saxophone]
-            let weights: [Double]              = [0.25,          0.20,     0.35,      0.20]
+            // Muted Trumpet 23%, Trumpet 18%, Tenor Sax 32%, Alto Sax 17%, Clarinet 10%
+            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .trumpet, .tenorSax, .saxophone, .clarinet]
+            let weights: [Double]              = [0.23,          0.18,     0.32,      0.17,       0.10]
             return insts[rng.weightedPick(weights)]
         }
+    }
+
+    private static func pickBeatStyleBlues(mood: Mood, rng: inout SeededRNG) -> ChillBeatStyle {
+        // Blues excludes stGermain and hipHopJazz; brushKit 40%, neoSoul 35%, electronic 25%.
+        let r = rng.nextDouble()
+        if r < 0.40 { return .brushKit }
+        if r < 0.75 { return .neoSoul }
+        return .electronic
+    }
+
+    private static func pickLeadInstrumentBlues(rng: inout SeededRNG) -> ChillLeadInstrument {
+        // Blues-appropriate horns/reeds — all capable of blues phrasing.
+        let insts:   [ChillLeadInstrument] = [.tenorSax, .saxophone, .clarinet, .mutedTrumpet, .trumpet]
+        let weights: [Double]              = [0.30,       0.22,       0.20,      0.18,          0.10]
+        return insts[rng.weightedPick(weights)]
     }
 
     private static func pickBeatStyle(mood: Mood, rng: inout SeededRNG) -> ChillBeatStyle {

@@ -16,19 +16,26 @@ struct ChillRhythmGenerator {
         mood: Mood,
         beatStyle: ChillBeatStyle = .electronic,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
+        bluesVariation: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
-        // Hip-hop jazz beat style always uses the acid jazz stab groove
         let compingMode: CompingMode
-        if beatStyle == .hipHopJazz {
+        if bluesVariation {
+            // Blues: mobyBackbeat 70%, stGermainSyncopated 30% — open to all moods.
+            compingMode = rng.nextDouble() < 0.70 ? .mobyBackbeat : .stGermainSyncopated
+        } else if beatStyle == .hipHopJazz {
             compingMode = .acidJazzStab
         } else {
             compingMode = pickCompingMode(mood: mood, rng: &rng)
         }
         usedRuleIDs.insert(compingMode.ruleID)
+        // Blues intro: keyboard enters at bar 1 (50%) or bar 3 (50%) — not from bar 0.
+        let bluesKeyboardBar: Int = bluesVariation ? (rng.nextDouble() < 0.50 ? 1 : 3) : 0
         return generateComping(frame: frame, structure: structure,
-                                compingMode: compingMode, breakdownStyle: breakdownStyle, rng: &rng)
+                                compingMode: compingMode, breakdownStyle: breakdownStyle,
+                                bluesVariation: bluesVariation, bluesKeyboardBar: bluesKeyboardBar,
+                                rng: &rng)
     }
 
     // MARK: - Comping modes
@@ -80,6 +87,8 @@ struct ChillRhythmGenerator {
     private static func generateComping(frame: GlobalMusicalFrame, structure: SongStructure,
                                          compingMode: CompingMode,
                                          breakdownStyle: ChillBreakdownStyle,
+                                         bluesVariation: Bool = false,
+                                         bluesKeyboardBar: Int = 0,
                                          rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let scalePCs  = frame.scalePCs
@@ -106,8 +115,15 @@ struct ChillRhythmGenerator {
                 }
             }
 
-            // Intro and outro: silent
-            if label == .intro || label == .outro { continue }
+            // Outro: always silent
+            if label == .outro { continue }
+            // Intro: silent unless blues (keyboard enters at bluesKeyboardBar)
+            if label == .intro {
+                if !bluesVariation { continue }
+                let introStart = structure.introSection?.startBar ?? 0
+                if bar - introStart < bluesKeyboardBar { continue }
+                // Fall through to normal comping for remaining intro bars
+            }
 
             // Breakdown handling
             if label == .bridge {
@@ -176,12 +192,16 @@ struct ChillRhythmGenerator {
 
             switch compingMode {
             case .stGermainSyncopated:
-                events += stGermainSyncopated(base: base, voicing: voicing, rng: &rng)
+                events += stGermainSyncopated(base: base, voicing: voicing, bar: bar,
+                                               sectionStart: section?.startBar ?? 0,
+                                               rng: &rng)
             case .mobyBackbeat:
                 events += mobyBackbeat(base: base, voicing: voicing, bar: bar, rng: &rng)
             case .bosaMoonArpeggiated:
                 events += bosaMoonArpeggiated(base: base, voicing: voicing, frame: frame,
-                                               chord: chord, rng: &rng)
+                                               chord: chord, bar: bar,
+                                               sectionStart: section?.startBar ?? 0,
+                                               rng: &rng)
             case .acidJazzStab:
                 events += acidJazzStab(base: base, voicing: voicing, bar: bar, rng: &rng)
             }
@@ -191,28 +211,52 @@ struct ChillRhythmGenerator {
 
     // MARK: - CHL-RHY-001: St Germain Syncopated
 
-    /// Chord strikes on beat 1 (step 0) and AND of beat 2 (step 6) — matching St Germain
-    /// "So Flute" piano: steps 1 and 7 in the MIDI (0-indexed: 0 and 6).
-    /// Occasional fill on step 10 or 14 (AND of beat 3 or beat 4) at 30%.
+    /// Beat 1 + syncopated second hit per bar. After 16 bars:
+    /// second hit slides from AND-of-2 (step 6) to AND-of-3 (step 10) every 16 bars;
+    /// every 4th bar becomes a single-hit bar (beat 1 only) for breathing room.
     private static func stGermainSyncopated(base: Int, voicing: [Int],
+                                             bar: Int, sectionStart: Int,
                                              rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
-        // Beat 1 downbeat: step 0
+
+        let barInSection = bar - sectionStart
+        let period16     = barInSection / 16
+
+        // Variation 2: second-hit position shifts every 16 bars.
+        // Period 0, 2, 4… → AND of beat 2 (step 6, original).
+        // Period 1, 3, 5… → AND of beat 3 (step 10, one beat later).
+        let secondHitStep = period16 % 2 == 0 ? 6 : 10
+
+        // Variation 3: sparse single-hit bar every 4 bars, starting from bar 16 of section.
+        // Sparse bars also use shell voicing [3rd, 7th] — drop the 5th for a lighter touch.
+        let isSparseBar   = period16 >= 1 && barInSection % 4 == 3
+        let activeVoicing = isSparseBar && voicing.count >= 3
+            ? [voicing[0], voicing[voicing.count - 1]]
+            : voicing
+
+        // Beat 1 downbeat: always present
         let vel1 = UInt8(75 + rng.nextInt(upperBound: 11))
-        for note in voicing {
+        for note in activeVoicing {
             events.append(MIDIEvent(stepIndex: base + 0, note: UInt8(note), velocity: vel1, durationSteps: 5))
         }
-        // AND of beat 2: step 6
-        let vel2 = UInt8(70 + rng.nextInt(upperBound: 11))
-        for note in voicing {
-            events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(note), velocity: vel2, durationSteps: 5))
-        }
-        // Occasional fill at step 10 (AND of beat 3) or step 14 (AND of beat 4)
-        if rng.nextDouble() < 0.30 {
-            let fillStep = rng.nextDouble() < 0.50 ? 10 : 14
-            let vel3 = UInt8(55 + rng.nextInt(upperBound: 11))
+
+        if !isSparseBar {
+            // Second syncopated hit
+            let vel2 = UInt8(70 + rng.nextInt(upperBound: 11))
             for note in voicing {
-                events.append(MIDIEvent(stepIndex: base + fillStep, note: UInt8(note), velocity: vel3, durationSteps: 3))
+                events.append(MIDIEvent(stepIndex: base + secondHitStep, note: UInt8(note),
+                                        velocity: vel2, durationSteps: 5))
+            }
+            // Occasional fill at AND of beat 3 or beat 4 (skip if second hit is already at step 10)
+            if rng.nextDouble() < 0.30 {
+                let fillStep = secondHitStep == 6
+                    ? (rng.nextDouble() < 0.50 ? 10 : 14)
+                    : 14   // period 1: second hit is at 10, so fill can only go to 14
+                let vel3 = UInt8(55 + rng.nextInt(upperBound: 11))
+                for note in voicing {
+                    events.append(MIDIEvent(stepIndex: base + fillStep, note: UInt8(note),
+                                            velocity: vel3, durationSteps: 3))
+                }
             }
         }
         return events
@@ -316,16 +360,43 @@ struct ChillRhythmGenerator {
 
     /// Chord tones played sequentially on 8th-note grid (~10 notes/bar).
     /// 30–40% chance of block chord on step 0 or step 8.
+    /// After 16 bars: direction flips every 16 bars; sparse quarter-note bar every 4 bars.
     private static func bosaMoonArpeggiated(base: Int, voicing: [Int],
                                              frame: GlobalMusicalFrame,
                                              chord: ChordWindow?,
+                                             bar: Int,
+                                             sectionStart: Int,
                                              rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         guard !voicing.isEmpty else { return events }
 
-        // Build extended arpeggiation pool: cycle through voicing ascending then descending
-        let arpPool = voicing + voicing.reversed()
-        // 8th-note grid: steps 0, 2, 4, 6, 8, 10, 12, 14
+        let barInSection = bar - sectionStart
+        let period16     = barInSection / 16   // increments every 16 bars within the section
+
+        // Variation 2: direction flip every 16 bars.
+        // Period 0, 2, 4… → ascending then descending (original feel).
+        // Period 1, 3, 5… → descending then ascending (mirror feel).
+        let arpPool = period16 % 2 == 0
+            ? voicing + voicing.reversed()
+            : voicing.reversed() + voicing
+
+        // Variation 3: sparse quarter-note bar every 4 bars, starting from bar 16 of the section.
+        // Shell voicing [3rd, 7th] — drop the 5th for a lighter harmonic touch on the sparse bar.
+        let isSparseBar = period16 >= 1 && barInSection % 4 == 3
+        if isSparseBar {
+            let shellVoicing = voicing.count >= 3
+                ? [voicing[0], voicing[voicing.count - 1]]
+                : voicing
+            for step in [0, 4, 8, 12] {
+                let vel = UInt8(63 + rng.nextInt(upperBound: 14))
+                for note in shellVoicing {
+                    events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: 6))
+                }
+            }
+            return events
+        }
+
+        // Dense bar: 8th-note grid, steps 0, 2, 4, 6, 8, 10, 12, 14
         for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
             let note = arpPool[i % arpPool.count]
             let vel  = UInt8(70 + rng.nextInt(upperBound: 16))
@@ -348,8 +419,8 @@ struct ChillRhythmGenerator {
 
     /// CHL-RHY-004: Four syncopated dyad stabs per bar in a repeating cell, derived from
     /// the measured Cantaloop keyboard groove. Stabs land on AND positions — off the beat —
-    /// never on beat 1. Voicing is a 2-note dyad (top two notes: 5th + 7th). Staccato:
-    /// each stab is 1–2 steps. Velocity uniform ~76–89 (programmed feel, minimal dynamics).
+    /// never on beat 1. Voicing is a 2-note dyad (top two notes: 5th + 7th), close position.
+    /// Staccato: each stab is 2 steps. Velocity ~55–70 (lighter feel for Chill mix).
     /// Every 4 bars, one "sparse bar" fires only 2 stabs for breathing room.
     /// Target density: ~8 note events/bar (4 stabs × 2 notes); sparse bar ~4 events/bar.
     private static func acidJazzStab(base: Int, voicing: [Int], bar: Int,
@@ -373,7 +444,7 @@ struct ChillRhythmGenerator {
         }
 
         for step in stabPositions {
-            let vel = UInt8(76 + rng.nextInt(upperBound: 14))
+            let vel = UInt8(55 + rng.nextInt(upperBound: 16))
             for note in dyad {
                 events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
                                         velocity: vel, durationSteps: 2))
@@ -403,12 +474,12 @@ struct ChillRhythmGenerator {
         }
 
         var notes: [Int] = []
-        for (i, interval) in intervals.enumerated() {
+        for interval in intervals {
             let pc = snapTable[(chordRootPC + interval) % 12]
-            // Correct pitch-class-to-MIDI: find nearest note at/above (baseRegister + octaveOffset)
-            // with pitch class pc. Avoids the subtraction bug that produced wrong pitch classes.
-            let octaveOffset = i == 2 ? 12 : 0
-            let target = baseRegister + octaveOffset
+            // Close-position voicing: all three notes in the same register.
+            // Previously the 7th was offset +12, creating a 15-semitone open spread that
+            // sounded harsh on clavinet. One octave of space is all we need here.
+            let target = baseRegister
             let targetPC = target % 12
             let semisUp = (pc - targetPC + 12) % 12
             var note = target + semisUp

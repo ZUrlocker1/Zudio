@@ -17,16 +17,19 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.3/Zudio-1.3.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.4/Zudio-1.4.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `1.3` (build 117). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `1.4` (build 118). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v1.3:**
+**What's new in v1.4:**
+- **Chill Blues** — a new variation appearing in ~1 in 5 Chill songs: 16-bar blues form, warm horns and reeds, brushed or neo-soul drums, and optional two-horn harmony in 25% of songs
+- **Visualizer gestures** — tap, swipe, pinch, and double-tap on the visualizer now fully regenerate a track with new musical rules
 - **Fast audio export** — offline render completes in ~15 sec (15–40× faster than real-time); iOS share sheet for saving or sharing
 - **Chill** — more melodic solos with recurring themes, new pad textures, more rhythm and secondary lead variety
 - **Kosmic** — more melodic lead lines (directional arc phrasing), improved pad and bass sequencer variety
 - **Ambient** — new bass rules and a new secondary lead phrase form
 - **Motorik** — more drum variation
+- **iOS 17 fix** — fixed a bug where turning off Reverb on any track would silence it entirely on iOS 17
 
 ---
 

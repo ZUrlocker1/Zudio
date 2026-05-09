@@ -194,6 +194,7 @@ enum ChillLeadInstrument: String, Codable, Sendable {
     case sopranoSax    // GM 64 — brighter reed; Lead 2
     case trumpet       // GM 56 — open horn; Lead 1
     case trombone      // GM 57 — warm low brass; Lead 2
+    case clarinet      // GM 71 — chalumeau register; Lead 1 (blues/jazz)
 
     var gmProgram: UInt8 {
         switch self {
@@ -205,6 +206,7 @@ enum ChillLeadInstrument: String, Codable, Sendable {
         case .sopranoSax:   return 64
         case .trumpet:      return 56
         case .trombone:     return 57
+        case .clarinet:     return 71
         }
     }
 }

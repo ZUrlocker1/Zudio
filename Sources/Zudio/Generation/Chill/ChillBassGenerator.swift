@@ -14,9 +14,16 @@ struct ChillBassGenerator {
         chillProgFamily: ChillProgressionFamily,
         beatStyle: ChillBeatStyle,
         breakdownStyle: ChillBreakdownStyle,
+        bluesVariation: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
+        // Blues Chill uses dedicated blues bass pool (overrides beat-style routing)
+        if bluesVariation {
+            return bluesBass(frame: frame, structure: structure, breakdownStyle: breakdownStyle,
+                             rng: &rng, usedRuleIDs: &usedRuleIDs)
+        }
+
         // St Germain beat style always uses the 8th-note ostinato (CHL-BASS-007)
         if beatStyle == .stGermain {
             usedRuleIDs.insert("CHL-BASS-007")
@@ -220,24 +227,35 @@ struct ChillBassGenerator {
 
     // MARK: - Root sustain (CHL-BASS-001)
 
+    /// firstBForm: guaranteed two-feel (root beats 1–2, 5th beats 3–4) — replaces the
+    /// probabilistic 5th and approach embellishments with locked movement for B-section contrast.
     private static func rootSustainPattern(base: Int, chordRoot: Int, scale: [Int],
-                                            rng: inout SeededRNG) -> [MIDIEvent] {
+                                            rng: inout SeededRNG,
+                                            firstBForm: Bool = false) -> [MIDIEvent] {
         var result: [MIDIEvent] = []
         let rootNote = clampBass(chordRoot)
-        result.append(MIDIEvent(stepIndex: base, note: UInt8(rootNote),
-                                velocity: UInt8(75 + rng.nextInt(upperBound: 11)), durationSteps: 12))
-        // Optional 5th on beat 3 (60%, raised from 40% to add pitch variety)
-        if rng.nextDouble() < 0.60 {
-            let fifth = snapToScale(chordRoot + 7, scale: scale)
-            result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(clampBass(fifth)),
-                                    velocity: UInt8(65 + rng.nextInt(upperBound: 11)), durationSteps: 4))
-        }
-        // Occasional approach tone on beat 3-AND (25%) — adds forward motion between bars
-        if rng.nextDouble() < 0.25 {
-            let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
-            if approach != clampBass(chordRoot) {
-                result.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach),
-                                        velocity: UInt8(60 + rng.nextInt(upperBound: 8)), durationSteps: 3))
+        let fifth    = clampBass(snapToScale(chordRoot + 7, scale: scale))
+
+        if firstBForm {
+            // B-form: locked two-feel — root on beats 1–2, 5th on beats 3–4.
+            result.append(MIDIEvent(stepIndex: base,     note: UInt8(rootNote), velocity: UInt8(80 + rng.nextInt(upperBound: 10)), durationSteps: 8))
+            result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(fifth),    velocity: UInt8(72 + rng.nextInt(upperBound: 10)), durationSteps: 7))
+        } else {
+            // A-section: long root sustain with optional embellishments.
+            result.append(MIDIEvent(stepIndex: base, note: UInt8(rootNote),
+                                    velocity: UInt8(75 + rng.nextInt(upperBound: 11)), durationSteps: 12))
+            // Optional 5th on beat 3 (60%)
+            if rng.nextDouble() < 0.60 {
+                result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(fifth),
+                                        velocity: UInt8(65 + rng.nextInt(upperBound: 11)), durationSteps: 4))
+            }
+            // Occasional approach tone (25%) — adds forward motion between bars
+            if rng.nextDouble() < 0.25 {
+                let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
+                if approach != clampBass(chordRoot) {
+                    result.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach),
+                                            velocity: UInt8(60 + rng.nextInt(upperBound: 8)), durationSteps: 3))
+                }
             }
         }
         return result
@@ -691,6 +709,315 @@ struct ChillBassGenerator {
             }
         }
         return events
+    }
+
+    // MARK: - Blues bass dispatcher (CHL-BASS-009 / CHL-BASS-010 / CHL-BASS-011)
+
+    /// Selects one blues bass pattern for the whole song, then applies it per bar.
+    /// Pool: CHL-BASS-009 (30%), CHL-BASS-011 (25%), CHL-BASS-001 (20%), CHL-BASS-003 (15%), CHL-BASS-010 (10%).
+    private static func bluesBass(frame: GlobalMusicalFrame, structure: SongStructure,
+                                   breakdownStyle: ChillBreakdownStyle,
+                                   rng: inout SeededRNG,
+                                   usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        let roll = rng.nextDouble()
+        let usePickup    = roll < 0.30
+        let useAscending = roll < 0.55
+        let useWalking   = roll < 0.70
+        let usePulse     = roll >= 0.90
+
+        if usePickup         { usedRuleIDs.insert("CHL-BASS-009") }
+        else if useAscending { usedRuleIDs.insert("CHL-BASS-011") }
+        else if useWalking   { usedRuleIDs.insert("CHL-BASS-001") }
+        else if usePulse     { usedRuleIDs.insert("CHL-BASS-010") }
+        else                 { usedRuleIDs.insert("CHL-BASS-003") }
+
+        // IV/V chord bass style — chosen once, applied to every IV and V bar in the song.
+        let ivvRoll = rng.nextDouble()
+        let ivvIsHold     = ivvRoll < 1.0 / 3.0
+        let ivvIsApproach = ivvRoll < 2.0 / 3.0
+        // else: two-feel
+
+        // CHL-BASS-011 ascending riff variant parameters (1a/1b/1c) — chosen once for the whole song.
+        let riffRhythmTemplate = rng.nextInt(upperBound: 3)   // 0=A (default), 1=B (long land), 2=C (dotted)
+        let riffAscendingOpener = rng.nextDouble() < 0.50     // true = 5th→6th, false = 6th→5th
+        let riffTailRoll = rng.nextDouble()
+        let riffTailInterval = riffTailRoll < 0.60 ? 10 : (riffTailRoll < 0.85 ? 5 : 12)  // b7 / 4th / root8va
+
+        // CHL-BASS-009 pickup variant parameters — chosen once for the whole song.
+        let pickupIsB3    = rng.nextDouble() < 0.30           // pickup note: b3 (30%) or 5th (70%)
+        let step12Roll    = rng.nextDouble()
+        let step12Interval = step12Roll < 0.60 ? 10 : (step12Roll < 0.85 ? 3 : 7)  // b7 / b3 / 5th
+        let echoRoll      = rng.nextDouble()
+        let echoStyle     = echoRoll < 0.65 ? 0 : (echoRoll < 0.85 ? 1 : 2)  // 0=echo, 1=silence, 2=ghost
+
+        var events: [MIDIEvent] = []
+        // CHL-BASS-012: bar 16 of each 16-bar blues cycle — plain root hold.
+        // A and B sections each have their own form clock so turnarounds fire in both.
+        let bSectionStart = structure.sections.first { $0.label == .B }?.startBar ?? -1
+        let aSectionStart = structure.sections.first { $0.label == .A }?.startBar ?? bSectionStart
+
+        for bar in 0..<frame.totalBars {
+            let section = structure.section(atBar: bar)
+            let label   = section?.label ?? .A
+            let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chordRoot = chordRootNote(frame: frame, chord: chord)
+            let scale     = scaleNotes(frame: frame, chord: chord)
+            let base      = bar * 16
+
+            // Cold start: bar 0 is drums-only, bass silent
+            if case .coldStart = structure.introStyle, bar == 0 { continue }
+
+            // Cold stop guards
+            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
+                if bar >= outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
+                                            velocity: 80, durationSteps: 3))
+                    continue
+                }
+            }
+
+            switch label {
+            case .bridge:
+                usedRuleIDs.insert("CHL-BASS-005")
+                let breakdownBar = bar - (section?.startBar ?? bar)
+                // Blues breakdown: root sustain with simple embellishment
+                let root = clampBass(chordRoot)
+                let fifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
+                let sectionLen  = section?.lengthBars ?? 4
+                let isLastBDBar = (breakdownBar == sectionLen - 1)
+                if isLastBDBar {
+                    events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),  velocity: 88, durationSteps: 6))
+                    events.append(MIDIEvent(stepIndex: base + 8,  note: UInt8(fifth), velocity: 78, durationSteps: 4))
+                    events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(root),  velocity: 84, durationSteps: 3))
+                } else {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                            velocity: UInt8(78 + rng.nextInt(upperBound: 10)), durationSteps: 14))
+                }
+
+            case .intro:
+                // Blues intro: full groove bass from bar 1 — establishes the pocket immediately.
+                // Bar 0 is already silenced by the coldStart guard above.
+                if usePickup {
+                    events += bluesPickup(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
+                                          pickupIsB3: pickupIsB3, step12Interval: step12Interval, echoStyle: echoStyle)
+                } else if useAscending {
+                    events += bluesAscendingRiff(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
+                                                 rhythmTemplate: riffRhythmTemplate,
+                                                 ascendingOpener: riffAscendingOpener,
+                                                 tailInterval: riffTailInterval,
+                                                 bSection: false)
+                } else if useWalking {
+                    events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
+                } else if usePulse {
+                    events += quarterPulse(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
+                } else {
+                    events += walkingLine(bar: bar, chordRoot: chordRoot, scale: scale, rng: &rng)
+                }
+
+            default:
+                // CHL-BASS-012: bar 16 of each 16-bar blues cycle — plain root hold.
+                // Matches the turnaround crash in the drum track; the bare note lets the
+                // crash and drum fill breathe without competing bass movement.
+                // Each section uses its own form clock so turnarounds align in both A and B sections.
+                let posInForm     = (label == .B) ? (bar - bSectionStart) : (bar - aSectionStart)
+                let isTurnaroundBar = (label == .A || label == .B) && posInForm >= 15 && (posInForm + 1) % 16 == 0
+                // Pickup riff plays its normal groove through turnarounds and IV/V bars (transposed).
+                if isTurnaroundBar && !usePickup {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
+                                            velocity: 88, durationSteps: 14))
+                    break
+                }
+
+                // IV and V chords: simplified pattern chosen once per song (ivvIsHold / ivvIsApproach / two-feel).
+                // Pickup songs bypass this — the riff handles all chord contexts itself.
+                let isIV = chord?.chordRoot == "4" && chord?.chordType == .min7
+                let isV  = chord?.chordType == .dom7  // dom7 only appears on V in the blues cycle
+
+                // True for the first full 16-bar blues form in B section — enables B-form variants.
+                let isFirstBForm = label == .B && posInForm < 32
+
+                if (isIV || isV) && !usePickup {
+                    let root = clampBass(chordRoot)
+                    if ivvIsHold {
+                        // Root hold: single sustained note spotlights the chord change.
+                        events.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                                velocity: UInt8(84 + rng.nextInt(upperBound: 8)), durationSteps: 14))
+                    } else if ivvIsApproach {
+                        // Root + chromatic approach: root holds through beat 3, half-step below
+                        // the next chord's root on beat 4 — pulls into the resolution.
+                        let nextRoot = nextChordRootNote(bar: bar, frame: frame, structure: structure)
+                        let approach = clampBass(nextRoot - 1)
+                        events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),     velocity: UInt8(86 + rng.nextInt(upperBound: 8)), durationSteps: 11))
+                        events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach),  velocity: UInt8(76 + rng.nextInt(upperBound: 8)), durationSteps: 2))
+                    } else {
+                        // Two-feel: root on beat 1, fifth on beat 3 — half-time groove.
+                        let fifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
+                        events.append(MIDIEvent(stepIndex: base,     note: UInt8(root),  velocity: UInt8(84 + rng.nextInt(upperBound: 8)), durationSteps: 7))
+                        events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(fifth), velocity: UInt8(76 + rng.nextInt(upperBound: 8)), durationSteps: 7))
+                    }
+                } else if usePickup {
+                    events += bluesPickup(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
+                                          firstBForm: isFirstBForm,
+                                          pickupIsB3: pickupIsB3, step12Interval: step12Interval, echoStyle: echoStyle)
+                } else if useAscending {
+                    events += bluesAscendingRiff(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
+                                                 rhythmTemplate: riffRhythmTemplate,
+                                                 ascendingOpener: riffAscendingOpener,
+                                                 tailInterval: riffTailInterval,
+                                                 bSection: isFirstBForm,
+                                                 echoAsFifth: isFirstBForm,
+                                                 forceTemplateB: isFirstBForm)
+                } else if useWalking {
+                    events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
+                                                 firstBForm: isFirstBForm)
+                } else if usePulse {
+                    events += quarterPulse(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
+                } else {
+                    events += walkingLine(bar: bar, chordRoot: chordRoot, scale: scale, rng: &rng)
+                }
+            }
+        }
+        return events
+    }
+
+    // MARK: - CHL-BASS-009: Blues Pickup
+
+    /// CHL-BASS-009: Root-anchored bass with a pickup on step 7 (5th or b3 of active chord).
+    /// Creates forward pull into beat 3; characteristic blues bass pickup feel.
+    /// Song-level variants (chosen once, passed from bluesBass):
+    ///   pickupIsB3     — pickup note at steps 7–8: b3 (30%) or 5th (70%)
+    ///   step12Interval — note at step 12: b7/+10 (60%), b3/+3 (25%), 5th/+7 (15%)
+    ///   echoStyle      — 0: root echo at step 2 (65%), 1: silence (20%), 2: ghost at step 6 (15%)
+    /// firstBForm: step 14 becomes a chromatic half-step approach (adds tension into next bar).
+    private static func bluesPickup(base: Int, chordRoot: Int, scale: [Int],
+                                     rng: inout SeededRNG,
+                                     firstBForm: Bool = false,
+                                     pickupIsB3: Bool = false,
+                                     step12Interval: Int = 10,
+                                     echoStyle: Int = 0) -> [MIDIEvent] {
+        var result: [MIDIEvent] = []
+        let root       = clampBass(chordRoot)
+        let fifth      = clampBass(snapToScale(chordRoot + 7,  scale: scale))
+        let b3         = clampBass(snapToScale(chordRoot + 3,  scale: scale))
+        let pickupNote = pickupIsB3 ? b3 : fifth
+        let step12Note = clampBass(snapToScale(chordRoot + step12Interval, scale: scale))
+        // B-form tail: chromatic half-step below root — pulls forward into next bar's landing.
+        let tail14     = firstBForm ? clampBass(chordRoot - 1) : fifth
+
+        // Step 0: root (long hold)
+        result.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                velocity: UInt8(82 + rng.nextInt(upperBound: 10)), durationSteps: 5))
+        // Echo variant: root echo at step 2, silence, or ghost anticipation at step 6
+        switch echoStyle {
+        case 1:  // silence — open space after root hit
+            break
+        case 2:  // ghost note at step 6 — soft anticipation one step before the pickup
+            result.append(MIDIEvent(stepIndex: base + 6, note: UInt8(pickupNote),
+                                    velocity: UInt8(42 + rng.nextInt(upperBound: 8)), durationSteps: 1))
+        default: // root echo at step 2
+            result.append(MIDIEvent(stepIndex: base + 2, note: UInt8(root),
+                                    velocity: UInt8(60 + rng.nextInt(upperBound: 10)), durationSteps: 4))
+        }
+        // Step 7: pickup (the characteristic blues feel — 5th or b3)
+        result.append(MIDIEvent(stepIndex: base + 7, note: UInt8(pickupNote),
+                                velocity: UInt8(72 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+        // Step 8: pickup hold
+        result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(pickupNote),
+                                velocity: UInt8(78 + rng.nextInt(upperBound: 10)), durationSteps: 4))
+        // Step 12: b7 / b3 / 5th
+        result.append(MIDIEvent(stepIndex: base + 12, note: UInt8(step12Note),
+                                velocity: UInt8(68 + rng.nextInt(upperBound: 10)), durationSteps: 2))
+        // Step 14: A-section = 5th (stable); B-form = chromatic approach (tension)
+        result.append(MIDIEvent(stepIndex: base + 14, note: UInt8(tail14),
+                                velocity: UInt8(64 + rng.nextInt(upperBound: 10)), durationSteps: 2))
+        return result
+    }
+
+    // MARK: - CHL-BASS-010: Blues Quarter Pulse
+
+    /// CHL-BASS-010: Quarter-note walking feel on chord tones — root, b3, 5th, b7.
+    /// Steady and grounded; works under all blues beat styles.
+    private static func quarterPulse(base: Int, chordRoot: Int, scale: [Int],
+                                      rng: inout SeededRNG) -> [MIDIEvent] {
+        var result: [MIDIEvent] = []
+        let root  = clampBass(chordRoot)
+        let b3    = clampBass(snapToScale(chordRoot + 3,  scale: scale))
+        let fifth = clampBass(snapToScale(chordRoot + 7,  scale: scale))
+        let b7    = clampBass(snapToScale(chordRoot + 10, scale: scale))
+        let notes = [root, b3, fifth, b7]
+        let steps = [0, 4, 8, 12]
+        for (note, step) in zip(notes, steps) {
+            let vel = UInt8(75 + rng.nextInt(upperBound: 12))
+            result.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
+                                    velocity: vel, durationSteps: 4))
+        }
+        return result
+    }
+
+    // MARK: - CHL-BASS-011: Blues Ascending Riff
+
+    /// CHL-BASS-011: Starts on the 5th (or 6th) — ascending/descending opener into a root landing.
+    /// Song-level variants:
+    ///   rhythmTemplate — A (default), B (longer landing), C (dotted approach)
+    ///   ascendingOpener — true: 5th→6th (up), false: 6th→5th (down) into root
+    ///   tailInterval   — +10 b7 (60%), +5 4th (25%), +12 root-octave (15%)
+    /// First-16-bar-B-form variants (revert to A behavior afterward):
+    ///   bSection       — halves the echo note duration for a tighter feel (2a)
+    ///   echoAsFifth    — echo note plays the 5th instead of the root (2b)
+    ///   forceTemplateB — overrides rhythmTemplate with B (long landing) (2c)
+    private static func bluesAscendingRiff(base: Int, chordRoot: Int, scale: [Int],
+                                            rng: inout SeededRNG,
+                                            rhythmTemplate: Int,
+                                            ascendingOpener: Bool,
+                                            tailInterval: Int,
+                                            bSection: Bool,
+                                            echoAsFifth: Bool = false,
+                                            forceTemplateB: Bool = false) -> [MIDIEvent] {
+        var result: [MIDIEvent] = []
+        let fifth    = clampBass(snapToScale(chordRoot + 7, scale: scale))
+        let sixth    = clampBass(snapToScale(chordRoot + 9, scale: scale))
+        let root     = clampBass(chordRoot)
+        let tailNote = clampBass(snapToScale(chordRoot + tailInterval, scale: scale))
+
+        // 1b: opener direction — ascending (5th→6th) or descending (6th→5th)
+        let opener1 = ascendingOpener ? fifth : sixth
+        let opener2 = ascendingOpener ? sixth : fifth
+
+        // 1a/2c: rhythmic templates — [step offsets], [durations] for the 5 events
+        // A (default): fast opener, square landing+echo
+        // B (long land): opener same, landing holds to step 10, tight echo
+        // C (dotted): dotted-eighth opener feel (3+1), square landing+echo
+        let steps: [Int]
+        let durs:  [Int]
+        switch forceTemplateB ? 1 : rhythmTemplate {
+        case 1:  // B — longer landing
+            steps = [0, 2,  4, 10, 12]
+            durs  = [2, 2,  6,  2,  4]
+        case 2:  // C — dotted approach
+            steps = [0, 3,  4,  8, 12]
+            durs  = [3, 1,  4,  4,  4]
+        default: // A — original
+            steps = [0, 2,  4,  8, 12]
+            durs  = [2, 2,  4,  4,  4]
+        }
+
+        // 2a: B-section echo halved (index 3 = echo)
+        let echoDur  = bSection ? max(1, durs[3] / 2) : durs[3]
+        // 2b: echo note — 5th instead of root in first B-form
+        let echoNote = echoAsFifth ? fifth : root
+
+        let notes     = [opener1, opener2, root, echoNote, tailNote]
+        let durations = [durs[0], durs[1], durs[2], echoDur, durs[4]]
+        let vels      = [80, 76, 85, 62, 68]
+
+        for i in 0..<5 {
+            result.append(MIDIEvent(stepIndex: base + steps[i],
+                                    note: UInt8(notes[i]),
+                                    velocity: UInt8(vels[i] + rng.nextInt(upperBound: 10)),
+                                    durationSteps: durations[i]))
+        }
+        return result
     }
 
     private static func isBeforeChordChange(bar: Int, structure: SongStructure) -> Bool {

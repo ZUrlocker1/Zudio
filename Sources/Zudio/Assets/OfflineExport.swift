@@ -205,7 +205,6 @@ enum OfflineExport {
             let reverb = AVAudioUnitReverb()
             reverb.loadFactoryPreset(snap.reverbPreset)
             reverb.wetDryMix = snap.reverbBypassed ? 0 : snap.reverbWetDryMix
-            reverb.auAudioUnit.shouldBypassEffect = snap.reverbBypassed
 
             let delay = AVAudioUnitDelay()
             delay.delayTime     = snap.delayTime
@@ -293,7 +292,6 @@ enum OfflineExport {
                     tEQ.bands[0].bypass     = false
                     tReverb.loadFactoryPreset(.smallRoom)
                     tReverb.wetDryMix = tex.reverbBypassed ? 0 : 10
-                    tReverb.auAudioUnit.shouldBypassEffect = tex.reverbBypassed
                 } else {
                     // Chill: low shelf + medium-hall reverb
                     tEQ.bands[0].filterType = .lowShelf
@@ -302,7 +300,6 @@ enum OfflineExport {
                     tEQ.bands[0].bypass     = !tex.lowShelfEnabled
                     tReverb.loadFactoryPreset(.mediumHall)
                     tReverb.wetDryMix = tex.reverbBypassed ? 0 : tex.reverbWetDryMix
-                    tReverb.auAudioUnit.shouldBypassEffect = tex.reverbBypassed
                 }
                 let boostGain: Float = tex.boostEnabled ? 1.7 : 1.0
 

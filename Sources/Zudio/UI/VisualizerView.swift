@@ -54,12 +54,18 @@ struct VisualizerView: View {
                 onRightClickOrb:    { handleRightClickOrb($0) },
                 onRightClickEmpty:  { handleRightClickEmpty() },
                 onTapPoint:         { appState.recordOrbTap(at: $0) },
-                onSwipeRight:       { appState.regenInstrument(forTrack: kTrackRhythm)
-                                      appState.regenInstrument(forTrack: kTrackPads) },
-                onSwipeLeft:        { appState.regenInstrument(forTrack: kTrackLead1)
-                                      appState.regenInstrument(forTrack: kTrackLead2) },
-                onRegenBassDrums:   { appState.regenInstrument(forTrack: kTrackBass)
-                                      appState.regenInstrument(forTrack: kTrackDrums) }
+                onSwipeRight:       { appState.triggerVisualizerFlash(trackIndex: kTrackRhythm)
+                                      appState.triggerVisualizerFlash(trackIndex: kTrackPads)
+                                      appState.regenerateTrack(kTrackRhythm)
+                                      appState.regenerateTrack(kTrackPads) },
+                onSwipeLeft:        { appState.triggerVisualizerFlash(trackIndex: kTrackLead1)
+                                      appState.triggerVisualizerFlash(trackIndex: kTrackLead2)
+                                      appState.regenerateTrack(kTrackLead1)
+                                      appState.regenerateTrack(kTrackLead2) },
+                onRegenBassDrums:   { appState.triggerVisualizerFlash(trackIndex: kTrackBass)
+                                      appState.triggerVisualizerFlash(trackIndex: kTrackDrums)
+                                      appState.regenerateTrack(kTrackBass)
+                                      appState.regenerateTrack(kTrackDrums) }
             )
         }
         #endif
@@ -94,13 +100,13 @@ struct VisualizerView: View {
     // MARK: - Mac gesture handlers (mirrors iPhone tap/double-tap-orb, tap-empty)
     #if os(macOS)
     private func handleClickOrb(_ trackIndex: Int) {
-        // Single click → 2-bar mute + instrument regen on release
+        // Single click → 2-bar mute + full track regen (new rule + events) on release
         appState.toggleMute(trackIndex)
         let twoBars = 2.0 * 4.0 * (60.0 / Double(appState.songState?.frame.tempo ?? 120))
         DispatchQueue.main.asyncAfter(deadline: .now() + twoBars) {
             if appState.muteState[trackIndex] {
                 appState.toggleMute(trackIndex)
-                appState.regenInstrument(forTrack: trackIndex)
+                appState.regenerateTrack(trackIndex)
             }
         }
     }
@@ -122,8 +128,10 @@ struct VisualizerView: View {
     }
 
     private func handleDoubleClickEmpty() {
-        appState.regenInstrument(forTrack: kTrackLead1)
-        appState.regenInstrument(forTrack: kTrackRhythm)
+        appState.triggerVisualizerFlash(trackIndex: kTrackLead1)
+        appState.triggerVisualizerFlash(trackIndex: kTrackRhythm)
+        appState.regenerateTrack(kTrackLead1)
+        appState.regenerateTrack(kTrackRhythm)
     }
 
     private func handleRightClickOrb(_ trackIndex: Int) {
@@ -592,6 +600,7 @@ private final class MacGestureNSView: NSView {
     // Cache last hit-tested position — skip the orb scan if cursor hasn't moved > 1pt.
     private var lastHitTestPoint: CGPoint = .init(x: -999, y: -999)
     private var lastHitTestResult: Bool = false
+    private var lastSwipeDate: Date = .distantPast
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
@@ -674,8 +683,11 @@ private final class MacGestureNSView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         let dx = event.scrollingDeltaX
-        if dx > 10  { coordinator?.fireSwipeRight() }
-        else if dx < -10 { coordinator?.fireSwipeLeft() }
+        guard abs(dx) > 10 else { return }
+        guard Date().timeIntervalSince(lastSwipeDate) > 0.5 else { return }
+        lastSwipeDate = Date()
+        if dx > 0 { coordinator?.fireSwipeRight() }
+        else      { coordinator?.fireSwipeLeft() }
     }
 
     // MARK: Right click — dry/wet toggle on orb, regen on empty

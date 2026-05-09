@@ -459,6 +459,10 @@ final class AppState: ObservableObject {
     // Tracks which styles have had at least one song generated — used for best-song mode.
     private var stylesWithGeneratedSongs: Set<MusicStyle> = []
     var instrumentOverrides: [Int: Int] = [:]
+    /// Saves the pads instrument override that was active before the most recent blues song,
+    /// so it can be restored when returning to a regular Chill song.
+    private var bluePadsSaved: Bool = false
+    private var bluePadsRestoreValue: Int? = nil
     /// Snapshot of instrumentOverrides taken right after each song finishes generating or loading.
     /// resetEffectsToDefaults() restores from this so instruments return to their song-original state.
     private var songInstrumentOverrides: [Int: Int] = [:]
@@ -496,7 +500,7 @@ final class AppState: ObservableObject {
 
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
         switch (trackIndex, style) {
-        case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
+        case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet"]
         case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Whistle","Brightness","Calliope Lead","Grand Piano","Harp"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead","FM Lead"]
@@ -509,7 +513,7 @@ final class AppState: ObservableObject {
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","New Age Pad"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
-        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ"]
+        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Clavinet","Perc Organ","Rock Organ"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Tubular Bells","Celesta","Crystal","Rain"]
         case (kTrackRhythm,  .kosmic):   return ["Moog Lead","Wurlitzer","Rock Organ"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
@@ -534,7 +538,7 @@ final class AppState: ObservableObject {
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
     nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
         switch (trackIndex, style) {
-        case (kTrackLead1, .chill):    return [59, 66, 65, 56]
+        case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
         case (kTrackLead1, .ambient):  return [73, 79, 78, 100, 82, 0, 46]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74]
         case (kTrackLead1, .motorik):  return [81, 62, 90, 83, 63]
@@ -548,7 +552,7 @@ final class AppState: ObservableObject {
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 14, 8, 98, 96]
-        case (kTrackRhythm, .chill):   return [4, 5, 17]
+        case (kTrackRhythm, .chill):   return [4, 5, 17, 7, 16, 18]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
@@ -1129,6 +1133,8 @@ final class AppState: ObservableObject {
                     self.randomizeTwoInstruments(style: style)
                 }
                 self.replaceOnceOnlyInstruments(style: style)
+                self.sanitiseBluesInstruments(for: state)
+                self.applyBluesPadsInstrument(for: state)
                 // Chill texture: always applied last so randomization can't overwrite it.
                 if style == .chill {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
@@ -1179,7 +1185,7 @@ final class AppState: ObservableObject {
                 // Configure ambient mode before defaultsResetToken fires so setEffect
                 // uses the correct Ambient reverb/delay values from the start.
                 self.playback.setAmbientMode(self.selectedStyle == .ambient)
-                self.playback.setChillMode(self.selectedStyle == .chill)
+                self.playback.setChillMode(self.selectedStyle == .chill, bluesVariation: state.chillBluesVariation)
                 // Reset instruments + effects and apply them synchronously before play.
                 // defaultsResetToken fires TrackRowView.onChange on the next render cycle
                 // (deferred), so applyCurrentInstrumentsToPlayback() ensures the correct
@@ -1419,7 +1425,10 @@ final class AppState: ObservableObject {
         } else if atRight {
             step = Double.random(in: 0..<1) < 0.25 ? -2 : -1  // Motorik: 75%→Kosmic, 25%→Chill
         } else {
-            step = Bool.random() ? 1 : -1
+            // 65% outward (toward nearest endpoint), 35% inward — raises Ambient/Motorik
+            // steady-state share from ~17% toward ~20% without starving the middle styles.
+            let outward = endlessStyleIndex < endlessStyleAxis.count / 2 ? -1 : 1
+            step = Double.random(in: 0..<1) < 0.65 ? outward : -outward
         }
         endlessStyleIndex   = max(0, min(endlessStyleAxis.count - 1, endlessStyleIndex + step))
         songsInCurrentStyle = 1
@@ -1524,15 +1533,78 @@ final class AppState: ObservableObject {
             let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style)
             guard pool.count > 1 else { continue }
             let currentIdx = instrumentOverrides[trackIdx] ?? 0
+            let weightedPool = instrumentPickPool(trackIndex: trackIdx, style: style, poolCount: pool.count)
             var newIdx = currentIdx
             var attempts = 0
             repeat {
-                newIdx = Int.random(in: 0..<pool.count, using: &rng)
+                newIdx = weightedPool[Int.random(in: 0..<weightedPool.count, using: &rng)]
                 attempts += 1
             } while newIdx == currentIdx && attempts < 3
             if newIdx != currentIdx {
                 instrumentOverrides[trackIdx] = newIdx
                 pickedCount += 1
+            }
+        }
+    }
+
+    /// Weighted index pool for instrument randomisation — repeated entries increase probability.
+    /// Chill kTrackRhythm: blues favours organs, regular favours Rhodes/Wurlitzer.
+    /// Chill kTrackLead2:  blues excludes Flute; regular reduces Trombone and Soprano Sax.
+    private func instrumentPickPool(trackIndex: Int, style: MusicStyle, poolCount: Int) -> [Int] {
+        guard style == .chill else { return Array(0..<poolCount) }
+        let isBlues = songState?.chillBluesVariation == true
+        switch trackIndex {
+        case kTrackRhythm:
+            // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=Clavinet, 4=PercOrg, 5=RockOrg]
+            return isBlues
+                // Blues: organs high, Rhodes/Wurlitzer rare, Clavinet excluded
+                ? [0, 1, 2, 2, 2, 4, 4, 4, 5, 5, 5]
+                // Regular: Rhodes/Wurlitzer high, B3/Clavinet medium, organs excluded
+                : [0, 0, 0, 1, 1, 1, 2, 2, 3, 3]
+        case kTrackLead2:
+            // [0=Vibraphone, 1=Flute, 2=SopSax, 3=Trombone, 4=Xylophone]
+            return isBlues
+                // Blues: Flute and Xylophone excluded
+                ? [0, 0, 0, 2, 2, 3, 3, 3]
+                // Regular: Xylophone rare (~11%), Trombone/SopSax rare
+                : [0, 0, 0, 1, 1, 2, 3, 3, 4]
+        default:
+            return Array(0..<poolCount)
+        }
+    }
+
+    /// After randomisation, enforce per-song instrument constraints.
+    /// Chill blues: Lead 2 must not be Flute (index 1) or Xylophone (index 4); Rhythm must not be Clavinet (index 3).
+    /// These instruments can be stale from a prior regular-Chill song when the randomly chosen
+    /// 2 tracks didn't happen to include Lead 2 or Rhythm.
+    private func sanitiseBluesInstruments(for state: SongState) {
+        guard state.style == .chill, state.chillBluesVariation else { return }
+        var rng = SystemRandomNumberGenerator()
+        for trackIdx in [kTrackLead2, kTrackRhythm] {
+            guard let current = instrumentOverrides[trackIdx] else { continue }
+            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: .chill)
+            let validPool = instrumentPickPool(trackIndex: trackIdx, style: .chill, poolCount: pool.count)
+            guard !Set(validPool).contains(current) else { continue }
+            instrumentOverrides[trackIdx] = validPool[Int.random(in: 0..<validPool.count, using: &rng)]
+        }
+    }
+
+    /// Sets pad instrument for blues songs (Warm Pad or String Pad, equally weighted) and
+    /// restores the previous pads instrument when returning to a regular Chill song.
+    private func applyBluesPadsInstrument(for state: SongState) {
+        guard state.style == .chill else { return }
+        if state.chillBluesVariation {
+            if !bluePadsSaved {
+                bluePadsSaved = true
+                bluePadsRestoreValue = instrumentOverrides[kTrackPads]
+            }
+            // Warm Pad (0) or String Pad (2) — equally weighted, both suit the blues texture.
+            instrumentOverrides[kTrackPads] = Bool.random() ? 0 : 2
+        } else {
+            if bluePadsSaved {
+                instrumentOverrides[kTrackPads] = bluePadsRestoreValue
+                bluePadsSaved = false
+                bluePadsRestoreValue = nil
             }
         }
     }
@@ -1555,6 +1627,8 @@ final class AppState: ObservableObject {
             self.appendGenerationLog(state.generationLog)
             self.randomizeTwoInstruments(style: state.style)
             self.replaceOnceOnlyInstruments(style: state.style)
+            self.sanitiseBluesInstruments(for: state)
+            self.applyBluesPadsInstrument(for: state)
             self.restoreLead2Mirror()
             self.applyLead2Mirror(for: state)
             self.finishLoadingSong(state, thenPlay: true)
@@ -2067,6 +2141,8 @@ final class AppState: ObservableObject {
         appendGenerationLog(state.generationLog)
         if !alreadyEvolved { randomizeTwoInstruments(style: state.style) }
         replaceOnceOnlyInstruments(style: state.style)
+        sanitiseBluesInstruments(for: state)
+        applyBluesPadsInstrument(for: state)
         restoreLead2Mirror()
         applyLead2Mirror(for: state)
         finishLoadingSong(state, thenPlay: true)
@@ -2107,10 +2183,12 @@ final class AppState: ObservableObject {
         playback.kosmicStyle  = state.style == .kosmic
         playback.motorikStyle = state.style == .motorik
         playback.chillFade    = false
-        playback.setAmbientMode(state.style == .ambient)
-        playback.setChillMode(state.style == .chill)
+        // load() must come before setAmbientMode/setChillMode so PlaybackEngine.songState
+        // is current when those methods check state fields like chillBluesVariation.
         playback.load(state)
         playback.seek(toStep: 0)
+        playback.setAmbientMode(state.style == .ambient)
+        playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation)
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
         if thenPlay {
@@ -2456,7 +2534,7 @@ final class AppState: ObservableObject {
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 self.playback.setAmbientMode(style == .ambient)
-                self.playback.setChillMode(style == .chill)
+                self.playback.setChillMode(style == .chill, bluesVariation: state.chillBluesVariation)
                 self.defaultsResetToken += 1
                 self.applyCurrentInstrumentsToPlayback()
                 if wasPlaying { self.playback.play() }
@@ -2815,9 +2893,10 @@ final class AppState: ObservableObject {
             default:            []
             }
         case .chill:
+            let isBlues = songState?.chillBluesVariation == true
             defaults = switch trackIndex {
-            case kTrackLead1:   [.space, .delay]
-            case kTrackLead2:   [.space, .delay]
+            case kTrackLead1:   isBlues ? [.space] : [.space, .delay]
+            case kTrackLead2:   isBlues ? [.space] : [.space, .delay]
             case kTrackRhythm:  [.space]
             case kTrackPads:    [.sweep, .tremolo]
             case kTrackTexture: [.lowShelf, .reverb]
@@ -2894,10 +2973,10 @@ final class AppState: ObservableObject {
         playback.soloState    = soloState
         playback.kosmicStyle  = state.style == .kosmic
         playback.motorikStyle = state.style == .motorik
-        playback.setAmbientMode(state.style == .ambient)
-        playback.setChillMode(state.style == .chill)
         playback.load(state)
         playback.seek(toStep: 0)
+        playback.setAmbientMode(state.style == .ambient)
+        playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation)
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
         if wasPlaying || forcePlay { playback.play() }

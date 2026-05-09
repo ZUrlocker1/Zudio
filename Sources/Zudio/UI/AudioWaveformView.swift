@@ -26,7 +26,7 @@ struct AudioWaveformView: View {
     @State private var expectedFilename: String? = nil
 
     var body: some View {
-        let curStep = playback.currentStep
+        let curStep = playback.displayStep
         ZStack {
             WaveformLayerView(
                 samples: samples,
@@ -91,18 +91,31 @@ struct AudioWaveformView: View {
             .appendingPathComponent(filename)
         guard FileManager.default.fileExists(atPath: url.path) else { return }
 
-        guard let file = try? AVAudioFile(forReading: url) else { return }
+        // File I/O and peak computation run on the cooperative thread pool (nonisolated static).
+        // Resumes back on main actor after the await.
+        guard let result = await Self.computePeaks(url: url, tempo: tempo) else { return }
+
+        // Discard if a newer filename (or nil) has been requested since this task started
+        guard expectedFilename == filename else { return }
+        samples             = result.peaks
+        audioDurationSeconds = result.durationSec
+        audioDurationBars   = result.durationBars
+    }
+
+    // Runs on the cooperative thread pool — nonisolated breaks the inherited @MainActor isolation.
+    private nonisolated static func computePeaks(url: URL, tempo: Double) async
+        -> (peaks: [Float], durationSec: Double, durationBars: Double)? {
+
+        guard let file = try? AVAudioFile(forReading: url) else { return nil }
 
         let frameCount = AVAudioFrameCount(file.length)
         guard frameCount > 0,
               let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
                                             frameCapacity: frameCount),
               (try? file.read(into: buffer)) != nil,
-              let channelData = buffer.floatChannelData else { return }
+              let channelData = buffer.floatChannelData else { return nil }
 
         // Use max across all channels so stereo files with uneven content display correctly.
-        // Max (not average) preserves the louder channel's peaks without reducing ocean-like
-        // files where both channels are nearly identical.
         let frameLength  = Int(buffer.frameLength)
         let channelCount = Int(buffer.format.channelCount)
 
@@ -123,27 +136,16 @@ struct AudioWaveformView: View {
             peaks[i] = peak
         }
 
-        // Normalize
         let maxPeak = peaks.max() ?? 1
-        if maxPeak > 0 {
-            for i in 0..<peaks.count { peaks[i] /= maxPeak }
-        }
+        if maxPeak > 0 { for i in 0..<peaks.count { peaks[i] /= maxPeak } }
 
-        // How many song bars does this audio file span before looping?
-        // Use buffer.frameLength (actual decoded frames) not file.length, which may differ
-        // from decoded frame count when there are priming/remainder frames or sample-rate conversion.
+        // Use buffer.frameLength (actual decoded frames) not file.length — may differ with
+        // priming/remainder frames or sample-rate conversion.
         let sampleRate     = file.processingFormat.sampleRate
         let durationSec    = Double(frameLength) / sampleRate
-        let barDurationSec = 240.0 / max(tempo, 1)
-        let durationBars   = durationSec / barDurationSec
+        let durationBars   = durationSec / (240.0 / max(tempo, 1))
 
-        await MainActor.run {
-            // Discard if a newer filename (or nil) has been requested since this task started
-            guard expectedFilename == filename else { return }
-            self.samples = peaks
-            self.audioDurationSeconds = durationSec
-            self.audioDurationBars = durationBars
-        }
+        return (peaks, durationSec, durationBars)
     }
 
     // MARK: - Playhead (identical to MIDILaneView)

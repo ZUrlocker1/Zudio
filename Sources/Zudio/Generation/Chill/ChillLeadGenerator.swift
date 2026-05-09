@@ -18,14 +18,13 @@ struct ChillLeadGenerator {
         leadInstrument: ChillLeadInstrument,
         beatStyle: ChillBeatStyle = .electronic,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
+        bluesVariation: Bool = false,
         forceRuleID: String? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
-        // CHL-LD1-005: St Germain staccato style — short bursts in active periods, long silences.
-        // Used when beat style is stGermain (strongly) or occasionally for other styles.
-        // Suppressed when a different rule is explicitly forced (best-first-song path).
-        let forceNonStaccato = forceRuleID != nil && forceRuleID != "CHL-LD1-005"
+        // CHL-LD1-005: St Germain staccato style — suppressed in blues (blues needs sustained phrases).
+        let forceNonStaccato = bluesVariation || (forceRuleID != nil && forceRuleID != "CHL-LD1-005")
         let staccatoProb: Double = forceNonStaccato ? 0.0 : (beatStyle == .stGermain ? 0.85 : 0.15)
         if rng.nextDouble() < staccatoProb {
             usedRuleIDs.insert("CHL-LD1-005")
@@ -36,7 +35,46 @@ struct ChillLeadGenerator {
             return (events, onsets, [])   // staccato already has long silences; no extra handoff
         }
 
-        let ruleID = lead1RuleID(for: leadInstrument)
+        // Rule selection is independent of instrument — instrument controls timbre/register,
+        // rule controls phrasing behavior.
+        //
+        // Blues pool: 009 35%, 004 35%, 002 20%, 003 10%.
+        // (001 "St Germain Long Phrase" and 005 "St Germain Staccato Burst" excluded —
+        //  European jazz flute phrasing and staccato club feel are wrong for blues character.)
+        //
+        // Regular Chill pool: 001 20%, 002 20%, 003 15%, 004 13%, 007 12%, 008 12%, 009 8%.
+        // (005 "St Germain Staccato Burst" handled by separate staccato path above.)
+        let ruleID: String
+        if bluesVariation {
+            let bluesPool = ["CHL-LD1-004","CHL-LD1-009","CHL-LD1-002","CHL-LD1-003"]
+            if let forced = forceRuleID, bluesPool.contains(forced) {
+                ruleID = forced
+            } else {
+                let r = rng.nextDouble()
+                ruleID = r < 0.35 ? "CHL-LD1-009"
+                       : r < 0.70 ? "CHL-LD1-004"
+                       : r < 0.90 ? "CHL-LD1-002"
+                       :            "CHL-LD1-003"
+            }
+        } else {
+            let chillPool = ["CHL-LD1-001","CHL-LD1-002","CHL-LD1-003","CHL-LD1-004",
+                             "CHL-LD1-007","CHL-LD1-008","CHL-LD1-009"]
+            if let forced = forceRuleID, chillPool.contains(forced) {
+                ruleID = forced
+            } else if forceRuleID != nil {
+                ruleID = forceRuleID!   // allow 005 and other overrides to pass through
+            } else {
+                let r = rng.nextDouble()
+                ruleID = r < 0.20 ? "CHL-LD1-001"
+                       : r < 0.40 ? "CHL-LD1-002"
+                       : r < 0.55 ? "CHL-LD1-003"
+                       : r < 0.68 ? "CHL-LD1-004"
+                       : r < 0.80 ? "CHL-LD1-007"
+                       : r < 0.92 ? "CHL-LD1-008"
+                       :            "CHL-LD1-009"
+            }
+        }
+        let useJazzIdioms = (ruleID == "CHL-LD1-009")
         usedRuleIDs.insert(ruleID)
 
         var events: [MIDIEvent] = []
@@ -79,20 +117,30 @@ struct ChillLeadGenerator {
         // First 2 phrases in groove-A are stored as seeds; replayed once each in the
         // opening, then freely developed, then recalled in the final 40% with a
         // last-note flip so the ending sounds like a familiar motif with a fresh tail.
-        let activeRuleID  = forceRuleID ?? lead1RuleID(for: leadInstrument)
-        let useZoneRepeat = (activeRuleID != "CHL-LD1-005")
+        let useZoneRepeat = (ruleID != "CHL-LD1-005")
         var seedPhrases:       [[MIDIEvent]] = []
         var seedPhraseLengths: [Int]         = []
         var openingReplaysDone = 0
         let recapStartBar = (frame.totalBars * 3) / 5   // 60% — shorter free zone, longer recap
+
+        // Blues form: section anchors for posInForm tracking (same approach as drums/bass/pads)
+        let (bSectionStart, aSectionStart) = bluesVariation ? bluesSectionAnchors(structure: structure) : (-1, -1)
+
+        // Blues: lead must have played at least one phrase before bar 4 of section A.
+        // Suppresses the lay-out rule and overrides silence probability until first phrase fires.
+        var bluesLeadHasPlayed = false
 
         var bar = 0
         while bar < frame.totalBars {
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
 
-            // Cold start: bar 0 is drums-only, lead silent
+            // Cold start: bar 0 is drums-only, lead silent.
+            // Blues: leads are silent for the entire intro — rhythm section sets the pocket first.
             if case .coldStart = structure.introStyle, bar == 0 {
+                bar += 1; continue
+            }
+            if bluesVariation && label == .intro {
                 bar += 1; continue
             }
 
@@ -155,35 +203,62 @@ struct ChillLeadGenerator {
             // Handoff window: LD1 forced silent so LD2 can take the melody
             if handoffBarSet.contains(bar) { bar += 1; continue }
 
-            // Brass and blues leads occasionally "lay out" for a full 4 or 8 bars — jazz breathing room
-            if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone || leadInstrument == .tenorSax),
+            // Brass and blues leads occasionally "lay out" for a full 4 or 8 bars — jazz breathing room.
+            // Suppressed in blues until the lead has played at least once (guarantees early A-section entry).
+            // Blues caps lay-out at 4 bars: an 8-bar lay-out at the start of a chorus can chain with
+            // another and silence a full 16-bar pass, which prevents harmony from firing.
+            if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone || leadInstrument == .tenorSax || leadInstrument == .clarinet),
                label == .A || label == .B,
+               !(bluesVariation && !bluesLeadHasPlayed),
                rng.nextDouble() < 0.12 {
-                bar += rng.nextDouble() < 0.60 ? 4 : 8
+                bar += (bluesVariation || rng.nextDouble() < 0.60) ? 4 : 8
                 continue
             }
 
-            // Silence probability by section
-            let silenceProb: Double
-            switch label {
-            case .intro:
-                // First 4 bars of intro always silent (CHL-RULE-06); sparse thereafter
-                let introStart = section?.startBar ?? 0
-                if bar < introStart + 4 {
-                    bar += 1
+            // Blues form: handle turnaround zone (positions 14–15 of 16-bar form).
+            // Position 15 always silent (drums/bass own the turnaround bar).
+            // Position 14: optional descending lick (50%) or rest; beats 3–4 left clear for fill.
+            let bluesFormPos = bluesVariation
+                ? bluesFormPosition(bar: bar, label: label, bStart: bSectionStart, aStart: aSectionStart)
+                : -1
+            if bluesFormPos >= 14 {
+                if bluesFormPos == 14 && rng.nextDouble() < 0.50 {
+                    events += bluesTurnaroundLick(base: bar * 16, frame: frame,
+                                                  regLow: regLow, regHigh: regHigh,
+                                                  useChromatic: useJazzIdioms, rng: &rng)
+                }
+                bar += 1; continue
+            }
+
+            // Blues: force the lead to play within the first 4 bars of the groove section.
+            // Once the lead has played once, normal silence/rest rules resume.
+            let forceBluesEntry = bluesVariation && !bluesLeadHasPlayed
+                && (label == .A || label == .B)
+                && bar >= (section?.startBar ?? 0) + 4
+
+            if !forceBluesEntry {
+                // Silence probability by section
+                let silenceProb: Double
+                switch label {
+                case .intro:
+                    // First 4 bars of intro always silent (CHL-RULE-06); sparse thereafter
+                    let introStart = section?.startBar ?? 0
+                    if bar < introStart + 4 {
+                        bar += 1
+                        continue
+                    }
+                    silenceProb = 0.90  // very sparse — at most 1 brief phrase
+                case .outro:  silenceProb = 0.85  // very sparse in outro — trailing off
+                case .A:      silenceProb = 0.40  // groove A: moderately active
+                case .B:      silenceProb = 0.10  // most active in groove B — consistently denser than A
+                default:      silenceProb = 0.50
+                }
+
+                if rng.nextDouble() < silenceProb {
+                    // Rest: 1–2 bars
+                    bar += 1 + rng.nextInt(upperBound: 2)
                     continue
                 }
-                silenceProb = 0.90  // very sparse — at most 1 brief phrase
-            case .outro:  silenceProb = 0.85  // very sparse in outro — trailing off
-            case .A:      silenceProb = 0.40  // groove A: moderately active
-            case .B:      silenceProb = 0.10  // most active in groove B — consistently denser than A
-            default:      silenceProb = 0.50
-            }
-
-            if rng.nextDouble() < silenceProb {
-                // Rest: 1–2 bars
-                bar += 1 + rng.nextInt(upperBound: 2)
-                continue
             }
 
             // Phrase length: instrument-specific
@@ -196,29 +271,41 @@ struct ChillLeadGenerator {
             case .tenorSax:      phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars (slightly longer than alto)
             case .sopranoSax:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             case .trumpet:       phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
+            case .clarinet:      phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars (smoky, patient)
             case .trombone:      phraseLen = 2 + rng.nextInt(upperBound: 3)   // 2–4 bars (smooth, longer lines)
             }
 
             // Clamp phrase to section boundary; intro/outro phrases max 2 bars to keep density low
             let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars
             let maxPhraseLen = (label == .intro || label == .outro) ? 2 : phraseLen
-            let actualPhraseLen = Swift.min(maxPhraseLen, sectionEnd - bar)
+            var actualPhraseLen = Swift.min(maxPhraseLen, sectionEnd - bar)
             guard actualPhraseLen > 0 else { bar += 1; continue }
+
+            // Blues form: clamp phrase to not cross a chord-change seam (IVm7 pos 8, V7 pos 12, turnaround pos 15)
+            if bluesVariation && bluesFormPos >= 0 {
+                let nextSeam = [8, 12, 15].first { $0 > bluesFormPos } ?? 16
+                actualPhraseLen = Swift.min(actualPhraseLen, nextSeam - bluesFormPos)
+            }
 
             // Zone-based repetition: seed collection → opening replay → free development → recap
             if useZoneRepeat, label == .A || label == .B {
                 let canReplayOpening = openingReplaysDone < 2 && seedPhrases.count == 2
 
                 if seedPhrases.count < 2 {
-                    // Seed zone: generate normally and store as relative-indexed motif
-                    let phraseBluePc = rng.nextDouble() < 0.15 ? blueNote : nil
-                    let phraseEndChord = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
+                    // Seed zone: generate normally and store as relative-indexed motif.
+                    // Blues increases blue-note probability from 15% to 50%.
+                    let bluePcProb = bluesVariation ? 0.50 : 0.15
+                    let phraseBluePc = rng.nextDouble() < bluePcProb ? blueNote : nil
+                    let phraseEndChord   = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
+                    let phraseStartChord = bluesVariation ? structure.chordPlan.first { $0.contains(bar: bar) } : nil
                     let phraseNotes = buildPhrase(frame: frame, bar: bar, bars: actualPhraseLen,
                                                    leadInstrument: leadInstrument,
                                                    pentatonic: pentatonic, scale: scale,
                                                    blueNotePC: phraseBluePc,
                                                    regLow: regLow, regHigh: regHigh,
-                                                   section: label, phraseEndChord: phraseEndChord, rng: &rng)
+                                                   section: label, phraseEndChord: phraseEndChord,
+                                                   phraseStartChord: phraseStartChord,
+                                                   useJazzIdioms: useJazzIdioms, rng: &rng)
                     events += phraseNotes
                     phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
                     let offset = bar * 16
@@ -227,34 +314,47 @@ struct ChillLeadGenerator {
                                   velocity: $0.velocity, durationSteps: $0.durationSteps)
                     })
                     seedPhraseLengths.append(actualPhraseLen)
+                    bluesLeadHasPlayed = true
                     bar += actualPhraseLen
                     bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
                     continue
                 }
 
                 let canRecap = bar >= recapStartBar && rng.nextDouble() < 0.55
-                if canReplayOpening || canRecap {
+                // Blues: seeds were generated over the I chord; don't replay them over IV/V bars.
+                // Fall through to normal phrase generation (chord-aware bodyPool) instead.
+                let bluesReplayOK = !bluesVariation || bluesFormPos < 8
+                if (canReplayOpening || canRecap) && bluesReplayOK {
                     let seedIdx = canReplayOpening ? (openingReplaysDone % seedPhrases.count)
                                                    : rng.nextInt(upperBound: seedPhrases.count)
                     let seedLen = seedPhraseLengths[seedIdx]
-                    if bar + seedLen <= sectionEnd {
+                    // Blues: don't replay if the seed would cross a chord-change seam.
+                    let bluesSeamOK: Bool
+                    if bluesVariation && bluesFormPos >= 0 {
+                        let nextSeam = [8, 12, 15].first { $0 > bluesFormPos } ?? 16
+                        bluesSeamOK = bluesFormPos + seedLen <= nextSeam
+                    } else {
+                        bluesSeamOK = true
+                    }
+                    if bar + seedLen <= sectionEnd && bluesSeamOK {
                         let base = bar * 16
                         var replayedNotes = seedPhrases[seedIdx].map {
                             MIDIEvent(stepIndex: $0.stepIndex + base, note: $0.note,
                                       velocity: $0.velocity, durationSteps: $0.durationSteps)
                         }
-                        // Opening: 50% chance of last-note flip; recap: always flip
-                        if canRecap || rng.nextDouble() < 0.50 {
+                        // Opening: 50% flip (jazz idioms: always); recap: always flip
+                        if canRecap || useJazzIdioms || rng.nextDouble() < 0.50 {
                             replayedNotes = applyLastNoteFlip(replayedNotes, scale: scale,
                                                                regLow: regLow, regHigh: regHigh)
                         }
-                        // 50% chance of last-note duration variation (short→long or long→short)
-                        if rng.nextDouble() < 0.50 {
+                        // 50% duration variation (jazz idioms: always — no exact opening replays)
+                        if useJazzIdioms || rng.nextDouble() < 0.50 {
                             replayedNotes = applyLastNoteDuration(replayedNotes, rng: &rng)
                         }
                         events += replayedNotes
                         phraseOnsets.append((startBar: bar, endBar: bar + seedLen))
                         if canReplayOpening { openingReplaysDone += 1 }
+                        bluesLeadHasPlayed = true
                         bar += seedLen
                         bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
                         continue
@@ -264,9 +364,12 @@ struct ChillLeadGenerator {
                 }
             }
 
-            // Normal phrase generation (non-blues lead, free development zone, or replay fallback)
-            let phraseBluePc = rng.nextDouble() < 0.15 ? blueNote : nil
-            let phraseEndChord = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
+            // Normal phrase generation (free development zone, or replay fallback).
+            // Blues raises blue-note probability from 15% to 50%.
+            let bluePcProb2 = bluesVariation ? 0.50 : 0.15
+            let phraseBluePc = rng.nextDouble() < bluePcProb2 ? blueNote : nil
+            let phraseEndChord   = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
+            let phraseStartChord = bluesVariation ? structure.chordPlan.first { $0.contains(bar: bar) } : nil
             let phraseNotes = buildPhrase(
                 frame: frame, bar: bar, bars: actualPhraseLen,
                 leadInstrument: leadInstrument,
@@ -275,10 +378,13 @@ struct ChillLeadGenerator {
                 regLow: regLow, regHigh: regHigh,
                 section: label,
                 phraseEndChord: phraseEndChord,
+                phraseStartChord: phraseStartChord,
+                useJazzIdioms: useJazzIdioms,
                 rng: &rng
             )
             events += phraseNotes
             phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
+            bluesLeadHasPlayed = true
 
             bar += actualPhraseLen
             // Mandatory rest after phrase (CHL-RULE-06); Groove B rests capped at 1 bar to stay dense
@@ -295,10 +401,12 @@ struct ChillLeadGenerator {
         lead1Instrument: ChillLeadInstrument,
         lead1Onsets: [(startBar: Int, endBar: Int)],
         handoffBars: Set<Int> = [],
+        bluesVariation: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
-        let useShadowHold = rng.nextDouble() < 0.50
+        // Blues forces CHL-LD2-001 (call-and-response) — shadow hold is too ambient for blues energy.
+        let useShadowHold = bluesVariation ? false : rng.nextDouble() < 0.50
         usedRuleIDs.insert(useShadowHold ? "CHL-LD2-002" : "CHL-LD2-001")
 
         var events: [MIDIEvent] = []
@@ -310,24 +418,49 @@ struct ChillLeadGenerator {
         let inst2: ChillLeadInstrument
         switch lead1Instrument {
         case .vibraphone:
-            inst2 = .flute          // flute lightens the texture when vibe is primary
+            // Vibraphone never used as Lead 1 in blues — flute pairing is regular-Chill only
+            inst2 = .flute
         case .saxophone:
-            // Alto Sax Lead 1: vibraphone 50%, trombone 35%, flute 10%, soprano sax 5%
+            // Alto Sax Lead 1 (regular Chill only — not in blues pool)
+            // Regular: vibraphone 65%, trombone 10%, flute 20%, soprano sax 5%
             let r0 = rng.nextDouble()
-            if r0 < 0.50      { inst2 = .vibraphone }
-            else if r0 < 0.85 { inst2 = .trombone }
+            if r0 < 0.65      { inst2 = .vibraphone }
+            else if r0 < 0.75 { inst2 = .trombone }
             else if r0 < 0.95 { inst2 = .flute }
             else              { inst2 = .sopranoSax }
         case .flute:
-            // Flute Lead 1: vibraphone (50%) or trombone (50%) — warm bass counterpoint
-            inst2 = rng.nextDouble() < 0.50 ? .vibraphone : .trombone
+            // Flute Lead 1 (regular Chill only — not in blues pool)
+            // Regular: vibraphone 80%, trombone 20%
+            inst2 = rng.nextDouble() < 0.80 ? .vibraphone : .trombone
+        case .clarinet:
+            // Clarinet Lead 1 — appears in both regular Chill and blues
+            let rc = rng.nextDouble()
+            if bluesVariation {
+                // Blues: vibraphone 50%, soprano sax 30%, trombone 20% — no flute
+                if rc < 0.50      { inst2 = .vibraphone }
+                else if rc < 0.80 { inst2 = .sopranoSax }
+                else              { inst2 = .trombone }
+            } else {
+                // Regular: vibraphone 55%, trombone 10%, flute 35%
+                if rc < 0.55      { inst2 = .vibraphone }
+                else if rc < 0.65 { inst2 = .trombone }
+                else              { inst2 = .flute }
+            }
         default:
-            // Brass Lead 1 (muted trumpet, trumpet, tenor sax): vibraphone 35%, soprano sax 30%, flute 30%, trombone 5%
+            // Brass Lead 1 (muted trumpet, trumpet, tenor sax) — main blues Lead 1 family
             let r = rng.nextDouble()
-            if r < 0.35      { inst2 = .vibraphone }
-            else if r < 0.65 { inst2 = .sopranoSax }
-            else if r < 0.95 { inst2 = .flute }
-            else             { inst2 = .trombone }
+            if bluesVariation {
+                // Blues: soprano sax 40%, vibraphone 40%, trombone 20% — no flute
+                if r < 0.40      { inst2 = .sopranoSax }
+                else if r < 0.80 { inst2 = .vibraphone }
+                else             { inst2 = .trombone }
+            } else {
+                // Regular: vibraphone 50%, flute 35%, soprano sax 10%, trombone 5%
+                if r < 0.50      { inst2 = .vibraphone }
+                else if r < 0.85 { inst2 = .flute }
+                else if r < 0.95 { inst2 = .sopranoSax }
+                else             { inst2 = .trombone }
+            }
         }
         let (regLow1, regHigh1) = register(for: lead1Instrument)
         let (rawLow2, rawHigh2) = register(for: inst2)
@@ -352,6 +485,9 @@ struct ChillLeadGenerator {
             for b in onset.startBar..<onset.endBar { lead1BarSet.insert(b) }
         }
 
+        // Blues form: section anchors for turnaround zone silence (pos 13–15 are Lead-2-free)
+        let (ld2_bSectionStart, ld2_aSectionStart) = bluesVariation ? bluesSectionAnchors(structure: structure) : (-1, -1)
+
         var bar = 0
         while bar < frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -359,6 +495,13 @@ struct ChillLeadGenerator {
 
             // Lead 2 only in groove sections (A and B)
             guard label == .A || label == .B else { bar += 1; continue }
+
+            // Blues: turnaround zone (pos 13–15) — Lead 2 silent; Lead 1 lick + drums own this
+            if bluesVariation
+                && bluesFormPosition(bar: bar, label: label, bStart: ld2_bSectionStart, aStart: ld2_aSectionStart) >= 13 {
+                bar += 1; continue
+            }
+
             // Skip bars where Lead 1 is playing
             guard !lead1BarSet.contains(bar) else { bar += 1; continue }
             // Handoff window: LD2 strongly encouraged to fill bars LD1 was forced to skip.
@@ -368,25 +511,35 @@ struct ChillLeadGenerator {
             guard rng.nextDouble() < responseProb else { bar += 1; continue }
 
             let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars
-            // 2-bar phrases for Lead 2
-            let phraseLen = Swift.min(2, sectionEnd - bar)
+            // 2-bar phrases for Lead 2; blues: clamp to chord seam so phrases don't span chord changes
+            var phraseLen = Swift.min(2, sectionEnd - bar)
+            if bluesVariation {
+                let ld2FormPos = bluesFormPosition(bar: bar, label: label, bStart: ld2_bSectionStart, aStart: ld2_aSectionStart)
+                if ld2FormPos >= 0 {
+                    let nextSeam = [8, 12, 15].first { $0 > ld2FormPos } ?? 16
+                    phraseLen = Swift.min(phraseLen, nextSeam - ld2FormPos)
+                }
+            }
             guard phraseLen > 0 else { bar += 1; continue }
 
             // Check gap is free of Lead 1
             let gapFree = (bar..<bar + phraseLen).allSatisfy { !lead1BarSet.contains($0) }
             guard gapFree else { bar += 1; continue }
 
+            let ld2PhraseStartChord = bluesVariation ? structure.chordPlan.first { $0.contains(bar: bar) } : nil
             let phraseNotes = buildPhrase(
                 frame: frame, bar: bar, bars: phraseLen,
                 leadInstrument: inst2,
                 pentatonic: pentatonic, scale: scale,
                 blueNotePC: nil,
                 regLow: regLow2, regHigh: regHigh2,
-                section: label, rng: &rng,
+                section: label,
+                phraseStartChord: ld2PhraseStartChord,
+                rng: &rng,
                 velocityOffset: inst2 == .vibraphone ? 0 : -15  // vibraphone reads quietly; match Lead 1 level
             )
             events += phraseNotes
-            bar += phraseLen  // Lead 2 fills gaps; Lead 1 bars provide natural spacing
+            bar += phraseLen + 1  // mandatory 1-bar rest after each phrase (CHL-RULE-06 breathing room)
         }
         return (events, inst2)
     }
@@ -461,6 +614,8 @@ struct ChillLeadGenerator {
         regHigh: Int,
         section: SectionLabel,
         phraseEndChord: ChordWindow? = nil,
+        phraseStartChord: ChordWindow? = nil,
+        useJazzIdioms: Bool = false,
         rng: inout SeededRNG,
         velocityOffset: Int = 0
     ) -> [MIDIEvent] {
@@ -476,7 +631,7 @@ struct ChillLeadGenerator {
         }
 
         // Note count per bar: instrument-specific; intro/outro capped at 2 (sparse fade)
-        let notesPerBar: Int
+        var notesPerBar: Int
         if section == .intro || section == .outro {
             notesPerBar = 2
         } else {
@@ -489,7 +644,12 @@ struct ChillLeadGenerator {
             case .tenorSax:     notesPerBar = 3 + rng.nextInt(upperBound: 3)   // 3–5 (rich, bluesy lines)
             case .sopranoSax:   notesPerBar = 2 + rng.nextInt(upperBound: 3)   // 2–4
             case .trombone:     notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3 (smooth legato, fewer notes)
+            case .clarinet:     notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4 (breathy, slightly sparse)
             }
+        }
+        // CHL-LD1-009: enforce minimum 4 notes per body bar — denser lines for jazz character
+        if useJazzIdioms && section != .intro && section != .outro {
+            notesPerBar = Swift.max(4, notesPerBar)
         }
 
         // Duration per note in steps: instrument-specific
@@ -503,6 +663,7 @@ struct ChillLeadGenerator {
         case .tenorSax:     noteDurSteps = 5 + rng.nextInt(upperBound: 5)   // 5–9 steps (slightly longer, warmer tone)
         case .sopranoSax:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
         case .trombone:     noteDurSteps = 6 + rng.nextInt(upperBound: 7)   // 6–12 steps (long legato slides)
+        case .clarinet:     noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps (chalumeau breath)
         }
 
         // Build an ordered pool from the full scale so adjacent indices are ≤2 semitones apart —
@@ -520,11 +681,32 @@ struct ChillLeadGenerator {
             .sorted().reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
         guard !orderedPool.isEmpty else { return events }
 
-        // Starting note: near tonic
-        let tonicNote = regLow + 5 + rng.nextInt(upperBound: Swift.max(1, regHigh - regLow - 5))
-        let startIdx  = orderedPool.indices.min(by: { abs(orderedPool[$0] - tonicNote) < abs(orderedPool[$1] - tonicNote) }) ?? 0
+        // Blues: strip avoid tones of the active chord from the body pool so body notes
+        // don't clash over IV and V bars (e.g. B♮ over Gm7 = tritone against F).
+        // orderedPool (full) is kept for phrase-ending chord-tone snapping below.
+        var bodyPool = orderedPool
+        if let chord = phraseStartChord, !chord.avoidTones.isEmpty {
+            let filtered = orderedPool.filter { !chord.avoidTones.contains($0 % 12) }
+            if filtered.count >= 3 { bodyPool = filtered }
+        }
+
+        // Starting note: bias toward chord tones when phrase opens on a chord change (IVm7, V7)
+        let startIdx: Int
+        if let startChord = phraseStartChord, !startChord.chordTones.isEmpty {
+            let chordPool = bodyPool.filter { startChord.chordTones.contains($0 % 12) }
+            if !chordPool.isEmpty {
+                let target = chordPool[rng.nextInt(upperBound: chordPool.count)]
+                startIdx = bodyPool.indices.min(by: { abs(bodyPool[$0] - target) < abs(bodyPool[$1] - target) }) ?? 0
+            } else {
+                let tonicNote = regLow + 5 + rng.nextInt(upperBound: Swift.max(1, regHigh - regLow - 5))
+                startIdx = bodyPool.indices.min(by: { abs(bodyPool[$0] - tonicNote) < abs(bodyPool[$1] - tonicNote) }) ?? 0
+            }
+        } else {
+            let tonicNote = regLow + 5 + rng.nextInt(upperBound: Swift.max(1, regHigh - regLow - 5))
+            startIdx = bodyPool.indices.min(by: { abs(bodyPool[$0] - tonicNote) < abs(bodyPool[$1] - tonicNote) }) ?? 0
+        }
         var prevIdx   = startIdx
-        var prevNote  = orderedPool[prevIdx]
+        var prevNote  = bodyPool[prevIdx]
         var direction = 1               // +1 ascending, -1 descending
         var lastWasLeap = false         // after a leap, strongly prefer stepwise (CHL-RULE-07)
 
@@ -533,13 +715,103 @@ struct ChillLeadGenerator {
         struct NoteSlot { var step: Int; var pitch: Int; var vel: UInt8 }
         var slots: [NoteSlot] = []
 
-        for barOffset in 0..<bars {
+        // CHL-LD1-009: jazz idiom phrase starters — turn figure (30%), riff cell (20%), or normal (50%).
+        // Idiom starters pre-fill bar 0; skipBars advances the main loop past that bar.
+        enum PhraseStart { case normal, turnFigure, riffCell }
+        let phraseStart: PhraseStart
+        if useJazzIdioms && bars >= 2 {
+            let r = rng.nextDouble()
+            phraseStart = r < 0.30 ? .turnFigure : (r < 0.50 ? .riffCell : .normal)
+        } else {
+            phraseStart = .normal
+        }
+        let skipBars = phraseStart == .normal ? 0 : 1
+        let barBase0 = bar * 16
+
+        if phraseStart == .turnFigure {
+            // [Lo, T, Hi, T, Lo, T] ornament at 2-step spacing around anchor chord tone T
+            let ctPool = bodyPool.filter { phraseStartChord?.chordTones.contains($0 % 12) ?? false }
+            let anchorNote: Int = !ctPool.isEmpty
+                ? ctPool[rng.nextInt(upperBound: ctPool.count)]
+                : bodyPool[bodyPool.count / 2]
+            let tIdx  = bodyPool.indices.min(by: { abs(bodyPool[$0] - anchorNote) < abs(bodyPool[$1] - anchorNote) }) ?? bodyPool.count / 2
+            let loIdx = Swift.max(0, tIdx - 1)
+            let hiIdx = Swift.min(bodyPool.count - 1, tIdx + 1)
+            let pattern   = [loIdx, tIdx, hiIdx, tIdx, loIdx, tIdx]
+            let velShapes = [-4, 8, 4, 6, 0, 10]
+            for (k, pidx) in pattern.enumerated() {
+                let s = barBase0 + k * 2
+                guard s < frame.totalBars * 16 else { break }
+                let v = UInt8(Swift.max(30, Swift.min(100, velBase + velShapes[k] + rng.nextInt(upperBound: 8))))
+                slots.append(NoteSlot(step: s, pitch: bodyPool[pidx], vel: v))
+            }
+            prevIdx  = tIdx
+            prevNote = bodyPool[tIdx]
+        }
+
+        if phraseStart == .riffCell {
+            // Oscillating [T, Lo, Approach] × 1–2 cycles with varied spacing, then a register break.
+            // Approach = Lo−1 (chromatic, non-pool). Cycle widths vary 4–6 steps for rhythmic variety.
+            // Anchor is constrained to the upper half of the register so the riff + break stay
+            // out of the muddy low zone.
+            let ctPool = bodyPool.filter { phraseStartChord?.chordTones.contains($0 % 12) ?? false }
+            let midPitch = (regLow + regHigh) / 2
+            let upperCtPool   = ctPool.filter { $0 >= midPitch }
+            let upperBodyPool = bodyPool.filter { $0 >= midPitch }
+            let anchorNote: Int = !upperCtPool.isEmpty
+                ? upperCtPool[rng.nextInt(upperBound: upperCtPool.count)]
+                : !upperBodyPool.isEmpty
+                    ? upperBodyPool[rng.nextInt(upperBound: upperBodyPool.count)]
+                    : bodyPool[bodyPool.count / 2]
+            let tIdx     = bodyPool.indices.min(by: { abs(bodyPool[$0] - anchorNote) < abs(bodyPool[$1] - anchorNote) }) ?? bodyPool.count / 2
+            let loIdx    = Swift.max(0, tIdx - 1)
+            let tPitch   = bodyPool[tIdx]
+            let loPitch  = bodyPool[loIdx]
+            let appPitch = loPitch - 1
+            let cycles   = 1 + rng.nextInt(upperBound: 2)   // 1–2 cycles (room left for break)
+            var cycleBase = barBase0
+            for _ in 0..<cycles {
+                let cycleWidth = 4 + rng.nextInt(upperBound: 3)   // 4, 5, or 6 steps
+                let s0 = cycleBase; let s1 = cycleBase + 2; let s2 = cycleBase + cycleWidth - 1
+                guard s2 < frame.totalBars * 16 && s2 < barBase0 + 13 else { break }
+                let vT   = UInt8(Swift.max(30, Swift.min(100, velBase + 10 + rng.nextInt(upperBound: 6))))
+                let vLo  = UInt8(Swift.max(30, Swift.min(100, velBase +  2 + rng.nextInt(upperBound: 6))))
+                let vApp = UInt8(Swift.max(30, Swift.min(100, velBase -  4 + rng.nextInt(upperBound: 6))))
+                slots.append(NoteSlot(step: s0, pitch: tPitch,   vel: vT))
+                slots.append(NoteSlot(step: s1, pitch: loPitch,  vel: vLo))
+                slots.append(NoteSlot(step: s2, pitch: appPitch, vel: vApp))
+                cycleBase += cycleWidth
+            }
+            // Register break: leap up 3–5 pool steps then step down — the blues "setup + payoff".
+            if cycleBase < barBase0 + 12 && rng.nextDouble() < 0.70 {
+                let pivotIdx = Swift.min(bodyPool.count - 1, tIdx + 3 + rng.nextInt(upperBound: 3))
+                let down1Idx = Swift.max(0, pivotIdx - 1)
+                let down2Idx = Swift.max(0, pivotIdx - 2)
+                let s0 = cycleBase; let s1 = s0 + 2; let s2 = s1 + 2
+                if s2 < frame.totalBars * 16 && s2 < barBase0 + 15 {
+                    slots.append(NoteSlot(step: s0, pitch: bodyPool[pivotIdx],
+                                          vel: UInt8(Swift.max(30, Swift.min(100, velBase + 15 + rng.nextInt(upperBound: 8))))))
+                    slots.append(NoteSlot(step: s1, pitch: bodyPool[down1Idx],
+                                          vel: UInt8(Swift.max(30, Swift.min(100, velBase +  8 + rng.nextInt(upperBound: 6))))))
+                    slots.append(NoteSlot(step: s2, pitch: bodyPool[down2Idx],
+                                          vel: UInt8(Swift.max(30, Swift.min(100, velBase +  4 + rng.nextInt(upperBound: 6))))))
+                }
+            }
+            prevIdx  = loIdx
+            prevNote = loPitch
+        }
+
+        for barOffset in skipBars..<bars {
             let barBase = (bar + barOffset) * 16
-            let spacing = 16 / notesPerBar
-            for noteIdx in 0..<notesPerBar {
-                // Brass: start on off-beat occasionally (syncopated attack)
+            // CHL-LD1-009: jazz burst mode — 25% of bars get 5–7 rapid notes at 2-step spacing,
+            // creating the short burst character that defines classic jazz phrasing.
+            let burstMode = useJazzIdioms && section != .intro && section != .outro && rng.nextDouble() < 0.25
+            let barNotes  = burstMode ? (5 + rng.nextInt(upperBound: 3)) : notesPerBar
+            let spacing   = burstMode ? 2 : (16 / notesPerBar)
+            for noteIdx in 0..<barNotes {
+                // Brass: start on off-beat occasionally (syncopated attack); disabled in burst mode
                 let stepOffset: Int
-                if (leadInstrument == .mutedTrumpet || leadInstrument == .trumpet) && noteIdx == 0 {
+                if (leadInstrument == .mutedTrumpet || leadInstrument == .trumpet) && noteIdx == 0 && !burstMode {
                     stepOffset = rng.nextDouble() < 0.40 ? 2 : 0
                 } else {
                     stepOffset = noteIdx * spacing
@@ -555,6 +827,8 @@ struct ChillLeadGenerator {
                 let stepProb: Double
                 if leadInstrument == .mutedTrumpet || leadInstrument == .trumpet {
                     stepProb = lastWasLeap ? 0.78 : 0.60  // ~40% leaps for brass — wider intervals than reeds
+                } else if useJazzIdioms {
+                    stepProb = lastWasLeap ? 0.82 : 0.65  // more leaps for jazz idioms — angular, wider phrases
                 } else {
                     stepProb = lastWasLeap ? 0.90 : 0.75
                 }
@@ -562,35 +836,35 @@ struct ChillLeadGenerator {
                 if rng.nextDouble() < stepProb {
                     // Step: adjacent pool index
                     let candidate = prevIdx + direction
-                    if candidate >= 0 && candidate < orderedPool.count {
+                    if candidate >= 0 && candidate < bodyPool.count {
                         nextIdx = candidate
                     } else {
                         // Hit boundary — reverse and jump 2–3 steps inward to break ping-pong
                         direction = -direction
                         let inward = 2 + rng.nextInt(upperBound: 2)
-                        nextIdx = Swift.max(0, Swift.min(orderedPool.count - 1, prevIdx + direction * inward))
+                        nextIdx = Swift.max(0, Swift.min(bodyPool.count - 1, prevIdx + direction * inward))
                     }
                     lastWasLeap = false
                 } else {
                     // Leap: skip 2–3 pool positions
                     let skip = 2 + rng.nextInt(upperBound: 2)
                     let candidate = prevIdx + direction * skip
-                    if candidate >= 0 && candidate < orderedPool.count {
+                    if candidate >= 0 && candidate < bodyPool.count {
                         nextIdx = candidate
                     } else {
                         direction = -direction
-                        nextIdx = Swift.max(0, Swift.min(orderedPool.count - 1, prevIdx + direction * skip))
+                        nextIdx = Swift.max(0, Swift.min(bodyPool.count - 1, prevIdx + direction * skip))
                     }
                     direction = -direction  // reverse after leap
                     lastWasLeap = true
                 }
                 // Avoid same-pitch-class repeat: nudge 2 positions further if we'd land on the same PC
-                if orderedPool.count > 3 && orderedPool[nextIdx] % 12 == prevNote % 12 {
+                if bodyPool.count > 3 && bodyPool[nextIdx] % 12 == prevNote % 12 {
                     let nudge = direction != 0 ? direction : 1
-                    let alt = Swift.max(0, Swift.min(orderedPool.count - 1, nextIdx + nudge * 2))
+                    let alt = Swift.max(0, Swift.min(bodyPool.count - 1, nextIdx + nudge * 2))
                     if alt != nextIdx { nextIdx = alt }
                 }
-                let snappedNote = orderedPool[nextIdx]
+                let snappedNote = bodyPool[nextIdx]
                 // Avoid same-note repeat: nudge direction if stuck at boundary
                 if nextIdx == prevIdx { direction = -direction }
 
@@ -609,6 +883,21 @@ struct ChillLeadGenerator {
             }
         }
         _ = prevNote  // suppress unused-variable warning
+
+        // CHL-LD1-009: chromatic approach note leading into the first body slot (35% chance).
+        // Only applied when phraseStart is .normal — idiom starters already shape the entry.
+        // Shifts the first slot 2 steps forward and inserts a lower-neighbor semitone before it.
+        if useJazzIdioms && phraseStart == .normal && !slots.isEmpty && rng.nextDouble() < 0.35 {
+            let first = slots[0]
+            let shiftedStep = first.step + 2
+            let maxStepInBar = (first.step / 16 + 1) * 16 - 1
+            let nextStep = slots.count >= 2 ? slots[1].step : Int.max
+            if shiftedStep <= maxStepInBar && shiftedStep < nextStep {
+                slots[0].step = shiftedStep
+                let approachVel = UInt8(Swift.max(30, Swift.min(100, Int(first.vel) - 18)))
+                slots.insert(NoteSlot(step: first.step, pitch: first.pitch - 1, vel: approachVel), at: 0)
+            }
+        }
 
         // Phrase-split: saxophone and trumpet (wide-interval / blues lead) phrases longer than 7 notes
         // are broken into two shorter sub-phrases by dropping 1–2 notes near the middle. This creates
@@ -637,7 +926,7 @@ struct ChillLeadGenerator {
             // If no landing note in the narrow register pool, search ±12 semitones
             if pool2.isEmpty {
                 pool2 = scale.filter { strongPCs.contains($0 % 12) &&
-                    $0 >= regLow - 12 && $0 <= regHigh + 12 }
+                    $0 >= regLow - 3 && $0 <= regHigh + 12 }
                     .sorted().reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
             }
             if !pool2.isEmpty {
@@ -676,19 +965,21 @@ struct ChillLeadGenerator {
         case .trumpet:      return "CHL-LD1-007"
         case .tenorSax:     return "CHL-LD1-008"
         case .trombone:     return "CHL-LD2-002"  // Lead 2 only
+        case .clarinet:     return "CHL-LD1-004"  // blues phrasing is the natural idiom
         }
     }
 
     private static func register(for instrument: ChillLeadInstrument) -> (low: Int, high: Int) {
         switch instrument {
         case .flute:        return (65, 85)
-        case .mutedTrumpet: return (53, 80)
-        case .trumpet:      return (55, 79)
+        case .mutedTrumpet: return (58, 80)
+        case .trumpet:      return (58, 79)
         case .vibraphone:   return (60, 80)
-        case .saxophone:    return (50, 70)   // alto sax
-        case .tenorSax:     return (54, 71)   // raised floor avoids muddy lows; slightly tighter than alto
+        case .saxophone:    return (58, 72)   // alto sax lead: Bb3–C5 (D3 floor was too muddy)
+        case .tenorSax:     return (57, 72)   // tenor sax lead: A3–C5
         case .sopranoSax:   return (58, 80)   // soprano sits higher than alto/tenor
         case .trombone:     return (45, 65)   // warm low brass — Lead 2 counter-melody register
+        case .clarinet:     return (58, 72)   // clarinet lead: Bb3–C5 (D3 floor was too muddy)
         }
     }
 
@@ -776,11 +1067,71 @@ struct ChillLeadGenerator {
         return result
     }
 
+    /// Returns (bSectionStart, aSectionStart) bar indices for blues form tracking.
+    /// bSectionStart is -1 if no B section exists; aSectionStart falls back to bSectionStart.
+    private static func bluesSectionAnchors(structure: SongStructure) -> (bStart: Int, aStart: Int) {
+        let b = structure.sections.first { $0.label == .B }?.startBar ?? -1
+        let a = structure.sections.first { $0.label == .A }?.startBar ?? b
+        return (b, a)
+    }
+
+    /// Returns the position (0–15) within the 16-bar blues form for the given bar,
+    /// or -1 if the bar is not in a groove section (A or B) or the anchor is invalid.
+    private static func bluesFormPosition(bar: Int, label: SectionLabel, bStart: Int, aStart: Int) -> Int {
+        guard label == .A || label == .B else { return -1 }
+        let anchor = (label == .B) ? bStart : aStart
+        guard anchor >= 0 else { return -1 }
+        return (bar - anchor) % 16
+    }
+
     private static func snapToRegister(_ note: Int, pool: [Int], regLow: Int, regHigh: Int) -> Int {
         // Find closest note in pool that is within [regLow, regHigh]
         let inRange = pool.filter { $0 >= regLow && $0 <= regHigh }
         guard !inRange.isEmpty else { return Swift.max(regLow, Swift.min(regHigh, note)) }
         return inRange.min(by: { abs($0 - note) < abs($1 - note) }) ?? note
+    }
+
+    /// Blues form position 14: 3–4 note descending figure on beats 1–2 (steps 0–6),
+    /// leaving beats 3–4 clear for the drum fill that precedes the turnaround bar.
+    /// useChromatic: descend by semitones (chromatic passing tones) instead of scale steps.
+    private static func bluesTurnaroundLick(
+        base: Int,
+        frame: GlobalMusicalFrame,
+        regLow: Int,
+        regHigh: Int,
+        useChromatic: Bool = false,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let scale = scaleNotes(frame: frame)
+        let pool = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
+            .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
+        guard pool.count >= 3 else { return [] }
+
+        // Start from upper-mid register and descend toward root
+        let startNote = regLow + (regHigh - regLow) * 2 / 3
+        var idx = pool.indices.min(by: { abs(pool[$0] - startNote) < abs(pool[$1] - startNote) }) ?? pool.count / 2
+
+        let noteCount   = 3 + rng.nextInt(upperBound: 2)   // 3 or 4 notes
+        let stepOffsets = [0, 2, 4, 6]                     // beats 1–2 only (steps 0–6)
+        var events: [MIDIEvent] = []
+        var chromaNote  = pool[idx]
+
+        for i in 0..<noteCount {
+            guard i < stepOffsets.count else { break }
+            let noteToPlay: Int
+            if useChromatic {
+                if i > 0 { chromaNote = Swift.max(regLow, chromaNote - 1 - rng.nextInt(upperBound: 2)) }
+                noteToPlay = chromaNote
+            } else {
+                if i > 0 { idx = Swift.max(0, idx - 1 - rng.nextInt(upperBound: 2)) }
+                noteToPlay = pool[idx]
+            }
+            let vel = UInt8(62 + i * 4 + rng.nextInt(upperBound: 10))
+            let dur = (i == noteCount - 1) ? 4 + rng.nextInt(upperBound: 3) : 2
+            events.append(MIDIEvent(stepIndex: base + stepOffsets[i], note: UInt8(noteToPlay),
+                                    velocity: vel, durationSteps: dur))
+        }
+        return events
     }
 
     // MARK: - CHL-LD1-005: St Germain Staccato
@@ -932,6 +1283,76 @@ struct ChillLeadGenerator {
             bar = nextBoundary
         }
         return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    // MARK: - Blues harmony / unison section
+
+    /// Post-processing pass: replaces Lead 2 events in `harmonyBars` with notes derived
+    /// from Lead 1 — either diatonic parallel harmony (intervalSteps scale positions below)
+    /// or unison (same pitch). Called from SongGenerator after both leads are generated.
+    /// ~15% of Lead 1's shortest notes are dropped for natural player looseness.
+    static func applyBluesHarmony(
+        lead1Events: [MIDIEvent],
+        lead2Events: inout [MIDIEvent],
+        harmonyBars: Set<Int>,
+        useUnison: Bool,
+        intervalSteps: Int,
+        maxPhrases: Int = 2,
+        frame: GlobalMusicalFrame,
+        rng: inout SeededRNG
+    ) {
+        // Strip any existing Lead 2 events from the harmony window
+        lead2Events = lead2Events.filter { !harmonyBars.contains($0.stepIndex / 16) }
+
+        let scale = scaleNotes(frame: frame).sorted()
+        guard !scale.isEmpty else { return }
+
+        // Gather and sort Lead 1 events within the window
+        let windowEvents = lead1Events
+            .filter { harmonyBars.contains($0.stepIndex / 16) }
+            .sorted { $0.stepIndex < $1.stepIndex }
+        guard !windowEvents.isEmpty else { return }
+
+        // Identify phrases by bar activity: contiguous runs of bars that have notes.
+        // Any silent bar (no Lead 1 events) breaks the run → phrase boundary.
+        // Keep only the first maxPhrases phrases.
+        let activeBars = Set(windowEvents.map { $0.stepIndex / 16 }).sorted()
+        var phraseBarGroups: [[Int]] = []
+        var currentGroup: [Int] = []
+        for bar in activeBars {
+            if let last = currentGroup.last, bar - last > 1 {
+                phraseBarGroups.append(currentGroup)
+                currentGroup = []
+            }
+            currentGroup.append(bar)
+        }
+        if !currentGroup.isEmpty { phraseBarGroups.append(currentGroup) }
+
+        let keptBars = Set(phraseBarGroups.prefix(maxPhrases).flatMap { $0 })
+        let keptEvents = windowEvents.filter { keptBars.contains($0.stepIndex / 16) }
+
+        for event in keptEvents {
+            // Drop ~15% of very short notes — looseness like real horn players
+            if Int(event.durationSteps) < 3 && rng.nextDouble() < 0.15 { continue }
+
+            let pitch: Int
+            if useUnison {
+                pitch = Int(event.note)
+            } else {
+                // Find Lead 1's note in the sorted scale, then go intervalSteps positions down
+                let noteInt = Int(event.note)
+                let idx = scale.indices.min(by: { abs(scale[$0] - noteInt) < abs(scale[$1] - noteInt) }) ?? 0
+                pitch = scale[Swift.max(0, idx - intervalSteps)]
+            }
+
+            lead2Events.append(MIDIEvent(
+                stepIndex:     event.stepIndex,
+                note:          UInt8(Swift.max(0, Swift.min(127, pitch))),
+                velocity:      event.velocity,
+                durationSteps: event.durationSteps
+            ))
+        }
+        lead2Events.sort { $0.stepIndex < $1.stepIndex }
     }
 
     /// Convert a flat event list to (startBar, endBar) onset pairs for Lead 2 awareness.

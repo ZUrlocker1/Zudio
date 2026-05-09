@@ -946,7 +946,7 @@ struct HelpView: View {
                         Text("Visualizer / Tracks (⌘Z)")
                             .font(.system(size: 14).bold())
                     }
-                    Text("Switch between visualizer and track view. Click on visuals to modify sounds.")
+                    Text("Switch between visualizer and track view. Click or swipe to modify tracks.")
                         .font(.system(size: 14)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -972,7 +972,7 @@ struct HelpView: View {
                         .font(.system(size: 14)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                helpLine("Status log", "Shows the generation rules applied to the current song.")
+                helpLine("Generation log", "Shows the rules which created the current song.")
             }
             Spacer()
             HStack {

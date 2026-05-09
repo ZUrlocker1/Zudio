@@ -20,12 +20,18 @@ struct ChillStructureGenerator {
         chillProgFamily: ChillProgressionFamily,
         mood: Mood,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
+        noBreakdown: Bool = false,
         rng: inout SeededRNG
     ) -> SongStructure {
-        let useSimpleForm = (mood == .Deep || mood == .Dream) && rng.nextDouble() < 0.30
-        let (sections, introStyle, outroStyle) = useSimpleForm
-            ? buildSimpleSections(frame: frame, rng: &rng)
-            : buildFullSections(frame: frame, breakdownStyle: breakdownStyle, rng: &rng)
+        let (sections, introStyle, outroStyle): ([SongSection], IntroStyle, OutroStyle)
+        if noBreakdown {
+            (sections, introStyle, outroStyle) = buildNoBreakdownSections(frame: frame, rng: &rng)
+        } else {
+            let useSimpleForm = (mood == .Deep || mood == .Dream) && rng.nextDouble() < 0.30
+            (sections, introStyle, outroStyle) = useSimpleForm
+                ? buildSimpleSections(frame: frame, rng: &rng)
+                : buildFullSections(frame: frame, breakdownStyle: breakdownStyle, rng: &rng)
+        }
         let chordPlan = buildChordPlan(frame: frame, sections: sections,
                                        family: chillProgFamily, rng: &rng)
         return SongStructure(sections: sections, chordPlan: chordPlan,
@@ -90,6 +96,49 @@ struct ChillStructureGenerator {
         let useColdStyle = rng.nextDouble() < 0.50
         let introStyle: IntroStyle = useColdStyle ? .coldStart(drumsOnly: true) : .alreadyPlaying
         let outroStyle: OutroStyle = useColdStyle ? .coldStop : .fade
+        return (sections, introStyle, outroStyle)
+    }
+
+    /// Blues form: INTRO / GROOVE-A / GROOVE-B / OUTRO (no breakdown, preserves A+B duality for drum routing)
+    private static func buildNoBreakdownSections(frame: GlobalMusicalFrame,
+                                                  rng: inout SeededRNG) -> ([SongSection], IntroStyle, OutroStyle) {
+        let total = frame.totalBars
+        // Blues intro: 50% chance of 0 bars (jump straight into the form), 50% chance of 4 bars.
+        // Lead solo must kick off within 4 bars of the A section — short intro enforces this.
+        let introBars = rng.nextDouble() < 0.50 ? 0 : 4
+        // Blues coldStop outro is exactly 2 bars: beat 0 of bar 0 is the crash+kick+bass+rhythm
+        // landing; bar 1 is silence. This makes the cold stop land on beat 1 of the bar immediately
+        // after the turnaround, merging with the turnaround's spill kick for a definitive ending.
+        let outroBars  = 2
+        let groovePool = total - introBars - outroBars
+        // grooveTotal: largest multiple of 16 that fits, minimum 32.
+        let grooveTotal = Swift.max(32, (groovePool / 16) * 16)
+        // Surplus (0–15 bars that don't fill a complete 16-bar cycle) goes into grooveB as extra
+        // Im7 bars before the outro. This keeps introBars at exactly 0 or 4 and outroBars at 2.
+        let surplus = groovePool - grooveTotal
+        // Split grooveTotal: A ≈ 45%, B ≈ 55%, both multiples of 16, minimum 16 each.
+        let grooveA_target = Int(Double(grooveTotal) * 0.45)
+        let grooveA = Swift.max(16, Swift.min(grooveTotal - 16, ((grooveA_target + 8) / 16) * 16))
+        let grooveB = grooveTotal - grooveA + surplus
+
+        var sections: [SongSection] = []
+        var cursor = 0
+        if introBars > 0 {
+            sections.append(SongSection(startBar: cursor, lengthBars: introBars, label: .intro, intensity: .low, mode: frame.mode))
+            cursor += introBars
+        }
+        sections.append(SongSection(startBar: cursor, lengthBars: grooveA,   label: .A,     intensity: .medium, mode: frame.mode))
+        cursor += grooveA
+        sections.append(SongSection(startBar: cursor, lengthBars: grooveB,   label: .B,     intensity: .high,   mode: frame.mode))
+        cursor += grooveB
+        sections.append(SongSection(startBar: cursor, lengthBars: outroBars, label: .outro,  intensity: .low,    mode: frame.mode))
+
+        // Blues: always coldStart(drumsOnly: false) — drums pickup on bar 0, bass and
+        // keyboard build in during the intro. drumsOnly=false signals generators to play
+        // bass/keyboard during the intro rather than staying silent.
+        // Always coldStop: blues genre ends with a definitive landing, never a fade.
+        let introStyle: IntroStyle = .coldStart(drumsOnly: false)
+        let outroStyle: OutroStyle = .coldStop
         return (sections, introStyle, outroStyle)
     }
 

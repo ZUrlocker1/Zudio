@@ -285,7 +285,7 @@ struct PhonePlayerView: View {
                         .font(.system(size: song.style == .ambient ? 16 : 20, weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                    Text(appState.selectedStyle.rawValue.capitalized)
+                    Text(song.displayStyleName)
                         .font(.system(size: 14))
                         .foregroundStyle(Color.white.opacity(0.50))
                 }
@@ -666,7 +666,7 @@ struct PhonePlayerView: View {
                                 .padding(.top, 24)
                         } else {
                             ForEach(songs) { song in
-                                Button {
+                                    Button {
                                     appState.loadFromPersistedSong(song)
                                     activeTab = .visuals
                                     hapticImpactLight.toggle()
@@ -741,7 +741,7 @@ struct PhonePlayerView: View {
     // MARK: - Gesture handlers
 
     private func handleTapOrb(_ trackIndex: Int) {
-        // Single tap → 2-bar mute + instrument regen on release
+        // Single tap → 2-bar mute + full track regen (new rule + events) on release
         appState.toggleMute(trackIndex)
         hapticImpactLight.toggle()
         let bpm = Double(appState.songState?.frame.tempo ?? 120)
@@ -749,7 +749,7 @@ struct PhonePlayerView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + twoBarsSeconds) {
             if appState.muteState[trackIndex] {
                 appState.toggleMute(trackIndex)
-                appState.regenInstrument(forTrack: trackIndex)
+                appState.regenerateTrack(trackIndex)
             }
         }
     }
@@ -786,31 +786,39 @@ struct PhonePlayerView: View {
     }
 
     private func handleDoubleTapEmpty() {
-        appState.regenInstrument(forTrack: kTrackLead1)
-        appState.regenInstrument(forTrack: kTrackRhythm)
+        appState.triggerVisualizerFlash(trackIndex: kTrackLead1)
+        appState.triggerVisualizerFlash(trackIndex: kTrackRhythm)
+        appState.regenerateTrack(kTrackLead1)
+        appState.regenerateTrack(kTrackRhythm)
         hapticImpactLight.toggle()
     }
-    
+
     private func handleLongPressEmpty() {
         appState.regenRandomNonDrumTrack()
         hapticImpactHeavy.toggle()
     }
 
     private func handleSwipeRight() {
-        appState.regenInstrument(forTrack: kTrackRhythm)
-        appState.regenInstrument(forTrack: kTrackPads)
+        appState.triggerVisualizerFlash(trackIndex: kTrackRhythm)
+        appState.triggerVisualizerFlash(trackIndex: kTrackPads)
+        appState.regenerateTrack(kTrackRhythm)
+        appState.regenerateTrack(kTrackPads)
         hapticSelection.toggle()
     }
 
     private func handleSwipeLeft() {
-        appState.regenInstrument(forTrack: kTrackLead1)
-        appState.regenInstrument(forTrack: kTrackLead2)
+        appState.triggerVisualizerFlash(trackIndex: kTrackLead1)
+        appState.triggerVisualizerFlash(trackIndex: kTrackLead2)
+        appState.regenerateTrack(kTrackLead1)
+        appState.regenerateTrack(kTrackLead2)
         hapticImpactSoft.toggle()
     }
 
     private func handleTwoFinger() {
-        appState.regenInstrument(forTrack: kTrackBass)
-        appState.regenInstrument(forTrack: kTrackDrums)
+        appState.triggerVisualizerFlash(trackIndex: kTrackBass)
+        appState.triggerVisualizerFlash(trackIndex: kTrackDrums)
+        appState.regenerateTrack(kTrackBass)
+        appState.regenerateTrack(kTrackDrums)
         hapticImpactRigid.toggle()
     }
 }
@@ -849,7 +857,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.3")
+                    Text("Generative music · v1.4")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
@@ -863,7 +871,7 @@ struct PhoneInfoView: View {
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Text("Tap or swipe to change instruments. Save, Load or Share songs from the Song list view. Log view shows the rules firing behind the scenes.")
+                    Text("Tap or swipe to modify tracks. Save, Load or Share songs from the Song list view. Log view shows the rules firing behind the scenes.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)

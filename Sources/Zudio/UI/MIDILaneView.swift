@@ -36,7 +36,7 @@ struct MIDILaneView: View {
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
         let version   = cacheVersion
-        let curStep   = playback.currentStep
+        let curStep   = playback.displayStep
 
         ZStack {
             // Note layer — does not capture currentStep, so SwiftUI skips its body

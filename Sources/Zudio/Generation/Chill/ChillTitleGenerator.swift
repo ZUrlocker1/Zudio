@@ -174,7 +174,7 @@ struct ChillTitleGenerator {
     // MARK: - Time of day
 
     private static func timeOfDay(rng: inout SeededRNG) -> String {
-        let times = ["After Midnight", "Three AM", "Last Set", "Before Dawn",
+        let times = ["After Midnight", "Three    AM", "Last Set", "Before Dawn",
                      "Late Hour", "After Two", "Last Light", "After Hours",
                      "Midnight Minus One", "Before Blue"]
         return times[rng.nextInt(upperBound: times.count)]

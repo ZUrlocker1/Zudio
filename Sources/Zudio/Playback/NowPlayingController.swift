@@ -148,7 +148,7 @@ final class NowPlayingController {
             let elapsed = Double(currentStep) * song.frame.secondsPerStep
             var info: [String: Any] = [
                 MPMediaItemPropertyTitle:                    song.title,
-                MPMediaItemPropertyArtist:                   song.style.rawValue.capitalized,
+                MPMediaItemPropertyArtist:                   song.displayStyleName,
                 MPMediaItemPropertyPlaybackDuration:         song.frame.totalDurationSeconds,
                 MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
                 MPNowPlayingInfoPropertyPlaybackRate:        isPlaying ? 1.0 : 0.0,

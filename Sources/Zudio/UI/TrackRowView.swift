@@ -290,9 +290,15 @@ struct TrackRowView: View {
 
     // Chip buttons extracted so effectsColumn can reference them in multiple branches.
     @ViewBuilder private var chipButtons: some View {
+        // Computed outside ForEach so SwiftUI re-evaluates it on every appState change.
+        let bluesDelayLocked = appState.selectedStyle == .chill
+            && appState.songState?.chillBluesVariation == true
+            && (trackIndex == kTrackLead1 || trackIndex == kTrackLead2)
         ForEach(trackEffects, id: \.self) { fx in
-            let isOn = activeEffects.contains(fx.rawValue)
+            let locked = fx == .delay && bluesDelayLocked
+            let isOn = locked ? false : activeEffects.contains(fx.rawValue)
             Button {
+                guard !locked else { return }
                 let nowOn = !isOn
                 if nowOn { activeEffects.insert(fx.rawValue) }
                 else     { activeEffects.remove(fx.rawValue) }
@@ -393,9 +399,10 @@ struct TrackRowView: View {
             default:            []
             }
         } else if activeStyle == .chill {
+            let isBlues = appState.songState?.chillBluesVariation == true
             defaults = switch trackIndex {
-            case kTrackLead1:   [.space, .delay]
-            case kTrackLead2:   [.space, .delay]
+            case kTrackLead1:   isBlues ? [.space] : [.space, .delay]
+            case kTrackLead2:   isBlues ? [.space] : [.space, .delay]
             case kTrackRhythm:  [.space]
             case kTrackPads:    [.sweep, .tremolo]
             case kTrackTexture: [.lowShelf, .reverb]
@@ -427,6 +434,12 @@ struct TrackRowView: View {
         for fx in defaults {
             activeEffects.insert(fx.rawValue)
             appState.setEffect(fx, enabled: true, forTrack: trackIndex)
+        }
+        // Hard stop: blues Chill Lead 1/2 never show delay as active, regardless of defaults.
+        if activeStyle == .chill
+           && appState.songState?.chillBluesVariation == true
+           && (trackIndex == kTrackLead1 || trackIndex == kTrackLead2) {
+            activeEffects.remove(TrackEffect.delay.rawValue)
         }
     }
 

@@ -102,7 +102,6 @@ final class AudioTexturePlayer {
         case .lowShelf:
             eqNode.bands[0].bypass = !enabled
         case .reverb, .space:
-            reverbNode.auAudioUnit.shouldBypassEffect = !enabled
             reverbNode.wetDryMix = enabled ? 22 : 0
         default:
             break
@@ -265,7 +264,7 @@ final class AudioTexturePlayer {
             boostEnabled:   boostNode.outputVolume > 1.1,
             lowShelfEnabled: !eqNode.bands[0].bypass && !eqNode.auAudioUnit.shouldBypassEffect,
             reverbWetDryMix: reverbNode.wetDryMix,
-            reverbBypassed: reverbNode.auAudioUnit.shouldBypassEffect,
+            reverbBypassed: reverbNode.wetDryMix == 0,
             isAmbient:      bypassEffects
         )
     }

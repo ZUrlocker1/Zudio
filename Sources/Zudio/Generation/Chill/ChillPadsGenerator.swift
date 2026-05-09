@@ -16,12 +16,63 @@ struct ChillPadsGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         breakdownStyle: ChillBreakdownStyle,
+        bluesVariation: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
         let roll = rng.nextDouble()
         var events: [MIDIEvent]
-        if roll < 0.20 {
+        if bluesVariation {
+            // Blues: CHL-PAD-004 (open fifth hold) — full B section.
+            // First 16-bar cycle: pads throughout. Subsequent cycles: Im7 section (first 8 bars
+            // of each cycle) is silent — pads re-enter at the chord changes (IVm7 onwards).
+            // Warm Pad or String Pad chosen in AppState (50/50).
+            usedRuleIDs.insert("CHL-PAD-004")
+            var bPads = openFifthHold(frame: frame, structure: structure, rng: &rng)
+
+            let firstBSection = structure.sections.first { $0.label == .B }
+            if let bSec = firstBSection {
+                let bStart = bSec.startBar
+                bPads = bPads.filter {
+                    let bar = $0.stepIndex / 16
+                    guard bar >= bStart && bar < bSec.endBar else { return false }
+                    let posInB = bar - bStart
+                    if posInB < 16 { return true }  // first cycle: always include
+                    return (posInB % 16) >= 8       // later cycles: skip Im7 section
+                }
+            } else {
+                bPads = []
+            }
+
+            // Split long Im7 windows (8 bars = 118 steps) into two 4-bar attacks.
+            // Hold 1: 0–3.5 bars (56 steps). Hold 2: starts at bar 4 (step +64), ends at 7.5
+            // bars (56 steps). The 0.5-bar gap lets the Chill Pads fade-out fire before the
+            // second attack, keeping volume consistent rather than one loud unbroken hold.
+            var splitPads: [MIDIEvent] = []
+            for ev in bPads {
+                if ev.durationSteps > 60 {
+                    splitPads.append(MIDIEvent(stepIndex: ev.stepIndex,
+                                               note: ev.note, velocity: ev.velocity, durationSteps: 56))
+                    splitPads.append(MIDIEvent(stepIndex: ev.stepIndex + 64,
+                                               note: ev.note, velocity: ev.velocity, durationSteps: 56))
+                } else {
+                    splitPads.append(ev)
+                }
+            }
+            bPads = splitPads
+
+            // Velocity and minimum hold:
+            // Long Im7 splits (56 steps): velocity 48 — plenty of fade-in time.
+            // Short IV/V chord windows (≤22 steps): velocity 56 — slightly louder to
+            //   compensate for the shorter hold; the fade-in has less time to reach peak.
+            // Minimum 14-step hold for 1-bar windows (was 6 steps = inaudible after fade).
+            bPads = bPads.map { ev in
+                let vel: UInt8 = ev.durationSteps <= 22 ? 58 : 48
+                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                 velocity: vel, durationSteps: max(14, ev.durationSteps))
+            }
+            events = bPads
+        } else if roll < 0.20 {
             usedRuleIDs.insert("CHL-PAD-001")
             events = chordSustain(frame: frame, structure: structure, rng: &rng)
         } else if roll < 0.36 {

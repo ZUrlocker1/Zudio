@@ -430,7 +430,11 @@ Lead in Ambient is sparse to the point of near-absence. Track: kTrackLead1 (regi
 
 AMB-LEAD-009 and AMB-LEAD-010 are section-level solos that bypass the loop tiler and require structure != nil.
 
-**Lead 2 (AMB-LEAD-005: Eno-style tonal cell)** — always active; 2–4 sparse sustained notes placed across the loop; pitches are drawn from the same pitch classes as Lead 1's actual notes (transposed into Lead 2's register MIDI 55–81); velocity 35–62 (softer than Lead 1); rests ≥ 2× note duration. Because Lead 1 and Lead 2 run on co-prime loop lengths, the two voices phase against each other — overlap is harmonic coincidence, not coordination.
+**Lead 2** — one of two rules, 70/30 weighted:
+
+**AMB-LEAD-005: Eno-style tonal cell** (70%) — 2–4 sparse sustained notes placed across the loop; pitches drawn from the same pitch classes as Lead 1's actual notes (transposed into Lead 2's register MIDI 55–81); velocity 35–62 (softer than Lead 1); rests ≥ 2× note duration. Because Lead 1 and Lead 2 run on co-prime loop lengths, the two voices phase against each other — overlap is harmonic coincidence, not coordination.
+
+**AMB-LEAD-006: Descending phrase** *(added v1.1)* (30%) — 3–5 diatonic scale tones descending stepwise from the upper register of Lead 2's range; held 8–16 steps each; fires 1–2 times per loop with long rests between. More melodic than the tonal cell; the downward direction gives a sense of resolution and melancholy.
 
 ---
 
@@ -447,6 +451,12 @@ Bass in Ambient is minimal — a sub-presence that confirms the harmonic root, n
 
 **AMB-BASS-003: Root+fifth drone** (35% of non-absent) — alternates root / fifth holds; 10% chance of third instead of fifth
 - Same hold/gap timing as AMB-BASS-001; minor third used in minor modes to avoid clashes
+
+**AMB-BASS-004: ECM Pluck** *(added v1.1)* — short staccato plucks (6–10 steps) spaced 3–5 bars apart, each at a different scale tone, stepwise walk. Eberhard Weber / ECM records feel — the bass is a melodic colour rather than a harmonic anchor.
+
+**AMB-BASS-005: Octave Double** *(added v1.1)* — root note played simultaneously at two octaves; long holds. Adds low-end weight without harmonic complexity.
+
+**AMB-BASS-006: Slow Pendulum** *(added v1.1)* — alternates root with b7 (minor modes) or 4th (major modes) on a slow long-note rhythm. Two-note oscillation that implies harmonic motion without chord changes.
 
 ---
 

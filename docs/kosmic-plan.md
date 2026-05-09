@@ -1068,6 +1068,9 @@ One base pattern selected per song; evolves in B sections.
 - KOS-PADS-006 — Electric Buddha cloud shimmer: high-register shimmer layer above pad voicing
 - KOS-PADS-007 — Probabilistic gated chord pulse: chord hits fire with variable probability each
   beat, creating rhythmic breathing texture rather than a sustained hold
+- KOS-PADS-008 — bIII colour chord layer *(added v1.1)*: supplementary layer that adds the flat-III
+  chord as a colour voicing above the primary pad; minor-mode only (suppressed in major); fires at
+  reduced probability in A sections, higher in B sections; song-level gate keeps it occasional
 
 ### Texture patterns (KOS-TEXT)
 

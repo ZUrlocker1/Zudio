@@ -33,7 +33,7 @@ struct KosmicBatchTests {
 
         for i in 1...20 {
             let seed = UInt64.random(in: .min ... .max)
-            let song = SongGenerator.generate(seed: seed, style: .kosmic, testMode: false)
+            let song = SongGenerator.generate(seed: seed, style: .kosmic)
 
             let seedHex  = String(format: "%016llx", seed)
             let filename = String(format: "kosmic_%02d_%@.MID", i, seedHex)

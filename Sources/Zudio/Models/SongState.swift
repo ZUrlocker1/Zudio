@@ -50,6 +50,8 @@ struct SongState: Sendable {
     let chillBreakdownStyle: ChillBreakdownStyle
     /// Chill-only: true when swing feel is applied (Bright/Free moods).
     let chillSwingFeel: Bool
+    /// Chill-only: true when the Blues Chill variation is active (Dorian mode, blues chord cycle, blues drums/bass).
+    let chillBluesVariation: Bool
     /// Chill-only: audio texture filename selected at generation time (nil = no texture).
     let chillAudioTexture: String?
     /// Chill-only: playback start offset in seconds (0, 15, 30, or 45) for audio texture.
@@ -73,6 +75,15 @@ struct SongState: Sendable {
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
     /// reaches that step, giving precise timing (e.g. fills fire 2 beats before the hit).
     let stepAnnotations: [Int: [GenerationLogEntry]]
+
+    // MARK: - Display helpers
+
+    /// Style name for UI display. Returns the substyle name when a substyle is active
+    /// (e.g. "Chill Blues" instead of "Chill"). Add new substyle cases here as they are implemented.
+    var displayStyleName: String {
+        if chillBluesVariation { return "Chill Blues" }
+        return style.rawValue.capitalized
+    }
 
     // MARK: - Custom init (default values for Ambient fields preserve all existing call sites)
 
@@ -100,6 +111,7 @@ struct SongState: Sendable {
         chillBeatStyle: ChillBeatStyle = .electronic,
         chillBreakdownStyle: ChillBreakdownStyle = .bassOstinato,
         chillSwingFeel: Bool = false,
+        chillBluesVariation: Bool = false,
         chillAudioTexture: String? = nil,
         chillAudioTextureOffset: Int = 0,
         ambientAudioTexture: String? = nil,
@@ -130,6 +142,7 @@ struct SongState: Sendable {
         self.chillBeatStyle          = chillBeatStyle
         self.chillBreakdownStyle     = chillBreakdownStyle
         self.chillSwingFeel          = chillSwingFeel
+        self.chillBluesVariation     = chillBluesVariation
         self.chillAudioTexture        = chillAudioTexture
         self.chillAudioTextureOffset  = chillAudioTextureOffset
         self.ambientAudioTexture      = ambientAudioTexture
@@ -162,6 +175,7 @@ struct SongState: Sendable {
                   chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillBluesVariation: chillBluesVariation,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -181,6 +195,7 @@ struct SongState: Sendable {
                   chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillBluesVariation: chillBluesVariation,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -200,6 +215,7 @@ struct SongState: Sendable {
                   chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillBluesVariation: chillBluesVariation,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: texture, ambientAudioTextureOffset: offset,
                   forcedRules: forcedRules,
@@ -219,6 +235,7 @@ struct SongState: Sendable {
                   chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillBluesVariation: chillBluesVariation,
                   chillAudioTexture: texture, chillAudioTextureOffset: chillAudioTextureOffset,
                   forcedRules: forcedRules,
                   keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
@@ -248,6 +265,7 @@ struct SongState: Sendable {
                   chillBeatStyle: anchor.chillBeatStyle,
                   chillBreakdownStyle: anchor.chillBreakdownStyle,
                   chillSwingFeel: anchor.chillSwingFeel,
+                  chillBluesVariation: anchor.chillBluesVariation,
                   chillAudioTexture: anchor.chillAudioTexture,
                   chillAudioTextureOffset: anchor.chillAudioTextureOffset,
                   ambientAudioTexture: anchor.ambientAudioTexture,

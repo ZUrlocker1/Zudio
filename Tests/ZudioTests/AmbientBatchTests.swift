@@ -33,7 +33,7 @@ struct AmbientBatchTests {
 
         for i in 1...20 {
             let seed = UInt64.random(in: .min ... .max)
-            let song = SongGenerator.generate(seed: seed, style: .ambient, testMode: false)
+            let song = SongGenerator.generate(seed: seed, style: .ambient)
 
             let seedHex  = String(format: "%016llx", seed)
             let filename = String(format: "ambient_%02d_%@.MID", i, seedHex)

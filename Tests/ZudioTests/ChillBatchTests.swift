@@ -54,7 +54,7 @@ struct ChillBatchTests {
 
         for i in 1...20 {
             let seed = UInt64.random(in: .min ... .max)
-            let song = SongGenerator.generate(seed: seed, style: .chill, testMode: false)
+            let song = SongGenerator.generate(seed: seed, style: .chill)
 
             let seedHex = String(format: "%016llx", seed)
             let filename = String(format: "chill_%02d_%@.MID", i, seedHex)
@@ -95,7 +95,7 @@ struct ChillBatchTests {
 
         for seed in Self.regenSeeds {
             let seedHex = String(format: "%016llx", seed)
-            let baseSong = SongGenerator.generate(seed: seed, style: .chill, testMode: false)
+            let baseSong = SongGenerator.generate(seed: seed, style: .chill)
             print("Seed \(seedHex)  [\(baseSong.frame.mood.rawValue) \(baseSong.frame.mode.rawValue)]  \(baseSong.frame.totalBars) bars")
 
             // Generate 5 drum regens

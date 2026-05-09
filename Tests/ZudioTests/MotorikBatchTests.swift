@@ -46,7 +46,7 @@ struct MotorikBatchTests {
             let seed     = UInt64.random(in: .min ... .max)
             let ruleID   = rotation[i - 1]
             let song     = SongGenerator.generate(seed: seed, style: .motorik,
-                                                  testMode: false, forceLeadRuleID: ruleID)
+                                                  forceLeadRuleID: ruleID)
 
             let seedHex  = String(format: "%016llx", seed)
             let filename = String(format: "motorik_%02d_%@.MID", i, seedHex)

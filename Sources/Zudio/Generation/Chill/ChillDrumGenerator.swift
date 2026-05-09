@@ -15,10 +15,17 @@ struct ChillDrumGenerator {
         structure: SongStructure,
         beatStyle: ChillBeatStyle,
         breakdownStyle: ChillBreakdownStyle,
+        bluesVariation: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         fillBars: inout [Int]
     ) -> [MIDIEvent] {
+        // Blues Chill routes to dedicated blues drum patterns regardless of beat style.
+        if bluesVariation {
+            usedRuleIDs.insert("CHL-DRUM-006")
+            usedRuleIDs.insert("CHL-DRUM-007")
+            return bluesDrums(frame: frame, structure: structure, breakdownStyle: breakdownStyle, rng: &rng)
+        }
         switch beatStyle {
         case .electronic:
             usedRuleIDs.insert("CHL-DRUM-001")
@@ -972,6 +979,240 @@ struct ChillDrumGenerator {
             }
         }
         return events
+    }
+
+    // MARK: - Blues drums (CHL-DRUM-006 + CHL-DRUM-007)
+
+    /// Blues Chill dispatcher: CHL-DRUM-006 (sparse side-stick) in all sections except Groove B,
+    /// which uses CHL-DRUM-007 (pushed groove) for propulsion.
+    private static func bluesDrums(frame: GlobalMusicalFrame, structure: SongStructure,
+                                    breakdownStyle: ChillBreakdownStyle,
+                                    rng: inout SeededRNG) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let sidestick = GMDrum.sidestick.rawValue
+        let snare     = GMDrum.snare.rawValue
+        let kick      = GMDrum.kick.rawValue
+        let openHat   = GMDrum.openHat.rawValue
+        let closedHat = GMDrum.closedHat.rawValue
+        let crash     = GMDrum.crash1.rawValue
+        // Picked once per song — determines which fill variant plays at every turnaround and mid-form fill.
+        // 0 = snare run / silence, 1 = kick-snare dialogue / cross-stick, 2 = wide snares / ghost roll.
+        let fillVariant = rng.nextInt(upperBound: 3)
+
+        // Pre-compute section-transition bars so crash fires one bar before each transition.
+        var transitionBars = Set<Int>()
+        for (i, sec) in structure.sections.enumerated() {
+            if i + 1 < structure.sections.count {
+                transitionBars.insert(sec.endBar - 1)   // bar before next section starts
+            }
+        }
+        // CHL-DRUM-008: bar 16 of each 16-bar blues form — turnaround detection.
+        // A and B sections each have their own form clock so turnarounds fire in both.
+        let bSectionStart = structure.sections.first { $0.label == .B }?.startBar ?? -1
+        let aSectionStart = structure.sections.first { $0.label == .A }?.startBar ?? bSectionStart
+
+        let coldStopOutroEnd: Int? = {
+            if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }
+            return nil
+        }()
+        let coldStopOutroLength = coldStopOutroEnd.flatMap { _ in structure.outroSection?.lengthBars } ?? 0
+
+        for bar in 0..<frame.totalBars {
+            let section     = structure.section(atBar: bar)
+            let label       = section?.label ?? .A
+            let isBreakdown = label == .bridge
+            let isGrooveB   = label == .B
+            let isGrooveA   = label == .A
+            let isIntro     = label == .intro
+            let base        = bar * 16
+
+            // Cold start: bar 0 is a jazz pickup fill
+            if case .coldStart = structure.introStyle, bar == 0 {
+                events += chillColdStartPickup(barStart: base, rng: &rng)
+                continue
+            }
+
+            // Cold stop: last bar silent; crash+kick 1 bar earlier; 2-beat fill in bar before that.
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    events.append(MIDIEvent(stepIndex: base, note: crash, velocity: 110, durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 105, durationSteps: 1))
+                    continue
+                }
+            }
+            let isColdStopPenultimate = coldStopOutroLength >= 3 && coldStopOutroEnd == bar + 3
+
+            // Form position: each groove section uses its own clock so turnarounds align correctly
+            // even when the A section spans multiple 16-bar cycles before the B section begins.
+            let posInForm = isGrooveB ? (bar - bSectionStart) : (bar - aSectionStart)
+            let isTurnaroundBar = (isGrooveA || isGrooveB) && posInForm >= 15 && (posInForm + 1) % 16 == 0
+
+            // Blues fill: snare run at position 7 of each 16-bar cycle (last Im7 bar before IVm7).
+            // Only in Groove B — suppresses sidestick/snare collision in Groove A.
+            // Suppressed on turnaround bars (turnaround replaces the bar entirely).
+            let isBluesFillBar = isGrooveB && (posInForm % 16 == 7) && !isTurnaroundBar
+
+            // Crash on bar before section transitions
+            if transitionBars.contains(bar) && !isIntro {
+                events.append(MIDIEvent(stepIndex: base + 10, note: crash,
+                                        velocity: UInt8(88 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            }
+
+            if isBluesFillBar {
+                switch fillVariant {
+                case 1:
+                    // Kick-snare call/response: alternating kick and snare — classic blues dialogue
+                    events.append(MIDIEvent(stepIndex: base,     note: kick,  velocity: UInt8(80 + rng.nextInt(upperBound: 12)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 2, note: snare, velocity: UInt8(75 + rng.nextInt(upperBound: 12)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 4, note: kick,  velocity: UInt8(85 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 6, note: snare, velocity: UInt8(88 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+                case 2:
+                    // Wide spaced snares: heavy hits on beats 2 and 3, plenty of space — unhurried
+                    events.append(MIDIEvent(stepIndex: base + 4, note: snare, velocity: UInt8(92 + rng.nextInt(upperBound: 8)), durationSteps: 1))
+                    events.append(MIDIEvent(stepIndex: base + 8, note: snare, velocity: UInt8(90 + rng.nextInt(upperBound: 8)), durationSteps: 1))
+                default:
+                    // Snare run: ascending 8th-note crescendo (steps 0 2 4 6)
+                    for step in [0, 2, 4, 6] {
+                        let vel = UInt8(58 + step * 5 + rng.nextInt(upperBound: 8))
+                        events.append(MIDIEvent(stepIndex: base + step, note: snare, velocity: vel, durationSteps: 1))
+                    }
+                }
+                // Normal groove pattern continues for the rest of the bar
+            }
+
+            if isBreakdown {
+                // CHL-DRUM-006 side-stick in breakdown (all styles)
+                events += bluesSideStickBar(base: base, isIntro: false, isLastBar: false,
+                                             sidestick: sidestick, snare: snare, kick: kick,
+                                             openHat: openHat, closedHat: closedHat, rng: &rng)
+            } else if isTurnaroundBar {
+                // CHL-DRUM-008: bar 16 turnaround — fires in both Groove A and Groove B.
+                events += bluesTurnaroundBar(base: base, kick: kick, snare: snare,
+                                             crash: crash, variant: fillVariant, rng: &rng)
+            } else if isGrooveB {
+                // CHL-DRUM-007: Blues pushed groove — propulsive.
+                // First 8 bars of each 16-bar cycle (Im7 section): thin hi-hat (quarter-note).
+                // Bars 8–14 (chord change section): full 8th-note hi-hat for energy.
+                let cyclePos  = posInForm % 16
+                let thinHiHat = cyclePos < 8
+                events += bluesPushedGrooveBar(base: base, isIntro: false, kick: kick, snare: snare,
+                                               closedHat: closedHat, thinHiHat: thinHiHat, rng: &rng)
+            } else {
+                // CHL-DRUM-006: Blues side-stick — used in Intro, Groove A, Outro
+                events += bluesSideStickBar(base: base, isIntro: isIntro, isLastBar: false,
+                                             sidestick: sidestick, snare: snare, kick: kick,
+                                             openHat: openHat, closedHat: closedHat, rng: &rng)
+            }
+
+            if isColdStopPenultimate {
+                events.removeAll { $0.stepIndex >= base + 8 }
+                events += chillColdStopFill(barStart: base)
+            }
+        }
+        return events
+    }
+
+    /// CHL-DRUM-008: Blues form turnaround — bar 16 of each 16-bar blues cycle.
+    /// Beat 1: crash + kick (always). Beats 2–3 vary by variant. Beat 4: tight 4-note fill. Spill kick.
+    /// Variant 0: silence on beats 2–3 — most dramatic space, bass root hold breathes alone.
+    /// Variant 1: sidestick on beats 2 and 3 — classic slow-blues cross-stick time-keeping.
+    /// Variant 2: ghost snare 8th-notes on beats 2–3, building tension before the fill lands.
+    private static func bluesTurnaroundBar(base: Int, kick: UInt8, snare: UInt8, crash: UInt8,
+                                            variant: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        var ev: [MIDIEvent] = []
+        ev.append(MIDIEvent(stepIndex: base, note: crash, velocity: 100, durationSteps: 1))
+        ev.append(MIDIEvent(stepIndex: base, note: kick,  velocity: 95,  durationSteps: 1))
+        switch variant {
+        case 1:
+            // Sidestick marks time on beats 2 and 3 while bass holds root
+            let ss = GMDrum.sidestick.rawValue
+            ev.append(MIDIEvent(stepIndex: base + 4, note: ss, velocity: UInt8(48 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+            ev.append(MIDIEvent(stepIndex: base + 8, note: ss, velocity: UInt8(52 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+        case 2:
+            // Ghost roll: quiet snare 8th-notes crescendo across beats 2–3, fill explodes on beat 4
+            for (i, step) in [4, 6, 8, 10].enumerated() {
+                ev.append(MIDIEvent(stepIndex: base + step, note: snare,
+                                    velocity: UInt8(28 + i * 6 + rng.nextInt(upperBound: 8)), durationSteps: 1))
+            }
+        default:
+            break  // variant 0: silence on beats 2–3
+        }
+        ev.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: UInt8(78 + rng.nextInt(upperBound: 8)),  durationSteps: 1))
+        ev.append(MIDIEvent(stepIndex: base + 13, note: snare, velocity: UInt8(86 + rng.nextInt(upperBound: 6)),  durationSteps: 1))
+        ev.append(MIDIEvent(stepIndex: base + 14, note: snare, velocity: UInt8(93 + rng.nextInt(upperBound: 6)),  durationSteps: 1))
+        ev.append(MIDIEvent(stepIndex: base + 15, note: snare, velocity: UInt8(100 + rng.nextInt(upperBound: 6)), durationSteps: 1))
+        ev.append(MIDIEvent(stepIndex: base + 16, note: kick,  velocity: 92, durationSteps: 1))
+        return ev
+    }
+
+    /// CHL-DRUM-006: Sparse 3+3+2 side-stick pattern.
+    /// Side-stick at steps 0, 2, 4, 8, 10, 12 (3+3+2 eighth-note grouping).
+    /// Kick on beats 1 and 3 (steps 0, 8).
+    /// No regular open hat — the sidestick at steps 4 and 12 already marks the backbeat.
+    /// Rare open hat accent (15% chance, step 12 only) for occasional cymbal color.
+    private static func bluesSideStickBar(base: Int, isIntro: Bool, isLastBar: Bool,
+                                           sidestick: UInt8, snare: UInt8, kick: UInt8,
+                                           openHat: UInt8, closedHat: UInt8,
+                                           rng: inout SeededRNG) -> [MIDIEvent] {
+        var ev: [MIDIEvent] = []
+        let velBase: Int = isIntro ? 45 : 62
+
+        // Kick on beats 1 and 3
+        ev.append(MIDIEvent(stepIndex: base,     note: kick, velocity: UInt8(velBase + rng.nextInt(upperBound: 12)), durationSteps: 1))
+        if !isIntro || rng.nextDouble() < 0.60 {
+            ev.append(MIDIEvent(stepIndex: base + 8, note: kick, velocity: UInt8((velBase - 5) + rng.nextInt(upperBound: 12)), durationSteps: 1))
+        }
+
+        // Side-stick: 3+3+2 pattern at steps 0, 2, 4, 8, 10, 12
+        for step in [0, 2, 4, 8, 10, 12] {
+            let vel = UInt8(max(25, velBase - 10 + rng.nextInt(upperBound: 14)))
+            ev.append(MIDIEvent(stepIndex: base + step, note: sidestick, velocity: vel, durationSteps: 1))
+        }
+
+        // Rare open hat accent on beat 4 (step 12) only — 15% chance per bar
+        if !isIntro && rng.nextDouble() < 0.15 {
+            let vel = UInt8(max(30, velBase - 12 + rng.nextInt(upperBound: 10)))
+            ev.append(MIDIEvent(stepIndex: base + 12, note: openHat, velocity: vel, durationSteps: 1))
+        }
+        return ev
+    }
+
+    /// CHL-DRUM-007 Groove B: blues shuffle drive.
+    /// Kick stays on beats 1 and 3 (steps 0, 8) — same phase as Groove A.
+    /// Full snare on 2 and 4 (steps 4, 12) replaces the Groove A sidestick for lift.
+    /// 8th-note closed hat drives the pulse. 50% chance of a shuffle pickup kick on step 14.
+    private static func bluesPushedGrooveBar(base: Int, isIntro: Bool,
+                                              kick: UInt8, snare: UInt8, closedHat: UInt8,
+                                              thinHiHat: Bool = false,
+                                              rng: inout SeededRNG) -> [MIDIEvent] {
+        var ev: [MIDIEvent] = []
+        let velBase: Int = 68
+
+        // Kick: beats 1 and 3 — stays in phase with Groove A
+        for step in [0, 8] {
+            ev.append(MIDIEvent(stepIndex: base + step, note: kick,
+                                velocity: UInt8(velBase + 4 + rng.nextInt(upperBound: 12)), durationSteps: 1))
+        }
+        // Shuffle pickup: "and of 4" (step 14) kicks into beat 1 — 50% of bars
+        if rng.nextDouble() < 0.50 {
+            ev.append(MIDIEvent(stepIndex: base + 14, note: kick,
+                                velocity: UInt8(velBase - 6 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+        }
+
+        // Snare: beats 2 and 4 — full backbeat, harder than the Groove A sidestick
+        for step in [4, 12] {
+            ev.append(MIDIEvent(stepIndex: base + step, note: snare,
+                                velocity: UInt8(velBase + 6 + rng.nextInt(upperBound: 14)), durationSteps: 1))
+        }
+
+        // Closed hi-hat: quarter-note in Im7 section (sparse, laid-back), 8th-note in chord-change section
+        let hatSteps: [Int] = thinHiHat ? [0, 4, 8, 12] : [0, 2, 4, 6, 8, 10, 12, 14]
+        for step in hatSteps {
+            ev.append(MIDIEvent(stepIndex: base + step, note: closedHat,
+                                velocity: UInt8(max(36, velBase - 20 + rng.nextInt(upperBound: 14))), durationSteps: 1))
+        }
+        return ev
     }
 
     // MARK: - Stop-time fill helper (shared across all drum styles)

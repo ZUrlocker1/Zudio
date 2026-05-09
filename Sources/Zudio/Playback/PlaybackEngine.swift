@@ -12,11 +12,15 @@ final class PlaybackEngine: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentBar: Int = 0
     @Published var currentStep: Int = 0
+    // Throttled to ≤15fps for Canvas playhead views (MIDILaneView, AudioWaveformView).
+    // currentStep still updates every step for the AppState DAW-scroll subscriber.
+    @Published var displayStep: Int = 0
     @Published var activeVisualizerNotes: [VisualizerNote] = []
     // Buffer flushed into activeVisualizerNotes at most 12×/sec — collapses append+prune
     // into one @Published mutation per frame, reducing AppKit layout scans at step rate.
     private var pendingVisualizerNotes: [VisualizerNote] = []
     private var lastVisualizerFlush: Date = .distantPast
+    private var lastDisplayStepFlush: Date = .distantPast
 
     // MARK: - Audio graph
 
@@ -581,6 +585,7 @@ final class PlaybackEngine: ObservableObject {
     /// Resets the playhead to bar 1 without requiring a loaded song.
     func resetPlayhead() {
         currentStep = 0
+        displayStep = 0
         currentBar  = 0
         activeVisualizerNotes = []
         pendingVisualizerNotes.removeAll()
@@ -644,6 +649,11 @@ final class PlaybackEngine: ObservableObject {
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             if bar != self.currentBar { self.currentBar = bar }
+            let displayNow = Date()
+            if displayNow.timeIntervalSince(self.lastDisplayStepFlush) >= (1.0 / 15.0) {
+                self.displayStep = step
+                self.lastDisplayStepFlush = displayNow
+            }
             let sps = self.songState?.frame.secondsPerStep ?? 0.1
             // Accumulate note-ons into pending buffer; flush to @Published array at ≤12fps.
             // This collapses append + prune into one objectWillChange per frame instead of
@@ -794,6 +804,7 @@ final class PlaybackEngine: ObservableObject {
             stopAmbientNoteFades()
             stopAmbientOutroFade()
             currentStep = clampedStep
+            displayStep = clampedStep
             currentBar  = clampedStep / 16
             currentSchedulerID += 1
             let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
@@ -804,6 +815,7 @@ final class PlaybackEngine: ObservableObject {
             if ambientMode               { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
         } else {
             currentStep = clampedStep
+            displayStep = clampedStep
             currentBar  = clampedStep / 16
         }
     }
@@ -840,6 +852,7 @@ final class PlaybackEngine: ObservableObject {
         allNotesOff()
         buildStepEventMap(state: passState)
         currentStep = 0
+        displayStep = 0
         currentBar  = 0
         activeVisualizerNotes = []
         pendingVisualizerNotes.removeAll()
@@ -871,6 +884,7 @@ final class PlaybackEngine: ObservableObject {
         buildStepEventMap(state: state)
         let totalSteps = state.frame.totalBars * 16
         currentStep = max(0, min(startStep, totalSteps - 1))
+        displayStep = currentStep
         currentBar  = currentStep / 16
         currentSchedulerID += 1
         isPlaying = true
@@ -952,7 +966,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead2 && program == 11 {
                 vol = 1.45   // Vibraphone runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead2 && program == 13 {
-                vol = 1.90   // Xylophone runs soft in GM — boost for presence
+                vol = 1.30   // Xylophone — light presence, sits back in the mix
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
             } else if trackIndex == kTrackLead1 && program == 80 {
@@ -1004,9 +1018,15 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 4 {
                 vol = 1.3    // Rhodes runs soft in GM — boost for Chill rhythm presence
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 5 {
-                vol = 0.55   // Wurlitzer runs hot on Chill rhythm — pull back
+                vol = 0.48   // Wurlitzer runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 17 {
-                vol = 0.75   // B3 Organ runs hot on Chill rhythm — pull back
+                vol = 0.50   // B3 Organ runs hot on Chill rhythm — pull back more
+            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 7 {
+                vol = 0.20   // Clavinet runs very hot on Chill rhythm — pull back significantly
+            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 16 {
+                vol = 0.55   // Perc Organ runs hot on Chill rhythm — pull back
+            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 18 {
+                vol = 0.50   // Rock Organ runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
                 vol = 0.26   // Mono Synth runs hot on Kosmic bass — pull back more
             } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
@@ -1027,6 +1047,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — pull back
             } else if trackIndex == kTrackBass && kosmicStyle {
                 vol = 0.80   // Kosmic bass slightly quieter overall
+            } else if trackIndex == kTrackBass && chillPadsMode {
+                vol = 0.82   // Chill bass slightly quieter overall
             } else {
                 vol = 1.0
             }
@@ -1094,7 +1116,7 @@ final class PlaybackEngine: ObservableObject {
                 pan:                trackStaticPan[i],
                 reverbPreset:       reverbPresets[i],
                 reverbWetDryMix:    reverbs[i].wetDryMix,
-                reverbBypassed:     reverbs[i].auAudioUnit.shouldBypassEffect,
+                reverbBypassed:     reverbs[i].wetDryMix == 0,
                 delayTime:          delays[i].delayTime,
                 delayFeedback:      delays[i].feedback,
                 delayLowPassCutoff: delays[i].lowPassCutoff,
@@ -1150,7 +1172,7 @@ final class PlaybackEngine: ObservableObject {
 
     /// Set Chill pads mode — enables per-note audio fade-in/fade-out on the Pads boost node.
     /// Call before defaultsResetToken fires, same as setAmbientMode.
-    func setChillMode(_ enabled: Bool) {
+    func setChillMode(_ enabled: Bool, bluesVariation: Bool = false) {
         chillPadsMode = enabled
         if !enabled {
             stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
@@ -1166,21 +1188,28 @@ final class PlaybackEngine: ObservableObject {
         reverbs[kTrackRhythm].loadFactoryPreset(.mediumHall);  reverbPresets[kTrackRhythm] = .mediumHall
         reverbs[kTrackBass].loadFactoryPreset(.mediumRoom);    reverbPresets[kTrackBass]   = .mediumRoom
         reverbs[kTrackDrums].loadFactoryPreset(.mediumHall);   reverbPresets[kTrackDrums]  = .mediumHall
-        // kTrackTexture sampler is unused in Chill — bypass its entire effect chain.
+        // kTrackTexture sampler is unused in Chill — suppress its effect chain.
         // (setEffect guards against re-enabling it; this covers the init low-shelf which is always on.)
         lowEQs[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
-        reverbs[kTrackTexture].auAudioUnit.shouldBypassEffect = true
+        reverbs[kTrackTexture].wetDryMix                      = 0
         delays[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
         // Tempo-synced delay for Chill Lead 1 (dotted-quarter) and Lead 2 (quarter note).
-        // Without this, both tracks default to the init value of 0.125 s (fixed 16th-note).
+        // Blues bypasses delay on both leads — dry saxophone/clarinet tone is more authentic.
         let tempo    = songState?.frame.tempo ?? 80
         let beatSecs = 60.0 / Double(tempo)
-        delays[kTrackLead1].delayTime     = Swift.min(2.0, beatSecs * 0.75)  // dotted-quarter
-        delays[kTrackLead1].feedback      = 35   // 2–3 audible echoes (was 55 → too many repeats)
-        delays[kTrackLead1].lowPassCutoff = 3000 // darker echoes — shadows, not copies (was 5000)
-        delays[kTrackLead2].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // quarter note
-        delays[kTrackLead2].feedback      = 40
-        delays[kTrackLead2].lowPassCutoff = 5500
+        if bluesVariation {
+            setEffect(.delay, enabled: false, forTrack: kTrackLead1)
+            setEffect(.delay, enabled: false, forTrack: kTrackLead2)
+        } else {
+            delays[kTrackLead1].delayTime     = Swift.min(2.0, beatSecs * 0.75)  // dotted-quarter
+            delays[kTrackLead1].feedback      = 35   // 2–3 audible echoes (was 55 → too many repeats)
+            delays[kTrackLead1].lowPassCutoff = 3000 // darker echoes — shadows, not copies (was 5000)
+            setEffect(.delay, enabled: true, forTrack: kTrackLead1)
+            delays[kTrackLead2].delayTime     = Swift.min(2.0, beatSecs * 0.5)   // quarter note
+            delays[kTrackLead2].feedback      = 40
+            delays[kTrackLead2].lowPassCutoff = 5500
+            setEffect(.delay, enabled: true, forTrack: kTrackLead2)
+        }
         applyStaticPans()
     }
 
@@ -1249,6 +1278,12 @@ final class PlaybackEngine: ObservableObject {
             boostEffectEnabled[trackIndex]  = enabled
             boosts[trackIndex].outputVolume = enabled ? 1.7 : 1.0  // 1.7 ≈ +4.6 dB
         case .delay:
+            if chillPadsMode && songState?.chillBluesVariation == true
+               && (trackIndex == kTrackLead1 || trackIndex == kTrackLead2) {
+                delays[trackIndex].auAudioUnit.shouldBypassEffect = true
+                delays[trackIndex].wetDryMix = 0
+                break
+            }
             delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
                 delays[trackIndex].wetDryMix = enabled ? ambientDelayWet[trackIndex] : 0
@@ -1284,7 +1319,6 @@ final class PlaybackEngine: ObservableObject {
         case .lowShelf:
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb:
-            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             let wet: Float = ambientMode   && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
                 : chillPadsMode            && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
                 : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
@@ -1292,7 +1326,6 @@ final class PlaybackEngine: ObservableObject {
                 : 50
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         case .space:
-            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             let wet: Float = ambientMode   && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
                 : chillPadsMode            && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
                 : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
@@ -1304,7 +1337,9 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Shared LFO timer
     // One 16ms DispatchSource drives all tremolo/sweep/pan updates.
-    // Tremolo updates every tick (60fps); sweep and pan every 3rd tick (~20fps).
+    // Fast tremolos (phaseInc ≥ 0.1, i.e. ≥2 Hz) update every tick (60fps).
+    // Slow tremolos (phaseInc < 0.1, e.g. Chill/Ambient pads at 0.15 Hz) update every 3rd tick (~20fps).
+    // Sweep and pan always update every 3rd tick (~20fps).
     // One DispatchQueue.main.async dispatch per 16ms regardless of how many effects are active.
 
     private func startSharedLFO() {
@@ -1341,7 +1376,7 @@ final class PlaybackEngine: ObservableObject {
         let do20fps   = (lfoTickCount % 3 == 0)
         let anySolo   = anySoloActive
 
-        // Tremolo — 60fps for fast tremolos (≥2 Hz), 20fps for slow swells (<2 Hz, e.g. Chill/Ambient pads at 0.15 Hz)
+        // Tremolo — 60fps for fast tremolos (phaseInc ≥ 0.1), 20fps for slow swells (phaseInc < 0.1)
         for i in 0..<kTrackCount where tremEnabled[i] {
             if !do20fps && tremPhaseInc[i] < 0.1 { continue }
             tremPhase[i] += tremPhaseInc[i]
@@ -1415,11 +1450,11 @@ final class PlaybackEngine: ObservableObject {
         }
     }
 
-    // MARK: - Tremolo LFO (6 Hz sine, 50% depth, main-queue timer)
+    // MARK: - Tremolo LFO
 
     private func startTremolo(forTrack i: Int) {
         if (ambientMode || chillPadsMode) && i == kTrackPads {
-            tremPhaseInc[i] = 0.015708   // 2π × 0.15 Hz / 60 fps — one swell per ~6.5 seconds
+            tremPhaseInc[i] = 0.047124   // 2π × 0.15 Hz / 20 fps — one swell per ~6.5 seconds (runs at 20fps via lfoTick guard)
             tremDepth[i]    = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
         } else {
             tremPhaseInc[i] = 0.8378     // 2π × 8 Hz / 60 fps
@@ -2076,7 +2111,6 @@ final class PlaybackEngine: ObservableObject {
             reverb.loadFactoryPreset(initPreset)
             reverbPresets[i] = initPreset
             reverb.wetDryMix = 0
-            reverb.auAudioUnit.shouldBypassEffect = true
 
             engine.attach(sampler)
             engine.attach(boost)
@@ -2189,6 +2223,7 @@ private func loadGMPrograms() {
         // would otherwise race to overwrite the 0 we set here.
         currentSchedulerID += 1
         currentStep = 0
+        displayStep = 0
         currentBar  = 0
 
         // Store callback now so cancelExport() works even during the pre-delay window.

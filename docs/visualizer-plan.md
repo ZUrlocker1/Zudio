@@ -100,21 +100,21 @@ The same actions are available on all platforms; only the input method differs.
 
 ### On an orb
 
-- **Tap / Click** — mute track for ~2 bars, then auto-unmute and regen instrument
+- **Tap / Click** — mute track for ~2 bars, then auto-unmute and fully regenerate track (e.g. rule and instrument)
 - **Double-tap / Double-click** — solo track for ~2 bars, then auto-release
 - **Long press** (iPhone/iPad) / **Right-click or Cmd+click** (Mac) — toggle dry signal (strip all effects on track / restore defaults)
 
 ### On empty canvas
 
 - **Tap / Click** — global filter sweep (3 s cutoff sweep + canvas white flash)
-- **Double-tap / Double-click** — regen Lead 1 and Rhythm
+- **Double-tap / Double-click** — fully regenerate Lead 1 and Rhythm tracks
 - **Long press** (iPhone/iPad) / **Right-click or Cmd+click** (Mac) — regen a random non-drum track
 
 ### Swipe and pinch — all platforms
 
-- **Swipe right** — regen Rhythm and Pads
-- **Swipe left** — regen Lead 1 and Lead 2
-- **Pinch** — regen Bass and Drums
+- **Swipe right** — fully regenerate Rhythm and Pads tracks
+- **Swipe left** — fully regenerate Lead 1 and Lead 2 tracks
+- **Pinch** — fully regenerate Bass and Drums tracks
 
 On iPhone/iPad these are `UISwipeGestureRecognizer` and `UIPinchGestureRecognizer`. On Mac, horizontal trackpad scroll (scrollWheel `deltaX > 10`) fires swipe right/left, and `NSMagnificationGestureRecognizer` fires the pinch/regen-bass-drums action.
 
