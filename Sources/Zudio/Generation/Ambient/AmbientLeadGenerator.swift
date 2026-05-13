@@ -549,4 +549,1035 @@ struct AmbientLeadGenerator {
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
+    // MARK: - Ambient Piano Lead (full-song, no loop tiler)
+
+    static func generateAmbientPianoLead(
+        pianoRule: String,
+        frame: GlobalMusicalFrame,
+        totalBars: Int,
+        rng: inout SeededRNG,
+        usedRuleIDs: inout Set<String>
+    ) -> [MIDIEvent] {
+        usedRuleIDs.insert(pianoRule)
+        switch pianoRule {
+        case "AMB-PNO-001": return floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs)
+        case "AMB-PNO-003": return dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng)
+        default:            return pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng)
+        }
+    }
+
+    // MARK: AMB-PNO-001 — Floating Tones (Harold Budd)
+
+    private static func floatingTonesFullSong(
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
+        usedRuleIDs: inout Set<String>
+    ) -> [MIDIEvent] {
+        let r = rng.nextDouble()
+        if r < 0.25 { return floatingTonesMode1(frame: frame, totalBars: totalBars, rng: &rng) }
+        if r < 0.75 { return floatingTonesMode2(frame: frame, totalBars: totalBars, rng: &rng) }
+        return floatingTonesMode3(frame: frame, totalBars: totalBars, rng: &rng)
+    }
+
+    /// Mode 1 — Sparse floating: chord wash + 4-7 sparse events.
+    private static func floatingTonesMode1(
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let totalSteps = totalBars * 16
+        let scalePCs   = frame.scalePCs
+        // Budd: G3–C6 register — middle and upper piano, no sub-bass.
+        // Descending figures stay above middle C; high end adds bell-tone character.
+        let evtNotes = notesInRegister(pitchClasses: scalePCs, low: 55, high: 84)
+        guard !evtNotes.isEmpty else { return [] }
+
+        // A persistent "color note" — Budd often returns to the same pitch area
+        let colorIdx = rng.nextInt(upperBound: evtNotes.count)
+        var lastIdx: Int = -1
+        var events: [MIDIEvent] = []
+
+        // Floor ensures at least ~0.5 events/8-bar chunk so no section goes completely empty.
+        let minEvents  = Swift.max(8, totalBars / 8)
+        let eventCount = minEvents + rng.nextInt(upperBound: 7)
+        var cursor = (2 + rng.nextInt(upperBound: 4)) * 16   // first event bar 2-5
+
+        for i in 0..<eventCount {
+            guard cursor < totalSteps - 4 * 16 else { break }
+            let roll = rng.nextDouble()
+
+            if roll < 0.10 {
+                // Single long floating note — Budd's most spare gesture (10%)
+                var idx = rng.nextInt(upperBound: evtNotes.count)
+                if rng.nextDouble() < 0.25 && lastIdx >= 0 { idx = lastIdx }
+                else if rng.nextDouble() < 0.15 { idx = colorIdx }
+                lastIdx = idx
+                let dur = Swift.min(24 + rng.nextInt(upperBound: 25), totalSteps - cursor)
+                if dur >= 12 {
+                    events.append(MIDIEvent(stepIndex: cursor, note: evtNotes[idx],
+                                            velocity: UInt8(24 + rng.nextInt(upperBound: 18)),
+                                            durationSteps: dur))
+                }
+            } else if roll < 0.45 {
+                // Two-note consonant dyad (P5 or M3) — rings beautifully under reverb (35%)
+                let idx   = rng.nextInt(upperBound: evtNotes.count)
+                let note1 = evtNotes[idx]
+                let note2 = evtNotes.first(where: { abs(Int($0) - Int(note1)) == 7 })  // P5 (either direction)
+                         ?? evtNotes.first(where: { abs(Int($0) - Int(note1)) == 4 })  // M3
+                         ?? evtNotes.first(where: { abs(Int($0) - Int(note1)) == 5 })  // P4
+                let dur = Swift.min(24 + rng.nextInt(upperBound: 25), totalSteps - cursor)
+                if dur >= 12 {
+                    let vel = UInt8(24 + rng.nextInt(upperBound: 18))
+                    events.append(MIDIEvent(stepIndex: cursor, note: note1, velocity: vel, durationSteps: dur))
+                    if let n2 = note2 {
+                        events.append(MIDIEvent(stepIndex: cursor, note: n2, velocity: vel - 6, durationSteps: dur))
+                    }
+                    lastIdx = idx
+                }
+            } else if roll < 0.67 {
+                // Descending figure: 3-6 scale steps drifting down, last note held long.
+                // Start from the upper half of the pool so descent lands in mid register, not bass.
+                let startIdx = evtNotes.count / 2 + rng.nextInt(upperBound: Swift.max(1, evtNotes.count / 2))
+                let figLen   = 3 + rng.nextInt(upperBound: 4)
+                var s = cursor
+                for i in 0..<figLen {
+                    guard s < totalSteps else { break }
+                    let noteIdx = Swift.max(0, startIdx - i)
+                    let isLast  = i == figLen - 1
+                    let dur = isLast
+                        ? Swift.min(20 + rng.nextInt(upperBound: 17), totalSteps - s)
+                        : Swift.min(3 + rng.nextInt(upperBound: 3), totalSteps - s)
+                    guard dur >= 2 else { break }
+                    events.append(MIDIEvent(stepIndex: s, note: evtNotes[noteIdx],
+                                            velocity: UInt8(Swift.max(20, 40 - i * 5)),
+                                            durationSteps: dur))
+                    s += dur + 2
+                    lastIdx = noteIdx
+                }
+            } else {
+                // Ascending burst: stepwise ascent, long hold at peak (Budd's climbing gesture)
+                let startIdx = rng.nextInt(upperBound: Swift.max(1, evtNotes.count / 2))
+                let figLen   = 4 + rng.nextInt(upperBound: 4)
+                var s = cursor
+                for i in 0..<figLen {
+                    guard s < totalSteps else { break }
+                    let noteIdx = Swift.min(startIdx + i, evtNotes.count - 1)
+                    let isLast  = i == figLen - 1
+                    let dur = isLast
+                        ? Swift.min(20 + rng.nextInt(upperBound: 17), totalSteps - s)
+                        : Swift.min(3 + rng.nextInt(upperBound: 3), totalSteps - s)
+                    guard dur >= 2 else { break }
+                    let vel = isLast ? UInt8(32 + rng.nextInt(upperBound: 16)) : UInt8(24 + rng.nextInt(upperBound: 10))
+                    events.append(MIDIEvent(stepIndex: s, note: evtNotes[noteIdx], velocity: vel, durationSteps: dur))
+                    s += dur + 2
+                    lastIdx = noteIdx
+                }
+            }
+            // Enforce a minimum gap so remaining events span the full tail of the song.
+            // Without this, small random gaps cluster all events in the first third.
+            let eventsLeft = eventCount - i - 1
+            let remaining  = Swift.max(0, totalSteps - cursor) / 16
+            let minGap = eventsLeft > 0 ? Swift.max(3, remaining / (eventsLeft + 1)) : 3
+            let maxGap = Swift.max(minGap + 1, Swift.min(minGap + 4, remaining / 2))
+            cursor += (minGap + rng.nextInt(upperBound: Swift.max(1, maxGap - minGap))) * 16
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    /// Mode 2 — Gong chord: two thick multi-octave chords alternating with long silences.
+    private static func floatingTonesMode2(
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let totalSteps = totalBars * 16
+        let root     = frame.keySemitoneValue
+        let scaleSet = Set(frame.scalePCs)
+        // Snap a semitone offset to the nearest scale PC (so chords are always in-key)
+        func snapToScale(_ raw: Int) -> Int {
+            let t = ((raw % 12) + 12) % 12
+            if scaleSet.contains(t) { return t }
+            for d in [1, -1, 2, -2] { let c = (t + d + 12) % 12; if scaleSet.contains(c) { return c } }
+            return t
+        }
+        let b3    = snapToScale(root + 3)
+        let p5    = snapToScale(root + 7)
+        let color = snapToScale(rng.nextDouble() < 0.50 ? root + 10 : root + 9)
+
+        // Chord B bass root in MIDI 41-50
+        var bBass = root + 48; while bBass > 50 { bBass -= 12 }; while bBass < 41 { bBass += 12 }
+        let aOff  = rng.nextDouble() < 0.50 ? 7 : 3
+        var aBass = bBass - aOff; while aBass < 39 { aBass += 12 }
+        // Snap aBass to nearest in-scale pitch class — the interval subtraction can land off-scale
+        let aBassPC = snapToScale(aBass % 12)
+        aBass = aBass - (aBass % 12) + aBassPC
+        while aBass < 39 { aBass += 12 }
+        while aBass > 54 { aBass -= 12 }
+
+        func voice(_ pcs: [Int], bass: Int) -> [UInt8] {
+            var notes: [UInt8] = []
+            // Low (39-54): bass only
+            if bass >= 39 && bass <= 54 { notes.append(UInt8(bass)) }
+            // Mid (60-75): up to 3 PCs; skip within 2 semitones to avoid dissonance
+            var midNotes: [Int] = []
+            for pc in pcs {
+                var m = pc + 60; while m > 75 { m -= 12 }; while m < 60 { m += 12 }
+                let tooClose = midNotes.contains(where: { abs($0 - m) <= 2 })
+                if m >= 60 && m <= 75 && !tooClose && !notes.contains(UInt8(m)) {
+                    notes.append(UInt8(m)); midNotes.append(m)
+                }
+            }
+            // No treble doubling — keep Budd chords sparse (bass + 2-3 mid only).
+            // Treble octave-doubling was inflating chords to 5-6 notes, burying the echo melody.
+            return Array(notes.sorted().prefix(4))
+        }
+
+        let chordA = voice([root, b3, p5], bass: aBass)
+        let chordB = voice([b3, p5, color], bass: bBass)
+        let baseVel = 38 + rng.nextInt(upperBound: 12)
+        var events: [MIDIEvent] = []
+        var cursor = 0; var useA = true
+        let target = 10 + rng.nextInt(upperBound: 11)
+        // Scale pool for Budd-style echo melody: chromatic notes near treble register
+        let scaleHigh = notesInRegister(pitchClasses: Set(frame.scalePCs), low: 62, high: 85)
+
+        for i in 0..<target {
+            guard cursor < totalSteps else { break }
+            let roll = rng.nextDouble()
+            // Per-chord velocity — Budd shapes each touch individually
+            let chordVel = UInt8(Swift.max(28, Swift.min(72, baseVel + rng.nextInt(upperBound: 17) - 8)))
+            if roll < 0.17 && i > 0 {
+                // Single breath note from previous chord
+                let prev  = useA ? chordB : chordA
+                let bNote = prev.count > 1 ? prev[1] : prev[0]
+                let dur   = Swift.min(12 + rng.nextInt(upperBound: 13), totalSteps - cursor)
+                if dur >= 4 { events.append(MIDIEvent(stepIndex: cursor, note: bNote, velocity: chordVel, durationSteps: dur)); cursor += dur }
+            } else {
+                let chord = useA ? chordA : chordB
+                let dur   = roll < 0.50
+                    ? Swift.min(12 + rng.nextInt(upperBound: 5), totalSteps - cursor)
+                    : Swift.min(36 + rng.nextInt(upperBound: 25), totalSteps - cursor)
+                if dur >= 4 {
+                    for note in chord { events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: chordVel, durationSteps: dur)) }
+                    // Budd echo: after chord settles, top voice steps immediately to scale neighbor.
+                    // Skipping the unison-repeat so every echo note contributes a stepwise interval.
+                    if rng.nextDouble() < 0.80, let topNote = chord.last,
+                       let ci = scaleHigh.firstIndex(of: topNote) {
+                        let echoStart = cursor + 3 + rng.nextInt(upperBound: 5)
+                        if echoStart < totalSteps {
+                            // Step directly to scale neighbor (no unison echo — every note is stepwise)
+                            let goUp  = rng.nextDouble() < 0.55
+                            let nb1Idx = goUp ? Swift.min(ci + 1, scaleHigh.count - 1) : Swift.max(0, ci - 1)
+                            let nb1    = scaleHigh[nb1Idx]
+                            if nb1 != topNote {
+                                let e1dur = Swift.min(5 + rng.nextInt(upperBound: 7), totalSteps - echoStart)
+                                let e1vel = UInt8(Swift.max(24, Int(chordVel) - 14))
+                                events.append(MIDIEvent(stepIndex: echoStart, note: nb1, velocity: e1vel, durationSteps: e1dur))
+                                // Second step (continue same direction for a 2-note phrase)
+                                let e2start = echoStart + e1dur + 1
+                                if e2start < totalSteps {
+                                    let nb2Idx = goUp ? Swift.min(nb1Idx + 1, scaleHigh.count - 1) : Swift.max(0, nb1Idx - 1)
+                                    let nb2    = scaleHigh[nb2Idx]
+                                    let e2dur  = Swift.min(5 + rng.nextInt(upperBound: 9), totalSteps - e2start)
+                                    let e2vel  = UInt8(Swift.max(20, Int(chordVel) - 20))
+                                    if e2dur >= 2 && nb2 != nb1 {
+                                        events.append(MIDIEvent(stepIndex: e2start, note: nb2, velocity: e2vel, durationSteps: e2dur))
+                                        // Resolve back (60%): adds third stepwise interval
+                                        if rng.nextDouble() < 0.60, e2start + e2dur + 2 < totalSteps {
+                                            let e3start = e2start + e2dur + 2
+                                            let e3dur   = Swift.min(4 + rng.nextInt(upperBound: 8), totalSteps - e3start)
+                                            let e3vel   = UInt8(Swift.max(18, Int(chordVel) - 24))
+                                            if e3dur >= 2 {
+                                                events.append(MIDIEvent(stepIndex: e3start, note: nb1, velocity: e3vel, durationSteps: e3dur))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    cursor += dur; useA.toggle()
+                }
+            }
+            // Proportional gap: scale to remaining time so events span the full song.
+            // Fixed IOIs (12-60 steps) cluster events in the first ~50% on longer songs.
+            let eventsLeft = target - i - 1
+            let remaining  = Swift.max(1, totalSteps - cursor)
+            let avgGap     = eventsLeft > 0 ? remaining / (eventsLeft + 1) : remaining / 2
+            let ioi = rng.nextDouble() < 0.60
+                ? Swift.max(8, avgGap / 2 + rng.nextInt(upperBound: Swift.max(1, avgGap / 4)))
+                : Swift.max(16, avgGap + rng.nextInt(upperBound: Swift.max(1, avgGap / 2)))
+            cursor += ioi
+        }
+        // Final long chord + optional single note
+        if cursor < totalSteps {
+            let fc    = useA ? chordA : chordB
+            let fcVel = UInt8(Swift.max(28, Swift.min(72, baseVel + rng.nextInt(upperBound: 17) - 8)))
+            let fd    = Swift.min(48 + rng.nextInt(upperBound: 17), totalSteps - cursor)
+            if fd >= 16 {
+                for note in fc { events.append(MIDIEvent(stepIndex: cursor, note: note, velocity: fcVel, durationSteps: fd)) }
+                let afterStep = cursor + fd + 24 + rng.nextInt(upperBound: 9)
+                if afterStep < totalSteps && !fc.isEmpty {
+                    let singleDur = Swift.min(8 + rng.nextInt(upperBound: 9), totalSteps - afterStep)
+                    if singleDur >= 4 {
+                        events.append(MIDIEvent(stepIndex: afterStep, note: fc.count > 1 ? fc[1] : fc[0],
+                                                velocity: UInt8(Swift.max(28, Int(fcVel) - 16)), durationSteps: singleDur))
+                    }
+                }
+            }
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    /// Mode 3 — Chromatic pendulum: metronomic A↔B cluster oscillation every beat.
+    private static func floatingTonesMode3(
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let totalSteps = totalBars * 16
+        let scalePCs   = frame.scalePCs
+        let allMid     = notesInRegister(pitchClasses: scalePCs, low: 59, high: 73)
+        guard allMid.count >= 3 else { return [] }
+
+        // Build clusters using stride-2 pool indices — gives m3/M3 intervals (consonant thirds)
+        // rather than stride-1 (M2/m2 seconds which sound dissonant in dense repetition).
+        let anchorIdx = rng.nextInt(upperBound: Swift.max(1, allMid.count - 6))
+        let a0 = Int(allMid[anchorIdx])
+        let a2 = Int(allMid[Swift.min(anchorIdx + 2, allMid.count - 1)])  // skip a1: m3/M3 instead of M2
+        let a4 = Int(allMid[Swift.min(anchorIdx + 4, allMid.count - 1)])
+        let a1 = Int(allMid[Swift.min(anchorIdx + 1, allMid.count - 1)])
+        let a3 = Int(allMid[Swift.min(anchorIdx + 3, allMid.count - 1)])
+        var clA: [Int] = [a0, a2]   // third apart
+        if rng.nextDouble() < 0.50 { clA.append(a4) }
+        var clB: [Int] = [a1, a3]   // third apart, interleaved with clA
+        if rng.nextDouble() < 0.50 { clB.append(Int(allMid[Swift.min(anchorIdx + 5, allMid.count - 1)])) }
+
+        // Bass progression (G2–G3 range — mid-bass register, avoids sub-bass crowding)
+        let bassPool  = notesInRegister(pitchClasses: scalePCs, low: 43, high: 55)
+        let numBass   = 4 + rng.nextInt(upperBound: 3)
+        let bassSeq   = (0..<numBass).map { _ in bassPool.isEmpty ? UInt8(28) : bassPool[rng.nextInt(upperBound: bassPool.count)] }
+        let baseVel3  = 46 + rng.nextInt(upperBound: 12)  // base velocity; per-cluster variation applied below
+
+        var events: [MIDIEvent] = []
+
+        // Pendulum section: 12-20 bars in the middle — metronomic oscillation as a contained body, not the whole song
+        let pendLength = 12 + rng.nextInt(upperBound: 9)
+        let pendStart  = totalBars * 30 / 100
+        let pendEnd    = Swift.min(pendStart + pendLength, totalBars * 72 / 100)
+
+        // Opening — sparse floating tones from bar 1 to pendulum start, drifting toward the anchor
+        var oCursor = 1 * 16
+        var oIdx = rng.nextInt(upperBound: Swift.max(1, anchorIdx / 2))  // start below anchor, drift up
+        while oCursor < pendStart * 16 && oCursor < totalSteps {
+            let note = allMid[Swift.max(0, Swift.min(oIdx, allMid.count - 1))]
+            let dur  = Swift.min(20 + rng.nextInt(upperBound: 13), totalSteps - oCursor)
+            if dur >= 8 {
+                events.append(MIDIEvent(stepIndex: oCursor, note: note,
+                                        velocity: UInt8(26 + rng.nextInt(upperBound: 14)), durationSteps: dur))
+            }
+            oCursor += (4 + rng.nextInt(upperBound: 4)) * 16
+            oIdx = Swift.min(oIdx + 1 + rng.nextInt(upperBound: 2), anchorIdx)  // drift toward anchor
+        }
+
+        // Pendulum body — A/B single-note alternation for stepwise melody; 35% chance adds chord texture
+        // (cluster-only approach produced 0% stepwise — all within-cluster intervals are thirds)
+        var step = pendStart * 16; var useA = true
+        while step < pendEnd * 16 && step < totalSteps {
+            let primaryNote = useA ? a0 : a1  // alternate adjacent scale tones → stepwise motion
+            let harmNote    = useA ? a2 : a3  // optional chord harmony a third above
+            let dur = Swift.min(3 + rng.nextInt(upperBound: 2), totalSteps - step)
+            let clVel = UInt8(Swift.max(36, Swift.min(68, baseVel3 + rng.nextInt(upperBound: 13) - 6)))
+            guard primaryNote >= 21 && primaryNote <= 108 else { useA.toggle(); step += 4; continue }
+            events.append(MIDIEvent(stepIndex: step, note: UInt8(primaryNote), velocity: clVel, durationSteps: dur))
+            if rng.nextDouble() < 0.35 && harmNote != primaryNote && harmNote >= 21 && harmNote <= 108 {
+                events.append(MIDIEvent(stepIndex: step, note: UInt8(harmNote),
+                                        velocity: UInt8(clVel > 8 ? clVel - 8 : clVel), durationSteps: dur))
+            }
+            if step % 32 == 0 {
+                let bassIdx = (step / 32) % bassSeq.count
+                let br = Int(bassSeq[bassIdx])
+                let bd = Swift.min(28 + rng.nextInt(upperBound: 5), totalSteps - step)
+                let bVel = UInt8(Swift.max(36, Swift.min(65, baseVel3 + rng.nextInt(upperBound: 11) - 5)))
+                if bd >= 4 && br >= 21 && br <= 108 {
+                    events.append(MIDIEvent(stepIndex: step, note: UInt8(br), velocity: bVel, durationSteps: bd))
+                    let br2 = br + 12
+                    if br2 <= 50 { events.append(MIDIEvent(stepIndex: step, note: UInt8(br2), velocity: bVel, durationSteps: bd)) }
+                }
+            }
+            useA.toggle(); step += 4
+        }
+
+        // Closing — sparse decay after pendulum, drifting down from anchor
+        var cCursor = pendEnd * 16
+        var cIdx = anchorIdx  // start at anchor, drift downward
+        while cCursor < totalSteps - 16 {
+            let note = allMid[Swift.max(0, Swift.min(cIdx, allMid.count - 1))]
+            let dur  = Swift.min(28 + rng.nextInt(upperBound: 21), totalSteps - cCursor)
+            if dur >= 8 {
+                events.append(MIDIEvent(stepIndex: cCursor, note: note,
+                                        velocity: UInt8(18 + rng.nextInt(upperBound: 12)), durationSteps: dur))
+            }
+            cCursor += (5 + rng.nextInt(upperBound: 5)) * 16
+            cIdx = Swift.max(0, cIdx - (1 + rng.nextInt(upperBound: 2)))  // drift downward
+        }
+
+        return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    // MARK: AMB-PNO-002 — Pensive Melody (Satie / Arnalds)
+
+    private static func pensiveMelodyFullSong(
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let totalSteps = totalBars * 16
+        let scalePCs   = frame.scalePCs
+        let upper = notesInRegister(pitchClasses: scalePCs, low: 65, high: 77)
+        let lower = notesInRegister(pitchClasses: scalePCs, low: 53, high: 63)
+        let all   = notesInRegister(pitchClasses: scalePCs, low: 53, high: 77)
+        guard upper.count >= 2, lower.count >= 2 else { return [] }
+
+        // Setup — once per song
+        let pivotIdx = rng.nextInt(upperBound: upper.count)
+        let pivot    = upper[pivotIdx]
+        // Neighbor = next scale tone above pivot (always in-scale, Satie-style close interval)
+        let neighbor = upper[Swift.min(pivotIdx + 1, upper.count - 1)]
+        // Prefer scale root (70%) or 5th (20%) for lower anchor — tonal stability à la Satie
+        let rootPC  = frame.keySemitoneValue % 12
+        let fifthPC = (rootPC + 7) % 12
+        let anchorRoll = rng.nextDouble()
+        let lowerAnchor: UInt8
+        if anchorRoll < 0.70, let root = lower.first(where: { Int($0) % 12 == rootPC }) {
+            lowerAnchor = root
+        } else if anchorRoll < 0.90, let fifth = lower.first(where: { Int($0) % 12 == fifthPC }) {
+            lowerAnchor = fifth
+        } else {
+            lowerAnchor = lower[rng.nextInt(upperBound: lower.count)]
+        }
+        let useNearLight = rng.nextDouble() < 0.30
+
+        // Phrase windows — 4 phrases spaced through song; phrase 1 enters at bar 1-2
+        let w1 = Swift.min(1 + rng.nextInt(upperBound: 2), totalBars - 8) * 16
+        let w2 = Swift.min(totalBars * 27 / 100, totalBars - 8) * 16
+        let w3 = Swift.min(totalBars * 52 / 100, totalBars - 8) * 16
+        let w4 = Swift.min(totalBars * 76 / 100, totalBars - 8) * 16
+        let wLen = 5 * 16
+
+        // Phrase type: 0=arc 1=oscillation 2=cadence
+        func phraseType() -> Int {
+            let r = rng.nextDouble()
+            return r < 0.70 ? 0 : (r < 0.90 ? 1 : 2)
+        }
+
+        var events: [MIDIEvent] = []
+
+        // Phrase 1 — three opening characters:
+        //   30% nearLight (Arnalds chord-texture)
+        //   40% Jarrett sparse opening (5-note motif + long hold + bass pedal)
+        //   30% standard pno002Phrase arc
+        let p1off = rng.nextInt(upperBound: Swift.max(1, wLen / 2))
+        if useNearLight {
+            events += nearLightTexture(startStep: w1 + p1off, pivot: pivot,
+                                       upper: upper, lower: lower, all: all,
+                                       totalSteps: totalSteps, rng: &rng)
+        } else if rng.nextDouble() < 0.65 {
+            events += jarrettSparseOpening(startStep: w1 + p1off, upper: upper, lower: lower,
+                                           totalSteps: totalSteps, rng: &rng)
+        } else {
+            events += pno002Phrase(type: phraseType(), startStep: w1 + p1off,
+                                   pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
+                                   upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng)
+        }
+
+        // Phrase 2 (optional pivot transpose — advance 1-2 pool indices to stay in scale)
+        let p2Pivot: UInt8
+        let p2Nb: UInt8
+        if rng.nextDouble() < 0.50 {
+            let shift     = 1 + rng.nextInt(upperBound: 2)  // 1 or 2 pool steps up
+            let p2PivIdx  = Swift.min(pivotIdx + shift, upper.count - 1)
+            p2Pivot = upper[p2PivIdx]
+            p2Nb    = upper[Swift.min(p2PivIdx + 1, upper.count - 1)]
+        } else { p2Pivot = pivot; p2Nb = neighbor }
+        let p2off = rng.nextInt(upperBound: Swift.max(1, wLen / 2))
+        events += pno002Phrase(type: phraseType(), startStep: w2 + p2off,
+                               pivot: p2Pivot, neighbor: p2Nb, lowerAnchor: lowerAnchor,
+                               upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng)
+
+        // Phrase 3 — revealed chord returns 2-3 times (Satie's recognizable repetition)
+        let p3roll  = rng.nextDouble()
+        let p3type  = p3roll < 0.80 ? (useNearLight ? 0 : phraseType()) : 2
+        let p3off   = rng.nextInt(upperBound: Swift.max(1, wLen / 2))
+        let p3start = w3 + p3off
+        events += pno002Phrase(type: p3type, startStep: p3start,
+                               pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
+                               upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng)
+        // Echo: same chord returns 1-2 more times, 5-7 bars apart, before the closing cadence
+        let p3echoes = 1 + (rng.nextDouble() < 0.60 ? 1 : 0)
+        var p3cursor = p3start
+        for _ in 0..<p3echoes {
+            p3cursor += (5 + rng.nextInt(upperBound: 3)) * 16
+            guard p3cursor < w4 else { break }
+            events += pno002Phrase(type: p3type, startStep: p3cursor,
+                                   pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
+                                   upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng)
+        }
+
+        // Phrase 4 — closing cadence
+        let p4off = rng.nextInt(upperBound: Swift.max(1, wLen / 2))
+        events += pno002Phrase(type: 2, startStep: w4 + p4off,
+                               pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
+                               upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng)
+
+        // Quiet returning figure — 2 scale notes that recur every 7-10 bars between phrases.
+        // More Satie than random fill: the same notes return, creating recognizable presence.
+        if !upper.isEmpty {
+            let qIdx1  = rng.nextInt(upperBound: Swift.max(1, upper.count / 2))
+            let qIdx2  = Swift.min(qIdx1 + 1 + rng.nextInt(upperBound: 2), upper.count - 1)
+            let qNote1 = upper[qIdx1]; let qNote2 = upper[qIdx2]
+            var qb = 3 + rng.nextInt(upperBound: 4)
+            while qb < totalBars - 1 {
+                let qs = qb * 16 + rng.nextInt(upperBound: 6)
+                guard qs < totalSteps else { break }
+                let note = rng.nextDouble() < 0.65 ? qNote1 : qNote2
+                let dur  = Swift.min(8 + rng.nextInt(upperBound: 7), totalSteps - qs)
+                if dur >= 4 { events.append(MIDIEvent(stepIndex: qs, note: note, velocity: UInt8(20 + rng.nextInt(upperBound: 10)), durationSteps: dur)) }
+                qb += 7 + rng.nextInt(upperBound: 4)
+            }
+        }
+
+        // Satie-style left-hand accompaniment: bass on beat 1, 2-note chord on beat 2.
+        // lhChord at 62-73 (above middle C) so chord tones register as melody, not bass.
+        // Bass alternates tonic / subdominant (Satie's characteristic IV→I rocking).
+        let lhBass  = notesInRegister(pitchClasses: scalePCs, low: 40, high: 54)
+        let lhChord = notesInRegister(pitchClasses: scalePCs, low: 62, high: 73)
+        if !lhBass.isEmpty, !lhChord.isEmpty {
+            let rootPC5   = frame.keySemitoneValue % 12
+            let fifthPC5  = (rootPC5 + 7) % 12
+            let fourthPC5 = (rootPC5 + 5) % 12
+            let bassRoot  = lhBass.first(where: { Int($0) % 12 == rootPC5  }) ?? lhBass[0]
+            let bassFifth = lhBass.first(where: { Int($0) % 12 == fifthPC5 }) ?? lhBass[lhBass.count / 2]
+            let bassFour  = lhBass.first(where: { Int($0) % 12 == fourthPC5 }) ?? bassFifth
+            // Base chord tones — two notes separated by a 3rd in the mid-treble register
+            let c1BaseIdx = rng.nextInt(upperBound: Swift.max(1, lhChord.count / 2))
+            for bar in 0..<totalBars {
+                let barStep = bar * 16
+                guard barStep < totalSteps else { break }
+                // Bass: tonic bars vs subdominant/dominant bars (Satie's rocking alternation)
+                let bassNote = bar % 2 == 0 ? bassRoot : (rng.nextDouble() < 0.60 ? bassFifth : bassFour)
+                let bassVel  = UInt8(30 + rng.nextInt(upperBound: 8))
+                // Jarrett/Satie: bass held for a half note (12 steps) — pedal, not a click
+                events.append(MIDIEvent(stepIndex: barStep, note: bassNote, velocity: bassVel, durationSteps: 12))
+                // Beat 2 (step 8): 2-note chord — cycle indices so chords vary bar to bar
+                if barStep + 8 < totalSteps {
+                    let c1Idx = (c1BaseIdx + bar) % lhChord.count
+                    let c2Idx = (c1Idx + 2) % lhChord.count
+                    let c1    = lhChord[c1Idx]
+                    let c2    = lhChord[c2Idx]
+                    let cv    = UInt8(22 + rng.nextInt(upperBound: 8))
+                    events.append(MIDIEvent(stepIndex: barStep + 8, note: c1, velocity: cv, durationSteps: 7))
+                    events.append(MIDIEvent(stepIndex: barStep + 8, note: c2, velocity: cv - 3, durationSteps: 7))
+                }
+                // Beat 3 (step 12): lighter chord note — only 35% of bars to keep breathing room
+                if barStep + 12 < totalSteps, rng.nextDouble() < 0.35 {
+                    let c3Idx = (c1BaseIdx + bar + 1) % lhChord.count
+                    events.append(MIDIEvent(stepIndex: barStep + 12, note: lhChord[c3Idx],
+                                            velocity: UInt8(16 + rng.nextInt(upperBound: 6)), durationSteps: 5))
+                }
+            }
+        }
+
+        return events.filter { $0.stepIndex < totalSteps }.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    private static func nearLightTexture(
+        startStep: Int, pivot: UInt8, upper: [UInt8], lower: [UInt8], all: [UInt8],
+        totalSteps: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let numBars = 4 + rng.nextInt(upperBound: 5)
+        var events: [MIDIEvent] = []
+        guard !lower.isEmpty, !upper.isEmpty else { return [] }
+
+        var chordRoot = lower[rng.nextInt(upperBound: Swift.max(1, lower.count / 2))]
+        var melNote   = upper[rng.nextInt(upperBound: upper.count)]
+
+        for bar in 0..<numBars {
+            let bs = startStep + bar * 16
+            guard bs < totalSteps else { break }
+            let cv: UInt8 = 45 + UInt8(rng.nextInt(upperBound: 11))
+            // 3-note chord on beat 1
+            for offset in [0, 7, 12] {
+                let n = Int(chordRoot) + offset
+                guard n >= 21 && n <= 108 else { continue }
+                events.append(MIDIEvent(stepIndex: bs, note: UInt8(n), velocity: cv, durationSteps: 16))
+            }
+            // Melody note on beat 3
+            let ms = bs + 8
+            if ms < totalSteps {
+                events.append(MIDIEvent(stepIndex: ms, note: melNote,
+                                        velocity: UInt8(Swift.min(55 + rng.nextInt(upperBound: 11), 65)), durationSteps: 4))
+            }
+            // Chord root: move 4th or 5th within scale tones
+            let interval = rng.nextDouble() < 0.50 ? 5 : 7
+            let dir      = rng.nextDouble() < 0.50 ? 1 : -1
+            let tPC      = (Int(chordRoot) + dir * interval + 120) % 12
+            if let found = all.first(where: { Int($0) % 12 == tPC }) { chordRoot = found }
+            // Melody: step down 1-2 positions in upper pool
+            if let ci = upper.firstIndex(of: melNote), ci > 0 {
+                melNote = upper[Swift.max(0, ci - (1 + rng.nextInt(upperBound: 2)))]
+            }
+        }
+        return events
+    }
+
+    /// Jarrett Köln opening motif: 5 scale notes (up a P4/P5, step back twice, step up), then
+    /// a long held landing note with a bass pedal entering underneath — 4+ bars of quiet space.
+    private static func jarrettSparseOpening(
+        startStep: Int, upper: [UInt8], lower: [UInt8],
+        totalSteps: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        guard !upper.isEmpty else { return [] }
+        var events: [MIDIEvent] = []
+        var cur = startStep
+
+        // Start low-mid in register; leap up P4/P5 (3-4 pool steps), step back down, step up, hold
+        let startIdx = rng.nextInt(upperBound: Swift.max(1, upper.count / 3))
+        let leapUp   = 3 + rng.nextInt(upperBound: 2)
+        let indices: [Int] = [
+            startIdx,
+            Swift.min(startIdx + leapUp,     upper.count - 1),
+            Swift.min(startIdx + leapUp - 1, upper.count - 1),
+            Swift.max(startIdx - 1, 0),
+            Swift.min(startIdx + 1,          upper.count - 1)
+        ]
+        for (i, idx) in indices.enumerated() {
+            guard cur < totalSteps else { break }
+            let isLast = i == indices.count - 1
+            let dur = isLast
+                ? Swift.min(32 + rng.nextInt(upperBound: 17), totalSteps - cur)  // 2–3 bar hold
+                : Swift.min(6 + rng.nextInt(upperBound: 4),  totalSteps - cur)   // dotted-quarter–half
+            guard dur >= 1 else { break }
+            events.append(MIDIEvent(stepIndex: cur,
+                                    note: upper[Swift.max(0, Swift.min(idx, upper.count - 1))],
+                                    velocity: UInt8(24 + rng.nextInt(upperBound: 14)),
+                                    durationSteps: dur))
+            if !isLast { cur += 8 + rng.nextInt(upperBound: 5) }   // half–dotted-half between notes
+        }
+        // Bass pedal enters under the held note — Jarrett LH grounds the harmony
+        if !lower.isEmpty, cur < totalSteps {
+            let bd = Swift.min(22 + rng.nextInt(upperBound: 14), totalSteps - cur)
+            if bd >= 8 {
+                events.append(MIDIEvent(stepIndex: cur,
+                                        note: lower[rng.nextInt(upperBound: lower.count)],
+                                        velocity: UInt8(26 + rng.nextInt(upperBound: 10)),
+                                        durationSteps: bd))
+            }
+        }
+        return events
+    }
+
+    private static func pno002Phrase(
+        type: Int, startStep: Int, pivot: UInt8, neighbor: UInt8, lowerAnchor: UInt8,
+        upper: [UInt8], lower: [UInt8], totalSteps: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        guard startStep < totalSteps else { return [] }
+        var events: [MIDIEvent] = []
+        var cur = startStep
+        // Cap at 52 — ambient piano lives in ppp–mp; Satie/Arnalds/Jarrett are never forte.
+        let cap: (Int) -> UInt8 = { UInt8(Swift.min($0, 52)) }
+
+        switch type {
+        case 0: // Standard two-register arc (Satie/Arnalds: spacious pivot-neighbor oscillation)
+            // Opening gesture (90%) — scale neighbor above pivot, settle back; held quarter-to-half note
+            if rng.nextDouble() < 0.90 && cur + 7 < totalSteps {
+                let pivIdx   = upper.firstIndex(of: pivot) ?? (upper.count / 2)
+                let openIdx  = Swift.min(pivIdx + 1 + rng.nextInt(upperBound: 2), upper.count - 1)
+                let openNote = upper[openIdx]
+                events.append(MIDIEvent(stepIndex: cur, note: openNote, velocity: cap(42), durationSteps: 6)); cur += 8
+                events.append(MIDIEvent(stepIndex: cur, note: pivot,    velocity: cap(38), durationSteps: 10)); cur += 13
+            }
+            // Upper oscillation — 3-5 cycles with quarter-to-dotted-quarter spacing (Satie's breath)
+            let cycles  = 3 + rng.nextInt(upperBound: 3)   // 3-5
+            let ioi     = 3 + rng.nextInt(upperBound: 3)    // 3-5 steps
+            let noteDur = 2 + rng.nextInt(upperBound: 3)    // 2-4 steps
+            for c in 0..<cycles {
+                guard cur < totalSteps else { break }
+                let velPiv = cap(34 + c * 4 + 3)   // 37 → 51 over 5 cycles
+                let velNbr = cap(32 + c * 4)        // 32 → 48
+                // Broken chord variant 30%
+                if rng.nextDouble() < 0.30, !lower.isEmpty {
+                    let fifth = lower[rng.nextInt(upperBound: lower.count)]
+                    events.append(MIDIEvent(stepIndex: cur, note: pivot, velocity: velPiv, durationSteps: noteDur)); cur += ioi
+                    if cur < totalSteps { events.append(MIDIEvent(stepIndex: cur, note: fifth, velocity: velNbr, durationSteps: noteDur)); cur += ioi }
+                    if cur < totalSteps { events.append(MIDIEvent(stepIndex: cur, note: neighbor, velocity: velNbr, durationSteps: noteDur)); cur += ioi }
+                } else {
+                    events.append(MIDIEvent(stepIndex: cur, note: pivot, velocity: velPiv, durationSteps: noteDur)); cur += ioi
+                    if cur < totalSteps { events.append(MIDIEvent(stepIndex: cur, note: neighbor, velocity: velNbr, durationSteps: noteDur)); cur += ioi }
+                }
+            }
+            // Suspension → resolution (60%) — resolve to scale neighbor below pivot
+            if rng.nextDouble() < 0.60 && cur < totalSteps {
+                let sd = Swift.min(6 + rng.nextInt(upperBound: 3), totalSteps - cur)
+                events.append(MIDIEvent(stepIndex: cur, note: pivot, velocity: cap(50), durationSteps: sd)); cur += sd
+                if cur < totalSteps {
+                    let pivIdx = upper.firstIndex(of: pivot) ?? 0
+                    let resIdx = Swift.max(0, pivIdx - 1 - rng.nextInt(upperBound: 2))
+                    let res    = upper[resIdx]
+                    events.append(MIDIEvent(stepIndex: cur, note: res, velocity: cap(44), durationSteps: Swift.min(4, totalSteps - cur))); cur += 5
+                }
+            }
+            // Leap down to lower register — use lower pool directly for scale-correct landing
+            if cur < totalSteps, !lower.isEmpty {
+                let land = lower[rng.nextInt(upperBound: lower.count)]
+                let ld   = Swift.min(8 + rng.nextInt(upperBound: 9), totalSteps - cur)
+                events.append(MIDIEvent(stepIndex: cur, note: land, velocity: cap(40), durationSteps: ld)); cur += ld
+            }
+            // Lower settlement (60%)
+            if rng.nextDouble() < 0.60 && cur < totalSteps, !lower.isEmpty {
+                if rng.nextDouble() < 0.35 {
+                    // Exhausted landing oscillation
+                    let li = rng.nextInt(upperBound: lower.count)
+                    for _ in 0..<(2 + rng.nextInt(upperBound: 2)) {
+                        guard cur < totalSteps else { break }
+                        events.append(MIDIEvent(stepIndex: cur, note: lower[li], velocity: 30, durationSteps: Swift.min(3, totalSteps - cur))); cur += 4
+                        if cur < totalSteps {
+                            events.append(MIDIEvent(stepIndex: cur, note: lower[Swift.max(0, li - 1)], velocity: 26, durationSteps: Swift.min(3, totalSteps - cur))); cur += 4
+                        }
+                    }
+                }
+                if cur < totalSteps {
+                    let finalNote = rng.nextDouble() < 0.30 ? lower[rng.nextInt(upperBound: lower.count)] : lowerAnchor
+                    let fd = Swift.min(10 + rng.nextInt(upperBound: 11), totalSteps - cur)
+                    events.append(MIDIEvent(stepIndex: cur, note: finalNote, velocity: 28, durationSteps: fd))
+                }
+            }
+
+        case 1: // Pure oscillation
+            let osc = 3 + rng.nextInt(upperBound: 2)
+            let ioi = 3 + rng.nextInt(upperBound: 3)
+            for i in 0..<(osc * 2) {
+                guard cur < totalSteps else { break }
+                let note = i % 2 == 0 ? pivot : neighbor
+                let vel  = cap(30 + i * 3)
+                events.append(MIDIEvent(stepIndex: cur, note: note, velocity: vel, durationSteps: Swift.min(2 + rng.nextInt(upperBound: 3), totalSteps - cur))); cur += ioi
+            }
+            if cur < totalSteps, !lower.isEmpty {
+                let fall = lower[rng.nextInt(upperBound: lower.count)]
+                events.append(MIDIEvent(stepIndex: cur, note: fall, velocity: cap(40), durationSteps: Swift.min(5, totalSteps - cur))); cur += 7
+            }
+            if cur < totalSteps {
+                events.append(MIDIEvent(stepIndex: cur, note: lowerAnchor, velocity: 30,
+                                        durationSteps: Swift.min(12 + rng.nextInt(upperBound: 9), totalSteps - cur)))
+            }
+
+        default: // Short cadence — all notes from scale pools, stepwise descent
+            guard !lower.isEmpty, !upper.isEmpty else { break }
+            let startNote = lower[rng.nextInt(upperBound: lower.count)]
+            let peakIdx   = rng.nextInt(upperBound: upper.count)
+            let midNote   = upper[peakIdx]
+            events.append(MIDIEvent(stepIndex: cur, note: startNote, velocity: 34, durationSteps: Swift.min(5, totalSteps - cur))); cur += 6
+            if cur < totalSteps {
+                events.append(MIDIEvent(stepIndex: cur, note: midNote, velocity: cap(46), durationSteps: Swift.min(4, totalSteps - cur))); cur += 5
+            }
+            let descentCount = 2 + rng.nextInt(upperBound: 2)
+            for i in 0..<descentCount {
+                guard cur < totalSteps else { break }
+                let dnIdx = Swift.max(0, peakIdx - i - 1)
+                events.append(MIDIEvent(stepIndex: cur, note: upper[dnIdx], velocity: cap(38 - i * 3), durationSteps: Swift.min(4, totalSteps - cur))); cur += 5
+            }
+            if cur < totalSteps {
+                events.append(MIDIEvent(stepIndex: cur, note: lowerAnchor, velocity: 28,
+                                        durationSteps: Swift.min(10 + rng.nextInt(upperBound: 7), totalSteps - cur)))
+            }
+        }
+        return events
+    }
+
+    // MARK: AMB-PNO-003 — Dramatic Arc (Winston / Jarrett)
+
+    private static func dramaticArcFullSong(
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let totalSteps = totalBars * 16
+        let scalePCs   = frame.scalePCs
+        let midNotes   = notesInRegister(pitchClasses: scalePCs, low: 60, high: 79)  // wider: C4-G5
+        let highNotes  = notesInRegister(pitchClasses: scalePCs, low: 69, high: 89)
+        let lowNotes   = notesInRegister(pitchClasses: scalePCs, low: 28, high: 46)
+        guard !midNotes.isEmpty, !highNotes.isEmpty else { return [] }
+
+        let use4Phrase    = rng.nextDouble() < 0.25
+        let useCallResp   = rng.nextDouble() < 0.40
+        let useOstinato   = rng.nextDouble() < 0.25
+        let usePostClimax = rng.nextDouble() < 0.50
+        let useParting    = rng.nextDouble() < 0.50
+
+        // All phrase positions scale proportionally to totalBars so the arc spans the full song.
+        // p1Bar=1 ensures piano enters after at most 1 bar of silence.
+        let p1Bar        = 1
+        let climaxBar    = totalBars * 42 / 100
+        let withdrawBar  = totalBars * 65 / 100
+        let closingBar   = totalBars * 83 / 100
+        let bass1Bar     = totalBars * 18 / 100
+        let bass2Bar     = totalBars * 56 / 100
+        let preclimaxBar = use4Phrase ? totalBars * 28 / 100 : -1
+
+        var events: [MIDIEvent] = []
+
+        // Helper: emit a burst-style phrase with directional melodic motion (Winston/Jarrett stepwise singing line)
+        func emitBurst(bar: Int, pool: [UInt8], count: Int, velMin: Int, velMax: Int, ioi: Int, holdDur: Int, startNear: Int = -1) -> (events: [MIDIEvent], endIdx: Int) {
+            guard bar < totalBars, bar >= 0, !pool.isEmpty else { return ([], pool.count / 2) }
+            var ev: [MIDIEvent] = []
+            var step = bar * 16 + rng.nextInt(upperBound: 4)
+            var ascending: Bool
+            var idx: Int
+            if startNear >= 0 && startNear < pool.count {
+                // Continue near previous burst's endpoint to avoid wide inter-phrase leaps
+                ascending = startNear < pool.count / 2
+                idx = startNear
+            } else {
+                // Default: random direction and starting position
+                ascending = rng.nextDouble() < 0.60
+                if ascending {
+                    let maxStart = Swift.max(0, pool.count / 3)
+                    idx = maxStart > 0 ? rng.nextInt(upperBound: maxStart + 1) : 0
+                } else {
+                    let minStart = pool.count / 2
+                    idx = minStart + (pool.count - minStart > 1 ? rng.nextInt(upperBound: pool.count - minStart) : 0)
+                }
+            }
+            for i in 0..<count {
+                guard step < totalSteps else { break }
+                let isLast = i == count - 1
+                let note = pool[Swift.max(0, Swift.min(idx, pool.count - 1))]
+                let dur  = isLast ? Swift.min(holdDur, totalSteps - step) : Swift.min(ioi, totalSteps - step)
+                guard dur >= 1 else { break }
+                let vel  = UInt8(velMin + rng.nextInt(upperBound: Swift.max(1, velMax - velMin + 1)))
+                ev.append(MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: dur))
+                // Chord accents: phrase launch (i==0) and phrase peak (~2/3 through) — Jarrett/Winston style
+                let isPeak = i == (count * 2 / 3)
+                if i == 0 || isPeak {
+                    let chordNote = pool.first(where: { Int($0) - Int(note) == 7 })  // P5 above
+                                 ?? pool.first(where: { Int($0) - Int(note) == 4 })  // M3 above
+                                 ?? pool.first(where: { Int($0) - Int(note) == 3 })  // m3 above
+                    if let cn = chordNote {
+                        ev.append(MIDIEvent(stepIndex: step, note: cn,
+                                            velocity: UInt8(vel > 5 ? vel - 5 : vel), durationSteps: dur))
+                    }
+                    // Jarrett touch: add a 3rd chord note at phrase peak (fuller chord stab)
+                    if isPeak {
+                        let third = pool.first(where: { Int($0) - Int(note) == 3 })   // m3 above
+                               ?? pool.first(where: { Int($0) - Int(note) == 4 })     // M3 above
+                        if let t = third, t != chordNote ?? 0 {
+                            ev.append(MIDIEvent(stepIndex: step, note: t,
+                                                velocity: UInt8(vel > 8 ? vel - 8 : vel), durationSteps: dur))
+                        }
+                    }
+                }
+                step += dur + (isLast ? 0 : 1)
+                // Advance 1-2 pool indices in chosen direction for natural stepwise motion
+                let advance = 1 + (rng.nextDouble() < 0.35 ? 1 : 0)
+                idx = ascending ? Swift.min(idx + advance, pool.count - 1) : Swift.max(0, idx - advance)
+            }
+            return (ev, idx)
+        }
+
+        // Phrase 1 (opening) — enters at bar 1, no more than 1 bar of opening silence
+        var burstEndIdx: Int = -1
+        let p1Result = emitBurst(bar: p1Bar, pool: midNotes, count: 7 + rng.nextInt(upperBound: 4),
+                                 velMin: 28, velMax: 42, ioi: 2, holdDur: 12)
+        events += p1Result.events; burstEndIdx = p1Result.endIdx
+
+        // Pre-climax phrase in 4-phrase form
+        if preclimaxBar > 0 {
+            let pcResult = emitBurst(bar: preclimaxBar, pool: midNotes, count: 8 + rng.nextInt(upperBound: 4),
+                                     velMin: 38, velMax: 55, ioi: 2, holdDur: 10)
+            events += pcResult.events; burstEndIdx = pcResult.endIdx
+        }
+
+        // Bass punctuation 1
+        if bass1Bar < totalBars, !lowNotes.isEmpty {
+            let bn  = lowNotes[rng.nextInt(upperBound: lowNotes.count)]
+            let bd  = Swift.min(32 + rng.nextInt(upperBound: 49), totalSteps - bass1Bar * 16)
+            if bd >= 4 { events.append(MIDIEvent(stepIndex: bass1Bar * 16, note: bn, velocity: UInt8(28 + rng.nextInt(upperBound: 18)), durationSteps: bd)) }
+        }
+
+        // Pre-climax ostinato (25%)
+        if useOstinato && climaxBar >= 2, !midNotes.isEmpty {
+            let ob    = Swift.max(0, climaxBar - 2)
+            let oNote = midNotes[rng.nextInt(upperBound: midNotes.count)]
+            var os    = ob * 16
+            for _ in 0..<(3 + rng.nextInt(upperBound: 2)) {
+                guard os < totalSteps else { break }
+                events.append(MIDIEvent(stepIndex: os, note: oNote, velocity: UInt8(36 + rng.nextInt(upperBound: 13)), durationSteps: Swift.min(6, totalSteps - os)))
+                os += 8
+            }
+        }
+
+        // Climax phrase
+        var highestNote: UInt8 = 0
+        if useCallResp {
+            let callResult = emitBurst(bar: climaxBar, pool: highNotes, count: 6 + rng.nextInt(upperBound: 3),
+                                       velMin: 55, velMax: 72, ioi: 2, holdDur: 8)
+            let respResult = emitBurst(bar: climaxBar + 2, pool: midNotes, count: 7 + rng.nextInt(upperBound: 3),
+                                       velMin: 42, velMax: 58, ioi: 2, holdDur: 10)
+            events += callResult.events + respResult.events
+            highestNote = (callResult.events + respResult.events).max(by: { $0.note < $1.note })?.note ?? 0
+        } else {
+            let cResult = emitBurst(bar: climaxBar, pool: highNotes, count: 9 + rng.nextInt(upperBound: 4),
+                                    velMin: 55, velMax: 72, ioi: 2, holdDur: 16)
+            events += cResult.events
+            highestNote = cResult.events.max(by: { $0.note < $1.note })?.note ?? 0
+        }
+
+        // Post-climax descending run (50%)
+        if usePostClimax {
+            let runBar = climaxBar + 6
+            if runBar < totalBars, !midNotes.isEmpty {
+                var rs  = runBar * 16
+                let top = midNotes.count - 1
+                for i in 0..<(6 + rng.nextInt(upperBound: 5)) {
+                    guard rs < totalSteps else { break }
+                    let idx = Swift.max(0, top - i)
+                    let vel = UInt8(Swift.max(20, 55 - i * 5))
+                    events.append(MIDIEvent(stepIndex: rs, note: midNotes[idx], velocity: vel, durationSteps: Swift.min(4, totalSteps - rs)))
+                    rs += 8
+                }
+            }
+        }
+
+        // Post-climax echo — mid-register bridge between descending run and withdrawal phrase
+        let echoBar = climaxBar + 10
+        if echoBar < withdrawBar - 2 {
+            events += emitBurst(bar: echoBar, pool: midNotes,
+                                count: 6 + rng.nextInt(upperBound: 3),
+                                velMin: 35, velMax: 52, ioi: 2, holdDur: 14).events
+        }
+
+        // Bass punctuation 2
+        if bass2Bar < totalBars, !lowNotes.isEmpty {
+            let bn = lowNotes[rng.nextInt(upperBound: lowNotes.count)]
+            let bd = Swift.min(32 + rng.nextInt(upperBound: 49), totalSteps - bass2Bar * 16)
+            if bd >= 4 { events.append(MIDIEvent(stepIndex: bass2Bar * 16, note: bn, velocity: UInt8(28 + rng.nextInt(upperBound: 18)), durationSteps: bd)) }
+        }
+
+        // Withdrawal phrase
+        let wPool = midNotes.filter { $0 <= 72 }.isEmpty ? midNotes : midNotes.filter { $0 <= 72 }
+        let wStartIdx = burstEndIdx < wPool.count ? burstEndIdx : -1
+        var wEvts = emitBurst(bar: withdrawBar, pool: wPool, count: 5 + rng.nextInt(upperBound: 3),
+                              velMin: 25, velMax: 42, ioi: 3, holdDur: 20, startNear: wStartIdx).events
+
+        // Parting gesture: copy highest climax note as first note of withdrawal phrase
+        if useParting && highestNote > 0 && withdrawBar < totalBars {
+            let ps = withdrawBar * 16
+            if !wEvts.contains(where: { $0.stepIndex == ps && $0.note == highestNote }) {
+                let pd = Swift.min(16 + rng.nextInt(upperBound: 9), totalSteps - ps)
+                wEvts.insert(MIDIEvent(stepIndex: ps, note: highestNote, velocity: 42, durationSteps: pd), at: 0)
+            }
+        }
+        events += wEvts
+
+        // Closing phrase — soft lyric fragment in last ~17% of song
+        if closingBar < totalBars - 2 {
+            let cPool = midNotes.filter { $0 <= 70 }.isEmpty ? midNotes : midNotes.filter { $0 <= 70 }
+            events += emitBurst(bar: closingBar, pool: cPool, count: 4 + rng.nextInt(upperBound: 3),
+                                velMin: 20, velMax: 35, ioi: 3, holdDur: 24).events
+        }
+
+        // Building arc — 4-6 structured scale-step phrases between opening and climax.
+        // Each phrase walks through consecutive pool indices; register and velocity
+        // rise progressively, building natural tension toward the climax.
+        let buildBars = climaxBar - p1Bar - 4
+        if buildBars > 6 {
+            let arcCount = 4 + rng.nextInt(upperBound: 3)
+            let spacing  = Swift.max(3, buildBars / arcCount)
+            for p in 0..<arcCount {
+                let pBar = p1Bar + 4 + p * spacing + rng.nextInt(upperBound: Swift.max(1, spacing / 2))
+                guard pBar < climaxBar - 2 else { break }
+                let progress  = Double(p) / Double(Swift.max(1, arcCount - 1))
+                let noteCount = 5 + rng.nextInt(upperBound: 4)
+                let ascending = rng.nextDouble() < 0.60
+                let idxLo     = Int(Double(midNotes.count - 1) * progress * 0.40)
+                let idxHi     = Int(Double(midNotes.count - 1) * (0.35 + progress * 0.55))
+                let safeHi    = Swift.min(Swift.max(idxLo, idxHi), midNotes.count - 1)
+                let startIdx  = idxLo + (safeHi > idxLo ? rng.nextInt(upperBound: safeHi - idxLo + 1) : 0)
+                let velLo     = 28 + Int(progress * 18)
+                let velHi     = 40 + Int(progress * 20)
+                var s = pBar * 16 + rng.nextInt(upperBound: 6)
+                for n in 0..<noteCount {
+                    guard s < totalSteps else { break }
+                    let idx = ascending
+                        ? Swift.min(startIdx + n, midNotes.count - 1)
+                        : Swift.max(0, startIdx - n)
+                    let isLast = n == noteCount - 1
+                    let dur = isLast
+                        ? Swift.min(12 + rng.nextInt(upperBound: 9), totalSteps - s)
+                        : Swift.min(2 + rng.nextInt(upperBound: 3), totalSteps - s)
+                    guard dur >= 1 else { break }
+                    let vel = UInt8(velLo + rng.nextInt(upperBound: Swift.max(1, velHi - velLo + 1)))
+                    events.append(MIDIEvent(stepIndex: s, note: midNotes[idx], velocity: vel, durationSteps: dur))
+                    s += dur + (isLast ? 0 : 2 + rng.nextInt(upperBound: 3))
+                }
+            }
+        }
+
+        // Two connective phrases between withdrawal and closing — meditative fragments, not silence
+        let decayZone = withdrawBar + 4
+        if decayZone < closingBar - 2 {
+            let softPool = midNotes.filter { $0 <= 70 }.isEmpty ? midNotes : midNotes.filter { $0 <= 70 }
+            let decaySpan = closingBar - decayZone
+            // First connective phrase — earlier third of the decay zone
+            let conn1Bar = decayZone + rng.nextInt(upperBound: Swift.max(1, decaySpan / 3))
+            events += emitBurst(bar: conn1Bar, pool: softPool,
+                                count: 7 + rng.nextInt(upperBound: 4),
+                                velMin: 22, velMax: 38, ioi: 3, holdDur: 18, startNear: wStartIdx).events
+            // Second connective phrase — later two-thirds, fading further
+            let conn2Bar = decayZone + decaySpan * 2 / 3 + rng.nextInt(upperBound: Swift.max(1, decaySpan / 4))
+            if conn2Bar < closingBar - 1 {
+                events += emitBurst(bar: conn2Bar, pool: softPool,
+                                    count: 5 + rng.nextInt(upperBound: 3),
+                                    velMin: 20, velMax: 34, ioi: 3, holdDur: 20, startNear: wStartIdx).events
+            }
+        }
+
+        // Winston/Jarrett left-hand: bass + arpeggiated chord tones throughout the song.
+        // lhMid at 61-72 (above middle C) so mid tones register as melody, not bass.
+        // Bass changes every 2 bars for variety; mid indices cycle independently per bar.
+        let lhBass = notesInRegister(pitchClasses: scalePCs, low: 40, high: 54)
+        let lhMid  = notesInRegister(pitchClasses: scalePCs, low: 61, high: 72)
+        if !lhBass.isEmpty, !lhMid.isEmpty {
+            let rootPC    = frame.keySemitoneValue % 12
+            let lhRoot    = lhBass.first(where: { Int($0) % 12 == rootPC }) ?? lhBass[0]
+            let lhRootIdx = lhBass.firstIndex(of: lhRoot) ?? 0
+            // Pentatonic pools have only 4-5 notes in the lhMid range; stride-2 gives 5-7st leaps.
+            // Stride-1 keeps within-chord intervals at 2-3st (step/skip), preserving lyricism.
+            let lhStride  = (frame.mode == .MinorPentatonic || frame.mode == .MajorPentatonic) ? 1 : 2
+            for lhBar in 0..<totalBars {
+                let barStep = lhBar * 16
+                guard barStep < totalSteps else { break }
+                // Bass steps through pool, changing every 2 bars for harmonic variety
+                let bIdx  = (lhRootIdx + (lhBar / 2) % Swift.max(1, lhBass.count / 2)) % lhBass.count
+                let bNote = lhBass[bIdx]
+                let bVel  = UInt8(38 + rng.nextInt(upperBound: 12))
+                // Beat 1 (step 0): bass alone — arrives first like Winston/Jarrett LH
+                events.append(MIDIEvent(stepIndex: barStep, note: bNote, velocity: bVel, durationSteps: 7))
+                // Beat 2 (step 4): 2-note chord stab SIMULTANEOUSLY — Winston's mid-register chord touch
+                if barStep + 4 < totalSteps {
+                    let mIdx  = (lhBar + 1) % lhMid.count
+                    let mIdx2 = (lhBar + 1 + lhStride) % lhMid.count
+                    let cv    = UInt8(30 + rng.nextInt(upperBound: 10))
+                    events.append(MIDIEvent(stepIndex: barStep + 4, note: lhMid[mIdx], velocity: cv, durationSteps: 6))
+                    events.append(MIDIEvent(stepIndex: barStep + 4, note: lhMid[mIdx2], velocity: cv - 3, durationSteps: 6))
+                }
+                // Beat 3 (step 8): another 2-note chord stab (Jarrett inner-voice repeat, slightly softer)
+                if barStep + 8 < totalSteps {
+                    let mIdx3 = (lhBar + 2) % lhMid.count
+                    let mIdx4 = (lhBar + 2 + lhStride) % lhMid.count
+                    let cv2   = UInt8(26 + rng.nextInt(upperBound: 10))
+                    events.append(MIDIEvent(stepIndex: barStep + 8, note: lhMid[mIdx3], velocity: cv2, durationSteps: 5))
+                    events.append(MIDIEvent(stepIndex: barStep + 8, note: lhMid[mIdx4], velocity: cv2 - 3, durationSteps: 5))
+                }
+                // Beat 4 (step 12): single lighter note — breathing space (45% of bars)
+                if barStep + 12 < totalSteps, rng.nextDouble() < 0.45 {
+                    let mIdx5 = (lhBar + 2) % lhMid.count
+                    events.append(MIDIEvent(stepIndex: barStep + 12, note: lhMid[mIdx5],
+                                            velocity: UInt8(22 + rng.nextInt(upperBound: 8)), durationSteps: 4))
+                }
+            }
+        }
+
+        return events.filter { $0.stepIndex < totalSteps }.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
 }

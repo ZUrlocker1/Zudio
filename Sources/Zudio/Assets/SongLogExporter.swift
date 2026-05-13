@@ -187,12 +187,12 @@ struct SongLogExporter {
         return parts.joined(separator: " ")
     }
 
-    private static func generationProgram(forTrack i: Int, song: SongState) -> UInt8 {
+    private static func generationProgram(forTrack i: Int, song: SongState) -> Int {
         if song.style == .chill {
-            if i == kTrackLead1 { return song.chillLeadInstrument.gmProgram }
-            if i == kTrackLead2 { return song.chillLead2Instrument.gmProgram }
+            if i == kTrackLead1 { return Int(song.chillLeadInstrument.gmProgram) }
+            if i == kTrackLead2 { return Int(song.chillLead2Instrument.gmProgram) }
         }
-        if i == kTrackLeadSynth { return kDefaultGMPrograms[kTrackLeadSynth] ?? 90 }
+        if i == kTrackLeadSynth { return Int(kDefaultGMPrograms[kTrackLeadSynth] ?? 90) }
         let pool = AppState.instrumentPoolPrograms(trackIndex: i, style: song.style)
         return pool.first ?? 255
     }

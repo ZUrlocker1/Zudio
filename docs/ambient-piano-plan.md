@@ -60,7 +60,7 @@ The hollow guard logic in `generateAmbient` must check `isAmbientPiano` and skip
 
 - **Modes**: Dorian (50%) or Aeolian (35%) — both produce the characteristic open-but-melancholy quality; Mixolydian (15%) only for lighter moods, never if mood is Dream or Deep
 - **No chord changes** — tonal map stays on the tonic for the full song; `droneSingle` progression family
-- **Scale constraint**: all piano notes (Lead 1) are drawn from the song's key + mode scale; no chromatic tones outside the mode
+- **Scale constraint**: piano notes are drawn from the song's key + mode scale wherever possible. Out-of-scale chromatic tones are permitted as approach notes (half-step to a target, duration 1–2 steps), passing tones (b3, b7 as brief transit notes), and cluster shimmer notes (Mode 3). Because only Lead 1 and occasional Pads are active, tonal collision risk is low and chromatic colour is a feature, not an error.
 - **Pad voicing**: root + fifth (no third) — implies neither major nor minor; harmonic ambiguity is structural
 
 ---
@@ -143,7 +143,7 @@ Four Budd MIDI files were analysed, revealing three structurally distinct Budd m
 - **Velocity mode**: contrast (chord wash vel 4–12; events vel 45–55) — the only Budd mode with layered dynamics
 
 **Chord wash (continuous):**
-Re-strike the 3-note chord cluster on every bar downbeat (every 16 steps), all three notes simultaneously. Held 16 steps, then re-struck. These notes are extremely quiet (vel 4–12); through reverb they bloom into the harmonic field. The chord wash root may move once mid-song (25% chance) — a 5th below or major 2nd above the original root.
+Re-strike the 3-note chord cluster on every bar downbeat (every 16 steps), all three notes simultaneously. Held 16 steps, then re-struck. These notes are extremely quiet (vel 4–12); through reverb they bloom into the harmonic field. The chord wash root may move once mid-song (25% chance) — a 5th below or major 2nd above the original root, chosen randomly 50/50.
 
 **Events (4–7, scattered across the song body):**
 - Gaps between events: 8–18 bars (128–288 steps), drawn uniformly
@@ -167,10 +167,15 @@ Re-strike the 3-note chord cluster on every bar downbeat (every 16 steps), all t
 **Setup:**
 - **Chord A** and **Chord B**: two chord voicings chosen once per song; used for the entire song
   - Each chord is 5–7 notes spanning 2–3 octaves (span 24–36 semitones)
-  - Registers covered: low (MIDI 39–52), mid (MIDI 55–67), high (MIDI 67–79) — one or two notes per register
-  - Chord A bass root: MIDI 39–46 (a minor third or 5th below chord B's bass root)
-  - Chord B bass root: MIDI 41–50
-  - Both chords built from the same 3–4 pitch classes, voiced in multiple octaves (e.g., Eb2 + Eb3 + Eb4 for the root)
+  - Registers covered: low (MIDI 39–52), mid (MIDI 52–67), high (MIDI 67–79) — one or two notes per register
+
+- **Construction algorithm** (choose once per song):
+  1. Select a 4-pitch-class palette: {root, b3, P5, color\_tone} where color\_tone is b7 (50%) or M2 (50%), all from the song's mode scale.
+  2. Chord A draws from {root, b3, P5}; Chord B draws from {b3, P5, color\_tone}. They share b3 and P5 — two common tones — so the two chords sound like facets of the same harmonic object.
+  3. Chord B bass root: song's root pitch class placed in MIDI 41–50.
+  4. Chord A bass root: Chord B bass root minus 7 (P5 below, 50%) or minus 3 (m3 below, 50%); clamp to MIDI 39–46.
+  5. Voice each chord to 5–7 notes by placing each pitch class at its lowest valid position within each octave zone (low 39–52, mid 52–67, high 67–79), adding doublings until the note count is reached.
+
 - **Velocity**: flat throughout, vel 60–72 — every note in the song, the same velocity
 
 **Event sequence:**
@@ -196,9 +201,17 @@ Re-strike the 3-note chord cluster on every bar downbeat (every 16 steps), all t
 **Setup:**
 - **Cluster A** and **Cluster B**: two small chord clusters, each 2–3 notes, chosen once per song
   - Each cluster spans 3–7 semitones total
-  - **At least one half-step interval** within each cluster — this creates the signature chromatic shimmer through reverb (e.g., `[C#4, Eb4, F#4]` contains C#–Eb = 2st and Eb–F# = 3st; `[Eb4, E4, Ab4]` contains Eb–E = 1st and E–Ab = 4st)
-  - Clusters should share 1–2 pitch classes so they sound like variations of the same harmonic object
+  - **At least one half-step interval** within each cluster — this creates the signature chromatic shimmer through reverb (chromatic tones outside the mode are permitted here; the shimmer effect depends on it)
+  - Clusters share 1 pitch class so they sound like variations of the same harmonic object
   - Cluster register: MIDI 59–72 (all in mid range, a compact zone)
+
+- **Construction algorithm** (choose once per song):
+  1. Pick anchor A1: a scale tone in MIDI 59–72.
+  2. Cluster A: {A1, A1+1} (chromatic half-step pair — the shimmer source); add A1+4 as a third note (60% chance).
+  3. Cluster B: {A1+1, A1+3} (shares A1+1 with Cluster A; adds a whole step above it); add A1+6 as a third note (same 60% chance as step 2). Total span ≤7 semitones by construction.
+  4. Verify all notes are in MIDI 59–72; transpose individual notes by ±12 if needed.
+
+- **Mid-section clusters C and D** (used at bars 16–24): pick a new anchor C1 from scale tones in MIDI 59–72, distinct from A1. Cluster C = {C1, C1+2}; Cluster D = {C1+2, C1+4} — whole-step pairs with no half-step, giving a clearly lighter quality for the 8-bar contrast section. Return to A/B after bar 24.
 - **Bass root**: a very low note, MIDI 20–38, used as the section anchor (always struck as an octave pair — same note, 12 semitones apart — e.g., A1 + A2 simultaneously)
 - **Velocity**: flat throughout, vel 75–85
 
@@ -281,6 +294,12 @@ Three sources inform the piano algorithm: **Satie** (Gnossienne 1 and 2, Gymnope
 - Phrase 3: bars 50–56 (steps 785–896)
 - Within each window, pick a random bar boundary for the phrase start
 
+**Phrase window compression** — when `totalBars < 65`, scale all three windows proportionally rather than using fixed bar numbers:
+- Phrase 1 start: `round(totalBars * 0.14)` (≈ bar 9 of 65)
+- Phrase 2 start: `round(totalBars * 0.43)` (≈ bar 28 of 65)
+- Phrase 3 start: `round(totalBars * 0.77)` (≈ bar 50 of 65)
+- Each window remains 5–6 bars wide; clamp so the window end does not exceed `totalBars − 4`
+
 **Standard two-register arc — note sequence:**
 
 1. **Opening gesture** (neighbor_up, 75% of phrases): first note = pivot; second note = pivot +1–3 semitones above; third note = pivot or pivot −1 semitone. This gives a sense of the melody arriving from slightly above and settling on its starting pitch.
@@ -355,13 +374,13 @@ These devices are drawn directly from the Gnossienne and Gymnopedie MIDI analysi
 - On beat 3 (step 9 of the bar): add one floating melody note, duration 4 steps (one beat)
   - Register: MIDI 69–78, 1–3 scale steps above the high chord voice
   - Velocity: 55–65 (louder than the chord by +6–10 units)
-- Chord root changes by a 4th or 5th each bar (slow harmonic rhythm)
+- Chord root changes by a 4th or 5th each bar (slow harmonic rhythm) — direction is random (up or down), but the new root must be a scale tone within the song's mode; re-draw if it would land outside the scale
 - The floating melody notes across bars should descend stepwise within the key (e.g. bar 1 = scale degree 6, bar 2 = degree 5, bar 3 = degree 4...)
 - After 4–8 bars, transition to the Satie oscillation pattern for phrases 2 and 3
 
 ### Form
 
-- Opening: 8–10 bars (128–160 steps) of pad only
+- Opening: 4–8 bars of pad/shimmer only (synth shimmer counts as part of the pad layer; its bar 3–4 entry is within this opening zone)
 - Phrase 1 (bars ~9–14): two-register arc or pure oscillation; 6–12 notes total; full velocity range
 - Silence (bars ~14–28): pad only — the absence is intentional
 - Phrase 2 (bars ~28–34): variation; optionally transposed +7 semitones above Phrase 1's final lower note
@@ -402,6 +421,13 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 - Phrase 2 — climax: bars 22–30 (steps 337–480)
 - Phrase 3: bars 42–47 (steps 657–752)
 
+**Phrase placement** (4-phrase form — 25% of songs, adds a pre-climax phrase):
+- Phrase 1 (opening): bars 6–11 (unchanged)
+- Phrase 2 (pre-climax bridge): bars 17–22 — 6–7 notes, velocity 65–80, register one zone below the climax peak; functions as a runway building tension toward Phrase 3
+- Phrase 3 — climax: bars 28–36 (shifted to accommodate Phrase 2)
+- Phrase 4 (withdrawal): bars 47–53 (shifted accordingly)
+- "Phrase 2" in setup flags (call-response split, registral peak) refers to the climax phrase — Phrase 3 in the 4-form, Phrase 2 in the 3-form
+
 **Per-phrase note count, velocity, and register:**
 
 - Phrase 1 (opening): 4–5 notes; velocity 52–68; register MIDI 57–72 (mid-range)
@@ -422,7 +448,7 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 
 **Registral peak rule** (applied at generation time after all phrases are built):
 - Identify the single highest MIDI pitch across all phrases
-- If parting gesture option was chosen: move that pitch to be the first note of Phrase 3, held 16–24 steps, then continue Phrase 3 descending from it
+- If parting gesture option was chosen: insert that pitch as the first note of Phrase 3 (held 16–24 steps), then continue Phrase 3's other notes descending from it. This is a copy, not a move — the original occurrence stays in Phrase 2. If the highest pitch already IS the first note of Phrase 3, skip the insertion.
 
 **Bass punctuation** — placed in silences between phrases, not during a phrase:
 - 1–2 single very low notes: MIDI 28–45 (A0–A2; as low as A1 confirmed by Winston, F#1 by Jarrett)
@@ -442,7 +468,7 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 - Sub-burst B (response): 4–5 notes in mid-register (MIDI 60–75), IOI 3–5 steps, velocity 60–80 (quieter than the call), completes the harmonic idea
 - The response must be in a lower register than the call
 
-**Pre-climax ostinato** (25% of songs, placed 8–16 steps before Phrase 2): a 2–3 note cell repeating 3–4 consecutive times at 8th-note pace (IOI 8 steps each), in mid-low register (MIDI 55–69), velocity 52–64. Cell shape: ascending minor third `[+3]`, or ascending whole-step pair `[+2, +2]`, or plateau `[+2, 0]`. The final repetition rises by step or leap into the first note of Phrase 2, making the ostinato feel like a runway into the climax.
+**Pre-climax ostinato** (25% of songs, placed 8–16 steps before the climax phrase): a 2–3 note cell repeating 3–4 consecutive times at 8th-note pace (IOI 8 steps each), in mid-low register (MIDI 55–69), velocity 52–64. Cell shape: ascending minor third `[+3]`, or ascending whole-step pair `[+2, +2]`, or plateau `[+2, 0]`. The final repetition rises by step or leap into the first note of the climax phrase, making the ostinato feel like a runway into the peak.
 
 **Post-climax descending run** (50% of songs, placed at the very start of the silence after Phrase 2, or as the opening of Phrase 3 when using the parting gesture option): 6–10 notes descending at 8th-note pace (IOI 8 steps), mostly stepwise, with 1–2 chromatic passing tones allowed. Duration per note: 4–6 steps. Velocity decays from Phrase 2's peak level down toward Phrase 3's quiet range. This run is the transition from climax to withdrawal — it makes the descent feel earned.
 
@@ -450,7 +476,8 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 
 ### Form
 
-- Opening: 4–6 bars (64–96 steps) of pad only
+**3-phrase form (75% of songs):**
+- Opening: 4–6 bars of pad only
 - Phrase 1 (bars ~6–11): mid-register, 4–5 notes, sparse burst pattern; optional neighbor-note figure at opening
 - Bass punctuation (bars ~13–15): one low note resonating into silence
 - Silence (bars ~11–22): pad only; optional pre-climax ostinato at bars ~20–21
@@ -459,6 +486,18 @@ The Winston model has a global emotional arc. The song builds from a quiet openi
 - Silence (bars ~30–42): longest silence
 - Bass punctuation (bars ~34–36): second low note
 - Phrase 3 (bars ~42–47): 3–4 notes; either opens on song's highest pitch then descends, or stays low and quiet; optional parting gesture = post-climax run leads directly into it
+
+**4-phrase form (25% of songs):**
+- Opening: 4–6 bars of pad only
+- Phrase 1 (bars ~6–11): same as 3-phrase
+- Bass punctuation (bars ~13–15): one low note
+- Phrase 2 — pre-climax bridge (bars ~17–22): 6–7 notes, velocity 65–80, register one zone below the climax peak
+- Silence (bars ~22–28): pad only; optional pre-climax ostinato at bars ~26–27
+- Phrase 3 — climax (bars ~28–36): dense burst or call-response split, 6–14 notes, loudest
+- Post-climax descending run (if active): immediately after Phrase 3 peak
+- Silence (bars ~36–47): longest silence
+- Bass punctuation (bars ~38–40): second low note
+- Phrase 4 (bars ~47–53): withdrawal; same shape as Phrase 3 in 3-form
 - Closing: pad fades; ends in near-silence
 - Duration: 4–5 minutes
 
@@ -503,7 +542,7 @@ When strings are active, four voices layer over the drone:
 - **Violin 2 / inner-high voice** (MIDI 67–81, G4–A5): enters bar 7 (step 97), vel=48; begins with whole-note ascent (see phrase arc below)
 - **Viola / inner-low voice** (MIDI 59–74, B3–D5): enters bar 8 (step 113), vel=48; begins with whole-note ascent
 
-**Portamento entrance:** each string note onset is preceded by two very short approach notes (each 0.10–0.16 beats / 1–2 steps, sliding up 1–2 semitones to the target pitch). This is the Arnalds string breath-in characteristic from *Near Light*.
+**Portamento entrance:** each string note onset is preceded by two discrete chromatic grace-note events stepping up to the target pitch — one note at target−2 semitones (duration 1–2 steps), one at target−1 semitone (duration 1–2 steps), then the target pitch itself. MIDI cannot slide continuously; these two short notes are the implementation of the Arnalds string breath-in from *Near Light*. Both grace notes are at the same velocity as the target note.
 
 **The Raein string phrase arc** — each string voice follows this shape on every active appearance:
 1. **Entry held note** — scale 5th or key tone, 16–32 steps (4–8 beats), vel=48

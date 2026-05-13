@@ -74,7 +74,10 @@ final class PlaybackEngine: ObservableObject {
     private var reverbPresets    = Array(repeating: AVAudioUnitReverbPreset.cathedral, count: kTrackCount)
     // Tracks whether the user's +4.6 dB boost EFFECT is on — separate from boosts[i].outputVolume
     // which is also used as a dynamic animator (Chill pads fade, Kosmic/Ambient drone fades).
-    private var boostEffectEnabled = Array(repeating: false, count: kTrackCount)
+    private var boostEffectEnabled  = Array(repeating: false,   count: kTrackCount)
+    // Instrument-level output gain multiplier applied via boosts[i].outputVolume.
+    // Lets external SF2 pianos exceed unity gain without being clamped by AVAudioUnitSampler.volume.
+    private var boostBaseMultiplier = Array(repeating: Float(1.0), count: kTrackCount)
 
     // Tremolo LFO
     private var tremEnabled   = Array(repeating: false,   count: kTrackCount)
@@ -106,6 +109,9 @@ final class PlaybackEngine: ObservableObject {
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
     private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
+    // GeneralUser GS piano programs have a velocity zone split near velocity 49; the low zone
+    // sounds shrill on certain pitches. Floor all piano Lead 1 note-ons at 49.
+    private static let ambientPianoPrograms: Set<Int> = []
     // Per-track pending instrument loads — used to coalesce rapid setProgram calls on macOS.
     private var programLoadWork: [Int: DispatchWorkItem] = [:]
     private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
@@ -356,7 +362,7 @@ final class PlaybackEngine: ObservableObject {
             // Texture stays 0 — auto-pan LFO controls it dynamically
             trackStaticPan = [-0.20, 0.20, 0.10, -0.15, 0, 0, 0, 0]
         } else if chillPadsMode {
-            trackStaticPan = [-0.20, 0.15, -0.10, 0.15, 0, 0, 0, 0]
+            trackStaticPan = [-0.18, 0.20, -0.10, 0.15, 0, 0, 0, 0]
         } else {
             trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]
         }
@@ -532,9 +538,11 @@ final class PlaybackEngine: ObservableObject {
         engine.stop()
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
-        cachedDrumProgram  = 255
-        cachedLead1Program = 255
-        cachedLead2Program = 255
+        cachedDrumProgram    = 255
+        cachedLead1Program   = 255
+        cachedLead2Program   = 255
+        cachedLead1IsGSPiano  = false
+        cachedIsAmbientPiano  = false
         #if !os(iOS)
         // macOS: start now; setProgram() works with the engine running.
         startEngine()
@@ -558,9 +566,11 @@ final class PlaybackEngine: ObservableObject {
     func invalidateProgramCache() {
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
-        cachedDrumProgram  = 255
-        cachedLead1Program = 255
-        cachedLead2Program = 255
+        cachedDrumProgram    = 255
+        cachedLead1Program   = 255
+        cachedLead2Program   = 255
+        cachedLead1IsGSPiano  = false
+        cachedIsAmbientPiano  = false
     }
 
     /// Stop the engine once before a batch of setProgram() calls.
@@ -615,14 +625,12 @@ final class PlaybackEngine: ObservableObject {
         for (trackIndex, ev) in noteOns {
             let channel = gmChannel(trackIndex)
             // Machine Kit (GM program 24) has harsh kick/snare at full velocity — scale down.
-            // Grand Piano (program 0) on lead tracks sounds thin below vel~48 in GeneralUser GS;
-            // apply a 52-floor so soft ambient phrases remain musical rather than click-y.
             let fireVelocity: UInt8
             if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 78 / 100))
-            } else if (trackIndex == kTrackLead1 && cachedLead1Program == 0) ||
-                      (trackIndex == kTrackLead2 && cachedLead2Program == 0) {
-                fireVelocity = UInt8(max(52, Int(ev.velocity)))
+            } else if trackIndex == kTrackLead1 && cachedLead1IsGSPiano {
+                // GS piano zone split near vel 50 — low zone sounds shrill; floor at 55.
+                fireVelocity = UInt8(max(55, Int(ev.velocity)))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -902,27 +910,44 @@ final class PlaybackEngine: ObservableObject {
     // Cache the currently-loaded program per sampler to skip redundant loadSoundBankInstrument
     // calls. loadSoundBankInstrument is expensive (SF2 parse + audio buffer alloc), and
     // TrackRowView always resets to program index 0 on generate — the same program every time.
-    private var currentProgram: [UInt8] = Array(repeating: 255, count: kTrackCount)   // 255 = "not yet loaded"
+    private var currentProgram: [Int] = Array(repeating: 255, count: kTrackCount)   // 255 = "not yet loaded"
     private var currentBankMSB: [UInt8] = Array(repeating: 0,   count: kTrackCount)
     // Cached programs for nonisolated onStep (written on main actor in setProgram, read from timer thread)
-    nonisolated(unsafe) private var cachedDrumProgram:  UInt8 = 255
-    nonisolated(unsafe) private var cachedLead1Program: UInt8 = 255
-    nonisolated(unsafe) private var cachedLead2Program: UInt8 = 255
+    nonisolated(unsafe) private var cachedDrumProgram:    UInt8 = 255
+    nonisolated(unsafe) private var cachedLead1Program:   UInt8 = 255
+    nonisolated(unsafe) private var cachedLead2Program:   UInt8 = 255
+    nonisolated(unsafe) private var cachedLead1IsGSPiano: Bool  = false
+    nonisolated(unsafe) private var cachedIsAmbientPiano: Bool  = false
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
     /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls
     /// and stops the Mac audio engine around the load to prevent EXC_BAD_ACCESS on the IOThread.
-    func setProgram(_ program: UInt8, forTrack trackIndex: Int, immediate: Bool = false) {
+    func setProgram(_ program: Int, forTrack trackIndex: Int, immediate: Bool = false) {
         guard trackIndex < samplers.count else { return }
         let isDrum = (trackIndex == kTrackDrums)
         let bankMSB: UInt8 = isDrum ? 0x78 : 0x79
+        // Programs >= 60000 encode external piano SF2 files: (program-60000)/1000 = file index, %1000 = preset
+        // Programs >= 1000  encode non-zero GeneralUser GS banks: bank = program/1000, preset = program%1000
+        let soundBankURL: URL
+        let bankLSB: UInt8
+        let actualProgram: UInt8
+        if program >= 60000 {
+            let fileIdx = (program - 60000) / 1000
+            actualProgram = UInt8((program - 60000) % 1000)
+            bankLSB = 0
+            soundBankURL = externalPianoURL(fileIndex: fileIdx) ?? gmDLSSoundBankURL()
+        } else {
+            bankLSB = program >= 1000 ? UInt8(program / 1000) : 0
+            actualProgram = program >= 1000 ? UInt8(program % 1000) : UInt8(program)
+            soundBankURL = gmDLSSoundBankURL()
+        }
         // Skip if the sampler already has this exact program loaded
         if program == currentProgram[trackIndex] && bankMSB == currentBankMSB[trackIndex] { return }
         currentProgram[trackIndex] = program
         currentBankMSB[trackIndex] = bankMSB
-        if trackIndex == kTrackDrums  { cachedDrumProgram  = program }
-        if trackIndex == kTrackLead1  { cachedLead1Program = program }
-        if trackIndex == kTrackLead2  { cachedLead2Program = program }
+        if trackIndex == kTrackDrums  { cachedDrumProgram  = actualProgram }
+        if trackIndex == kTrackLead1  { cachedLead1Program = actualProgram; cachedLead1IsGSPiano = Self.ambientPianoPrograms.contains(program) }
+        if trackIndex == kTrackLead2  { cachedLead2Program = actualProgram }
 
         // Cancel any pending debounced load for this track (covers rapid interactive changes).
         programLoadWork[trackIndex]?.cancel()
@@ -935,13 +960,13 @@ final class PlaybackEngine: ObservableObject {
         // same-program calls. engine stop/start is NOT used here: it resets all other samplers.
         if immediate {
             try? samplers[trackIndex].loadSoundBankInstrument(
-                at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
+                at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
             )
         } else {
-            let work = DispatchWorkItem { [weak self, program, bankMSB, trackIndex] in
+            let work = DispatchWorkItem { [weak self, soundBankURL, actualProgram, bankMSB, bankLSB, trackIndex] in
                 guard let self else { return }
                 try? self.samplers[trackIndex].loadSoundBankInstrument(
-                    at: self.gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
+                    at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
                 )
                 self.programLoadWork[trackIndex] = nil
             }
@@ -950,15 +975,15 @@ final class PlaybackEngine: ObservableObject {
         }
         #else
         try? samplers[trackIndex].loadSoundBankInstrument(
-            at: gmDLSSoundBankURL(), program: program, bankMSB: bankMSB, bankLSB: 0
+            at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
         )
         #endif
         // Per-track default volumes; tremolo overrides live sampler volume via LFO.
         // trackBaseVolume is always updated so stopTremolo restores the correct new value.
         do {
             let vol: Float
-            if trackIndex == kTrackLead1 && program == 0 {
-                vol = 0.62   // Grand Piano on Ambient Lead 1 — keep it soft
+            if trackIndex == kTrackLead1 && program == 61001 {
+                vol = 1.0    // Stereo Piano — gain via boostBaseMultiplier
             } else if trackIndex == kTrackLead1 && program == 46 {
                 vol = 1.35   // Harp runs soft in GM on Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 59 {
@@ -967,6 +992,10 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.45   // Vibraphone runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead2 && program == 13 {
                 vol = 1.30   // Xylophone — light presence, sits back in the mix
+            } else if trackIndex == kTrackLead1 && program == 13081 {
+                vol = 1.3    // Saw Lead 3 runs soft on Motorik Lead 1 — boost
+            } else if trackIndex == kTrackLead2 && program == 13088 {
+                vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
             } else if trackIndex == kTrackLead1 && program == 80 {
@@ -1054,6 +1083,17 @@ final class PlaybackEngine: ObservableObject {
             }
             trackBaseVolume[trackIndex] = vol
             if !tremEnabled[trackIndex] { samplers[trackIndex].volume = vol }
+            // External SF2 pianos run soft and need gain above unity; route through the boost node
+            // rather than AVAudioUnitSampler.volume, which is clamped to [0, 1] by Apple.
+            if trackIndex == kTrackLead1 {
+                let mult: Float = (program == 61001) ? 8.0 : 1.0   // Stereo Piano needs boost above unity
+                boostBaseMultiplier[kTrackLead1] = mult
+                boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
+                if mult != 1.0 {
+                    let v = boosts[kTrackLead1].outputVolume
+                    print("[Zudio] Lead1 boost set to \(mult) → readback: \(v)")
+                }
+            }
         }
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
         applyMuteState()
@@ -1061,7 +1101,7 @@ final class PlaybackEngine: ObservableObject {
 
     /// Returns the most recently CONFIRMED loaded program for a track (255 = never successfully loaded).
     /// Used by AppState to detect whether a style-specific instrument loaded correctly.
-    func loadedProgram(forTrack trackIndex: Int) -> UInt8 {
+    func loadedProgram(forTrack trackIndex: Int) -> Int {
         guard trackIndex < currentProgram.count else { return 255 }
         return currentProgram[trackIndex]
     }
@@ -1098,7 +1138,7 @@ final class PlaybackEngine: ObservableObject {
             // Sweep-active tracks get a 0.75 scale: the static midpoint cutoff lets through
             // more signal on average than the live LFO which spends half its cycle heavily attenuated.
             let sweepScale: Float = sweepEnabled[i] ? 0.75 : 1.0
-            let volume = (boostEffectEnabled[i] ? 1.7 : 1.0) * trackBaseVolume[i] * sweepScale
+            let volume = (boostEffectEnabled[i] ? 1.7 : 1.0) * boostBaseMultiplier[i] * trackBaseVolume[i] * sweepScale
 
             // Sweep midpoint: if sweep is active, compute the static midpoint of the LFO range
             // so the export approximates the time-averaged timbre (vs leaving it fully open).
@@ -1135,8 +1175,8 @@ final class PlaybackEngine: ObservableObject {
     /// Call before defaultsResetToken fires so all subsequent setEffect calls use Ambient values.
     func setAmbientMode(_ enabled: Bool) {
         ambientMode = enabled
+        cachedIsAmbientPiano = enabled && songState?.isAmbientPiano == true
         if !enabled {
-            // Restore HPF bypass for all tracks when leaving Ambient mode
             for i in 0..<lowEQs.count { lowEQs[i].bands[1].bypass = true }
             applyStaticPans()
             return
@@ -1162,12 +1202,26 @@ final class PlaybackEngine: ObservableObject {
             delays[i].feedback      = ambientDelayFeedback[i]
             delays[i].lowPassCutoff = ambientDelayLowpass[i]
         }
-        // Enable HPF (250 Hz) on Lead and Texture to prevent reverb low-end muddiness
+        // Ambient Piano: mediumHall reverb at 75% wet, no delay.
+        if songState?.isAmbientPiano == true {
+            reverbs[kTrackLead1].loadFactoryPreset(.mediumHall)
+            reverbPresets[kTrackLead1] = .mediumHall
+            reverbs[kTrackLead1].wetDryMix    = 75
+            delays[kTrackLead1].feedback      = 0
+            delays[kTrackLead1].lowPassCutoff = 2000
+            setEffect(.delay, enabled: false, forTrack: kTrackLead1)
+        }
+        // Enable HPF (250 Hz) on Lead and Texture to prevent reverb low-end muddiness.
         let hpfTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackTexture]
         for i in 0..<lowEQs.count {
             lowEQs[i].bands[1].bypass = !hpfTracks.contains(i)
         }
         applyStaticPans()
+        // AMB-PNO: center the piano — solo piano should not be panned.
+        if songState?.isAmbientPiano == true {
+            trackStaticPan[kTrackLead1] = 0.0
+            boosts[kTrackLead1].pan     = 0.0
+        }
     }
 
     /// Set Chill pads mode — enables per-note audio fade-in/fade-out on the Pads boost node.
@@ -1276,7 +1330,7 @@ final class PlaybackEngine: ObservableObject {
         switch effect {
         case .boost:
             boostEffectEnabled[trackIndex]  = enabled
-            boosts[trackIndex].outputVolume = enabled ? 1.7 : 1.0  // 1.7 ≈ +4.6 dB
+            boosts[trackIndex].outputVolume = boostBaseMultiplier[trackIndex] * (enabled ? 1.7 : 1.0)  // 1.7 ≈ +4.6 dB
         case .delay:
             if chillPadsMode && songState?.chillBluesVariation == true
                && (trackIndex == kTrackLead1 || trackIndex == kTrackLead2) {
@@ -1286,7 +1340,10 @@ final class PlaybackEngine: ObservableObject {
             }
             delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
-                delays[trackIndex].wetDryMix = enabled ? ambientDelayWet[trackIndex] : 0
+                let wet: Float = (trackIndex == kTrackLead1 && songState?.isAmbientPiano == true)
+                    ? 18   // piano with LH accompaniment needs subtler echo than standard ambient (40)
+                    : ambientDelayWet[trackIndex]
+                delays[trackIndex].wetDryMix = enabled ? wet : 0
             } else if chillPadsMode && trackIndex == kTrackLead1 {
                 delays[trackIndex].wetDryMix = enabled ? 30 : 0  // St. Germain echo: subtle shadow
             } else if motorikStyle && trackIndex == kTrackLead1 {
@@ -1326,10 +1383,11 @@ final class PlaybackEngine: ObservableObject {
                 : 50
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         case .space:
-            let wet: Float = ambientMode   && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
-                : chillPadsMode            && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
-                : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
-                : kosmicStyle              && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
+            let wet: Float = ambientMode && trackIndex == kTrackLead1 && songState?.isAmbientPiano == true ? 28
+                : ambientMode          && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
+                : chillPadsMode        && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
+                : motorikStyle         && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
+                : kosmicStyle          && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
                 : 70
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         }
@@ -2169,9 +2227,14 @@ private func loadGMPrograms() {
                 at: bankURL, program: program, bankMSB: bankMSB, bankLSB: 0
             )
             // Seed the cache so setProgram() skips redundant reloads of the startup defaults
-            currentProgram[i] = program
+            currentProgram[i] = Int(program)
             currentBankMSB[i] = bankMSB
         }
+    }
+
+
+    private func externalPianoURL(fileIndex: Int) -> URL? {
+        fileIndex == 1 ? Bundle.main.url(forResource: "SC55 Piano_V2", withExtension: "sf2") : nil
     }
 
     private func gmDLSSoundBankURL() -> URL {

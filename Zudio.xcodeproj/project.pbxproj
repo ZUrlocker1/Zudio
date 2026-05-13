@@ -79,6 +79,7 @@
 		AA000000000000000000069 /* Sources/Zudio/Resources/Textures in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Sources/Zudio/Resources/Textures */; };
 		AA00000000000000000006A /* AudioWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006A /* AudioWaveformView.swift */; };
 		AA00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 */; };
+		AA000000000000000000201 /* assets/SC55 Piano_V2.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000201 /* assets/SC55 Piano_V2.sf2 */; };
 		AA00000000000000000006D /* assets/images/zudio-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006D /* assets/images/zudio-logo.png */; };
 		AA00000000000000000007A /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007A /* MediaPlayer.framework */; };
 		AA00000000000000000007B /* NowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007B /* NowPlayingController.swift */; };
@@ -96,6 +97,7 @@
 		IF000000000000000000002 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB00000000000000000007A /* MediaPlayer.framework */; };
 		IR000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000100 /* Assets.xcassets */; };
 		IR000000000000000000002 /* assets/GeneralUser_GS_v1.471.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 */; };
+		IR000000000000000000007 /* assets/SC55 Piano_V2.sf2 in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000201 /* assets/SC55 Piano_V2.sf2 */; };
 		IR000000000000000000003 /* assets/images/zudio-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = BB00000000000000000006D /* assets/images/zudio-logo.png */; };
 		IR000000000000000000004 /* Sources/Zudio/Resources/Textures in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000069 /* Sources/Zudio/Resources/Textures */; };
 		IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
@@ -269,6 +271,7 @@
 		BB000000000000000000069 /* Sources/Zudio/Resources/Textures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Sources/Zudio/Resources/Textures; sourceTree = "<group>"; };
 		BB00000000000000000006A /* AudioWaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioWaveformView.swift; sourceTree = "<group>"; };
 		BB00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = assets/GeneralUser_GS_v1.471.sf2; sourceTree = "<group>"; };
+		BB000000000000000000201 /* assets/SC55 Piano_V2.sf2 */ = {isa = PBXFileReference; lastKnownFileType = file; path = "assets/SC55 Piano_V2.sf2"; sourceTree = "<group>"; };
 		BB00000000000000000006D /* assets/images/zudio-logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "assets/images/zudio-logo.png"; sourceTree = "<group>"; };
 		BB00000000000000000007A /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
 		BB00000000000000000007B /* NowPlayingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingController.swift; sourceTree = "<group>"; };
@@ -327,6 +330,7 @@
 				BB000000000000000000028 /* assets/images/zudio-icon.icns */,
 				BB000000000000000000029 /* assets/images/zudio-doc.icns */,
 				BB00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 */,
+				BB000000000000000000201 /* assets/SC55 Piano_V2.sf2 */,
 				BB00000000000000000006D /* assets/images/zudio-logo.png */,
 			);
 			name = "Recovered References";
@@ -655,6 +659,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA00000000000000000006C /* assets/GeneralUser_GS_v1.471.sf2 in Resources */,
+				AA000000000000000000201 /* assets/SC55 Piano_V2.sf2 in Resources */,
 				AA00000000000000000006D /* assets/images/zudio-logo.png in Resources */,
 				AA000000000000000000028 /* assets/images/zudio-icon.icns in Resources */,
 				AA000000000000000000029 /* assets/images/zudio-doc.icns in Resources */,
@@ -670,6 +675,7 @@
 			files = (
 				IR000000000000000000001 /* Assets.xcassets in Resources */,
 				IR000000000000000000002 /* assets/GeneralUser_GS_v1.471.sf2 in Resources */,
+				IR000000000000000000007 /* assets/SC55 Piano_V2.sf2 in Resources */,
 				IR000000000000000000003 /* assets/images/zudio-logo.png in Resources */,
 				IR000000000000000000004 /* Sources/Zudio/Resources/Textures in Resources */,
 				IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */,
@@ -1128,7 +1134,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 119;
 				DEVELOPMENT_TEAM = K66MA9TR8Z;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Sources/Zudio/iOS-Info.plist";
@@ -1143,7 +1149,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;
@@ -1158,7 +1164,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 118;
+				CURRENT_PROJECT_VERSION = 119;
 				DEVELOPMENT_TEAM = K66MA9TR8Z;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Sources/Zudio/iOS-Info.plist";
@@ -1173,7 +1179,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = ZudioiOS;
 				SDKROOT = iphoneos;

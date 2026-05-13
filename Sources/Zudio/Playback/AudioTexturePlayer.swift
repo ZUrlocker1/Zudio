@@ -154,7 +154,7 @@ final class AudioTexturePlayer {
         case "wind-stoorm.m4a":   return 0.20
         case "desert-winds.m4a":  return 0.10
         case "harbor.m4a":        return 0.22
-        case "vinyl_crackle.m4a": return 0.45
+        case "vinyl_crackle.m4a": return 0.38
         case "city_at_night.m4a": return 0.50
         case "bar_sounds.m4a":    return 0.25
         case "another-pub.m4a":   return 0.22

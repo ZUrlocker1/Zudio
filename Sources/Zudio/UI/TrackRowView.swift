@@ -62,7 +62,7 @@ struct TrackRowView: View {
 
     // MARK: - Instrument list — single source of truth is AppState pool definitions
 
-    private struct Instrument { let name: String; let program: UInt8 }
+    private struct Instrument { let name: String; let program: Int }
 
     private var instruments: [Instrument] {
         // Ambient texture with audio active: picker shows audio file names (pseudo-programs 231–236)
@@ -389,7 +389,7 @@ struct TrackRowView: View {
         let defaults: [TrackEffect]
         if activeStyle == .ambient {
             defaults = switch trackIndex {
-            case kTrackLead1:   [.delay, .space]
+            case kTrackLead1:   appState.songState?.isAmbientPiano == true ? [.space] : [.delay, .space]
             case kTrackLead2:   isInstrumentLocked ? [.delay, .space] : [.space]
             case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
@@ -439,6 +439,12 @@ struct TrackRowView: View {
         if activeStyle == .chill
            && appState.songState?.chillBluesVariation == true
            && (trackIndex == kTrackLead1 || trackIndex == kTrackLead2) {
+            activeEffects.remove(TrackEffect.delay.rawValue)
+        }
+        // Hard stop: AMB-PNO Lead 1 never shows delay — dry intimate piano signal.
+        if activeStyle == .ambient
+           && appState.songState?.isAmbientPiano == true
+           && trackIndex == kTrackLead1 {
             activeEffects.remove(TrackEffect.delay.rawValue)
         }
     }

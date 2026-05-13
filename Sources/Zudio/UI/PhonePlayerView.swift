@@ -666,7 +666,7 @@ struct PhonePlayerView: View {
                                 .padding(.top, 24)
                         } else {
                             ForEach(songs) { song in
-                                    Button {
+                                        Button {
                                     appState.loadFromPersistedSong(song)
                                     activeTab = .visuals
                                     hapticImpactLight.toggle()
@@ -857,7 +857,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.4")
+                    Text("Generative music · v1.5")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)

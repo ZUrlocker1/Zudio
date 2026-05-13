@@ -30,7 +30,8 @@ struct SongGenerator {
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
         useBrushKit:          Bool    = false,
-        forceBluesVariation:  Bool    = false
+        forceBluesVariation:  Bool    = false,
+        forceAmbientPianoRule: String? = nil
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
         return generate(seed: globalSeed, keyOverride: keyOverride, tempoOverride: tempoOverride,
@@ -41,7 +42,8 @@ struct SongGenerator {
                         forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
                         forceBridge: forceBridge,
                         useBrushKit: useBrushKit,
-                        forceBluesVariation: forceBluesVariation)
+                        forceBluesVariation: forceBluesVariation,
+                        forceAmbientPianoRule: forceAmbientPianoRule)
     }
 
     /// Deterministic generation from an explicit seed (for reproducible test runs).
@@ -60,7 +62,8 @@ struct SongGenerator {
         forcePercussionStyle: PercussionStyle? = nil,
         forceBridge:          Bool    = false,
         useBrushKit:          Bool    = false,
-        forceBluesVariation:  Bool    = false
+        forceBluesVariation:  Bool    = false,
+        forceAmbientPianoRule: String? = nil
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -84,7 +87,8 @@ struct SongGenerator {
                                    forcePadsRuleID: forcePadsRuleID, forceLeadRuleID: forceLeadRuleID,
                                    forceTexRuleID: forceTexRuleID, forcePercussionStyle: forcePercussionStyle,
                                    forceBridge: forceBridge,
-                                   useBrushKit: useBrushKit)
+                                   useBrushKit: useBrushKit,
+                                   forceAmbientPianoRule: forceAmbientPianoRule)
         case .chill:
             return generateChill(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                  moodOverride: moodOverride,
@@ -473,23 +477,42 @@ struct SongGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
-        forceBassRuleID:      String? = nil,
-        forceArpRuleID:       String? = nil,
-        forcePadsRuleID:      String? = nil,
-        forceLeadRuleID:      String? = nil,
-        forceTexRuleID:       String? = nil,
-        forcePercussionStyle: PercussionStyle? = nil,
-        forceBridge:          Bool    = false,
-        useBrushKit:          Bool    = false
+        forceBassRuleID:       String? = nil,
+        forceArpRuleID:        String? = nil,
+        forcePadsRuleID:       String? = nil,
+        forceLeadRuleID:       String? = nil,
+        forceTexRuleID:        String? = nil,
+        forcePercussionStyle:  PercussionStyle? = nil,
+        forceBridge:           Bool    = false,
+        useBrushKit:           Bool    = false,
+        forceAmbientPianoRule: String? = nil
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
+        // Ambient Piano sub-style — drawn before frame generator to keep all other songs seed-stable.
+        // pianoRuleRoll is consumed regardless so non-piano songs produce the same frame as before.
+        let pianoRoll     = rng.nextDouble()
+        let pianoRuleRoll = rng.nextDouble()
+        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.75
+        let pianoRule: String = {
+            if let f = forceAmbientPianoRule { return f }
+            return pianoRuleRoll < 0.30 ? "AMB-PNO-001" : (pianoRuleRoll < 0.75 ? "AMB-PNO-002" : "AMB-PNO-003")
+        }()
+
         // Step 1 — Ambient musical frame (tempo, key, mood, loop lengths, prog family)
-        let (frame, percStylePicked, ambientProgFamily, loopLengths) = AmbientMusicalFrameGenerator.generate(
+        let (rawFrame, percStylePicked, ambientProgFamily, loopLengths) = AmbientMusicalFrameGenerator.generate(
             rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
             moodOverride: moodOverride
         )
         let percussionStyle = forcePercussionStyle ?? percStylePicked
+
+        // Ambient Piano frame adjustments: clamp BPM 58-72, replace Mixolydian→Dorian for Dream/Deep.
+        var frame = rawFrame
+        if isAmbientPiano {
+            let t = Swift.max(58, Swift.min(72, frame.tempo))
+            if t != frame.tempo { frame = frame.withTempo(t) }
+            // Mixolydian is intentionally preserved — its floating b7 is ideal for ambient/dream character.
+        }
 
         // Step 2 — Ambient structure (intro/body/outro + chord plan)
         let structure = AmbientStructureGenerator.generate(
@@ -498,6 +521,57 @@ struct SongGenerator {
 
         // Step 3 — Tonal governance map (same builder as Motorik/Kosmic)
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
+
+        // Ambient Piano early-return — bypasses all loop-based generation and post-processing.
+        // Only Lead 1 (piano) and optional Pads are generated; all other tracks stay empty.
+        if isAmbientPiano {
+            var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
+            var lead1RNG    = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackLead1))
+            var padsRNG     = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackPads))
+
+            var lead1Rules: Set<String> = []
+            trackEvents[kTrackLead1] = AmbientLeadGenerator.generateAmbientPianoLead(
+                pianoRule: pianoRule, frame: frame, totalBars: frame.totalBars,
+                rng: &lead1RNG, usedRuleIDs: &lead1Rules)
+
+            var padRules: Set<String> = []
+            if padsRNG.nextDouble() < 0.50 {
+                trackEvents[kTrackPads] = AmbientPadsGenerator.generateAmbientPianoPads(
+                    pianoRule: pianoRule, frame: frame, tonalMap: tonalMap,
+                    totalBars: frame.totalBars, rng: &padsRNG, usedRuleIDs: &padRules)
+            }
+
+            let title = AmbientTitleGenerator.generate(rng: &rng)
+            let log   = buildAmbientLog(
+                title: title, frame: frame, structure: structure, loopLengths: loopLengths,
+                percussionStyle: percussionStyle, ambientProgFamily: ambientProgFamily,
+                drumRules: [], bassRules: [], padRules: padRules,
+                lead1Rules: lead1Rules, lead2Rules: [], rhythmRules: [], texRules: [],
+                isAmbientPiano: true, ambientPianoRule: pianoRule)
+            let stepAnnotations = buildStepAnnotations(
+                structure: structure, trackEvents: trackEvents,
+                frame: frame, isAmbient: true, includeDrumFills: false)
+            var forced: [String: String] = [:]
+            if let r = forceAmbientPianoRule { forced["Piano"] = r }
+            return SongState(
+                frame: frame, structure: structure, tonalMap: tonalMap,
+                trackEvents: trackEvents, globalSeed: seed, trackOverrides: [:],
+                title: title, form: .singleA, style: .ambient,
+                percussionStyle: percussionStyle, kosmicProgFamily: .static_drone,
+                generationLog: log, stepAnnotations: stepAnnotations,
+                ambientProgFamily: ambientProgFamily, ambientLoopLengths: loopLengths,
+                ambientXFilesBlockRange: nil,
+                ambientUseBrushKit: useBrushKit,
+                isAmbientPiano: true,
+                ambientPianoRule: pianoRule,
+                ambientAudioTexture: nil,
+                ambientAudioTextureOffset: 0,
+                forcedRules: forced,
+                keyOverride: keyOverride,
+                tempoOverride: tempoOverride,
+                moodOverride: moodOverride
+            )
+        }
 
         // Steps 4–9 — Per-track loops then tile to full song length
         var trackEvents = [[MIDIEvent]](repeating: [], count: kTrackCount)
@@ -953,7 +1027,8 @@ struct SongGenerator {
         var events: [MIDIEvent]
         let isKosmic  = songState.style == .kosmic
         let isAmbient = songState.style == .ambient
-        let isChill   = songState.style == .chill
+        let isChill    = songState.style == .chill
+        let isAmbPiano = isAmbient && songState.isAmbientPiano
         let ambLoopLengths = songState.ambientLoopLengths
         // For Ambient texture regen: may switch between audio and MIDI texture.
         var regenAmbientAudioTexture: String? = songState.ambientAudioTexture
@@ -961,7 +1036,9 @@ struct SongGenerator {
         var ambientAudioTextureChanged = false
         switch trackIndex {
         case kTrackDrums:
-            if isAmbient {
+            if isAmbPiano {
+                return songState
+            } else if isAmbient {
                 let regenPercStyle = AmbientMusicalFrameGenerator.pickPercussionStyle(rng: &rng)
                 events = AmbientDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -990,7 +1067,9 @@ struct SongGenerator {
                 events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed)[kTrackDrums]
             }
         case kTrackBass:
-            if isAmbient {
+            if isAmbPiano {
+                return songState
+            } else if isAmbient {
                 events = AmbientBassGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
                     rng: &rng, loopBars: songState.ambientLoopLengths?.bass ?? 11,
@@ -1018,7 +1097,12 @@ struct SongGenerator {
                 events = scratch[kTrackBass]
             }
         case kTrackPads:
-            if isAmbient {
+            if isAmbPiano {
+                events = AmbientPadsGenerator.generateAmbientPianoPads(
+                    pianoRule: songState.ambientPianoRule,
+                    frame: songState.frame, tonalMap: songState.tonalMap,
+                    totalBars: songState.frame.totalBars, rng: &rng, usedRuleIDs: &usedRules)
+            } else if isAmbient {
                 let loopBars = ambLoopLengths?.pads ?? 8
                 let loop = AmbientPadsGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
@@ -1039,7 +1123,12 @@ struct SongGenerator {
                 events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackLead1:
-            if isAmbient {
+            if isAmbPiano {
+                events = AmbientLeadGenerator.generateAmbientPianoLead(
+                    pianoRule: songState.ambientPianoRule,
+                    frame: songState.frame, totalBars: songState.frame.totalBars,
+                    rng: &rng, usedRuleIDs: &usedRules)
+            } else if isAmbient {
                 let loopBars = ambLoopLengths?.lead1 ?? 11
                 var regenRules: Set<String> = []
                 let loop = AmbientLeadGenerator.generateLead1(
@@ -1069,7 +1158,9 @@ struct SongGenerator {
                 (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars)
             }
         case kTrackLead2:
-            if isAmbient {
+            if isAmbPiano {
+                return songState
+            } else if isAmbient {
                 let loopBars = ambLoopLengths?.lead2 ?? 13
                 let lead1Loop = Array(songState.trackEvents[kTrackLead1].filter { $0.stepIndex < loopBars * 16 })
                 let loop = AmbientLeadGenerator.generateLead2(
@@ -1108,7 +1199,9 @@ struct SongGenerator {
                 events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackRhythm:
-            if isAmbient {
+            if isAmbPiano {
+                return songState
+            } else if isAmbient {
                 let loopBars = ambLoopLengths?.rhythm ?? 5
                 let loop = AmbientRhythmGenerator.generate(
                     frame: songState.frame, tonalMap: songState.tonalMap,
@@ -1130,7 +1223,9 @@ struct SongGenerator {
                 events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
             }
         case kTrackTexture:
-            if isAmbient {
+            if isAmbPiano {
+                return songState
+            } else if isAmbient {
                 let loopBars = ambLoopLengths?.texture ?? 7
                 let ambientFiles = Self.ambientAudioFilePool
                 ambientAudioTextureChanged = true
@@ -1763,12 +1858,14 @@ struct SongGenerator {
         forceBassRuleID: String? = nil,
         forceArpRuleID: String? = nil,
         forceLeadRuleID: String? = nil,
-        forcePercussionStyle: PercussionStyle? = nil
+        forcePercussionStyle: PercussionStyle? = nil,
+        isAmbientPiano: Bool = false,
+        ambientPianoRule: String = ""
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
-        log.append(GenerationLogEntry(tag: "Style", description: "Ambient"))
+        log.append(GenerationLogEntry(tag: "Style", description: isAmbientPiano ? "Ambient Piano" : "Ambient"))
 
         // Song form / structure shape
         let hasIntro = structure.introSection != nil
@@ -1788,9 +1885,11 @@ struct SongGenerator {
         let progLabel = ambientProgressionFamilyLabel(ambientProgFamily)
         log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progLabel)"))
 
-        // Loop lengths (shows phase-shift structure)
-        let loopDesc = "pd \(loopLengths.pads) l1 \(loopLengths.lead1) l2 \(loopLengths.lead2) ry \(loopLengths.rhythm) tx \(loopLengths.texture) bs \(loopLengths.bass)"
-        log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
+        // Loop lengths — omitted for Ambient Piano (full-song events, no tiler)
+        if !isAmbientPiano {
+            let loopDesc = "pd \(loopLengths.pads) l1 \(loopLengths.lead1) l2 \(loopLengths.lead2) ry \(loopLengths.rhythm) tx \(loopLengths.texture) bs \(loopLengths.bass)"
+            log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
+        }
 
         for ruleID in padRules.sorted() {
             log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
@@ -1821,6 +1920,14 @@ struct SongGenerator {
 
     private static func ambientRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
+        // Ambient Piano — Lead
+        case "AMB-PNO-001":  return "Floating Tones"
+        case "AMB-PNO-002":  return "Pensive Melody"
+        case "AMB-PNO-003":  return "Dramatic Arc"
+        // Ambient Piano — Pads
+        case "AMB-PADS-007": return "Sparse drone"
+        case "AMB-PADS-008": return "Staggered strings"
+        case "AMB-PADS-009": return "Warm sustain"
         // Pads
         case "AMB-PADS-001":    return "Sustained chord layer"
         case "AMB-PADS-002":    return "Slow cascade"
@@ -2752,7 +2859,7 @@ struct SongGenerator {
             chillTextureFiles.removeAll { $0 == "city_at_night.m4a" }
         }
         // forceTexRuleID "forced" guarantees a texture is selected (used by best-first-song).
-        let chillAudioTexture: String? = (forceTexRuleID == "forced" || rng.nextDouble() < 0.60)
+        let chillAudioTexture: String? = (forceTexRuleID == "forced" || rng.nextDouble() < 0.55)
             ? chillTextureFiles[rng.weightedPick(Array(repeating: 1.0 / Double(chillTextureFiles.count),
                                                        count: chillTextureFiles.count))]
             : nil
@@ -3004,7 +3111,7 @@ struct SongGenerator {
         case "CHL-BASS-009": return "Blues pickup riff"
         case "CHL-BASS-010": return "Blues quarter pulse"
         case "CHL-BASS-011": return "Blues ascending riff"
-        case "CHL-BASS-012": return "Blues turnaround root hold (bar 16)"
+        case "CHL-BASS-012": return "Rumba bass"
         case "CHL-PAD-001":  return "Chord sustain"
         case "CHL-PAD-002":  return "Staggered entry"
         case "CHL-PAD-003":  return "Moby anchor"

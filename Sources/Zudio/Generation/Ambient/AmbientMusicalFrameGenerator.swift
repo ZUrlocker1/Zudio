@@ -61,8 +61,10 @@ struct AmbientMusicalFrameGenerator {
     }
 
     private static func pickMode(rng: inout SeededRNG) -> Mode {
-        let modes:   [Mode]   = [.Dorian, .Aeolian, .Mixolydian, .Ionian, .MinorPentatonic]
-        let weights: [Double] = [0.35,    0.30,     0.15,        0.10,    0.10]
+        // Weighted toward Mixolydian/Ionian/MajorPentatonic per Köln Concert analysis.
+        // MajorPentatonic raised: pure brightness, no tension, 77% of Jarrett's Köln notes.
+        let modes:   [Mode]   = [.Mixolydian, .Dorian, .Ionian, .MajorPentatonic, .Aeolian, .MinorPentatonic]
+        let weights: [Double] = [0.28,        0.22,    0.18,    0.20,             0.08,     0.04]
         return modes[rng.weightedPick(weights)]
     }
 

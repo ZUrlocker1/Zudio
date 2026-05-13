@@ -376,7 +376,7 @@ final class AppState: ObservableObject {
     private var evolveNextSongShouldLog:   Bool        = false  // set at 12-bar mark; tells preGen to log when ready
     private var evolveNextSongLogged:      Bool        = false  // prevents duplicate "Up next" at transition
     private var evolveInstrumentsChanged:  Bool        = false  // true if both evolve passes ran before song end
-    private var lead2MirroredProgram: UInt8?            = nil    // non-nil = Lead 2 plays Lead 1's program
+    private var lead2MirroredProgram: Int?               = nil    // non-nil = Lead 2 plays Lead 1's program
     // Incremented on each evolve phase switch so the scrollbar recreates itself even when
     // totalBars hasn't changed (e.g. preGeneratePassContent(pass: 2) already extended songState).
     @Published var evolvePhaseToken: Int = 0
@@ -480,7 +480,7 @@ final class AppState: ObservableObject {
     // All instruments remain equally available — this only prevents back-to-back repeats.
     private static let noRepeatInstruments: [(track: Int, style: MusicStyle, poolIndex: Int)] = [
         (kTrackLead1,  .ambient, 1),  // Ocarina          patch 79
-        (kTrackLead1,  .ambient, 5),  // Grand Piano      patch 0
+        (kTrackLead1,  .ambient, 1),  // Stereo Piano     patch 61001
         (kTrackLead2,  .kosmic,  2),  // Charang          patch 84
         (kTrackLead2,  .kosmic,  3),  // Vox Solo         patch 85
         (kTrackBass,   .kosmic,  2),  // Lead Bass        patch 87
@@ -501,22 +501,23 @@ final class AppState: ObservableObject {
     static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet"]
-        case (kTrackLead1,   .ambient): return ["Flute","Ocarina","Whistle","Brightness","Calliope Lead","Grand Piano","Harp"]
+        case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
-        case (kTrackLead1,   .motorik): return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead","FM Lead"]
+        case (kTrackLead1,   .motorik): return ["Mono Synth","Soft Brass","Polysynth","Chiff Lead","FM Lead","Saw Lead 3"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Xylophone"]
         case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal"]
+        case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar","Night Vision"]
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","New Age Pad"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Clavinet","Perc Organ","Rock Organ"]
-        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Tubular Bells","Celesta","Crystal","Rain"]
-        case (kTrackRhythm,  .kosmic):   return ["Moog Lead","Wurlitzer","Rock Organ"]
-        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
+        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Tubular Bells","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells"]
+        case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ"]
+        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Synth Bass 3","Fuzz Guitar"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
@@ -524,11 +525,13 @@ final class AppState: ObservableObject {
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
-        case (kTrackBass,    .kosmic):  return ["Moog Bass","Lead Bass","Mono Synth","Rock Bass"]
+        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3"]
+        case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
-        case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Standard Kit"]
+        case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
-        case (kTrackDrums,   .kosmic):  return ["Brush Kit","808 Kit","Machine Kit","Standard Kit"]
+        case (kTrackDrums,   .kosmic):  return ["808 Kit","Machine Kit","Standard Kit"]
+        case (kTrackDrums,   .motorik): return ["Rock Kit","Brush Kit","Dance Drums"]
         case (kTrackDrums,   _):        return ["Rock Kit","808 Kit","Brush Kit"]
         default:                        return []
         }
@@ -536,24 +539,26 @@ final class AppState: ObservableObject {
 
     /// MIDI program numbers for each slot in instrumentPoolNames — same order, same count.
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
-    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [UInt8] {
+    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [Int] {
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
-        case (kTrackLead1, .ambient):  return [73, 79, 78, 100, 82, 0, 46]
+        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74]
-        case (kTrackLead1, .motorik):  return [81, 62, 90, 83, 63]
+        case (kTrackLead1, .motorik):  return [81, 62, 90, 83, 63, 13081]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 13]
         case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
         case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98]
+        case (kTrackLead2, .motorik):  return [90, 100, 39, 30, 13088]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 88]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91]
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
-        case (kTrackRhythm, .ambient): return [9, 14, 8, 98, 96]
+        case (kTrackRhythm, .ambient): return [9, 14, 8, 98, 96, 112, 5124, 8014]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 7, 16, 18]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18]
+        case (kTrackRhythm, .motorik): return [28, 8038, 29]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
@@ -561,11 +566,13 @@ final class AppState: ObservableObject {
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
-        case (kTrackBass, .kosmic):    return [39, 87, 81, 34]
+        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038]
+        case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
-        case (kTrackDrums, .chill):    return [40, 25, 0]
+        case (kTrackDrums, .chill):    return [40, 25, 32]
         case (kTrackDrums, .ambient):  return [0, 40]
-        case (kTrackDrums, .kosmic):   return [40, 25, 24, 0]
+        case (kTrackDrums, .kosmic):   return [25, 24, 0]
+        case (kTrackDrums, .motorik):  return [8, 40, 26]
         case (kTrackDrums, _):         return [8, 25, 40]
         default: return []
         }
@@ -1153,6 +1160,7 @@ final class AppState: ObservableObject {
                 self.stylesWithGeneratedSongs.insert(style)
 
                 self.appendGenerationLog(state.generationLog)
+                self.applyAmbientPianoInstrument(for: state)
                 self.restoreLead2Mirror()
                 self.applyLead2Mirror(for: state)
                 // Reset mute/solo so every new song starts with all parts audible
@@ -1500,6 +1508,16 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Forces Lead 1 to Stereo Piano (pool index 0) for Ambient Piano songs.
+    /// Called after randomizeTwoInstruments so randomisation cannot overwrite it.
+    /// User can still change it manually after the song loads.
+    private func applyAmbientPianoInstrument(for state: SongState) {
+        guard state.isAmbientPiano else { return }
+        // Ambient Lead 1 pool: ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp"]
+        // Stereo Piano is at index 0 (encoded program 61001).
+        instrumentOverrides[kTrackLead1] = 0
+    }
+
     // When Ambient Lead 1 uses a sparse/melodic rule, mirror Lead 2's program to match
     // Lead 1 so both leads share the same timbre.
     // Stored as a raw MIDI program number so it survives pool-index lookup differences.
@@ -1629,6 +1647,7 @@ final class AppState: ObservableObject {
             self.replaceOnceOnlyInstruments(style: state.style)
             self.sanitiseBluesInstruments(for: state)
             self.applyBluesPadsInstrument(for: state)
+            self.applyAmbientPianoInstrument(for: state)
             self.restoreLead2Mirror()
             self.applyLead2Mirror(for: state)
             self.finishLoadingSong(state, thenPlay: true)
@@ -2143,6 +2162,7 @@ final class AppState: ObservableObject {
         replaceOnceOnlyInstruments(style: state.style)
         sanitiseBluesInstruments(for: state)
         applyBluesPadsInstrument(for: state)
+        applyAmbientPianoInstrument(for: state)
         restoreLead2Mirror()
         applyLead2Mirror(for: state)
         finishLoadingSong(state, thenPlay: true)
@@ -2439,7 +2459,7 @@ final class AppState: ObservableObject {
                     let parts = token.components(separatedBy: ":")
                     guard parts.count == 2,
                           let trackIdx = instrumentShortNames[parts[0]],
-                          let prog = UInt8(parts[1]) else { continue }
+                          let prog = Int(parts[1]) else { continue }
                     let pool = Self.instrumentPoolPrograms(trackIndex: trackIdx, style: style)
                     if let poolIdx = pool.firstIndex(of: prog) {
                         loadedInstrumentOverrides[trackIdx] = poolIdx
@@ -2671,7 +2691,7 @@ final class AppState: ObservableObject {
 
     // MARK: - Instrument
 
-    func setProgram(_ program: UInt8, forTrack trackIndex: Int) {
+    func setProgram(_ program: Int, forTrack trackIndex: Int) {
         // If Lead 1 changes while the mirror is active, keep Lead 2 in sync.
         if trackIndex == kTrackLead1, lead2MirroredProgram != nil {
             lead2MirroredProgram = program
@@ -2711,7 +2731,7 @@ final class AppState: ObservableObject {
     }
 
     /// Maps a Chill texture pseudo-program (240–250) to an M4A filename.
-    static func chillTextureFilename(forProgram program: UInt8) -> String? {
+    static func chillTextureFilename(forProgram program: Int) -> String? {
         switch program {
         case 240: return nil
         case 241: return "another_bar.m4a"
@@ -2752,7 +2772,7 @@ final class AppState: ObservableObject {
     }
 
     /// Maps an Ambient audio texture pseudo-program (231–236) to an M4A filename.
-    static func ambientAudioFilename(forProgram program: UInt8) -> String? {
+    static func ambientAudioFilename(forProgram program: Int) -> String? {
         switch program {
         case 231: return "light_rain.m4a"
         case 232: return "rain-and-thunder.m4a"
@@ -2813,7 +2833,7 @@ final class AppState: ObservableObject {
     // MARK: - Phone player gesture helpers
 
     /// Returns the current MIDI program number for a track, using instrumentOverrides if set.
-    func currentInstrument(forTrack trackIndex: Int) -> UInt8 {
+    func currentInstrument(forTrack trackIndex: Int) -> Int {
         let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
         guard !programs.isEmpty else { return 0 }
         let idx = instrumentOverrides[trackIndex] ?? 0
@@ -2843,7 +2863,7 @@ final class AppState: ObservableObject {
     }
 
     /// Sets a specific program on a track and records the override index.
-    func setInstrument(_ program: UInt8, forTrack trackIndex: Int) {
+    func setInstrument(_ program: Int, forTrack trackIndex: Int) {
         let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
         if let idx = programs.firstIndex(of: program) {
             instrumentOverrides[trackIndex] = idx
@@ -2883,7 +2903,7 @@ final class AppState: ObservableObject {
         switch selectedStyle {
         case .ambient:
             defaults = switch trackIndex {
-            case kTrackLead1:   [.delay, .space]
+            case kTrackLead1:   songState?.isAmbientPiano == true ? [.space] : [.delay, .space]
             case kTrackLead2:   [.space]
             case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
@@ -2965,6 +2985,7 @@ final class AppState: ObservableObject {
             }
         }
         songInstrumentOverrides = instrumentOverrides
+        applyAmbientPianoInstrument(for: state)
         restoreLead2Mirror()
         applyLead2Mirror(for: state)
         muteState = Array(repeating: false, count: kTrackCount)
@@ -3036,6 +3057,7 @@ final class AppState: ObservableObject {
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
                 }
                 self.songInstrumentOverrides = self.instrumentOverrides
+                self.applyAmbientPianoInstrument(for: state)
                 self.restoreLead2Mirror()
                 self.applyLead2Mirror(for: state)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
@@ -3079,7 +3101,7 @@ final class AppState: ObservableObject {
         // loadedProgram() returns 255 on iOS after cache invalidation. Restore the default
         // so OfflineExport doesn't try to load a non-existent GM patch 255.
         if programs[kTrackLeadSynth] == 255 {
-            programs[kTrackLeadSynth] = kDefaultGMPrograms[kTrackLeadSynth] ?? 90
+            programs[kTrackLeadSynth] = Int(kDefaultGMPrograms[kTrackLeadSynth] ?? 90)
         }
         // If instruments haven't loaded yet (program 255 = never loaded), don't attempt export.
         // This can happen when an old saved song is loaded and the user taps Export immediately.

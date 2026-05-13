@@ -20,8 +20,7 @@ struct ChillBassGenerator {
     ) -> [MIDIEvent] {
         // Blues Chill uses dedicated blues bass pool (overrides beat-style routing)
         if bluesVariation {
-            return bluesBass(frame: frame, structure: structure, breakdownStyle: breakdownStyle,
-                             rng: &rng, usedRuleIDs: &usedRuleIDs)
+            return bluesBass(frame: frame, structure: structure, rng: &rng, usedRuleIDs: &usedRuleIDs)
         }
 
         // St Germain beat style always uses the 8th-note ostinato (CHL-BASS-007)
@@ -711,21 +710,22 @@ struct ChillBassGenerator {
         return events
     }
 
-    // MARK: - Blues bass dispatcher (CHL-BASS-009 / CHL-BASS-010 / CHL-BASS-011)
+    // MARK: - Blues bass dispatcher (CHL-BASS-009 / CHL-BASS-010 / CHL-BASS-011 / CHL-BASS-012)
 
     /// Selects one blues bass pattern for the whole song, then applies it per bar.
-    /// Pool: CHL-BASS-009 (30%), CHL-BASS-011 (25%), CHL-BASS-001 (20%), CHL-BASS-003 (15%), CHL-BASS-010 (10%).
+    /// Pool: CHL-BASS-012 (20%), CHL-BASS-009 (22%), CHL-BASS-011 (22%), CHL-BASS-001 (14%), CHL-BASS-003 (12%), CHL-BASS-010 (10%).
     private static func bluesBass(frame: GlobalMusicalFrame, structure: SongStructure,
-                                   breakdownStyle: ChillBreakdownStyle,
                                    rng: inout SeededRNG,
                                    usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
         let roll = rng.nextDouble()
-        let usePickup    = roll < 0.30
-        let useAscending = roll < 0.55
-        let useWalking   = roll < 0.70
+        let useRumba     = roll < 0.20
+        let usePickup    = roll >= 0.20 && roll < 0.42
+        let useAscending = roll >= 0.42 && roll < 0.64
+        let useWalking   = roll >= 0.64 && roll < 0.78
         let usePulse     = roll >= 0.90
 
-        if usePickup         { usedRuleIDs.insert("CHL-BASS-009") }
+        if useRumba          { usedRuleIDs.insert("CHL-BASS-012") }
+        else if usePickup    { usedRuleIDs.insert("CHL-BASS-009") }
         else if useAscending { usedRuleIDs.insert("CHL-BASS-011") }
         else if useWalking   { usedRuleIDs.insert("CHL-BASS-001") }
         else if usePulse     { usedRuleIDs.insert("CHL-BASS-010") }
@@ -750,8 +750,13 @@ struct ChillBassGenerator {
         let echoRoll      = rng.nextDouble()
         let echoStyle     = echoRoll < 0.65 ? 0 : (echoRoll < 0.85 ? 1 : 2)  // 0=echo, 1=silence, 2=ghost
 
+        // CHL-BASS-012 rumba variant parameters — chosen once for the whole song.
+        let rumbaIsTight     = rng.nextDouble() < 0.20   // 4-attack: omit step 14 (tight pocket)
+        let rumbaBlues7th    = rng.nextDouble() < 0.50   // enable per-bar 20% b7 sub at step 12
+        let rumbaOctaveReset = rng.nextDouble() < 0.30   // step 14 = nextRoot−12 on chord-change bars
+
         var events: [MIDIEvent] = []
-        // CHL-BASS-012: bar 16 of each 16-bar blues cycle — plain root hold.
+        // Turnaround bar: bar 16 of each 16-bar blues cycle — plain root hold (non-rumba rules).
         // A and B sections each have their own form clock so turnarounds fire in both.
         let bSectionStart = structure.sections.first { $0.label == .B }?.startBar ?? -1
         let aSectionStart = structure.sections.first { $0.label == .A }?.startBar ?? bSectionStart
@@ -795,49 +800,38 @@ struct ChillBassGenerator {
                                             velocity: UInt8(78 + rng.nextInt(upperBound: 10)), durationSteps: 14))
                 }
 
-            case .intro:
-                // Blues intro: full groove bass from bar 1 — establishes the pocket immediately.
-                // Bar 0 is already silenced by the coldStart guard above.
-                if usePickup {
-                    events += bluesPickup(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
-                                          pickupIsB3: pickupIsB3, step12Interval: step12Interval, echoStyle: echoStyle)
-                } else if useAscending {
-                    events += bluesAscendingRiff(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
-                                                 rhythmTemplate: riffRhythmTemplate,
-                                                 ascendingOpener: riffAscendingOpener,
-                                                 tailInterval: riffTailInterval,
-                                                 bSection: false)
-                } else if useWalking {
-                    events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
-                } else if usePulse {
-                    events += quarterPulse(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
-                } else {
-                    events += walkingLine(bar: bar, chordRoot: chordRoot, scale: scale, rng: &rng)
-                }
-
             default:
-                // CHL-BASS-012: bar 16 of each 16-bar blues cycle — plain root hold.
-                // Matches the turnaround crash in the drum track; the bare note lets the
-                // crash and drum fill breathe without competing bass movement.
+                // Turnaround bar: bar 16 of each 16-bar blues cycle.
                 // Each section uses its own form clock so turnarounds align in both A and B sections.
                 let posInForm     = (label == .B) ? (bar - bSectionStart) : (bar - aSectionStart)
                 let isTurnaroundBar = (label == .A || label == .B) && posInForm >= 15 && (posInForm + 1) % 16 == 0
-                // Pickup riff plays its normal groove through turnarounds and IV/V bars (transposed).
-                if isTurnaroundBar && !usePickup {
-                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
-                                            velocity: 88, durationSteps: 14))
+                // Turnaround bar: rumba and pickup — root on beat 1, beats 2–3 rest,
+                // P5+b7 on beat 4 as announcement pickup into the new form's bar 1.
+                // All other rules: plain root hold.
+                if isTurnaroundBar {
+                    let tRoot = UInt8(clampBass(chordRoot))
+                    if useRumba || usePickup {
+                        let tP5 = UInt8(clampBass(chordRoot + 7))
+                        let tB7 = UInt8(clampBass(chordRoot + 10))
+                        events.append(MIDIEvent(stepIndex: base,      note: tRoot, velocity: 88, durationSteps: 4))
+                        // beats 2–3 (steps 4–11): rest
+                        events.append(MIDIEvent(stepIndex: base + 12, note: tP5,  velocity: 76, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 14, note: tB7,  velocity: 72, durationSteps: 2))
+                    } else {
+                        events.append(MIDIEvent(stepIndex: base, note: tRoot, velocity: 88, durationSteps: 14))
+                    }
                     break
                 }
 
                 // IV and V chords: simplified pattern chosen once per song (ivvIsHold / ivvIsApproach / two-feel).
-                // Pickup songs bypass this — the riff handles all chord contexts itself.
+                // Pickup and rumba bypass this — both handle all chord contexts in their own riff.
                 let isIV = chord?.chordRoot == "4" && chord?.chordType == .min7
                 let isV  = chord?.chordType == .dom7  // dom7 only appears on V in the blues cycle
 
                 // True for the first full 16-bar blues form in B section — enables B-form variants.
                 let isFirstBForm = label == .B && posInForm < 32
 
-                if (isIV || isV) && !usePickup {
+                if (isIV || isV) && !usePickup && !useRumba {
                     let root = clampBass(chordRoot)
                     if ivvIsHold {
                         // Root hold: single sustained note spotlights the chord change.
@@ -868,6 +862,18 @@ struct ChillBassGenerator {
                                                  bSection: isFirstBForm,
                                                  echoAsFifth: isFirstBForm,
                                                  forceTemplateB: isFirstBForm)
+                } else if useRumba {
+                    let isInBSection   = (label == .B)
+                    let isChanging     = isBeforeChordChange(bar: bar, structure: structure)
+                    let beforeChange   = isInBSection && isChanging
+                    let doOctaveReset  = rumbaOctaveReset && isChanging && !isInBSection
+                    let nextRoot       = nextChordRootNote(bar: bar, frame: frame, structure: structure)
+                    events += rumbaBassCell(base: base, chordRoot: chordRoot, rng: &rng,
+                                            isTight: rumbaIsTight,
+                                            blues7th: rumbaBlues7th,
+                                            isBeforeChange: beforeChange,
+                                            doOctaveReset: doOctaveReset,
+                                            nextChordRoot: nextRoot)
                 } else if useWalking {
                     events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
                                                  firstBForm: isFirstBForm)
@@ -1016,6 +1022,58 @@ struct ChillBassGenerator {
                                     note: UInt8(notes[i]),
                                     velocity: UInt8(vels[i] + rng.nextInt(upperBound: 10)),
                                     durationSteps: durations[i]))
+        }
+        return result
+    }
+
+    // MARK: - CHL-BASS-012: Rumba Bass
+
+    /// CHL-BASS-012: Five-attack rumba cell (root / m3 / P5 / M6 / tail) derived from the
+    /// Beatles "Ballad of John and Yoko" bass part — a laid-back jazz-blues pocket feel.
+    /// Steps: 0 (root, Q), 6 (m3, offbeat Q), 10 (P5, 8th), 12 (M6, 8th), 14 (tail, 8th).
+    /// m3 (+3 semitones) sits in Dorian and keeps the minor tonality of the surrounding arrangement.
+    /// Song-level variants (chosen once, passed from bluesBass):
+    ///   isTight       — 4-attack: omit step 14 (20% of songs)
+    ///   blues7th      — enables 20%-per-bar substitution of M6 → b7 at step 12
+    ///   isBeforeChange — B-section chord-change bars: step 14 = chromatic half-step approach
+    ///   doOctaveReset — non-B chord-change bars: step 14 = nextRoot−12 (octave drop)
+    /// Turnaround bar (bar 16): handled by the dispatcher as a plain root hold, same as other rules.
+    private static func rumbaBassCell(base: Int, chordRoot: Int,
+                                       rng: inout SeededRNG,
+                                       isTight: Bool,
+                                       blues7th: Bool,
+                                       isBeforeChange: Bool,
+                                       doOctaveReset: Bool,
+                                       nextChordRoot: Int) -> [MIDIEvent] {
+        var result: [MIDIEvent] = []
+        let root   = clampBass(chordRoot)
+        let minor3 = clampBass(chordRoot + 3)   // m3 — in scale for Dorian; matches minor tonality
+        let fifth  = clampBass(chordRoot + 7)
+        let m6     = clampBass(chordRoot + 9)
+        let b7     = clampBass(chordRoot + 10)
+        let step12Note = (blues7th && rng.nextDouble() < 0.20) ? b7 : m6
+
+        let vel1 = UInt8(85 + rng.nextInt(upperBound: 8))
+        let vel2 = UInt8(80 + rng.nextInt(upperBound: 8))
+        let vel3 = UInt8(77 + rng.nextInt(upperBound: 8))
+        let vel4 = UInt8(74 + rng.nextInt(upperBound: 8))
+        let vel5 = UInt8(71 + rng.nextInt(upperBound: 8))
+
+        result.append(MIDIEvent(stepIndex: base,      note: UInt8(root),       velocity: vel1, durationSteps: 4))
+        result.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(minor3),     velocity: vel2, durationSteps: 4))
+        result.append(MIDIEvent(stepIndex: base + 10, note: UInt8(fifth),      velocity: vel3, durationSteps: 2))
+        result.append(MIDIEvent(stepIndex: base + 12, note: UInt8(step12Note), velocity: vel4, durationSteps: 2))
+
+        if !isTight {
+            let tail: Int
+            if isBeforeChange {
+                tail = clampBass(nextChordRoot - 1)   // chromatic half-step approach (B section)
+            } else if doOctaveReset {
+                tail = clampBass(nextChordRoot - 12)  // octave drop into next chord root
+            } else {
+                tail = fifth                          // standard: P5
+            }
+            result.append(MIDIEvent(stepIndex: base + 14, note: UInt8(tail), velocity: vel5, durationSteps: 2))
         }
         return result
     }

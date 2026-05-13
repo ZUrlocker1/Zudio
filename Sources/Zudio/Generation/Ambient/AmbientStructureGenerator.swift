@@ -113,9 +113,10 @@ struct AmbientStructureGenerator {
     /// Minor modes: min7 (all four notes in Dorian/Aeolian scale).
     private static func hazeType(for mode: Mode) -> ChordType {
         switch mode {
-        case .Mixolydian: return .dom7
-        case .Ionian:     return .add9
-        default:          return .min7
+        case .Mixolydian:      return .dom7
+        case .Ionian,
+             .MajorPentatonic: return .add9
+        default:               return .min7
         }
     }
 
@@ -124,6 +125,7 @@ struct AmbientStructureGenerator {
     private static func secondChord(for mode: Mode) -> (String, ChordType) {
         switch mode {
         case .Ionian:          return ("4", .major)   // IV — C E G fully in G Ionian
+        case .MajorPentatonic: return ("5", .sus2)    // Vsus2 — D A E fully in G MajorPentatonic
         case .MinorPentatonic: return ("b3", .major)  // bIII — C E G fully in A MinorPentatonic
         default:               return ("b7", .major)  // bVII — fully diatonic in Mixolydian/Dorian/Aeolian
         }
@@ -136,7 +138,8 @@ struct AmbientStructureGenerator {
         case .Ionian:          return ("5", .major)   // V — D F# A fully in G Ionian
         case .Mixolydian:      return ("4", .major)   // IV — C E G fully in G Mixolydian
         case .Aeolian:         return ("b6", .major)  // bVI — F A C fully in A Aeolian
-        case .MinorPentatonic: return ("4", .sus2)    // IV sus2 — D E A fully in A MinorPentatonic
+        case .MajorPentatonic: return ("2", .sus2)    // IIsus2 — A B E fully in G MajorPentatonic
+        case .MinorPentatonic: return ("4", .sus2)    // IVsus2 — D E A fully in A MinorPentatonic
         default:               return ("4", .major)   // IV — G B D fully in D Dorian
         }
     }
@@ -157,6 +160,7 @@ struct AmbientStructureGenerator {
             case .Ionian:          return ("4", .major)   // IV — classic major pivot
             case .Mixolydian:      return ("b7", .major)  // bVII — Mixolydian's signature chord
             case .Dorian:          return ("b7", .major)  // bVII — diatonic in Dorian (b6 is not)
+            case .MajorPentatonic: return ("5", .sus2)    // Vsus2 — D A E fully in G MajorPentatonic
             case .MinorPentatonic: return ("b3", .major)  // bIII — only fully-diatonic major choice
             default:               return (rng.nextDouble() < 0.65 ? "b7" : "b6", .major)  // Aeolian
             }

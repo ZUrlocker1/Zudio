@@ -55,7 +55,7 @@ enum OfflineExport {
     /// Returns (songSeconds, elapsedSeconds) for timing log.
     static func render(
         state: SongState,
-        programs: [UInt8],
+        programs: [Int],
         snapshots: [PlaybackEngine.TrackEffectSnapshot],
         textureSnapshot: AudioTexturePlayer.ExportSnapshot?,
         outputURL: URL,
@@ -82,7 +82,14 @@ enum OfflineExport {
 
         for t in activeTracks {
             let bankMSB: UInt8 = (t == kTrackDrums) ? 0x78 : 0x79
-            let au = try makeSampler(sf2: sf2URL, program: programs[t], bankMSB: bankMSB)
+            let trackSF2: URL
+            if programs[t] >= 60000 {
+                let fileIdx = (programs[t] - 60000) / 1000
+                trackSF2 = Self.externalPianoURL(fileIndex: fileIdx) ?? sf2URL
+            } else {
+                trackSF2 = sf2URL
+            }
+            let au = try makeSampler(sf2: trackSF2, encodedProgram: programs[t], bankMSB: bankMSB)
             samplers.append((t, au))
         }
 
@@ -106,8 +113,10 @@ enum OfflineExport {
         }
 
         let sps = 60.0 / Double(state.frame.tempo) / 4.0
+        let pianoPrograms: Set<Int> = [0]
         let eventLists: [[SampleEvent]] = samplers.map { item in
-            buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps)
+            let floor = (item.trackIdx == kTrackLead1 && pianoPrograms.contains(programs[item.trackIdx])) ? 55 : 0
+            return buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps, velocityFloor: floor)
         }
         var evtIdxs = [Int](repeating: 0, count: samplers.count)
 
@@ -365,7 +374,20 @@ enum OfflineExport {
 
     // MARK: - Helpers
 
-    private static func makeSampler(sf2: URL, program: UInt8, bankMSB: UInt8) throws -> AudioUnit {
+    private static func externalPianoURL(fileIndex: Int) -> URL? {
+        fileIndex == 1 ? Bundle.main.url(forResource: "SC55 Piano_V2", withExtension: "sf2") : nil
+    }
+
+    private static func makeSampler(sf2: URL, encodedProgram: Int, bankMSB: UInt8) throws -> AudioUnit {
+        let bankLSB: UInt8
+        let program: UInt8
+        if encodedProgram >= 60000 {
+            bankLSB = 0
+            program = UInt8((encodedProgram - 60000) % 1000)
+        } else {
+            bankLSB = encodedProgram >= 1000 ? UInt8(encodedProgram / 1000) : 0
+            program = encodedProgram >= 1000 ? UInt8(encodedProgram % 1000) : UInt8(encodedProgram)
+        }
         var desc = AudioComponentDescription(
             componentType: kAudioUnitType_MusicDevice,
             componentSubType: kAudioUnitSubType_Sampler,
@@ -387,7 +409,7 @@ enum OfflineExport {
         var instrData = AUSamplerInstrumentData(
             fileURL: Unmanaged.passUnretained(sf2 as CFURL),
             instrumentType: UInt8(kInstrumentType_SF2Preset),
-            bankMSB: bankMSB, bankLSB: 0, presetID: program
+            bankMSB: bankMSB, bankLSB: bankLSB, presetID: program
         )
         try check(AudioUnitSetProperty(
             au, kAUSamplerProperty_LoadInstrument, kAudioUnitScope_Global, 0,
@@ -398,13 +420,14 @@ enum OfflineExport {
     }
 
     private static func buildEvents(_ trackEvents: [MIDIEvent],
-                                    sampleRate: Double, sps: Double) -> [SampleEvent] {
+                                    sampleRate: Double, sps: Double, velocityFloor: Int = 0) -> [SampleEvent] {
         var evts = [SampleEvent]()
         evts.reserveCapacity(trackEvents.count * 2)
         for e in trackEvents {
             let on  = Int64(Double(e.stepIndex)                   * sampleRate * sps)
             let off = Int64(Double(e.stepIndex + e.durationSteps) * sampleRate * sps)
-            evts.append(SampleEvent(pos: on,  status: 0x90, note: e.note, vel: e.velocity))
+            let vel = velocityFloor > 0 ? UInt8(max(velocityFloor, Int(e.velocity))) : e.velocity
+            evts.append(SampleEvent(pos: on,  status: 0x90, note: e.note, vel: vel))
             evts.append(SampleEvent(pos: off, status: 0x80, note: e.note, vel: 0))
         }
         return evts.sorted { $0.pos < $1.pos }
