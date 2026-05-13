@@ -535,7 +535,8 @@ struct SongGenerator {
                 rng: &lead1RNG, usedRuleIDs: &lead1Rules)
 
             var padRules: Set<String> = []
-            if padsRNG.nextDouble() < 0.50 {
+            let padChance = pianoRule == "AMB-PNO-001" ? 0.85 : 0.50
+            if padsRNG.nextDouble() < padChance {
                 trackEvents[kTrackPads] = AmbientPadsGenerator.generateAmbientPianoPads(
                     pianoRule: pianoRule, frame: frame, tonalMap: tonalMap,
                     totalBars: frame.totalBars, rng: &padsRNG, usedRuleIDs: &padRules)
