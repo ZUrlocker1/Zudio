@@ -109,9 +109,6 @@ final class PlaybackEngine: ObservableObject {
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
     private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
-    // GeneralUser GS piano programs have a velocity zone split near velocity 49; the low zone
-    // sounds shrill on certain pitches. Floor all piano Lead 1 note-ons at 49.
-    private static let ambientPianoPrograms: Set<Int> = []
     // Per-track pending instrument loads — used to coalesce rapid setProgram calls on macOS.
     private var programLoadWork: [Int: DispatchWorkItem] = [:]
     private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
@@ -541,7 +538,6 @@ final class PlaybackEngine: ObservableObject {
         cachedDrumProgram    = 255
         cachedLead1Program   = 255
         cachedLead2Program   = 255
-        cachedLead1IsGSPiano  = false
         cachedIsAmbientPiano  = false
         #if !os(iOS)
         // macOS: start now; setProgram() works with the engine running.
@@ -569,7 +565,6 @@ final class PlaybackEngine: ObservableObject {
         cachedDrumProgram    = 255
         cachedLead1Program   = 255
         cachedLead2Program   = 255
-        cachedLead1IsGSPiano  = false
         cachedIsAmbientPiano  = false
     }
 
@@ -628,9 +623,6 @@ final class PlaybackEngine: ObservableObject {
             let fireVelocity: UInt8
             if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 78 / 100))
-            } else if trackIndex == kTrackLead1 && cachedLead1IsGSPiano {
-                // GS piano zone split near vel 50 — low zone sounds shrill; floor at 55.
-                fireVelocity = UInt8(max(55, Int(ev.velocity)))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -916,7 +908,6 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedDrumProgram:    UInt8 = 255
     nonisolated(unsafe) private var cachedLead1Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedLead2Program:   UInt8 = 255
-    nonisolated(unsafe) private var cachedLead1IsGSPiano: Bool  = false
     nonisolated(unsafe) private var cachedIsAmbientPiano: Bool  = false
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
@@ -946,7 +937,7 @@ final class PlaybackEngine: ObservableObject {
         currentProgram[trackIndex] = program
         currentBankMSB[trackIndex] = bankMSB
         if trackIndex == kTrackDrums  { cachedDrumProgram  = actualProgram }
-        if trackIndex == kTrackLead1  { cachedLead1Program = actualProgram; cachedLead1IsGSPiano = Self.ambientPianoPrograms.contains(program) }
+        if trackIndex == kTrackLead1  { cachedLead1Program = actualProgram }
         if trackIndex == kTrackLead2  { cachedLead2Program = actualProgram }
 
         // Cancel any pending debounced load for this track (covers rapid interactive changes).
@@ -1089,10 +1080,6 @@ final class PlaybackEngine: ObservableObject {
                 let mult: Float = (program == 61001) ? 8.0 : 1.0   // Stereo Piano needs boost above unity
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
-                if mult != 1.0 {
-                    let v = boosts[kTrackLead1].outputVolume
-                    print("[Zudio] Lead1 boost set to \(mult) → readback: \(v)")
-                }
             }
         }
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
@@ -1936,12 +1923,21 @@ final class PlaybackEngine: ObservableObject {
         ambientOutroFadeTimer = nil
 
         let totalBars = state.frame.totalBars
-        // Always fade the last 8 bars regardless of structural outro length.
-        // 8 bars = 17–27 seconds at ambient BPM, long enough to overlap the final
-        // notes of any loop tile (loop tiling can leave silence before the structural
-        // outro start if the last tile's notes end early).
-        let fadeBars       = min(8, max(1, totalBars / 2))
-        let outroStartStep = max(0, totalBars - fadeBars) * 16
+        // Use the structural outro when present (extended states have one anchored to the
+        // real ending bars).  For plain ambient songs started from step 0 with no structural
+        // outro, fall back to the last-8-bars heuristic.  For pass states (phase 1 / phase 2)
+        // that start mid-song and have no outro section, skip the fade entirely — the single
+        // fade on the final extended state covers the ending.
+        let outroStart: Int
+        if let outroSection = state.structure.outroSection {
+            outroStart = outroSection.startBar
+        } else if currentStep == 0 {
+            let fadeBars = min(8, max(1, totalBars / 2))
+            outroStart = max(0, totalBars - fadeBars)
+        } else {
+            return
+        }
+        let outroStartStep = outroStart * 16
         let outroEndStep   = totalBars * 16
         let totalSteps     = outroEndStep - outroStartStep
         guard totalSteps > 0, currentStep < outroEndStep else { return }

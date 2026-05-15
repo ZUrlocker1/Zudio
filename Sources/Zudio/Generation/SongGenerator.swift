@@ -493,25 +493,36 @@ struct SongGenerator {
         // pianoRuleRoll is consumed regardless so non-piano songs produce the same frame as before.
         let pianoRoll     = rng.nextDouble()
         let pianoRuleRoll = rng.nextDouble()
-        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.75
+        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.50
         let pianoRule: String = {
             if let f = forceAmbientPianoRule { return f }
             return pianoRuleRoll < 0.30 ? "AMB-PNO-001" : (pianoRuleRoll < 0.75 ? "AMB-PNO-002" : "AMB-PNO-003")
         }()
 
+        // For Ambient Piano, derive a rule-appropriate tempo before frame generation so that
+        // bar count is computed at the correct BPM from the start.
+        // AMB-PNO-001/002: 60–75 BPM (peak 68). AMB-PNO-003 (Pendulum): 70–82 BPM (peak 76).
+        let pianoTempoOverride: Int? = {
+            guard isAmbientPiano, tempoOverride == nil else { return tempoOverride }
+            return pianoRule == "AMB-PNO-003"
+                ? AmbientMusicalFrameGenerator.pickAmbientPianoTempoMid(rng: &rng)
+                : AmbientMusicalFrameGenerator.pickAmbientPianoTempoSlow(rng: &rng)
+        }()
+
         // Step 1 — Ambient musical frame (tempo, key, mood, loop lengths, prog family)
         let (rawFrame, percStylePicked, ambientProgFamily, loopLengths) = AmbientMusicalFrameGenerator.generate(
-            rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
+            rng: &rng, keyOverride: keyOverride,
+            tempoOverride: isAmbientPiano ? pianoTempoOverride : tempoOverride,
             moodOverride: moodOverride
         )
         let percussionStyle = forcePercussionStyle ?? percStylePicked
 
-        // Ambient Piano frame adjustments: clamp BPM 58-72, replace Mixolydian→Dorian for Dream/Deep.
+        // For Ambient Piano, replace the standard bar count with the shorter piano-specific target.
         var frame = rawFrame
-        if isAmbientPiano {
-            let t = Swift.max(58, Swift.min(72, frame.tempo))
-            if t != frame.tempo { frame = frame.withTempo(t) }
-            // Mixolydian is intentionally preserved — its floating b7 is ideal for ambient/dream character.
+        if isAmbientPiano, tempoOverride == nil {
+            let pianoBars = AmbientMusicalFrameGenerator.pickAmbientPianoTotalBars(
+                tempo: frame.tempo, rng: &rng)
+            frame = frame.withTotalBars(pianoBars)
         }
 
         // Step 2 — Ambient structure (intro/body/outro + chord plan)
@@ -549,9 +560,23 @@ struct SongGenerator {
                 drumRules: [], bassRules: [], padRules: padRules,
                 lead1Rules: lead1Rules, lead2Rules: [], rhythmRules: [], texRules: [],
                 isAmbientPiano: true, ambientPianoRule: pianoRule)
-            let stepAnnotations = buildStepAnnotations(
+            var stepAnnotations = buildStepAnnotations(
                 structure: structure, trackEvents: trackEvents,
                 frame: frame, isAmbient: true, includeDrumFills: false)
+            if pianoRule == "AMB-PNO-003" {
+                let climaxBar      = frame.totalBars * 60 / 100
+                let withdrawBar    = frame.totalBars * 73 / 100
+                let closingBar     = frame.totalBars * 87 / 100
+                let urgentBar      = climaxBar - 4
+                let aftershockBase = withdrawBar + 2
+                let ann: (Int, String) -> Void = { bar, desc in
+                    stepAnnotations[bar * 16, default: []].append(
+                        GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
+                }
+                if urgentBar > 5 { ann(urgentBar, "Building tension") }
+                ann(climaxBar, "Climax")
+                if aftershockBase < closingBar - 2 { ann(aftershockBase, "Aftershock") }
+            }
             var forced: [String: String] = [:]
             if let r = forceAmbientPianoRule { forced["Piano"] = r }
             return SongState(
@@ -1279,7 +1304,7 @@ struct SongGenerator {
         } else {
             for ruleID in usedRules.sorted() {
                 let desc = ruleDescription(ruleID, trackIndex: trackIndex)
-                let tag  = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID
+                let tag  = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
                 regenLog.append(GenerationLogEntry(tag: tag, description: desc))
             }
         }
@@ -1370,7 +1395,8 @@ struct SongGenerator {
 
         // Lead 1
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: lead1RuleDescription(ruleID)))
+            let tag = ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
+            log.append(GenerationLogEntry(tag: tag, description: lead1RuleDescription(ruleID)))
         }
         if lead1Rules.isEmpty {
             log.append(GenerationLogEntry(tag: "MOT-LD1-001", description: lead1RuleDescription("MOT-LD1-001")))
@@ -1922,7 +1948,10 @@ struct SongGenerator {
     private static func ambientRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
         // Ambient Piano — Lead
-        case "AMB-PNO-001":  return "Floating Tones"
+        case "AMB-PNO-001":    return "Floating Tones"
+        case "AMB-PNO-001-BT": return "Floating Tones — Sparse"
+        case "AMB-PNO-001-CW": return "Floating Tones — Chord Wash"
+        case "AMB-PNO-001-PD": return "Floating Tones — Pendulum"
         case "AMB-PNO-002":  return "Pensive Melody"
         case "AMB-PNO-003":  return "Dramatic Arc"
         // Ambient Piano — Pads

@@ -110,6 +110,24 @@ struct AmbientMusicalFrameGenerator {
         return Swift.max(8, Swift.min(maxBars, (rawBars / 4) * 4))
     }
 
+    /// Shorter target for Ambient Piano: mostly 3:00–3:30, max 4:00.
+    static func pickAmbientPianoTotalBars(tempo: Int, rng: inout SeededRNG) -> Int {
+        let secs = Double(triangularInt(min: 170.0, peak: 200.0, max: 240.0, rng: &rng))
+        let secondsPerBar = 60.0 / Double(tempo) * 4.0
+        let rawBars = Int((secs / secondsPerBar).rounded())
+        return Swift.max(8, (rawBars / 4) * 4)
+    }
+
+    /// Tempo for AMB-PNO-001 / AMB-PNO-002: triangular 60–72, peak 66.
+    static func pickAmbientPianoTempoSlow(rng: inout SeededRNG) -> Int {
+        triangularInt(min: 60.0, peak: 66.0, max: 72.0, rng: &rng)
+    }
+
+    /// Tempo for AMB-PNO-003 (Pendulum): triangular 68–77, peak 72.
+    static func pickAmbientPianoTempoMid(rng: inout SeededRNG) -> Int {
+        triangularInt(min: 68.0, peak: 72.0, max: 77.0, rng: &rng)
+    }
+
     private static func triangularInt(min: Double, peak: Double, max: Double, rng: inout SeededRNG) -> Int {
         let r  = rng.nextDouble()
         let fc = (peak - min) / (max - min)

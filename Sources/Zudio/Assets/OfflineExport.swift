@@ -113,10 +113,8 @@ enum OfflineExport {
         }
 
         let sps = 60.0 / Double(state.frame.tempo) / 4.0
-        let pianoPrograms: Set<Int> = [0]
         let eventLists: [[SampleEvent]] = samplers.map { item in
-            let floor = (item.trackIdx == kTrackLead1 && pianoPrograms.contains(programs[item.trackIdx])) ? 55 : 0
-            return buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps, velocityFloor: floor)
+            buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps, velocityFloor: 0)
         }
         var evtIdxs = [Int](repeating: 0, count: samplers.count)
 

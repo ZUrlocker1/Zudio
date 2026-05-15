@@ -50,6 +50,27 @@ enum Mode: String, CaseIterable, Codable, Sendable {
         }
     }
 
+    /// True for Ionian, Mixolydian, MajorPentatonic; false for the minor-flavored modes.
+    var isMajorFlavored: Bool {
+        switch self {
+        case .Ionian, .Mixolydian, .MajorPentatonic: return true
+        case .Aeolian, .Dorian, .MinorPentatonic:    return false
+        }
+    }
+
+    /// Parallel-mode complement — same root, opposite quality.
+    /// Ionian↔Aeolian, Mixolydian↔Dorian, MajorPentatonic↔MinorPentatonic.
+    var complementaryMode: Mode {
+        switch self {
+        case .Ionian:          return .Aeolian
+        case .Aeolian:         return .Ionian
+        case .Mixolydian:      return .Dorian
+        case .Dorian:          return .Mixolydian
+        case .MajorPentatonic: return .MinorPentatonic
+        case .MinorPentatonic: return .MajorPentatonic
+        }
+    }
+
     /// Snaps `semitones` to the nearest interval present in this mode's scale.
     /// Use for diatonic scale degrees (3rd, 6th, 7th) that differ between modes.
     /// Purely chromatic passing tones (tritone, neighbour notes) should not use this.

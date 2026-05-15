@@ -35,6 +35,12 @@ struct GlobalMusicalFrame: Equatable, Sendable {
                            progressionFamily: progressionFamily, totalBars: totalBars)
     }
 
+    /// Returns a copy with only the mode changed (used for Ambient modal-shift passes).
+    func withMode(_ newMode: Mode) -> GlobalMusicalFrame {
+        GlobalMusicalFrame(key: key, mode: newMode, tempo: tempo, mood: mood,
+                           progressionFamily: progressionFamily, totalBars: totalBars)
+    }
+
     /// Returns a copy with only totalBars changed (used for Evolve pass states).
     func withTotalBars(_ newBars: Int) -> GlobalMusicalFrame {
         GlobalMusicalFrame(key: key, mode: mode, tempo: tempo, mood: mood,

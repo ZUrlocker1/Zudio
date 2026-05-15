@@ -183,7 +183,7 @@ struct AmbientTitleGenerator {
     private static let cravenFaultsTerms = [
         "Drumlins", "Grykes", "Zorvaaks", "Shakeholes", "Erratics", "Zacks",
         "Soughs", "Rakes", "Screes", "Swales", "Kettle Holes",
-        "Alluvium", "Corries", "Runnels", "Loess", "Ghylls", "Tikkenboxes",
+        "Alluvium", "Corries", "Runnels", "Lowess", "Ghylls", "Tikkenboxes",
         "Moraines", "Eskers", "Tarns", "Kames", "Outwash",
         "Unconformities", "Striations", "Pavements", "Drumlins"
     ]
@@ -284,7 +284,7 @@ struct AmbientTitleGenerator {
     // Classical music forms — used in tech-grief pattern
     private static let classicalForms = [
         "Suite", "Nocturne", "Requiem", "Étude", "Notes",
-        "Elegy", "Lament", "Prelude", "Dirge", "Threnody",
+        "Elegy", "Lament", "Prelude", "Dirge", "Concert",
         "Interlude", "Fugue", "Variations", "Aria", "Coda"
     ]
 
@@ -321,7 +321,7 @@ struct AmbientTitleGenerator {
 
     // AI entities — for "The ___ Arrangements" style
     private static let aiEntities = [
-        "Claude", "ChatGPT", "Copilot", "Gemini", "Model",
+        "Claude", "Akron", "Cleveland", "Gemini", "Model",
         "Code", "Foundation Model", "Transformer", "AI", "Agentic",
         "Inference Engine", "Software", "Prompt", "Buddha"
     ]
