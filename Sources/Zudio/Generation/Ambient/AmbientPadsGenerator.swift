@@ -151,16 +151,41 @@ struct AmbientPadsGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
+        let roll = rng.nextDouble()
         switch pianoRule {
         case "AMB-PNO-001":
-            usedRuleIDs.insert("AMB-PADS-007")
-            return sparseDroneFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            // 50% sparse drone, 20% halo shimmer, 20% warm sustain, 10% staggered strings
+            if roll < 0.50 {
+                usedRuleIDs.insert("AMB-PADS-007")
+                return sparseDroneFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            } else if roll < 0.70 {
+                usedRuleIDs.insert("AMB-PADS-010")
+                return haloShimmerFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            } else if roll < 0.90 {
+                usedRuleIDs.insert("AMB-PADS-009")
+                return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            } else {
+                usedRuleIDs.insert("AMB-PADS-008")
+                return staggeredStringsFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            }
         case "AMB-PNO-003":
             usedRuleIDs.insert("AMB-PADS-009")
             return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
         default:
-            usedRuleIDs.insert("AMB-PADS-008")
-            return staggeredStringsFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            // AMB-PNO-002: 50% staggered strings, 20% halo shimmer, 20% warm sustain, 10% sparse drone
+            if roll < 0.50 {
+                usedRuleIDs.insert("AMB-PADS-008")
+                return staggeredStringsFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            } else if roll < 0.70 {
+                usedRuleIDs.insert("AMB-PADS-010")
+                return haloShimmerFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            } else if roll < 0.90 {
+                usedRuleIDs.insert("AMB-PADS-009")
+                return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            } else {
+                usedRuleIDs.insert("AMB-PADS-007")
+                return sparseDroneFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            }
         }
     }
 
@@ -295,6 +320,37 @@ struct AmbientPadsGenerator {
         }
         let octave = UInt8(Int(root) + 12)
         return octave <= UInt8(high) ? [root, octave] : [root]
+    }
+
+    // AMB-PADS-010: Halo Shimmer — high-register overtone floating above the piano.
+    // Root (+ fifth if it fits) in octave 5, velocity 16–26, 2–3 long breaths with short gaps.
+    private static func haloShimmerFullSong(tonalMap: TonalGovernanceMap, totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        let totalSteps = totalBars * 16
+        guard let entry = tonalMap.entry(atBar: 0) else { return [] }
+
+        let allNotes = notesInRegister(pitchClasses: entry.chordWindow.chordTones, low: 72, high: 86)
+        guard !allNotes.isEmpty else { return [] }
+        let root    = allNotes[0]
+        let fifthPC = (Int(root) + 7) % 12
+        let fifth   = entry.chordWindow.chordTones.contains(fifthPC) ? UInt8(Int(root) + 7) : nil
+        let notes: [UInt8] = (fifth != nil && Int(fifth!) <= 86) ? [root, fifth!] : [root]
+
+        let breathBars = 18 + rng.nextInt(upperBound: 7)   // 18–24 bars per breath
+        let gapBars    = 2  + rng.nextInt(upperBound: 3)   // 2–4 bar gap between breaths
+        let baseVel    = 18 + rng.nextInt(upperBound: 8)   // 18–25
+
+        var events: [MIDIEvent] = []
+        var step = (2 + rng.nextInt(upperBound: 4)) * 16   // first breath starts bar 2–5
+        while step < totalSteps {
+            let dur = Swift.min(breathBars * 16, totalSteps - step)
+            guard dur >= 16 else { break }
+            for note in notes {
+                let v = UInt8(Swift.max(16, Swift.min(26, baseVel + rng.nextInt(upperBound: 5) - 2)))
+                events.append(MIDIEvent(stepIndex: step, note: note, velocity: v, durationSteps: dur))
+            }
+            step += (breathBars + gapBars) * 16
+        }
+        return events
     }
 
     // MARK: - Helpers

@@ -1917,7 +1917,7 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Ambient song-level outro fade
 
     /// Fades engine.mainMixerNode.outputVolume 1→0 over the declared outro section,
-    /// or over the last 4 bars when no outro exists (pureDrone form).
+    /// or over the last 4–6 bars when no outro exists (pureDrone form).
     private func startAmbientOutroFade(state: SongState, schedulerID: Int) {
         ambientOutroFadeTimer?.cancel()
         ambientOutroFadeTimer = nil
@@ -1925,14 +1925,14 @@ final class PlaybackEngine: ObservableObject {
         let totalBars = state.frame.totalBars
         // Use the structural outro when present (extended states have one anchored to the
         // real ending bars).  For plain ambient songs started from step 0 with no structural
-        // outro, fall back to the last-8-bars heuristic.  For pass states (phase 1 / phase 2)
-        // that start mid-song and have no outro section, skip the fade entirely — the single
-        // fade on the final extended state covers the ending.
+        // outro, fall back to a 4–6 bar heuristic (scaled to song length).  For pass states
+        // (phase 1 / phase 2) that start mid-song and have no outro section, skip the fade
+        // entirely — the single fade on the final extended state covers the ending.
         let outroStart: Int
         if let outroSection = state.structure.outroSection {
             outroStart = outroSection.startBar
         } else if currentStep == 0 {
-            let fadeBars = min(8, max(1, totalBars / 2))
+            let fadeBars = min(6, max(4, totalBars / 10))
             outroStart = max(0, totalBars - fadeBars)
         } else {
             return

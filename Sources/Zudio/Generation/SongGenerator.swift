@@ -493,10 +493,10 @@ struct SongGenerator {
         // pianoRuleRoll is consumed regardless so non-piano songs produce the same frame as before.
         let pianoRoll     = rng.nextDouble()
         let pianoRuleRoll = rng.nextDouble()
-        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.50
+        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.40
         let pianoRule: String = {
             if let f = forceAmbientPianoRule { return f }
-            return pianoRuleRoll < 0.30 ? "AMB-PNO-001" : (pianoRuleRoll < 0.75 ? "AMB-PNO-002" : "AMB-PNO-003")
+            return pianoRuleRoll < 0.40 ? "AMB-PNO-001" : (pianoRuleRoll < 0.70 ? "AMB-PNO-002" : "AMB-PNO-003")
         }()
 
         // For Ambient Piano, derive a rule-appropriate tempo before frame generation so that
@@ -546,7 +546,12 @@ struct SongGenerator {
                 rng: &lead1RNG, usedRuleIDs: &lead1Rules)
 
             var padRules: Set<String> = []
-            let padChance = pianoRule == "AMB-PNO-001" ? 0.85 : 0.50
+            let padChance: Double
+            switch pianoRule {
+            case "AMB-PNO-001": padChance = 0.85
+            case "AMB-PNO-003": padChance = 0.20
+            default:            padChance = 0.50
+            }
             if padsRNG.nextDouble() < padChance {
                 trackEvents[kTrackPads] = AmbientPadsGenerator.generateAmbientPianoPads(
                     pianoRule: pianoRule, frame: frame, tonalMap: tonalMap,
@@ -576,6 +581,18 @@ struct SongGenerator {
                 if urgentBar > 5 { ann(urgentBar, "Building tension") }
                 ann(climaxBar, "Climax")
                 if aftershockBase < closingBar - 2 { ann(aftershockBase, "Aftershock") }
+            }
+            if pianoRule == "AMB-PNO-002" {
+                let buildingBar   = frame.totalBars * 38 / 100
+                let climaxBar     = frame.totalBars * 52 / 100
+                let denouementBar = frame.totalBars * 76 / 100
+                let ann: (Int, String) -> Void = { bar, desc in
+                    stepAnnotations[bar * 16, default: []].append(
+                        GenerationLogEntry(tag: "Arc", description: desc, isTitle: false))
+                }
+                if buildingBar > 3 { ann(buildingBar, "Building tension") }
+                ann(climaxBar, "Climax")
+                ann(denouementBar, "Denouement")
             }
             var forced: [String: String] = [:]
             if let r = forceAmbientPianoRule { forced["Piano"] = r }
@@ -1922,7 +1939,8 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            let tag = ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
+            log.append(GenerationLogEntry(tag: tag, description: ambientRuleDescription(ruleID)))
         }
         for ruleID in lead2Rules.sorted() {
             log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
@@ -1958,6 +1976,7 @@ struct SongGenerator {
         case "AMB-PADS-007": return "Sparse drone"
         case "AMB-PADS-008": return "Staggered strings"
         case "AMB-PADS-009": return "Warm sustain"
+        case "AMB-PADS-010": return "Halo shimmer"
         // Pads
         case "AMB-PADS-001":    return "Sustained chord layer"
         case "AMB-PADS-002":    return "Slow cascade"
