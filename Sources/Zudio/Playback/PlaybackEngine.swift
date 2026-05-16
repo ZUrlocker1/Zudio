@@ -130,6 +130,8 @@ final class PlaybackEngine: ObservableObject {
     var onAudioEngineRestarted: (() -> Void)? = nil
     // onEngineError: fired when engine.start() throws so AppState can log the failure.
     var onEngineError: ((String) -> Void)? = nil
+    // onMissingPatch: fired when loadSoundBankInstrument fails (preset stripped from SF2).
+    var onMissingPatch: ((Int, Int) -> Void)? = nil   // (trackIndex, program)
     // onAudioInterrupted: fired on iOS when another app takes audio focus (e.g. Apple Music starts)
     // or when headphones are pulled. PlaybackEngine.stop() has already been called; AppState uses
     // this to stop audioTexture (Chill background loop) and any other non-engine audio.
@@ -950,24 +952,30 @@ final class PlaybackEngine: ObservableObject {
         // debounce 80 ms to coalesce rapid taps — the dedup check above already short-circuits
         // same-program calls. engine stop/start is NOT used here: it resets all other samplers.
         if immediate {
-            try? samplers[trackIndex].loadSoundBankInstrument(
-                at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
-            )
-        } else {
-            let work = DispatchWorkItem { [weak self, soundBankURL, actualProgram, bankMSB, bankLSB, trackIndex] in
-                guard let self else { return }
-                try? self.samplers[trackIndex].loadSoundBankInstrument(
+            do {
+                try samplers[trackIndex].loadSoundBankInstrument(
                     at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
                 )
+            } catch { onMissingPatch?(trackIndex, program) }
+        } else {
+            let work = DispatchWorkItem { [weak self, soundBankURL, actualProgram, bankMSB, bankLSB, trackIndex, program] in
+                guard let self else { return }
+                do {
+                    try self.samplers[trackIndex].loadSoundBankInstrument(
+                        at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
+                    )
+                } catch { self.onMissingPatch?(trackIndex, program) }
                 self.programLoadWork[trackIndex] = nil
             }
             programLoadWork[trackIndex] = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: work)
         }
         #else
-        try? samplers[trackIndex].loadSoundBankInstrument(
-            at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
-        )
+        do {
+            try samplers[trackIndex].loadSoundBankInstrument(
+                at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
+            )
+        } catch { onMissingPatch?(trackIndex, program) }
         #endif
         // Per-track default volumes; tremolo overrides live sampler volume via LFO.
         // trackBaseVolume is always updated so stopTremolo restores the correct new value.
@@ -1041,12 +1049,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.48   // Wurlitzer runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 17 {
                 vol = 0.50   // B3 Organ runs hot on Chill rhythm — pull back more
-            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 7 {
-                vol = 0.20   // Clavinet runs very hot on Chill rhythm — pull back significantly
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 16 {
                 vol = 0.55   // Perc Organ runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 18 {
                 vol = 0.50   // Rock Organ runs hot on Chill rhythm — pull back
+            } else if trackIndex == kTrackRhythm && chillPadsMode && program == 61001 {
+                vol = 1.0    // Stereo Piano on Chill Rhythm — gain via boost node
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
                 vol = 0.26   // Mono Synth runs hot on Kosmic bass — pull back more
             } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
@@ -1080,6 +1088,10 @@ final class PlaybackEngine: ObservableObject {
                 let mult: Float = (program == 61001) ? 8.0 : 1.0   // Stereo Piano needs boost above unity
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
+            } else if trackIndex == kTrackRhythm {
+                let mult: Float = (program == 61001) ? 2.5 : 1.0   // Stereo Piano needs boost; all others unity
+                boostBaseMultiplier[kTrackRhythm] = mult
+                boosts[kTrackRhythm].outputVolume = mult * (boostEffectEnabled[kTrackRhythm] ? 1.7 : 1.0)
             }
         }
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
@@ -2234,11 +2246,9 @@ private func loadGMPrograms() {
     }
 
     private func gmDLSSoundBankURL() -> URL {
-        // Prefer bundled GeneralUser GS SF2 for higher quality.
-        // To roll back: delete the SF2 from Resources — this fallback restores the Apple DLS bank.
-        if let sf2 = Bundle.main.url(forResource: "GeneralUser_GS_v1.471", withExtension: "sf2") {
-            return sf2
-        }
+        // Prefer Zudio.sf2 (stripped GeneralUser GS), fall back to full GU, then Apple DLS.
+        if let sf2 = Bundle.main.url(forResource: "Zudio", withExtension: "sf2") { return sf2 }
+        if let sf2 = Bundle.main.url(forResource: "GeneralUser_GS_v1.471", withExtension: "sf2") { return sf2 }
         return URL(fileURLWithPath: "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls")
     }
 

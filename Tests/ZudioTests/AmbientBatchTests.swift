@@ -28,16 +28,16 @@ struct AmbientBatchTests {
             try? fm.removeItem(at: url)
         }
 
-        // Distribute 20 songs across rules in natural proportions: 001×6 (30%), 002×9 (45%), 003×5 (25%)
-        let ruleSequence: [String] = Array(repeating: "AMB-PNO-001", count: 6)
-            + Array(repeating: "AMB-PNO-002", count: 9)
-            + Array(repeating: "AMB-PNO-003", count: 5)
+        // Distribute 30 songs across rules in natural proportions: 001×9 (30%), 002×14 (47%), 003×7 (23%)
+        let ruleSequence: [String] = Array(repeating: "AMB-PNO-001", count: 9)
+            + Array(repeating: "AMB-PNO-002", count: 14)
+            + Array(repeating: "AMB-PNO-003", count: 7)
 
-        print("\n=== Generating 20 Ambient Piano songs ===")
-        print("Rules: 6×AMB-PNO-001, 9×AMB-PNO-002, 5×AMB-PNO-003")
+        print("\n=== Generating 30 Ambient Piano songs ===")
+        print("Rules: 9×AMB-PNO-001, 14×AMB-PNO-002, 7×AMB-PNO-003")
         print("Output: \(dir.path)\n")
 
-        for i in 1...20 {
+        for i in 1...30 {
             let pianoRule = ruleSequence[i - 1]
             let seed = UInt64.random(in: .min ... .max)
             let song = SongGenerator.generate(seed: seed, style: .ambient,

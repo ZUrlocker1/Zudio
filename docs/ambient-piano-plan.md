@@ -3,13 +3,13 @@ Copyright (c) 2026 Zack Urlocker
 
 ## Overview
 
-Ambient Piano is a sub-style of Ambient, appearing ~15% of the time. Where base Ambient generates variation through co-prime loop phasing — a mathematical, machine-like process — Ambient Piano inverts this completely. The sole melodic voice is a piano making deliberate statements into a field of near-silence, with long rests between phrases and no looping or layering.
+Ambient Piano is a sub-style of Ambient, appearing 40% of the time. Where base Ambient generates variation through co-prime loop phasing — a mathematical, machine-like process — Ambient Piano inverts this completely. The sole melodic voice is a piano making deliberate statements into a field of near-silence, with long rests between phrases and no looping or layering.
 
 Each Ambient Piano song is shaped by one of three **lead rules** for Lead 1, chosen probabilistically at generation time. The rules have genuinely different generative logic — not just different parameters — because the three reference aesthetics have fundamentally different structural approaches:
 
 - **AMB-PNO-001 — Floating Tones:** individual notes floating in space, no phrase direction, stochastic placement *(Harold Budd reference)*
 - **AMB-PNO-002 — Pensive Melody:** true melodic phrases with stepwise oscillation and varied returns *(Satie / Arnalds reference)*
-- **AMB-PNO-003 — Dramatic Arc:** fuller phrases shaped by a global dynamic arc across the song *(George Winston reference)*
+- **AMB-PNO-003 — Dramatic Arc:** fuller phrases shaped by a global dynamic arc across the song *(Keith Jarrett / George Winston reference)*
 
 **The governing idea:** every other Ambient track generates texture, density, and layering. This one generates *events in a field of near-silence*.
 
@@ -19,7 +19,7 @@ Each Ambient Piano song is shaped by one of three **lead rules** for Lead 1, cho
 
 Base Ambient: multiple tracks phasing against each other, continuous sonic activity at low density, variation automatic and imperceptible moment-to-moment.
 
-Ambient Piano: one instrument, deliberate human gesture, long silences, the listener can count the notes.
+Ambient Piano: one solo instrument, with occasional pads, deliberate human gesture, long silences, the listener can count the notes.
 
 The two styles share the same harmonic world (modal, static, no chord progression) and the same sonic palette (piano timbre is already in base Ambient's instrument pool). What is radically different is the generative philosophy: base Ambient is *continuous and mathematical*; Ambient Piano is *sparse and composed-feeling*.
 
@@ -264,6 +264,12 @@ Introduce a new cluster pair C and D, different pitch classes from A/B, for 8 ba
 - **Mode 1**: 6–10 bar opening → 4–7 sparse events over continuous chord wash → silence at end. Duration 3–4 min.
 - **Mode 2**: immediate first chord → 10–20 gong chord events with long silences between → final long decay into silence. Duration 4–5 min.
 - **Mode 3**: immediate start → continuous beat-pulse oscillation throughout with bass octave anchors every 2 bars → abrupt stop. Duration 3–4 min.
+
+### Mode character (audible description)
+
+- **Mode 1 — Chord wash:** A very quiet 3-note minor chord blooms continuously in the low register throughout the song. Individual notes, ascending bursts, or brief flash events float above it at wide, irregular intervals. The wash is so quiet it registers more as resonance than notes; the floating events are the foreground. Closest reference: *A Stream With Bright Fish*.
+- **Mode 2 — Gong chord:** No continuous background — only silence and large multi-octave chord strikes. Two chord voicings alternate for the entire song, each held so long (up to 15 seconds) that the chord itself resonating into the reverb is the music. Sparse single breath notes occasionally float between strikes. The most extreme of the three modes in terms of space and silence. Closest reference: *Against the Sky*.
+- **Mode 3 — Chromatic pendulum:** Metronomic, hypnotic, continuous. Two small chromatic clusters alternate every beat without stopping — no pauses, no events, just the oscillation. A very low bass octave pair anchors each 2-bar section beneath the clusters. A brief mid-section introduces a lighter cluster pair before returning. Unlike the other two modes this one never falls silent. Closest reference: *Not-yet-remembered*.
 
 ---
 

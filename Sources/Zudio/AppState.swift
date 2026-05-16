@@ -518,7 +518,7 @@ final class AppState: ObservableObject {
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","New Age Pad"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
-        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Clavinet","Perc Organ","Rock Organ"]
+        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Synth Bass 3","Fuzz Guitar"]
@@ -560,7 +560,7 @@ final class AppState: ObservableObject {
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014]
-        case (kTrackRhythm, .chill):   return [4, 5, 17, 7, 16, 18]
+        case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18]
         case (kTrackRhythm, .motorik): return [28, 8038, 29]
         case (kTrackRhythm, _):        return [28, 39, 29]
@@ -901,6 +901,16 @@ final class AppState: ObservableObject {
         playback.onEngineError = { [weak self] msg in
             guard let self else { return }
             self.appendToLog([GenerationLogEntry(tag: "ERROR", description: msg, isTitle: false)])
+        }
+        // Log missing SF2 patches so stripped presets are visible in the generation log.
+        playback.onMissingPatch = { [weak self] trackIndex, program in
+            guard let self else { return }
+            let style    = self.songState?.style ?? .chill
+            let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+            let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: style)
+            let name     = zip(programs, names).first { $0.0 == program }.map(\.1) ?? "p\(program)"
+            self.appendToLog([GenerationLogEntry(tag: "Error",
+                description: "Missing MIDI patch \(program)  \(name)", isTitle: false)])
         }
         // iOS audio interruption (another app takes focus) or headphones pulled.
         // PlaybackEngine.stop() has already fired; stop audioTexture (Chill background loop) too.
@@ -1652,12 +1662,12 @@ final class AppState: ObservableObject {
         let isBlues = songState?.chillBluesVariation == true
         switch trackIndex {
         case kTrackRhythm:
-            // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=Clavinet, 4=PercOrg, 5=RockOrg]
+            // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=PercOrg, 4=StereoPiano, 5=RockOrg(blues only)]
             return isBlues
-                // Blues: organs high, Rhodes/Wurlitzer rare, Clavinet excluded
-                ? [0, 1, 2, 2, 2, 4, 4, 4, 5, 5, 5]
-                // Regular: Rhodes/Wurlitzer high, B3/Clavinet medium, organs excluded
-                : [0, 0, 0, 1, 1, 1, 2, 2, 3, 3]
+                // Blues: B3 20%, PercOrg/RockOrg 30% each, StereoPiano 20%; no Rhodes/Wurlitzer
+                ? [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5]
+                // Regular: Rhodes/Wurlitzer high, B3/StereoPiano medium, organs excluded
+                : [0, 0, 0, 1, 1, 1, 2, 2, 4, 4]
         case kTrackLead2:
             // [0=Vibraphone, 1=Flute, 2=SopSax, 3=Trombone, 4=Xylophone]
             return isBlues
@@ -1671,7 +1681,7 @@ final class AppState: ObservableObject {
     }
 
     /// After randomisation, enforce per-song instrument constraints.
-    /// Chill blues: Lead 2 must not be Flute (index 1) or Xylophone (index 4); Rhythm must not be Clavinet (index 3).
+    /// Chill blues: Lead 2 must not be Flute (index 1) or Xylophone (index 4).
     /// These instruments can be stale from a prior regular-Chill song when the randomly chosen
     /// 2 tracks didn't happen to include Lead 2 or Rhythm.
     private func sanitiseBluesInstruments(for state: SongState) {

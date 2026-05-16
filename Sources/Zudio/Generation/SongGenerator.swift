@@ -496,14 +496,17 @@ struct SongGenerator {
         let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.40
         let pianoRule: String = {
             if let f = forceAmbientPianoRule { return f }
-            return pianoRuleRoll < 0.40 ? "AMB-PNO-001" : (pianoRuleRoll < 0.70 ? "AMB-PNO-002" : "AMB-PNO-003")
+            return pianoRuleRoll < 0.35 ? "AMB-PNO-001" : (pianoRuleRoll < 0.65 ? "AMB-PNO-002" : "AMB-PNO-003")
         }()
 
         // For Ambient Piano, derive a rule-appropriate tempo before frame generation so that
         // bar count is computed at the correct BPM from the start.
         // AMB-PNO-001/002: 60–75 BPM (peak 68). AMB-PNO-003 (Pendulum): 70–82 BPM (peak 76).
         let pianoTempoOverride: Int? = {
-            guard isAmbientPiano, tempoOverride == nil else { return tempoOverride }
+            guard isAmbientPiano else { return tempoOverride }
+            // Discard any override above 92 BPM — it was almost certainly leaked from a non-Ambient
+            // style (e.g. Chill Blues at 106 BPM loaded before switching to Ambient Piano).
+            if let t = tempoOverride, t <= 92 { return t }
             return pianoRule == "AMB-PNO-003"
                 ? AmbientMusicalFrameGenerator.pickAmbientPianoTempoMid(rng: &rng)
                 : AmbientMusicalFrameGenerator.pickAmbientPianoTempoSlow(rng: &rng)
@@ -541,9 +544,25 @@ struct SongGenerator {
             var padsRNG     = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackPads))
 
             var lead1Rules: Set<String> = []
+            let pianoIntroEndBar = structure.introSection?.endBar ?? 0
             trackEvents[kTrackLead1] = AmbientLeadGenerator.generateAmbientPianoLead(
                 pianoRule: pianoRule, frame: frame, totalBars: frame.totalBars,
-                rng: &lead1RNG, usedRuleIDs: &lead1Rules)
+                rng: &lead1RNG, usedRuleIDs: &lead1Rules,
+                introEndBar: pianoIntroEndBar)
+
+            // Trim song to where melodic content ends — avoids bass-only or silent tails.
+            // Uses only notes above MIDI 57 (A3) so LH bass doesn't extend the trim point.
+            let kMelodicFloor: UInt8 = 57
+            let lastMelodicEnd = trackEvents[kTrackLead1]
+                .lazy.filter { $0.note >= kMelodicFloor }
+                .map { $0.stepIndex + $0.durationSteps }
+                .max() ?? (frame.totalBars * 16)
+            let trimBars = Swift.max(8, (lastMelodicEnd / 16) + 3)
+            if trimBars < frame.totalBars - 2 {
+                frame = frame.withTotalBars(trimBars)
+                trackEvents[kTrackLead1] = trackEvents[kTrackLead1]
+                    .filter { $0.stepIndex < trimBars * 16 }
+            }
 
             var padRules: Set<String> = []
             let padChance: Double
@@ -1170,7 +1189,8 @@ struct SongGenerator {
                 events = AmbientLeadGenerator.generateAmbientPianoLead(
                     pianoRule: songState.ambientPianoRule,
                     frame: songState.frame, totalBars: songState.frame.totalBars,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules,
+                    introEndBar: songState.structure.introSection?.endBar ?? 0)
             } else if isAmbient {
                 let loopBars = ambLoopLengths?.lead1 ?? 11
                 var regenRules: Set<String> = []
@@ -1935,8 +1955,12 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
         }
 
-        for ruleID in padRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+        if padRules.isEmpty && isAmbientPiano {
+            log.append(GenerationLogEntry(tag: "AMB-PADS-000", description: "No Pads"))
+        } else {
+            for ruleID in padRules.sorted() {
+                log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
+            }
         }
         for ruleID in lead1Rules.sorted() {
             let tag = ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID

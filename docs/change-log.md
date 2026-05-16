@@ -5,9 +5,9 @@
 - **Ambient Piano** — New Ambient sub-style (work in progress). Appears in roughly 20% of Ambient songs. Generates a solo piano arrangement with optional pad accompaniment, piano-specific phrasing rules, smaller room reverb, and no delay on the lead voice.
 - **New Ambient rhythm instruments** — Church Bells, Windchime, and Tinker Bell added to the Ambient Rhythm instrument pool.
 - **Expanded Kosmic and Motorik instruments** — New synth bass options (Synth Bass 3, Synth Bass 4, Mean Saw Bass) added to Kosmic and Motorik bass pools; Saw Lead 3 added to Motorik Lead 1; Night Vision added to Motorik Lead 2.
-- **Ambient Piano sound improvements** — Improved Grand Piano tone and dynamics in Ambient Piano songs by manually editing the SF2 soundfont attenuation levels.
-- **SC55 Stereo piano** — After experimenting with several external SF2 piano soundfonts (Florestan, SC55 variants, Velocity Grand, Yamaha PSR), SC55 Stereo from the Roland SC55 soundfont emerged as the best option: more dynamic and natural-sounding than the GeneralUser GS Grand Piano. Now available as an Ambient Lead 1 option alongside Grand Piano and Piano & Str.-Fade.
+- **SC55 Stereo piano** — After experimenting with several external SF2 piano soundfonts (Florestan, SC55 variants, Velocity Grand, Yamaha PSR), SC55 Stereo from the Roland SC55 soundfont emerged as the best option: more dynamic and natural-sounding than the GeneralUser GS Grand Piano. Now used in Ambient, Ambient Piano and Chill.
 - **New drum kits** — Jazz Drums added to the Chill drum pool; Dance Drums added to the Motorik drum pool.
+**Custom Zudio.sf2** — Replaced the bundled GeneralUser GS soundfont with a trimmed custom build. 115 unused presets were removed — including the piano/brass family cluster, Violin, Pipe Organ, accordion, woodwinds and all sound-effect programs reducing the size from **29.8 MB to 20.9 MB**, a saving of **(30%)** which makes the Zudio app 9MB smaller.
 
 ---
 

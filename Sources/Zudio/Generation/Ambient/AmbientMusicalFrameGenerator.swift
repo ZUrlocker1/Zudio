@@ -85,7 +85,9 @@ struct AmbientMusicalFrameGenerator {
     static func pickLoopLengths(rng: inout SeededRNG) -> AmbientLoopLengths {
         // Rhythm and Texture: pick 2 distinct values from [23, 29, 31]
         var longPool: [Int] = [23, 29, 31]
-        longPool.swapAt(0, rng.nextInt(upperBound: 3))
+        for i in stride(from: longPool.count - 1, through: 1, by: -1) {
+            longPool.swapAt(i, rng.nextInt(upperBound: i + 1))
+        }
         let texture = longPool[0]
         let rhythm  = longPool[1]
 

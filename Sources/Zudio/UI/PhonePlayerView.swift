@@ -862,7 +862,7 @@ struct PhoneInfoView: View {
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
 
-                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, St Germain, Jean-Michel Jarre, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
+                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, St Germain, Keith Jarrett, Neu!, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -881,7 +881,7 @@ struct PhoneInfoView: View {
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 5)
-                    Text("Available for iPad and macOS with MIDI track view.")
+                    Text("Available on iPad, macOS w/ MIDI track view.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
