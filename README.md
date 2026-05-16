@@ -24,7 +24,7 @@ Current release: `1.5` (build 119). Universal binary — runs natively on both A
 **What's new in v1.5:**
 - **Ambient Piano** — a new Ambient sub-style (work in progress) featuring solo piano with optional pad accompaniment, smaller reverb, and piano-specific phrasing rules
 - **Improved piano sound** — switched to the SC55 Stereo piano soundfont for a more dynamic, natural-sounding piano in Ambient and Chill styles
-- **Smaller app size** — replaced the bundled general MIDI soundfont with a custom trimmed build (Zudio.sf2), removing 113 unused instrument presets. The soundfont shrinks from 29.8 MB to 20.9 MB, making the Zudio app roughly 9 MB smaller
+- **Smaller app size** — replaced the bundled general MIDI soundfont with a custom trimmed build (Zudio.sf2), removing 113 unused instrument presets. This makes the Zudio app 10 MB smaller
 - **New Ambient rhythm instruments** — Church Bells, Windchime, Tinker Bell added to the Ambient Rhythm pool
 - **Expanded Kosmic and Motorik instrument palettes** — new synth bass, lead, and pad options across both styles
 - **Chill** — more melodic solos with recurring themes, new pad textures, more rhythm and secondary lead variety
