@@ -129,10 +129,10 @@ struct ChillTitleGenerator {
     // MARK: - French word + modifier
 
     private static func frenchWord(rng: inout SeededRNG) -> String {
-        let words = ["Velours", "Sablier", "Solstice", "Brume", "Toile",
-                     "Azur", "Nuit", "Soiree", "Homard", "Crepuscule",
-                     "Lune", "Reflet", "Silence", "Calme", "Nuage", "Poisson",
-                     "Nocturne", "Etude", "Reverie", "Minuit", "Lumiere"]
+        let words = ["Velours", "Sablier", "Tournesol", "Fromage", "Stylo",
+                     "Pamplemousse", "Nuit", "Soiree", "Homard", "Cornichon",
+                     "Lune", "Poitrine", "Escargot", "Parapluie", "Nuage", "Poisson",
+                     "Nocturne", "Etude", "Reverie", "Gaufrier", "Lumiere"]
         let modifiers = [
             // Time-of-day
             "Late Night", "After Dark", "After Midnight", "Before Dawn",

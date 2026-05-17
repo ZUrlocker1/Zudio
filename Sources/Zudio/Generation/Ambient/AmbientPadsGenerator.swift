@@ -152,40 +152,25 @@ struct AmbientPadsGenerator {
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
         let roll = rng.nextDouble()
+        // Select rule ID based on piano rule and roll.
+        // AMB-PNO-001: 50% sparse drone, 20% halo shimmer, 20% warm sustain, 10% staggered strings
+        // AMB-PNO-002: 50% staggered strings, 20% halo shimmer, 20% warm sustain, 10% sparse drone
+        // AMB-PNO-003: always warm sustain
+        let chosen: String
         switch pianoRule {
         case "AMB-PNO-001":
-            // 50% sparse drone, 20% halo shimmer, 20% warm sustain, 10% staggered strings
-            if roll < 0.50 {
-                usedRuleIDs.insert("AMB-PADS-007")
-                return sparseDroneFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            } else if roll < 0.70 {
-                usedRuleIDs.insert("AMB-PADS-010")
-                return haloShimmerFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            } else if roll < 0.90 {
-                usedRuleIDs.insert("AMB-PADS-009")
-                return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            } else {
-                usedRuleIDs.insert("AMB-PADS-008")
-                return staggeredStringsFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            }
+            chosen = roll < 0.50 ? "AMB-PADS-007" : roll < 0.70 ? "AMB-PADS-010" : roll < 0.90 ? "AMB-PADS-009" : "AMB-PADS-008"
         case "AMB-PNO-003":
-            usedRuleIDs.insert("AMB-PADS-009")
-            return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+            chosen = "AMB-PADS-009"
         default:
-            // AMB-PNO-002: 50% staggered strings, 20% halo shimmer, 20% warm sustain, 10% sparse drone
-            if roll < 0.50 {
-                usedRuleIDs.insert("AMB-PADS-008")
-                return staggeredStringsFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            } else if roll < 0.70 {
-                usedRuleIDs.insert("AMB-PADS-010")
-                return haloShimmerFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            } else if roll < 0.90 {
-                usedRuleIDs.insert("AMB-PADS-009")
-                return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            } else {
-                usedRuleIDs.insert("AMB-PADS-007")
-                return sparseDroneFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
-            }
+            chosen = roll < 0.50 ? "AMB-PADS-008" : roll < 0.70 ? "AMB-PADS-010" : roll < 0.90 ? "AMB-PADS-009" : "AMB-PADS-007"
+        }
+        usedRuleIDs.insert(chosen)
+        switch chosen {
+        case "AMB-PADS-007": return sparseDroneFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+        case "AMB-PADS-008": return staggeredStringsFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+        case "AMB-PADS-010": return haloShimmerFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
+        default:             return warmSustainFullSong(tonalMap: tonalMap, totalBars: totalBars, rng: &rng)
         }
     }
 

@@ -557,13 +557,14 @@ struct AmbientLeadGenerator {
         totalBars: Int,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        introEndBar: Int = 0
+        introEndBar: Int = 0,
+        isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         usedRuleIDs.insert(pianoRule)
         switch pianoRule {
-        case "AMB-PNO-001": return floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs)
-        case "AMB-PNO-003": return dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng)
-        default:            return pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar)
+        case "AMB-PNO-001": return floatingTonesFullSong(frame: frame, totalBars: totalBars, rng: &rng, usedRuleIDs: &usedRuleIDs, isEvolvePass: isEvolvePass)
+        case "AMB-PNO-003": return dramaticArcFullSong(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
+        default:            return pensiveMelodyFullSong(frame: frame, totalBars: totalBars, rng: &rng, introEndBar: introEndBar, isEvolvePass: isEvolvePass)
         }
     }
 
@@ -571,24 +572,24 @@ struct AmbientLeadGenerator {
 
     private static func floatingTonesFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         let r = rng.nextDouble()
         if r < 0.40 {
             usedRuleIDs.remove("AMB-PNO-001"); usedRuleIDs.insert("AMB-PNO-001-BT")
-            return floatingTonesMode1(frame: frame, totalBars: totalBars, rng: &rng)
+            return floatingTonesMode1(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
         }
         if r < 0.75 {
             usedRuleIDs.remove("AMB-PNO-001"); usedRuleIDs.insert("AMB-PNO-001-CW")
-            return floatingTonesMode2(frame: frame, totalBars: totalBars, rng: &rng)
+            return floatingTonesMode2(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
         }
         usedRuleIDs.remove("AMB-PNO-001"); usedRuleIDs.insert("AMB-PNO-001-PD")
-        return floatingTonesMode3(frame: frame, totalBars: totalBars, rng: &rng)
+        return floatingTonesMode3(frame: frame, totalBars: totalBars, rng: &rng, isEvolvePass: isEvolvePass)
     }
 
     /// Mode 1 — Sparse floating: chord wash + 4-7 sparse events.
     private static func floatingTonesMode1(
-        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let scalePCs   = frame.scalePCs
@@ -601,7 +602,7 @@ struct AmbientLeadGenerator {
 
         let minEvents  = Swift.max(16, totalBars / 5)
         let eventCount = minEvents + rng.nextInt(upperBound: 6)
-        var cursor = (1 + rng.nextInt(upperBound: 2)) * 16
+        var cursor = isEvolvePass ? rng.nextInt(upperBound: 8) : (1 + rng.nextInt(upperBound: 2)) * 16
 
         for i in 0..<eventCount {
             guard cursor < totalSteps - 2 * 16 else { break }
@@ -834,7 +835,7 @@ struct AmbientLeadGenerator {
             guard rng.nextDouble() < 0.75 else { continue } // idea 2: higher probability
             guard let lastEIdx = evtNotes.firstIndex(of: ev.note) else { continue }
 
-            let connVel  = UInt8(14 + rng.nextInt(upperBound: 9))
+            let connVel  = UInt8(22 + rng.nextInt(upperBound: 9))
             let delta    = rng.nextDouble() < 0.50 ? 1 : -1
             let nbIdx    = Swift.max(0, Swift.min(evtNotes.count - 1, lastEIdx + delta))
 
@@ -853,7 +854,7 @@ struct AmbientLeadGenerator {
                     let lateDur      = Swift.min(12 + rng.nextInt(upperBound: 9), next.stepIndex - lateStep - 2)
                     if lateDur >= 6 && lateStep < next.stepIndex - 4 {
                         connectors.append(MIDIEvent(stepIndex: lateStep, note: evtNotes[nb2Idx],
-                                                    velocity: UInt8(Swift.max(12, Int(connVel) - 3)),
+                                                    velocity: UInt8(Swift.max(20, Int(connVel) - 3)),
                                                     durationSteps: lateDur))
                     }
                 }
@@ -877,7 +878,7 @@ struct AmbientLeadGenerator {
         }
         events.append(contentsOf: connectors)
 
-        return events.sorted { $0.stepIndex < $1.stepIndex }
+        return trimDissonances(events, totalSteps: totalSteps)
     }
 
     /// Mode 2 — Revealed chords: two alternating chords with melodic fragments woven into every gap.
@@ -886,7 +887,7 @@ struct AmbientLeadGenerator {
     /// an arpeggio reveal, a stepwise melodic drift, or a soft echo cascade. Velocity follows
     /// a gentle arc (softer opening and closing, fuller middle) for even dynamic balance.
     private static func floatingTonesMode2(
-        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let root     = frame.keySemitoneValue
@@ -1005,7 +1006,8 @@ struct AmbientLeadGenerator {
             let eventsLeft = target - i - 1
             let remaining  = Swift.max(1, totalSteps - startStep - dur)
             let avgGap     = eventsLeft > 0 ? remaining / (eventsLeft + 1) : remaining / 2
-            let denseMult: Double = (songPos < 0.15 || songPos > 0.80) ? 1.75 :
+            let denseMult: Double = isEvolvePass ? 0.85 :
+                                    (songPos < 0.15 || songPos > 0.80) ? 1.75 :
                                     (songPos < 0.30 || songPos > 0.65) ? 1.20 : 0.85
             let scaledAvg  = Swift.max(8, Int(Double(avgGap) * denseMult))
             let rawGap = rng.nextDouble() < 0.60
@@ -1125,7 +1127,7 @@ struct AmbientLeadGenerator {
                         : Swift.min(3 + rng.nextInt(upperBound: 4), gapEnd - s)
                     guard noteDur >= 2 else { break }
                     events.append(MIDIEvent(stepIndex: s, note: scaleHigh[idx],
-                                            velocity: UInt8(Swift.max(12, Int(gVel) - n * 6)),
+                                            velocity: UInt8(Swift.max(20, Int(gVel) - n * 6)),
                                             durationSteps: noteDur))
                     s += noteDur + 3 + rng.nextInt(upperBound: 5)
                 }
@@ -1135,7 +1137,7 @@ struct AmbientLeadGenerator {
         // ── Closing chord: tonic resolution when song trails off ──
         let lastStep   = events.max(by: { $0.stepIndex < $1.stepIndex })?.stepIndex ?? 0
         let trailSteps = totalSteps - lastStep
-        if trailSteps > 9 * 16 {
+        if !isEvolvePass && trailSteps > 9 * 16 {
             let closingStep = totalSteps - (9 + rng.nextInt(upperBound: 2)) * 16
             let closingDur  = Swift.min(totalSteps - closingStep - 4, 2 * 16)
             if closingStep > lastStep + 16 && closingDur >= 16 {
@@ -1153,7 +1155,7 @@ struct AmbientLeadGenerator {
 
     /// Mode 3 — Chromatic pendulum: metronomic A↔B cluster oscillation every beat.
     private static func floatingTonesMode3(
-        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let scalePCs   = frame.scalePCs
@@ -1190,7 +1192,7 @@ struct AmbientLeadGenerator {
         // Each cycle: a 3-5 note phrase (3-10 steps/note, short piano-appropriate durations)
         // descending through allMid, then 2-3 bars of a0/a1 fragments. Melody stays above
         // anchorIdx+1 so it never collides with the pendulum register until handoff.
-        var oCursor  = 16  // bar 2
+        var oCursor  = isEvolvePass ? 0 : 16  // bar 1 for evolve passes, bar 2 otherwise
         var melIdx   = allMid.count - 1 - rng.nextInt(upperBound: 2)  // near top of register
         var oFlip    = true
         let openEnd  = pendStart * 16
@@ -1225,7 +1227,7 @@ struct AmbientLeadGenerator {
             let fragEnd   = Swift.min(s + fragBars * 16, openEnd)
             let fragCount = 1 + Int(progress * 3.5) + rng.nextInt(upperBound: 2)
             var fs = s + 2 + rng.nextInt(upperBound: 6)
-            let fragVel   = UInt8(Swift.max(12, velBase - 10))
+            let fragVel   = UInt8(Swift.max(20, velBase - 10))
             for _ in 0..<fragCount {
                 guard fs + 3 < fragEnd else { break }
                 let fNote = oFlip ? a0 : a1
@@ -1338,7 +1340,7 @@ struct AmbientLeadGenerator {
             let fragEnd   = Swift.min(s + fragBars * 16, totalSteps)
             let fragCount = 1 + Int(progress * 3.5) + rng.nextInt(upperBound: 2)
             var fs = s + 2 + rng.nextInt(upperBound: 6)
-            let fragVel   = UInt8(Swift.max(10, velBase - 10))
+            let fragVel   = UInt8(Swift.max(20, velBase - 10))
             for _ in 0..<fragCount {
                 guard fs + 3 < fragEnd else { break }
                 let fNote = cFlip ? a0 : a1
@@ -1355,14 +1357,14 @@ struct AmbientLeadGenerator {
             cCursor = fragEnd
         }
 
-        return events.sorted { $0.stepIndex < $1.stepIndex }
+        return trimDissonances(events, totalSteps: totalSteps)
     }
 
     // MARK: AMB-PNO-002 — Pensive Melody (Satie / Arnalds)
 
     private static func pensiveMelodyFullSong(
         frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG,
-        introEndBar: Int = 0
+        introEndBar: Int = 0, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let scalePCs   = frame.scalePCs
@@ -1462,21 +1464,22 @@ struct AmbientLeadGenerator {
                                    velCap: 60)
         }
 
-        // Phrase 4 — closing cadence
+        // Phrases 4 & 5 — closing cadences (suppressed for evolve passes)
         let p4off = rng.nextInt(upperBound: Swift.max(1, wLen / 2))
-        events += pno002Phrase(type: 2, startStep: w4 + p4off,
-                               pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
-                               upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng,
-                               velCap: 36)
-
-        // Phrase 5 — sparse final exhale for long songs (>90 bars), very soft cadence
-        if totalBars > 90 {
-            let w5 = Swift.min(totalBars * 90 / 100, totalBars - 4) * 16
-            if w5 > w4 + wLen {
-                events += pno002Phrase(type: 2, startStep: w5,
-                                       pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
-                                       upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng,
-                                       velCap: 24)
+        if !isEvolvePass {
+            events += pno002Phrase(type: 2, startStep: w4 + p4off,
+                                   pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
+                                   upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng,
+                                   velCap: 36)
+            // Phrase 5 — sparse final exhale for long songs (>90 bars), very soft cadence
+            if totalBars > 90 {
+                let w5 = Swift.min(totalBars * 90 / 100, totalBars - 4) * 16
+                if w5 > w4 + wLen {
+                    events += pno002Phrase(type: 2, startStep: w5,
+                                           pivot: pivot, neighbor: neighbor, lowerAnchor: lowerAnchor,
+                                           upper: upper, lower: lower, totalSteps: totalSteps, rng: &rng,
+                                           velCap: 24)
+                }
             }
         }
 
@@ -1769,7 +1772,7 @@ struct AmbientLeadGenerator {
     // MARK: AMB-PNO-003 — Dramatic Arc (Winston / Jarrett)
 
     private static func dramaticArcFullSong(
-        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG
+        frame: GlobalMusicalFrame, totalBars: Int, rng: inout SeededRNG, isEvolvePass: Bool = false
     ) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let scalePCs   = frame.scalePCs
@@ -2219,7 +2222,7 @@ struct AmbientLeadGenerator {
                 guard ss < totalSteps - 6 else { break }
                 let rootIdx = rng.nextInt(upperBound: Swift.max(1, shockPool.count / 2))
                 let sRoot   = shockPool[rootIdx]
-                let sVel    = UInt8(68 + rng.nextInt(upperBound: 18))
+                let sVel    = UInt8(56 + rng.nextInt(upperBound: 18))
                 let sDur    = Swift.min(6 + rng.nextInt(upperBound: 5), totalSteps - ss)
                 guard sDur >= 4 else { break }
                 events.append(MIDIEvent(stepIndex: ss, note: sRoot, velocity: sVel, durationSteps: sDur))
@@ -2234,7 +2237,7 @@ struct AmbientLeadGenerator {
                     let gap2  = rng.nextDouble() < 0.50 ? 2 + rng.nextInt(upperBound: 3)
                                                         : 5 + rng.nextInt(upperBound: 4)
                     let ss2   = ss + gap2
-                    let sVel2 = UInt8(Swift.max(50, Int(sVel) - 8 - rng.nextInt(upperBound: 8)))
+                    let sVel2 = UInt8(Swift.max(38, Int(sVel) - 8 - rng.nextInt(upperBound: 8)))
                     let sDur2 = Swift.min(4 + rng.nextInt(upperBound: 4), totalSteps - ss2)
                     if ss2 < totalSteps - 4, sDur2 >= 2 {
                         events.append(MIDIEvent(stepIndex: ss2, note: sRoot, velocity: sVel2, durationSteps: sDur2))
@@ -2268,37 +2271,52 @@ struct AmbientLeadGenerator {
             // Pentatonic pools have only 4-5 notes in the lhMid range; stride-2 gives 5-7st leaps.
             // Stride-1 keeps within-chord intervals at 2-3st (step/skip), preserving lyricism.
             let lhStride  = (frame.mode == .MinorPentatonic || frame.mode == .MajorPentatonic) ? 1 : 2
-            // True when two MIDI pitches form a minor 2nd, tritone, or major 7th.
-            let dissonant: (UInt8, UInt8) -> Bool = { a, b in
-                let ivl = abs(Int(a) - Int(b)) % 12
-                return ivl == 1 || ivl == 6 || ivl == 11
-            }
-            // Snapshot of melody notes (>= C4) already generated — used below to steer
-            // bass note selection away from minor-2nd / tritone / maj-7th clashes.
+            // Snapshot of RH melody notes already generated — used to score bass candidates.
             let melodySnap = events.filter { $0.note >= 55 }
             for lhBar in 0..<totalBars {
                 let barStep = lhBar * 16
                 guard barStep < totalSteps else { break }
-                // Bass steps through pool, changing every 2 bars for harmonic variety.
-                // If the default candidate clashes with melody notes in this bar, try
-                // other lhBass candidates, preferring whichever is closest to the root.
+                // Bass cycles through pool every 2 bars for harmonic movement.
                 let defaultIdx = (lhRootIdx + (lhBar / 2) % Swift.max(1, lhBass.count / 2)) % lhBass.count
                 let barEnd = barStep + 16
                 let melodyInBar = melodySnap.filter {
                     $0.stepIndex < barEnd && ($0.stepIndex + $0.durationSteps) > barStep
                 }
-                let clashesWithMelody: (UInt8) -> Bool = { candidate in
-                    melodyInBar.contains { dissonant(candidate, $0.note) }
+                // Score each bass candidate by the harmony it creates with sustaining melody.
+                // P5/P4 (open, majestic) → thirds/sixths (warm) → m7 (jazzy) → penalise clashes.
+                // Ties broken by: default cycling pattern first, then proximity to root.
+                let scoreNote: (UInt8) -> Int = { candidate in
+                    var score = 0
+                    for mel in melodyInBar {
+                        let ivl = abs(Int(candidate) - Int(mel.note)) % 12
+                        switch ivl {
+                        case 7, 5:  score += 3   // P5, P4
+                        case 0:     score += 2   // octave
+                        case 4, 3:  score += 2   // M3, m3
+                        case 9, 8:  score += 2   // M6, m6
+                        case 10:    score += 1   // m7
+                        case 1, 11: score -= 10  // m2, M7
+                        case 6:     score -= 10  // tritone
+                        case 2 where Swift.min(candidate, mel.note) < 55:
+                                    score -= 8   // bass M2
+                        default:    break
+                        }
+                    }
+                    return score
                 }
                 let bIdx: Int
-                let defaultNote = lhBass[defaultIdx]
-                if clashesWithMelody(defaultNote),
-                   let alt = lhBass.indices
-                       .filter({ $0 != defaultIdx && !clashesWithMelody(lhBass[$0]) })
-                       .min(by: { abs(Int(lhBass[$0]) - Int(lhRoot)) < abs(Int(lhBass[$1]) - Int(lhRoot)) }) {
-                    bIdx = alt
-                } else {
+                if melodyInBar.isEmpty {
                     bIdx = defaultIdx
+                } else {
+                    bIdx = lhBass.indices
+                        .sorted {
+                            let s0 = scoreNote(lhBass[$0]), s1 = scoreNote(lhBass[$1])
+                            if s0 != s1 { return s0 > s1 }
+                            if $0 == defaultIdx { return true }
+                            if $1 == defaultIdx { return false }
+                            return abs(Int(lhBass[$0]) - Int(lhRoot)) < abs(Int(lhBass[$1]) - Int(lhRoot))
+                        }
+                        .first ?? defaultIdx
                 }
                 let bNote = lhBass[bIdx]
                 let bVel  = UInt8(38 + rng.nextInt(upperBound: 12))
@@ -2307,64 +2325,27 @@ struct AmbientLeadGenerator {
                 // Beat 2 (step 4): 2-note chord stab — skip both beats 2+3 on ~20% of bars
                 // for Jarrett-style breathing space (just bass + optional beat 4).
                 let skipInner = rng.nextDouble() < 0.20
-                // Track which beat-2 notes were actually emitted — they sustain 6 steps and
-                // overlap beat 3 (which fires at step 8), so beat-3 must check against them.
-                var beat2Active: [UInt8] = []
                 if !skipInner && barStep + 4 < totalSteps {
                     let mIdx  = (lhBar + 1) % lhMid.count
                     let mIdx2 = (lhBar + 1 + lhStride) % lhMid.count
                     let cv    = UInt8(30 + rng.nextInt(upperBound: 10))
-                    let n1 = lhMid[mIdx], n2 = lhMid[mIdx2]
-                    if !dissonant(bNote, n1) {
-                        events.append(MIDIEvent(stepIndex: barStep + 4, note: n1, velocity: cv, durationSteps: 6))
-                        beat2Active.append(n1)
-                    }
-                    if !dissonant(bNote, n2) && beat2Active.allSatisfy({ !dissonant($0, n2) }) {
-                        events.append(MIDIEvent(stepIndex: barStep + 4, note: n2, velocity: cv - 3, durationSteps: 6))
-                        beat2Active.append(n2)
-                    }
+                    events.append(MIDIEvent(stepIndex: barStep + 4, note: lhMid[mIdx],  velocity: cv,     durationSteps: 6))
+                    events.append(MIDIEvent(stepIndex: barStep + 4, note: lhMid[mIdx2], velocity: cv - 3, durationSteps: 6))
                 }
-                // Beat 3 (step 8): inner-voice repeat — 65% of bars (was every bar).
-                // Check each candidate against the bass and against beat-2 notes still sustaining.
+                // Beat 3 (step 8): inner-voice repeat — 65% of bars.
                 if !skipInner && barStep + 8 < totalSteps && rng.nextDouble() < 0.65 {
                     let mIdx3 = (lhBar + 2) % lhMid.count
                     let mIdx4 = (lhBar + 2 + lhStride) % lhMid.count
                     let cv2   = UInt8(26 + rng.nextInt(upperBound: 10))
-                    var beat3Active: [UInt8] = []
-                    let n3 = lhMid[mIdx3]
-                    if !dissonant(bNote, n3) && beat2Active.allSatisfy({ !dissonant($0, n3) }) {
-                        events.append(MIDIEvent(stepIndex: barStep + 8, note: n3, velocity: cv2, durationSteps: 5))
-                        beat3Active.append(n3)
-                    }
-                    let n4 = lhMid[mIdx4]
-                    if !dissonant(bNote, n4) && beat2Active.allSatisfy({ !dissonant($0, n4) })
-                                             && beat3Active.allSatisfy({ !dissonant($0, n4) }) {
-                        events.append(MIDIEvent(stepIndex: barStep + 8, note: n4, velocity: cv2 - 3, durationSteps: 5))
-                    }
+                    events.append(MIDIEvent(stepIndex: barStep + 8, note: lhMid[mIdx3], velocity: cv2,     durationSteps: 5))
+                    events.append(MIDIEvent(stepIndex: barStep + 8, note: lhMid[mIdx4], velocity: cv2 - 3, durationSteps: 5))
                 }
                 // Beat 4 (step 12): single lighter note — breathing space (45% of bars).
-                // Uses the same pool index as beat-3, so the bass check is sufficient.
                 if barStep + 12 < totalSteps, rng.nextDouble() < 0.45 {
                     let mIdx5 = (lhBar + 2) % lhMid.count
-                    let n5 = lhMid[mIdx5]
-                    if !dissonant(bNote, n5) {
-                        events.append(MIDIEvent(stepIndex: barStep + 12, note: n5,
-                                                velocity: UInt8(22 + rng.nextInt(upperBound: 8)), durationSteps: 4))
-                    }
+                    events.append(MIDIEvent(stepIndex: barStep + 12, note: lhMid[mIdx5],
+                                            velocity: UInt8(22 + rng.nextInt(upperBound: 8)), durationSteps: 4))
                 }
-            }
-        }
-
-        // Drop high RH notes (>= E5 / MIDI 76) that would clash (m2, tritone, M7) with a
-        // simultaneously active lower note (< C5 / MIDI 73). Suppresses cross-register
-        // dissonance introduced by high-register reach and follow-up phrases.
-        let lhSnapshot = events.filter { $0.note < 73 }
-        events = events.filter { ev in
-            guard ev.note >= 76 else { return true }
-            let evEnd = ev.stepIndex + ev.durationSteps
-            return !lhSnapshot.contains { lh in
-                lh.stepIndex < evEnd && (lh.stepIndex + lh.durationSteps) > ev.stepIndex
-                    && [1, 6, 11].contains(abs(Int(ev.note) - Int(lh.note)) % 12)
             }
         }
 
@@ -2400,11 +2381,11 @@ struct AmbientLeadGenerator {
             }
         }
 
-        // Jarrett-style resolution chord in the last 3 bars — three voicing variants chosen
-        // randomly: A=spread triad, B=add9, C=slow roll. All start with bass root on beat 1.
+        // Jarrett-style resolution chord in the last 3 bars — suppressed for evolve passes
+        // (anchor song's outro already provides the true ending chord).
         let resBar  = totalBars - 3
         let resStep = resBar * 16
-        if resStep > 0, resStep < totalSteps {
+        if !isEvolvePass, resStep > 0, resStep < totalSteps {
             events = events.filter { $0.stepIndex < resStep }
             let rootPC  = frame.keySemitoneValue % 12
             let fifthPC = (rootPC + 7) % 12
@@ -2484,12 +2465,44 @@ struct AmbientLeadGenerator {
 
     // MARK: - Shared helpers
 
+    /// Removes Lead 1 notes that form dissonant intervals with simultaneously sustained Pads notes.
+    /// Operates cross-track — `trimDissonances` only sees a single track, so this fills that gap.
+    static func trimLeadAgainstPads(_ lead: [MIDIEvent], pads: [MIDIEvent], totalSteps: Int) -> [MIDIEvent] {
+        func isDissonant(_ a: UInt8, _ b: UInt8) -> Bool {
+            let ivl = abs(Int(a) - Int(b)) % 12
+            return ivl == 1 || ivl == 6 || ivl == 11 || (ivl == 2 && Swift.min(a, b) < 55)
+        }
+        guard !pads.isEmpty else { return lead }
+        var result = lead.sorted { $0.stepIndex < $1.stepIndex }
+        var dropIndices = Set<Int>()
+        for i in 0..<result.count where !dropIndices.contains(i) {
+            for pad in pads {
+                let overlapStart = max(result[i].stepIndex, pad.stepIndex)
+                let overlapEnd   = min(result[i].stepIndex + result[i].durationSteps,
+                                       pad.stepIndex      + pad.durationSteps)
+                guard overlapEnd > overlapStart else { continue }
+                guard isDissonant(result[i].note, pad.note) else { continue }
+                if pad.stepIndex > result[i].stepIndex {
+                    let trimmedDur = pad.stepIndex - result[i].stepIndex - 1
+                    if trimmedDur >= 4 {
+                        result[i] = MIDIEvent(stepIndex: result[i].stepIndex, note: result[i].note,
+                                              velocity: result[i].velocity, durationSteps: trimmedDur)
+                    } else { dropIndices.insert(i) }
+                } else {
+                    dropIndices.insert(i)
+                }
+                break
+            }
+        }
+        return result.indices.filter { !dropIndices.contains($0) }.map { result[$0] }
+    }
+
     /// Trims or drops notes that form dissonant intervals when sustained simultaneously.
     /// Catches: minor 2nd (1), tritone (6), major 7th (11), bass major 2nd (2 when both < 57).
     private static func trimDissonances(_ events: [MIDIEvent], totalSteps: Int) -> [MIDIEvent] {
         func isDissonant(_ a: UInt8, _ b: UInt8) -> Bool {
             let ivl = abs(Int(a) - Int(b)) % 12
-            return ivl == 1 || ivl == 6 || ivl == 11 || (ivl == 2 && a < 57 && b < 57)
+            return ivl == 1 || ivl == 6 || ivl == 11 || (ivl == 2 && Swift.min(a, b) < 55)
         }
         var trimmed = events.filter { $0.stepIndex < totalSteps }.sorted { $0.stepIndex < $1.stepIndex }
         var dropIndices = Set<Int>()
@@ -2498,17 +2511,28 @@ struct AmbientLeadGenerator {
                 let b = trimmed[j]
                 guard b.stepIndex < trimmed[i].stepIndex + trimmed[i].durationSteps else { break }
                 if isDissonant(trimmed[i].note, b.note) {
-                    let trimmedDur = b.stepIndex - trimmed[i].stepIndex - 1
-                    if trimmedDur >= 4 {
-                        trimmed[i] = MIDIEvent(stepIndex: trimmed[i].stepIndex, note: trimmed[i].note,
-                                               velocity: trimmed[i].velocity, durationSteps: trimmedDur)
-                    } else if b.durationSteps < trimmed[i].durationSteps {
-                        dropIndices.insert(j)
-                    } else if trimmedDur >= 1 {
-                        trimmed[i] = MIDIEvent(stepIndex: trimmed[i].stepIndex, note: trimmed[i].note,
-                                               velocity: trimmed[i].velocity, durationSteps: trimmedDur)
-                    } else if trimmed[i].note < 57 && b.note < 57 {
-                        dropIndices.insert(trimmed[i].note > b.note ? i : j)
+                    if b.stepIndex == trimmed[i].stepIndex {
+                        // Same start step — drop the quieter note
+                        dropIndices.insert(trimmed[i].velocity >= b.velocity ? j : i)
+                    } else {
+                        let trimmedDur = b.stepIndex - trimmed[i].stepIndex - 1
+                        if trimmedDur >= 4 {
+                            // If the later note is much shorter (bass intruding on a sustained
+                            // melody), drop the intruder rather than truncating the melody.
+                            if b.durationSteps * 2 < trimmed[i].durationSteps {
+                                dropIndices.insert(j)
+                            } else {
+                                trimmed[i] = MIDIEvent(stepIndex: trimmed[i].stepIndex, note: trimmed[i].note,
+                                                       velocity: trimmed[i].velocity, durationSteps: trimmedDur)
+                            }
+                        } else if b.durationSteps < trimmed[i].durationSteps {
+                            dropIndices.insert(j)
+                        } else if trimmedDur >= 1 {
+                            trimmed[i] = MIDIEvent(stepIndex: trimmed[i].stepIndex, note: trimmed[i].note,
+                                                   velocity: trimmed[i].velocity, durationSteps: trimmedDur)
+                        } else {
+                            dropIndices.insert(trimmed[i].velocity >= b.velocity ? j : i)
+                        }
                     }
                 }
             }

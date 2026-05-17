@@ -354,10 +354,6 @@ final class AppState: ObservableObject {
     // Incremented each time a new pre-gen is started; stale task completions that carry an old
     // token are discarded so they can't overwrite nextSongState with the wrong style.
 
-    // Set when the ambient modal-shift extension has been triggered for the current endless song.
-    // Prevents the second onApproachingEnd (on the extended state) from re-triggering the shift.
-    private var ambientEndlessModalShiftDone = false
-
     // Set by onApproachingEnd so preGenerateNextSong() logs "Up next" when it finishes.
     // Kept false for silent pre-gen calls (generateNew, startEndlessSong).
     private var shouldLogNextUpWhenReady = false
@@ -861,10 +857,7 @@ final class AppState: ObservableObject {
             guard let self else { return }
             switch self.playMode {
             case .endless:
-                // Ambient piano: first firing triggers modal shift; second firing pre-gens next song.
-                if self.songState?.isAmbientPiano == true && !self.ambientEndlessModalShiftDone {
-                    self.handleAmbientEndlessModalShift()
-                } else if let next = self.nextSongState {
+                if let next = self.nextSongState {
                     self.upNextLogged = true
                     _ = next
                 } else {
@@ -1479,36 +1472,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    // MARK: - Ambient Endless modal shift
-
-    private func handleAmbientEndlessModalShift() {
-        guard let anchor = songState, playMode == .endless else { return }
-        ambientEndlessModalShiftDone = true
-        let complementMode = anchor.frame.mode.complementaryMode
-        let outroStartBar  = anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let phase1 = Self.buildAmbientModalShiftPass(anchor: anchor, mode: complementMode, passBars: 16)
-            let phase2 = Self.buildAmbientModalShiftPass(anchor: anchor, mode: anchor.frame.mode,  passBars: 8)
-            await MainActor.run { [weak self] in
-                guard let self, self.playMode == .endless else { return }
-                let extended = Self.buildExtendedState(
-                    anchor: anchor, outroStartBar: outroStartBar,
-                    pass1Events: phase1.trackEvents, pass1Bars: 16,
-                    pass2Events: phase2.trackEvents, pass2Bars: 8,
-                    includeOutro: true)
-                self.songState = extended
-                let toName   = "\(anchor.frame.key) \(complementMode.rawValue)"
-                let fromName = "\(anchor.frame.key) \(anchor.frame.mode.rawValue)"
-                self.appendToLog([
-                    GenerationLogEntry(tag: "Modal",  description: "\(fromName) → \(toName) (16 bars)", isTitle: false),
-                    GenerationLogEntry(tag: "Return", description: "\(fromName) (8 bars)",               isTitle: false)
-                ])
-                self.playback.loadAndPlay(state: extended, fromStep: outroStartBar * 16)
-            }
-        }
-    }
-
     private nonisolated static func buildAmbientModalShiftPass(
         anchor: SongState, mode: Mode, passBars: Int
     ) -> SongState {
@@ -1533,7 +1496,7 @@ final class AppState: ObservableObject {
         var padRules:   Set<String> = []
         let lead1Events = AmbientLeadGenerator.generateAmbientPianoLead(
             pianoRule: anchor.ambientPianoRule, frame: shiftedFrame, totalBars: passBars,
-            rng: &rng1, usedRuleIDs: &lead1Rules)
+            rng: &rng1, usedRuleIDs: &lead1Rules, isEvolvePass: true)
 
         var events = Array(repeating: [MIDIEvent](), count: kTrackCount)
         events[kTrackLead1] = lead1Events
@@ -1541,6 +1504,8 @@ final class AppState: ObservableObject {
             events[kTrackPads] = AmbientPadsGenerator.generateAmbientPianoPads(
                 pianoRule: anchor.ambientPianoRule, frame: shiftedFrame, tonalMap: tonalMap,
                 totalBars: passBars, rng: &rng2, usedRuleIDs: &padRules)
+            events[kTrackLead1] = AmbientLeadGenerator.trimLeadAgainstPads(
+                events[kTrackLead1], pads: events[kTrackPads], totalSteps: passBars * 16)
         }
 
         let minStruct = SongStructure(sections: [], chordPlan: [],
@@ -1720,7 +1685,6 @@ final class AppState: ObservableObject {
         selectedStyle                = state.style
         shouldLogNextUpWhenReady     = false   // reset — next pre-gen is silent until trigger fires
         upNextLogged                 = false
-        ambientEndlessModalShiftDone = false
         nextSongState   = nil
         isPreGenerating = false
         preGenerateNextSong()   // silently pre-gen the song after next; starts during the gap
@@ -2049,10 +2013,6 @@ final class AppState: ObservableObject {
                             pass1Events: pass1.trackEvents, pass1Bars: self.evolvePass1Bars,
                             pass2Events: state.trackEvents, pass2Bars: passBars)
                         self.songState = extended
-                        let returnQuality = anchor.frame.mode.isMajorFlavored ? "major" : "minor"
-                        self.appendToLog([GenerationLogEntry(tag: "Upcoming",
-                            description: "Evolving \(passBars) bars, return to \(returnQuality)",
-                            isTitle: false)])
                     }
                 }
             }
@@ -2153,10 +2113,10 @@ final class AppState: ObservableObject {
         lastEmittedStep  = outroStartBar * 16 - 1
         visibleBarOffset = max(0, outroStartBar - Int(Double(visibleBars) * 0.15))
         if anchor.isAmbientPiano {
-            let comp = anchor.frame.mode.complementaryMode
-            let quality = comp.isMajorFlavored ? "major" : "minor"
-            appendToLog([GenerationLogEntry(tag: "Modal",
-                description: "\(anchor.frame.key) \(anchor.frame.mode.rawValue) → \(quality) (\(evolvePass1Bars) bars)",
+            let comp   = anchor.frame.mode.complementaryMode
+            let barTag = String(format: "Bar %03d", outroStartBar + 1)
+            appendToLog([GenerationLogEntry(tag: barTag,
+                description: "Shifting to \(anchor.frame.key) \(comp.rawValue) (\(evolvePass1Bars) bars)",
                 isTitle: false)])
         } else {
             switchEvolveInstruments(freshTracks: [kTrackLead1, kTrackLead2])
@@ -2182,9 +2142,9 @@ final class AppState: ObservableObject {
         lastEmittedStep  = pass2StartBar * 16 - 1
         visibleBarOffset = max(0, pass2StartBar - Int(Double(visibleBars) * 0.15))
         if anchor.isAmbientPiano {
-            let quality = anchor.frame.mode.isMajorFlavored ? "major" : "minor"
-            appendToLog([GenerationLogEntry(tag: "Return",
-                description: "→ \(anchor.frame.key) \(anchor.frame.mode.rawValue) / \(quality) (\(evolvePass2Bars) bars)",
+            let barTag = String(format: "Bar %03d", pass2StartBar + 1)
+            appendToLog([GenerationLogEntry(tag: barTag,
+                description: "Back to \(anchor.frame.key) \(anchor.frame.mode.rawValue) (\(evolvePass2Bars) bars)",
                 isTitle: false)])
         } else {
             switchEvolveInstruments(freshTracks: [kTrackPads, kTrackRhythm])
@@ -2204,10 +2164,8 @@ final class AppState: ObservableObject {
                                                    pass1Events: pass1.trackEvents, pass1Bars: evolvePass1Bars)
             songState = extended
             if anchor.isAmbientPiano {
-                let comp    = anchor.frame.mode.complementaryMode
-                let quality = comp.isMajorFlavored ? "major" : "minor"
                 appendToLog([GenerationLogEntry(tag: "Upcoming",
-                    description: "Evolving \(evolvePass1Bars) bars, \(quality)",
+                    description: "\(evolvePass1Bars) bar modal shift",
                     isTitle: false)])
             } else {
                 appendToLog([GenerationLogEntry(tag: "Upcoming",
@@ -3149,6 +3107,7 @@ final class AppState: ObservableObject {
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
         if wasPlaying || forcePlay { playback.play() }
+        if playMode == .evolve { tearDownEvolve(); startEvolveMode(from: state) }
     }
 
     /// Loads a song from persistedHistory. Fast path: already in session memory.
@@ -3209,6 +3168,7 @@ final class AppState: ObservableObject {
                 self.restoreLead2Mirror()
                 self.applyLead2Mirror(for: state)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
+                if self.playMode == .evolve { self.tearDownEvolve(); self.startEvolveMode(from: state) }
             }
         }
     }

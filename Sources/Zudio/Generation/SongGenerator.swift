@@ -567,7 +567,7 @@ struct SongGenerator {
             var padRules: Set<String> = []
             let padChance: Double
             switch pianoRule {
-            case "AMB-PNO-001": padChance = 0.85
+            case "AMB-PNO-001": padChance = 1.00
             case "AMB-PNO-003": padChance = 0.20
             default:            padChance = 0.50
             }
@@ -575,6 +575,8 @@ struct SongGenerator {
                 trackEvents[kTrackPads] = AmbientPadsGenerator.generateAmbientPianoPads(
                     pianoRule: pianoRule, frame: frame, tonalMap: tonalMap,
                     totalBars: frame.totalBars, rng: &padsRNG, usedRuleIDs: &padRules)
+                trackEvents[kTrackLead1] = AmbientLeadGenerator.trimLeadAgainstPads(
+                    trackEvents[kTrackLead1], pads: trackEvents[kTrackPads], totalSteps: frame.totalBars * 16)
             }
 
             let title = AmbientTitleGenerator.generate(rng: &rng)

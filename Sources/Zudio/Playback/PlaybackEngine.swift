@@ -985,8 +985,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.0    // Stereo Piano — gain via boostBaseMultiplier
             } else if trackIndex == kTrackLead1 && program == 46 {
                 vol = 1.35   // Harp runs soft in GM on Lead 1 — boost for presence
+            } else if trackIndex == kTrackLead1 && program == 56 {
+                vol = 1.3    // Trumpet runs soft in GM on Lead 1 — boost for presence
+            } else if trackIndex == kTrackLead1 && program == 65 {
+                vol = 1.3    // Alto Sax runs soft in GM on Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 59 {
-                vol = 1.3    // Muted Trumpet runs soft in GM — boost for presence
+                vol = 1.5    // Muted Trumpet runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead2 && program == 11 {
                 vol = 1.45   // Vibraphone runs soft in GM — boost for presence
             } else if trackIndex == kTrackLead2 && program == 13 {
@@ -1066,7 +1070,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && motorikStyle && program == 29 {
                 vol = 0.75   // Fuzz Guitar runs hot on Motorik rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 5 {
-                vol = 0.40   // Wurlitzer runs hot on Kosmic rhythm — pull back
+                vol = 0.34   // Wurlitzer runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 18 {
                 vol = 0.60   // Rock Organ runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 {
@@ -1089,7 +1093,7 @@ final class PlaybackEngine: ObservableObject {
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
             } else if trackIndex == kTrackRhythm {
-                let mult: Float = (program == 61001) ? 2.5 : 1.0   // Stereo Piano needs boost; all others unity
+                let mult: Float = (program == 61001) ? 2.0 : 1.0   // Stereo Piano needs boost; all others unity
                 boostBaseMultiplier[kTrackRhythm] = mult
                 boosts[kTrackRhythm].outputVolume = mult * (boostEffectEnabled[kTrackRhythm] ? 1.7 : 1.0)
             }
