@@ -153,17 +153,17 @@ struct AmbientPadsGenerator {
     ) -> [MIDIEvent] {
         let roll = rng.nextDouble()
         // Select rule ID based on piano rule and roll.
-        // AMB-PNO-001: 50% sparse drone, 20% halo shimmer, 20% warm sustain, 10% staggered strings
-        // AMB-PNO-002: 50% staggered strings, 20% halo shimmer, 20% warm sustain, 10% sparse drone
-        // AMB-PNO-003: always warm sustain
+        // AMB-PNO-001: 20% sparse drone, 30% halo shimmer, 25% warm sustain, 25% staggered strings
+        // AMB-PNO-002: 40% staggered strings, 30% halo shimmer, 20% warm sustain, 10% sparse drone
+        // AMB-PNO-003: 50% warm sustain, 50% halo shimmer
         let chosen: String
         switch pianoRule {
         case "AMB-PNO-001":
-            chosen = roll < 0.50 ? "AMB-PADS-007" : roll < 0.70 ? "AMB-PADS-010" : roll < 0.90 ? "AMB-PADS-009" : "AMB-PADS-008"
+            chosen = roll < 0.20 ? "AMB-PADS-007" : roll < 0.50 ? "AMB-PADS-010" : roll < 0.75 ? "AMB-PADS-009" : "AMB-PADS-008"
         case "AMB-PNO-003":
-            chosen = "AMB-PADS-009"
+            chosen = roll < 0.50 ? "AMB-PADS-009" : "AMB-PADS-010"
         default:
-            chosen = roll < 0.50 ? "AMB-PADS-008" : roll < 0.70 ? "AMB-PADS-010" : roll < 0.90 ? "AMB-PADS-009" : "AMB-PADS-007"
+            chosen = roll < 0.40 ? "AMB-PADS-008" : roll < 0.70 ? "AMB-PADS-010" : roll < 0.90 ? "AMB-PADS-009" : "AMB-PADS-007"
         }
         usedRuleIDs.insert(chosen)
         switch chosen {
@@ -183,7 +183,7 @@ struct AmbientPadsGenerator {
         let sustainBars = 14 + rng.nextInt(upperBound: 8)   // 14-21 bars of audible chord
         let gapBars     = 4  + rng.nextInt(upperBound: 5)   // 4-8 bars of true silence
         let cycleBars   = sustainBars + gapBars
-        let baseVel     = 28 + rng.nextInt(upperBound: 9)
+        let baseVel     = 34 + rng.nextInt(upperBound: 11)
         let drones      = pianoDroneFoundation(tonalMap: tonalMap, low: 36, high: 52)
         guard !drones.isEmpty else { return [] }
 
@@ -193,7 +193,7 @@ struct AmbientPadsGenerator {
             let dur = Swift.min(sustainBars * 16, totalSteps - step)
             guard dur >= 16 else { break }
             for note in drones {
-                let v = UInt8(Swift.max(24, Swift.min(40, baseVel + rng.nextInt(upperBound: 5) - 2)))
+                let v = UInt8(Swift.max(28, Swift.min(48, baseVel + rng.nextInt(upperBound: 7) - 3)))
                 events.append(MIDIEvent(stepIndex: step, note: note, velocity: v, durationSteps: dur))
             }
             step += cycleBars * 16
@@ -253,7 +253,7 @@ struct AmbientPadsGenerator {
     private static func warmSustainFullSong(tonalMap: TonalGovernanceMap, totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         let totalSteps = totalBars * 16
         let reattack   = 128 + rng.nextInt(upperBound: 129)
-        let baseVel    = 38 + rng.nextInt(upperBound: 17)
+        let baseVel    = 28 + rng.nextInt(upperBound: 13)
         let drones     = pianoDroneFoundation(tonalMap: tonalMap, low: 36, high: 55)
         guard !drones.isEmpty else { return [] }
 
@@ -263,7 +263,7 @@ struct AmbientPadsGenerator {
             let dur = Swift.min(reattack - 8, totalSteps - step)
             guard dur > 0 else { break }
             for note in drones {
-                let v = UInt8(Swift.max(30, Swift.min(60, baseVel + rng.nextInt(upperBound: 9) - 4)))
+                let v = UInt8(Swift.max(22, Swift.min(48, baseVel + rng.nextInt(upperBound: 9) - 4)))
                 events.append(MIDIEvent(stepIndex: step, note: note, velocity: v, durationSteps: dur))
             }
             step += reattack

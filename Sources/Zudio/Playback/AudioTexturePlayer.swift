@@ -147,7 +147,7 @@ final class AudioTexturePlayer {
 
     private func volumeForTexture(_ filename: String) -> Float {
         switch filename {
-        case "light_rain.m4a":    return 0.10
+        case "light_rain.m4a":    return 0.07
         case "rain-and-thunder.m4a":    return 0.14
         case "ocean_waves.m4a":   return 0.05
         case "zen-bells.m4a":     return 0.18

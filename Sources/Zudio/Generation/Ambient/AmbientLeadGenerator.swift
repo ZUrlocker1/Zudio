@@ -1246,18 +1246,25 @@ struct AmbientLeadGenerator {
 
         // Pendulum body — A/B single-note alternation for stepwise melody; 35% chance adds chord texture
         // (cluster-only approach produced 0% stepwise — all within-cluster intervals are thirds)
+        let pendTotalSteps = Swift.max(1, (pendEnd - pendStart) * 16)
         var step = pendStart * 16; var useA = true
         while step < pendEnd * 16 && step < totalSteps {
             let primaryNote = useA ? a0 : a1  // alternate adjacent scale tones → stepwise motion
             let harmNote    = useA ? a2 : a3  // optional chord harmony a third above
             let dur = Swift.min(3 + rng.nextInt(upperBound: 2), totalSteps - step)
-            let clVel = UInt8(Swift.max(36, Swift.min(68, baseVel3 + rng.nextInt(upperBound: 13) - 6)))
+            // Slow sine breath (±10) over ~2.5 cycles through the pendulum + small per-note jitter (±4).
+            // Produces 2-3 dynamic swells so the section breathes rather than sitting uniformly loud.
+            let t = Double(step - pendStart * 16) / Double(pendTotalSteps)
+            let breathBoost = Int(sin(t * .pi * 2.5) * 10.0)
+            let clVel = UInt8(Swift.max(22, Swift.min(54, baseVel3 + breathBoost + rng.nextInt(upperBound: 9) - 4)))
             guard primaryNote >= 21 && primaryNote <= 108 else { useA.toggle(); step += 4; continue }
             events.append(MIDIEvent(stepIndex: step, note: UInt8(primaryNote), velocity: clVel, durationSteps: dur))
             if rng.nextDouble() < 0.35 && harmNote != primaryNote && harmNote >= 21 && harmNote <= 108 {
                 events.append(MIDIEvent(stepIndex: step, note: UInt8(harmNote),
                                         velocity: UInt8(clVel > 8 ? clVel - 8 : clVel), durationSteps: dur))
             }
+            // Primary bass every 2 bars (full velocity, octave doubled).
+            // Secondary lighter hit at every 1-bar mark (40% chance) fills sparse stretches like bars 29-33.
             if step % 32 == 0 {
                 let bassIdx = (step / 32) % bassSeq.count
                 let br = Int(bassSeq[bassIdx])
@@ -1267,6 +1274,14 @@ struct AmbientLeadGenerator {
                     events.append(MIDIEvent(stepIndex: step, note: UInt8(br), velocity: bVel, durationSteps: bd))
                     let br2 = br + 12
                     if br2 <= 50 { events.append(MIDIEvent(stepIndex: step, note: UInt8(br2), velocity: bVel, durationSteps: bd)) }
+                }
+            } else if step % 16 == 0 && rng.nextDouble() < 0.40 {
+                let bassIdx = (step / 32) % bassSeq.count
+                let br = Int(bassSeq[bassIdx])
+                let bd = Swift.min(14 + rng.nextInt(upperBound: 7), totalSteps - step)
+                let bVel = UInt8(Swift.max(26, Swift.min(48, baseVel3 - 12 + rng.nextInt(upperBound: 9) - 4)))
+                if bd >= 4 && br >= 21 && br <= 108 {
+                    events.append(MIDIEvent(stepIndex: step, note: UInt8(br), velocity: bVel, durationSteps: bd))
                 }
             }
             useA.toggle(); step += 4
@@ -2273,20 +2288,24 @@ struct AmbientLeadGenerator {
             let lhStride  = (frame.mode == .MinorPentatonic || frame.mode == .MajorPentatonic) ? 1 : 2
             // Snapshot of RH melody notes already generated — used to score bass candidates.
             let melodySnap = events.filter { $0.note >= 55 }
+            var prevBassNote: UInt8 = 0
             for lhBar in 0..<totalBars {
                 let barStep = lhBar * 16
                 guard barStep < totalSteps else { break }
-                // Bass cycles through pool every 2 bars for harmonic movement.
-                let defaultIdx = (lhRootIdx + (lhBar / 2) % Swift.max(1, lhBass.count / 2)) % lhBass.count
+                // Bass steps through the full pool every 2 bars (previously only covered half).
+                let defaultIdx = (lhRootIdx + (lhBar / 2)) % lhBass.count
                 let barEnd = barStep + 16
                 let melodyInBar = melodySnap.filter {
                     $0.stepIndex < barEnd && ($0.stepIndex + $0.durationSteps) > barStep
                 }
                 // Score each bass candidate by the harmony it creates with sustaining melody.
                 // P5/P4 (open, majestic) → thirds/sixths (warm) → m7 (jazzy) → penalise clashes.
+                // Repetition penalty (-3) discourages same note two bars running without overriding
+                // a genuine consonance advantage.
                 // Ties broken by: default cycling pattern first, then proximity to root.
                 let scoreNote: (UInt8) -> Int = { candidate in
                     var score = 0
+                    if candidate == prevBassNote { score -= 2 }
                     for mel in melodyInBar {
                         let ivl = abs(Int(candidate) - Int(mel.note)) % 12
                         switch ivl {
@@ -2319,6 +2338,7 @@ struct AmbientLeadGenerator {
                         .first ?? defaultIdx
                 }
                 let bNote = lhBass[bIdx]
+                prevBassNote = bNote
                 let bVel  = UInt8(38 + rng.nextInt(upperBound: 12))
                 // Beat 1 (step 0): bass alone — arrives first like Winston/Jarrett LH
                 events.append(MIDIEvent(stepIndex: barStep, note: bNote, velocity: bVel, durationSteps: 7))

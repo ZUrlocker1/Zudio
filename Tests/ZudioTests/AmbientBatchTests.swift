@@ -66,10 +66,10 @@ struct AmbientBatchTests {
         let existing = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         for url in existing { try? fm.removeItem(at: url) }
 
-        print("\n=== Generating 10 AMB-PNO-003 (Dramatic Arc) songs ===")
+        print("\n=== Generating 20 AMB-PNO-003 (Dramatic Arc) songs ===")
         print("Output: \(dir.path)\n")
 
-        for i in 1...10 {
+        for i in 1...20 {
             let seed = UInt64.random(in: .min ... .max)
             let song = SongGenerator.generate(seed: seed, style: .ambient,
                                               forceAmbientPianoRule: "AMB-PNO-003")

@@ -568,7 +568,7 @@ struct SongGenerator {
             let padChance: Double
             switch pianoRule {
             case "AMB-PNO-001": padChance = 1.00
-            case "AMB-PNO-003": padChance = 0.20
+            case "AMB-PNO-003": padChance = 0.30
             default:            padChance = 0.50
             }
             if padsRNG.nextDouble() < padChance {

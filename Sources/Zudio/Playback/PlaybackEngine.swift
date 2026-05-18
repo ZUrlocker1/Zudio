@@ -1031,6 +1031,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 4.0    // FX Atmosphere very soft on Ambient Texture — boost more
             } else if trackIndex == kTrackTexture && program == 99 {
                 vol = 2.6    // FX Atmosphere runs very soft on Texture — boost
+            } else if trackIndex == kTrackPads && ambientMode && program == 97 {
+                vol = 0.68   // Soundtrack runs hot on Ambient Pads — pull back
             } else if trackIndex == kTrackPads && chillPadsMode && program == 89 {
                 vol = 0.75   // Warm Pad runs hot on Chill Pads — pull back
             } else if trackIndex == kTrackTexture && program == 89 {
