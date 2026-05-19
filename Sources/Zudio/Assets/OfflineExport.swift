@@ -65,7 +65,8 @@ enum OfflineExport {
 
         let wallStart = CFAbsoluteTimeGetCurrent()
 
-        guard let sf2URL = Bundle.main.url(forResource: "GeneralUser_GS_v1.471", withExtension: "sf2") else {
+        guard let sf2URL = Bundle.main.url(forResource: "Zudio", withExtension: "sf2")
+                        ?? Bundle.main.url(forResource: "GeneralUser_GS_v1.471", withExtension: "sf2") else {
             throw ExportError.sf2NotFound
         }
 

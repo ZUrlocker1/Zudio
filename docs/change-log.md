@@ -1,5 +1,11 @@
 # Zudio Change Log
 
+## V 1.5.1 (Build 120)  Bug fix
+
+- **Audio export fix** — Save as Audio was broken due to a missing soundfont reference; fixed.
+
+---
+
 ## V 1.5 (Build 119)  Ambient Piano and new instruments
 
 - **Ambient Piano** — New Ambient sub-style (work in progress). Appears in roughly 20% of Ambient songs. Generates a solo piano arrangement with optional pad accompaniment, piano-specific phrasing rules, smaller room reverb, and no delay on the lead voice.

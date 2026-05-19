@@ -19,7 +19,10 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.5/Zudio-1.5.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `1.5` (build 119). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `1.5.1` (build 120). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+
+**What's new in v1.5.1:**
+- **Bug fix** — audio export (Save as Audio) was broken due to the sf2 file name change; now fixed
 
 **What's new in v1.5:**
 - **Ambient Piano** — a new Ambient sub-style (work in progress) featuring solo piano with optional pad accompaniment, smaller reverb, and piano-specific phrasing rules
