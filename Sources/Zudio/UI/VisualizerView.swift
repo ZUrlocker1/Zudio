@@ -62,10 +62,14 @@ struct VisualizerView: View {
                 onTapPoint:         { appState.recordOrbTap(at: $0) },
                 onSwipeRight:       { appState.triggerVisualizerFlash(trackIndex: kTrackRhythm)
                                       appState.triggerVisualizerFlash(trackIndex: kTrackPads)
+                                      appState.regenInstrument(forTrack: kTrackRhythm)
+                                      appState.regenInstrument(forTrack: kTrackPads)
                                       appState.regenerateTrack(kTrackRhythm)
                                       appState.regenerateTrack(kTrackPads) },
                 onSwipeLeft:        { appState.triggerVisualizerFlash(trackIndex: kTrackLead1)
                                       appState.triggerVisualizerFlash(trackIndex: kTrackLead2)
+                                      appState.regenInstrument(forTrack: kTrackLead1)
+                                      appState.regenInstrument(forTrack: kTrackLead2)
                                       appState.regenerateTrack(kTrackLead1)
                                       appState.regenerateTrack(kTrackLead2) },
                 onSwipeUp:          { let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
@@ -74,6 +78,8 @@ struct VisualizerView: View {
                                       appState.tempoOverride = max(20, min(200, cur - 5)) },
                 onRegenBassDrums:   { appState.triggerVisualizerFlash(trackIndex: kTrackBass)
                                       appState.triggerVisualizerFlash(trackIndex: kTrackDrums)
+                                      appState.regenInstrument(forTrack: kTrackBass)
+                                      appState.regenInstrument(forTrack: kTrackDrums)
                                       appState.regenerateTrack(kTrackBass)
                                       appState.regenerateTrack(kTrackDrums) }
             )

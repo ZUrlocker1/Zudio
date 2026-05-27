@@ -5,8 +5,10 @@
 - **Motorik Noir** — New dark sub-style appearing in ~30% of Motorik songs. Slower tempo (110–128 BPM), always minor mode. Inspired by Public Image Ltd, Joy Division etc.  Has deep bass rules (Albatross Pulse, Annalisa Riff, Wobble Theme), inverted drum grooves (Albatross Grid, Annalisa March), sparse pads, Cold Chord texture lead, and power-chord Chord Chug rhythm. Fills are rare and minimal.
 - **Expanded Motorik instruments** — Motorik Rhythm pool expanded from 3 to 8 instruments: Crunch Guitar, Doctor Solo, Acoustic Bass, Pick Bass, and Charang added alongside the existing guitars and synth bass. Machine Kit added to Motorik Drums. Techno Bass added to Motorik Bass. Motorik Lead 1 gains two new voices: Synth Lead and Saw Stack. Kosmic Rhythm gains Harpsi Pad.
 - **Swipe up / swipe down** — New visualizer gestures on all platforms: swipe up increases tempo by 5 BPM, swipe down decreases by 5 BPM (clamped 20–200). On iPhone/iPad uses UISwipeGestureRecognizer; on Mac uses vertical trackpad scroll (dominant-axis logic prevents conflict with horizontal swipes).
-- **Orb click regenerates instrument and track** — Clicking or tapping an orb now regenerates both the instrument and the MIDI track, matching the lightning bolt button in the Tracks view.
+- **Orb click regenerates instrument and track** — Clicking or tapping an orb, swiping or pinching now regenerates both the instrument and the MIDI track, matching the lightning bolt button in the Tracks view.
 - **Evolve tempo clamping fix** — Minor bug fixed to clamp tempo within the proper range for each style when playing in Evolve mode.
+- **Kosmic intro effects fix** — Fixed a bug where incorrect reverb effects were applied during the Kosmic intro and outro.
+- **Bass/drum sync improvements** — Fixed off-beat note placement in CHL-BASS-008 (Acid Jazz), KOS-BASS-009, MOT-BASS-003 (Crawling Walk) where primary bass notes were landing on weak 16th-note positions causing rhythmic misalignment.
 
 ---
 

@@ -738,7 +738,7 @@ struct BassGenerator {
             }
         } else {
             events.append(MIDIEvent(stepIndex: barStart,     note: rootNote,  velocity: 92, durationSteps: 3))
-            events.append(MIDIEvent(stepIndex: barStart + 5, note: rootNote,  velocity: 78, durationSteps: 2))
+            events.append(MIDIEvent(stepIndex: barStart + 6, note: rootNote,  velocity: 78, durationSteps: 2))
             events.append(MIDIEvent(stepIndex: barStart + 8, note: fifthNote, velocity: 85, durationSteps: 6))
         }
         return events

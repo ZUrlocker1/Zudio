@@ -193,12 +193,6 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var currentExportTap:        ExportTapState?                        = nil
     nonisolated(unsafe) private var currentExportOnComplete: (@Sendable (Error?) -> Void)?          = nil
 
-    // Hidden intro/outro modulation: pads sweep LFO + bass slow pan (no UI change)
-    // Driven by the shared lfoTimer — no separate timers.
-    private var kosmicIntroSweepPhase:  Double = 0.0
-    private var kosmicIntroSweepActive: Bool   = false
-    private var kosmicIntroBassPanPhase: Double = 0.0
-    private var kosmicIntroBassPanActive: Bool  = false
     // Intro volume ramp timer (bass + pads: 0 → 1.0 over intro duration)
     private var kosmicIntroFadeTimer:    DispatchSourceTimer? = nil
 
@@ -508,8 +502,6 @@ final class PlaybackEngine: ObservableObject {
         stopAmbientOutroFade()
         // Stop any active pan LFOs so phase state doesn't bleed into the next song.
         for i in 0..<kTrackCount where panEnabled[i] { stopPan(forTrack: i) }
-        kosmicIntroBassPanActive = false
-        kosmicIntroBassPanPhase  = 0.0
         // Clear reverb/delay buffers so tails don't bleed through when volume
         // is restored for the next song — applies to all styles.
         for rev in reverbs { rev.reset() }
@@ -1435,7 +1427,7 @@ final class PlaybackEngine: ObservableObject {
 
     private func stopSharedLFOIfIdle() {
         let anyActive = tremEnabled.contains(true) || sweepEnabled.contains(true)
-                     || panEnabled.contains(true)  || kosmicIntroSweepActive || kosmicIntroBassPanActive
+                     || panEnabled.contains(true)
         anyLFOActive = anyActive
         guard !anyActive else { return }
         lfoTimer?.cancel()
@@ -1511,22 +1503,11 @@ final class PlaybackEngine: ObservableObject {
 
         // Pan — ~20fps, all active tracks.
         // Skip Bass when the Kosmic intro bass pan is running — it owns that node.
-        for i in 0..<kTrackCount where panEnabled[i] && !(i == kTrackBass && kosmicIntroBassPanActive) {
+        for i in 0..<kTrackCount where panEnabled[i] {
             panPhase[i] += panPhaseInc[i]
             boosts[i].pan = Float(sin(panPhase[i]))
         }
 
-        // Kosmic hidden intro effects — ~20fps
-        if kosmicIntroSweepActive {
-            kosmicIntroSweepPhase += 0.02199
-            let cutoff = Float(400 + 1400 * (1 + sin(kosmicIntroSweepPhase)))
-            AudioUnitSetParameter(sweepFilters[kTrackPads].audioUnit,
-                                  0, kAudioUnitScope_Global, 0, cutoff, 0)
-        }
-        if kosmicIntroBassPanActive {
-            kosmicIntroBassPanPhase += 0.01571  // 2π × 0.05 Hz / 20 fps
-            boosts[kTrackBass].pan = Float(0.5 * sin(kosmicIntroBassPanPhase))
-        }
     }
 
     // MARK: - Tremolo LFO
@@ -1630,7 +1611,6 @@ final class PlaybackEngine: ObservableObject {
         droneFadeTimers[1]?.cancel();   droneFadeTimers[1]   = nil
         kosmicIntroFadeTimer?.cancel(); kosmicIntroFadeTimer  = nil
         bodyEntranceFadeTimer?.cancel(); bodyEntranceFadeTimer = nil
-        stopKosmicIntroEffects()
 
         let schedulerID   = currentSchedulerID
         let intro         = state.structure.introSection
@@ -1662,9 +1642,6 @@ final class PlaybackEngine: ObservableObject {
             boosts[kTrackPads].outputVolume   = 1.0
             engine.mainMixerNode.outputVolume = 1.0
         }
-
-        // Intro effects (Cathedral reverb, sweep LFO) only while playhead is in the intro.
-        if inIntro { startKosmicIntroEffects() }
 
         // --- Intro boost ramp (only when playhead is inside the intro) ---
         if inIntro, let intro = intro {
@@ -1703,7 +1680,6 @@ final class PlaybackEngine: ObservableObject {
             DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + delayToBody) {
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.isPlaying, self.currentSchedulerID == schedulerID else { return }
-                    self.stopKosmicIntroEffects()
                     self.startBodyEntranceFade(state: state, schedulerID: schedulerID)
                 }
             }
@@ -1735,7 +1711,6 @@ final class PlaybackEngine: ObservableObject {
 
                 self.boosts[kTrackBass].outputVolume = startProgress
                 self.boosts[kTrackPads].outputVolume = startProgress
-                self.startKosmicIntroEffects()
 
                 let src = DispatchSource.makeTimerSource(queue: lfoQueue)
                 src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
@@ -1752,7 +1727,6 @@ final class PlaybackEngine: ObservableObject {
                     if linearFade <= 0.0 {
                         self.droneFadeTimers[1]?.cancel()
                         self.droneFadeTimers[1] = nil
-                        self.stopKosmicIntroEffects()
                     }
                 }
                 src.resume()
@@ -1768,7 +1742,6 @@ final class PlaybackEngine: ObservableObject {
         droneFadeTimers[1] = nil
         bodyEntranceFadeTimer?.cancel()
         bodyEntranceFadeTimer = nil
-        stopKosmicIntroEffects()
         // Restore volumes that the intro/outro ramp may have left at non-unity values
         boosts[kTrackBass].outputVolume = 1.0
         boosts[kTrackPads].outputVolume = 1.0
@@ -2069,57 +2042,6 @@ final class PlaybackEngine: ObservableObject {
         }
         src.resume()
         bodyEntranceFadeTimer = src
-    }
-
-    // MARK: - Kosmic hidden intro/outro effects (pads sweep + bass slow pan)
-    // Activated during intro/outro drone sections only — no UI state change.
-
-    private func startKosmicIntroEffects() {
-        // Bass: Cathedral reverb during the Kosmic intro — lush and spatial.
-        // wetDryMix 70 (vs Large Chamber 50 in body) for a deep, washy quality.
-        reverbs[kTrackBass].loadFactoryPreset(.cathedral)
-        reverbPresets[kTrackBass] = .cathedral
-        reverbs[kTrackBass].auAudioUnit.shouldBypassEffect = false
-        reverbs[kTrackBass].wetDryMix = 70
-
-        // Pads: sweep LFO (0.07 Hz, cutoff 400–3200 Hz) — driven by shared lfoTimer
-        if !sweepEnabled[kTrackPads] {
-            kosmicIntroSweepPhase  = 0.0
-            kosmicIntroSweepActive = true
-            sweepFilters[kTrackPads].auAudioUnit.shouldBypassEffect = false
-            anyLFOActive = true
-            startSharedLFO()
-        }
-
-        // Bass: very slow pan (0.05 Hz, ±0.5) — driven by shared lfoTimer
-        if !panEnabled[kTrackBass] {
-            kosmicIntroBassPanPhase  = 0.0
-            kosmicIntroBassPanActive = true
-            anyLFOActive = true
-            startSharedLFO()
-        }
-    }
-
-    private func stopKosmicIntroEffects() {
-        kosmicIntroFadeTimer?.cancel()
-        kosmicIntroFadeTimer = nil
-        kosmicIntroSweepActive  = false
-        kosmicIntroSweepPhase   = 0.0
-        kosmicIntroBassPanActive = false
-        kosmicIntroBassPanPhase  = 0.0
-        if !sweepEnabled[kTrackPads] {
-            sweepFilters[kTrackPads].auAudioUnit.shouldBypassEffect = true
-            AudioUnitSetParameter(sweepFilters[kTrackPads].audioUnit,
-                                  0, kAudioUnitScope_Global, 0, 6000, 0)
-        }
-        if !panEnabled[kTrackBass] {
-            boosts[kTrackBass].pan = 0.0
-        }
-        stopSharedLFOIfIdle()
-        // Revert bass reverb to Large Hall for the body (lighter than the intro cathedral)
-        reverbs[kTrackBass].loadFactoryPreset(.largeHall)
-        reverbPresets[kTrackBass] = .largeHall
-        reverbs[kTrackBass].wetDryMix = 45
     }
 
     // MARK: - Channel volume (CC7)

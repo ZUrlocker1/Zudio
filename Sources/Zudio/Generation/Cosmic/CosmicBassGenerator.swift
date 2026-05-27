@@ -770,7 +770,7 @@ struct KosmicBassGenerator {
         } else {
             return [
                 MIDIEvent(stepIndex: barStart,     note: root,  velocity: 85, durationSteps: 3),
-                MIDIEvent(stepIndex: barStart + 5, note: root,  velocity: 72, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6, note: root,  velocity: 72, durationSteps: 2),
                 MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 80, durationSteps: 6),
             ]
         }

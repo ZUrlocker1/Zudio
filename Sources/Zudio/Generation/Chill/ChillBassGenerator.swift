@@ -699,10 +699,11 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base + 10, note: UInt8(fifth), velocity: vel3, durationSteps: 2))
                         events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(root),  velocity: vel2, durationSteps: 2))
                     } else {
-                        // Cell A: root (3) → 5th (2) → b7 (2)  [3 notes/bar; syncopated acid jazz feel]
-                        events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),  velocity: vel1, durationSteps: 3))
-                        events.append(MIDIEvent(stepIndex: base + 5,  note: UInt8(fifth), velocity: vel2, durationSteps: 2))
-                        events.append(MIDIEvent(stepIndex: base + 9,  note: UInt8(b7),    velocity: vel3, durationSteps: 4))
+                        // Cell A: root (3) → 5th (2) → b7 (4)  [3 notes/bar; syncopated acid jazz feel]
+                        // Steps 6 and 10 ("and of 2", "and of 3") lock with the 8th-note hi-hat grid.
+                        events.append(MIDIEvent(stepIndex: base,       note: UInt8(root),  velocity: vel1, durationSteps: 3))
+                        events.append(MIDIEvent(stepIndex: base + 6,   note: UInt8(fifth), velocity: vel2, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 10,  note: UInt8(b7),    velocity: vel3, durationSteps: 4))
                     }
                 }
             }

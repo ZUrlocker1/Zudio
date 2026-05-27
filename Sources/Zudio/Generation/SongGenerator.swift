@@ -214,8 +214,8 @@ struct SongGenerator {
         let title: String = {
             let raw = TitleGenerator.generate(frame: frame, rng: &rng)
             guard isNoir && !raw.contains(" ") else { return raw }
-            let appendPhrases = ["After Dark", "Late at Night", "Past Midnight", "Noir"]
-            let prependWords  = ["Post-Punk", "Midnight", "Dark", "Black", "Dunkel"]
+            let appendPhrases = ["After Dark", "Apocalypse", "Midnight", "Noir"]
+            let prependWords  = ["Post-Punk", "Bleak", "Darker", "Black", "Dunkel"]
             if rng.nextDouble() < 0.50 {
                 return "\(raw) \(appendPhrases[rng.nextInt(upperBound: appendPhrases.count)])"
             } else {
