@@ -21,7 +21,8 @@ struct KosmicMusicalFrameGenerator {
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily) {
 
         let key    = keyOverride   ?? pickKey(rng: &rng)
-        let tempo  = tempoOverride ?? pickTempo(rng: &rng)
+        var tempo  = tempoOverride ?? pickTempo(rng: &rng)
+        tempo = Swift.max(108, Swift.min(tempo, 126))
         let mood   = moodOverride  ?? pickMood(rng: &rng)
         let mode   = pickMode(rng: &rng)
         let family = pickProgressionFamilyMotarik(rng: &rng)  // standard ProgressionFamily for StructureGenerator

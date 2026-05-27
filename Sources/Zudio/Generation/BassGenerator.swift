@@ -33,27 +33,73 @@
 //   BAS-014: McCartney PBW — "Paperback Writer" (1966) Mixolydian riff;
 //            root–fifth–root–b7–fifth–root–mode3rd–root in 8 8th-notes.
 //            The flat-seventh gives a blues/Mixolydian edge. b7 falls back to fifth in pure major contexts.
+//   BAS-016: Albatross Pulse — PiL "Albatross" (1979) deep E1-register 8th-note ostinato;
+//            root–root–P5–root–root–root–P5–m6 per bar, MIDI 28–40 zone, flat mechanical velocity.
+//            The m6 (mode-snapped) at position 8 gives the characteristic dark lean before bar 2.
+//            ~5% breathe variant: first P5 extends to a held quarter note. Motorik Noir only.
+//   BAS-017: Annalisa Riff — PiL "Annalisa" (1979) 4-bar cycling deep bass.
+//            Bar A (anchor): root long (4 steps) + mode-6th repeated with escalating durations.
+//            Bar B (descend): beat 1 silent; chromatic descent in two 3-note waves (P5→b5→P4, oct→maj7→b7).
+//            Bar A repeat.
+//            Bar C (ascend): beat 1 silent; chromatic ascent (b7→maj7→oct, P4→b5→P5) — mirror of B.
+//            Deep register MIDI 28–40. Motorik Noir only.
+//   BAS-018: Wobble Theme — PiL "Theme" (1979) 2-bar cycle; Jah Wobble half-note pulse.
+//            Bar A: root half-note (steps 0-7), P5 half-note (steps 8-15). Extremelysparse.
+//            Bar B: beat 1 silent; b7→b7→maj2→root→b7 melodic riff (steps 2,6,8,10,12).
+//            Deep register MIDI 28–40. Motorik Noir only.
+//   BAS-019: Religion Groove — PiL "Religion" (1979) front-loaded root cluster;
+//            steps 0,2,4: root 8th-notes descending velocity; step 6: m3 above (4 steps);
+//            steps 10,12: m3 below (landing). 81% modal consistency across 149 bars.
+//            Deep register MIDI 28–40. Motorik Noir only.
+//   BAS-020: Shadowplay Pulse — Joy Division "Shadowplay" (1979) 2-bar root ostinato;
+//            Bar A: root 8th-notes skipping step 2 (steps 0,4,6,8,10,12,14).
+//            Bar B: denser root pulse (steps 0,2,4,6,8,10) + M2 lean on final quarter.
+//            Deep register MIDI 28–40. Motorik Noir only.
+//   BAS-021: No Birds Walk — PiL "No Birds" (1979) 2-bar P4 suspension walk;
+//            Bar A: root pickup (steps 0,2), P4 suspension held through bar.
+//            Bar B: root quarter×2, then P4→TT→P5 chromatic ascent resolution.
+//            Deep register MIDI 28–40. Motorik Noir only.
 //
 // All patterns hit beat 1 (step 0) as the primary anchor, matching the kick drum.
 // Syncopation is deliberately minimized — Motorik bass is locked and pulse-forward.
 
 struct BassGenerator {
+
+    // Rules that receive a variation pattern in B sections and A sections at bar >= 48.
+    // MOT-BASS-015 is included so variationBars is populated, but it handles the flag
+    // internally rather than delegating to simpleRuleVariationBar.
+    private static let variationRules: Set<String> = [
+        "MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
+        "MOT-BASS-013", "MOT-BASS-014", "MOT-BASS-015",
+        "MOT-BASS-016", "MOT-BASS-017", "MOT-BASS-018"
+    ]
+
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
-        let rules:   [String] = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
-                                  "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
-                                  "MOT-BASS-010","MOT-BASS-011",
-                                  "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014","MOT-BASS-015"]
-        let weights: [Double] = [0.07,     0.11,     0.04,     0.04,
-                                  0.09,     0.05,     0.08,     0.10,     0.06,
-                                  0.03,     0.03,
-                                  0.07,     0.04,     0.08,     0.11]
+        // Noir bass pool: PIL deep riffs + Joy Division high-register counter-melody + Kraftwerk cold mechanics.
+        // Removed: Motorik Drive (too upbeat), Crawling Walk (jazzy), Moroder Chase (too energetic).
+        let rules: [String]
+        let weights: [Double]
+        if noirVariation {
+            rules   = ["MOT-BASS-017","MOT-BASS-016","MOT-BASS-007","MOT-BASS-018","MOT-BASS-008","MOT-BASS-006","MOT-BASS-019","MOT-BASS-020","MOT-BASS-021"]
+            weights = [0.17,          0.10,          0.05,          0.16,          0.05,          0.05,          0.16,          0.10,          0.16]
+        } else {
+            rules   = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
+                        "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
+                        "MOT-BASS-010","MOT-BASS-011",
+                        "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014","MOT-BASS-015"]
+            weights = [0.07,     0.11,     0.04,     0.04,
+                        0.09,     0.05,     0.08,     0.10,     0.06,
+                        0.03,     0.03,
+                        0.07,     0.04,     0.08,     0.11]
+        }
         let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
 
@@ -69,8 +115,9 @@ struct BassGenerator {
         // Fires for: every B section; every other A section that starts at or after bar 48
         // (alternating on/off so the variation doesn't take over the whole second half).
         // This keeps the bass interesting at section boundaries without being relentless.
-        let simpleRules: Set<String> = ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
-                                         "MOT-BASS-013", "MOT-BASS-014", "MOT-BASS-015"]
+        // MOT-BASS-015 is included here so it gets variationBars set, but handles the flag
+        // internally via kraftwerkAutobahnMotBar(useVariation:) rather than simpleRuleVariationBar.
+        let simpleRules: Set<String> = Self.variationRules
         var variationBars = Set<Int>()
         if simpleRules.contains(ruleID) {
             var aToggle = false
@@ -87,6 +134,15 @@ struct BassGenerator {
             }
         }
 
+        // Rules exempt from Noir octave-down shift: already in the deep register,
+        // or intentionally high (Hook Ascent is the melodic lead voice in Noir).
+        let noirShiftExempt: Set<String> = [
+            "MOT-BASS-007",
+            "MOT-BASS-016", "MOT-BASS-017", "MOT-BASS-018",
+            "MOT-BASS-019", "MOT-BASS-020", "MOT-BASS-021"
+        ]
+        let applyNoirShift = noirVariation && !noirShiftExempt.contains(ruleID)
+
         var events: [MIDIEvent] = []
 
         // MOT-BASS-015: sub-pattern rotation (same 3 variants as KOS-BASS-011)
@@ -98,14 +154,16 @@ struct BassGenerator {
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
 
+            let barEvents: [MIDIEvent]
             if let introSec = structure.introSection, introSec.contains(bar: bar) {
-                events += introBar(bar: bar, introSection: introSec, ruleID: ruleID,
-                                   barStart: barStart, entry: entry, frame: frame, rng: &rng,
-                                   mccartney4BarDrive: mccartney4BarDrive, style: structure.introStyle)
+                barEvents = introBar(bar: bar, introSection: introSec, ruleID: ruleID,
+                                     barStart: barStart, entry: entry, frame: frame, rng: &rng,
+                                     mccartney4BarDrive: mccartney4BarDrive, style: structure.introStyle,
+                                     noirVariation: noirVariation)
             } else if let outroSec = structure.outroSection, outroSec.contains(bar: bar) {
-                events += outroBar(bar: bar, outroSection: outroSec, ruleID: ruleID,
-                                   barStart: barStart, entry: entry, frame: frame, rng: &rng,
-                                   mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
+                barEvents = outroBar(bar: bar, outroSection: outroSec, ruleID: ruleID,
+                                     barStart: barStart, entry: entry, frame: frame, rng: &rng,
+                                     mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
             } else {
                 let useVariation = variationBars.contains(bar)
 
@@ -121,13 +179,26 @@ struct BassGenerator {
                     }
                 }
 
-                events += bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                                  frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
-                                  useVariation: useVariation, mot015Variant: mot015Variant)
+                barEvents = bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
+                                    frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
+                                    useVariation: useVariation, mot015Variant: mot015Variant,
+                                    noirVariation: noirVariation)
             }
+
+            events += applyNoirShift ? noirOctaveDown(barEvents) : barEvents
         }
 
         return events
+    }
+
+    // Shifts all notes down one octave, clamped to MIDI 28 (E1 floor).
+    private static func noirOctaveDown(_ events: [MIDIEvent]) -> [MIDIEvent] {
+        events.map { e in
+            MIDIEvent(stepIndex: e.stepIndex,
+                      note: UInt8(max(28, Int(e.note) - 12)),
+                      velocity: e.velocity,
+                      durationSteps: e.durationSteps)
+        }
     }
 
     // MARK: - Body bar dispatcher
@@ -136,11 +207,12 @@ struct BassGenerator {
         ruleID: String, barStart: Int, bar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         rng: inout SeededRNG, mccartney4BarDrive: [Bool],
-        useVariation: Bool = false, mot015Variant: Int = 0
+        useVariation: Bool = false, mot015Variant: Int = 0,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
-        // Simple 1–2 note rules get a more interesting variant in B sections and after bar 48
-        if useVariation, ["MOT-BASS-001", "MOT-BASS-002", "MOT-BASS-004",
-                          "MOT-BASS-013", "MOT-BASS-014"].contains(ruleID) {
+        // Rules in the variation set get a more interesting variant in B sections and after bar 48.
+        // MOT-BASS-015 is in variationRules but excluded here — it passes the flag to its own function.
+        if useVariation && ruleID != "MOT-BASS-015" && variationRules.contains(ruleID) {
             return simpleRuleVariationBar(barStart: barStart, bar: bar, ruleID: ruleID, entry: entry, frame: frame)
         }
         switch ruleID {
@@ -151,7 +223,7 @@ struct BassGenerator {
             let allDrive = mccartney4BarDrive[min(bar / 4, mccartney4BarDrive.count - 1)]
             return mccartneyDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame, allDrive: allDrive)
         case "MOT-BASS-006": return laWomanSustainBar(barStart: barStart, entry: entry, frame: frame)
-        case "MOT-BASS-007": return hookAscentBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-007": return hookAscentBar(barStart: barStart, bar: bar, entry: entry, frame: frame, noirVariation: noirVariation)
         case "MOT-BASS-008": return motoroderPulseBar(barStart: barStart, entry: entry, frame: frame)
         case "MOT-BASS-009": return vitaminHookBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-010": return quoArcBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
@@ -162,6 +234,17 @@ struct BassGenerator {
         case "MOT-BASS-015": return kraftwerkAutobahnMotBar(barStart: barStart, bar: bar, entry: entry,
                                                              frame: frame, useVariation: useVariation,
                                                              subVariant: mot015Variant)
+        case "MOT-BASS-016": return albatrossPulseBar(barStart: barStart, bar: bar, entry: entry,
+                                                       frame: frame, rng: &rng)
+        case "MOT-BASS-017": return annalisaRiffBar(barStart: barStart, bar: bar, entry: entry,
+                                                     frame: frame)
+        case "MOT-BASS-018": return wobbleThemeBar(barStart: barStart, bar: bar, entry: entry,
+                                                    frame: frame)
+        case "MOT-BASS-019": return religionGrooveBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-020": return shadowplayPulseBar(barStart: barStart, bar: bar, entry: entry,
+                                                        frame: frame)
+        case "MOT-BASS-021": return noBirdsWalkBar(barStart: barStart, bar: bar, entry: entry,
+                                                    frame: frame)
         default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
         }
     }
@@ -232,6 +315,57 @@ struct BassGenerator {
             }
             return evs14
 
+        case "MOT-BASS-016":
+            // Albatross Pulse B-section: m7 replaces two bare root hits (positions 1 and 5)
+            // Standard R–R–P5–R–R–R–P5–m6 → R–m7–P5–R–R–m7–P5–m6.
+            let rootPC16 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root16   = UInt8(clamped(24 + rootPC16, low: 28, high: 40))
+            let fifth16  = UInt8(clamped(Int(root16) + 7,  low: 28, high: 42))
+            let m7_16    = nearestScaleNote(to: Int(root16) + 10, frame: frame, low: 28, high: 42)
+            let m6_16    = nearestScaleNote(to: Int(root16) + 8,  frame: frame, low: 28, high: 42)
+            let pitches16: [UInt8] = [root16, m7_16, fifth16, root16, root16, m7_16, fifth16, m6_16]
+            let vels16:    [UInt8] = [82,     74,    80,      76,     80,     74,    78,       72   ]
+            var evs16: [MIDIEvent] = []
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evs16.append(MIDIEvent(stepIndex: barStart + step, note: pitches16[i],
+                                       velocity: vels16[i], durationSteps: 2))
+            }
+            return evs16
+
+        case "MOT-BASS-017":
+            // Annalisa Riff B-section: anchor bars use b7 instead of mode-6th (darker, more tense).
+            // Movement bars (B and C) are unchanged — chromatic descent/ascent stays intact.
+            let rootPC17 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root17   = UInt8(clamped(24 + rootPC17, low: 28, high: 40))
+            let b7_17    = nearestScaleNote(to: Int(root17) + 10, frame: frame, low: 28, high: 42)
+            switch bar % 4 {
+            case 0, 2:
+                return [
+                    MIDIEvent(stepIndex: barStart,      note: root17, velocity: 88, durationSteps: 4),
+                    MIDIEvent(stepIndex: barStart + 4,  note: b7_17,  velocity: 76, durationSteps: 2),
+                    MIDIEvent(stepIndex: barStart + 6,  note: b7_17,  velocity: 72, durationSteps: 4),
+                    MIDIEvent(stepIndex: barStart + 10, note: b7_17,  velocity: 68, durationSteps: 6),
+                ]
+            default:
+                return annalisaRiffBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+            }
+
+        case "MOT-BASS-018":
+            // Wobble Theme B-section: Bar A uses root + m7 instead of root + P5.
+            // The minor seventh (10 semitones) is darker than the fifth (7), adding tension.
+            // Bar B (the chromatic riff) is unchanged.
+            let rootPC18 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root18   = UInt8(clamped(24 + rootPC18, low: 28, high: 40))
+            if bar % 2 == 0 {
+                let m7_18 = nearestScaleNote(to: Int(root18) + 10, frame: frame, low: 28, high: 42)
+                return [
+                    MIDIEvent(stepIndex: barStart,     note: root18, velocity: 78, durationSteps: 8),
+                    MIDIEvent(stepIndex: barStart + 8, note: m7_18,  velocity: 74, durationSteps: 8),
+                ]
+            } else {
+                return wobbleThemeBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+            }
+
         default: // BAS-001
             // Root Anchor walk: root → third → fifth → root (same arpeggio as the intro hint,
             // now used in the body for variety). Still quarter-note locked.
@@ -249,7 +383,8 @@ struct BassGenerator {
     private static func introBar(
         bar: Int, introSection: SongSection, ruleID: String,
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: IntroStyle
+        rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: IntroStyle,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
         let offsetBar = bar - introSection.startBar
 
@@ -260,13 +395,9 @@ struct BassGenerator {
                            frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
 
         case .progressiveEntry:
-            // Simplified riff derived from the song's bass rule — signals "something is coming"
-            // without playing the actual groove. Volume fade handled by PlaybackEngine.
             return simplifiedIntroBar(ruleID: ruleID, barStart: barStart, entry: entry, frame: frame)
 
         case .coldStart(let drumsOnly):
-            // drumsOnly bar 0: drums alone, bass silent — full impact lands on bar 1.
-            // All other bars: simplified riff at note-on velocity (master ramp provides the fade).
             if drumsOnly && offsetBar == 0 { return [] }
             return simplifiedIntroBar(ruleID: ruleID, barStart: barStart, entry: entry, frame: frame)
         }
@@ -394,6 +525,68 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 8, note: root, velocity: 76, durationSteps: 7),
             ]
 
+        case "MOT-BASS-017":   // Annalisa Riff → staccato 8th root pulse (withholds chromatic movement)
+            let rootPC17 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root17   = UInt8(clamped(24 + rootPC17, low: 28, high: 40))
+            let vels17:  [UInt8] = [84, 70, 76, 68, 80, 68, 74, 66]
+            var evs17: [MIDIEvent] = []
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evs17.append(MIDIEvent(stepIndex: barStart + step, note: root17,
+                                       velocity: vels17[i], durationSteps: 2))
+            }
+            return evs17
+
+        case "MOT-BASS-018":   // Wobble Theme → root beat 1 + fifth beat 3 (teases the sparse pulse)
+            let rootPC18 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root18   = UInt8(clamped(24 + rootPC18, low: 28, high: 40))
+            let fifth18  = UInt8(clamped(Int(root18) + 7, low: 28, high: 42))
+            return [
+                MIDIEvent(stepIndex: barStart,     note: root18,  velocity: 78, durationSteps: 7),
+                MIDIEvent(stepIndex: barStart + 8, note: fifth18, velocity: 70, durationSteps: 7),
+            ]
+
+        case "MOT-BASS-019":   // Religion Groove → front-loaded root cluster, withholds m3 and landing
+            let rootPC19 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root19   = UInt8(clamped(24 + rootPC19, low: 28, high: 40))
+            return [
+                MIDIEvent(stepIndex: barStart,     note: root19, velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 2, note: root19, velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4, note: root19, velocity: 74, durationSteps: 12),
+            ]
+
+        case "MOT-BASS-020":   // Shadowplay Pulse → simplified 8th pulse skipping step 2 (bar A shape)
+            let rootPC20 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root20   = UInt8(clamped(24 + rootPC20, low: 28, high: 40))
+            let vels20:  [UInt8] = [82, 76, 76, 76, 76, 76, 76]
+            var evs20: [MIDIEvent] = []
+            for (i, step) in [0, 4, 6, 8, 10, 12, 14].enumerated() {
+                evs20.append(MIDIEvent(stepIndex: barStart + step, note: root20, velocity: vels20[i], durationSteps: 2))
+            }
+            return evs20
+
+        case "MOT-BASS-021":   // No Birds Walk → root + P4 suspension (teases the chromatic walk)
+            let rootPC21 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root21   = UInt8(clamped(24 + rootPC21, low: 28, high: 40))
+            let p4i21    = UInt8(clamped(Int(root21) + 5, low: 28, high: 42))
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root21, velocity: 84, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 2,  note: p4i21,  velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: p4i21,  velocity: 74, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: p4i21,  velocity: 76, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: p4i21,  velocity: 72, durationSteps: 4),
+            ]
+
+        case "MOT-BASS-016":   // Albatross Pulse → root-only staccato 8ths (withholds P5 and m6)
+            let rootPC16 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root16   = UInt8(clamped(24 + rootPC16, low: 28, high: 40))
+            let vels16:  [UInt8] = [80, 72, 74, 70, 78, 70, 74, 68]
+            var evs16: [MIDIEvent] = []
+            for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+                evs16.append(MIDIEvent(stepIndex: barStart + step, note: root16,
+                                       velocity: vels16[i], durationSteps: 2))
+            }
+            return evs16
+
         case "MOT-BASS-010", "MOT-BASS-011":   // Quo Arc / Quo Drive → root–third alternating 8ths
             let third = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 62)
             let quoNotes: [UInt8] = [root, third, root, third, root, third, root, third]
@@ -406,7 +599,6 @@ struct BassGenerator {
             return evsQuo
 
         default:   // BAS-001 Root Anchor (simple) → quarter-note chord arpeggio: root→3rd→5th→root
-            // Body alternates just two notes; intro hints at the full chord with a short arpeggio.
             let third1 = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 28, high: 56)
             return [
                 MIDIEvent(stepIndex: barStart,      note: root,   velocity: 86, durationSteps: 4),
@@ -621,13 +813,16 @@ struct BassGenerator {
     // All scale degrees (3rd, 2nd, 6th) snap to the song's mode — minor songs get minor 3rd etc.
 
     private static func hookAscentBar(
-        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let root   = chordRootNote(entry: entry, frame: frame)
-        let third  = nearestScaleNote(to: Int(root) + 4, frame: frame, low: 36, high: 60)  // mode 3rd
-        let second = nearestScaleNote(to: Int(root) + 2, frame: frame, low: 36, high: 60)  // mode 2nd
-        let sixth  = nearestScaleNote(to: Int(root) + 9, frame: frame, low: 36, high: 60)  // mode 6th
+        // Noir restores the original high-register Peter Hook sound (one octave above standard).
+        let (lo, hi) = noirVariation ? (48, 72) : (36, 60)
+        let third  = nearestScaleNote(to: Int(root) + 4, frame: frame, low: lo, high: hi)  // mode 3rd
+        let second = nearestScaleNote(to: Int(root) + 2, frame: frame, low: lo, high: hi)  // mode 2nd
+        let sixth  = nearestScaleNote(to: Int(root) + 9, frame: frame, low: lo, high: hi)  // mode 6th
 
         if bar % 2 == 0 {
             // Drive bar: six M3 hits, step down to M2, return to M3 (descending tail)
@@ -985,6 +1180,228 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 6,  note: midNote, velocity: midVel, durationSteps: 2),
                 MIDIEvent(stepIndex: barStart + 8,  note: root,    velocity: 82, durationSteps: 2),
                 MIDIEvent(stepIndex: barStart + 14, note: fifth,   velocity: 84, durationSteps: 2),
+            ]
+        }
+    }
+
+    // MARK: - MOT-BASS-017: Annalisa Riff — PiL "Annalisa" (1979) 4-bar cycling riff
+    // 4-bar cycle keyed off bar % 4:
+    //   0 → Bar A (anchor): root long + mode-6th repeated with escalating durations
+    //   1 → Bar B (descend): beat 1 silent; two chromatic 3-note descent waves
+    //   2 → Bar A (anchor repeat)
+    //   3 → Bar C (ascend): beat 1 silent; two chromatic 3-note ascent waves (mirror of B)
+    //
+    // Bars B and C are exact mirror images — B descends P5→b5→P4 then oct→maj7→b7;
+    // C ascends b7→maj7→oct then P4→b5→P5. The chromatic passing tones are deliberate
+    // and non-scale — they're the source of the restless, unsettled quality.
+    //
+    // All notes in MIDI 28–42 deep register. Beat 1 silence on B/C bars creates a
+    // two-bar "breathing" arc: anchored bar → moving bar → anchored bar → moving bar.
+
+    private static func annalisaRiffBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root   = UInt8(clamped(24 + rootPC, low: 28, high: 40))   // deep E1-zone octave
+        let sixth  = nearestScaleNote(to: Int(root) + 9, frame: frame, low: 28, high: 42)  // mode 6th
+
+        switch bar % 4 {
+
+        case 0, 2:
+            // Bar A — anchor: root held 4 steps, then mode-6th repeated with escalating durations
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,  velocity: 88, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: sixth, velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: sixth, velocity: 72, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 10, note: sixth, velocity: 68, durationSteps: 6),
+            ]
+
+        case 1:
+            // Bar B — descend: beat 1 silent; two chromatic 3-note descent waves
+            // Wave 1: P5 → b5 → P4  (starting step 2)
+            // Wave 2: root+octave → maj7 → b7  (starting step 8)
+            let p5  = UInt8(clamped(Int(root) + 7,  low: 28, high: 42))
+            let b5  = UInt8(clamped(Int(root) + 6,  low: 28, high: 42))
+            let p4  = UInt8(clamped(Int(root) + 5,  low: 28, high: 42))
+            let oct = UInt8(clamped(Int(root) + 12, low: 28, high: 42))
+            let m7  = UInt8(clamped(Int(root) + 11, low: 28, high: 42))
+            let b7  = UInt8(clamped(Int(root) + 10, low: 28, high: 42))
+            return [
+                MIDIEvent(stepIndex: barStart + 2,  note: p5,  velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: b5,  velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: p4,  velocity: 74, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8,  note: oct, velocity: 80, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 10, note: m7,  velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 12, note: b7,  velocity: 72, durationSteps: 4),
+            ]
+
+        default:  // case 3
+            // Bar C — ascend: beat 1 silent; two chromatic 3-note ascent waves (mirror of B)
+            // Wave 1: b7 → maj7 → root+octave  (starting step 2)
+            // Wave 2: P4 → b5 → P5  (starting step 8)
+            let b7c  = UInt8(clamped(Int(root) + 10, low: 28, high: 42))
+            let m7c  = UInt8(clamped(Int(root) + 11, low: 28, high: 42))
+            let octc = UInt8(clamped(Int(root) + 12, low: 28, high: 42))
+            let p4c  = UInt8(clamped(Int(root) + 5,  low: 28, high: 42))
+            let b5c  = UInt8(clamped(Int(root) + 6,  low: 28, high: 42))
+            let p5c  = UInt8(clamped(Int(root) + 7,  low: 28, high: 42))
+            return [
+                MIDIEvent(stepIndex: barStart + 2,  note: b7c,  velocity: 72, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: m7c,  velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 6,  note: octc, velocity: 80, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8,  note: p4c,  velocity: 74, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 10, note: b5c,  velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 12, note: p5c,  velocity: 82, durationSteps: 4),
+            ]
+        }
+    }
+
+    // MARK: - MOT-BASS-016: Albatross Pulse — PiL "Albatross" (1979) deep ostinato
+    // Bass sits in MIDI 28–40 (E1 zone), one octave below the normal motorik register.
+    // Pattern per bar: R–R–P5–R–R–R–P5–m6, all 8th notes (2 steps each).
+    // The m6 snaps to the nearest scale tone — in Aeolian it's the natural b6, giving a
+    // dark lean on the last 8th before the cycle restarts on bar 2.
+    // Velocity is flat and mechanical (76–82), simulating a sequencer, not a live player.
+    // ~5% breathe variant: the first P5 (position 4) extends to a held quarter note (4 steps),
+    // creating a momentary opening in the relentless pulse.
+
+    private static func albatrossPulseBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry,
+        frame: GlobalMusicalFrame, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root    = UInt8(clamped(24 + rootPC, low: 28, high: 40))   // deep E1-zone octave
+        let fifth   = UInt8(clamped(Int(root) + 7, low: 28, high: 52))
+        let m6      = nearestScaleNote(to: Int(root) + 8, frame: frame, low: 28, high: 52)
+
+        // ~5% breathe variant: P5 at position 4 extends to a held quarter note (4 steps)
+        if rng.nextDouble() < 0.05 {
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root,  velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 2,  note: root,  velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: fifth, velocity: 80, durationSteps: 4),  // held
+                MIDIEvent(stepIndex: barStart + 8,  note: root,  velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 10, note: root,  velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 12, note: fifth, velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 14, note: m6,    velocity: 72, durationSteps: 2),
+            ]
+        }
+
+        // Standard: R–R–P5–R–R–R–P5–m6
+        let pitches: [UInt8] = [root, root, fifth, root, root, root, fifth, m6]
+        let vels:    [UInt8] = [82,   76,   80,    78,   82,   76,   80,    74]
+        var events: [MIDIEvent] = []
+        for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: pitches[i],
+                                    velocity: vels[i], durationSteps: 2))
+        }
+        return events
+    }
+
+    // MARK: - MOT-BASS-018: Wobble Theme — PiL "Theme" (1979) 2-bar half-note pulse
+    // Two-bar cycle: Bar A has two half-notes (root + P5), Bar B has a 5-note chromatic riff
+    // with the downbeat silent. Jah Wobble's bass on "Theme" is the sparsest in the PiL catalog —
+    // entire sections driven by just two pitches per bar.
+
+    private static func wobbleThemeBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root   = UInt8(clamped(24 + rootPC, low: 28, high: 40))   // deep E1-zone
+
+        if bar % 2 == 0 {
+            // Bar A — two half-notes: root beat 1, P5 beat 3
+            let fifth = UInt8(clamped(Int(root) + 7, low: 28, high: 42))
+            return [
+                MIDIEvent(stepIndex: barStart,     note: root,  velocity: 78, durationSteps: 8),
+                MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 74, durationSteps: 8),
+            ]
+        } else {
+            // Bar B — beat 1 silent; b7-based riff with maj2 color (steps 2,6,8,10,12)
+            let b7   = UInt8(clamped(Int(root) + 10, low: 28, high: 42))
+            let maj2 = nearestScaleNote(to: Int(root) + 2, frame: frame, low: 28, high: 42)
+            return [
+                MIDIEvent(stepIndex: barStart + 2,  note: b7,   velocity: 76, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 6,  note: b7,   velocity: 72, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8,  note: maj2, velocity: 74, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 10, note: root, velocity: 76, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 12, note: b7,   velocity: 70, durationSteps: 4),
+            ]
+        }
+    }
+
+    // MARK: - MOT-BASS-019: Religion Groove
+
+    private static func religionGrooveBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root    = UInt8(clamped(24 + rootPC, low: 28, high: 40))
+        let m3up    = nearestScaleNote(to: Int(root) + 3, frame: frame, low: 28, high: 52)
+        let m3down  = UInt8(clamped(Int(root) - 4, low: 24, high: 40))
+        return [
+            MIDIEvent(stepIndex: barStart,      note: root,   velocity: 88, durationSteps: 2),
+            MIDIEvent(stepIndex: barStart + 2,  note: root,   velocity: 84, durationSteps: 2),
+            MIDIEvent(stepIndex: barStart + 4,  note: root,   velocity: 80, durationSteps: 2),
+            MIDIEvent(stepIndex: barStart + 6,  note: m3up,   velocity: 74, durationSteps: 4),
+            MIDIEvent(stepIndex: barStart + 10, note: m3down, velocity: 78, durationSteps: 2),
+            MIDIEvent(stepIndex: barStart + 12, note: m3down, velocity: 74, durationSteps: 4),
+        ]
+    }
+
+    // MARK: - MOT-BASS-020: Shadowplay Pulse
+
+    private static func shadowplayPulseBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root   = UInt8(clamped(24 + rootPC, low: 28, high: 40))
+        let lean   = UInt8(clamped(Int(root) + 2, low: 28, high: 42))
+        var events: [MIDIEvent] = []
+        if bar % 2 == 0 {
+            // Bar A: 8th-note root ostinato skipping step 2 (the Shadowplay skip)
+            for step in [0, 4, 6, 8, 10, 12, 14] {
+                let vel: UInt8 = (step == 0 || step == 8) ? 82 : 76
+                events.append(MIDIEvent(stepIndex: barStart + step, note: root, velocity: vel, durationSteps: 2))
+            }
+        } else {
+            // Bar B: denser pulse with M2 lean on the final quarter
+            for step in [0, 2, 4, 6, 8, 10] {
+                let vel: UInt8 = (step == 0 || step == 8) ? 82 : 76
+                events.append(MIDIEvent(stepIndex: barStart + step, note: root, velocity: vel, durationSteps: 2))
+            }
+            events.append(MIDIEvent(stepIndex: barStart + 12, note: lean, velocity: 72, durationSteps: 4))
+        }
+        return events
+    }
+
+    // MARK: - MOT-BASS-021: No Birds Walk
+
+    private static func noBirdsWalkBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let root   = UInt8(clamped(24 + rootPC, low: 28, high: 40))
+        let p4     = UInt8(clamped(Int(root) + 5, low: 28, high: 42))
+        let tt     = UInt8(clamped(Int(root) + 6, low: 28, high: 42))
+        let p5     = UInt8(clamped(Int(root) + 7, low: 28, high: 42))
+        if bar % 2 == 0 {
+            // Bar A: root pickup + P4 suspension (pedal feel)
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root, velocity: 86, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 2,  note: p4,   velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 4,  note: p4,   velocity: 74, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: p4,   velocity: 78, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 12, note: p4,   velocity: 72, durationSteps: 4),
+            ]
+        } else {
+            // Bar B: root ascent to TT then P5 resolution
+            return [
+                MIDIEvent(stepIndex: barStart,      note: root, velocity: 86, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 4,  note: root, velocity: 80, durationSteps: 4),
+                MIDIEvent(stepIndex: barStart + 8,  note: p4,   velocity: 82, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 10, note: tt,   velocity: 78, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 12, note: p5,   velocity: 86, durationSteps: 4),
             ]
         }
     }

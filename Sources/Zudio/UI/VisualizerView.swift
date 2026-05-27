@@ -35,6 +35,12 @@ struct VisualizerView: View {
     // Random gradient angle (radians) chosen per song — varies which direction the colour sweeps.
     @State private var bgGradientAngle: Double = .pi / 2
 
+    // Tempo nudge overlay — shows briefly when swipe up/down changes BPM.
+    @State private var tempoNudgeText: String = ""
+    @State private var tempoNudgeOpacity: Double = 0
+    @State private var tempoNudgeOffset: CGFloat = 0
+    @State private var prevNudgeTempo: Int? = nil
+
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 12,
                                 paused: !playback.isPlaying && playback.activeVisualizerNotes.isEmpty)) { tl in
@@ -62,6 +68,10 @@ struct VisualizerView: View {
                                       appState.triggerVisualizerFlash(trackIndex: kTrackLead2)
                                       appState.regenerateTrack(kTrackLead1)
                                       appState.regenerateTrack(kTrackLead2) },
+                onSwipeUp:          { let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
+                                      appState.tempoOverride = max(20, min(200, cur + 5)) },
+                onSwipeDown:        { let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
+                                      appState.tempoOverride = max(20, min(200, cur - 5)) },
                 onRegenBassDrums:   { appState.triggerVisualizerFlash(trackIndex: kTrackBass)
                                       appState.triggerVisualizerFlash(trackIndex: kTrackDrums)
                                       appState.regenerateTrack(kTrackBass)
@@ -95,6 +105,28 @@ struct VisualizerView: View {
             bgFadeStart = Date()
             bgGradientAngle = Double.random(in: 0 ..< .pi * 2)
         }
+        .onChangeCompat(of: appState.tempoOverride) { newVal in
+            guard let bpm = newVal else { return }
+            let prev = prevNudgeTempo ?? appState.songState?.frame.tempo ?? bpm
+            let goingUp = bpm >= prev
+            tempoNudgeText = goingUp ? "↑" : "↓"
+            prevNudgeTempo = bpm
+            if tempoNudgeOpacity < 0.1 { tempoNudgeOffset = 0 }
+            tempoNudgeOpacity = 0.88
+            withAnimation(.easeOut(duration: 0.65)) {
+                tempoNudgeOpacity = 0
+                tempoNudgeOffset  = goingUp ? -40 : 40
+            }
+        }
+        .overlay(alignment: .center) {
+            Text(tempoNudgeText)
+                .font(.system(size: 60, weight: .bold))
+                .foregroundStyle(Color.white)
+                .shadow(color: .black.opacity(0.6), radius: 4, x: 0, y: 2)
+                .opacity(tempoNudgeOpacity)
+                .offset(y: tempoNudgeOffset)
+                .allowsHitTesting(false)
+        }
     }
 
     // MARK: - Mac gesture handlers (mirrors iPhone tap/double-tap-orb, tap-empty)
@@ -106,6 +138,7 @@ struct VisualizerView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + twoBars) {
             if appState.muteState[trackIndex] {
                 appState.toggleMute(trackIndex)
+                appState.regenInstrument(forTrack: trackIndex)
                 appState.regenerateTrack(trackIndex)
             }
         }
@@ -486,6 +519,8 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
     var onTapPoint:         (CGPoint) -> Void
     var onSwipeRight:       ()    -> Void
     var onSwipeLeft:        ()    -> Void
+    var onSwipeUp:          ()    -> Void
+    var onSwipeDown:        ()    -> Void
     var onRegenBassDrums:   ()    -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -510,6 +545,8 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
         func fireTapPoint(at pt: CGPoint) { parent.onTapPoint(pt) }
         func fireSwipeRight()     { parent.onSwipeRight() }
         func fireSwipeLeft()      { parent.onSwipeLeft() }
+        func fireSwipeUp()        { parent.onSwipeUp() }
+        func fireSwipeDown()      { parent.onSwipeDown() }
         func fireRegenBassDrums() { parent.onRegenBassDrums() }
 
         @objc func handlePinch(_ gr: NSMagnificationGestureRecognizer) {
@@ -679,15 +716,23 @@ private final class MacGestureNSView: NSView {
         }
     }
 
-    // MARK: Scroll — horizontal swipe maps to regen gestures (threshold avoids accidental triggers)
+    // MARK: Scroll — horizontal swipe → regen gestures; vertical swipe → tempo ±5 BPM
 
     override func scrollWheel(with event: NSEvent) {
         let dx = event.scrollingDeltaX
-        guard abs(dx) > 10 else { return }
+        let dy = event.scrollingDeltaY
+        guard abs(dx) > 10 || abs(dy) > 10 else { return }
         guard Date().timeIntervalSince(lastSwipeDate) > 0.5 else { return }
         lastSwipeDate = Date()
-        if dx > 0 { coordinator?.fireSwipeRight() }
-        else      { coordinator?.fireSwipeLeft() }
+        // Prefer the dominant axis so diagonal swipes pick one action only.
+        if abs(dy) > abs(dx) {
+            // NSEvent scrollingDeltaY > 0 means content moves DOWN (finger moves down).
+            if dy > 0 { coordinator?.fireSwipeDown() }
+            else      { coordinator?.fireSwipeUp() }
+        } else {
+            if dx > 0 { coordinator?.fireSwipeRight() }
+            else      { coordinator?.fireSwipeLeft() }
+        }
     }
 
     // MARK: Right click — dry/wet toggle on orb, regen on empty

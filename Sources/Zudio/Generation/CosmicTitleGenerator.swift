@@ -25,7 +25,7 @@ struct KosmicTitleGenerator {
         "Albatroxe", "Nitrogen", "Magnetique", "Electronique", "Chronique",
         // Real French/Latin scientific
         "Galaxie", "Proxima", "Axiome", "Paradoxe", "Fluxion", "Maxima",
-        "Orbite", "Cosmique", "Quantique", "Ionique", "Luminare", "Frequence",
+        "Orbite", "Cosmique", "Quantique", "Ionique", "Luminare", "Arastradero",
         "Polarite", "Dimensione", "Algorhythme", "Spectrion", "Resonanse",
         // Invented in JMJ style
         "Vortexe", "Galaxene", "Solaxe", "Nexione", "Hexalon", "Flexure",

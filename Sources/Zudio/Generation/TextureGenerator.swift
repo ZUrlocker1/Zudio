@@ -15,6 +15,9 @@
 //   TEXT-008: Phase Slip — two adjacent semitone notes at same step (vel 25–35), ~once per 20 body bars
 //
 // Per song: TEXT-001 always active; 1–2 supplementary rules chosen at generation time.
+// Noir-only:    TEXT-006 (High Tension Touch), TEXT-008 (Phase Slip)
+// Regular-only: TEXT-002 (Transition Swell),  TEXT-005 (Breath Release)
+// Shared:       TEXT-003 (Spatial Sweep), TEXT-004 (Shimmer Hold), TEXT-007 (Pedal Drone)
 
 struct TextureGenerator {
     static func generate(
@@ -22,17 +25,23 @@ struct TextureGenerator {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
         // MOT-TEXT-001 is always the backbone
         usedRuleIDs.insert("MOT-TEXT-001")
 
-        // Select 1–2 supplementary rules per song
-        let suppCandidates = ["MOT-TEXT-002", "MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005",
-                               "MOT-TEXT-006", "MOT-TEXT-007", "MOT-TEXT-008"]
-        let suppWeights:   [Double]  = [0.16, 0.14, 0.14, 0.12, 0.12, 0.16, 0.16]
+        // Select 1–2 supplementary rules per song (equal weights within each pool)
+        // Noir:    shared + TEXT-006, TEXT-008   Regular: shared + TEXT-002, TEXT-005
+        let suppCandidates: [String]
+        if noirVariation {
+            suppCandidates = ["MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-006", "MOT-TEXT-007", "MOT-TEXT-008"]
+        } else {
+            suppCandidates = ["MOT-TEXT-002", "MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005", "MOT-TEXT-007"]
+        }
+        let suppWeights = [Double](repeating: 1.0 / Double(suppCandidates.count), count: suppCandidates.count)
         let primaryIdx = rng.weightedPick(suppWeights)
         var activeSupp: Set<String> = [suppCandidates[primaryIdx]]
         if rng.nextDouble() < 0.40 {

@@ -74,7 +74,10 @@ struct ChillLeadGenerator {
                        :            "CHL-LD1-009"
             }
         }
-        let useJazzIdioms = (ruleID == "CHL-LD1-009")
+        let useJazzIdioms   = (ruleID == "CHL-LD1-009")
+        let useBluesRuns    = (ruleID == "CHL-LD1-004")   // CHL-LD1-004: occasional fast blues runs
+        let isShortPunch    = (ruleID == "CHL-LD1-002")   // CHL-LD1-002: compact staccato punches
+        let isSparseMelodic = (ruleID == "CHL-LD1-003")   // CHL-LD1-003: sparse phrasing, per-bar density
         usedRuleIDs.insert(ruleID)
 
         var events: [MIDIEvent] = []
@@ -207,10 +210,13 @@ struct ChillLeadGenerator {
             // Suppressed in blues until the lead has played at least once (guarantees early A-section entry).
             // Blues caps lay-out at 4 bars: an 8-bar lay-out at the start of a chorus can chain with
             // another and silence a full 16-bar pass, which prevents harmony from firing.
+            // CHL-LD1-002 in blues: reduce lay-out probability to 5% — short punches should keep
+            // the groove alive rather than dropping out for 4 bars at a time.
+            let layOutProb: Double = (bluesVariation && isShortPunch) ? 0.05 : 0.12
             if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone || leadInstrument == .tenorSax || leadInstrument == .clarinet),
                label == .A || label == .B,
                !(bluesVariation && !bluesLeadHasPlayed),
-               rng.nextDouble() < 0.12 {
+               rng.nextDouble() < layOutProb {
                 bar += (bluesVariation || rng.nextDouble() < 0.60) ? 4 : 8
                 continue
             }
@@ -249,7 +255,8 @@ struct ChillLeadGenerator {
                     }
                     silenceProb = 0.90  // very sparse — at most 1 brief phrase
                 case .outro:  silenceProb = 0.85  // very sparse in outro — trailing off
-                case .A:      silenceProb = 0.40  // groove A: moderately active
+                // CHL-LD1-002 in blues: less silence in A so punches keep the energy going
+                case .A:      silenceProb = (bluesVariation && isShortPunch) ? 0.25 : 0.40
                 case .B:      silenceProb = 0.10  // most active in groove B — consistently denser than A
                 default:      silenceProb = 0.50
                 }
@@ -305,7 +312,10 @@ struct ChillLeadGenerator {
                                                    regLow: regLow, regHigh: regHigh,
                                                    section: label, phraseEndChord: phraseEndChord,
                                                    phraseStartChord: phraseStartChord,
-                                                   useJazzIdioms: useJazzIdioms, rng: &rng)
+                                                   useJazzIdioms: useJazzIdioms,
+                                                   useBluesRuns: useBluesRuns,
+                                                   isShortPunch: isShortPunch,
+                                                   isSparseMelodic: isSparseMelodic, rng: &rng)
                     events += phraseNotes
                     phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
                     let offset = bar * 16
@@ -380,6 +390,9 @@ struct ChillLeadGenerator {
                 phraseEndChord: phraseEndChord,
                 phraseStartChord: phraseStartChord,
                 useJazzIdioms: useJazzIdioms,
+                useBluesRuns: useBluesRuns,
+                isShortPunch: isShortPunch,
+                isSparseMelodic: isSparseMelodic,
                 rng: &rng
             )
             events += phraseNotes
@@ -387,8 +400,10 @@ struct ChillLeadGenerator {
             bluesLeadHasPlayed = true
 
             bar += actualPhraseLen
-            // Mandatory rest after phrase (CHL-RULE-06); Groove B rests capped at 1 bar to stay dense
-            bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
+            // Mandatory rest after phrase (CHL-RULE-06); Groove B capped at 1 bar; CHL-LD1-002 blues
+            // also capped at 1 bar so punches keep the groove alive without long halting gaps.
+            let extraRest = (label == .B || (bluesVariation && isShortPunch)) ? 0 : rng.nextInt(upperBound: 2)
+            bar += 1 + extraRest
         }
         return (events, phraseOnsets, handoffBarSet)
     }
@@ -616,6 +631,9 @@ struct ChillLeadGenerator {
         phraseEndChord: ChordWindow? = nil,
         phraseStartChord: ChordWindow? = nil,
         useJazzIdioms: Bool = false,
+        useBluesRuns: Bool = false,
+        isShortPunch: Bool = false,
+        isSparseMelodic: Bool = false,
         rng: inout SeededRNG,
         velocityOffset: Int = 0
     ) -> [MIDIEvent] {
@@ -805,13 +823,75 @@ struct ChillLeadGenerator {
             let barBase = (bar + barOffset) * 16
             // CHL-LD1-009: jazz burst mode — 25% of bars get 5–7 rapid notes at 2-step spacing,
             // creating the short burst character that defines classic jazz phrasing.
-            let burstMode = useJazzIdioms && section != .intro && section != .outro && rng.nextDouble() < 0.25
-            let barNotes  = burstMode ? (5 + rng.nextInt(upperBound: 3)) : notesPerBar
-            let spacing   = burstMode ? 2 : (16 / notesPerBar)
+            // CHL-LD1-004: blues run mode — 20% of bars get 3–5 rapid notes at 2–3 step spacing,
+            // mimicking horn players throwing in quick passing-tone licks between longer phrases.
+            let burstMode     = useJazzIdioms  && section != .intro && section != .outro && rng.nextDouble() < 0.25
+            let bluesRunMode  = useBluesRuns   && section != .intro && section != .outro && rng.nextDouble() < 0.20
+            let barNotes: Int
+            let spacing:  Int
+            let sparsePhaseOffset: Int   // only used when isSparseMelodic
+            if burstMode {
+                barNotes = 5 + rng.nextInt(upperBound: 3)   // 5–7
+                spacing  = 2
+                sparsePhaseOffset = 0
+            } else if bluesRunMode {
+                barNotes = 3 + rng.nextInt(upperBound: 3)   // 3–5
+                spacing  = 2 + rng.nextInt(upperBound: 2)   // 2–3 steps
+                sparsePhaseOffset = 0
+            } else if isSparseMelodic && section != .intro && section != .outro {
+                // Option C: draw fresh density each bar — lyrical (30%), moderate (50%), cluster (20%)
+                let dr = rng.nextDouble()
+                if dr < 0.30 {
+                    barNotes = 1 + rng.nextInt(upperBound: 2)   // 1–2 notes: long, lyrical
+                    spacing  = barNotes == 1 ? 8 : 6 + rng.nextInt(upperBound: 4)
+                } else if dr < 0.80 {
+                    barNotes = 3 + rng.nextInt(upperBound: 2)   // 3–4 notes: moderate
+                    spacing  = 3 + rng.nextInt(upperBound: 3)   // 3–5 steps (tighter grouping)
+                } else {
+                    barNotes = 5                                 // cluster run
+                    spacing  = 2
+                }
+                // Shift the whole cluster to a random beat position within the bar
+                let maxPhase = Swift.max(0, 15 - (barNotes - 1) * spacing)
+                sparsePhaseOffset = maxPhase > 0 ? rng.nextInt(upperBound: maxPhase + 1) : 0
+            } else {
+                barNotes = notesPerBar
+                spacing  = 16 / notesPerBar
+                sparsePhaseOffset = 0
+            }
+            // CHL-LD1-002: syncopated spacing — pairs with a mid-bar breath instead of a
+            // mechanical even grid. First note lands on or just off the beat; subsequent notes
+            // cluster in pairs with a gap between, giving the "dit-dit [breath] dahh" feel.
+            let punchOffsets: [Int]
+            if isShortPunch && !burstMode && !bluesRunMode {
+                let s = rng.nextDouble() < 0.45 ? 0 : 2  // on-beat or pickup
+                switch barNotes {
+                case 2:
+                    let gap = 6 + rng.nextInt(upperBound: 5)                      // 6–10 step gap
+                    punchOffsets = [s, Swift.min(15, s + gap)]
+                case 3:
+                    let t  = 2 + rng.nextInt(upperBound: 2)                        // 2–3 tight
+                    let g  = t + 5 + rng.nextInt(upperBound: 4)                    // 7–11 from start
+                    punchOffsets = [s, Swift.min(13, s + t), Swift.min(15, s + g)]
+                case 4:
+                    let t1 = 2 + rng.nextInt(upperBound: 2)                        // 2–3
+                    let g2 = t1 + 4 + rng.nextInt(upperBound: 3)                  // gap of 6–9 from start
+                    punchOffsets = [s, s + t1, Swift.min(13, s + g2), Swift.min(15, s + g2 + 2)]
+                default:
+                    punchOffsets = (0..<barNotes).map { $0 * spacing }
+                }
+            } else {
+                punchOffsets = (0..<barNotes).map { $0 * spacing }
+            }
+
             for noteIdx in 0..<barNotes {
-                // Brass: start on off-beat occasionally (syncopated attack); disabled in burst mode
+                // CHL-LD1-002: syncopated offsets; other brass: off-beat pickup on note 0
                 let stepOffset: Int
-                if (leadInstrument == .mutedTrumpet || leadInstrument == .trumpet) && noteIdx == 0 && !burstMode {
+                if isShortPunch && !burstMode {
+                    stepOffset = noteIdx < punchOffsets.count ? punchOffsets[noteIdx] : noteIdx * spacing
+                } else if isSparseMelodic && !burstMode {
+                    stepOffset = sparsePhaseOffset + noteIdx * spacing
+                } else if (leadInstrument == .mutedTrumpet || leadInstrument == .trumpet) && noteIdx == 0 && !burstMode {
                     stepOffset = rng.nextDouble() < 0.40 ? 2 : 0
                 } else {
                     stepOffset = noteIdx * spacing
@@ -936,17 +1016,75 @@ struct ChillLeadGenerator {
             }
         }
 
+        // CHL-LD1-002: remove orphaned tail notes — a slot is "orphaned" when it's the last
+        // in its bar, the gap from the previous same-bar note is large (> 6 steps), and it's
+        // not the final note of the whole phrase. These sound like accidental stray notes.
+        if isShortPunch && slots.count > 2 {
+            var toRemove = IndexSet()
+            for i in 1..<(slots.count - 1) {
+                let barIdx = slots[i].step / 16
+                let isLastInBar = slots[i + 1].step / 16 != barIdx
+                let prevSameBar = slots[i - 1].step / 16 == barIdx
+                let gapBefore = prevSameBar ? slots[i].step - slots[i - 1].step : 0
+                if isLastInBar && gapBefore > 6 { toRemove.insert(i) }
+            }
+            if !toRemove.isEmpty {
+                slots = slots.enumerated().filter { !toRemove.contains($0.offset) }.map { $0.element }
+            }
+        }
+
         // Assign durations: each note ends ≥1 step before the next note starts (monophonic).
-        // The final note in the phrase keeps its instrument-specific duration.
+        // CHL-LD1-004: per-note duration variation — 30% short punches (2–3 steps), 50% normal
+        // (4–8 steps), 20% longer holds (8–12 steps) — gives the blues horn a more varied,
+        // realistic feel instead of uniform note lengths.
         for i in 0..<slots.count {
             let maxDur: Int
             if i + 1 < slots.count {
-                // Leave at least 1 step gap to the next note
                 maxDur = Swift.max(1, slots[i + 1].step - slots[i].step - 1)
             } else {
-                maxDur = noteDurSteps
+                maxDur = noteDurSteps * 2   // final note: allow a longer hold
             }
-            let dur = Swift.min(noteDurSteps, maxDur)
+            var baseDur: Int
+            if useBluesRuns {
+                let r = rng.nextDouble()
+                if r < 0.30 {
+                    baseDur = 2 + rng.nextInt(upperBound: 2)    // 2–3 steps: short punch
+                } else if r < 0.80 {
+                    baseDur = noteDurSteps                       // 4–8 steps: normal
+                } else {
+                    baseDur = noteDurSteps + 4 + rng.nextInt(upperBound: 5)  // 8–12 steps: held note
+                }
+            } else if isShortPunch {
+                // Per-note duration mix — 40% stab, 40% medium, 20% held.
+                let r = rng.nextDouble()
+                if r < 0.40 {
+                    baseDur = 1 + rng.nextInt(upperBound: 2)    // 1–2 steps: quick stab
+                } else if r < 0.80 {
+                    baseDur = 3 + rng.nextInt(upperBound: 3)    // 3–5 steps: medium
+                } else {
+                    baseDur = 6 + rng.nextInt(upperBound: 4)    // 6–9 steps: held note
+                }
+                // If the gap to the next note is large and this note is still short,
+                // extend it to fill the gap — avoids "dit-dit [big gap] dit" fragmented feel.
+                if i + 1 < slots.count {
+                    let gapToNext = slots[i + 1].step - slots[i].step
+                    if gapToNext > 5 && baseDur < 4 { baseDur = gapToNext - 1 }
+                }
+            } else if isSparseMelodic {
+                // Option A: 20% ornament, 55% medium, 25% long sustain.
+                // Last note always gets a long ring-out regardless of roll.
+                let r = rng.nextDouble()
+                if i == slots.count - 1 || r >= 0.75 {
+                    baseDur = noteDurSteps + 5 + rng.nextInt(upperBound: 6)  // long sustain
+                } else if r < 0.20 {
+                    baseDur = 2 + rng.nextInt(upperBound: 2)                 // 2–3: quick ornament
+                } else {
+                    baseDur = noteDurSteps                                    // instrument medium
+                }
+            } else {
+                baseDur = noteDurSteps
+            }
+            let dur = Swift.min(baseDur, maxDur)
             events.append(MIDIEvent(stepIndex: slots[i].step, note: UInt8(slots[i].pitch),
                                     velocity: slots[i].vel, durationSteps: Swift.max(1, dur)))
         }

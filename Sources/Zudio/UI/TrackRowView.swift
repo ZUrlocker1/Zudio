@@ -421,13 +421,16 @@ struct TrackRowView: View {
             default:             []
             }
         } else {
-            // Motorik defaults (unchanged from original)
+            let idx = appState.instrumentOverrides[kTrackLead1] ?? 0
+            let mnames = AppState.instrumentPoolNames(trackIndex: kTrackLead1, style: .motorik)
+            let motSynthLead = trackIndex == kTrackLead1
+                && idx < mnames.count && mnames[idx] == "Synth Lead"
             defaults = switch trackIndex {
-            case kTrackLead1:    [.delay]
-            case kTrackRhythm:   [.delay]
-            case kTrackPads:     [.space]
-            case kTrackTexture:  [.pan]
-            default:             []
+            case kTrackLead1:   motSynthLead ? [.delay, .tremolo] : [.delay]
+            case kTrackRhythm:  [.delay]
+            case kTrackPads:    [.space]
+            case kTrackTexture: [.pan]
+            default:            []
             }
         }
 

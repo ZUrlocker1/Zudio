@@ -17,24 +17,15 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.5/Zudio-1.5.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.6/Zudio-1.6.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `1.5.1` (build 120). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `1.6` (build 122). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v1.5.1:**
-- **Bug fix** — audio export (Save as Audio) was broken due to the sf2 file name change; now fixed
-
-**What's new in v1.5:**
-- **Ambient Piano** — a new Ambient sub-style (work in progress) featuring solo piano with optional pad accompaniment, smaller reverb, and piano-specific phrasing rules
-- **Improved piano sound** — switched to the SC55 Stereo piano soundfont for a more dynamic, natural-sounding piano in Ambient and Chill styles
-- **Smaller app size** — replaced the bundled general MIDI soundfont with a custom trimmed build (Zudio.sf2), removing 113 unused instrument presets. This makes the Zudio app 10 MB smaller.
-- **New Ambient rhythm instruments** — Church Bells, Windchime, Tinker Bell added to the Ambient Rhythm pool
-- **Expanded Kosmic and Motorik instrument palettes** — new synth bass, lead, and pad options across both styles
-- **Chill** — more melodic solos with recurring themes, new pad textures, more rhythm and secondary lead variety
-- **Kosmic** — more melodic lead lines (directional arc phrasing), improved pad and bass sequencer variety
-- **Ambient** — new bass rules and a new secondary lead phrase form
-- **Motorik** — more drum variation
-- **iOS 17 fix** — fixed a bug where turning off Reverb on any track would silence it entirely on iOS 17
+**What's new in v1.6:**
+- **Motorik Noir** — New dark sub-style appearing in ~50% of Motorik songs. Slower tempo, always minor mode, PiL-inspired deep bass rules, inverted drum grooves, sparse pads, and a distinct instrument palette
+- **Expanded Motorik instruments** — Motorik Rhythm pool expanded from 3 to 8 instruments; Synth Lead and Saw Stack added to Motorik Lead 1; Machine Kit added to Motorik Drums; Techno Bass added to Motorik Bass
+- **Tempo gestures** — Swipe up/down on the visualizer to increase or decrease tempo by 5 BPM
+- **Orb click regenerates instrument and track** — Clicking or tapping an orb now regenerates both the instrument and the MIDI track, matching the lightning bolt button in the Tracks view.
 
 ---
 

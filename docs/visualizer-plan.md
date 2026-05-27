@@ -114,9 +114,11 @@ The same actions are available on all platforms; only the input method differs.
 
 - **Swipe right** — fully regenerate Rhythm and Pads tracks
 - **Swipe left** — fully regenerate Lead 1 and Lead 2 tracks
+- **Swipe up** — increase tempo by 5 BPM (clamped to 20–200)
+- **Swipe down** — decrease tempo by 5 BPM (clamped to 20–200)
 - **Pinch** — fully regenerate Bass and Drums tracks
 
-On iPhone/iPad these are `UISwipeGestureRecognizer` and `UIPinchGestureRecognizer`. On Mac, horizontal trackpad scroll (scrollWheel `deltaX > 10`) fires swipe right/left, and `NSMagnificationGestureRecognizer` fires the pinch/regen-bass-drums action.
+On iPhone/iPad these are `UISwipeGestureRecognizer` (right, left, up, down) and `UIPinchGestureRecognizer`. On Mac, trackpad scroll fires the gestures via `scrollWheel`: deltaX > 10 fires right/left, deltaY > 10 fires up/down; when both axes move, the dominant axis wins. `NSMagnificationGestureRecognizer` fires the pinch/regen-bass-drums action. Tempo changes write to `appState.tempoOverride: Int?`, which Combine sinks forward to `playback.setTempo(bpm)` for live scrubbing.
 
 ### Mac-specific behaviour
 
@@ -147,7 +149,7 @@ If the user resumes playback after a sleep stop, the timer re-arms from that mom
 ## Implementation Notes
 
 - `VisualizerView` has no `.ignoresSafeArea()` — safe-area handling is the responsibility of the parent (`PhonePlayerView` ZStack on iPhone; panel bounds on iPad).
-- **Mac gesture handling** is in `MacVisualizerGestureView` (NSViewRepresentable overlay) inside `VisualizerView`. Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click. Cmd+click routes to the right-click handler. Swipes are detected via `scrollWheel` deltaX; pinch via `NSMagnificationGestureRecognizer`.
+- **Mac gesture handling** is in `MacVisualizerGestureView` (NSViewRepresentable overlay) inside `VisualizerView`. Single-click is delayed by `NSEvent.doubleClickInterval` to distinguish from double-click. Cmd+click routes to the right-click handler. Horizontal swipes are detected via `scrollWheel` deltaX > 10; vertical swipes via deltaY > 10 (dominant axis wins); pinch via `NSMagnificationGestureRecognizer`.
 - **iPhone gesture handling** is in `CanvasGestureView` (UIViewRepresentable overlay) inside `PhonePlayerView`. **iPad** uses the same `CanvasGestureView` wired through `iPadCanvasGestureLayer` in `ContentView`. Both use `UISwipeGestureRecognizer` for swipes and `UIPinchGestureRecognizer` for the pinch/bass-drums regen.
 - `muteState` and `soloState` are `[Bool]` arrays on `AppState` indexed by track.
 - `isAnySolo` on `AppState` is a plain `private(set) var Bool` (precomputed at all `soloState` mutation sites) that drives the solo-out dim logic.

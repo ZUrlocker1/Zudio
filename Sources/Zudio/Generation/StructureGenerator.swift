@@ -207,12 +207,15 @@ struct StructureGenerator {
         //   Aeolian "2"   — ii dim  (e.g. F# in E Aeolian: P5=C#, scale has C)
         let degrees: [String]
         switch mode {
-        case .Ionian:          degrees = ["1", "2", "3", "4", "5", "6"]          // removed "7"
-        case .Dorian:          degrees = ["1", "2", "b3", "4", "5", "b7"]        // removed "6"
-        case .Mixolydian:      degrees = ["1", "2", "4", "5", "6", "b7"]         // removed "3"
-        case .Aeolian:         degrees = ["1", "b3", "4", "5", "b6", "b7"]       // removed "2"
+        case .Ionian:          degrees = ["1", "2", "3", "4", "5", "6"]             // removed "7" (dim)
+        case .Dorian:          degrees = ["1", "2", "b3", "4", "5", "b7"]         // removed "6" (dim)
+        case .Mixolydian:      degrees = ["1", "2", "4", "5", "6", "b7"]          // removed "3" (dim)
+        case .Aeolian:         degrees = ["1", "b3", "4", "5", "b6", "b7"]        // removed "2" (dim)
         case .MinorPentatonic: degrees = ["1", "b3", "4", "5", "b7"]
         case .MajorPentatonic: degrees = ["1", "2", "3", "5", "6"]
+        case .Lydian:          degrees = ["1", "2", "3", "5", "6", "7"]           // removed "#4" (dim)
+        case .Phrygian:        degrees = ["1", "b2", "b3", "4", "b6", "b7"]       // removed "5" (dim)
+        case .HarmonicMinor:   degrees = ["1", "4", "5", "b6"]                    // only 4 roots with P5 in scale
         }
         return degrees[rng.nextInt(upperBound: degrees.count)]
     }
@@ -397,6 +400,107 @@ struct StructureGenerator {
             default:
                 let t: [ChordType] = [.minor, .sus2, .power]
                 return t[rng.weightedPick([0.50, 0.30, 0.20])]
+            }
+        }
+
+        // ── PHRYGIAN  (scale: 1 b2 b3 4 5 b6 b7  e.g. C Db Eb F G Ab Bb) ─────────────
+        // "5" excluded — G + P5 = D, not in C Phrygian. bII (b2) is the characteristic chord.
+        if mode == .Phrygian {
+            switch rootDegree {
+            case "1":
+                // i minor (C Eb G ✓). sus2: C D G — D not in Phrygian. min7: C Eb G Bb ✓.
+                let t: [ChordType] = [.minor, .min7, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "b2":
+                // bII major — the defining Phrygian colour (Db F Ab in C Phrygian ✓).
+                // dom7 on bII: +10=Cb not in scale. sus2: Db Eb Ab ✓.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.65, 0.20, 0.15])]
+            case "b3":
+                // bIII major (Eb G Bb ✓). dom7: Eb G Bb Db — Db(1) ✓. sus2: Eb F Bb ✓.
+                let t: [ChordType] = [.major, .dom7, .sus2, .power]
+                return t[rng.weightedPick([0.40, 0.25, 0.25, 0.10])]
+            case "4":
+                // iv minor (F Ab C ✓). sus2: F G C ✓. min7: F Ab C Eb ✓.
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.25, 0.20, 0.10])]
+            case "b6":
+                // bVI major (Ab C Eb ✓). dom7: Ab C Eb F# — F# not in scale. sus2: Ab Bb Eb ✓.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "b7":
+                // bVII minor (Bb Db F ✓). sus2: Bb C F ✓. min7: Bb Db F Ab ✓.
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.25, 0.20, 0.10])]
+            default:
+                let t: [ChordType] = [.minor, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            }
+        }
+
+        // ── HARMONIC MINOR  (scale: 1 2 b3 4 5 b6 7  e.g. A B C D E F G#) ─────────────
+        // Only 4 roots have P5 in scale. V7 (dom7 on "5") is the defining harmonic-minor sound.
+        if mode == .HarmonicMinor {
+            switch rootDegree {
+            case "1":
+                // i minor (A C E ✓). sus2: A B E ✓. min7: A C E G — G not in scale (has G#).
+                let t: [ChordType] = [.minor, .sus2, .power]
+                return t[rng.weightedPick([0.60, 0.25, 0.15])]
+            case "4":
+                // iv minor (D F A ✓). sus2: D E A ✓. min7: D F A C — C(b3) ✓.
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.40, 0.30, 0.20, 0.10])]
+            case "5":
+                // V major (E G# B ✓) — raised 7th gives the leading tone.
+                // V7 = E G# B D — D(4th) ✓. The defining harmonic-minor dominant.
+                let t: [ChordType] = [.major, .dom7, .power]
+                return t[rng.weightedPick([0.35, 0.50, 0.15])]
+            case "b6":
+                // bVI major (F A C ✓). bVI minor: F G# C — G#(7th) ✓ and C(b3) ✓.
+                let t: [ChordType] = [.major, .minor, .power]
+                return t[rng.weightedPick([0.50, 0.35, 0.15])]
+            default:
+                let t: [ChordType] = [.minor, .power]
+                return t[rng.weightedPick([0.70, 0.30])]
+            }
+        }
+
+        // ── LYDIAN  (scale: 1 2 3 #4 5 6 7  e.g. C D E F# G A B) ──────────────────────
+        if mode == .Lydian {
+            switch rootDegree {
+            case "1":
+                // I major tonic. dom7 adds b7 (Bb in C Lydian, scale has B) — clash.
+                // The defining Lydian sound is the bright I with its sus2 neighbour.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.60, 0.25, 0.15])]
+            case "2":
+                // II major — the characteristic Lydian chord (D F# A in C Lydian ✓).
+                // dom7 = D F# A C — C is in C Lydian ✓. sus2 = D E A — E(4) in scale ✓.
+                let t: [ChordType] = [.major, .dom7, .sus2, .power]
+                return t[rng.weightedPick([0.40, 0.25, 0.25, 0.10])]
+            case "3":
+                // iii minor (E G B in C Lydian ✓). sus2 = E F# B — F#(6) in scale ✓.
+                // min7 = E G B D — D(2) in scale ✓.
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.45, 0.25, 0.20, 0.10])]
+            case "5":
+                // V major (G B D in C Lydian ✓). dom7 adds F — scale has F# — clash.
+                // sus2 = G A D — A(9) in scale ✓.
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
+            case "6":
+                // vi minor (A C E in C Lydian ✓). sus2 = A B E — B(11) in scale ✓.
+                // min7 = A C E G — G(7) in scale ✓.
+                let t: [ChordType] = [.minor, .sus2, .min7, .power]
+                return t[rng.weightedPick([0.40, 0.30, 0.20, 0.10])]
+            case "7":
+                // vii minor (B D F# in C Lydian ✓). sus2 = B C# F# — C# not in scale — clash.
+                // min7 = B D F# A — A(9) in scale ✓.
+                let t: [ChordType] = [.minor, .min7, .power]
+                return t[rng.weightedPick([0.60, 0.28, 0.12])]
+            default:
+                let t: [ChordType] = [.major, .sus2, .power]
+                return t[rng.weightedPick([0.55, 0.30, 0.15])]
             }
         }
 

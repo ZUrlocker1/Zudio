@@ -6,28 +6,72 @@
 //   DRM-002: Open Pocket — kick 1+3, snare 2+4, 8th-hat, open hat on 1, ghost snares
 //   DRM-003: Ride Groove — kick 1+3, snare 2+4, ride 8ths, pedal hat 2+4
 //   DRM-004: Almost Motorik — 4-on-the-floor kick, snare 2+4, 16th-hat gradient (disco/motorik hybrid)
+//   DRM-005: Albatross Grid — kick 1+3, snare 2+4, 16th-hat gradient + open hat locked on "and of 4"
+//            (step 14 every bar). Based on the Albatross (PiL, 1979) tom-less grid feel.
+//            Same velocity gradient as DRM-001; the open hat accent is the only structural addition.
+//            Motorik Noir only.
+//   DRM-006: Annalisa March — snare all 4 beats, open hat all 8 8th-note positions, kick on
+//            syncopated offbeats (steps 2, 6, 10 — NOT beat 1). No closed hats.
+//            Based on PiL "Annalisa" (1979 Metal Box). At high intensity, ~25% of bars
+//            add a double snare at steps 14-15 (built-in micro-fill into the next downbeat).
+//            Motorik Noir only.
+//   DRM-007: Inverted Beat — snare on beats 1+3 (steps 0, 8), kick on beats 2+4 (steps 4, 12).
+//            Inverts the Apache convention — urgency and claustrophobia without losing the grid.
+//            Based on Joy Division "Disorder" (1979). 8th-note hat. At high intensity (odd bars):
+//            extra syncopated kick on "and of 2" (step 6) and "and of 4" (step 14).
+//            Motorik Noir only.
+//   DRM-008: Tribal — NO hi-hat. Kick syncopated on steps 2, 4, 12, 14. Snare on beats 1+3.
+//            Based on Joy Division "She's Lost Control" (1980) — purely percussive, tom-driven.
+//            At high intensity every 6th bar: a mechanical descending tom cascade replaces the
+//            normal bar (hi-mid tom → low-mid tom → floor tom roll with kick+snare launch).
+//            Motorik Noir only.
 //
 // ALL patterns have snare on beats 2 AND 4 (steps 4+12). This is the defining
 // characteristic of the Apache/Motorik beat — not snare on beat 3 alone.
+// Exception: DRM-006 has snare on ALL 4 beats (0, 4, 8, 12) — the Annalisa march feel.
 //
 // Hi-hat velocity gradient creates human groove feel:
 //   Beat 1 (step 0): 80    Beat 2 (step 4): 72    Beat 3 (step 8): 78    Beat 4 (step 12): 72
 //   8th offbeats (2,6,10,14): 64    16th subdivisions (odd steps): 50
 
 struct DrumGenerator {
+
+    // MARK: - Velocity tables
+    private static let motorikHatGradient:       [UInt8] = [80,50,64,50,72,50,64,50,78,50,64,50,72,50,64,50]
+    private static let almostMotorikHatGradient: [UInt8] = [78,50,62,50,70,50,62,50,76,50,62,50,70,50,62,50]
+    private static let marchHatVels:   [UInt8] = [74,60,70,58,72,60,68,56]
+    private static let marchSnareVels: [UInt8] = [92,86,90,84]
+    private static let marchKickVels:  [UInt8] = [98,90,94]
+    private static let rideGrooveVels: [UInt8] = [58,50,55,48]
+    private static let rideKickVels:   [UInt8] = [95,88,92]
+    private static let tribalKickVels: [UInt8] = [90,98,96,88]
+
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
         let ruleID: String
         if let forced = forceRuleID {
             ruleID = forced
+        } else if noirVariation {
+            // Noir: Classic, Open Pocket, Ride, Albatross, Annalisa, Inverted Beat, Tribal.
+            let ruleWeights: [Double] = [0.12, 0.06, 0.12, 0.20, 0.20, 0.10, 0.20]
+            switch rng.weightedPick(ruleWeights) {
+            case 1:  ruleID = "MOT-DRUM-002"
+            case 2:  ruleID = "MOT-DRUM-003"
+            case 3:  ruleID = "MOT-DRUM-005"
+            case 4:  ruleID = "MOT-DRUM-006"
+            case 5:  ruleID = "MOT-DRUM-007"
+            case 6:  ruleID = "MOT-DRUM-008"
+            default: ruleID = "MOT-DRUM-001"
+            }
         } else {
-            // Weighted rule selection: DRM-001 35%, DRM-002 25%, DRM-003 20%, DRM-004 20%
-            let ruleWeights: [Double] = [0.35, 0.25, 0.20, 0.20]
+            // Weighted rule selection: DRM-001 30%, DRM-002 25%, DRM-003 20%, DRM-004 25%
+            let ruleWeights: [Double] = [0.30, 0.25, 0.20, 0.25]
             let ruleIndex = rng.weightedPick(ruleWeights)
             switch ruleIndex {
             case 1:  ruleID = "MOT-DRUM-002"
@@ -39,6 +83,13 @@ struct DrumGenerator {
         usedRuleIDs.insert(ruleID)
 
         var events: [MIDIEvent] = []
+
+        // MOT-DRUM-006 relief: full march bursts of 4–7 bars, then 8–12 bars of either
+        // half-march or ride groove (chosen randomly each cycle).
+        var marchRunLen    = 0
+        var marchReliefLen = 0
+        var marchReliefType = 0  // 0 = half-march, 1 = ride groove
+        var marchCap       = ruleID == "MOT-DRUM-006" ? 4 + rng.nextInt(upperBound: 4) : 0
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
@@ -53,11 +104,32 @@ struct DrumGenerator {
                                        style: structure.outroStyle, barStart: barStart, rng: &rng)
             } else {
                 let intensity = section.subPhaseIntensity(atBar: bar)
-                // Crash on first bar of each new body section
                 if isFirstBarOfBodySection {
                     events.append(MIDIEvent(stepIndex: barStart, note: GMDrum.crash1.rawValue, velocity: 95, durationSteps: 1))
                 }
-                events += bodyBar(bar: bar, ruleID: ruleID, intensity: intensity, barStart: barStart, rng: &rng)
+                if ruleID == "MOT-DRUM-006" {
+                    if marchReliefLen > 0 {
+                        marchReliefLen -= 1
+                        events += marchReliefType == 1
+                            ? annalisaRideGrooveBar(barStart: barStart)
+                            : annalisaHalfMarchBar(barStart: barStart)
+                    } else {
+                        events += annalisaMarchBar(bar: bar, intensity: intensity, barStart: barStart, rng: &rng)
+                        // Only count medium/high bars — low intensity returns motorikSparseBar
+                        // and should not trigger a relief window before any real march has played.
+                        if intensity != .low {
+                            marchRunLen += 1
+                            if marchRunLen >= marchCap {
+                                marchRunLen    = 0
+                                marchReliefLen = 8 + rng.nextInt(upperBound: 5)  // 8–12 bars
+                                marchReliefType = rng.nextInt(upperBound: 2)      // 0=half-march, 1=ride
+                                marchCap       = 4 + rng.nextInt(upperBound: 4)  // next cap: 4–7 bars
+                            }
+                        }
+                    }
+                } else {
+                    events += bodyBar(bar: bar, ruleID: ruleID, intensity: intensity, barStart: barStart, rng: &rng)
+                }
             }
         }
 
@@ -73,6 +145,10 @@ struct DrumGenerator {
         case "MOT-DRUM-002": return openPocketBar(intensity: intensity, barStart: barStart)
         case "MOT-DRUM-003": return rideGrooveBar(intensity: intensity, barStart: barStart)
         case "MOT-DRUM-004": return almostMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-005": return albatrossGridBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-006": return annalisaMarchBar(bar: bar, intensity: intensity, barStart: barStart, rng: &rng)
+        case "MOT-DRUM-007": return invertedBeatBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-008": return tribalBar(bar: bar, intensity: intensity, barStart: barStart)
         default:             return classicMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
         }
     }
@@ -93,10 +169,9 @@ struct DrumGenerator {
         var events: [MIDIEvent] = []
 
         // 16th-note hi-hats — velocity gradient creates human groove
-        let hatVelocities: [Int] = [80, 50, 64, 50, 72, 50, 64, 50, 78, 50, 64, 50, 72, 50, 64, 50]
         for step in 0..<16 {
             events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
-                                    velocity: UInt8(hatVelocities[step]), durationSteps: 1))
+                                    velocity: motorikHatGradient[step], durationSteps: 1))
         }
 
         // Kick on beats 1 and 3 (steps 0, 8)
@@ -131,6 +206,222 @@ struct DrumGenerator {
         events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 72, durationSteps: 1))
         events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 68, durationSteps: 1))
         return events
+    }
+
+    // MARK: - DRM-005: Albatross Grid — Classic Motorik + open hat locked on "and of 4"
+    // Structurally identical to DRM-001 with one addition: the closed hat at step 14
+    // ("and of 4") is replaced by an open hat every bar. The open hat stays open for
+    // 2 steps, giving a slight "tss" tail before the next downbeat.
+    // Same velocity gradient as DRM-001; syncopated kick variation preserved at high intensity.
+    // Inspired by the drum grid on PiL "Albatross" (1979) — the recurring open hat on the
+    // last eighth of bar gives the groove its slightly unsettled, nocturnal quality.
+
+    private static func albatrossGridBar(bar: Int, intensity: SectionIntensity, barStart: Int) -> [MIDIEvent] {
+        switch intensity {
+        case .low:    return motorikSparseBar(barStart: barStart)  // sparse intro/outro: 8th hats, no open accent
+        case .medium: return albatrossGridCoreBar(barStart: barStart, addSyncopatedKick: false)
+        case .high:   return albatrossGridCoreBar(barStart: barStart, addSyncopatedKick: bar % 4 >= 2)
+        }
+    }
+
+    private static func albatrossGridCoreBar(barStart: Int, addSyncopatedKick: Bool) -> [MIDIEvent] {
+        // Same as Classic Motorik but with the closed hat at step 14 replaced by an open hat.
+        var events = motorikCoreBar(barStart: barStart, addSyncopatedKick: addSyncopatedKick)
+        events.removeAll { $0.stepIndex == barStart + 14 && $0.note == GMDrum.closedHat.rawValue }
+        events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.openHat.rawValue,
+                                velocity: 72, durationSteps: 2))
+        return events
+    }
+
+    // MARK: - DRM-006: Annalisa March — PiL "Annalisa" (1979) all-open-hat marching grid
+    // Snare on all 4 beats (quarter notes), open hat on all 8 8th-note positions, kick
+    // syncopated on offbeat steps 2, 6, 10 — NOT on beat 1. No closed hats.
+    // The kick never landing on beat 1 creates an unsettled, forward-lurching quality;
+    // the snare-on-every-beat replaces the hat's timekeeping role and drives like a march.
+    // At high intensity, ~25% of bars add a double snare at steps 14-15 — a built-in
+    // micro-fill that marks the bar boundary without derailing the locked grid.
+
+    private static func annalisaMarchBar(
+        bar: Int, intensity: SectionIntensity, barStart: Int, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        switch intensity {
+        case .low:    return motorikSparseBar(barStart: barStart)
+        case .medium: return annalisaMarchCoreBar(barStart: barStart, doubleSnareTail: false)
+        case .high:   return annalisaMarchCoreBar(barStart: barStart, doubleSnareTail: rng.nextDouble() < 0.25)
+        }
+    }
+
+    private static func annalisaMarchCoreBar(barStart: Int, doubleSnareTail: Bool) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // Open hat on all 8 8th-note positions — beat positions slightly louder
+        for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.openHat.rawValue,
+                                    velocity: marchHatVels[i], durationSteps: 2))
+        }
+
+        // Snare on all 4 beats (0, 4, 8, 12) — the march
+        for (i, step) in [0, 4, 8, 12].enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.snare.rawValue,
+                                    velocity: marchSnareVels[i], durationSteps: 1))
+        }
+
+        // Kick on syncopated offbeats (steps 2, 6, 10) — never on beat 1
+        for (i, step) in [2, 6, 10].enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
+                                    velocity: marchKickVels[i], durationSteps: 1))
+        }
+
+        // Double snare tail at steps 14-15 — micro-fill into next downbeat (~25% of high bars)
+        if doubleSnareTail {
+            events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.snare.rawValue,
+                                    velocity: 78, durationSteps: 1))
+            events.append(MIDIEvent(stepIndex: barStart + 15, note: GMDrum.snare.rawValue,
+                                    velocity: 96, durationSteps: 1))
+        }
+
+        return events
+    }
+
+    // Half-march relief: snare on beats 2+4 only (standard backbeat), open hat locked to
+    // beats 2+4 — hat and snare lock together, beats 1+3 left open for the syncopated kick.
+    private static func annalisaHalfMarchBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // Open hat on beats 2+4 only — locks with snare, 2 hits per bar
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.openHat.rawValue, velocity: 66, durationSteps: 2))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.openHat.rawValue, velocity: 63, durationSteps: 2))
+
+        // Snare on beats 2+4 only (steps 4, 12) — standard backbeat, not a march
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 86, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 84, durationSteps: 1))
+
+        // Syncopated kick on offbeats (steps 2, 6, 10) — identical to full march
+        for (i, step) in [2, 6, 10].enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
+                                    velocity: marchKickVels[i], durationSteps: 1))
+        }
+
+        return events
+    }
+
+    // Ride groove relief: ride cymbal on quarter notes (thinned), snare on 2+4.
+    // Same skeleton as the march but with a controlled ride character — Can/Cluster feel.
+    private static func annalisaRideGrooveBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // Ride on all 4 beats at low velocity — textural rather than driving
+        for (i, step) in [0, 4, 8, 12].enumerated() {
+            let note: GMDrum = (i == 0) ? .rideBell : .ride
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note.rawValue,
+                                    velocity: rideGrooveVels[i], durationSteps: 2))
+        }
+
+        // Snare on beats 2+4 only (steps 4, 12)
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 84, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 82, durationSteps: 1))
+
+        // Syncopated kick on offbeats (steps 2, 6, 10) — identical to full march
+        for (i, step) in [2, 6, 10].enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
+                                    velocity: rideKickVels[i], durationSteps: 1))
+        }
+
+        return events
+    }
+
+    // MARK: - DRM-007: Inverted Beat — Joy Division "Disorder" inverted backbeat
+    // Snare on beats 1+3 (steps 0, 8), kick on beats 2+4 (steps 4, 12).
+    // Inverts the standard Apache convention — unsettled urgency without breaking the grid.
+    // At high intensity (odd bars): extra kick on "and of 2" (step 6) and "and of 4" (step 14).
+
+    private static func invertedBeatBar(bar: Int, intensity: SectionIntensity, barStart: Int) -> [MIDIEvent] {
+        switch intensity {
+        case .low:    return motorikSparseBar(barStart: barStart)
+        case .medium: return invertedBeatCoreBar(barStart: barStart, addExtraKicks: false)
+        case .high:   return invertedBeatCoreBar(barStart: barStart, addExtraKicks: bar % 2 == 1)
+        }
+    }
+
+    private static func invertedBeatCoreBar(barStart: Int, addExtraKicks: Bool) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // 8th-note hi-hats — slightly restrained velocity to let snare/kick dominate
+        for step in Swift.stride(from: 0, to: 16, by: 2) {
+            let vel: UInt8 = (step % 8 == 0) ? 68 : 55
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+
+        // Snare on beats 1+3 — the inverted anchor
+        events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.snare.rawValue, velocity: 96, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.snare.rawValue, velocity: 92, durationSteps: 1))
+
+        // Kick on beats 2+4 — inverted from Apache convention
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 96,  durationSteps: 1))
+
+        // Extra syncopated kicks on "and of 2" and "and of 4" at high intensity
+        if addExtraKicks {
+            events.append(MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.kick.rawValue, velocity: 78, durationSteps: 1))
+            events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.kick.rawValue, velocity: 76, durationSteps: 1))
+        }
+
+        return events
+    }
+
+    // MARK: - DRM-008: Tribal — Joy Division "She's Lost Control" tom-driven grid
+    // No hi-hat. Kick syncopated on steps 2, 4, 12, 14. Snare on beats 1+3 (steps 0, 8).
+    // Every 6th bar at high intensity: descending tom cascade replaces the normal pattern.
+
+    private static func tribalBar(bar: Int, intensity: SectionIntensity, barStart: Int) -> [MIDIEvent] {
+        switch intensity {
+        case .low:    return tribalSparseBar(barStart: barStart)
+        case .medium: return tribalCoreBar(barStart: barStart)
+        case .high:   return (bar % 6 == 5) ? tribalTomCascade(barStart: barStart)
+                                            : tribalCoreBar(barStart: barStart)
+        }
+    }
+
+    private static func tribalSparseBar(barStart: Int) -> [MIDIEvent] {
+        return [
+            MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.snare.rawValue, velocity: 75, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 2,  note: GMDrum.kick.rawValue,  velocity: 82, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.snare.rawValue, velocity: 70, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue,  velocity: 80, durationSteps: 1),
+        ]
+    }
+
+    private static func tribalCoreBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        // Snare on beats 1+3
+        events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.snare.rawValue, velocity: 95, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.snare.rawValue, velocity: 90, durationSteps: 1))
+        // Kick syncopated: steps 2, 4, 12, 14
+        for (i, step) in [2, 4, 12, 14].enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
+                                    velocity: tribalKickVels[i], durationSteps: 1))
+        }
+        return events
+    }
+
+    /// Mechanical descending tom cascade — "She's Lost Control" fill.
+    /// Kick+snare launch → hi-mid tom triplet → low-mid tom triplet → floor tom roll.
+    private static func tribalTomCascade(barStart: Int) -> [MIDIEvent] {
+        return [
+            MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue,          velocity: 105, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.snare.rawValue,          velocity: 95,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.hiMidTom.rawValue,       velocity: 88,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 5,  note: GMDrum.hiMidTom.rawValue,       velocity: 82,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.hiMidTom.rawValue,       velocity: 76,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.lowMidTom.rawValue,      velocity: 88,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 9,  note: GMDrum.lowMidTom.rawValue,      velocity: 82,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 10, note: GMDrum.lowMidTom.rawValue,      velocity: 76,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 12, note: GMDrum.highFloorTom.rawValue,   velocity: 90,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 13, note: GMDrum.highFloorTom.rawValue,   velocity: 84,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 14, note: GMDrum.highFloorTom.rawValue,   velocity: 80,  durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 15, note: GMDrum.highFloorTom.rawValue,   velocity: 88,  durationSteps: 1),
+        ]
     }
 
     // MARK: - DRM-002: Open Pocket
@@ -207,10 +498,9 @@ struct DrumGenerator {
         var events: [MIDIEvent] = []
 
         // 16th-note hi-hats — same velocity gradient as DRM-001
-        let hatVelocities: [Int] = [78, 50, 62, 50, 70, 50, 62, 50, 76, 50, 62, 50, 70, 50, 62, 50]
         for step in 0..<16 {
             events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
-                                    velocity: UInt8(hatVelocities[step]), durationSteps: 1))
+                                    velocity: almostMotorikHatGradient[step], durationSteps: 1))
         }
 
         // 4-on-the-floor kick (all 4 beats) — what makes this "almost" rather than classic Motorik

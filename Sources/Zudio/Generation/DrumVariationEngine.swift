@@ -31,6 +31,9 @@
 //                             minimal electronic and post-punk drumming.
 //     v5  Short Roll        — strip hats 12-15, four snares ascending velocity.
 //                             The standard "rock fill in 1 beat." Energetic but contained.
+//     v6  Floor Tom Double  — strip hats 14-15, two floor toms (14+15). Motorik Noir only.
+//                             PiL-style minimal cue: no snare, no crash, just two floor tom
+//                             hits landing into the downbeat. Quiet and industrial.
 //
 //   2-BEAT fills — last 8 steps (steps 8-15). Four variations; all strip hats 8-15.
 //
@@ -90,7 +93,8 @@ struct DrumVariationEngine {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         seed: UInt64,
-        chillMode: Bool = false
+        chillMode: Bool = false,
+        noirVariation: Bool = false
     ) -> [[MIDIEvent]] {
         var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
         var drumEvents = trackEvents[kTrackDrums]
@@ -98,7 +102,8 @@ struct DrumVariationEngine {
 
         // MARK: Step 1 — Identify fill bars
 
-        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure, chillMode: chillMode)
+        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure,
+                                       chillMode: chillMode, noirVariation: noirVariation)
 
         // MARK: Step 2 — Apply fills to drums, collecting fill type info
 
@@ -107,13 +112,16 @@ struct DrumVariationEngine {
         for fillBar in fillBars.sorted() {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
-            // Chill: no 3-beat fills (tom cascades are rock-style, inappropriate for jazz chill)
-            // Chill weights: 80% 1-beat, 20% 2-beat, 0% 3-beat
-            let fillLength = chillMode
-                ? rng.weightedPick([0.80, 0.20, 0.00])
-                : rng.weightedPick([0.70, 0.25, 0.05])
+            // Noir: 95% 1-beat / 5% 2-beat — fills are rare and subtle; 3-beat excluded entirely.
+            // Chill: 80% 1-beat / 20% 2-beat; no 3-beat (tom cascades too rock for jazz).
+            let fillLength = noirVariation
+                ? rng.weightedPick([0.95, 0.05, 0.00])
+                : chillMode
+                    ? rng.weightedPick([0.80, 0.20, 0.00])
+                    : rng.weightedPick([0.70, 0.25, 0.05])
             drumEvents = applyFill(to: drumEvents, bar: fillBar, fillLength: fillLength,
-                                   frame: frame, structure: structure, chillMode: chillMode, rng: &rng)
+                                   frame: frame, structure: structure,
+                                   chillMode: chillMode, noirVariation: noirVariation, rng: &rng)
             fillInfos.append(FillBarInfo(bar: fillBar, fillLength: fillLength))
         }
 
@@ -146,22 +154,26 @@ struct DrumVariationEngine {
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        seed: UInt64
+        seed: UInt64,
+        noirVariation: Bool = false
     ) -> [[MIDIEvent]] {
         var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
 
-        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure, chillMode: false)
+        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure,
+                                       chillMode: false, noirVariation: noirVariation)
 
         var fillInfos: [FillBarInfo] = []
         for fillBar in fillBars.sorted() {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
-            let fillLength = rng.weightedPick([0.70, 0.25, 0.05])
-            // Consume the variation rng draw to stay in step with the original sequence
+            let fillLength = noirVariation
+                ? rng.weightedPick([0.95, 0.05, 0.00])
+                : rng.weightedPick([0.70, 0.25, 0.05])
+            // Consume the variant rng draw to stay in sync with the original apply() sequence
             switch fillLength {
-            case 0:  _ = rng.nextInt(upperBound: 6)
+            case 0:  _ = rng.nextInt(upperBound: noirVariation ? 7 : 6)
             case 2:  _ = rng.nextInt(upperBound: 3)
-            default: _ = rng.nextInt(upperBound: 4)
+            default: _ = rng.nextInt(upperBound: noirVariation ? 3 : 4)
             }
             fillInfos.append(FillBarInfo(bar: fillBar, fillLength: fillLength))
         }
@@ -180,7 +192,8 @@ struct DrumVariationEngine {
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        chillMode: Bool = false
+        chillMode: Bool = false,
+        noirVariation: Bool = false
     ) -> Set<Int> {
         var fillBars = Set<Int>()
 
@@ -201,8 +214,8 @@ struct DrumVariationEngine {
         }
 
         // Instrument entrance fills: non-drum track comes in after ≥2 silent bars.
-        // Skipped in chillMode — jazz/chill doesn't drum-fanfare every instrument entry.
-        if !chillMode {
+        // Skipped in chillMode and noirVariation — both styles prioritise the locked grid.
+        if !chillMode && !noirVariation {
             for trackIdx in 0..<kTrackDrums {
                 let tEvents = trackEvents[trackIdx]
                 let presence: [Bool] = (0..<frame.totalBars).map { bar in
@@ -220,8 +233,8 @@ struct DrumVariationEngine {
         }
 
         // Periodic body fills: fire on bars 7, 15, 23 … within each body section.
-        // Suppressed in chillMode — fills only at structural boundaries (section transitions above).
-        if !chillMode {
+        // Suppressed in chillMode and noirVariation — both styles fill only at structural boundaries.
+        if !chillMode && !noirVariation {
             for bar in 0..<frame.totalBars {
                 guard let sec = structure.section(atBar: bar),
                       sec.label != .intro && sec.label != .outro else { continue }
@@ -233,6 +246,7 @@ struct DrumVariationEngine {
         }
 
         // Chill: enforce a 16-bar minimum gap between any two fills to prevent fill clustering.
+        // (Not applied to Noir — section-transition-only fills are already sparse enough.)
         if chillMode && fillBars.count > 1 {
             var spaced = Set<Int>()
             var lastFill = -16
@@ -330,18 +344,29 @@ struct DrumVariationEngine {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         chillMode: Bool = false,
+        noirVariation: Bool = false,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let barStart = bar * 16
         let data: FillData
 
         switch fillLength {
-        case 0:  data = oneBeatFill(barStart: barStart, variation: rng.nextInt(upperBound: 6))
+        case 0:
+            // Noir: 7 variants including v6 Floor Tom Double. Standard: 6 variants.
+            let v1b = noirVariation ? rng.nextInt(upperBound: 7) : rng.nextInt(upperBound: 6)
+            data = oneBeatFill(barStart: barStart, variation: v1b)
         case 2:  data = threeBeatFill(barStart: barStart, variation: rng.nextInt(upperBound: 3))
         default:
-            // Chill: restrict to snare-only variants (v2=double-time roll, v3=funk cross-pattern)
-            // to avoid rock-style tom fills. Standard: all 4 variants available.
-            let v = chillMode ? 2 + rng.nextInt(upperBound: 2) : rng.nextInt(upperBound: 4)
+            // Noir: exclude Bonham Descent (v1) — too dramatic for the locked-grid aesthetic.
+            // Chill: restrict to snare-only variants (v2=double-time roll, v3=funk cross-pattern).
+            let v: Int
+            if noirVariation {
+                v = [0, 2, 3][rng.nextInt(upperBound: 3)]
+            } else if chillMode {
+                v = 2 + rng.nextInt(upperBound: 2)
+            } else {
+                v = rng.nextInt(upperBound: 4)
+            }
             data = twoBeatFill(barStart: barStart, variation: v)
         }
 
@@ -445,6 +470,15 @@ struct DrumVariationEngine {
                     MIDIEvent(stepIndex: barStart + 15, note: GMDrum.snare.rawValue,        velocity: 96, durationSteps: 1),
                 ],
                 addCrash: true, crashVelocity: 90)
+
+        case 6:  // Floor Tom Double — PiL-style. Strip hats 14-15, two floor tom hits. No crash.
+            return FillData(
+                stripFrom: barStart + 14,
+                notes: [
+                    MIDIEvent(stepIndex: barStart + 14, note: GMDrum.highFloorTom.rawValue, velocity: 72, durationSteps: 1),
+                    MIDIEvent(stepIndex: barStart + 15, note: GMDrum.highFloorTom.rawValue, velocity: 88, durationSteps: 1),
+                ],
+                addCrash: false, crashVelocity: 0)
 
         default: // Short Roll — four snares, the standard 1-beat fill.
             return FillData(
@@ -591,21 +625,39 @@ struct DrumVariationEngine {
         fillBars: Set<Int>,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        // Count body bars independently of fill bars, then fire a cymbal variation every 8
-        // body bars starting at bar 8 (skipping fill bars, which already have varied content).
-        // Previously used a run-length fingerprint approach that broke once fills started
-        // triggering every 4 bars — the counter never reached 16 so variations never fired.
+        // Fire a cymbal variation every 8 body bars starting at bar 8. When a variation
+        // fires, it lasts 4, 6, or 8 bars rather than just one — a 1-bar ride swap sounds
+        // like an accident; a 4-8 bar window sounds like a deliberate texture change.
+        // Crash variations (var-2) only place the crash on the first bar of the window;
+        // subsequent bars sustain the open-hat colour without repeating the crash.
         var result = events
         var bodyBarCount = 0
+        var variationWindowEnd = -1   // bars before this index are inside an active window
 
         for bar in 0..<frame.totalBars {
             guard let sec = structure.section(atBar: bar),
                   sec.label != .intro && sec.label != .outro else { continue }
             bodyBarCount += 1
             guard !fillBars.contains(bar) else { continue }
-            if bodyBarCount >= 8 && bodyBarCount % 8 == 0 {
-                let varType = rng.nextInt(upperBound: 3)
-                result = applyVariation(to: result, bar: bar, varType: varType)
+            guard bodyBarCount >= 8 && bodyBarCount % 8 == 0 && bar >= variationWindowEnd else { continue }
+
+            let varType  = rng.nextInt(upperBound: 3)
+            let windowLen = [4, 6, 8][rng.nextInt(upperBound: 3)]
+            variationWindowEnd = bar + windowLen
+
+            for windowBar in bar..<min(bar + windowLen, frame.totalBars) {
+                guard let wSec = structure.section(atBar: windowBar),
+                      wSec.label != .intro && wSec.label != .outro,
+                      !fillBars.contains(windowBar) else { continue }
+                if varType == 2 && windowBar > bar {
+                    // Sustain the open-hat-on-step-6 colour without repeating the crash
+                    let bs = windowBar * 16
+                    result = result.filter { !($0.stepIndex == bs + 6 && $0.note == GMDrum.closedHat.rawValue) }
+                    result.append(MIDIEvent(stepIndex: bs + 6, note: GMDrum.openHat.rawValue,
+                                            velocity: 65, durationSteps: 1))
+                } else {
+                    result = applyVariation(to: result, bar: windowBar, varType: varType)
+                }
             }
         }
 

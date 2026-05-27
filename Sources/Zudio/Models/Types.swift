@@ -36,7 +36,9 @@ enum TrackEffect: String, CaseIterable {
 // MARK: - Musical enumerations
 
 enum Mode: String, CaseIterable, Codable, Sendable {
-    case Ionian, Dorian, Mixolydian, Aeolian, MinorPentatonic, MajorPentatonic
+    case Ionian, Dorian, Mixolydian, Aeolian, MinorPentatonic, MajorPentatonic, Lydian
+    case Phrygian       // [0,1,3,5,7,8,10] — very dark minor, bII is characteristic chord
+    case HarmonicMinor  // [0,2,3,5,7,8,11] — Aeolian + raised 7th; V7 dominant is defining sound
 
     // Scale degrees as semitones above root
     var intervals: [Int] {
@@ -47,25 +49,31 @@ enum Mode: String, CaseIterable, Codable, Sendable {
         case .Aeolian:         return [0, 2, 3, 5, 7, 8, 10]
         case .MinorPentatonic: return [0, 3, 5, 7, 10]
         case .MajorPentatonic: return [0, 2, 4, 7, 9]
+        case .Lydian:          return [0, 2, 4, 6, 7, 9, 11]
+        case .Phrygian:        return [0, 1, 3, 5, 7, 8, 10]
+        case .HarmonicMinor:   return [0, 2, 3, 5, 7, 8, 11]
         }
     }
 
-    /// True for Ionian, Mixolydian, MajorPentatonic; false for the minor-flavored modes.
+    /// True for Ionian, Mixolydian, Lydian, MajorPentatonic; false for minor-flavored modes.
     var isMajorFlavored: Bool {
         switch self {
-        case .Ionian, .Mixolydian, .MajorPentatonic: return true
-        case .Aeolian, .Dorian, .MinorPentatonic:    return false
+        case .Ionian, .Mixolydian, .Lydian, .MajorPentatonic:     return true
+        case .Aeolian, .Dorian, .MinorPentatonic,
+             .Phrygian, .HarmonicMinor:                            return false
         }
     }
 
     /// Parallel-mode complement — same root, opposite quality.
-    /// Ionian↔Aeolian, Mixolydian↔Dorian, MajorPentatonic↔MinorPentatonic.
     var complementaryMode: Mode {
         switch self {
         case .Ionian:          return .Aeolian
         case .Aeolian:         return .Ionian
         case .Mixolydian:      return .Dorian
         case .Dorian:          return .Mixolydian
+        case .Lydian:          return .Aeolian
+        case .Phrygian:        return .Lydian
+        case .HarmonicMinor:   return .Ionian
         case .MajorPentatonic: return .MinorPentatonic
         case .MinorPentatonic: return .MajorPentatonic
         }

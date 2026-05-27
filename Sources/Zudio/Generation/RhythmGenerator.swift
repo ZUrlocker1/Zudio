@@ -11,6 +11,25 @@
 //   RHY-005: Chord stab — short root+third stabs on beats 2 and 4
 //   RHY-006: Arpeggio — quarter-note legato, 5 direction variants:
 //              0=up, 1=down, 2=up-down bounce, 3=down-up bounce, 4=ping-pong
+//   RHY-007: Chord Chug — root+fifth (or root+fourth) 8th-note power stabs; Motorik Noir only.
+//            Creates the "guitar power chord texture" of PiL (Albatross, Careering) — no melodic
+//            movement, pure rhythmic mass. 60% P5, 40% P4 voicing.
+//   RHY-008: Sparse Stab — same root+fifth dyad as RHY-007, quarter-note spacing, 65% hit
+//            probability. More open and spacious than Chord Chug — fits sparser Noir sections.
+//            Motorik Noir only.
+//   RHY-009: Interleave — root on beats, lower pitch on ands; Motorik Noir only.
+//   RHY-010: Single-Note Pulse — single root pitch, 8th-note grid, 75% probability, accent on
+//            beats 1+3. No dyad — the mechanical one-pitch throb of Joy Division bass lines
+//            (Dead Souls G2 71% unison, Shadowplay E1 50%). Motorik Noir only.
+//   RHY-011: Three-One Stab — 3 quick dyad hits (s0,s2,s4), shifted chord at s6, return at s10.
+//            From Keith Levene's Religion guitar (PiL): 3+1+1 rhythmic grouping feel. Noir only.
+//   RHY-012: Void Stab — root+fifth sustained d8 on beat 1, optional beat-3 re-hit (50%),
+//            optional pickup at s14 (40%). Max 3 notes per bar — creates ambient chord wash.
+//            From PiL Albatross T3 guitar long sustains. Motorik Noir only.
+//   RHY-013: Levene Drop — single-note staccato hits on "and" positions only (s2,s6,s10,s14),
+//            45% probability per step, 30% of bars completely silent. Root (55%) / flat7 (30%) /
+//            fifth (15%) chosen once per bar — no dyad. From Keith Levene's isolated guitar drops
+//            in early PiL (Theme, Annalisa). Motorik Noir only.
 //
 // Pattern type chosen per section; arpeggio direction fixed for the whole song.
 // prevNote tracking gives smooth voice leading across bar lines.
@@ -22,7 +41,8 @@ struct RhythmGenerator {
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
@@ -32,7 +52,8 @@ struct RhythmGenerator {
 
         // Forced pattern index (nil = pick randomly per section as normal)
         let ruleIDs = ["MOT-RTHM-001", "MOT-RTHM-002", "MOT-RTHM-003",
-                       "MOT-RTHM-004", "MOT-RTHM-005", "MOT-RTHM-006"]
+                       "MOT-RTHM-004", "MOT-RTHM-005", "MOT-RTHM-006", "MOT-RTHM-007", "MOT-RTHM-008",
+                       "MOT-RTHM-009", "MOT-RTHM-010", "MOT-RTHM-011", "MOT-RTHM-012", "MOT-RTHM-013"]
         let forcedPatternType: Int? = forceRuleID.flatMap { ruleIDs.firstIndex(of: $0) }
 
         for section in structure.sections {
@@ -40,12 +61,17 @@ struct RhythmGenerator {
             guard section.label != .intro && section.label != .outro else { continue }
 
             // Pick pattern type once per section (or use forced value for all sections)
-            let patternWeights: [Double] = [0.30, 0.17, 0.17, 0.13, 0.08, 0.15]
+            // Noir: Chord Chug (idx 6) dominates; dense/melodic patterns suppressed.
+            let patternWeights: [Double] = noirVariation
+                ? [0.04, 0.10, 0.00, 0.00, 0.00, 0.00, 0.10, 0.14, 0.12, 0.14, 0.14, 0.12, 0.12]
+                : [0.30, 0.17, 0.17, 0.13, 0.08, 0.15, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
             let patternType = forcedPatternType ?? rng.weightedPick(patternWeights)
             usedRuleIDs.insert(ruleIDs[min(patternType, ruleIDs.count - 1)])
 
             // prevNote for smooth octave transitions across bar lines
             var prevNote: UInt8? = nil
+            // RHY-010: phrase-silence state — resets at each new section
+            var rhy010SilentGroup = false
 
             // For RHY-004: build a 2-bar riff once per section
             let riffPattern = buildMelodicRiff(rng: &rng)
@@ -132,6 +158,176 @@ struct RhythmGenerator {
                         events.append(MIDIEvent(stepIndex: barStart + step, note: pitches.third,
                                                 velocity: UInt8(vel - 6), durationSteps: 2))
                         prevNote = pitches.third
+                    }
+
+                case 6:
+                    // RHY-007: Chord Chug — root+fifth (or root+P4) power stabs on every 8th, Noir only.
+                    // No melodic movement — pure rhythmic texture, guitar-chug feel (PiL, Wire).
+                    let chugUpper: UInt8
+                    if rng.nextDouble() < 0.40 {
+                        chugUpper = nearestScaleMIDI(target: Int(pitches.root) + 5,
+                                                     scalePCs: riffScalePCs, low: 45, high: 76)
+                    } else {
+                        chugUpper = pitches.fifth
+                    }
+                    for step in Swift.stride(from: 0, to: 16, by: 2) {
+                        guard rng.nextDouble() < density else { continue }
+                        let accentBoost: UInt8 = (step % 8 == 0) ? 6 : 0
+                        let velBase = UInt8(72 + rng.nextInt(upperBound: 9))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: pitches.root,
+                                                velocity: velBase + accentBoost, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: chugUpper,
+                                                velocity: velBase, durationSteps: 2))
+                        prevNote = pitches.root
+                    }
+
+                case 7:
+                    // RHY-008: Sparse Stab — same dyad as RHY-007, quarter-note hits, 65% probability.
+                    // More open than Chord Chug — space between hits is the texture. Noir only.
+                    let stabUpper: UInt8
+                    if rng.nextDouble() < 0.40 {
+                        stabUpper = nearestScaleMIDI(target: Int(pitches.root) + 5,
+                                                     scalePCs: riffScalePCs, low: 45, high: 76)
+                    } else {
+                        stabUpper = pitches.fifth
+                    }
+                    for step in Swift.stride(from: 0, to: 16, by: 4) {
+                        guard rng.nextDouble() < 0.65 else { continue }
+                        let accentBoost: UInt8 = (step == 0) ? 6 : 0
+                        let velBase = UInt8(70 + rng.nextInt(upperBound: 10))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: pitches.root,
+                                                velocity: velBase + accentBoost, durationSteps: 3))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: stabUpper,
+                                                velocity: velBase, durationSteps: 3))
+                        prevNote = pitches.root
+                    }
+
+                case 8:
+                    // RHY-009: Interleave — root on beats (0,4,8,12), lower pitch on ands (2,6,10,14).
+                    // Never simultaneous — the two voices alternate, creating angular two-voice texture.
+                    // Based on PiL "Not A Love Song" guitar pattern.
+                    let interLower: UInt8
+                    if rng.nextDouble() < 0.40 {
+                        interLower = nearestMIDI(target: Int(pitches.root) - 5, low: 45, high: 74, prev: prevNote)
+                    } else {
+                        interLower = nearestMIDI(target: Int(pitches.root) - 7, low: 45, high: 74, prev: prevNote)
+                    }
+                    for beatStep in Swift.stride(from: 0, to: 16, by: 4) {
+                        guard rng.nextDouble() < 0.65 else { continue }
+                        let beatVel = UInt8(74 + rng.nextInt(upperBound: 10))
+                        let andVel  = UInt8(62 + rng.nextInt(upperBound: 8))
+                        events.append(MIDIEvent(stepIndex: barStart + beatStep,     note: pitches.root,
+                                                velocity: beatVel, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: barStart + beatStep + 2, note: interLower,
+                                                velocity: andVel,  durationSteps: 2))
+                        prevNote = pitches.root
+                    }
+
+                case 9:
+                    // RHY-010: Single-Note Pulse — 8th-note grid, accented beats 1+3. Noir only.
+                    // Phrase silence: 30% of 4-bar groups go completely silent.
+                    // Density follows section intensity arc (50/65/82%).
+                    // Pitch: 80% root, 15% P5-below, 5% flat-7 — chosen once per bar.
+                    if bar % 4 == 0 { rhy010SilentGroup = rng.nextDouble() < 0.30 }
+                    if !rhy010SilentGroup {
+                        let pulseDensity: Double
+                        switch intensity {
+                        case .low:    pulseDensity = 0.50
+                        case .medium: pulseDensity = 0.65
+                        case .high:   pulseDensity = 0.82
+                        }
+                        let pitchRoll = rng.nextDouble()
+                        let pulseNote: UInt8
+                        if pitchRoll < 0.80 {
+                            pulseNote = pitches.root
+                        } else if pitchRoll < 0.95 {
+                            pulseNote = nearestMIDI(target: Int(pitches.root) - 7, low: 45, high: 76, prev: prevNote)
+                        } else {
+                            pulseNote = pitches.flat7
+                        }
+                        for step in Swift.stride(from: 0, to: 16, by: 2) {
+                            guard rng.nextDouble() < pulseDensity else { continue }
+                            let accentBoost: UInt8 = (step % 8 == 0) ? 8 : 0
+                            let vel = UInt8(clamping: 68 + rng.nextInt(upperBound: 10) + Int(accentBoost))
+                            events.append(MIDIEvent(stepIndex: barStart + step, note: pulseNote,
+                                                    velocity: vel, durationSteps: 2))
+                            prevNote = pulseNote
+                        }
+                    }
+
+                case 10:
+                    // RHY-011: Three-One Stab — 3 quick dyad hits at s0,s2,s4 (d2), then a shifted
+                    // chord at s6 (d4), then root return at s10 (d5). From Keith Levene's Religion
+                    // guitar (PiL): the 3+1+1 rhythmic grouping in bars 6/8/10. Noir only.
+                    let toUpper: UInt8 = rng.nextDouble() < 0.40
+                        ? nearestScaleMIDI(target: Int(pitches.root) + 5, scalePCs: riffScalePCs, low: 45, high: 76)
+                        : pitches.fifth
+                    let shiftNote: UInt8 = rng.nextDouble() < 0.60 ? pitches.flat7 : pitches.third
+                    for step in [0, 2, 4] {
+                        guard rng.nextDouble() < density else { continue }
+                        let vel = UInt8(clamping: 72 + rng.nextInt(upperBound: 12) + (step == 0 ? 6 : 0))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: pitches.root,
+                                                velocity: vel, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: toUpper,
+                                                velocity: UInt8(clamping: Int(vel) - 5), durationSteps: 2))
+                    }
+                    if rng.nextDouble() < density {
+                        let vel = UInt8(70 + rng.nextInt(upperBound: 10))
+                        events.append(MIDIEvent(stepIndex: barStart + 6, note: pitches.root,
+                                                velocity: vel, durationSteps: 4))
+                        events.append(MIDIEvent(stepIndex: barStart + 6, note: shiftNote,
+                                                velocity: UInt8(clamping: Int(vel) - 4), durationSteps: 4))
+                    }
+                    if rng.nextDouble() < density {
+                        let vel = UInt8(68 + rng.nextInt(upperBound: 12))
+                        events.append(MIDIEvent(stepIndex: barStart + 10, note: pitches.root,
+                                                velocity: vel, durationSteps: 5))
+                        events.append(MIDIEvent(stepIndex: barStart + 10, note: toUpper,
+                                                velocity: UInt8(clamping: Int(vel) - 5), durationSteps: 5))
+                    }
+                    prevNote = pitches.root
+
+                case 11:
+                    // RHY-012: Void Stab — root+fifth held d8 on beat 1, optional beat-3 hit (50%),
+                    // optional pickup at s14 (40%). Maximum 3 notes per bar — ambient chord wash.
+                    // From PiL Albatross T3 guitar: full-bar sustains with sparse melodic fragments.
+                    // Noir only.
+                    let voidUpper: UInt8 = rng.nextDouble() < 0.40
+                        ? nearestScaleMIDI(target: Int(pitches.root) + 5, scalePCs: riffScalePCs, low: 45, high: 76)
+                        : pitches.fifth
+                    let velBeat1 = UInt8(74 + rng.nextInt(upperBound: 10))
+                    events.append(MIDIEvent(stepIndex: barStart, note: pitches.root,
+                                            velocity: velBeat1, durationSteps: 8))
+                    events.append(MIDIEvent(stepIndex: barStart, note: voidUpper,
+                                            velocity: UInt8(clamping: Int(velBeat1) - 6), durationSteps: 8))
+                    if rng.nextDouble() < 0.50 {
+                        let velBeat3 = UInt8(65 + rng.nextInt(upperBound: 10))
+                        events.append(MIDIEvent(stepIndex: barStart + 8, note: pitches.root,
+                                                velocity: velBeat3, durationSteps: 4))
+                        events.append(MIDIEvent(stepIndex: barStart + 8, note: voidUpper,
+                                                velocity: UInt8(clamping: Int(velBeat3) - 6), durationSteps: 4))
+                    }
+                    if rng.nextDouble() < 0.40 {
+                        events.append(MIDIEvent(stepIndex: barStart + 14, note: pitches.root,
+                                                velocity: UInt8(60 + rng.nextInt(upperBound: 10)), durationSteps: 2))
+                    }
+                    prevNote = pitches.root
+
+                case 12:
+                    // RHY-013: Levene Drop — staccato single notes on "and" positions only.
+                    // 30% of bars silent; 45% hit probability per off-beat step.
+                    // Root (55%) / flat7 (30%) / fifth (15%) chosen once per bar — no dyad.
+                    guard rng.nextDouble() >= 0.30 else { break }
+                    let r13 = rng.nextDouble()
+                    let dropNote: UInt8 = r13 < 0.55 ? pitches.root
+                                       : r13 < 0.85 ? pitches.flat7
+                                       : pitches.fifth
+                    for step in [2, 6, 10, 14] {
+                        guard rng.nextDouble() < 0.45 else { continue }
+                        let vel = UInt8(clamping: 60 + rng.nextInt(upperBound: 16))
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: dropNote,
+                                                velocity: vel, durationSteps: 2))
+                        prevNote = dropNote
                     }
 
                 default:

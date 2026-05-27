@@ -862,7 +862,7 @@ struct ContentView: View {
     // MARK: - iPad canvas gesture layer
 
     private var iPadCanvasGestureLayer: some View {
-        CanvasGestureView(
+        CanvasGestureView       (
             notes: appState.playback.activeVisualizerNotes,
             onTapOrb:         { orbTrack in iPadHandleTapOrb(orbTrack) },
             onDoubleTapOrb:   { orbTrack in iPadHandleDoubleTapOrb(orbTrack) },
@@ -872,6 +872,8 @@ struct ContentView: View {
             onLongPressEmpty: { iPadHandleLongPressEmpty() },
             onSwipeRight:     { iPadHandleSwipeRight() },
             onSwipeLeft:      { iPadHandleSwipeLeft() },
+            onSwipeUp:        { iPadHandleSwipeUp() },
+            onSwipeDown:      { iPadHandleSwipeDown() },
             onTwoFinger:      { iPadHandleTwoFinger() },
             onTapPoint:       { pt in appState.recordOrbTap(at: pt) }
         )
@@ -942,6 +944,18 @@ struct ContentView: View {
         appState.regenInstrument(forTrack: kTrackLead1)
         appState.regenInstrument(forTrack: kTrackLead2)
         iPadHapticImpactSoft.toggle()
+    }
+
+    private func iPadHandleSwipeUp() {
+        let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
+        appState.tempoOverride = max(20, min(200, cur + 5))
+        iPadHapticImpactLight.toggle()
+    }
+
+    private func iPadHandleSwipeDown() {
+        let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
+        appState.tempoOverride = max(20, min(200, cur - 5))
+        iPadHapticImpactLight.toggle()
     }
 
     private func iPadHandleTwoFinger() {

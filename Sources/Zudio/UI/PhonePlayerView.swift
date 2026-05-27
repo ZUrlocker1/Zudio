@@ -733,6 +733,8 @@ struct PhonePlayerView: View {
             onLongPressEmpty: { handleLongPressEmpty() },
             onSwipeRight:     { handleSwipeRight() },
             onSwipeLeft:      { handleSwipeLeft() },
+            onSwipeUp:        { handleSwipeUp() },
+            onSwipeDown:      { handleSwipeDown() },
             onTwoFinger:      { handleTwoFinger() },
             onTapPoint:       { pt in appState.recordOrbTap(at: pt) }
         )
@@ -749,6 +751,7 @@ struct PhonePlayerView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + twoBarsSeconds) {
             if appState.muteState[trackIndex] {
                 appState.toggleMute(trackIndex)
+                appState.regenInstrument(forTrack: trackIndex)
                 appState.regenerateTrack(trackIndex)
             }
         }
@@ -821,6 +824,18 @@ struct PhonePlayerView: View {
         appState.regenerateTrack(kTrackDrums)
         hapticImpactRigid.toggle()
     }
+
+    private func handleSwipeUp() {
+        let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
+        appState.tempoOverride = max(20, min(200, cur + 5))
+        hapticImpactLight.toggle()
+    }
+
+    private func handleSwipeDown() {
+        let cur = appState.tempoOverride ?? appState.songState?.frame.tempo ?? 120
+        appState.tempoOverride = max(20, min(200, cur - 5))
+        hapticImpactLight.toggle()
+    }
 }
 
 // MARK: - Info sheet
@@ -857,12 +872,12 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.5")
+                    Text("Generative music · v1.6")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
 
-                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, St Germain, Keith Jarrett, Neu!, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
+                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, Keith Jarrett, PIL, Neu!, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -918,6 +933,8 @@ struct CanvasGestureView: UIViewRepresentable {
     var onLongPressEmpty:  () -> Void
     var onSwipeRight:      () -> Void
     var onSwipeLeft:       () -> Void
+    var onSwipeUp:         () -> Void
+    var onSwipeDown:       () -> Void
     var onTwoFinger:       () -> Void
     var onTapPoint:        (CGPoint) -> Void
 
@@ -948,6 +965,14 @@ struct CanvasGestureView: UIViewRepresentable {
         let swipeLeft = UISwipeGestureRecognizer(target: c, action: #selector(Coordinator.handleSwipeLeft))
         swipeLeft.direction = .left
         view.addGestureRecognizer(swipeLeft)
+
+        let swipeUp = UISwipeGestureRecognizer(target: c, action: #selector(Coordinator.handleSwipeUp))
+        swipeUp.direction = .up
+        view.addGestureRecognizer(swipeUp)
+
+        let swipeDown = UISwipeGestureRecognizer(target: c, action: #selector(Coordinator.handleSwipeDown))
+        swipeDown.direction = .down
+        view.addGestureRecognizer(swipeDown)
 
         let pinch = UIPinchGestureRecognizer(target: c, action: #selector(Coordinator.handlePinch(_:)))
         view.addGestureRecognizer(pinch)
@@ -1096,6 +1121,8 @@ struct CanvasGestureView: UIViewRepresentable {
 
         @objc func handleSwipeRight() { parent.onSwipeRight() }
         @objc func handleSwipeLeft()  { parent.onSwipeLeft() }
+        @objc func handleSwipeUp()    { parent.onSwipeUp() }
+        @objc func handleSwipeDown()  { parent.onSwipeDown() }
 
         @objc func handlePinch(_ gr: UIPinchGestureRecognizer) {
             guard gr.state == .began else { return }

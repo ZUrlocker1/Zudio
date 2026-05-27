@@ -17,7 +17,8 @@ struct AmbientMusicalFrameGenerator {
           ambientProgFamily: AmbientProgressionFamily, loopLengths: AmbientLoopLengths) {
 
         let key        = keyOverride   ?? pickKey(rng: &rng)
-        let tempo      = tempoOverride ?? pickTempo(rng: &rng)
+        var tempo      = tempoOverride ?? pickTempo(rng: &rng)
+        tempo = Swift.max(62, Swift.min(tempo, 110))
         let mood       = moodOverride  ?? pickMood(rng: &rng)
         let mode       = pickMode(rng: &rng)
         let total      = pickTotalBars(tempo: tempo, rng: &rng)

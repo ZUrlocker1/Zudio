@@ -50,8 +50,10 @@ struct ChillMusicalFrameGenerator {
         // Tempo picked after beat style so stGermain can bias toward its faster range.
         // Blues range: 85–92 BPM. Re-roll once if the initial pick lands outside that window.
         var tempo = tempoOverride ?? pickTempo(mood: mood, rng: &rng, beatStyle: beatStyle)
-        if bluesVariation && tempoOverride == nil && (tempo < 85 || tempo > 92) {
-            tempo = triangularInt(min: 85, peak: 88, max: 92, rng: &rng)
+        if bluesVariation {
+            tempo = Swift.max(85, Swift.min(tempo, 92))
+        } else {
+            tempo = Swift.max(72, Swift.min(tempo, 124))
         }
 
         // Blues: cap total bars so grooveTotal stays within 4–5 complete 16-bar forms.

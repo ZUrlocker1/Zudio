@@ -624,7 +624,7 @@ final class PlaybackEngine: ObservableObject {
             // Machine Kit (GM program 24) has harsh kick/snare at full velocity — scale down.
             let fireVelocity: UInt8
             if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
-                fireVelocity = UInt8(max(1, Int(ev.velocity) * 78 / 100))
+                fireVelocity = UInt8(max(1, Int(ev.velocity) * 88 / 100))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -1006,7 +1006,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackBass && kosmicStyle && program == 87 {
                 vol = 0.24   // Lead Bass runs hot on Kosmic bass — pull back further
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 63 {
-                vol = 0.36   // FM Lead (Synth Brass 2) runs loud on Motorik Lead 1 — pull back
+                vol = 0.28   // FM Lead (Synth Brass 2) runs loud on Motorik Lead 1 — pull back
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 83 {
                 vol = 1.3    // Chiff Lead runs soft on Motorik Lead 1 — boost
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {
@@ -1069,8 +1069,20 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.25   // Chill Lead 2 instruments run soft — boost for presence
             } else if trackIndex == kTrackLead2 && motorikStyle && program == 39 {
                 vol = 1.8    // Minimoog runs soft on Lead 2 — boost
+            } else if trackIndex == kTrackBass && motorikStyle && program == 11038 {
+                vol = 1.8    // Techno Bass runs soft on Motorik bass — boost
+            } else if trackIndex == kTrackRhythm && motorikStyle && program == 28 {
+                vol = 1.2    // Guitar Pulse runs soft on Motorik rhythm — boost
             } else if trackIndex == kTrackRhythm && motorikStyle && program == 29 {
-                vol = 0.75   // Fuzz Guitar runs hot on Motorik rhythm — pull back
+                vol = 0.62   // Crunch Guitar runs hot on Motorik rhythm — pull back
+            } else if trackIndex == kTrackRhythm && motorikStyle && program == 30 {
+                vol = 0.38   // Fuzz Guitar runs hotter than Crunch — pull back further
+            } else if trackIndex == kTrackRhythm && motorikStyle && program == 81 {
+                vol = 0.38   // Saw Lead runs hot on Motorik rhythm — pull back
+            } else if trackIndex == kTrackRhythm && motorikStyle && program == 1081 {
+                vol = 0.46   // Saw Wave runs hot on Motorik rhythm — pull back
+            } else if trackIndex == kTrackRhythm && motorikStyle && program == 8081 {
+                vol = 0.60   // Doctor Solo runs hot on Motorik rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 5 {
                 vol = 0.34   // Wurlitzer runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 18 {
@@ -1211,6 +1223,7 @@ final class PlaybackEngine: ObservableObject {
         if songState?.isAmbientPiano == true {
             reverbs[kTrackLead1].loadFactoryPreset(.mediumHall)
             reverbPresets[kTrackLead1] = .mediumHall
+            reverbs[kTrackLead1].auAudioUnit.shouldBypassEffect = false
             reverbs[kTrackLead1].wetDryMix    = 75
             delays[kTrackLead1].feedback      = 0
             delays[kTrackLead1].lowPassCutoff = 2000
@@ -1250,6 +1263,7 @@ final class PlaybackEngine: ObservableObject {
         // kTrackTexture sampler is unused in Chill — suppress its effect chain.
         // (setEffect guards against re-enabling it; this covers the init low-shelf which is always on.)
         lowEQs[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
+        reverbs[kTrackTexture].auAudioUnit.shouldBypassEffect = true
         reverbs[kTrackTexture].wetDryMix                      = 0
         delays[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
         // Tempo-synced delay for Chill Lead 1 (dotted-quarter) and Lead 2 (quarter note).
@@ -1386,6 +1400,7 @@ final class PlaybackEngine: ObservableObject {
                 : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
                 : kosmicStyle              && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
                 : 50
+            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         case .space:
             let wet: Float = ambientMode && trackIndex == kTrackLead1 && songState?.isAmbientPiano == true ? 28
@@ -1394,6 +1409,7 @@ final class PlaybackEngine: ObservableObject {
                 : motorikStyle         && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
                 : kosmicStyle          && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
                 : 70
+            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             reverbs[trackIndex].wetDryMix = enabled ? wet : 0
         }
     }
@@ -2063,6 +2079,7 @@ final class PlaybackEngine: ObservableObject {
         // wetDryMix 70 (vs Large Chamber 50 in body) for a deep, washy quality.
         reverbs[kTrackBass].loadFactoryPreset(.cathedral)
         reverbPresets[kTrackBass] = .cathedral
+        reverbs[kTrackBass].auAudioUnit.shouldBypassEffect = false
         reverbs[kTrackBass].wetDryMix = 70
 
         // Pads: sweep LFO (0.07 Hz, cutoff 400–3200 Hz) — driven by shared lfoTimer
@@ -2103,6 +2120,14 @@ final class PlaybackEngine: ObservableObject {
         reverbs[kTrackBass].loadFactoryPreset(.largeHall)
         reverbPresets[kTrackBass] = .largeHall
         reverbs[kTrackBass].wetDryMix = 45
+    }
+
+    // MARK: - Channel volume (CC7)
+
+    func setChannelVolume(_ volume: Int, forTrack trackIndex: Int) {
+        guard trackIndex < samplers.count else { return }
+        let value = UInt8(clamping: volume)
+        samplers[trackIndex].sendController(7, withValue: value, onChannel: gmChannel(trackIndex))
     }
 
     // MARK: - All-notes-off (used by stop())
@@ -2183,6 +2208,7 @@ final class PlaybackEngine: ObservableObject {
             reverb.loadFactoryPreset(initPreset)
             reverbPresets[i] = initPreset
             reverb.wetDryMix = 0
+            reverb.auAudioUnit.shouldBypassEffect = true
 
             engine.attach(sampler)
             engine.attach(boost)
