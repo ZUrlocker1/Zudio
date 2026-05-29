@@ -196,3 +196,17 @@ The changes to `setEffect`, `restoreDefaultEffects`, and the style setup methods
 ## Recommended Approach
 
 Implement the two-bus reverb architecture as a **standalone refactor** — reverb only, no other effects touched. Profile with Instruments Time Profiler before and after. The expected result is a meaningful reduction in the `com.apple.audio.IOThread.client` load seen in the earlier profiling session.
+
+---
+
+## Difficulty Assessment
+
+**This is a relatively easy, well-isolated project — the most approachable refactor in the current roadmap.** Realistic timeline: **4–6 days** including testing and CPU profiling.
+
+**Why it's contained.** The change touches `PlaybackEngine.swift` as the primary file, plus parallel changes in the export audio graphs (`AudioFileExporter.swift`, `OfflineExport.swift`). No generator code changes. No new musical rules. No new UI. No cross-platform divergence beyond what already exists.
+
+**The one genuinely risky step** is the AVAudioEngine graph rewire — the engine must be stopped, nodes removed and added, and connections re-established before restarting. A bad connection silences the engine entirely. However, failure is immediate and obvious (no audio at all), not a subtle regression that takes days to isolate. There is no category of "it mostly works but sometimes glitches" — it either wires correctly or it doesn't.
+
+**Testing is methodical, not open-ended.** The checklist is finite: mute/solo through the shared reverb tail, per-track effect reset, all four style setup methods, iOS parity, one listening test for Ambient drums, before/after CPU profile. No musical tuning iteration required.
+
+**The only pre-start check:** read `AudioFileExporter.swift` and `OfflineExport.swift` before coding to confirm whether their audio graphs mirror `PlaybackEngine`'s wiring or differ. If they differ, that is a second rewire pass — still straightforward, just needs to be scoped correctly at the start rather than discovered mid-way.

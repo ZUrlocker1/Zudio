@@ -156,3 +156,19 @@ AU extensions have stricter sandbox rules on macOS. Worth validating early with 
 - **Preset system** — AUv3 has a built-in preset mechanism via `fullState`; Zudio's existing `.zudio` save format could map to this
 - **Per-track mute/solo** from within the plugin UI — useful but optional
 - **Loop mode** — whether the generated song loops automatically at the end or stops
+
+---
+
+## Difficulty Assessment
+
+**This is a hard project — the hardest in the current roadmap.** Three problems stack on top of each other, each capable of consuming a week independently:
+
+**Real-time render block.** The `internalRenderBlock` runs on the audio thread, which forbids Swift ARC, memory allocation, and any locking. The lock-free queue (or double-buffer) between the main thread and the audio thread is the kind of code that passes unit tests and then deadlocks intermittently under Logic's actual scheduling. This is a different category of problem from anything else in the Zudio codebase.
+
+**Framework extraction.** Moving ~25 generator and model files into `ZudioCore.framework` is mechanically straightforward until it isn't. Import cycles, missing type visibility between targets, and build configuration drift are all real time sinks. Any generator file with an implicit dependency on something that doesn't belong in the framework causes a cascade of build errors to unravel.
+
+**Multi-host DAW testing.** `auval` is strict and fails for non-obvious reasons. Logic Pro, GarageBand, and AUM behave differently as hosts. iPad adds a second test surface. Bugs that only reproduce in a specific host/transport-state combination (e.g. the host loops, or scrubs backward, or starts mid-bar) are slow to isolate and reproduce.
+
+**Open decisions mid-implementation.** The unresolved items (MIDI input, preset system, loop mode, per-track mute/solo) will get answered during implementation rather than before it, and some answers will require rework of already-written code.
+
+**Realistic timeline: 3–5 weeks**, and longer is plausible if the render block or auval validation surface unexpected issues. Compare to a new substyle (~1 week) or the reverb bus refactor (~4–6 days). This project is best approached as a standalone sprint with no other music generation work in parallel.

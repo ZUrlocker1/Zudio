@@ -104,106 +104,31 @@ Low risk. New full-song generator rule AMB-PIANO-001 (bypasses loop tiler, like 
 
 ---
 
-## Sub-Style 3: Kosmische Spiritual
+## Sub-Style 3: Kosmic Drift
 
 **Parent style:** Kosmic
-**Reference artists:** Popol Vuh (*Hosianna Mantra*, *Seligpreisung*), Klaus Schulze (*Irrlicht*), Jon Hassell & Brian Eno (*Fourth World Vol. 1: Possible Musics*)
 **Appears:** ~15% of Kosmic songs
+**Full plan:** [kosmic-drift-plan.md](kosmic-drift-plan.md)
 
 ### Musical identity
 
-Base Kosmic is driven by a bass sequencer ostinato — the Berlin School engine. Kosmische Spiritual removes this engine entirely and replaces it with devotional stillness. The reference is Popol Vuh's *Hosianna Mantra* (1972): Florian Fricke abandoned synthesizers for acoustic piano, oboe, tambura drone, and voice — glacial, meditative, raga-adjacent. Where Kosmic is propulsive and cosmic, Kosmische Spiritual is inward and devotional.
+Base Kosmic is JMJ / Tangerine Dream territory — sequencer-driven, melodic lead, cosmic and propulsive. Kosmic Drift keeps the sequencer and melodic lead entirely intact but drops the tempo to 70–90 BPM, allowing the sequencer ostinato to breathe rather than drive. A slow loping drum groove replaces Kosmic's sparse or absent rhythm — not a breakbeat in the hip-hop sense, more of a slow pulse that frames the sequencer without competing with it.
+
+The primary references are **Carbon Based Lifeforms — *Hydroponic Garden*** (cold end), **Boards of Canada** sequencer-forward tracks (strange/nostalgic middle), **Tycho** (warm, melodic end), and **Air — "La Femme d'Argent"** (elegant, cinematic). All keep the Berlin School sequencer logic intact; they just run it slower and wrap it in warmer, more organic textures than classic TD.
+
+*Note: "Kosmische Spiritual" (Popol Vuh, drone-based, raga-adjacent) was considered and rejected. Tangerine Dream — Zeit and Steve Roach — Structures from Silence were also set aside as too close to Ambient territory. None of these are part of this substyle.*
 
 ### How it differs from base Kosmic
 
-**Structure**
-- Base Kosmic: sequencer-driven build with melodic improvisation over it, glacial development, rhythm patterns
-- Kosmische Spiritual: two-movement arc:
-  - Movement 1 — pure drone introduction: tambura-like pad on root + fifth, no rhythm, a wind/oboe-like synth moving very slowly (long held notes, ornaments around a single pitch). 5–8 minutes.
-  - Movement 2 — sparse melodic development: lead ornaments around the modal root like a raga *alap*. If rhythm appears at all, it enters briefly in the final third and exits before the end — cymbal pulse or hand drum, no more than once every 4–8 bars.
-
-**Harmony**
-- Raga-adjacent: a single scale (Phrygian or Bhairavi equivalent) held throughout the entire piece
-- No chord changes
-- Melodic interest comes from ornaments and micro-inflections around the root and dominant — not from harmonic motion
-- Continuous drone on root + fifth throughout
-
-**Instrumentation**
-- Lead: wind or oboe-like synth timbre (replaces the standard synth lead)
-- Optional secondary voice: piano or Rhodes, single notes with very long decay — no chords
-- Pad: tambura-style drone, root + fifth, constant throughout
-- Bass: absent or minimal pedal note — no sequencer motion
-- Drums: very sparse (cymbal, hand drum equivalent), optional, late-appearing only
-
-**What is removed from base Kosmic**
-- Driving bass sequencer — entirely absent
-- Melodic arpeggios
-- Active rhythm patterns in the first two-thirds
-- Synth density and layering
-
-### Key tracks to study
-
-**Popol Vuh — *Hosianna Mantra* (1972)**
-- "Kyrie" — acoustic piano + oboe + tambura drone; the entire harmonic content is a single sustained root pedal with a slowly orbiting melody; no chord changes across the track's full duration
-- "Hosianna" — voice enters over piano and drone; demonstrates how a second melodic voice (here vocal, in Zudio an oboe-like synth) can weave around the lead without competing
-
-**Popol Vuh — *Seligpreisung* (1973)**
-- 30-minute continuous piece; atavistic grand piano, sparse drums entering very late and then leaving again; the clearest structural model for the two-movement arc (long drone intro → brief rhythmic arrival → dissolution)
-
-**Popol Vuh — *Einsjäger & Siebenjäger* (1974)**
-- "Ah! Die ewige Frage" — piano + cymbals opening a 19-minute suite before fuller sound arrives; guitar solos appear as meditative and ornamental, not as a lead voice
-
-**Popol Vuh — *Aguirre* (1975)**
-- Werner Herzog film soundtrack; some of the most purely devotional material in the catalog; the wind-timbre synth lead is the closest existing reference to the oboe-like voice described in the instrumentation plan
-
-**Klaus Schulze — *Irrlicht* (1972)**
-- "Ebene" — pre-sequencer Schulze; broken organ drones, processed orchestral samples, no ostinato pattern at all; demonstrates that the Berlin School identity survives without the sequencer if the drone logic is strong enough
-
-**Tangerine Dream — *Zeit* (1972)**
-- Four sides of pure drone; cello quartets, organ, and early synthesizers with no pulse; the earliest Berlin School record and the one that most directly prefigures Kosmische Spiritual; study for how harmonic stasis creates its own forward motion
-
-**Jon Hassell & Brian Eno — *Fourth World Vol. 1: Possible Musics* (1980)**
-- "Charm" — raga-inflected trumpet processed into near-synth timbres over an ambient groove with Indian-adjacent rhythm patterns; the best existing example of how to apply the "ornament around the modal root" rule to an electronic context
-
-**Dark Kosmic key tracks**
-- Klaus Schulze — *Timewind* (1975), side 2 "Wahnfried 1883": sequencer present but very slow and ominous; Phrygian-adjacent mode; good tempo and mood target for Dark Kosmic
-- Steve Roach — *Structures from Silence* (1984), "Quiet Friend": sequencer-driven but meditative rather than propulsive; demonstrates the slow-tempo sequencer at 65–75 BPM
-- Tangerine Dream — *Phaedra* (1974): sequencer returns but in a darker, more dissonant context than the later JMJ-influenced material; useful for the timbre target (sawtooth leads, minor mode)
+- **Tempo** — 70–90 BPM (new BPM Mode C) vs. base Kosmic's Mode A (115–126) and Mode B (88–105). The sequencer ostinato feels meditative, not driving.
+- **Rhythm** — slow loping groove with snare slightly behind beat 2, ghost hits, sparse hi-hats; replaces sparse or absent Kosmic rhythm. Never 4-on-the-floor.
+- **Sequencer / bass** — same patterns at lower BPM; bass hit density slightly reduced (85% gate) to complement the groove rather than compete.
+- **Lead and pads** — unchanged; the slower tempo naturally gives them more room to breathe.
+- **Song structure** — identical to base Kosmic (intro drone → body → outro).
 
 ### Implementation notes
 
-Medium risk. Removing the sequencer bass means the primary engine that drives Kosmic energy is absent. Careful tuning is needed to ensure the result is identifiably "Kosmic family" rather than sounding like base Ambient. The wind-timbre lead voice is the distinguishing marker. If implementation proves difficult, the fallback sub-style below is lower risk.
-
-### Alternative: Dark Kosmic
-
-A safer Kosmic sub-style that keeps the sequencer engine intact:
-
-- Same bass sequencer and rhythm patterns as base Kosmic
-- Slower tempo: 65–80 BPM
-- Strictly dark modes: Phrygian or Locrian
-- Sawtooth lead voice, darker timbre, more ominous tone
-- Reduced harmonic motion — fewer chord changes, longer dwells
-- References: Steve Roach *Structures from Silence*, Klaus Schulze *Timewind* side 2
-
-Dark Kosmic is straightforward to implement (tempo + mode + lead timbre adjustment only) and produces a clearly distinct mood from the current JMJ / Tangerine Dream palette without architectural changes.
-
-### Kosmic Substyle Candidates: Genre Analysis
-
-Three other electronic genres were evaluated as potential Kosmic substyles: downtempo, house, and techno. Summary findings:
-
-**Downtempo — strongest candidate after Kosmische Spiritual / Dark Kosmic**
-
-Reference artists: Massive Attack, Boards of Canada, Amon Tobin, Portishead. Tempo 70–100 BPM — overlaps almost exactly with Kosmic's contemplative Mode B (88–105). Same emotional register as Kosmic: introspective, atmospheric, not a dancefloor style. The distinguishing feature is the **hip-hop breakbeat** replacing Kosmic's sparse or absent drums — slow, loping, slightly swung snare on the 2-and, ghost hits, off-beat bass hits. Harmonic and pad infrastructure is nearly identical to existing Kosmic generators; only the drum rule and bass syncopation pattern would need new work. Implementation cost is low: one new drum rule type and a bass variation, everything else reuses existing generators. Most coherent tonal fit with Zudio's overall palette.
-
-**House — not recommended**
-
-Defined by 4-on-the-floor kick (every quarter note) plus offbeat hi-hats and soulful chord stabs. Energy register is dancefloor, not contemplative — a significant departure from Zudio's atmospheric character. Tempo (120–130 BPM) overlaps with Kosmic's upper range, which would cause genre confusion in the style selector. Requires a new drum pattern, new bass groove style, and chord-stab pattern; implementation cost is moderate. The fundamental mismatch in emotional register makes it a poor fit for the app as currently positioned.
-
-**Techno — not recommended**
-
-Tempo 130–150 BPM — entirely above Kosmic's ceiling of 126; would require a separate BPM zone and is effectively a fifth standalone style, not a substyle. Even darker and more minimal than house; more repetitive and rhythm-driven. Competes directly with Motorik for the "driving rhythmic electronic" territory. Implementation cost is high (separate generator infrastructure). Pass.
-
-**Conclusion:** Downtempo is worth adding to the Kosmic substyle roadmap after Kosmische Spiritual and Dark Kosmic. It is distinct, recognizable (Boards of Canada fans would identify it immediately), and low-effort to build on the existing Kosmic infrastructure.
+Low risk. One new drum rule (KOS-DRUM-007 Loping Groove) and a BPM mode change are the only new work. The sequencer engine, lead, pads, and harmonic language are untouched. See [kosmic-drift-plan.md](kosmic-drift-plan.md) for full implementation detail.
 
 ---
 
@@ -211,7 +136,7 @@ Tempo 130–150 BPM — entirely above Kosmic's ceiling of 126; would require a 
 
 - **Motorik Noir** — highest priority. Most distinct emotional impact, lowest implementation risk. Same generator structure, different tempo + harmony + register rules. No new instruments needed.
 - **Ambient Piano** — second priority. Genuinely different from loop-phasing Ambient, elegant to implement, already has the right instruments (piano, Wurlitzer).
-- **Kosmische Spiritual or Dark Kosmic** — third. Kosmische Spiritual is the more interesting musical statement; Dark Kosmic is the safer build. Decision should be made when the Kosmic generator is being extended.
+- **Kosmic Drift** — third. Keeps the JMJ/TD melodic DNA intact; only new work is a slow loping drum rule (KOS-DRUM-007) and a BPM mode change. Carbon Based Lifeforms, Boards of Canada, and Tycho are the clearest reference points.
 
 ---
 

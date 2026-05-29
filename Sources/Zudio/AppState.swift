@@ -485,12 +485,16 @@ final class AppState: ObservableObject {
         (kTrackLead2,  .kosmic,  3),  // Vox Solo         patch 85
         (kTrackBass,   .kosmic,  2),  // Lead Bass        patch 87
         (kTrackRhythm, .kosmic,  2),  // Rock Organ       patch 18
+        (kTrackLead1,  .motorik, 5),  // Square Lead      patch 80
+        (kTrackBass,   .motorik, 1),  // Lead Bass        patch 87
         (kTrackBass,   .motorik, 2),  // Rock Bass        patch 34
         (kTrackLead2,  .motorik, 1),  // Brightness       patch 100
         (kTrackLead2,  .ambient, 0),  // Harp             patch 46
         (kTrackLead2,  .ambient, 1),  // Acoustic Guitar  patch 24
         (kTrackBass,   .ambient, 2),  // Voice Oohs       patch 54
         (kTrackBass,   .ambient, 3),  // FM Synth         patch 62
+        (kTrackTexture, .motorik, 0), // Fifths Lead      patch 86
+        (kTrackTexture, .motorik, 6), // Interference     patch 11127
     ]
 
     private static let trackDisplayName: [Int: String] = [
@@ -503,7 +507,7 @@ final class AppState: ObservableObject {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet"]
         case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
-        case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","FM Lead","Synth Lead","Saw Stack"]
+        case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Xylophone"]
         case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
@@ -546,7 +550,7 @@ final class AppState: ObservableObject {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
         case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74]
-        case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 63, 87, 11100]
+        case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 13]
         case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
@@ -587,9 +591,9 @@ final class AppState: ObservableObject {
         let names = instrumentPoolNames(trackIndex: trackIndex, style: style)
         return names.map { name in
             switch (trackIndex, style, name) {
-            case (kTrackLead1,   .motorik, "FM Lead"):       return 108
+            // Square Lead (program 80) at default CC7 100 — PlaybackEngine vol 0.78 handles calibration
             case (kTrackLead1,   .motorik, "Saw Stack"):     return 127
-            case (kTrackLead1,   .motorik, "Synth Lead"):    return 90
+            case (kTrackLead1,   .motorik, "Synth Lead"):    return 70
             case (kTrackLead1,   .motorik, "Mono Synth"):    return 85
             case (kTrackLead1,   .motorik, "Soft Brass"):    return 80
             case (kTrackRhythm,  .motorik, "Charang"):       return 70
@@ -746,6 +750,9 @@ final class AppState: ObservableObject {
 
     init() {
         persistedHistory = Self.loadPersistedHistory()
+        // Pre-populate from persisted history so "first best" rules only fire on a true clean
+        // slate (new install or after reset). A returning user with any saved songs skips them.
+        stylesWithGeneratedSongs = Set(persistedHistory.map { $0.style })
         preloadPersistedSongs()
         // Arm sleep timer from launch using saved preference (default 2 hours).
         // Set directly to avoid triggering sleepTimerDuration.didSet (no UserDefaults write at init).
@@ -864,9 +871,9 @@ final class AppState: ObservableObject {
                 .store(in: &cancellables)
 
         // DAW-style scrolling + live annotation feed.
-        // .receive(on: DispatchQueue.main) guarantees main-thread delivery — no Task wrapper needed.
-        playback.$currentStep
-            .dropFirst()
+        // stepPublisher replaces $currentStep — same per-step delivery without the
+        // objectWillChange broadcast that @Published would trigger (8×/sec at 120 BPM).
+        playback.stepPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] step in
                 guard let self else { return }
@@ -1175,7 +1182,7 @@ final class AppState: ObservableObject {
                 }
                 self.replaceOnceOnlyInstruments(style: style)
                 self.sanitiseBluesInstruments(for: state)
-                self.sanitiseNoirBassInstrument(for: state)
+                self.sanitiseNoirInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
                 // Chill texture: always applied last so randomization can't overwrite it.
                 if style == .chill {
@@ -1589,7 +1596,7 @@ final class AppState: ObservableObject {
 
     /// Ensures Motorik bass and Lead 1 instruments are appropriate for Noir vs regular.
     /// Fixes any stale override left over from the previous song when the Noir flag changed.
-    private func sanitiseNoirBassInstrument(for state: SongState) {
+    private func sanitiseNoirInstruments(for state: SongState) {
         guard state.style == .motorik else { return }
         let isNoir = state.motorikNoirVariation
         var rng    = SystemRandomNumberGenerator()
@@ -1603,7 +1610,7 @@ final class AppState: ObservableObject {
             instrumentOverrides[kTrackBass] = valid[Int.random(in: 0..<valid.count, using: &rng)]
         }
 
-        // Lead 1 pool: [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=FM Lead, 6=Synth Lead, 7=Saw Stack]
+        // Lead 1 pool: [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
         let ld1NoirOnly: Set<Int>    = [5, 7]
         let ld1RegularOnly: Set<Int> = [0, 2, 3]
         let currentLd1 = instrumentOverrides[kTrackLead1] ?? 0
@@ -1712,10 +1719,11 @@ final class AppState: ObservableObject {
                 : [0, 1, 2, 3]   // Regular: Moog + Lead Bass (shared) + Rock Bass + Elec Bass
         }
         if style == .motorik && trackIndex == kTrackLead1 {
-            // Pool: [0=Mono Synth, 1=Soft Brass, 2=Polysynth, 3=Chiff Lead, 4=FM Lead, 5=Saw Lead 3, 6=Synth Lead]
+            // Pool: [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
+            // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
             return songState?.motorikNoirVariation == true
-                ? [0, 3, 4, 5, 6]   // Noir: Mono Synth + Saw Lead 3 (shared) + Chiff Lead + FM Lead + Synth Lead
-                : [0, 1, 2, 5]      // Regular: Mono Synth + Saw Lead 3 (shared) + Soft Brass + Polysynth
+                ? [1, 4, 5, 6, 7]      // Noir: Saw Lead 3 + Chiff Lead + Square Lead + Synth Lead + Saw Stack
+                : [0, 1, 2, 3, 4, 6]   // Regular: Mono Synth + Saw Lead 3 + Soft Brass + Polysynth + Chiff Lead + Synth Lead
         }
         if style == .motorik && trackIndex == kTrackDrums {
             // Pool: [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit]
@@ -1724,10 +1732,11 @@ final class AppState: ObservableObject {
                 : [0, 1, 2]   // Regular: Rock Kit + Brush Kit + Dance Drums — no Machine Kit
         }
         if style == .motorik && trackIndex == kTrackRhythm {
-            // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Synth Bass 3, 4=Saw Lead, 5=Saw Wave, 6=Doctor Solo]
+            // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang]
+            // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
             return songState?.motorikNoirVariation == true
-                ? [2, 4, 5, 6]      // Noir: Fuzz Guitar + Saw Lead + Saw Wave + Doctor Solo
-                : [0, 1, 3, 4, 5]   // Regular: Guitar Pulse + Crunch Guitar + Synth Bass 3 + shared synths
+                ? [2, 3, 5, 6, 7]   // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
+                : [0, 1, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Acoustic Bass + Pick Bass + Synth Bass 3
         }
         guard style == .chill else { return Array(0..<poolCount) }
         let isBlues = songState?.chillBluesVariation == true
@@ -1806,7 +1815,7 @@ final class AppState: ObservableObject {
             self.randomizeTwoInstruments(style: state.style)
             self.replaceOnceOnlyInstruments(style: state.style)
             self.sanitiseBluesInstruments(for: state)
-            self.sanitiseNoirBassInstrument(for: state)
+            self.sanitiseNoirInstruments(for: state)
             self.applyBluesPadsInstrument(for: state)
             self.applyAmbientPianoInstrument(for: state)
             self.restoreLead2Mirror()
@@ -2104,11 +2113,16 @@ final class AppState: ObservableObject {
         if anchor.isAmbientPiano {
             let targetMode = (pass == 1) ? anchor.frame.mode.complementaryMode : anchor.frame.mode
             evolveIsPreGenerating = true
+            let tokenAtStart = evolvePhaseToken   // stale-Task guard — see note below
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
                 let state = Self.buildAmbientModalShiftPass(anchor: anchor, mode: targetMode, passBars: passBars)
                 await MainActor.run {
-                    guard self.playMode == .evolve else { return }
+                    // If tearDownEvolve() fired since this Task was launched, evolvePhaseToken
+                    // has been incremented and this result belongs to a now-abandoned session.
+                    // Applying it would corrupt songState and cause Next-Track oscillation.
+                    guard self.playMode == .evolve,
+                          self.evolvePhaseToken == tokenAtStart else { return }
                     if pass == 1 { self.evolvePass1State = state } else { self.evolvePass2State = state }
                     self.evolveIsPreGenerating = false
                     // Pass-2 only: update display immediately (12-bar early look-ahead)
@@ -2130,11 +2144,17 @@ final class AppState: ObservableObject {
         // evolve pass introduces them. Both passes do this so bass/drums persist through pass 2.
         freshTracks += absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
         evolveIsPreGenerating = true
+        let tokenAtStart = evolvePhaseToken   // stale-Task guard
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let state = Self.buildPassState(anchor: anchor, freshTracks: freshTracks, passBars: passBars)
             await MainActor.run {
-                guard self.playMode == .evolve else { return }
+                // Stale-Task guard: if tearDownEvolve() was called since this Task launched,
+                // the token has changed. Applying a stale result here would overwrite songState
+                // with an extended state built from the old anchor — causing Next-Track to
+                // oscillate between two history entries instead of generating a new song.
+                guard self.playMode == .evolve,
+                      self.evolvePhaseToken == tokenAtStart else { return }
                 if pass == 1 {
                     self.evolvePass1State = state
                 } else {
@@ -2167,13 +2187,15 @@ final class AppState: ObservableObject {
         // If style changed, generate fresh — no BPM, mood, key or scale from the previous song.
         let mood:  Mood? = styleChanged ? nil : evolveMoodAnchor
         let tempo: Int?  = styleChanged ? nil : evolveTempoAnchor
+        let tokenAtStart = evolvePhaseToken   // stale-Task guard
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
             let newTempo: Int? = tempo.map { max(20, min(200, $0 + Int.random(in: -5...5))) }
             let state = SongGenerator.generate(tempoOverride: newTempo, moodOverride: mood,
                                                style: style)
             await MainActor.run {
-                guard self.playMode == .evolve else { return }
+                guard self.playMode == .evolve,
+                      self.evolvePhaseToken == tokenAtStart else { return }
                 self.evolveNextSongState   = state
                 self.evolveIsPreGenerating = false
                 if self.evolveNextSongShouldLog && !self.evolveNextSongLogged {
@@ -2332,11 +2354,15 @@ final class AppState: ObservableObject {
             evolveIsPreGenerating = false
             evolveNextSongLogged  = false
         }
+        // Capture token now so the 500 ms asyncAfter closure can detect if the user navigated
+        // away (via history tap or Next-Track-into-history) before the silence gap expires.
+        let tokenAtStart = evolvePhaseToken
         if let next = evolveNextSongState {
             evolveNextSongState = nil
             // 500 ms silence between songs
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self, self.playMode == .evolve else { return }
+                guard let self, self.playMode == .evolve,
+                      self.evolvePhaseToken == tokenAtStart else { return }
                 self.finishLoadingEvolveSong(next)
             }
         } else {
@@ -2351,10 +2377,12 @@ final class AppState: ObservableObject {
                 let state = SongGenerator.generate(tempoOverride: newTempo, moodOverride: mood,
                                                    style: style)
                 await MainActor.run {
-                    guard self.playMode == .evolve else { return }
+                    guard self.playMode == .evolve,
+                          self.evolvePhaseToken == tokenAtStart else { return }
                     // 500 ms silence between songs
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                        guard let self, self.playMode == .evolve else { return }
+                        guard let self, self.playMode == .evolve,
+                              self.evolvePhaseToken == tokenAtStart else { return }
                         self.finishLoadingEvolveSong(state)
                     }
                 }
@@ -2372,6 +2400,7 @@ final class AppState: ObservableObject {
         if !alreadyEvolved { randomizeTwoInstruments(style: state.style) }
         replaceOnceOnlyInstruments(style: state.style)
         sanitiseBluesInstruments(for: state)
+        sanitiseNoirInstruments(for: state)
         applyBluesPadsInstrument(for: state)
         applyAmbientPianoInstrument(for: state)
         restoreLead2Mirror()
@@ -2840,11 +2869,27 @@ final class AppState: ObservableObject {
                 self?.appendToLog([
                     GenerationLogEntry(tag: "FILE", description: "Exported audio \(url.lastPathComponent)")
                 ])
+                let legacyAnySolo = self?.soloState.contains(true) ?? false
+                let legacyMuteState = self?.muteState ?? Array(repeating: false, count: kTrackCount)
+                let legacySoloState = self?.soloState ?? Array(repeating: false, count: kTrackCount)
+                let legacyMutedNames = (0..<kTrackCount).compactMap { i -> String? in
+                    guard i != kTrackLeadSynth else { return nil }
+                    let muted = legacyMuteState[i] || (legacyAnySolo && !legacySoloState[i])
+                    return muted ? kTrackNames[i] : nil
+                }
+                let legacyComment = legacyMutedNames.isEmpty ? "" : "Muted: \(legacyMutedNames.joined(separator: ", "))"
+                let legacyVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
                 await AudioFileExporter.addMetadata(
                     to: url,
-                    title: song.title,
-                    artist: "Zudio",
-                    genre: style
+                    title:         song.title,
+                    artist:        "Zudio",
+                    genre:         song.displayStyleName,
+                    bpm:           song.frame.tempo,
+                    year:          Calendar.current.component(.year, from: Date()),
+                    keySignature:  "\(song.frame.key) \(song.frame.mode.rawValue)",
+                    timeSignature: "4/4",
+                    encoder:       "Zudio \(legacyVersion)",
+                    comment:       legacyComment
                 )
             }
         }
@@ -3060,7 +3105,11 @@ final class AppState: ObservableObject {
 
     /// Shuffles the instrument on a track to a different entry in its pool.
     func regenInstrument(forTrack trackIndex: Int) {
-        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
+        // Use the loaded song's style, not selectedStyle — the style picker may differ
+        // from the song currently playing (e.g. a Motorik song loaded while the picker
+        // still shows Chill would otherwise draw instruments from the Chill pool).
+        let style = songState?.style ?? selectedStyle
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
         guard programs.count > 1 else { return }
         let currentIdx = instrumentOverrides[trackIndex] ?? 0
         var newIdx = currentIdx
@@ -3075,7 +3124,7 @@ final class AppState: ObservableObject {
         instrumentChangeToken += 1
         triggerVisualizerFlash(trackIndex: trackIndex)
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle)
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style)
         let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
         appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(iName)", isTitle: false)])
     }
@@ -3155,10 +3204,11 @@ final class AppState: ObservableObject {
         case .motorik:
             let idx = instrumentOverrides[kTrackLead1] ?? 0
             let mnames = Self.instrumentPoolNames(trackIndex: kTrackLead1, style: .motorik)
-            let isSynthLead = trackIndex == kTrackLead1
-                && idx < mnames.count && mnames[idx] == "Synth Lead"
+            let isTremoloLead = trackIndex == kTrackLead1
+                && idx < mnames.count
+                && (mnames[idx] == "Synth Lead" || mnames[idx] == "Square Lead")
             defaults = switch trackIndex {
-            case kTrackLead1:   isSynthLead ? [.delay, .tremolo] : [.delay]
+            case kTrackLead1:   isTremoloLead ? [.delay, .tremolo] : [.delay]
             case kTrackRhythm:  [.delay]
             case kTrackPads:    [.space]
             case kTrackTexture: [.pan]
@@ -3335,9 +3385,33 @@ final class AppState: ObservableObject {
             appendToLog([GenerationLogEntry(tag: "⚠️ EXPORT", description: msg)])
             return
         }
-        let snapshots       = playback.effectSnapshots()
+        let rawSnapshots    = playback.effectSnapshots()
+        // Apply mute/solo: mirror PlaybackEngine.applyMuteState() so export
+        // matches what the user hears during playback.
+        let anySolo = soloState.contains(true)
+        var snapshots = rawSnapshots
+        for i in 0..<snapshots.count {
+            let idx    = (i == kTrackLeadSynth) ? kTrackLead1 : i
+            let muted  = muteState[idx] || (anySolo && !soloState[idx])
+            if muted { snapshots[i].volume = 0.0 }
+        }
         let textureSnapshot = audioTexture.exportSnapshot()
-        let genre           = song.style.rawValue.capitalized
+        let genre           = song.displayStyleName   // e.g. "Chill Blues", "Motorik Noir", not just "Chill"
+
+        // Muted-track comment — list any user-visible tracks that are silent in this export
+        let mutedTrackNames = (0..<kTrackCount).compactMap { i -> String? in
+            guard i != kTrackLeadSynth else { return nil }  // internal track, not user-visible
+            let muted = muteState[i] || (anySolo && !soloState[i])
+            return muted ? kTrackNames[i] : nil
+        }
+        let exportComment = mutedTrackNames.isEmpty
+            ? ""
+            : "Muted: \(mutedTrackNames.joined(separator: ", "))"
+
+        let exportYear    = Calendar.current.component(.year, from: Date())
+        let exportVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let exportEncoder = "Zudio \(exportVersion)"
+        let exportKey     = "\(song.frame.key) \(song.frame.mode.rawValue)"
 
         audioExportFilename = url.lastPathComponent
         audioExportProgress = 0
@@ -3347,7 +3421,7 @@ final class AppState: ObservableObject {
 
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
-                let (songSecs, elapsed) = try OfflineExport.render(
+                try OfflineExport.render(
                     state: song,
                     programs: programs,
                     snapshots: snapshots,
@@ -3358,12 +3432,19 @@ final class AppState: ObservableObject {
                     },
                     isCancelled: { [weak self] in self?.fastExportCancelled ?? true }
                 )
-                let speedup = songSecs / max(elapsed, 0.001)
-                print("[FastExport] ✅ \(String(format: "%.1f", songSecs))s rendered in " +
-                      "\(String(format: "%.2f", elapsed))s (\(String(format: "%.1f", speedup))×)")
 
-                await AudioFileExporter.addMetadata(to: url, title: song.title,
-                                                    artist: "Zudio", genre: genre)
+                await AudioFileExporter.addMetadata(
+                    to: url,
+                    title:         song.title,
+                    artist:        "Zudio",
+                    genre:         genre,
+                    bpm:           song.frame.tempo,
+                    year:          exportYear,
+                    keySignature:  exportKey,
+                    timeSignature: "4/4",
+                    encoder:       exportEncoder,
+                    comment:       exportComment
+                )
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     self.isExportingAudio = false
@@ -3381,7 +3462,6 @@ final class AppState: ObservableObject {
                     self?.isFastExporting  = false
                     if !(error is CancellationError) {
                         let msg = error.localizedDescription
-                        print("[FastExport] ❌ \(msg)")
                         self?.fastExportErrorMessage = msg
                         self?.appendToLog([GenerationLogEntry(tag: "⚠️ EXPORT", description: msg)])
                     }

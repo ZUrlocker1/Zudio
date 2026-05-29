@@ -4,6 +4,7 @@
 
 import AVFoundation
 import AudioToolbox
+import Combine
 
 @MainActor
 final class PlaybackEngine: ObservableObject {
@@ -11,16 +12,49 @@ final class PlaybackEngine: ObservableObject {
 
     @Published var isPlaying: Bool = false
     @Published var currentBar: Int = 0
-    @Published var currentStep: Int = 0
-    // Throttled to ≤15fps for Canvas playhead views (MIDILaneView, AudioWaveformView).
-    // currentStep still updates every step for the AppState DAW-scroll subscriber.
-    @Published var displayStep: Int = 0
+    // Plain var — objectWillChange is NOT fired on step updates (8×/sec at 120 BPM).
+    // AppState's DAW-scroll and annotation subscriber uses stepPublisher instead,
+    // which carries the same value without triggering per-step view re-evaluations.
+    // Result: views reading playback.currentBar (PhonePlayerView, TopBarView, etc.)
+    // are only re-evaluated ~0.5×/sec (once per bar) instead of 8×/sec.
+    var currentStep: Int = 0
+    // stepPublisher replaces the @Published $currentStep Combine publisher.
+    // PassthroughSubject: no initial value emitted on subscribe (unlike @Published).
+    let stepPublisher = PassthroughSubject<Int, Never>()
+    // Plain var (not @Published): wallClockStep reads it as a fallback when stopped,
+    // but nothing subscribes to it for rendering — TimelineView drives lane redraws now.
+    var displayStep: Int = 0
     @Published var activeVisualizerNotes: [VisualizerNote] = []
     // Buffer flushed into activeVisualizerNotes at most 12×/sec — collapses append+prune
     // into one @Published mutation per frame, reducing AppKit layout scans at step rate.
     private var pendingVisualizerNotes: [VisualizerNote] = []
     private var lastVisualizerFlush: Date = .distantPast
-    private var lastDisplayStepFlush: Date = .distantPast
+
+    // MARK: - Wall-clock playhead (Option A: smooth animation without dispatch lag)
+
+    // Set by recordPlaybackStart() at the moment the scheduler fires its first step.
+    // Cleared (sps → 0) by stopSchedulerOnly() so wallClockStep falls back to displayStep.
+    var playbackStartWallTime: Date = .distantPast
+    var playbackSecondsPerStep: Double = 0.0
+    var playbackStartStep: Int = 0
+    var playbackTotalSteps: Int = 1
+
+    /// Smooth wall-clock playhead: computed from elapsed time so MIDILaneView's
+    /// TimelineView always reads the true position rather than a dispatch-queued value.
+    /// Falls back to displayStep when stopped or before the scheduler has started.
+    var wallClockStep: Int {
+        guard isPlaying && playbackSecondsPerStep > 0 else { return displayStep }
+        let elapsed = Date().timeIntervalSince(playbackStartWallTime)
+        let step = playbackStartStep + Int(elapsed / playbackSecondsPerStep)
+        return max(0, min(step, playbackTotalSteps - 1))
+    }
+
+    private func recordPlaybackStart(step: Int, state: SongState) {
+        playbackStartWallTime   = Date()
+        playbackStartStep       = step
+        playbackSecondsPerStep  = state.frame.secondsPerStep
+        playbackTotalSteps      = state.frame.totalBars * 16
+    }
 
     // MARK: - Audio graph
 
@@ -410,6 +444,7 @@ final class PlaybackEngine: ObservableObject {
                 let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
                 self.scheduler = sched
                 sched.start()
+                self.recordPlaybackStart(step: 0, state: state)
                 self.startKosmicDroneFades(state: state)
             }
         } else if (motorikStyle || chillFade) && currentStep == 0 && state.structure.introSection != nil {
@@ -420,6 +455,7 @@ final class PlaybackEngine: ObservableObject {
                 let sched = StepScheduler(engine: self, songState: state, startStep: 0, schedulerID: schedulerID)
                 self.scheduler = sched
                 sched.start()
+                self.recordPlaybackStart(step: 0, state: state)
                 self.startMotorikFades(state: state)
             }
         } else {
@@ -435,6 +471,7 @@ final class PlaybackEngine: ObservableObject {
             let sched = StepScheduler(engine: self, songState: state, startStep: currentStep, schedulerID: schedulerID)
             scheduler = sched
             sched.start()
+            recordPlaybackStart(step: currentStep, state: state)
             if kosmicStyle              { startKosmicDroneFades(state: state) }
             if motorikStyle || chillFade { startMotorikFades(state: state) }
             if ambientMode               { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
@@ -494,6 +531,7 @@ final class PlaybackEngine: ObservableObject {
         scheduler?.stop()
         scheduler = nil
         isPlaying = false
+        playbackSecondsPerStep = 0   // disables wallClockStep; falls back to displayStep
         // Leave playhead in place — user can resume from here with Play
         allNotesOff()
         stopKosmicDroneFades()
@@ -613,26 +651,44 @@ final class PlaybackEngine: ObservableObject {
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
         for (trackIndex, ev) in noteOns {
             let channel = gmChannel(trackIndex)
-            // Machine Kit (GM program 24) has harsh kick/snare at full velocity — scale down.
-            let fireVelocity: UInt8
-            if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
-                fireVelocity = UInt8(max(1, Int(ev.velocity) * 88 / 100))
-            } else {
-                fireVelocity = ev.velocity
-            }
             // 808 Kit (GM program 25): tom slots have cheesy synthesized 808 toms — substitute
             // with kick/snare/open-hat so Bonham-style cascades sound like 808-appropriate fills.
             // Low/mid toms (≤45) → kick; hiMid tom (48) → snare; hi tom (50) → open hi-hat.
+            //
+            // Machine Kit (program 24) is Motorik-only and exclusively used in Noir. Its electronic
+            // tom slots produce space-age bloop/beep hits that clash with the cold, austere aesthetic.
+            // Remap: low toms → kick, high toms → snare, crash → ride (klangy and sustained).
+            // Velocity: native Machine Kit kick/snare/hat fire at 88% to tame harshness. Remapped
+            // toms keep their original velocity — they were already moderate and scaling makes them
+            // inaudible (e.g. an intro pickup tom at vel 78 → kick at vel 68 disappears entirely).
             let fireNote: UInt8
+            let wasRemapped: Bool
             if trackIndex == kTrackDrums && cachedDrumProgram == 25 {
                 switch ev.note {
-                case 41, 43, 45: fireNote = GMDrum.kick.rawValue
-                case 48:         fireNote = GMDrum.snare.rawValue
-                case 50:         fireNote = GMDrum.openHat.rawValue
-                default:         fireNote = ev.note
+                case 41, 43, 45: fireNote = GMDrum.kick.rawValue;  wasRemapped = true
+                case 48:         fireNote = GMDrum.snare.rawValue;  wasRemapped = true
+                case 50:         fireNote = GMDrum.openHat.rawValue; wasRemapped = true
+                default:         fireNote = ev.note;                 wasRemapped = false
+                }
+            } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
+                switch ev.note {
+                case 41, 43, 45: fireNote = GMDrum.snare.rawValue;   wasRemapped = true
+                case 48:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
+                case 50:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
+                case 40:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
+                case 49:         fireNote = GMDrum.ride.rawValue;    wasRemapped = true
+                default:         fireNote = ev.note;                  wasRemapped = false
                 }
             } else {
-                fireNote = ev.note
+                fireNote = ev.note; wasRemapped = false
+            }
+            // Machine Kit native notes fire at 88% to tame harshness at high velocity.
+            // Remapped tom notes keep their original velocity — they're already moderate.
+            let fireVelocity: UInt8
+            if trackIndex == kTrackDrums && cachedDrumProgram == 24 && !wasRemapped {
+                fireVelocity = UInt8(max(1, Int(ev.velocity) * 88 / 100))
+            } else {
+                fireVelocity = ev.velocity
             }
             samplers[trackIndex].startNote(fireNote, withVelocity: fireVelocity, onChannel: channel)
         }
@@ -643,11 +699,12 @@ final class PlaybackEngine: ObservableObject {
             guard let self, self.currentSchedulerID == schedulerID else { return }
             self.currentStep = step
             if bar != self.currentBar { self.currentBar = bar }
-            let displayNow = Date()
-            if displayNow.timeIntervalSince(self.lastDisplayStepFlush) >= (1.0 / 15.0) {
-                self.displayStep = step
-                self.lastDisplayStepFlush = displayNow
-            }
+            // displayStep is a plain var (not @Published) — update every step so
+            // wallClockStep has an accurate fallback when stopped.
+            self.displayStep = step
+            // Notify DAW-scroll and annotation subscriber (AppState) without firing
+            // objectWillChange — currentStep is now a plain var, not @Published.
+            self.stepPublisher.send(step)
             let sps = self.songState?.frame.secondsPerStep ?? 0.1
             // Accumulate note-ons into pending buffer; flush to @Published array at ≤12fps.
             // This collapses append + prune into one objectWillChange per frame instead of
@@ -804,6 +861,7 @@ final class PlaybackEngine: ObservableObject {
             let sched = StepScheduler(engine: self, songState: state, startStep: clampedStep, schedulerID: currentSchedulerID)
             scheduler = sched
             sched.start()
+            recordPlaybackStart(step: clampedStep, state: state)
             if kosmicStyle               { startKosmicDroneFades(state: state) }
             if motorikStyle || chillFade { startMotorikFades(state: state) }
             if ambientMode               { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
@@ -830,6 +888,7 @@ final class PlaybackEngine: ObservableObject {
         let sched = StepScheduler(engine: self, songState: songState!, startStep: currentStep, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
+        recordPlaybackStart(step: currentStep, state: songState!)
     }
 
     // MARK: - Evolve pass swap
@@ -859,6 +918,7 @@ final class PlaybackEngine: ObservableObject {
                                   startStep: 0, schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
+        recordPlaybackStart(step: 0, state: passState)
     }
 
     /// Loads a new SongState and immediately starts playing from `startStep`.
@@ -886,6 +946,7 @@ final class PlaybackEngine: ObservableObject {
                                   schedulerID: currentSchedulerID)
         scheduler = sched
         sched.start()
+        recordPlaybackStart(step: currentStep, state: state)
         // Pass states have no intro/outro — set volume directly to full.
         engine.mainMixerNode.outputVolume = 1.0
         if ambientMode { startAmbientOutroFade(state: state, schedulerID: currentSchedulerID) }
@@ -902,7 +963,7 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedDrumProgram:    UInt8 = 255
     nonisolated(unsafe) private var cachedLead1Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedLead2Program:   UInt8 = 255
-    nonisolated(unsafe) private var cachedIsAmbientPiano: Bool  = false
+    nonisolated(unsafe) private var cachedIsAmbientPiano:   Bool  = false
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
     /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls
@@ -994,11 +1055,9 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
             } else if trackIndex == kTrackLead1 && program == 80 {
-                vol = 0.78   // Square Lead on Lead 1
+                vol = 0.68   // Square Lead — Motorik Noir Lead 1 (with tremolo)
             } else if trackIndex == kTrackBass && kosmicStyle && program == 87 {
                 vol = 0.24   // Lead Bass runs hot on Kosmic bass — pull back further
-            } else if trackIndex == kTrackLead1 && motorikStyle && program == 63 {
-                vol = 0.28   // FM Lead (Synth Brass 2) runs loud on Motorik Lead 1 — pull back
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 83 {
                 vol = 1.3    // Chiff Lead runs soft on Motorik Lead 1 — boost
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {

@@ -32,16 +32,21 @@ struct MIDILaneView: View {
     @State private var cacheVersion: Int = 0
 
     var body: some View {
-        // Capture stable locals so closures hold their current values
+        // Capture stable locals so closures hold their current values.
+        // displayStep is intentionally NOT read here — the playhead uses
+        // wallClockStep inside a TimelineView so this body only re-runs on
+        // note-data changes (song load / regen / DAW scroll), not on step ticks.
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
         let version   = cacheVersion
-        let curStep   = playback.displayStep
+        // Adaptive fps: at wide zoom the playhead moves <1px/frame at 15fps — no
+        // visible difference, so run fewer redraws to save CPU.
+        // ≤8 bars → 15fps  |  9–32 bars → 8fps  |  ≥33 bars → 4fps
+        let playheadFPS: Double = visibleBars <= 8 ? 15 : visibleBars <= 32 ? 8 : 4
 
         ZStack {
-            // Note layer — does not capture currentStep, so SwiftUI skips its body
-            // whenever only the playhead moves. O(N) note draw runs only on song
-            // load, track regen, or DAW scroll — not on every 9 Hz step tick.
+            // Note layer — Equatable, skipped on every tick. O(N) note draw
+            // runs only on song load, track regen, or DAW scroll.
             NoteLayerView(
                 events: events,
                 onsets: onsets,
@@ -56,9 +61,20 @@ struct MIDILaneView: View {
             )
             .equatable()
 
-            // Playhead layer — O(1): one rect + optional triangle per tick
-            Canvas { ctx, size in
-                drawPlayhead(ctx: ctx, size: size, currentStep: curStep)
+            // Playhead layer — wall-clock position, O(1).
+            // When playing: TimelineView drives redraws at the adaptive fps so the
+            // position is computed from elapsed time, never lagging or jumping.
+            // When stopped: plain Canvas drawn once; no timer needed.
+            if playback.isPlaying {
+                TimelineView(.periodic(from: .now, by: 1.0 / playheadFPS)) { _ in
+                    Canvas { ctx, size in
+                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockStep)
+                    }
+                }
+            } else {
+                Canvas { ctx, size in
+                    drawPlayhead(ctx: ctx, size: size, currentStep: playback.displayStep)
+                }
             }
 
             // Drag-to-seek overlay — invisible, covers full lane

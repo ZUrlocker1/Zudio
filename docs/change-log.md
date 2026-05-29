@@ -9,6 +9,11 @@
 - **Evolve tempo clamping fix** — Minor bug fixed to clamp tempo within the proper range for each style when playing in Evolve mode.
 - **Kosmic intro effects fix** — Fixed a bug where incorrect reverb effects were applied during the Kosmic intro and outro.
 - **Bass/drum sync improvements** — Fixed off-beat note placement in CHL-BASS-008 (Acid Jazz), KOS-BASS-009, MOT-BASS-003 (Crawling Walk) where primary bass notes were landing on weak 16th-note positions causing rhythmic misalignment.
+- **Audio export respects Mute and Solo** — Exporting audio now respects  Mute and Solo track settings. Muted tracks are silent in the export matching what the user hears during playback.
+- **Evolve mode Next Track fix** — Fixed a timing bug where pressing Next Track while Evolve mode was mid-evolution could cause it to alternate between two history songs instead of generating a new one.
+- **First-best rules tightened** — The curated "first best" rules (which select the most representative groove for each style) now only fire on a true clean slate: the first time the user runs Zudio or after a full reset. Every session after the first uses a full random selection.
+- **Smoother track view animation** — Playhead position now computed from wall-clock time rather than dispatch callbacks, eliminating lag during playback.
+
 
 ---
 

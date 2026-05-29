@@ -26,7 +26,11 @@ struct AudioWaveformView: View {
     @State private var expectedFilename: String? = nil
 
     var body: some View {
-        let curStep = playback.displayStep
+        // displayStep is intentionally NOT read here — playhead uses wallClockStep
+        // inside TimelineView so this body never re-evaluates on step ticks.
+        // Adaptive fps: same logic as MIDILaneView.
+        let playheadFPS: Double = visibleBars <= 8 ? 15 : visibleBars <= 32 ? 8 : 4
+
         ZStack {
             WaveformLayerView(
                 samples: samples,
@@ -38,9 +42,18 @@ struct AudioWaveformView: View {
             )
             .equatable()
 
-            // Playhead — O(1), redraws every tick
-            Canvas { ctx, size in
-                drawPlayhead(ctx: ctx, size: size, currentStep: curStep)
+            // Playhead — wall-clock position, O(1). Same approach as MIDILaneView.
+            // When playing: adaptive-fps TimelineView; when stopped: plain Canvas.
+            if playback.isPlaying {
+                TimelineView(.periodic(from: .now, by: 1.0 / playheadFPS)) { _ in
+                    Canvas { ctx, size in
+                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockStep)
+                    }
+                }
+            } else {
+                Canvas { ctx, size in
+                    drawPlayhead(ctx: ctx, size: size, currentStep: playback.displayStep)
+                }
             }
 
             // Drag-to-seek

@@ -80,6 +80,7 @@ struct TitleGenerator {
         "Munchen", "Essen", "Wuppertal", "Dortmund", "Bremen",
         "Hannover", "Leipzig", "Dresden","Vienna",
         "Nordhausen", "Dora", "Middelbrau", "Mittelwerk",
+        "Volkmann","Stinnes", "Riemeck", "Fiedler", "Mundt",
     ]
 
     /// City prefixes — English or near-English so they read immediately

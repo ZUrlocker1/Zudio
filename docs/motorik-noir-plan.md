@@ -224,17 +224,17 @@ High-register melodic phrase with offbeat entry — the phrase starts on the "an
 
 ### Lead pool weights (Noir)
 
+- MOT-LD1-010 Pendulum: 17%
+- MOT-LD1-011 Melodic Spiral: 17%
+- MOT-LD1-014 Rising phrase: 15%
+- MOT-LD1-013 Slow arc: 14%
 - MOT-LD1-009 Cold Chord: 11%
-- MOT-LD1-010 Pendulum: 16%
-- MOT-LD1-011 Melodic Spiral: 16%
-- MOT-LD1-013 Slow arc: 13%
-- MOT-LD1-014 Rising phrase: 14%
 - MOT-LD1-012 Chromatic Descent: 10%
 - MOT-LD1-006 Long Arc Solo: 4%
-- MOT-LD1-007 Vanishing Solo: 4%
 - MOT-LD1-008 Visiting Solo: 4%
 - MOT-LD1-001 Neu! Motif First: 4%
 - MOT-LD1-005 Call and Answer: 4%
+- ~~MOT-LD1-007 Vanishing Solo~~ — excluded from Noir. Its melodic arc was written for a major-key context; minor-scale adjustment corrects the notes but not the optimistic resolved character of the phrase, which clashes with the Noir aesthetic. 
 
 ### Rhythm rules
 

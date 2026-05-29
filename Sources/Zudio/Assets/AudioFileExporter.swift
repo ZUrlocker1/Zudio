@@ -188,7 +188,13 @@ struct AudioFileExporter {
         to url: URL,
         title: String,
         artist: String,
-        genre: String
+        genre: String,
+        bpm: Int,
+        year: Int,
+        keySignature: String,
+        timeSignature: String,
+        encoder: String,
+        comment: String
     ) async {
         let asset = AVURLAsset(url: url)
 
@@ -207,9 +213,24 @@ struct AudioFileExporter {
         }
 
         items.append(iTunesItem(.iTunesMetadataKeySongName,     title))
-        items.append(iTunesItem(.iTunesMetadataKeyArtist,      artist))
-        items.append(iTunesItem(.iTunesMetadataKeyAlbum,       "Greatest Hits"))
-        items.append(iTunesItem(.iTunesMetadataKeyUserGenre,   genre))
+        items.append(iTunesItem(.iTunesMetadataKeyArtist,       artist))
+        items.append(iTunesItem(.iTunesMetadataKeyAlbum,        "Greatest Hits"))
+        items.append(iTunesItem(.iTunesMetadataKeyUserGenre,    genre))
+        // NOTE: do NOT write BPM via AVFoundation here.
+        // AVFoundation serialises NSNumber tmpo as a 64-bit integer (8-byte content, 32-byte item)
+        // but Apple Music requires a 16-bit integer (2-byte content, 26-byte item).
+        // injectBPM() writes the correct atom at the byte level after the session completes.
+        items.append(iTunesItem(.iTunesMetadataKeyEncodingTool, encoder))
+        // Raw 4-char iTunes atom codes for fields without named AVMetadataKey constants
+        items.append(iTunesItem(AVMetadataKey(rawValue: "©day"), "\(year)"))    // year / release date
+        items.append(iTunesItem(AVMetadataKey(rawValue: "©key"), keySignature)) // key (Logic/GarageBand; not shown in Music.app)
+        items.append(iTunesItem(AVMetadataKey(rawValue: "©tmr"), timeSignature)) // time signature
+
+        // Comment: key and time signature, plus muted-track note if any.
+        // BPM is omitted here — it is written correctly to the dedicated tmpo atom by injectBPM().
+        var commentParts: [String] = ["\(keySignature), \(timeSignature)"]
+        if !comment.isEmpty { commentParts.append(comment) }
+        items.append(iTunesItem(.iTunesMetadataKeyUserComment, commentParts.joined(separator: " — ")))
 
         // Album art — rendered from the bundled app icon
         if let artData = await MainActor.run(resultType: Data?.self, body: appIconPNGData) {
@@ -232,9 +253,182 @@ struct AudioFileExporter {
         if session.status == .completed {
             try? FileManager.default.removeItem(at: url)
             try? FileManager.default.moveItem(at: tmp, to: url)
+            // AVFoundation does not reliably write the tmpo (BPM) atom as an integer —
+            // a known limitation. Patch the file at the byte level so Apple Music reads it.
+            try? injectBPM(bpm, into: url)
         } else {
             try? FileManager.default.removeItem(at: tmp)
             if let err = session.error { print("Metadata export skipped: \(err)") }
+        }
+    }
+
+    // MARK: - BPM byte-level injection
+
+    /// Injects a `tmpo` (BPM) atom into an M4A file at the byte level.
+    ///
+    /// AVFoundation's `AVAssetExportSession` cannot write a correct tmpo atom.
+    /// When given an NSNumber it emits an 8-byte (64-bit) integer with item-size=32;
+    /// Apple Music requires a 2-byte (16-bit) integer with item-size=26.
+    /// We therefore keep BPM out of AVFoundation metadata entirely and insert the
+    /// correctly-sized atom here after the passthrough session completes.
+    ///
+    /// `tmpo` atom layout inside `moov.udta.meta.ilst` (26 bytes total):
+    ///
+    ///   Offset  Size  Content
+    ///   +0      4     item size = 26
+    ///   +4      4     "tmpo"
+    ///   +8      4     data-box size = 18
+    ///   +12     4     "data"
+    ///   +16     1     version = 0x00
+    ///   +17     3     flags   = 0x00 0x00 0x15  (signed integer, type 21)
+    ///   +20     4     locale  = 0x00000000
+    ///   +24     2     BPM as big-endian int16
+    private static func injectBPM(_ bpm: Int, into url: URL) throws {
+        guard bpm > 0, bpm < 32768 else { return }
+        var d = try Data(contentsOf: url)
+        let bpmU16 = UInt16(bpm)
+
+        // Canonical 26-byte tmpo item with correct 16-bit integer encoding.
+        let tmpoItem = Data([
+            0, 0, 0, 26,                                    // item size = 26
+            116, 109, 112, 111,                             // "tmpo"
+            0, 0, 0, 18,                                    // data-box size = 18
+            100, 97, 116, 97,                               // "data"
+            0, 0, 0, 0x15,                                  // version=0, flags=integer(21)
+            0, 0, 0, 0,                                     // locale = 0
+            UInt8(bpmU16 >> 8), UInt8(bpmU16 & 0xFF)       // BPM as big-endian int16
+        ])
+
+        // Navigate to ilst. Try moov > udta > meta > ilst first,
+        // then fall back to moov > meta > ilst (some muxers omit udta).
+        guard let moov = mp4Box("moov", in: d, range: 0..<d.count) else { return }
+
+        var ilst: Range<Int>?
+        var ancestorStarts: [Int] = []   // outermost-first; all need +26
+
+        if let udta = mp4Box("udta", in: d, range: (moov.lowerBound+8)..<moov.upperBound),
+           let meta = mp4Box("meta", in: d, range: (udta.lowerBound+8)..<udta.upperBound),
+           let il   = mp4Box("ilst", in: d, range: (meta.lowerBound+12)..<meta.upperBound) {
+            ilst           = il
+            ancestorStarts = [moov.lowerBound, udta.lowerBound, meta.lowerBound, il.lowerBound]
+        } else if let meta = mp4Box("meta", in: d, range: (moov.lowerBound+8)..<moov.upperBound),
+                  let il   = mp4Box("ilst", in: d, range: (meta.lowerBound+12)..<meta.upperBound) {
+            ilst           = il
+            ancestorStarts = [moov.lowerBound, meta.lowerBound, il.lowerBound]
+        }
+
+        guard let ilstRange = ilst else { return }
+
+        // Insert the new tmpo at the end of ilst.
+        // Since moov comes AFTER mdat in typical AVFoundation output, inserting inside
+        // moov does NOT shift mdat, so stco/co64 offsets remain valid.
+        let moovPrecedesMdat = moov.upperBound < d.count
+        d.insert(contentsOf: tmpoItem, at: ilstRange.upperBound)
+
+        for start in ancestorStarts {
+            mp4WriteU32(mp4ReadU32(d, start) + 26, into: &d, at: start)
+        }
+
+        // Only patch chunk offsets when moov was before mdat (rare for AVFoundation output).
+        if moovPrecedesMdat, let newMoov = mp4Box("moov", in: d, range: 0..<d.count) {
+            mp4PatchChunkOffsets(in: newMoov, data: &d, delta: 26)
+        }
+
+        try d.write(to: url)
+    }
+
+    // MARK: - MP4 box helpers (used only by injectBPM)
+
+    /// Read a big-endian UInt32 from `data` at byte offset `i`.
+    private static func mp4ReadU32(_ data: Data, _ i: Int) -> UInt32 {
+        (UInt32(data[i]) << 24) | (UInt32(data[i+1]) << 16) | (UInt32(data[i+2]) << 8) | UInt32(data[i+3])
+    }
+
+    /// Write a big-endian UInt32 into `data` at byte offset `i`.
+    private static func mp4WriteU32(_ value: UInt32, into data: inout Data, at i: Int) {
+        data[i]   = UInt8((value >> 24) & 0xFF)
+        data[i+1] = UInt8((value >> 16) & 0xFF)
+        data[i+2] = UInt8((value >>  8) & 0xFF)
+        data[i+3] = UInt8( value        & 0xFF)
+    }
+
+    /// Find the first MP4 box with the given 4-char type within `range`.
+    /// Returns the range of the entire box (header + content), or nil if not found.
+    ///
+    /// Handles the two special size values defined by ISO 14496-12:
+    ///   sz == 0  — box extends to end of its parent (rare; treated as rest of range)
+    ///   sz == 1  — box uses a 64-bit "largesize" field at bytes [8..15]
+    ///              Layout: [size=1][fourcc][8-byte largesize][content...]
+    ///              AVFoundation routinely emits mdat with largesize even for small files.
+    private static func mp4Box(_ type: String, in data: Data, range: Range<Int>) -> Range<Int>? {
+        let t = Array(type.utf8)
+        var i = range.lowerBound
+        while i + 8 <= range.upperBound {
+            let szU32 = mp4ReadU32(data, i)
+            let sz: Int
+            if szU32 == 0 {
+                // Box extends to end of parent range.
+                sz = range.upperBound - i
+            } else if szU32 == 1 {
+                // 64-bit largesize: [size=1 (4)][fourcc (4)][largesize (8)][content…]
+                guard i + 16 <= range.upperBound else { return nil }
+                let hi  = UInt64(mp4ReadU32(data, i + 8))
+                let lo  = UInt64(mp4ReadU32(data, i + 12))
+                let s64 = (hi << 32) | lo
+                guard s64 >= 16, s64 <= UInt64(range.upperBound - i) else {
+                    // Box is larger than the remaining scan range; can't navigate inside,
+                    // but we can skip it if we know the exact size — just give up here.
+                    return nil
+                }
+                sz = Int(s64)
+            } else {
+                sz = Int(szU32)
+                guard sz >= 8, i + sz <= range.upperBound else { return nil }
+            }
+            if data[i+4..<i+8].elementsEqual(t) { return i..<i+sz }
+            i += sz
+        }
+        return nil
+    }
+
+    /// Adds `delta` to every chunk-offset entry in all `stco` and `co64` boxes
+    /// inside `moovRange`. Called after inserting bytes into moov when moov precedes
+    /// mdat — the insertion shifts mdat's absolute position, invalidating stored offsets.
+    private static func mp4PatchChunkOffsets(in moovRange: Range<Int>, data d: inout Data, delta: Int) {
+        var stack = [moovRange]
+        while let range = stack.popLast() {
+            var i = range.lowerBound + 8
+            while i + 8 <= range.upperBound {
+                let sz = Int(mp4ReadU32(d, i))
+                guard sz >= 8, i + sz <= range.upperBound else { break }
+                let type = String(bytes: d[i+4..<i+8], encoding: .isoLatin1) ?? ""
+                switch type {
+                case "stco":
+                    let n = Int(mp4ReadU32(d, i + 12))
+                    var e = i + 16
+                    for _ in 0..<n {
+                        let old = mp4ReadU32(d, e)
+                        mp4WriteU32(old + UInt32(delta), into: &d, at: e)
+                        e += 4
+                    }
+                case "co64":
+                    let n = Int(mp4ReadU32(d, i + 12))
+                    var e = i + 16
+                    for _ in 0..<n {
+                        let hi = UInt64(mp4ReadU32(d, e))
+                        let lo = UInt64(mp4ReadU32(d, e + 4))
+                        let new = ((hi << 32) | lo) + UInt64(delta)
+                        mp4WriteU32(UInt32(new >> 32),         into: &d, at: e)
+                        mp4WriteU32(UInt32(new & 0xFFFFFFFF),  into: &d, at: e + 4)
+                        e += 8
+                    }
+                case "trak", "mdia", "minf", "stbl":
+                    stack.append(i..<i+sz)  // recurse into container boxes on the stco path
+                default:
+                    break
+                }
+                i += sz
+            }
         }
     }
 

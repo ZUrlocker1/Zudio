@@ -25,12 +25,16 @@ struct HarmonicFilter {
     static func apply(
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
-        structure: SongStructure
+        structure: SongStructure,
+        skipLead1ClashFilter: Bool = false
     ) -> [[MIDIEvent]] {
         var events = trackEvents
 
-        // Pass A — remove out-of-scale Lead notes on strong beats
-        for track in [kTrackLead1, kTrackLead2] {
+        // Pass A — remove out-of-scale Lead notes on strong beats.
+        // LD1-012 (Chromatic Descent) intentionally uses chromatic passing tones that
+        // fall in avoidTones; skip Pass A for Lead 1 when that rule is active.
+        let lead1Tracks: [Int] = skipLead1ClashFilter ? [] : [kTrackLead1]
+        for track in lead1Tracks + [kTrackLead2] {
             events[track] = removeStrongBeatClashes(events[track], structure: structure)
         }
 

@@ -52,7 +52,8 @@ enum OfflineExport {
     /// - `textureSnapshot`: current AudioTexturePlayer state (nil if no texture active).
     /// - `onProgress`: called from background thread with 0…1 fraction.
     /// - `isCancelled`: polled each block; throws CancellationError when true.
-    /// Returns (songSeconds, elapsedSeconds) for timing log.
+    /// Returns (songSeconds, elapsedSeconds) — caller may discard.
+    @discardableResult
     static func render(
         state: SongState,
         programs: [Int],
@@ -105,8 +106,6 @@ enum OfflineExport {
         let avFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate,
                                      channels: AVAudioChannelCount(nChannels))!
 
-        print("[FastExport]    Format: \(Int(sampleRate)) Hz \(nChannels)ch  " +
-              "Tracks: \(activeTracks.count)  Tempo: \(state.frame.tempo) BPM")
 
         // Per-track render buffers and event lists
         let trackBufs = samplers.map { _ in

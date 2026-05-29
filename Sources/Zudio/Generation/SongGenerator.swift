@@ -116,8 +116,8 @@ struct SongGenerator {
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
-        // Motorik Noir: 75% during testing — will reduce to ~15% for release.
-        let isNoir = rng.nextDouble() < 0.50
+        // Motorik Noir: was 75% during testing, 50% in early release. Settled at 20%.
+        let isNoir = rng.nextDouble() < 0.20
 
         // Step 1 — Global musical frame
         let frame = MusicalFrameGenerator.generate(
@@ -192,15 +192,19 @@ struct SongGenerator {
             }
         }
 
-        // Step 11 — Harmonic filter: clash guard, register separation, velocity arc
-        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+        // Step 11 — Harmonic filter: clash guard, register separation, velocity arc.
+        // LD1-012 (Chromatic Descent) bypasses Pass A: its chromatic passing tones are
+        // intentional and would be wiped by the avoidTones filter in chromatic chord contexts.
+        let isLD1012 = lead1Rules.contains("MOT-LD1-012")
+        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure,
+                                           skipLead1ClashFilter: isLD1012)
 
-        // Step 11.5 — LD1-012 phrase cleanup: HarmonicFilter can remove a main note and leave its
-        // echo orphaned, and rest windows can strand a single held note between silences.
-        // Remove any Lead 1 group of < 3 events that is isolated by gaps larger than 1 bar.
-        if lead1Rules.contains("MOT-LD1-012") {
+        // Step 11.5 — LD1-012 phrase cleanup: rest windows can strand a single held note
+        // between silences. Threshold is 2 (not 3) because LD1-012 phrases can be legitimately
+        // short once HarmonicFilter no longer strips their chromatic notes.
+        if isLD1012 {
             trackEvents[kTrackLead1] = removeIsolatedPhrases(
-                trackEvents[kTrackLead1], minNotes: 3, maxGapSteps: 16)
+                trackEvents[kTrackLead1], minNotes: 2, maxGapSteps: 16)
         }
 
         // Step 12 — Pattern evolver: gradual bass mutation across evolution windows

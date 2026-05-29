@@ -187,8 +187,8 @@ struct LeadGenerator {
         var coldDescent:      [UInt8] = []
         var coldDescentIdx:   Int     = 0
         var coldCycleCount:   Int     = 0       // A: descent cycles (register drift, beat offset)
-        var coldGoUp:         Bool    = false   // A: whether current cycle ascends
-        var coldBeatOffset:   Int     = 0       // A: step offset within bar (0=beat1, 8=beat3)
+        var coldGoUp:         Int     = 0        // A: contour: 0=descent, 1=ascent, 2=arch
+        var coldBeatOffset:   Int     = 0       // A: step offset within bar (0=beat1, 4=beat2, 8=beat3, 12=beat4)
         var coldMotif:        [UInt8] = []
         var coldBlockCount:   Int     = 0       // C: blocks played (transposition scheduling)
         var coldMotifReverse: Bool    = false   // C: play motif in retrograde this block
@@ -232,8 +232,9 @@ struct LeadGenerator {
         var stabDirUp:          Bool   = true
         var stabDirCount:       Int    = 0
 
-        // O: LD1-011 Melodic Spiral — phrase silence gate
+        // O: LD1-011 Melodic Spiral — phrase silence gate + consecutive-active counter (Noir thinning)
         var baPhraseSilent: Bool = false
+        var baConsecutiveActive: Int = 0
 
         // H: Solo placement for LD1-007 / LD1-008 — single well-placed window in the A section.
         let isSoloRule = aRule == "MOT-LD1-007" || aRule == "MOT-LD1-008"
@@ -302,9 +303,13 @@ struct LeadGenerator {
             }
 
             // I: Structured rest window — silent for pre-computed 4–8 bar stretches (all non-solo rules)
-            // LD1-013 and LD1-014 manage their own phrase silences; skip to preserve solo presence.
+            // LD1-011, LD1-013 and LD1-014 manage their own phrase silences; skip to preserve solo presence.
+            // LD1-010 and LD1-011 reprise zone (final 25%) bypasses ld1RestBars so the return-to-form fires.
+            let ld1RepriseBypass = (ruleID == "MOT-LD1-010" || ruleID == "MOT-LD1-011")
+                                    && bar >= frame.totalBars * 3 / 4
             if !isIntroOutro && ld1RestBars.contains(bar)
-                && ruleID != "MOT-LD1-013" && ruleID != "MOT-LD1-014" {
+                && ruleID != "MOT-LD1-013" && ruleID != "MOT-LD1-014"
+                && !ld1RepriseBypass {
                 prevNote = nil
                 continue
             }
@@ -317,6 +322,7 @@ struct LeadGenerator {
                     intensity: intensity, isIntroOutro: isIntroOutro,
                     currentPhrase: &currentPhrase, nextPhraseBar: &nextPhraseBar,
                     entryBar: entryBar, phraseSparseCycle: &phraseSparseCycle,
+                    noir: noirVariation,
                     prevNote: prevNote, rng: &rng)
 
             case "MOT-LD1-002":
@@ -395,6 +401,7 @@ struct LeadGenerator {
                     intensity: intensity, isIntroOutro: isIntroOutro,
                     arcScale: arcScale, arcScaleIdx: &arcScaleIdx, arcAscending: &arcAscending,
                     arcDescendRunLen: &arcDescendRunLen, arcAscendRunLen: &arcAscendRunLen,
+                    noir: noirVariation,
                     rng: &rng)
 
             case "MOT-LD1-009":
@@ -429,7 +436,9 @@ struct LeadGenerator {
                 if !isIntroOutro {
                     barEvents = lead1BeatAnchor(
                         barStart: barStart, bar: bar, entry: entry, frame: frame,
-                        intensity: intensity, baPhraseSilent: &baPhraseSilent, rng: &rng)
+                        intensity: intensity, baPhraseSilent: &baPhraseSilent,
+                        baConsecutiveActive: &baConsecutiveActive,
+                        rng: &rng)
                 }
 
             case "MOT-LD1-012":
@@ -765,6 +774,7 @@ struct LeadGenerator {
         intensity: SectionIntensity, isIntroOutro: Bool,
         currentPhrase: inout Ph, nextPhraseBar: inout Int,
         entryBar: Int, phraseSparseCycle: inout Bool,
+        noir: Bool = false,
         prevNote: UInt8?, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         if isIntroOutro {
@@ -782,13 +792,18 @@ struct LeadGenerator {
         let phraseStepBase = cycleBar * 16
         let bounds        = kRegisterBounds[kTrackLead1]!
         let keyRoot       = 48 + keySemitone(frame.key)
-        // G: Decide sparse mode at the start of each 4-bar cycle (20% chance).
+        // G: Decide sparse mode at the start of each 4-bar cycle (20% chance normally).
         // Sparse mode thins the phrase to ~45% of notes, giving 4–6 from a 10–13 note phrase.
+        // Noir: per-bar gate — 45% of bars are completely silent; active bars fire at full density.
+        // ld1RestBars already provides macro 4–8 bar gaps, so per-note thinning (the old 0.25
+        // gate) only scattered isolated singles. A bar-level flip always delivers melodic cells.
+        // phraseSparseCycle is still drawn to keep RNG deterministic across modes.
         if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.20 }
+        if noir && rng.nextDouble() < 0.45 { return [] }   // G: Noir bar-level silence gate
         let gateProb: Double = phraseSparseCycle ? 0.45 : 1.0
         var barEvents: [MIDIEvent] = []
         for evt in currentPhrase where evt.step >= phraseStepBase && evt.step < phraseStepBase + 16 {
-            guard rng.nextDouble() < gateProb else { continue }   // G: sparse gate
+            guard rng.nextDouble() < gateProb else { continue }   // G: sparse gate (non-Noir only)
             let localStep = evt.step - phraseStepBase
             // Mode-snap deg to current mode's nearest interval — fixes out-of-scale notes
             // when the same phrase is replayed in a different mode (e.g. deg:9 in Aeolian).
@@ -898,6 +913,7 @@ struct LeadGenerator {
         intensity: SectionIntensity, isIntroOutro: Bool,
         arcScale: [Int], arcScaleIdx: inout Int, arcAscending: inout Bool,
         arcDescendRunLen: inout Int, arcAscendRunLen: inout Int,
+        noir: Bool = false,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         // F: Arc solo stepping through mode scale; quarter notes are the backbone.
@@ -907,8 +923,8 @@ struct LeadGenerator {
         // F2: After 4 consecutive steps in same direction, jump the other way.
         guard !isIntroOutro && !arcScale.isEmpty else { return [] }
         var barEvents: [MIDIEvent] = []
-        // 12% chance of a rest bar — breathing space
-        if rng.nextDouble() > 0.12 {
+        // Rest bar probability: 12% normally, 35% in Noir for more breathing space.
+        if rng.nextDouble() > (noir ? 0.35 : 0.12) {
             let idx = max(0, min(arcScale.count - 1, arcScaleIdx))
             // Chord-aware snap helper: returns nearest chord-compatible MIDI note
             let (ct006, st006, _) = NotePoolBuilder.build(
@@ -1087,7 +1103,7 @@ struct LeadGenerator {
         coldDescent:      inout [UInt8],
         coldDescentIdx:   inout Int,
         coldCycleCount:   inout Int,
-        coldGoUp:         inout Bool,
+        coldGoUp:         inout Int,
         coldBeatOffset:   inout Int,
         coldMotif:        inout [UInt8],
         coldBlockCount:   inout Int,
@@ -1104,16 +1120,18 @@ struct LeadGenerator {
             coldVariant = rng.nextDouble() < 0.50 ? 0 : 1
         }
 
-        // ── Variant A: Slow Descent (with ascent, register drift, beat offset) ─────────────
+        // ── Variant A: Slow Descent (with ascent, arch, register drift, beat offset) ──────────
         if coldVariant == 0 {
             if bar >= coldWindowEnd && bar >= coldSilUntil {
                 coldCycleCount += 1
 
-                // 30% chance note falls on beat 3 (step 8) instead of beat 1
-                coldBeatOffset = rng.nextDouble() < 0.30 ? 8 : 0
+                // Beat placement: 55% beat 1, 20% beat 3, 15% beat 2, 10% beat 4
+                let br = rng.nextDouble()
+                coldBeatOffset = br < 0.55 ? 0 : br < 0.75 ? 8 : br < 0.90 ? 4 : 12
 
-                // 20% chance ascend instead of descend
-                coldGoUp = rng.nextDouble() < 0.20
+                // Contour: 60% descent, 15% ascent, 25% arch (descend then partially rise)
+                let cr = rng.nextDouble()
+                coldGoUp = cr < 0.60 ? 0 : cr < 0.75 ? 1 : 2
 
                 let startPC   = nearestScalePitchClass((rootPC + 3) % 12, in: scalePCs)
                 var startNote = Int(nearestMIDI(pc: startPC, bounds: bounds, prevNote: nil))
@@ -1125,13 +1143,33 @@ struct LeadGenerator {
                     if shifted >= bounds.low && shifted <= bounds.high { startNote = shifted }
                 }
 
-                let direction = coldGoUp ? 1 : -1
-                let limit     = coldGoUp ? bounds.high : bounds.low
                 var seq: [UInt8] = []
-                for n in stride(from: startNote, through: limit, by: direction) {
-                    guard scalePCs.contains(n % 12) else { continue }
-                    seq.append(UInt8(n))
-                    if seq.count >= 8 { break }
+                if coldGoUp == 2 {
+                    // Arch: descend 3–4 scale steps then rise back 2–3 steps
+                    let descLen = 3 + rng.nextInt(upperBound: 2)
+                    for n in stride(from: startNote, through: bounds.low, by: -1) {
+                        guard scalePCs.contains(n % 12) else { continue }
+                        seq.append(UInt8(n))
+                        if seq.count >= descLen { break }
+                    }
+                    if let bottom = seq.last {
+                        let ascLen = 2 + rng.nextInt(upperBound: 2)
+                        var rising = 0
+                        for n in stride(from: Int(bottom) + 1, through: bounds.high, by: 1) {
+                            guard scalePCs.contains(n % 12) else { continue }
+                            seq.append(UInt8(n))
+                            rising += 1
+                            if rising >= ascLen { break }
+                        }
+                    }
+                } else {
+                    let direction = coldGoUp == 1 ? 1 : -1
+                    let limit     = coldGoUp == 1 ? bounds.high : bounds.low
+                    for n in stride(from: startNote, through: limit, by: direction) {
+                        guard scalePCs.contains(n % 12) else { continue }
+                        seq.append(UInt8(n))
+                        if seq.count >= 8 { break }
+                    }
                 }
                 let len        = min(5 + rng.nextInt(upperBound: 3), seq.count)
                 coldDescent    = Array(seq.prefix(len))
@@ -1246,12 +1284,20 @@ struct LeadGenerator {
         let p5bPC  = (rootPC + 5) % 12
         let p4bPC  = (rootPC + 7) % 12
 
+        // Late reprise — final ~25% of song: chain blocks continuously, no silence between them.
+        let isReprise = bar >= (frame.totalBars * 3 / 4)
+
         // Chord change mid-block: end block now, short rest before new one
         if pendulumLastRootPC >= 0 && rootPC != pendulumLastRootPC && bar < pendulumWindowEnd {
             pendulumWindowEnd = bar
             pendulumRestEnd   = bar + 2 + rng.nextInt(upperBound: 2)
         }
         pendulumLastRootPC = rootPC
+
+        // Reprise: truncate any ongoing post-phrase silence so the next block starts immediately
+        if isReprise && bar >= pendulumPhraseEnd && pendulumPhraseEnd > 0 && bar < pendulumRestEnd {
+            pendulumRestEnd = bar
+        }
 
         // Rest phase — 2-bar melodic release phrase, then 1-2 bars sparse/silence
         if bar >= pendulumWindowEnd && bar < pendulumRestEnd {
@@ -1271,13 +1317,24 @@ struct LeadGenerator {
 
         // Start a new active block
         if bar >= pendulumRestEnd {
+            // Noir thinning: 35% of potential blocks are skipped with an extended rest,
+            // creating breathing room. Reprise bypasses this so late-song density returns.
+            if !isReprise && rng.nextDouble() < 0.35 {
+                pendulumWindowEnd      = bar
+                pendulumPhraseBarStart = bar
+                pendulumPhraseEnd      = bar
+                pendulumRestEnd        = bar + 3 + rng.nextInt(upperBound: 3)  // 3–5 bar skip
+                pendulumUsesP4         = rng.nextDouble() < 0.30   // consume draw for RNG determinism
+                return []
+            }
             let blockLen           = 3 + rng.nextInt(upperBound: 2)   // 3–4 bars max
             pendulumBlockStart     = bar
             pendulumWindowEnd      = bar + blockLen
             pendulumPhraseShape    = rng.nextInt(upperBound: 3)        // pick phrase shape once
             pendulumPhraseBarStart = pendulumWindowEnd
             pendulumPhraseEnd      = pendulumWindowEnd + 2             // 2-bar phrase
-            let silenceLen         = 1 + rng.nextInt(upperBound: 2)   // 1-2 silent bars after
+            // Reprise: no silence after phrase — chain directly into next block
+            let silenceLen         = isReprise ? 0 : 1 + rng.nextInt(upperBound: 2)
             pendulumRestEnd        = pendulumPhraseEnd + silenceLen
             pendulumUsesP4         = rng.nextDouble() < 0.30
         }
@@ -1531,6 +1588,7 @@ struct LeadGenerator {
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         intensity: SectionIntensity,
         baPhraseSilent: inout Bool,
+        baConsecutiveActive: inout Int,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let bounds   = kRegisterBounds[kTrackLead1]!
@@ -1538,14 +1596,30 @@ struct LeadGenerator {
         let scalePCs = frame.scalePCs
         let melodyLow = (bounds.low + bounds.high) / 2   // ~65
 
-        // 1. Phrase silence gate — reset at start of each 4-bar cycle
-        if bar % 4 == 0 { baPhraseSilent = rng.nextDouble() < 0.30 }
+        // 6. Late reprise — final ~25% of song: bypass silence gate, restore full density.
+        // Gives a sense of returning to the original form after the thinned mid-section.
+        let isReprise = bar >= (frame.totalBars * 3 / 4)
+
+        // 1. Phrase silence gate — reset at start of each 4-bar cycle.
+        // 50% base silence probability; after 3 consecutive active cycles (12 bars), next forced silent.
+        // Reprise: gate bypassed — always active. RNG draw consumed for determinism.
+        if bar % 4 == 0 {
+            let roll = rng.nextDouble()   // always consume for RNG determinism
+            if isReprise {
+                baPhraseSilent     = false
+                baConsecutiveActive = 0   // reset cap so reprise starts cleanly
+            } else {
+                let forceRest  = baConsecutiveActive >= 3
+                baPhraseSilent = forceRest || roll < 0.50
+                if baPhraseSilent { baConsecutiveActive = 0 } else { baConsecutiveActive += 1 }
+            }
+        }
         if baPhraseSilent { return [] }
 
-        // 5. Chord-change dropout — drop 2 bars before a long chord transition
+        // 5. Chord-change dropout — drop 2 bars before a long chord transition (skip in reprise)
         let chordLen     = entry.chordWindow.endBar - entry.chordWindow.startBar
         let barsToChange = entry.chordWindow.endBar - bar
-        if chordLen >= 16 && barsToChange <= 2 { return [] }
+        if !isReprise && chordLen >= 16 && barsToChange <= 2 { return [] }
 
         var scale: [Int] = []
         for oct in 0...8 {
@@ -1567,16 +1641,23 @@ struct LeadGenerator {
         }
         let anchorMIDI = UInt8(max(bounds.low, Int(melodyNotes[0]) - 12))
 
-        // 2. Density by intensity — controls how many melody beats fire
+        // 2. Density by intensity — controls how many melody beats fire.
+        // Reprise: always full density (all 4 beats) regardless of intensity.
         let melodySteps: [Int]
-        switch intensity {
-        case .low:    melodySteps = [0, 8]           // beats 1+3 — spare and open
-        case .medium: melodySteps = [0, 8, 12]       // beats 1+3+4
-        case .high:   melodySteps = [0, 4, 8, 12]   // all 4 — full original density
+        if isReprise {
+            melodySteps = [0, 4, 8, 12]   // full density — return to form
+        } else {
+            switch intensity {
+            case .low:    melodySteps = [0, 8]           // beats 1+3 — spare and open
+            case .medium: melodySteps = [0, 8, 12]       // beats 1+3+4
+            case .high:   melodySteps = [0, 4, 8, 12]   // all 4 — full original density
+            }
         }
 
-        // 3. Anchor dropout — 20% of active bars drop the lower pulse entirely
-        let dropAnchor = rng.nextDouble() < 0.20
+        // 3. Anchor dropout — 20% of active bars drop the lower pulse entirely.
+        // Reprise: anchor always on for full rhythmic presence. RNG draw consumed for determinism.
+        let dropAnchorRoll = rng.nextDouble()
+        let dropAnchor     = isReprise ? false : dropAnchorRoll < 0.20
 
         var events: [MIDIEvent] = []
 
@@ -1613,6 +1694,9 @@ struct LeadGenerator {
         let bounds   = kRegisterBounds[kTrackLead1]!
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let rootMIDI = nearestMIDI(pc: rootPC, bounds: bounds, prevNote: nil)
+
+        // Silence gate — respect gap after phrase cadence
+        if bar < chromaDescStepUntil { return [] }
 
         if chromaDescNote == nil {
             if rng.nextDouble() < 0.20 {
@@ -1657,19 +1741,29 @@ struct LeadGenerator {
                 let step      = rng.nextDouble() < 0.60 ? 1 : 2
                 let descended = Int(noteVal) - step
                 if descended <= Int(rootMIDI) {
-                    if rng.nextDouble() < 0.20 {
+                    // 30% chance: cadence on root then insert 2–4 bar silence
+                    if rng.nextDouble() < 0.30 {
+                        noteVal = rootMIDI
+                        chromaDescNote = nil
+                        chromaDescStepUntil = bar + 2 + rng.nextInt(upperBound: 3)
+                    } else if rng.nextDouble() < 0.20 {
                         chromaAscending = true; chromaArcFastFired = false
                         chromaArcPeak = UInt8(clamping: Int(rootMIDI) + (rng.nextDouble() < 0.55 ? 7 : 5))
-                        noteVal = rootMIDI
+                        noteVal = rootMIDI; chromaDescNote = noteVal
                     } else {
                         chromaArcMode = false
                         noteVal = UInt8(clamping: Int(rootMIDI) + (rng.nextDouble() < 0.55 ? 7 : 5))
+                        chromaDescNote = noteVal
                     }
-                    chromaDescNote = noteVal
                 } else {
                     noteVal = UInt8(clamping: max(Int(bounds.low), descended))
                     chromaDescNote = noteVal
                 }
+            }
+            // Gap was triggered — fire root cadence note cleanly, skip fast run
+            if chromaDescNote == nil {
+                let vel = UInt8(62 + rng.nextInt(upperBound: 12))
+                return [MIDIEvent(stepIndex: barStart, note: noteVal, velocity: vel, durationSteps: 12)]
             }
             if rng.nextDouble() < 0.20 {
                 let baseVel  = UInt8(62 + rng.nextInt(upperBound: 12))
@@ -1687,14 +1781,19 @@ struct LeadGenerator {
                 let step      = rng.nextDouble() < 0.60 ? 1 : 2
                 let descended = Int(noteVal) - step
                 if descended <= Int(rootMIDI) {
-                    if rng.nextDouble() < 0.20 {
+                    // 30% chance: cadence on root then insert 2–4 bar silence
+                    if rng.nextDouble() < 0.30 {
+                        noteVal = rootMIDI
+                        chromaDescNote = nil
+                        chromaDescStepUntil = bar + 2 + rng.nextInt(upperBound: 3)
+                    } else if rng.nextDouble() < 0.20 {
                         chromaArcMode = true; chromaAscending = true; chromaArcFastFired = false
                         chromaArcPeak = UInt8(clamping: Int(rootMIDI) + (rng.nextDouble() < 0.55 ? 7 : 5))
-                        noteVal = rootMIDI
+                        noteVal = rootMIDI; chromaDescNote = noteVal
                     } else {
                         noteVal = UInt8(clamping: Int(rootMIDI) + (rng.nextDouble() < 0.55 ? 7 : 5))
+                        chromaDescNote = noteVal
                     }
-                    chromaDescNote = noteVal
                 } else {
                     noteVal = UInt8(clamping: max(Int(bounds.low), descended))
                     chromaDescNote = noteVal
@@ -1702,14 +1801,17 @@ struct LeadGenerator {
             }
             let dur = 12 + rng.nextInt(upperBound: 5)
             let vel = UInt8(62 + rng.nextInt(upperBound: 12))
-            let echoRoll = rng.nextDouble()
             var events: [MIDIEvent] = []
             events.append(MIDIEvent(stepIndex: barStart, note: noteVal, velocity: vel, durationSteps: dur))
-            // Echo only when pitch class is in scale — out-of-scale main notes are removed by
-            // HarmonicFilter, which would leave the echo orphaned with nothing preceding it.
-            if echoRoll < 0.20 && frame.scalePCs.contains(Int(noteVal) % 12) {
-                events.append(MIDIEvent(stepIndex: barStart + 8, note: noteVal,
-                                        velocity: UInt8(clamping: Int(vel) - 12), durationSteps: 4))
+            // Skip echo on phrase-end cadence — clean landing before the silence gap
+            if chromaDescNote != nil {
+                // Echo only when pitch class is in scale — out-of-scale main notes are removed by
+                // HarmonicFilter, which would leave the echo orphaned with nothing preceding it.
+                let echoRoll = rng.nextDouble()
+                if echoRoll < 0.20 && frame.scalePCs.contains(Int(noteVal) % 12) {
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: noteVal,
+                                            velocity: UInt8(clamping: Int(vel) - 12), durationSteps: 4))
+                }
             }
             return events
         }
@@ -1866,6 +1968,7 @@ struct LeadGenerator {
 
             let halfNotes = noteCount / 2
             let move      = 1 + rng.nextInt(upperBound: 2)
+            let prevIdx   = scaleIdx
             switch shape {
             case 0:  scaleIdx = min(scaleNotes.count - 1, scaleIdx + move)
             case 1:  scaleIdx = max(0, scaleIdx - move)
@@ -1875,6 +1978,17 @@ struct LeadGenerator {
             default: scaleIdx = noteIdx < halfNotes
                 ? max(0, scaleIdx - move)
                 : min(scaleNotes.count - 1, scaleIdx + move)
+            }
+            // If the boundary clamped scaleIdx in place, bounce 1–2 steps the other way
+            // to prevent flat runs of 3+ identical notes at the top or bottom of the register.
+            if scaleIdx == prevIdx {
+                let bounce   = 1 + rng.nextInt(upperBound: 2)
+                let goingUp  = (shape == 0)
+                    || (shape == 2 && noteIdx < halfNotes)
+                    || (shape == 3 && noteIdx >= halfNotes)
+                scaleIdx = goingUp
+                    ? max(0, scaleIdx - bounce)
+                    : min(scaleNotes.count - 1, scaleIdx + bounce)
             }
         }
 
@@ -1922,7 +2036,9 @@ struct LeadGenerator {
         droneLastNote: inout UInt8?, droneDirUp: inout Bool, droneDirCount: inout Int,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        if bar >= droneActiveEnd && bar < droneSilentEnd { return [] }
+        // Late reprise — final ~25% of song: chain phrases continuously with no silence gaps.
+        let isReprise = bar >= (frame.totalBars * 3 / 4)
+        if bar >= droneActiveEnd && bar < droneSilentEnd && !isReprise { return [] }
 
         if bar >= droneActiveEnd {
             let bounds = kRegisterBounds[kTrackLead1]!
@@ -1944,7 +2060,7 @@ struct LeadGenerator {
             dronePhraseData     = data
             dronePhraseBarStart = bar
             droneActiveEnd      = bar + phraseLen
-            let silBars         = (intensity == .high ? 1 : 2) + rng.nextInt(upperBound: 3)
+            let silBars         = isReprise ? 0 : (intensity == .high ? 1 : 2) + rng.nextInt(upperBound: 3)
             droneSilentEnd      = droneActiveEnd + silBars
         }
 
@@ -1966,7 +2082,9 @@ struct LeadGenerator {
         stabLastNote: inout UInt8?, stabDirUp: inout Bool, stabDirCount: inout Int,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
-        if bar >= stabPhraseEnd && bar < stabSilenceEnd { return [] }
+        // Late reprise — final ~25% of song: chain phrases continuously with no silence gaps.
+        let isReprise = bar >= (frame.totalBars * 3 / 4)
+        if bar >= stabPhraseEnd && bar < stabSilenceEnd && !isReprise { return [] }
 
         if bar >= stabPhraseEnd {
             let bounds     = kRegisterBounds[kTrackLead1]!
@@ -1990,14 +2108,18 @@ struct LeadGenerator {
             stabPhraseBarStart = bar
             stabPhraseEnd      = bar + phraseLen
 
-            // Silence blends shorter as song progresses
-            let quickChance = 0.10 + 0.30 * songPos
-            let longChance  = 0.30 - 0.25 * songPos
-            let sr = rng.nextDouble()
+            // Silence blends shorter as song progresses; reprise: no silence — chain phrases continuously
             let silBars: Int
-            if sr < quickChance           { silBars = 1 }
-            else if sr < 1.0 - longChance { silBars = 2 + rng.nextInt(upperBound: 2) }
-            else                          { silBars = 4 + rng.nextInt(upperBound: 3) }
+            if isReprise {
+                silBars = 0
+            } else {
+                let quickChance = 0.10 + 0.30 * songPos
+                let longChance  = 0.30 - 0.25 * songPos
+                let sr = rng.nextDouble()
+                if sr < quickChance           { silBars = 1 }
+                else if sr < 1.0 - longChance { silBars = 2 + rng.nextInt(upperBound: 2) }
+                else                          { silBars = 4 + rng.nextInt(upperBound: 3) }
+            }
             stabSilenceEnd = stabPhraseEnd + silBars
         }
 
@@ -2181,8 +2303,10 @@ struct LeadGenerator {
         if noir {
             // Noir: sparse, atmospheric leads dominate — long-note anchor, solo phrases, cold chord texture.
             // High-density rules (002 Pentatonic Cell, 003 Ratchet, 004 Syncopated) are suppressed.
-            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-007","MOT-LD1-008","MOT-LD1-001","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
-            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.04,         0.11,         0.16,         0.16,         0.10,         0.13,         0.14]
+            // MOT-LD1-007 (Vanishing Solo) excluded: its major-key melodic arc feels tonally out of place
+            // even with minor-scale adjustment; its 4% redistributed 1% each to 010/011/013/014.
+            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
+            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15]
             return rules[rng.weightedPick(weights)]
         }
         let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008"]
