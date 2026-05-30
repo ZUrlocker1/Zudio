@@ -271,6 +271,8 @@ enum PercussionStyle: String, Codable, Sendable {
     case handPercussion              // Ambient: congas, bongos, shakers (AMB-DRUM-004)
     case textural                    // Ambient: sparse brush/ride (AMB-DRUM-001)
     case softPulse                   // Ambient: gentle kick + hat (AMB-DRUM-002)
+    case driftLopingGroove           // Drift: doubled kick + snare variant (clean/lopsided/floating) (KOS-DRUM-007)
+    case driftHalfTimeLope           // Drift: snare on beat 3 only, sparse hat, BPM ≤ 78 (KOS-DRUM-008)
 }
 
 // MARK: - Kosmic song forms

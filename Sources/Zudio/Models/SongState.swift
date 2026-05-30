@@ -54,6 +54,10 @@ struct SongState: Sendable {
     let chillBluesVariation: Bool
     /// Motorik-only: true when the Motorik Noir sub-style is active (dark minor, low BPM, sparse melodic lead).
     let motorikNoirVariation: Bool
+    /// Kosmic-only: true when the Kosmic Drift sub-style is active (70–90 BPM, loping groove, meditative).
+    let isKosmicDrift: Bool
+    /// Kosmic Drift only: true when the Dreamscape variant is active (Floating snare + Four-Bar Hold + Svefn Float).
+    let isDriftDreamscape: Bool
     /// Ambient-only: true when the Ambient Piano sub-style is active (sparse piano, near-silence).
     let isAmbientPiano: Bool
     /// Ambient Piano rule selected at generation time. "AMB-PNO-001" / "AMB-PNO-002" / "AMB-PNO-003"; "" otherwise.
@@ -90,6 +94,7 @@ struct SongState: Sendable {
         if isAmbientPiano { return "Ambient Piano" }
         if chillBluesVariation { return "Chill Blues" }
         if motorikNoirVariation { return "Motorik Noir" }
+        if isKosmicDrift { return "Kosmic Drift" }
         return style.rawValue.capitalized
     }
 
@@ -121,6 +126,8 @@ struct SongState: Sendable {
         chillSwingFeel: Bool = false,
         chillBluesVariation: Bool = false,
         motorikNoirVariation: Bool = false,
+        isKosmicDrift: Bool = false,
+        isDriftDreamscape: Bool = false,
         isAmbientPiano: Bool = false,
         ambientPianoRule: String = "",
         chillAudioTexture: String? = nil,
@@ -155,6 +162,8 @@ struct SongState: Sendable {
         self.chillSwingFeel          = chillSwingFeel
         self.chillBluesVariation     = chillBluesVariation
         self.motorikNoirVariation    = motorikNoirVariation
+        self.isKosmicDrift           = isKosmicDrift
+        self.isDriftDreamscape       = isDriftDreamscape
         self.isAmbientPiano          = isAmbientPiano
         self.ambientPianoRule        = ambientPianoRule
         self.chillAudioTexture        = chillAudioTexture
@@ -190,6 +199,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
@@ -211,6 +221,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
@@ -232,6 +243,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: texture, ambientAudioTextureOffset: offset,
@@ -253,6 +265,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: texture, chillAudioTextureOffset: chillAudioTextureOffset,
                   forcedRules: forcedRules,
@@ -285,6 +298,7 @@ struct SongState: Sendable {
                   chillSwingFeel: anchor.chillSwingFeel,
                   chillBluesVariation: anchor.chillBluesVariation,
                   motorikNoirVariation: anchor.motorikNoirVariation,
+                  isKosmicDrift: anchor.isKosmicDrift, isDriftDreamscape: anchor.isDriftDreamscape,
                   isAmbientPiano: anchor.isAmbientPiano, ambientPianoRule: anchor.ambientPianoRule,
                   chillAudioTexture: anchor.chillAudioTexture,
                   chillAudioTextureOffset: anchor.chillAudioTextureOffset,
@@ -315,6 +329,7 @@ struct SongState: Sendable {
             chillLead2Instrument: chillLead2Instrument,
             chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
             chillBluesVariation: chillBluesVariation,
+            isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
             chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
             ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,

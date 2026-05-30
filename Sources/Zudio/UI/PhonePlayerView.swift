@@ -878,12 +878,12 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.6")
+                    Text("Generative music · v1.7")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)
 
-                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, Keith Jarrett, PIL, Neu!, Tangerine Dream, Kraftwerk & Electric Buddha Band.")
+                    Text("Zudio was coded with AI, inspired by Brian Eno, Moby, Keith Jarrett, Erik Satie, Portishead, BoC, PiL, Neu!, Kraftwerk & Electric Buddha Band.")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.primary)
                         .fixedSize(horizontal: false, vertical: true)

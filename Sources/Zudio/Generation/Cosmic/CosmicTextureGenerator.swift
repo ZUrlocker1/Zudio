@@ -20,7 +20,8 @@ struct KosmicTextureGenerator {
         kosmicProgFamily: KosmicProgressionFamily = .static_drone,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        isKosmicDrift: Bool = false
     ) -> [MIDIEvent] {
 
         // Clash fix: KOS-TEXT-003 (Spatial Sweep — chromatic passing) clashes with quartal

@@ -16,7 +16,8 @@ struct KosmicPadsGenerator {
         kosmicProgFamily: KosmicProgressionFamily,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        isKosmicDrift: Bool = false
     ) -> [MIDIEvent] {
 
         // Pick primary pad rule

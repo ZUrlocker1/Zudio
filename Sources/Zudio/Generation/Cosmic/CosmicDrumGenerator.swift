@@ -14,7 +14,10 @@ struct KosmicDrumGenerator {
         structure: SongStructure,
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        isKosmicDrift: Bool = false,
+        isDriftDreamscape: Bool = false,
+        driftVelocityBase: Int = 89
     ) -> [MIDIEvent] {
 
         switch percussionStyle {
@@ -41,6 +44,15 @@ struct KosmicDrumGenerator {
         case .electricBuddhaRestrained:
             usedRuleIDs.insert("KOS-DRUM-006")
             return generateElectricBuddhaRestrained(frame: frame, structure: structure, rng: &rng)
+
+        case .driftLopingGroove:
+            return generateLopingGroove(frame: frame, structure: structure, rng: &rng,
+                                        isDreamscape: isDriftDreamscape, velBase: driftVelocityBase,
+                                        usedRuleIDs: &usedRuleIDs)
+
+        case .driftHalfTimeLope:
+            usedRuleIDs.insert("KOS-DRUM-008")
+            return generateHalfTimeLope(frame: frame, structure: structure, rng: &rng, velBase: driftVelocityBase)
 
         default:
             usedRuleIDs.insert("KOS-DRUM-003")
@@ -488,6 +500,7 @@ struct KosmicDrumGenerator {
         structure: SongStructure,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
+        guard frame.totalBars > 0 else { return [] }
         var events: [MIDIEvent] = []
 
         let introColdStart: Bool
@@ -607,7 +620,7 @@ struct KosmicDrumGenerator {
 
             // Crash on section entry
             if bodySectionEntryBars.contains(bar) {
-                let vel = UInt8(max(20, Int(Double(38 + rng.nextInt(upperBound: 10)) * outroVelScale)))
+                let vel = UInt8(min(127, max(20, Int(Double(38 + rng.nextInt(upperBound: 10)) * outroVelScale))))
                 events.append(MIDIEvent(stepIndex: barStart, note: GMDrum.crash2.rawValue,
                                         velocity: vel, durationSteps: 1))
             }
@@ -615,10 +628,9 @@ struct KosmicDrumGenerator {
             // Ride: every beat — absent only in mode 3 and mode 5
             let rideActive = dropMode != 3 && dropMode != 5
             if rideActive {
-                // In stripped zones reduce ride velocity further
                 let baseVel = isStripped ? 32 : 43
                 for beat in 0..<4 {
-                    let vel = UInt8(max(10, Int(Double(baseVel + rng.nextInt(upperBound: 8)) * outroVelScale)))
+                    let vel = UInt8(min(127, max(10, Int(Double(baseVel + rng.nextInt(upperBound: 8)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + beat * 4, note: GMDrum.ride.rawValue,
                                             velocity: vel, durationSteps: 1))
                 }
@@ -626,7 +638,7 @@ struct KosmicDrumGenerator {
 
             // Ride bell beat 1.5 — always present unless stripped (then 50% chance)
             if outroVelScale > 0.35 && (!isStripped || rng.nextDouble() < 0.50) {
-                let vel = UInt8(max(14, Int(Double(36 + rng.nextInt(upperBound: 8)) * outroVelScale)))
+                let vel = UInt8(min(127, max(14, Int(Double(36 + rng.nextInt(upperBound: 8)) * outroVelScale))))
                 events.append(MIDIEvent(stepIndex: barStart + 2, note: GMDrum.rideBell.rawValue,
                                         velocity: vel, durationSteps: 1))
             }
@@ -634,7 +646,7 @@ struct KosmicDrumGenerator {
             // Pedal hat off-beats — absent in modes 1 and 4 (kick-led motor feel)
             if dropMode != 1 && dropMode != 4 {
                 for offbeat in [2, 6, 10, 14] {
-                    let vel = UInt8(max(8, Int(Double(18 + rng.nextInt(upperBound: 12)) * outroVelScale)))
+                    let vel = UInt8(min(127, max(8, Int(Double(18 + rng.nextInt(upperBound: 12)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + offbeat, note: GMDrum.pedalHat.rawValue,
                                             velocity: vel, durationSteps: 1))
                 }
@@ -642,7 +654,7 @@ struct KosmicDrumGenerator {
 
             // Sidestick: only in mode 5 (extremely sparse) — beat 3 (step 8)
             if dropMode == 5 {
-                let vel = UInt8(max(20, Int(Double(42 + rng.nextInt(upperBound: 14)) * outroVelScale)))
+                let vel = UInt8(min(127, max(20, Int(Double(42 + rng.nextInt(upperBound: 14)) * outroVelScale))))
                 events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.sidestick.rawValue,
                                         velocity: vel, durationSteps: 1))
             }
@@ -654,29 +666,27 @@ struct KosmicDrumGenerator {
                 let useHalfTime = isHalfTime || dropMode == 4
                 let kickBeats: [Int] = useHalfTime ? [0, 8] : [0, 4, 8, 12]
                 for step in kickBeats {
-                    let vel = UInt8(max(20, Int(Double(48 + rng.nextInt(upperBound: 10)) * outroVelScale)))
+                    let vel = UInt8(min(127, max(20, Int(Double(48 + rng.nextInt(upperBound: 10)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
                                             velocity: vel, durationSteps: 1))
                 }
-                // In half-time, floor tom ghost on beat 4 (step 12) fills the absent kicks
                 if useHalfTime {
-                    let vel = UInt8(max(12, Int(Double(22 + rng.nextInt(upperBound: 10)) * outroVelScale)))
+                    let vel = UInt8(min(127, max(12, Int(Double(22 + rng.nextInt(upperBound: 10)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.highFloorTom.rawValue,
                                             velocity: vel, durationSteps: 1))
                 } else {
-                    // Ghost kick anticipation beat 4.5 (step 14)
-                    let vel = UInt8(max(14, Int(Double(24 + rng.nextInt(upperBound: 6)) * outroVelScale)))
+                    let vel = UInt8(min(127, max(14, Int(Double(24 + rng.nextInt(upperBound: 6)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.kick.rawValue,
                                             velocity: vel, durationSteps: 1))
                 }
             }
 
             // Snare backbeat beats 2+4 — active in normal and mode 2 only
-            let snareActive    = !isStripped && (dropMode == nil || dropMode == 2)
+            let snareActive     = !isStripped && (dropMode == nil || dropMode == 2)
             let snareOutDropout = section.label == .outro && outroVelScale < 0.25
             if snareActive && !snareOutDropout {
                 for snareStep in [4, 12] {
-                    let vel = UInt8(max(20, Int(Double(58 + rng.nextInt(upperBound: 14)) * outroVelScale)))
+                    let vel = UInt8(min(127, max(20, Int(Double(58 + rng.nextInt(upperBound: 14)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + snareStep, note: GMDrum.snare.rawValue,
                                             velocity: vel, durationSteps: 1))
                 }
@@ -784,9 +794,9 @@ struct KosmicDrumGenerator {
         evs.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 70, durationSteps: 1))
         // Final 4 bars: quietly reintroduce hats
         if barInBridge >= bridgeLen - 4 {
-            let phase = barInBridge - (bridgeLen - 4)
+            let phase = min(3, barInBridge - (bridgeLen - 4))   // clamp phase: max 3 regardless of section length
             for beat in 0..<4 {
-                let vel = UInt8(max(14, 18 + phase * 10 + beat * 5 + rng.nextInt(upperBound: 8)))
+                let vel = UInt8(min(127, max(14, 18 + phase * 10 + beat * 5 + rng.nextInt(upperBound: 8))))
                 evs.append(MIDIEvent(stepIndex: barStart + beat * 4, note: GMDrum.closedHat.rawValue,
                                      velocity: vel, durationSteps: 1))
             }
@@ -917,5 +927,227 @@ struct KosmicDrumGenerator {
                                     velocity: finalVel, durationSteps: 1))
         }
         return events
+    }
+
+    // MARK: - KOS-DRUM-007: Loping Groove (Drift)
+
+    /// Three snare variants (chosen once per song):
+    ///   C = Clean:    step 4 (beat 2) + step 12 (beat 4)                     — Roygbiv pattern
+    ///   L = Lopsided: step 4 + step 7 + step 12 + step 15                    — Aquarius pattern
+    ///   F = Floating: step 0 (beat 1) + step 6 (and-of-2) + step 8 (beat 3)  — Svefn pattern
+    ///
+    /// Kick: step 0 + step 2 (doubled beat 1), step 8 + step 10 (doubled beat 3).
+    /// Hat:  continuous 8th pedal hat (PHat, steps 0–14 even) + CHat layer at quarter positions (40%).
+    /// Zone reduction (intro/outro): drop CHat entirely, thin PHat to quarter notes (steps 0,4,8,12).
+    private static func generateLopingGroove(
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        rng: inout SeededRNG,
+        isDreamscape: Bool,
+        velBase: Int,
+        usedRuleIDs: inout Set<String>
+    ) -> [MIDIEvent] {
+        // Snare variant: Dreamscape always uses Floating; others choose from C/L/F
+        enum SnareVariant { case clean, lopsided, floating }
+        let variant: SnareVariant
+        if isDreamscape {
+            variant = .floating
+        } else {
+            let roll = rng.nextDouble()
+            if roll < 0.40      { variant = .clean }
+            else if roll < 0.80 { variant = .lopsided }
+            else                { variant = .floating }
+        }
+        usedRuleIDs.insert("KOS-DRUM-007")
+
+        // Whether this song has any fills at all (30%; Floating capped at 10%)
+        let fillThreshold = variant == .floating ? 0.10 : 0.30
+        let hasFills = rng.nextDouble() < fillThreshold
+
+        let vb = UInt8(clamping: velBase)
+        let vLo = UInt8(clamping: max(1, velBase - 4))
+        let vHi = UInt8(clamping: velBase + 4)
+        // Kick ghost: ~70% of primary kick velocity
+        let vKickGhost = UInt8(clamping: max(1, velBase * 70 / 100))
+        // Hat: slightly softer
+        let vHat = UInt8(clamping: max(1, velBase - 6))
+
+        var events: [MIDIEvent] = []
+        let kick   = GMDrum.kick.rawValue
+        let snare  = GMDrum.snare.rawValue
+        let phat   = GMDrum.pedalHat.rawValue
+        let chat   = GMDrum.closedHat.rawValue
+
+        let intro   = structure.introSection
+        let outro   = structure.outroSection
+        let bodyStart = intro.map(\.endBar) ?? 0
+        let bodyEnd   = outro.map(\.startBar) ?? frame.totalBars
+
+        var prevSectionLabel: SectionLabel? = nil
+        for bar in 0..<frame.totalBars {
+            let bs = bar * 16
+            let inBody = bar >= bodyStart && bar < bodyEnd
+            let curLabel = structure.section(atBar: bar)?.label
+
+            // Crash cymbal on body section entry (intro→body, A→B, B→A)
+            if let lbl = curLabel, lbl != .intro, lbl != .outro, lbl != prevSectionLabel {
+                let vel = UInt8(clamping: max(1, velBase - 10 + rng.nextInt(upperBound: 12)))
+                events.append(ev(bs, GMDrum.crash2.rawValue, vel))
+            }
+            prevSectionLabel = curLabel
+
+            // Ride cymbal at 4-bar phrase boundaries (BoC-style phrasing accent)
+            if inBody && bar % 4 == 0 {
+                let v1 = UInt8(clamping: max(1, velBase - 16 + rng.nextInt(upperBound: 8)))
+                let v2 = UInt8(clamping: max(1, velBase - 20 + rng.nextInt(upperBound: 8)))
+                events.append(ev(bs + 0, GMDrum.ride.rawValue, v1))
+                events.append(ev(bs + 8, GMDrum.ride.rawValue, v2))
+            }
+
+            // --- Kick ---
+            events.append(ev(bs + 0,  kick, vHi))
+            events.append(ev(bs + 2,  kick, vKickGhost))
+            events.append(ev(bs + 8,  kick, vHi))
+            events.append(ev(bs + 10, kick, vKickGhost))
+
+            // --- Snare ---
+            switch variant {
+            case .clean:
+                events.append(ev(bs + 4,  snare, vb))
+                events.append(ev(bs + 12, snare, vb))
+            case .lopsided:
+                events.append(ev(bs + 4,  snare, vb))
+                events.append(ev(bs + 7,  snare, UInt8(clamping: max(1, velBase - 8))))
+                events.append(ev(bs + 12, snare, vb))
+                events.append(ev(bs + 15, snare, UInt8(clamping: max(1, velBase - 8))))
+            case .floating:
+                events.append(ev(bs + 0, snare, UInt8(clamping: max(1, velBase - 3))))
+                events.append(ev(bs + 6, snare, vb))
+                events.append(ev(bs + 8, snare, vb))
+            }
+
+            // --- Hi-hat ---
+            if inBody {
+                // Full groove: pedal hat all 8th positions + CHat layer at quarters (40%)
+                for step in stride(from: 0, through: 14, by: 2) {
+                    events.append(ev(bs + step, phat, vHat))
+                }
+                if rng.nextDouble() < 0.40 {
+                    for step in [0, 4, 8, 12] {
+                        events.append(ev(bs + step, chat, UInt8(clamping: max(1, velBase - 12))))
+                    }
+                }
+            } else {
+                // Intro/outro zone: PHat quarter notes only, no CHat
+                for step in [0, 4, 8, 12] {
+                    events.append(ev(bs + step, phat, vHat))
+                }
+            }
+        }
+
+        // Fills: section-transition, 1 beat max — only if this song has fills
+        if hasFills {
+            let transitionBars = structure.sections.compactMap { sec -> Int? in
+                let t = sec.startBar
+                guard t > 0 && t < frame.totalBars - 1 else { return nil }
+                guard let s = structure.section(atBar: t), s.label != .intro, s.label != .outro else { return nil }
+                return t
+            }
+            for fillBar in transitionBars {
+                let bs = fillBar * 16
+                // 1-beat snare run at step 12 (beat 4) + crash1 climax
+                events.append(ev(bs + 12, snare, vb))
+                events.append(ev(bs + 13, snare, vLo))
+                events.append(ev(bs + 14, snare, vb))
+                events.append(ev(bs + 14, GMDrum.crash1.rawValue, UInt8(clamping: min(127, velBase + 8))))
+            }
+        }
+
+        return events
+    }
+
+    // MARK: - KOS-DRUM-008: Half-Time Lope (Drift, BPM ≤ 78)
+
+    /// Snare on beat 3 only (step 8) — one backbeat per bar, making it feel slow and heavy.
+    /// Kick: beat 1 (step 0) always; step 6 ("and-of-2") in 40% of bars.
+    /// Ghost snare: step 6 or step 10 in 30% of bars.
+    /// Hi-hat: beat 1 and beat 3 only (steps 0 and 8), 55% probability each.
+    /// Open hat: step 14 in 25% of bars.
+    private static func generateHalfTimeLope(
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        rng: inout SeededRNG,
+        velBase: Int
+    ) -> [MIDIEvent] {
+        let vb = UInt8(clamping: velBase)
+        let vGhost = UInt8(clamping: max(1, velBase * 38 / 100))
+        let vHat   = UInt8(clamping: max(1, velBase - 10))
+        let vOHat  = UInt8(clamping: max(1, velBase - 20))
+
+        let kick  = GMDrum.kick.rawValue
+        let snare = GMDrum.snare.rawValue
+        let chat  = GMDrum.closedHat.rawValue
+        let ohat  = GMDrum.openHat.rawValue
+
+        var events: [MIDIEvent] = []
+        let intro  = structure.introSection
+        let outro  = structure.outroSection
+        let bodyStart = intro.map(\.endBar) ?? 0
+        let bodyEnd   = outro.map(\.startBar) ?? frame.totalBars
+
+        // Pre-compute body section entry bars for crash cymbal
+        var bodyEntryBars = Set<Int>()
+        var prevEntryLabel: SectionLabel? = nil
+        for bar in 0..<frame.totalBars {
+            let lbl = structure.section(atBar: bar)?.label
+            if let l = lbl, l != .intro, l != .outro, l != prevEntryLabel {
+                bodyEntryBars.insert(bar)
+            }
+            prevEntryLabel = lbl
+        }
+
+        for bar in 0..<frame.totalBars {
+            let bs = bar * 16
+            let inBody = bar >= bodyStart && bar < bodyEnd
+
+            // Crash cymbal on body section entry
+            if bodyEntryBars.contains(bar) {
+                let vel = UInt8(clamping: max(1, velBase - 10 + rng.nextInt(upperBound: 12)))
+                events.append(ev(bs, GMDrum.crash2.rawValue, vel))
+            }
+
+            guard inBody else { continue }   // half-time lope only in body
+
+            // Kick beat 1
+            events.append(ev(bs + 0, kick, vb))
+            // Optional push kick on step 6 (40%)
+            if rng.nextDouble() < 0.40 {
+                events.append(ev(bs + 6, kick, UInt8(clamping: max(1, velBase - 15))))
+            }
+
+            // Snare beat 3 (step 8)
+            events.append(ev(bs + 8, snare, vb))
+
+            // Ghost snare (30%)
+            if rng.nextDouble() < 0.30 {
+                let ghostStep = rng.nextDouble() < 0.50 ? 6 : 10
+                events.append(ev(bs + ghostStep, snare, vGhost))
+            }
+
+            // Hi-hats: beat 1 and beat 3 (55% each)
+            if rng.nextDouble() < 0.55 { events.append(ev(bs + 0, chat, vHat)) }
+            if rng.nextDouble() < 0.55 { events.append(ev(bs + 8, chat, vHat)) }
+
+            // Open hat step 14 (25%)
+            if rng.nextDouble() < 0.25 {
+                events.append(ev(bs + 14, ohat, vOHat))
+            }
+        }
+        return events
+    }
+
+    /// Convenience: create a 1-step event.
+    private static func ev(_ step: Int, _ note: UInt8, _ vel: UInt8) -> MIDIEvent {
+        MIDIEvent(stepIndex: step, note: note, velocity: vel, durationSteps: 1)
     }
 }

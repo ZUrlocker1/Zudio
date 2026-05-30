@@ -15,14 +15,16 @@ struct KosmicStructureGenerator {
         kosmicProgFamily: KosmicProgressionFamily,
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
-        forceBridge: Bool = false
+        forceBridge: Bool = false,
+        isKosmicDrift: Bool = false
     ) -> SongStructure {
         let (sections, introStyle, outroStyle) = buildSections(
             form: kosmicForm,
             totalBars: frame.totalBars,
             percussionStyle: percussionStyle,
             rng: &rng,
-            forceBridge: forceBridge
+            forceBridge: forceBridge,
+            isKosmicDrift: isKosmicDrift
         )
         let chordPlan = buildChordPlan(
             frame: frame,
@@ -41,7 +43,8 @@ struct KosmicStructureGenerator {
         totalBars: Int,
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
-        forceBridge: Bool = false
+        forceBridge: Bool = false,
+        isKosmicDrift: Bool = false
     ) -> (sections: [SongSection], introStyle: IntroStyle, outroStyle: OutroStyle) {
 
         // Kosmic intro: 2 bars (25%), 4 bars (62.5%), 8 bars (12.5%)
@@ -65,7 +68,7 @@ struct KosmicStructureGenerator {
         // Body — build raw sections then optionally insert bridge
         var bodySections = buildBodySections(form: form, bodyBars: bodyBars, cursor: cursor, rng: &rng)
         bodySections = insertBridgeIfNeeded(form: form, sections: bodySections, rng: &rng,
-                                            forceBridge: forceBridge)
+                                            forceBridge: forceBridge, isKosmicDrift: isKosmicDrift)
         sections.append(contentsOf: bodySections)
         cursor += bodyBars
 
@@ -176,14 +179,15 @@ struct KosmicStructureGenerator {
     /// Only for ab/aba forms. 35% chance. Bars are taken from the preceding A section.
     private static func insertBridgeIfNeeded(
         form: KosmicSongForm, sections: [SongSection], rng: inout SeededRNG,
-        forceBridge: Bool = false
+        forceBridge: Bool = false, isKosmicDrift: Bool = false
     ) -> [SongSection] {
         // Only ab/aba forms get bridges
         guard form == .ab || form == .two_world || form == .aba || form == .build_and_dissolve else {
             return sections
         }
-        // 35% chance normally; always insert when forced.
-        guard forceBridge || rng.nextDouble() < 0.35 else { return sections }
+        // Drift: 80% during testing (reduce to 30% for release); base Kosmic: 35%.
+        let bridgeProb: Double = isKosmicDrift ? 0.80 : 0.35
+        guard forceBridge || rng.nextDouble() < bridgeProb else { return sections }
 
         // Find the index of the first A→B boundary
         guard let aIdx = sections.firstIndex(where: { $0.label == .A }),
@@ -194,7 +198,9 @@ struct KosmicStructureGenerator {
 
         let archetype: String = rng.nextDouble() < 0.50 ? "drumBridge" : "melodyBridge"
 
-        let minARemain = forceBridge ? 12 : 24
+        // Drift songs are shorter (~80 bars vs ~120). Reduce the minimum A-section remainder
+        // so bridges can fit — otherwise the length guard blocks most bridge attempts.
+        let minARemain = forceBridge ? 12 : (isKosmicDrift ? 16 : 24)
 
         if archetype == "drumBridge" {
             // A-1 or A-2: 4 bars (70%) or 8 bars (30%)

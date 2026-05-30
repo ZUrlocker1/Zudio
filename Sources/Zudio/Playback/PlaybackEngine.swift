@@ -114,10 +114,13 @@ final class PlaybackEngine: ObservableObject {
     private var boostBaseMultiplier = Array(repeating: Float(1.0), count: kTrackCount)
 
     // Tremolo LFO
-    private var tremEnabled   = Array(repeating: false,   count: kTrackCount)
-    private var tremPhase     = Array(repeating: Double(0), count: kTrackCount)
-    private var tremPhaseInc  = Array(repeating: Double(0.8378), count: kTrackCount)  // default 8 Hz at 60fps
-    private var tremDepth     = Array(repeating: Float(0.40),  count: kTrackCount)    // default 40% depth
+    private var tremEnabled    = Array(repeating: false,   count: kTrackCount)
+    private var tremPhase      = Array(repeating: Double(0), count: kTrackCount)
+    private var tremPhaseInc   = Array(repeating: Double(0.8378), count: kTrackCount)  // default 8 Hz at 60fps
+    private var tremDepth      = Array(repeating: Float(0.40),  count: kTrackCount)    // default 40% depth
+    // Scales the tremolo peak so it never exceeds the track's calibrated base volume.
+    // Default 1.0 preserves existing behaviour; set to trackBaseVolume[i] to clamp the peak.
+    private var tremBaseVolume = Array(repeating: Float(1.0), count: kTrackCount)
 
     // Sweep LFO (low-pass filter cutoff modulation)
     private var sweepEnabled = Array(repeating: false, count: kTrackCount)
@@ -176,7 +179,10 @@ final class PlaybackEngine: ObservableObject {
 
     // Kosmic drone fade (intro 0→1, outro 1→0 on boosts[bass] and boosts[pads])
     var kosmicStyle: Bool = false {
-        didSet { if kosmicStyle && kosmicStyle != oldValue { applyKosmicAudio() } }
+        didSet {
+            cachedIsKosmicDrift = kosmicStyle && songState?.isKosmicDrift == true
+            if kosmicStyle && kosmicStyle != oldValue { applyKosmicAudio() }
+        }
     }
     private var droneFadeTimers: [DispatchSourceTimer?] = [nil, nil]  // [intro, outro]
     // Body entrance fade: tracks with no intro notes fade in over 1 bar at the body downbeat
@@ -348,6 +354,9 @@ final class PlaybackEngine: ObservableObject {
 
     func load(_ state: SongState) {
         songState = state
+        // Update cachedIsKosmicDrift here so it reflects the INCOMING song, not the previous one.
+        // kosmicStyle is set before load() is called in AppState, so didSet fires with stale songState.
+        cachedIsKosmicDrift = kosmicStyle && state.isKosmicDrift
         approachingEndFired = false
         outroStartFired     = false
         activeVisualizerNotes = []
@@ -571,6 +580,7 @@ final class PlaybackEngine: ObservableObject {
         cachedLead1Program   = 255
         cachedLead2Program   = 255
         cachedIsAmbientPiano  = false
+        cachedIsKosmicDrift   = false
         #if !os(iOS)
         // macOS: start now; setProgram() works with the engine running.
         startEngine()
@@ -598,6 +608,7 @@ final class PlaybackEngine: ObservableObject {
         cachedLead1Program   = 255
         cachedLead2Program   = 255
         cachedIsAmbientPiano  = false
+        cachedIsKosmicDrift   = false
     }
 
     /// Stop the engine once before a batch of setProgram() calls.
@@ -687,6 +698,12 @@ final class PlaybackEngine: ObservableObject {
             let fireVelocity: UInt8
             if trackIndex == kTrackDrums && cachedDrumProgram == 24 && !wasRemapped {
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 88 / 100))
+            } else if trackIndex == kTrackDrums && cachedDrumProgram == 0
+                   && cachedIsKosmicDrift
+                   && (fireNote == GMDrum.kick.rawValue || fireNote == GMDrum.kick2.rawValue) {
+                // Standard Kit in Kosmic Drift: kick runs slightly hot — pull back 20% so it
+                // sits under the sparse texture rather than punching through it.
+                fireVelocity = UInt8(max(1, Int(ev.velocity) * 50 / 100))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -964,6 +981,7 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedLead1Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedLead2Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedIsAmbientPiano:   Bool  = false
+    nonisolated(unsafe) private var cachedIsKosmicDrift:    Bool  = false
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
     /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls
@@ -1054,10 +1072,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
+            } else if trackIndex == kTrackLead1 && kosmicStyle && program == 80 {
+                vol = 0.48   // Square Lead on Kosmic Lead 1 — lower than Motorik Noir (0.68)
             } else if trackIndex == kTrackLead1 && program == 80 {
                 vol = 0.68   // Square Lead — Motorik Noir Lead 1 (with tremolo)
             } else if trackIndex == kTrackBass && kosmicStyle && program == 87 {
-                vol = 0.24   // Lead Bass runs hot on Kosmic bass — pull back further
+                vol = 0.20   // Lead Bass on Kosmic bass — pull back
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 83 {
                 vol = 1.3    // Chiff Lead runs soft on Motorik Lead 1 — boost
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {
@@ -1076,8 +1096,6 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.48   // Pad 3 Poly (90) and Fifths Lead (86) run loud on Kosmic — pull back
             } else if trackIndex == kTrackTexture && (program == 90 || program == 86) {
                 vol = 0.85   // Pad 3 Poly (90) and Fifths Lead (86) run loud — pull back
-            } else if trackIndex == kTrackTexture && kosmicStyle && program == 99 {
-                vol = 1.7    // FX Atmosphere very soft on Kosmic Texture — boost
             } else if trackIndex == kTrackTexture && ambientMode && program == 99 {
                 vol = 4.0    // FX Atmosphere very soft on Ambient Texture — boost more
             } else if trackIndex == kTrackTexture && program == 99 {
@@ -1113,7 +1131,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 61001 {
                 vol = 1.0    // Stereo Piano on Chill Rhythm — gain via boost node
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
-                vol = 0.26   // Mono Synth runs hot on Kosmic bass — pull back more
+                vol = 0.17   // Mono Synth on Kosmic bass — pull back further
             } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
                 vol = 1.6    // Celesta runs soft on Ambient Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && chillPadsMode {
@@ -1140,12 +1158,34 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.60   // Rock Organ runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 {
                 vol = 0.65   // Moog Lead on Kosmic rhythm — pull back
+            // Drift Rhythm calibrations must sit before the general kosmicStyle catch below
+            } else if trackIndex == kTrackRhythm && kosmicStyle && songState?.isKosmicDrift == true && program == 88 {
+                vol = 0.50   // New Age Pad on Drift Rhythm — pull back
+            } else if trackIndex == kTrackRhythm && kosmicStyle && songState?.isKosmicDrift == true && program == 1098 {
+                vol = 0.70   // Synth Mallet on Drift Rhythm — lower
+            } else if trackIndex == kTrackRhythm && kosmicStyle && songState?.isKosmicDrift == true && program == 11098 {
+                vol = 0.55   // Synth Chime on Drift Rhythm — pull back further
+            } else if trackIndex == kTrackRhythm && kosmicStyle && songState?.isKosmicDrift == true && program == 11096 {
+                vol = 0.65   // Mystery Pad on Drift Rhythm — lower
             } else if trackIndex == kTrackRhythm && kosmicStyle {
-                vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — pull back
+                vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — general fallback
             } else if trackIndex == kTrackBass && kosmicStyle {
                 vol = 0.80   // Kosmic bass slightly quieter overall
             } else if trackIndex == kTrackBass && chillPadsMode {
                 vol = 0.82   // Chill bass slightly quieter overall
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 96 {
+                vol = 0.60   // Rain (Ice Rain) runs loud on Kosmic Texture — pull back
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 11089 {
+                vol = 0.58   // Solar Wind runs loud on Kosmic Texture — pull back
+
+            } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 8080 {
+                vol = 0.80   // Sine Wave — lower from initial guess
+            } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 76 {
+                vol = 1.1    // Bottle Blow runs soft — modest boost
+            } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 111 {
+                vol = 1.1    // Shenai — modest boost
+            } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 89 {
+                vol = 0.45   // Warm Pad on Drift Lead 1 — pull back further
             } else {
                 vol = 1.0
             }
@@ -1429,10 +1469,11 @@ final class PlaybackEngine: ObservableObject {
         case .pan:
             if enabled {
                 let hz: Double
-                if ambientMode && trackIndex == kTrackTexture {
-                    // 1 full sweep per 4 bars: hz = tempo / (4 bars × 4 beats × 60 s/min)
+                if (ambientMode || kosmicStyle) && trackIndex == kTrackTexture {
+                    // 1 full sweep per 4 bars — tempo-aware, slow and meditative.
+                    // Ambient: ~12.8s at 75 BPM. Kosmic Drift: ~10.6s at 90 BPM.
                     let bpm = Double(songState?.frame.tempo ?? 75)
-                    hz = bpm / 960.0   // e.g. 75 BPM → 0.078 Hz → ~12.8s per sweep
+                    hz = bpm / 960.0
                 } else {
                     hz = 0.5
                 }
@@ -1511,7 +1552,7 @@ final class PlaybackEngine: ObservableObject {
             if !do20fps && tremPhaseInc[i] < 0.1 { continue }
             tremPhase[i] += tremPhaseInc[i]
             let muted = muteState[i] || (anySolo && !soloState[i])
-            let tremVol = Float(1.0 - Double(tremDepth[i]) * (1.0 + sin(tremPhase[i])))
+            let tremVol = tremBaseVolume[i] * Float(1.0 - Double(tremDepth[i]) * (1.0 + sin(tremPhase[i])))
             samplers[i].volume = muted ? 0.0 : tremVol
         }
 
@@ -1573,11 +1614,20 @@ final class PlaybackEngine: ObservableObject {
 
     private func startTremolo(forTrack i: Int) {
         if (ambientMode || chillPadsMode) && i == kTrackPads {
-            tremPhaseInc[i] = 0.047124   // 2π × 0.15 Hz / 20 fps — one swell per ~6.5 seconds (runs at 20fps via lfoTick guard)
-            tremDepth[i]    = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
+            tremPhaseInc[i]   = 0.047124   // 2π × 0.15 Hz / 20 fps — one swell per ~6.5 seconds (runs at 20fps via lfoTick guard)
+            tremDepth[i]      = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
+            tremBaseVolume[i] = 1.0
+        } else if kosmicStyle && i == kTrackBass {
+            // Drift bass: 5 Hz (slower than 8 Hz lead vibrato), 25% depth.
+            // At 75 BPM: ~4 cycles per beat — audible flutter within each note.
+            // tremBaseVolume clamps the peak to the track's calibrated base volume (no volume raise).
+            tremPhaseInc[i]   = 0.5236     // 2π × 5 Hz / 60 fps
+            tremDepth[i]      = 0.25
+            tremBaseVolume[i] = trackBaseVolume[i]   // peak never exceeds calibrated volume
         } else {
-            tremPhaseInc[i] = 0.8378     // 2π × 8 Hz / 60 fps
-            tremDepth[i]    = 0.40
+            tremPhaseInc[i]   = 0.8378     // 2π × 8 Hz / 60 fps
+            tremDepth[i]      = 0.40
+            tremBaseVolume[i] = 1.0
         }
         tremEnabled[i] = true
         tremPhase[i]   = 0.0
@@ -1586,8 +1636,9 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func stopTremolo(forTrack i: Int) {
-        tremEnabled[i] = false
-        tremPhase[i]   = 0.0
+        tremEnabled[i]    = false
+        tremPhase[i]      = 0.0
+        tremBaseVolume[i] = 1.0
         samplers[i].volume = trackBaseVolume[i]
         stopSharedLFOIfIdle()
     }

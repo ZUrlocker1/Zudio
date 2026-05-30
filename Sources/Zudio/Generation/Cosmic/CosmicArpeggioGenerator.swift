@@ -40,16 +40,34 @@ struct KosmicArpeggioGenerator {
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        forceRuleID: String? = nil
+        forceRuleID: String? = nil,
+        isKosmicDrift: Bool = false
     ) -> [MIDIEvent] {
 
-        let rules:   [String] = ["KOS-RTHM-001", "KOS-RTHM-002", "KOS-RTHM-003", "KOS-RTHM-004",
-                                 "KOS-RTHM-005", "KOS-RTHM-006", "KOS-RTHM-007", "KOS-RTHM-008",
-                                 "KOS-RTHM-009", "KOS-RTHM-010"]
-        let weights: [Double] = [0.14,           0.13,           0.12,           0.09,
-                                 0.12,           0.12,           0.09,           0.07,
-                                 0.06,           0.06]
-        let chosenRule = forceRuleID ?? rules[rng.weightedPick(weights)]
+        // Drift: exclude Electric Buddha, JMJ Dual-Rate, Kraftwerk; weight spacious rules higher.
+        // Consume base slot first for seed stability of non-Drift Kosmic songs.
+        let baseRules:   [String] = ["KOS-RTHM-001", "KOS-RTHM-002", "KOS-RTHM-003", "KOS-RTHM-004",
+                                     "KOS-RTHM-005", "KOS-RTHM-006", "KOS-RTHM-007", "KOS-RTHM-008",
+                                     "KOS-RTHM-009", "KOS-RTHM-010"]
+        let baseWeights: [Double] = [0.14,           0.13,           0.12,           0.09,
+                                     0.12,           0.12,           0.09,           0.07,
+                                     0.06,           0.06]
+        let baseChoice = baseRules[rng.weightedPick(baseWeights)]
+
+        let chosenRule: String
+        if isKosmicDrift {
+            // New Drift-exclusive rules (011–015) = 78%; shared existing rules = 22%
+            // KOS-RTHM-009 excluded — density (80% gate, ~4 notes/bar) conflicts with Drift spaciousness
+            let driftRules:   [String] = ["KOS-RTHM-012", "KOS-RTHM-015", "KOS-RTHM-011",
+                                          "KOS-RTHM-013", "KOS-RTHM-014",
+                                          "KOS-RTHM-003", "KOS-RTHM-008", "KOS-RTHM-007"]
+            let driftWeights: [Double] = [0.16,           0.18,           0.16,
+                                          0.14,           0.14,
+                                          0.12,           0.07,           0.03]
+            chosenRule = forceRuleID ?? driftRules[rng.weightedPick(driftWeights)]
+        } else {
+            chosenRule = forceRuleID ?? baseChoice
+        }
         usedRuleIDs.insert(chosenRule)
 
         var events: [MIDIEvent]
@@ -63,6 +81,11 @@ struct KosmicArpeggioGenerator {
         case "KOS-RTHM-008": events = generateOxygene8Bar(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         case "KOS-RTHM-009": events = generateCravenFaultsPhase(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         case "KOS-RTHM-010": events = generateCravenFaultsGrit(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-011": events = generateChordTremolo(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-012": events = generateSlowChordPulse(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-013": events = generateFourBarChordHold(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-014": events = generateChromaticTremolo(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        case "KOS-RTHM-015": events = generateDownbeatChord(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         default:             events = generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         }
 
@@ -1191,17 +1214,210 @@ struct KosmicArpeggioGenerator {
                     let cellIdx = (startNote + i) % cell.count
                     let note    = cell[cellIdx]
                     if rng.nextDouble() < 0.65 {
-                        // Main hit
-                        let vel = UInt8(44 + rng.nextInt(upperBound: 17))  // 44–60
+                        let vel = UInt8(44 + rng.nextInt(upperBound: 17))
                         events.append(MIDIEvent(stepIndex: barStart + step,
                                                 note: UInt8(note), velocity: vel, durationSteps: 1))
                     } else if rng.nextDouble() < 0.25 {
-                        // Ghost note — same pitch, quiet, provides modular "bleed" texture
-                        let vel = UInt8(22 + rng.nextInt(upperBound: 17))  // 22–38
+                        let vel = UInt8(22 + rng.nextInt(upperBound: 17))
                         events.append(MIDIEvent(stepIndex: barStart + step,
                                                 note: UInt8(note), velocity: vel, durationSteps: 1))
                     }
                 }
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-RTHM-011: Chord Tremolo (Drift) — Portishead Roads "Synth b"
+    // 3 chord tones fired simultaneously at 12 of the 16 steps per bar (skipping
+    // steps 2, 6, 10, 14 — the "and-of-beat" positions). Duration 2 steps each,
+    // overlapping to create a shimmering tremolo wash at low velocity.
+    // Reference: Portishead "Roads" bar 1: A2/E3/A3 every 2-3 steps at vel 89.
+    private static func generateChordTremolo(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        // Steps to fire per bar — skip the 4 "and-of-beat" positions for organic breathing
+        let fireSteps = [0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 13, 15]
+        var events: [MIDIEvent] = []
+        for bar in bodyStart..<bodyEnd {
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            let barStart = bar * 16
+            // Pick up to 3 chord tones in register 52–76 (E3–E5)
+            var tones = entry.chordWindow.chordTones
+                .map { clampToRegister($0, low: 52, high: 76) }
+            tones = Array(Set(tones)).sorted().prefix(3).map { $0 }
+            guard !tones.isEmpty else { continue }
+            for step in fireSteps {
+                let vel = UInt8(38 + rng.nextInt(upperBound: 18))  // 38–55 — soft wash
+                for note in tones {
+                    events.append(MIDIEvent(stepIndex: barStart + step, note: UInt8(note),
+                                            velocity: vel, durationSteps: 2))
+                }
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-RTHM-012: Slow Chord Pulse (Drift) — Portishead Roads "Synth a"
+    // Variable density per 4-bar window: busy windows have chord on beat 1 + beat 3
+    // with possibly different voicings; quiet windows hold a single chord for the full bar.
+    // Reference: Portishead "Roads" — sustained A-minor chords re-attacked on downbeats,
+    // sometimes once per bar, sometimes twice with voicing variation.
+    private static func generateSlowChordPulse(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        var events: [MIDIEvent] = []
+        var busyWindow = false
+        for bar in bodyStart..<bodyEnd {
+            // Decide density once per 4-bar window
+            if (bar - bodyStart) % 4 == 0 {
+                busyWindow = rng.nextDouble() < 0.40  // 40% busy, 60% quiet
+            }
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            let barStart = bar * 16
+            var tones = entry.chordWindow.chordTones
+                .map { clampToRegister($0, low: 48, high: 76) }
+            tones = Array(Set(tones)).sorted().prefix(4).map { $0 }
+            guard !tones.isEmpty else { continue }
+            let vel = UInt8(58 + rng.nextInt(upperBound: 18))  // 58–75
+            if busyWindow {
+                // Beat 1 chord (2b hold) + beat 3 chord (2b hold), possible voicing shift
+                for note in tones {
+                    events.append(MIDIEvent(stepIndex: barStart,     note: UInt8(note), velocity: vel, durationSteps: 8))
+                }
+                // Beat 3 — same chord or drop highest note for lighter second hit
+                let beat3Tones = rng.nextDouble() < 0.50 ? tones : Array(tones.dropLast())
+                let vel3 = UInt8(max(1, Int(vel) - 8 - rng.nextInt(upperBound: 8)))
+                for note in beat3Tones {
+                    events.append(MIDIEvent(stepIndex: barStart + 8,  note: UInt8(note), velocity: vel3, durationSteps: 8))
+                }
+                // Occasional step-10 ornament (single note)
+                if rng.nextDouble() < 0.25, let top = tones.last {
+                    events.append(MIDIEvent(stepIndex: barStart + 10, note: UInt8(top),
+                                            velocity: UInt8(max(1, Int(vel) - 15)), durationSteps: 4))
+                }
+            } else {
+                // Quiet bar: single chord on beat 1, full-bar hold
+                for note in tones {
+                    events.append(MIDIEvent(stepIndex: barStart, note: UInt8(note),
+                                            velocity: UInt8(max(1, Int(vel) - 5)), durationSteps: 15))
+                }
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-RTHM-013: Four-Bar Chord Hold (Drift) — Sigur Rós Svefn-g-englar
+    // One full chord voicing (5 voices) fires at step 0, held for exactly 4 bars (64 steps).
+    // No re-attack, no movement. The most spacious possible rhythm presence.
+    // Reference: Svefn — E2/A2/D3/G3/B3/E4 all at step 0, duration 16 beats (4 bars).
+    private static func generateFourBarChordHold(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        var events: [MIDIEvent] = []
+        var bar = bodyStart
+        while bar < bodyEnd {
+            guard let entry = tonalMap.entry(atBar: bar) else { bar += 4; continue }
+            // 5-voice chord: root in 3 registers + 3rd + 5th + optional 7th
+            let root3 = clampToRegister(entry.chordWindow.chordTones.first ?? 60, low: 40, high: 55)
+            var tones = entry.chordWindow.chordTones
+                .map { clampToRegister($0, low: 52, high: 80) }
+            tones = Array(Set(tones + [root3])).sorted().prefix(5).map { $0 }
+            let dur = min(64, (bodyEnd - bar) * 16 - 1)
+            guard dur > 0 else { break }
+            let vel = UInt8(55 + rng.nextInt(upperBound: 16))  // 55–70 — resonant but not loud
+            for note in tones {
+                events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note),
+                                        velocity: vel, durationSteps: dur))
+            }
+            bar += 4
+        }
+        return events
+    }
+
+    // MARK: - KOS-RTHM-014: Chromatic Tremolo (Drift) — Portishead Wandering Star guitar
+    // Two notes a semitone apart (chord root and root+1) alternating every 2 steps.
+    // Creates a beating/vibrato harmonic effect — purely textural, not melodic.
+    // Reference: Wandering Star — F#3 and F3 alternating every 16th step throughout.
+    private static func generateChromaticTremolo(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        var events: [MIDIEvent] = []
+        for bar in bodyStart..<bodyEnd {
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            let barStart = bar * 16
+            // Root of current chord, clamped to mid register
+            let root  = clampToRegister(entry.chordWindow.chordTones.first ?? 60, low: 56, high: 72)
+            let upper = Swift.min(127, root + 1)  // semitone above
+            let vel = UInt8(44 + rng.nextInt(upperBound: 17))  // 44–60
+            // Alternate every 2 steps: root on even half-beats, upper on odd half-beats
+            for i in 0..<8 {
+                let step = i * 2
+                let note = i % 2 == 0 ? root : upper
+                events.append(MIDIEvent(stepIndex: barStart + step, note: UInt8(note),
+                                        velocity: vel, durationSteps: 2))
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-RTHM-015: Downbeat Chord (Drift) — BoC Roygbiv piano
+    // Chord hit on beat 1 (always), beat 3 at 65% chance, step 10 ornament at 25%.
+    // Each chord is a 3–4 note voicing held until the next event.
+    // Reference: Roygbiv bars 17-20 — C#3/E3/B3/E4 on beat 1, B2/F#3/B3/D#4 on step 10.
+    private static func generateDownbeatChord(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        var events: [MIDIEvent] = []
+        for bar in bodyStart..<bodyEnd {
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            let barStart = bar * 16
+            var tones = entry.chordWindow.chordTones
+                .map { clampToRegister($0, low: 48, high: 76) }
+            tones = Array(Set(tones)).sorted().prefix(4).map { $0 }
+            guard !tones.isEmpty else { continue }
+            let vel = UInt8(60 + rng.nextInt(upperBound: 19))  // 60–78
+            let hasBeat3   = rng.nextDouble() < 0.65
+            let hasStep10  = rng.nextDouble() < 0.25
+            // Beat 1: full chord, held to beat 3 or end of bar
+            let beat1Dur = hasBeat3 ? 8 : 15
+            for note in tones {
+                events.append(MIDIEvent(stepIndex: barStart, note: UInt8(note),
+                                        velocity: vel, durationSteps: beat1Dur))
+            }
+            if hasBeat3 {
+                // Beat 3: same chord or substitute 2nd for 3rd for color
+                let beat3Tones: [Int] = rng.nextDouble() < 0.40
+                    ? tones  // same voicing
+                    : tones.map { t in  // substitute: raise lowest note by 2 semitones
+                        t == tones.first ? Swift.min(127, t + 2) : t }
+                let beat3Dur = hasStep10 ? 6 : 7
+                let vel3 = UInt8(max(1, Int(vel) - 6))
+                for note in beat3Tones {
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: UInt8(note),
+                                            velocity: vel3, durationSteps: beat3Dur))
+                }
+            }
+            if hasStep10, let top = tones.last {
+                // Ornament: single high note at step 10 — mirrors the Roygbiv piano arpeggio motion
+                events.append(MIDIEvent(stepIndex: barStart + 10, note: UInt8(top),
+                                        velocity: UInt8(max(1, Int(vel) - 18)),
+                                        durationSteps: 5))
             }
         }
         return events

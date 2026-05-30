@@ -18,17 +18,83 @@ struct KosmicMusicalFrameGenerator {
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil
-    ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily) {
+    ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily,
+          isKosmicDrift: Bool, isDriftDreamscape: Bool, driftVelocityBase: Int) {
 
-        let key    = keyOverride   ?? pickKey(rng: &rng)
-        var tempo  = tempoOverride ?? pickTempo(rng: &rng)
-        tempo = Swift.max(108, Swift.min(tempo, 126))
-        let mood   = moodOverride  ?? pickMood(rng: &rng)
-        let mode   = pickMode(rng: &rng)
-        let family = pickProgressionFamilyMotarik(rng: &rng)  // standard ProgressionFamily for StructureGenerator
-        let total  = pickTotalBars(tempo: tempo, rng: &rng)
-        let percStyle = pickPercussionStyle(tempo: tempo, rng: &rng)
-        let kosmicFamily = pickKosmicProgressionFamily(rng: &rng)
+        // Kosmic Drift sub-style: 50% for extended testing (target 15% for release)
+        let isKosmicDrift = rng.nextDouble() < 0.50
+        // Dreamscape variant: ~10% of Drift songs (must be Drift first)
+        let isDriftDreamscape = isKosmicDrift && rng.nextDouble() < 0.15
+        // Flat velocity base for BoC-style rules: drawn once per song, 85–92
+        let driftVelocityBase = isKosmicDrift ? (85 + rng.nextInt(upperBound: 8)) : 89
+
+        let key = keyOverride ?? pickKey(rng: &rng)
+
+        // Tempo: Drift uses Mode C (70–90); Dreamscape further restricts to 70–80.
+        // When isKosmicDrift, consume the same RNG slot as normal pickTempo would
+        // to keep base Kosmic songs seed-stable regardless of the Drift flag.
+        var tempo: Int
+        if isKosmicDrift {
+            let _ = pickTempo(rng: &rng)   // consume base slot — keeps non-Drift songs stable
+            let driftRange = isDriftDreamscape ? 11 : 21   // 70–80 vs 70–90
+            tempo = 70 + rng.nextInt(upperBound: driftRange)
+        } else {
+            tempo = tempoOverride ?? pickTempo(rng: &rng)
+            tempo = Swift.max(108, Swift.min(tempo, 126))
+        }
+        if let t = tempoOverride { tempo = t }
+
+        let mood = moodOverride ?? pickMood(rng: &rng)
+
+        // Mode: Drift uses different weights (Dorian 50%, Aeolian 22%, Mixolydian 20%, Ionian 8%, no Phrygian)
+        let mode: Mode
+        if isKosmicDrift {
+            let _ = pickMode(rng: &rng)   // consume base slot
+            let driftModes:   [Mode]   = [.Dorian, .Aeolian, .Mixolydian, .Ionian]
+            let driftWeights: [Double] = [0.50,    0.22,     0.20,        0.08]
+            mode = driftModes[rng.weightedPick(driftWeights)]
+        } else {
+            mode = pickMode(rng: &rng)
+        }
+
+        // Progression family: Drift uses static_drone-heavy weights
+        let family: ProgressionFamily
+        if isKosmicDrift {
+            let _ = pickProgressionFamilyMotarik(rng: &rng)  // consume base slot
+            // modal_cadence_bVI_bVII_I excluded — rock/anthemic cadence, wrong for Drift
+            let driftFamilies: [ProgressionFamily] = [.static_tonic, .two_chord_I_bVII, .minor_loop_i_VII, .minor_loop_i_VI]
+            let driftFWeights: [Double]            = [0.37,           0.31,              0.20,              0.12]
+            family = driftFamilies[rng.weightedPick(driftFWeights)]
+        } else {
+            family = pickProgressionFamilyMotarik(rng: &rng)
+        }
+
+        let total = pickTotalBars(tempo: tempo, rng: &rng)
+
+        // Percussion / drum rule: Drift uses its own pool; Dreamscape forces floating snare
+        let percStyle: PercussionStyle
+        if isKosmicDrift {
+            let _ = pickPercussionStyle(tempo: tempo, rng: &rng)  // consume base slot
+            if isDriftDreamscape {
+                percStyle = .driftLopingGroove  // Dreamscape always uses floating snare variant
+            } else {
+                percStyle = pickDriftPercussionStyle(tempo: tempo, rng: &rng)
+            }
+        } else {
+            percStyle = pickPercussionStyle(tempo: tempo, rng: &rng)
+        }
+
+        // Kosmic progression family: Drift uses static_drone-heavy weights
+        let kosmicFamily: KosmicProgressionFamily
+        if isKosmicDrift {
+            let _ = pickKosmicProgressionFamily(rng: &rng)   // consume base slot
+            // quartal_stack excluded — abstract/angular, anti-Drift character
+            let driftKFamilies: [KosmicProgressionFamily] = [.static_drone, .two_chord_pendulum, .modal_drift, .suspended_resolution]
+            let driftKWeights:  [Double]                  = [0.37,           0.31,                0.20,          0.12]
+            kosmicFamily = driftKFamilies[rng.weightedPick(driftKWeights)]
+        } else {
+            kosmicFamily = pickKosmicProgressionFamily(rng: &rng)
+        }
 
         let frame = GlobalMusicalFrame(
             key: key,
@@ -38,7 +104,15 @@ struct KosmicMusicalFrameGenerator {
             progressionFamily: family,
             totalBars: total
         )
-        return (frame, percStyle, kosmicFamily)
+        return (frame, percStyle, kosmicFamily, isKosmicDrift, isDriftDreamscape, driftVelocityBase)
+    }
+
+    /// Drift drum rule pool — evenly weighted regardless of tempo.
+    /// Drift-exclusive (007/008/absent) = 78%; shared minimal (001) = 22%.
+    static func pickDriftPercussionStyle(tempo: Int, rng: inout SeededRNG) -> PercussionStyle {
+        let styles:  [PercussionStyle] = [.driftLopingGroove, .driftHalfTimeLope, .absent, .minimal]
+        let weights: [Double]          = [0.29,                0.24,               0.25,    0.22]
+        return styles[rng.weightedPick(weights)]
     }
 
     // MARK: - Private helpers
@@ -109,13 +183,13 @@ struct KosmicMusicalFrameGenerator {
     }
 
     /// PercussionStyle weights (tempo >= 100):
-    ///   absent 22%, sparse 18%, minimal 13%,
+    ///   absent 15%, sparse 21%, minimal 17%,
     ///   electricBuddhaGroove 27%, electricBuddhaPulse 10%, electricBuddhaRestrained 10%
     /// Below 100 BPM: Electric Buddha patterns redistributed to absent/sparse/restrained.
     static func pickPercussionStyle(tempo: Int, rng: inout SeededRNG) -> PercussionStyle {
         if tempo >= 100 {
             let styles:  [PercussionStyle] = [.absent, .sparse, .minimal, .motorikGrid, .electricBuddhaPulse, .electricBuddhaRestrained]
-            let weights: [Double]          = [0.22,    0.18,    0.13,     0.27,          0.10,                  0.10]
+            let weights: [Double]          = [0.15,    0.21,    0.17,     0.27,          0.10,                  0.10]
             return styles[rng.weightedPick(weights)]
         } else {
             // Very slow tempo: heavier toward absent/sparse, restrained suits slow tempos well

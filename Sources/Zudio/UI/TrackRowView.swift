@@ -77,8 +77,9 @@ struct TrackRowView: View {
                 Instrument(name: "Desert Winds", program: 236),
             ]
         }
-        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle)
-        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle)
+        let isDrift  = appState.songState?.isKosmicDrift == true
+        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle, isKosmicDrift: isDrift)
+        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle, isKosmicDrift: isDrift)
         return zip(names, programs).map { Instrument(name: $0, program: $1) }
     }
 
@@ -338,8 +339,9 @@ struct TrackRowView: View {
             }
             return isKosmic ? [.pan, .delay, .space] : [.pan, .delay, .reverb]
         case kTrackBass:
-            if isChill   { return [.lowShelf, .compression, .reverb] }
-            if isAmbient { return [.sweep, .delay, .reverb] }
+            if isChill          { return [.lowShelf, .compression, .reverb] }
+            if isAmbient        { return [.sweep, .delay, .reverb] }
+            if activeStyle == .kosmic { return [.tremolo, .delay, .reverb] }   // Kosmic/Drift: Trem replaces Low Filter
             return [.lowShelf, .delay, .reverb]
         case kTrackDrums:
             if isChill   { return [.compression, .space, .lowShelf] }
@@ -411,12 +413,13 @@ struct TrackRowView: View {
             default:            []
             }
         } else if activeStyle == .kosmic {
+            let isDrift = appState.songState?.isKosmicDrift == true
             defaults = switch trackIndex {
             case kTrackLead1:    [.delay, .space]
             case kTrackLead2:    [.space]
-            case kTrackPads:     [.space, .delay]
-            case kTrackTexture:  [.delay, .space]
-            case kTrackBass:     [.reverb]
+            case kTrackPads:     isDrift ? [.space, .delay, .sweep] : [.space, .delay]
+            case kTrackTexture:  isDrift ? [.delay, .space, .pan]   : [.delay, .space]
+            case kTrackBass:     isDrift ? [.tremolo] : []
             case kTrackRhythm:   [.delay]
             default:             []
             }
@@ -426,10 +429,11 @@ struct TrackRowView: View {
             let motTremoloLead = trackIndex == kTrackLead1
                 && idx < mnames.count
                 && (mnames[idx] == "Synth Lead" || mnames[idx] == "Square Lead")
+            let isNoir = appState.songState?.motorikNoirVariation == true
             defaults = switch trackIndex {
             case kTrackLead1:   motTremoloLead ? [.delay, .tremolo] : [.delay]
             case kTrackRhythm:  [.delay]
-            case kTrackPads:    [.space]
+            case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
             default:            []
             }

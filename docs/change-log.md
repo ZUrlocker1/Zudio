@@ -1,5 +1,12 @@
 # Zudio Change Log
 
+## V 1.7 (Build 123)  Kosmic Drift
+
+- **Kosmic Drift** — New Kosmic sub-style appearing in ~50% of Kosmic songs. Inspired by Boards of Canada, Portishead, and Sigur Ros. Slower tempo (70–90 BPM), sparse and meditative. Features three new drum rules (Loping Groove, Half-Time Lope, Dreamscape Float), four new bass rules, three new lead rules (Tycho Phrase, Drift Memory, Sigur Ros late entry float), and five new rhythm rules (Chord Tremolo, Slow Chord Pulse, Four-Bar Chord Hold, Chromatic Tremolo, Downbeat Chord) all drawn from MIDI analysis of reference tracks. A Dreamscape variant (~10% of Drift songs) produces the most extreme spaciousness.
+- **Expanded Kosmic instrument pools** — Kosmic Pads gains Halo Pad and Bowed Glass for warmer choices. Kosmic Texture gains Solar Wind and FX Echoes for added atmospheric depth. Drift Lead 1 uses Warm Pad, Sine Wave, Bottle Blow, and Shenai. Drift Rhythm uses Moog, New Age Pad, Synth Mallet, Synth Chime, and Mystery Pad. Tremolo added to Kosmic Bass effects chip, replacing Low Filter.
+
+---
+
 ## V 1.6 (Build 122)  Motorik Noir + improved gestures
 
 - **Motorik Noir** — New dark sub-style appearing in ~30% of Motorik songs. Slower tempo (110–128 BPM), always minor mode. Inspired by Public Image Ltd, Joy Division etc.  Has deep bass rules (Albatross Pulse, Annalisa Riff, Wobble Theme), inverted drum grooves (Albatross Grid, Annalisa March), sparse pads, Cold Chord texture lead, and power-chord Chord Chug rhythm. Fills are rare and minimal.

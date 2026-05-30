@@ -15,18 +15,36 @@ struct KosmicBassGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
-        bassEvolutionBars: inout [Int]
+        bassEvolutionBars: inout [Int],
+        isKosmicDrift: Bool = false,
+        isDriftDreamscape: Bool = false,
+        driftVelocityBase: Int = 89
     ) -> [MIDIEvent] {
 
-        // Pick primary bass rule
-        let rules:   [String] = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-005",
-                                  "KOS-BASS-008", "KOS-BASS-009", "KOS-BASS-010",
-                                  "KOS-BASS-011", "KOS-BASS-012", "KOS-BASS-013"]
-        let weights: [Double] = [0.09,           0.07,          0.11,           0.09,           0.06,
-                                  0.08,           0.07,           0.11,
-                                  0.12,           0.07,           0.13]
-        // Only honour forceRuleID if it belongs to the Kosmic bass pool.
-        // Test slots that force Motorik rules (e.g. MOT-BASS-015) must not bleed into Kosmic songs.
+        // Drift uses a different bass pool with new rules and adjusted weights
+        let rules: [String]
+        let weights: [Double]
+        if isKosmicDrift {
+            if isDriftDreamscape {
+                // Dreamscape forces Four-Bar Hold
+                rules   = ["KOS-BASS-017"]
+                weights = [1.00]
+            } else {
+                // Drift-exclusive (014/015/016/017) = 77%; shared = 23%
+                rules   = ["KOS-BASS-014", "KOS-BASS-015", "KOS-BASS-016", "KOS-BASS-017",
+                           "KOS-BASS-001", "KOS-BASS-004", "KOS-BASS-013"]
+                weights = [0.22,           0.20,           0.18,           0.17,
+                           0.10,           0.08,           0.05]
+            }
+        } else {
+            rules   = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-005",
+                       "KOS-BASS-008", "KOS-BASS-009", "KOS-BASS-010",
+                       "KOS-BASS-011", "KOS-BASS-012", "KOS-BASS-013"]
+            weights = [0.09,           0.07,          0.11,           0.09,           0.06,
+                       0.08,           0.07,           0.11,
+                       0.12,           0.07,           0.13]
+        }
+
         let validForce = forceRuleID.flatMap { rules.contains($0) ? $0 : nil }
         let ruleID = validForce ?? rules[rng.weightedPick(weights)]
 
@@ -39,15 +57,20 @@ struct KosmicBassGenerator {
         // KOS-BASS-006: staccato dual layer — blocked with KOS-BASS-004 (chromatic neighbour
         // clashes with staccato root) and KOS-BASS-010 (Moroder Pulse already fills off-beats).
         // KOS-BASS-008 (Hallogallo Lock) REQUIRES the dual layer — sounds thin without it.
-        // PBW (012) is already an 8-note melodic riff — dual staccato layer would clutter it.
-        let canUseDualLayer = !bassAbsent && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
-        let useDualLayer    = canUseDualLayer && (ruleID == "KOS-BASS-008" || rng.nextDouble() < 0.25)
+        // Drift: excluded entirely — staccato off-beats clutter the spacious feel.
+        //   Exception: KOS-BASS-008 still gets it since it sounds thin without it.
+        let canUseDualLayer = !bassAbsent && !isKosmicDrift
+            && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010"
+            && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
+        let driftNeedsDual  = isKosmicDrift && ruleID == "KOS-BASS-008"
+        let useDualLayer    = driftNeedsDual || (canUseDualLayer && (ruleID == "KOS-BASS-008" || rng.nextDouble() < 0.25))
         if useDualLayer { usedRuleIDs.insert("KOS-BASS-006") }
 
-        // KOS-BASS-007: pulsating tremolo — mutually exclusive with 006, blocked when absent,
-        // blocked with KOS-BASS-004 (Moroder Drift long hold clashes), and
-        // blocked with KOS-BASS-010 (Moroder Pulse is already a dense 8th-note sequence).
-        let usePulsatingLayer = !bassAbsent && !useDualLayer && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010" && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013" && rng.nextDouble() < 0.45
+        // KOS-BASS-007: pulsating tremolo — excluded from Drift (rapid tremolo is anti-spacious).
+        let usePulsatingLayer = !isKosmicDrift && !bassAbsent && !useDualLayer
+            && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010"
+            && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
+            && rng.nextDouble() < 0.45
         if usePulsatingLayer { usedRuleIDs.insert("KOS-BASS-007") }
 
         // Precompute variation windows for static Kosmic rules (same logic as Motorik BassGenerator).
@@ -116,6 +139,29 @@ struct KosmicBassGenerator {
         let moroderGateProbs: [Double] = [0.94, 0.82, 0.82, 0.65, 0.65, 0.70, 0.70, 0.94]
         var moroder4WinIdx = -1
         var modorerGates   = [Bool](repeating: true, count: 8)
+
+        // KOS-BASS-016: BoC Loop — cell chosen once per song, tracked across 4-bar windows
+        // Cell is an array of (scaleInterval, velocity) pairs; one note per beat.
+        // shiftIdx: which cell index is currently shifted (-1 = none); changes per 4-bar roll.
+        var boc016Cell: [(Int, UInt8)] = []   // (semitone offset from root, velocity)
+        var boc016ShiftIdx  = -1
+        var boc016LastWin   = -4
+
+        // KOS-BASS-014: evolution window (rolls every 8 bars)
+        var smooth014VarType = 0
+        var smooth014LastWin = -8
+
+        // KOS-BASS-015: evolution window (rolls every 8 bars)
+        // 0=normal, 1=colour (step-6 → b7/4th), 2=push (beat-3 root to step 9), 3=drop (step-6 omitted)
+        var drift015VarType = 0
+        var drift015LastWin = -8
+        if ruleID == "KOS-BASS-016" {
+            // Root → mode-2nd → root → 5th; Dorian 2nd = 2 semitones, 5th = 7 semitones
+            let second = 2  // major 2nd (Dorian has raised 2nd vs Aeolian)
+            let fifth  = 7
+            let vb     = UInt8(clamping: driftVelocityBase)
+            boc016Cell = [(0, vb), (second, vb), (0, vb), (fifth, vb)]
+        }
 
         var events: [MIDIEvent] = []
 
@@ -320,6 +366,40 @@ struct KosmicBassGenerator {
                 modorerGates   = moroderGateProbs.map { rng.nextDouble() < $0 }
             }
 
+            // KOS-BASS-014: roll evolution type every 8 bars
+            // 0=normal, 1=color (beat-4 becomes b7/sus4), 2=syncopation (beat-2 shifted to step 5), 3=note drop (beat-3 silent)
+            if ruleID == "KOS-BASS-014" {
+                let win014 = bar / 8
+                if win014 != smooth014LastWin {
+                    smooth014LastWin = win014
+                    let r = rng.nextDouble()
+                    smooth014VarType = r < 0.35 ? 1 : r < 0.55 ? 2 : r < 0.75 ? 3 : 0
+                }
+            }
+
+            // KOS-BASS-015: roll evolution type every 8 bars
+            if ruleID == "KOS-BASS-015" {
+                let win015 = bar / 8
+                if win015 != drift015LastWin {
+                    drift015LastWin = win015
+                    let r = rng.nextDouble()
+                    drift015VarType = r < 0.30 ? 1 : r < 0.45 ? 2 : r < 0.60 ? 3 : 0
+                }
+            }
+
+            // KOS-BASS-016: roll fresh cell shift every 4-bar window
+            if ruleID == "KOS-BASS-016" {
+                let win = bar / 4
+                if win != boc016LastWin {
+                    boc016LastWin = win
+                    if rng.nextDouble() < 0.30 {
+                        boc016ShiftIdx = rng.nextInt(upperBound: boc016Cell.count)
+                    } else {
+                        boc016ShiftIdx = -1
+                    }
+                }
+            }
+
             events += primaryBassBar(ruleID: ruleID, barStart: barStart, bar: bar,
                                      sectionStartBar: section.startBar,
                                      entry: entry, frame: frame, rng: &rng,
@@ -329,7 +409,11 @@ struct KosmicBassGenerator {
                                      bass002UseB7: bass002UseB7, bass002DurChoice: bass002DurChoice,
                                      bass002AttackStep: bass002AttackStep, bass002Velocity: bass002Velocity,
                                      bass002UseApproach: bass002UseApproach, bass002UseEcho: bass002UseEcho,
-                                     modorerGates: modorerGates)
+                                     modorerGates: modorerGates,
+                                     driftVelocityBase: driftVelocityBase,
+                                     boc016Cell: boc016Cell, boc016ShiftIdx: boc016ShiftIdx,
+                                     smooth014VarType: smooth014VarType,
+                                     drift015VarType: drift015VarType)
 
             // Sub-layer B: rhythmic staccato movement (KOS-RULE-17)
             if useDualLayer {
@@ -404,7 +488,13 @@ struct KosmicBassGenerator {
         bass002UseB7: Bool = false, bass002DurChoice: Double = 0.5,
         bass002AttackStep: Int = 0, bass002Velocity: UInt8 = 96,
         bass002UseApproach: Bool = false, bass002UseEcho: Bool = false,
-        modorerGates: [Bool] = []
+        modorerGates: [Bool] = [],
+        // Drift-specific
+        driftVelocityBase: Int = 89,
+        boc016Cell: [(Int, UInt8)] = [],
+        boc016ShiftIdx: Int = -1,
+        smooth014VarType: Int = 0,
+        drift015VarType: Int = 0
     ) -> [MIDIEvent] {
         switch ruleID {
         case "KOS-BASS-001": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
@@ -433,6 +523,16 @@ struct KosmicBassGenerator {
         case "KOS-BASS-013": return loscilSubBassPulseBar(barStart: barStart, bar: bar, entry: entry,
                                                            frame: frame, useVariation: useVariation,
                                                            rng: &rng)
+        case "KOS-BASS-014": return smoothArpeggioBar(barStart: barStart, bar: bar, entry: entry,
+                                                       frame: frame, velBase: driftVelocityBase,
+                                                       useVariation: useVariation, varType: smooth014VarType)
+        case "KOS-BASS-015": return driftGrooveBar(barStart: barStart, bar: bar, entry: entry,
+                                                    frame: frame, velBase: driftVelocityBase,
+                                                    useVariation: useVariation, varType: drift015VarType, rng: &rng)
+        case "KOS-BASS-016": return bocLoopBar(barStart: barStart, bar: bar, entry: entry,
+                                               frame: frame, cell: boc016Cell, shiftIdx: boc016ShiftIdx)
+        case "KOS-BASS-017": return fourBarHoldBar(barStart: barStart, bar: bar, entry: entry,
+                                                    frame: frame, velBase: driftVelocityBase)
         default:             return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: isBody)
         }
@@ -1146,5 +1246,149 @@ struct KosmicBassGenerator {
 
     private static func clamped(_ v: Int, low: Int, high: Int) -> Int {
         Swift.max(low, Swift.min(high, v))
+    }
+
+    // MARK: - KOS-BASS-014: Smooth Arpeggio (Drift)
+    // Continuous quarter-note cycling: root → 3rd → 5th → 3rd.
+    // Flat velocity. Mode-aware 3rd (minor in Aeolian/Dorian, major in Mixolydian/Ionian).
+    // B-section variation: inserts b7 between 5th and returning 3rd.
+    // MARK: - KOS-BASS-014: Smooth Arpeggio (Drift)
+    // varType (rolled every 8 bars):
+    //   0 = normal: root→3rd→5th→3rd
+    //   1 = color:  beat-4 3rd replaced by b7 (Dorian colour), or sus4 for Mixolydian
+    //   2 = syncopation: beat-2 note shifts from step 4 to step 5 (one 16th later — subtle groove push)
+    //   3 = note drop: beat-3 note omitted — 3-note bar creates breathing room
+    private static func smoothArpeggioBar(
+        barStart: Int, bar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        velBase: Int, useVariation: Bool, varType: Int = 0
+    ) -> [MIDIEvent] {
+        let root = bassRoot(entry: entry, frame: frame)
+        let thirdOffset = (frame.mode == .Mixolydian || frame.mode == .Ionian) ? 4 : 3
+        let fifthOffset = 7
+        let b7Offset    = 10
+        let sus4Offset  = 5
+
+        func note(_ semitones: Int) -> UInt8 {
+            UInt8(clampToRegister(Int(root) + semitones, low: 38, high: 55))
+        }
+
+        let vb = UInt8(clamping: velBase)
+
+        if useVariation {
+            // B-section: root → 3rd → 5th → b7 → 3rd (5 events)
+            let pattern: [(Int, Int)] = [(0,0),(3,thirdOffset),(6,fifthOffset),(9,b7Offset),(12,thirdOffset)]
+            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+        }
+
+        // Body — apply evolution variant
+        switch varType {
+        case 1:
+            // Colour: beat-4 3rd → b7 (Dorian) or sus4 (Mixolydian)
+            let colorSemitone = (frame.mode == .Mixolydian) ? sus4Offset : b7Offset
+            let pattern: [(Int, Int)] = [(0,0),(4,thirdOffset),(8,fifthOffset),(12,colorSemitone)]
+            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+        case 2:
+            // Syncopation: beat-2 pushed one 16th later (step 4 → step 5)
+            let pattern: [(Int, Int)] = [(0,0),(5,thirdOffset),(8,fifthOffset),(12,thirdOffset)]
+            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+        case 3:
+            // Note drop: beat-3 omitted — 3-note bar
+            let pattern: [(Int, Int)] = [(0,0),(4,thirdOffset),(12,thirdOffset)]
+            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+        default:
+            // Normal: root→3rd→5th→3rd
+            let pattern: [(Int, Int)] = [(0,0),(4,thirdOffset),(8,fifthOffset),(12,thirdOffset)]
+            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+        }
+    }
+
+    // MARK: - KOS-BASS-015: Drift Groove (Drift)
+    // Root on beat 1, 5th on step 6 (and-of-2), root on beat 3.
+    // Optional light 5th on step 13 (55% of bars). Locks with the loping kick groove.
+    // varType (rolled every 8 bars):
+    //   0 = normal
+    //   1 = colour: step-6 note → b7 or 4th (instead of 5th) for harmonic variety
+    //   2 = push: beat-3 root shifted from step 8 to step 9 (subtle groove push)
+    //   3 = drop: step-6 note omitted — 2-hit bar (root/beat1 + root/beat3 only)
+    private static func driftGrooveBar(
+        barStart: Int, bar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        velBase: Int, useVariation: Bool, varType: Int = 0, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let root  = bassRoot(entry: entry, frame: frame)
+        let fifth = UInt8(clampToRegister(Int(root) + 7,  low: 38, high: 55))
+        let vb    = UInt8(clamping: velBase)
+        let vMid  = UInt8(clamping: velBase - 10)
+        let vLo   = UInt8(clamping: max(1, velBase - 15))
+
+        // B-section variation overrides varType
+        let step6Note: UInt8
+        if useVariation {
+            let offset = rng.nextDouble() < 0.50 ? 10 : 5  // b7 or 4th
+            step6Note = UInt8(clampToRegister(Int(root) + offset, low: 38, high: 55))
+        } else if varType == 1 {
+            let offset = rng.nextDouble() < 0.60 ? 10 : 5  // b7 (60%) or 4th (40%)
+            step6Note = UInt8(clampToRegister(Int(root) + offset, low: 38, high: 55))
+        } else {
+            step6Note = fifth
+        }
+
+        let beat3Step = (varType == 2) ? 9 : 8   // push: step 8 → step 9
+
+        var evs: [MIDIEvent] = [
+            MIDIEvent(stepIndex: barStart + 0,         note: root,      velocity: vb,   durationSteps: 4),
+            MIDIEvent(stepIndex: barStart + beat3Step,  note: root,      velocity: vb,   durationSteps: 4),
+        ]
+
+        // Step-6 mid-beat hit (omitted in drop variant)
+        if varType != 3 {
+            evs.append(MIDIEvent(stepIndex: barStart + 6, note: step6Note, velocity: vMid, durationSteps: 3))
+        }
+
+        // Optional step-13 ornament (55% of bars in all variants)
+        if rng.nextDouble() < 0.55 {
+            evs.append(MIDIEvent(stepIndex: barStart + 13, note: fifth, velocity: vLo, durationSteps: 3))
+        }
+        return evs
+    }
+
+    // MARK: - KOS-BASS-016: BoC Loop (Drift)
+    // Short melodic cell repeating every bar; shift one note every 4-bar window (30%).
+    // Cell is precomputed in generate() as (semitoneOffset, velocity) pairs.
+    private static func bocLoopBar(
+        barStart: Int, bar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        cell: [(Int, UInt8)], shiftIdx: Int
+    ) -> [MIDIEvent] {
+        guard !cell.isEmpty else { return [] }
+        let root = bassRoot(entry: entry, frame: frame)
+
+        return cell.enumerated().map { (i, pair) in
+            var (semitones, vel) = pair
+            // Apply shift: note at shiftIdx moves by ±2 (2nd→3rd or 5th→4th)
+            if i == shiftIdx {
+                semitones = semitones == 2 ? 3 : (semitones == 7 ? 5 : semitones)
+            }
+            let note = UInt8(clampToRegister(Int(root) + semitones, low: 38, high: 55))
+            return MIDIEvent(stepIndex: barStart + i * 4, note: note,
+                             velocity: vel, durationSteps: 4)
+        }
+    }
+
+    // MARK: - KOS-BASS-017: Four-Bar Hold (Drift / Dreamscape)
+    // Holds the chord root for exactly 4 bars (64 steps).
+    // Only fires a note on bar % 4 == 0; sustains through the next 3 bars.
+    private static func fourBarHoldBar(
+        barStart: Int, bar: Int,
+        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        velBase: Int
+    ) -> [MIDIEvent] {
+        guard bar % 4 == 0 else { return [] }
+        let root = UInt8(clampToRegister(Int(bassRoot(entry: entry, frame: frame)), low: 28, high: 48))
+        let vel  = UInt8(clamping: velBase)
+        let dur  = min(64, (frame.totalBars - bar) * 16 - 1)
+        guard dur > 0 else { return [] }
+        return [MIDIEvent(stepIndex: barStart, note: root, velocity: vel, durationSteps: dur)]
     }
 }

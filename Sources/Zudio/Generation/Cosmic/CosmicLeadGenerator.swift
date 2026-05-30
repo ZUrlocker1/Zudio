@@ -32,12 +32,52 @@ struct KosmicLeadGenerator {
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
         lead1BaseRule: inout String,
-        xFilesBars: inout [Int]
+        xFilesBars: inout [Int],
+        isKosmicDrift: Bool = false,
+        isDriftDreamscape: Bool = false,
+        driftVelocityBase: Int = 89
     ) -> [MIDIEvent] {
 
-        let aRule = forceRuleID ?? pickLeadRule(rng: &rng)
+        // Drift lead pool — different weights and includes new rules 010/011/012
+        let aRule: String
+        if isKosmicDrift {
+            let _ = pickLeadRule(rng: &rng)   // consume base slot for seed stability
+            if isDriftDreamscape {
+                aRule = forceRuleID ?? "KOS-LD1-012"
+            } else {
+                // Drift-exclusive (010/011/012) = 78%; shared = 22%
+                // KOS-LEAD-004 (Echo Melody) excluded — question-answer structure is too composed for Drift
+                let driftRules:   [String] = ["KOS-LD1-010", "KOS-LD1-011", "KOS-LD1-012",
+                                              "KOS-LEAD-002", "KOS-LEAD-008", "KOS-LEAD-009",
+                                              "KOS-LEAD-003"]
+                let driftWeights: [Double] = [0.28,           0.27,           0.23,
+                                              0.09,           0.05,           0.05,
+                                              0.03]
+                aRule = forceRuleID ?? driftRules[rng.weightedPick(driftWeights)]
+            }
+        } else {
+            aRule = forceRuleID ?? pickLeadRule(rng: &rng)
+        }
         lead1BaseRule = aRule
         usedRuleIDs.insert(aRule)
+
+        // Dispatch Drift-specific section-level rules before the base rules
+        if aRule == "KOS-LD1-010" {
+            return generateTychoPhrase(frame: frame, structure: structure, tonalMap: tonalMap,
+                                       rng: &rng, velBase: driftVelocityBase)
+        }
+        if aRule == "KOS-LD1-011" {
+            usedRuleIDs.insert("KOS-LD1-011")
+            let evolving = rng.nextDouble() >= 0.30   // 70% evolving, 30% static-with-micro-evolution
+            return generateDriftMemory(frame: frame, structure: structure, tonalMap: tonalMap,
+                                       rng: &rng, velBase: driftVelocityBase, evolving: evolving)
+        }
+        if aRule == "KOS-LD1-012" {
+            usedRuleIDs.remove("KOS-LD1-012")
+            usedRuleIDs.insert("KOS-LD1-012")
+            return generateSvefnFloat(frame: frame, structure: structure, tonalMap: tonalMap,
+                                      rng: &rng, velBase: driftVelocityBase)
+        }
 
         // Technique D: B sections use a different rule for contrast.
         // Sparse ambient rules (001, 002, 003) always escalate to a denser rule in B sections
@@ -49,18 +89,22 @@ struct KosmicLeadGenerator {
         let hasBSection = structure.sections.contains { $0.label == .B }
         let bRule: String
         if sparseLeadRules.contains(aRule) {
-            // Always escalate — B section must use a denser rule (004 or 006)
-            bRule = pickDenseLeadRule(rng: &rng)
+            // Escalate to a denser rule for B sections.
+            // Drift: KOS-LEAD-006 and 007 excluded — escalate to 004 (Echo Melody) only.
+            bRule = isKosmicDrift ? "KOS-LEAD-004" : pickDenseLeadRule(rng: &rng)
             if hasBSection { usedRuleIDs.insert(bRule) }
         } else if rng.nextDouble() < 0.60 {
-            bRule = pickBSectionRule(excluding: aRule, rng: &rng)
+            bRule = pickBSectionRule(excluding: aRule, isKosmicDrift: isKosmicDrift, rng: &rng)
             if hasBSection && bRule != aRule { usedRuleIDs.insert(bRule) }
         } else {
             bRule = aRule
         }
 
         // Bridge melody sections always use a distinct rule (independent of Technique D)
-        let bridgeMelodyRule = pickLeadRuleDifferentFrom(aRule, rng: &rng)
+        // Drift: exclude KOS-LEAD-006 and KOS-LEAD-007 from bridge melody selection.
+        let bridgeMelodyRule = isKosmicDrift
+            ? pickLeadRuleDifferentFrom(aRule, excluding: ["KOS-LEAD-006","KOS-LEAD-007"], rng: &rng)
+            : pickLeadRuleDifferentFrom(aRule, rng: &rng)
 
         // KOS-LEAD-006/008/009 use section-level phrase generation — bypass per-bar dispatch
         if aRule == "KOS-LEAD-006" {
@@ -298,18 +342,25 @@ struct KosmicLeadGenerator {
     }
 
     /// Pick a lead rule that is different from `current`. Used by bridge melody selection.
-    private static func pickLeadRuleDifferentFrom(_ current: String, rng: inout SeededRNG) -> String {
+    private static func pickLeadRuleDifferentFrom(_ current: String,
+                                                   excluding: [String] = [],
+                                                   rng: inout SeededRNG) -> String {
         let allRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007", "KOS-LEAD-008", "KOS-LEAD-009"]
-        let candidates = allRules.filter { $0 != current }
+        let excluded = Set(excluding + [current])
+        let candidates = allRules.filter { !excluded.contains($0) }
         guard !candidates.isEmpty else { return current }
         return candidates[rng.nextInt(upperBound: candidates.count)]
     }
 
-    /// Pick a B-section rule for Technique D. Restricted to per-bar-compatible rules only
-    /// (001–007 excluding 006 which also bypasses emitLeadBar). KOS-LEAD-008 and 009 are
-    /// section-level solo generators that don't work through the per-bar dispatch path.
-    private static func pickBSectionRule(excluding current: String, rng: inout SeededRNG) -> String {
-        let perBarRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-007"]
+    /// Pick a B-section rule for Technique D. Restricted to per-bar-compatible rules only.
+    /// Drift excludes KOS-LEAD-006 (JMJ Phrase, bypasses emitLeadBar) and KOS-LEAD-007
+    /// (TD Skip Sequence, wrong character for Drift).
+    private static func pickBSectionRule(excluding current: String,
+                                          isKosmicDrift: Bool = false,
+                                          rng: inout SeededRNG) -> String {
+        let perBarRules: [String] = isKosmicDrift
+            ? ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005"]
+            : ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-007"]
         let candidates = perBarRules.filter { $0 != current }
         guard !candidates.isEmpty else { return current }
         return candidates[rng.nextInt(upperBound: candidates.count)]
@@ -1333,6 +1384,302 @@ struct KosmicLeadGenerator {
                     }
                 }
             }
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-010: Tycho Phrase (Drift)
+    // 4–6 note phrase with rise-to-peak arc, then descent.
+    // Stated once, then repeated with one random note shifted ±1 diatonic step after 10–14 bar silence.
+    // Velocity arc mirrors pitch contour.
+    private static func generateTychoPhrase(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG, velBase: Int
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        guard bodyEnd > bodyStart + 8 else { return [] }
+
+        // Build phrase: 4–6 diatonic notes, rise then fall
+        let phraseNotes: Int = 4 + rng.nextInt(upperBound: 3)
+        guard let firstEntry = tonalMap.entry(atBar: bodyStart) ?? tonalMap.first else { return [] }
+        let scaleNotes = scaleNotesInRegister(
+            entry: firstEntry,
+            frame: frame, low: 60, high: 80
+        )
+        guard scaleNotes.count >= 4 else { return [] }
+
+        // Start near middle, rise to peak, descend
+        let peakIdx  = phraseNotes * 2 / 3   // peak at ~65% through phrase
+        let startIdx = rng.nextInt(upperBound: Swift.max(1, scaleNotes.count / 3))
+        var phraseIndices: [Int] = []
+        for i in 0..<phraseNotes {
+            if i < peakIdx {
+                phraseIndices.append(Swift.min(scaleNotes.count - 1,
+                    startIdx + Int(Double(i) * 2.5 / Double(peakIdx))))
+            } else if i == peakIdx {
+                phraseIndices.append(Swift.min(scaleNotes.count - 1, startIdx + 4 + rng.nextInt(upperBound: 3)))
+            } else {
+                let down = i - peakIdx
+                phraseIndices.append(Swift.max(startIdx, phraseIndices[peakIdx] - down * 2))
+            }
+        }
+        let phrase = phraseIndices.map { scaleNotes[Swift.max(0, Swift.min($0, scaleNotes.count - 1))] }
+
+        // Durations: ascending notes 3–5 steps, peak held 12–20, descent 4–8
+        var durations: [Int] = []
+        for i in 0..<phraseNotes {
+            if i == peakIdx {
+                durations.append(12 + rng.nextInt(upperBound: 9))
+            } else if i < peakIdx {
+                durations.append(3 + rng.nextInt(upperBound: 3))
+            } else {
+                durations.append(4 + rng.nextInt(upperBound: 5))
+            }
+        }
+
+        // Phrase spacing: appears every 12–16 bars starting from bodyStart + entry delay
+        let spacing = 12 + rng.nextInt(upperBound: 5)
+        let phraseLen = durations.reduce(0, +)
+
+        var events: [MIDIEvent] = []
+        var appearanceIdx = 0
+        var phrasePitch = phrase  // may shift each repetition
+
+        var bar = bodyStart + (spacing / 2)  // first appearance partway in
+        while bar < bodyEnd - 4 {
+            guard let entry = tonalMap.entry(atBar: bar) else { bar += spacing; continue }
+
+            // Velocity arc: low at start, peak at peak note, low again at end
+            var step = bar * 16
+            for (i, (note, dur)) in zip(phrase.indices, zip(phrasePitch, durations)) {
+                let normPos = Double(i) / Double(phraseNotes - 1)
+                let peakNorm = Double(peakIdx) / Double(phraseNotes - 1)
+                let proximity = 1.0 - abs(normPos - peakNorm)
+                let vel = UInt8(54 + Int(proximity * 18))  // 54–72, soft melodic arc
+                let clampedNote = UInt8(clampToRegister(note, low: 60, high: 80))
+                if step < frame.totalBars * 16 {
+                    events.append(MIDIEvent(stepIndex: step, note: clampedNote,
+                                            velocity: vel, durationSteps: dur))
+                }
+                step += dur
+            }
+
+            // Next repetition: always vary the final (cadential) note ±1 diatonic step.
+            // The last note is the most audible variation point — the phrase ending changes
+            // each time like a musician varying their cadence. Also shift one interior note
+            // occasionally for additional colour.
+            if appearanceIdx > 0 {
+                let lastIdx = phraseNotes - 1
+                let delta = rng.nextDouble() < 0.50 ? 1 : -1
+                let newLastIdx = Swift.max(0, Swift.min(scaleNotes.count - 1,
+                    phraseIndices[lastIdx] + delta))
+                phraseIndices[lastIdx] = newLastIdx
+                var newPhrase = phrasePitch
+                newPhrase[lastIdx] = scaleNotes[newLastIdx]
+                // Also shift one random interior note 40% of the time for additional colour
+                if rng.nextDouble() < 0.40 {
+                    let interiorNote = rng.nextInt(upperBound: phraseNotes - 1)  // exclude last
+                    let iDelta = rng.nextDouble() < 0.50 ? 1 : -1
+                    let newIIdx = Swift.max(0, Swift.min(scaleNotes.count - 1,
+                        phraseIndices[interiorNote] + iDelta))
+                    phraseIndices[interiorNote] = newIIdx
+                    newPhrase[interiorNote] = scaleNotes[newIIdx]
+                }
+                phrasePitch = newPhrase
+            }
+            appearanceIdx += 1
+            bar += phraseLen / 16 + spacing
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-011: Drift Memory (Drift)
+    // Short pentatonic cell, appears every 3–5 bars (jittered grid) from first entry.
+    // Evolving (70%): 30% chance per 8-bar window to shift one note.
+    // Static (30%): 10% chance per 16-bar window for micro-shift — cell never fully locks.
+    // Octave doubling in 40% of songs.
+    private static func generateDriftMemory(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        velBase: Int, evolving: Bool
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        guard bodyEnd > bodyStart + 8 else { return [] }
+
+        let entryBar = bodyStart + 8 + rng.nextInt(upperBound: 9)
+        guard entryBar < bodyEnd - 4 else { return [] }
+
+        let cellSize = 3 + rng.nextInt(upperBound: 3)
+        guard let entryEntry = tonalMap.entry(atBar: entryBar) ?? tonalMap.first else { return [] }
+        let penta = pentatonicNotes(entry: entryEntry, frame: frame, low: 60, high: 78)
+        guard penta.count >= 3 else { return [] }
+
+        let keyST = keySemitone(frame.key)
+        let minor3PC = (keyST + 3) % 12
+        let major3PC = (keyST + 4) % 12
+        let thirdNote = penta.first(where: { $0 % 12 == minor3PC || $0 % 12 == major3PC }) ?? penta[1]
+        let startNote = rng.nextDouble() < 0.60 ? thirdNote : (penta.count > 2 ? penta[2] : penta[0])
+        guard let startIdx = penta.firstIndex(of: startNote) else { return [] }
+
+        var cell = Array(penta[startIdx..<Swift.min(startIdx + cellSize, penta.count)])
+        if cell.count < cellSize && penta.count >= cellSize { cell = Array(penta.prefix(cellSize)) }
+
+        let cellDurs = (0..<cell.count).map { _ in 6 + rng.nextInt(upperBound: 3) }
+        let useOctave = rng.nextDouble() < 0.40
+
+        let midpoint    = bodyStart + (bodyEnd - bodyStart) / 2
+        let absenceLen  = 8 + rng.nextInt(upperBound: 9)
+        let absenceStart = midpoint - absenceLen / 2
+        let absenceEnd   = absenceStart + absenceLen
+
+        let vb = UInt8(clamping: velBase)
+        var events: [MIDIEvent] = []
+        var bar = entryBar
+        // Evolution tracking
+        var lastEvolveWin  = -1
+        var lastStaticWin  = -1
+        var appearanceCount = 0   // guaranteed shift of last note every 3 appearances
+
+        while bar < bodyEnd {
+            if bar >= absenceStart && bar < absenceEnd { bar += 3 + rng.nextInt(upperBound: 3); continue }
+            guard let _ = tonalMap.entry(atBar: bar) else { bar += 4; continue }
+
+            // Guaranteed: last note shifts every 3rd appearance (both evolving and static).
+            // This ensures audible variation in every song regardless of window luck.
+            if appearanceCount > 0 && appearanceCount % 3 == 0 {
+                let lastIdx = cell.count - 1
+                let pIdx = penta.firstIndex(of: cell[lastIdx]) ?? 0
+                let delta = rng.nextDouble() < 0.50 ? 1 : -1
+                let newPIdx = Swift.max(0, Swift.min(penta.count - 1, pIdx + delta))
+                cell[lastIdx] = penta[newPIdx]
+            }
+
+            // Additional window-based evolution on top of the guaranteed shift
+            let evolveWin = bar / 8
+            let staticWin = bar / 16
+            if evolving && evolveWin != lastEvolveWin {
+                lastEvolveWin = evolveWin
+                if rng.nextDouble() < 0.40 {   // raised from 30% to 40% for more audible change
+                    let shiftIdx = rng.nextInt(upperBound: cell.count - 1)  // interior note, not last
+                    let pIdx = penta.firstIndex(of: cell[shiftIdx]) ?? 0
+                    let delta = rng.nextDouble() < 0.50 ? 1 : -1
+                    let newPIdx = Swift.max(0, Swift.min(penta.count - 1, pIdx + delta))
+                    cell[shiftIdx] = penta[newPIdx]
+                }
+            } else if !evolving && staticWin != lastStaticWin {
+                lastStaticWin = staticWin
+                if rng.nextDouble() < 0.20 {   // raised from 10% for static micro-evolution
+                    let shiftIdx = rng.nextInt(upperBound: cell.count - 1)
+                    let pIdx = penta.firstIndex(of: cell[shiftIdx]) ?? 0
+                    let delta = rng.nextDouble() < 0.50 ? 1 : -1
+                    let newPIdx = Swift.max(0, Swift.min(penta.count - 1, pIdx + delta))
+                    cell[shiftIdx] = penta[newPIdx]
+                }
+            }
+            appearanceCount += 1
+
+            // Place the cell
+            var step = bar * 16
+            for (i, note) in cell.enumerated() {
+                let midi = clampToRegister(note, low: 60, high: 78)
+                let vel  = UInt8(clamping: Int(vb) + rng.nextInt(upperBound: 9) - 4)
+                let dur  = cellDurs[i]
+                if step < frame.totalBars * 16 {
+                    events.append(MIDIEvent(stepIndex: step, note: UInt8(midi), velocity: vel, durationSteps: dur))
+                    if useOctave {
+                        let octMidi = clampToRegister(note + 12, low: 60, high: 92)
+                        events.append(MIDIEvent(stepIndex: step, note: UInt8(octMidi), velocity: vel, durationSteps: dur))
+                    }
+                }
+                step += dur
+            }
+
+            // Jittered grid: 3, 4, or 5 bars until next appearance
+            bar += 3 + rng.nextInt(upperBound: 3)
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-012: Svefn Float (Drift / Dreamscape)
+    //
+    // Enters after 1/3 of the song. Each appearance is a short 3–5 note melodic phrase
+    // using scale notes in stepwise motion — not random chord tones, but a slow singing line.
+    // Notes held 2–5 beats each. Silences of 6–10 bars between phrases. 6–10 appearances.
+    // Never starts a phrase on the same pitch class as the previous phrase's first note.
+    // Velocity near-flat. The phrase should feel like a held breath surfacing from the texture.
+    private static func generateSvefnFloat(
+        frame: GlobalMusicalFrame, structure: SongStructure,
+        tonalMap: TonalGovernanceMap, rng: inout SeededRNG, velBase: Int
+    ) -> [MIDIEvent] {
+        let bodyStart = structure.introSection?.endBar ?? 0
+        let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+        let bodyLen   = bodyEnd - bodyStart
+
+        // Entry: after 1/3 of the song from the body start
+        let minEntry  = bodyStart + Swift.max(bodyLen / 3, 8)
+        let entryBar  = minEntry + rng.nextInt(upperBound: Swift.max(1, bodyLen / 10))
+        guard entryBar < bodyEnd - 6 else { return [] }
+
+        var prevPitchClass: Int = -1
+        var events: [MIDIEvent] = []
+
+        // 6–10 total phrases, spaced 6–10 bars apart
+        let phraseCount = 6 + rng.nextInt(upperBound: 5)
+        var bar = entryBar
+
+        for _ in 0..<phraseCount {
+            guard bar < bodyEnd - 4 else { break }
+            guard let entry = tonalMap.entry(atBar: bar) else { bar += 8; continue }
+
+            // Get scale notes in a comfortable register
+            let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame, low: 60, high: 79)
+            guard scaleNotes.count >= 3 else { bar += 8; continue }
+
+            // Pick start note — avoid the same pitch class as previous phrase's start
+            let startCandidates = scaleNotes.filter { $0 % 12 != prevPitchClass }
+            guard !startCandidates.isEmpty else { bar += 8; continue }
+            let startNote = startCandidates[rng.nextInt(upperBound: startCandidates.count)]
+            guard let startIdx = scaleNotes.firstIndex(of: startNote) else { bar += 8; continue }
+            prevPitchClass = startNote % 12
+
+            // Build a 3–5 note phrase moving stepwise from the start
+            // Direction: ascending (0), descending (1), or arch up then down (2)
+            let phraseLen = 3 + rng.nextInt(upperBound: 3)
+            let direction = rng.nextInt(upperBound: 3)  // 0=up, 1=down, 2=arch
+
+            var phraseNotes: [Int] = [startNote]
+            var idx = startIdx
+            let peak = phraseLen * 2 / 3
+
+            for i in 1..<phraseLen {
+                let goUp: Bool
+                switch direction {
+                case 0: goUp = true
+                case 1: goUp = false
+                default: goUp = (i <= peak)  // arch: up then down
+                }
+                let step = goUp ? 1 : -1
+                idx = Swift.max(0, Swift.min(scaleNotes.count - 1, idx + step))
+                phraseNotes.append(scaleNotes[idx])
+            }
+
+            // Place notes: each held 2–5 beats (8–20 steps)
+            // Velocity soft and near-flat — 46–62 so the float surfaces gently from the texture.
+            var tickStep = bar * 16
+            for note in phraseNotes {
+                let dur = (2 + rng.nextInt(upperBound: 4)) * 4   // 8–16 steps (2–4 beats)
+                if tickStep < bodyEnd * 16 {
+                    let vel = UInt8(46 + rng.nextInt(upperBound: 17))
+                    events.append(MIDIEvent(stepIndex: tickStep, note: UInt8(note),
+                                            velocity: vel, durationSteps: dur))
+                }
+                tickStep += dur
+            }
+
+            // Silence before next phrase: 6–10 bars
+            bar += 6 + rng.nextInt(upperBound: 5)
         }
         return events
     }

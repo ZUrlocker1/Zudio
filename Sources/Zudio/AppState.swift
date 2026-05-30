@@ -495,6 +495,8 @@ final class AppState: ObservableObject {
         (kTrackBass,   .ambient, 3),  // FM Synth         patch 62
         (kTrackTexture, .motorik, 0), // Fifths Lead      patch 86
         (kTrackTexture, .motorik, 6), // Interference     patch 11127
+        (kTrackTexture, .kosmic,  3), // FX Echoes        patch 102  (index shifted: FX Atmosphere removed)
+        (kTrackRhythm,  .kosmic,  6), // Synth Chime      patch 11098 (index shifted: Crystal Bells removed)
     ]
 
     private static let trackDisplayName: [Int: String] = [
@@ -502,11 +504,13 @@ final class AppState: ObservableObject {
         kTrackRhythm: "Rhythm", kTrackTexture: "Texture", kTrackBass: "Bass", kTrackDrums: "Drums"
     ]
 
-    static func instrumentPoolNames(trackIndex: Int, style: MusicStyle) -> [String] {
+    static func instrumentPoolNames(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [String] {
+        // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
+        // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet"]
         case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp"]
-        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder"]
+        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Xylophone"]
@@ -516,16 +520,16 @@ final class AppState: ObservableObject {
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
-        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice"]
+        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells"]
-        case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad"]
+        case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
-        case (kTrackTexture, .kosmic):  return ["FX Atmosphere","Pad 3 Poly","Fifths Lead"]
+        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
                                                 "Solar Wind","Interference"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
@@ -536,7 +540,7 @@ final class AppState: ObservableObject {
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
-        case (kTrackDrums,   .kosmic):  return ["808 Kit","Machine Kit","Standard Kit"]
+        case (kTrackDrums,   .kosmic):  return ["808 Kit","Machine Kit","Standard Kit","Brush Kit","Jazz Kit"]
         case (kTrackDrums,   .motorik): return ["Rock Kit","Brush Kit","Dance Drums","Machine Kit"]
         case (kTrackDrums,   _):        return ["Rock Kit","808 Kit","Brush Kit"]
         default:                        return []
@@ -545,11 +549,12 @@ final class AppState: ObservableObject {
 
     /// MIDI program numbers for each slot in instrumentPoolNames — same order, same count.
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
-    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle) -> [Int] {
+    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [Int] {
+        // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
         case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46]
-        case (kTrackLead1, .kosmic):   return [73, 100, 68, 74]
+        case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111]  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 13]
@@ -558,17 +563,17 @@ final class AppState: ObservableObject {
         case (kTrackLead2, .motorik):  return [90, 100, 39, 30]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
-        case (kTrackPads, .kosmic):    return [95, 50, 89, 91]
+        case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92]
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18]
-        case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088]
+        case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096]  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
         case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
-        case (kTrackTexture, .kosmic): return [99, 90, 86]
+        case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96]  // + Rain
         case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
@@ -578,7 +583,7 @@ final class AppState: ObservableObject {
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
         case (kTrackDrums, .ambient):  return [0, 40]
-        case (kTrackDrums, .kosmic):   return [25, 24, 0]
+        case (kTrackDrums, .kosmic):   return [25, 24, 0, 40, 32]  // + Brush Kit, Jazz Kit
         case (kTrackDrums, .motorik):  return [8, 40, 26, 24]
         case (kTrackDrums, _):         return [8, 25, 40]
         default: return []
@@ -587,8 +592,8 @@ final class AppState: ObservableObject {
 
     /// CC7 channel-volume override per pool slot (0 = use default 100).
     /// Entries that differ from 100 are listed explicitly; all others return 100.
-    static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle) -> [Int] {
-        let names = instrumentPoolNames(trackIndex: trackIndex, style: style)
+    static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [Int] {
+        let names = instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isKosmicDrift)
         return names.map { name in
             switch (trackIndex, style, name) {
             // Square Lead (program 80) at default CC7 100 — PlaybackEngine vol 0.78 handles calibration
@@ -619,10 +624,11 @@ final class AppState: ObservableObject {
         #endif
 
         let style = selectedStyle
+        let isDrift = songState?.isKosmicDrift == true
         let trackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"]
         var warnings: [GenerationLogEntry] = []
         for trackIndex in 0..<kTrackCount {
-            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
             guard !programs.isEmpty else { continue }
             // Chill/Ambient audio texture tracks are handled by audioTexture.start() — skip MIDI load
             if trackIndex == kTrackTexture && style == .chill { continue }
@@ -633,7 +639,7 @@ final class AppState: ObservableObject {
             let poolProgram = programs[min(idx, programs.count - 1)]
             let program = (trackIndex == kTrackLead2 ? lead2MirroredProgram : nil) ?? poolProgram
             playback.setProgram(program, forTrack: trackIndex, immediate: true)
-            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style)
+            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
             let cc7 = idx < cc7Values.count ? cc7Values[idx] : 100
             playback.setChannelVolume(cc7, forTrack: trackIndex)
             // Check that the load was confirmed (currentProgram updated only on success)
@@ -934,7 +940,7 @@ final class AppState: ObservableObject {
             let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: style)
             let name     = zip(programs, names).first { $0.0 == program }.map(\.1) ?? "p\(program)"
             self.appendToLog([GenerationLogEntry(tag: "Error",
-                description: "Missing MIDI patch \(program)  \(name)", isTitle: false)])
+                description: "Missing MIDI patch \(program) \(name)", isTitle: false)])
         }
         // iOS audio interruption (another app takes focus) or headphones pulled.
         // PlaybackEngine.stop() has already fired; stop audioTexture (Chill background loop) too.
@@ -1000,7 +1006,7 @@ final class AppState: ObservableObject {
                 let prefixed = entries.map { e -> GenerationLogEntry in
                     let desc = e.tag.isEmpty
                         ? e.description
-                        : "\(e.tag.trimmingCharacters(in: .whitespaces))  \(e.description)"
+                        : "\(e.tag.trimmingCharacters(in: .whitespaces)) \(e.description)"
                     return GenerationLogEntry(tag: barTag, description: desc, isTitle: e.isTitle)
                 }
                 newEntries.append(contentsOf: prefixed)
@@ -1183,6 +1189,7 @@ final class AppState: ObservableObject {
                 self.replaceOnceOnlyInstruments(style: style)
                 self.sanitiseBluesInstruments(for: state)
                 self.sanitiseNoirInstruments(for: state)
+                self.sanitiseDriftInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
                 // Chill texture: always applied last so randomization can't overwrite it.
                 if style == .chill {
@@ -1576,13 +1583,14 @@ final class AppState: ObservableObject {
     /// equally available — this only prevents two consecutive songs from sharing
     /// the same distinctive instrument.
     private func replaceOnceOnlyInstruments(style: MusicStyle) {
+        let isDrift = songState?.isKosmicDrift == true
         var rng = SystemRandomNumberGenerator()
         for entry in Self.noRepeatInstruments where entry.style == style {
             let current = instrumentOverrides[entry.track] ?? 0
             guard current == entry.poolIndex else { continue }
             // Only swap if the previous song also used this instrument.
             guard lastUsedInstrumentIndex[entry.track]?[style] == entry.poolIndex else { continue }
-            let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style)
+            let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift)
             guard pool.count > 1 else { continue }
             var newIdx = current
             var attempts = 0
@@ -1675,7 +1683,7 @@ final class AppState: ObservableObject {
         lead2MirroredProgram = lead1Programs[min(lead1Idx, lead1Programs.count - 1)]
         let name = lead1Idx < lead1Names.count ? lead1Names[lead1Idx] : "Lead 1"
         lead2MirrorName = name
-        appendToLog([GenerationLogEntry(tag: "Instrument", description: "Lead 2  \(name) locked to L1", isTitle: false)])
+        appendToLog([GenerationLogEntry(tag: "Instrument", description: "Lead 2 \(name) locked to L1", isTitle: false)])
     }
 
     private func restoreLead2Mirror() {
@@ -1684,13 +1692,14 @@ final class AppState: ObservableObject {
     }
 
     private func randomizeTwoInstruments(style: MusicStyle) {
+        let isDrift = songState?.isKosmicDrift == true
         var rng = SystemRandomNumberGenerator()
         var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
         var pickedCount = 0
         while pickedCount < 2, !eligible.isEmpty {
             let pos = eligible.indices.randomElement(using: &rng)!
             let trackIdx = eligible.remove(at: pos)
-            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style)
+            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style, isKosmicDrift: isDrift)
             guard pool.count > 1 else { continue }
             let currentIdx = instrumentOverrides[trackIdx] ?? 0
             let weightedPool = instrumentPickPool(trackIndex: trackIdx, style: style, poolCount: pool.count)
@@ -1738,6 +1747,31 @@ final class AppState: ObservableObject {
                 ? [2, 3, 5, 6, 7]   // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
                 : [0, 1, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Acoustic Bass + Pick Bass + Synth Bass 3
         }
+        // Kosmic: unified pool (Regular + Drift-exclusive); substyle restricts random picks.
+        if style == .kosmic {
+            let isDrift = songState?.isKosmicDrift == true
+            switch trackIndex {
+            case kTrackLead1:
+                // [0=Flute, 1=Brightness, 2=Oboe, 3=Recorder, 4=Warm Pad, 5=Sine Wave, 6=Bottle Blow, 7=Shenai]
+                return isDrift ? [4, 5, 6, 7] : [0, 1, 2, 3]
+            case kTrackRhythm:
+                // [0=Moog, 1=Wurlitzer, 2=Rock Organ, 3=Harpsi Pad, 4=New Age Pad, 5=Synth Mallet, 6=Synth Chime, 7=Mystery Pad]
+                return isDrift ? [0, 4, 5, 6, 7] : [0, 1, 2, 3]
+            case kTrackDrums:
+                // [0=808 Kit, 1=Machine Kit, 2=Standard Kit, 3=Brush Kit, 4=Jazz Kit]
+                return isDrift ? [2, 3, 4] : [0, 1, 2]  // Drift: Standard/Brush/Jazz; Regular: 808/Machine/Standard
+            case kTrackTexture:
+                // [0=Pad 3 Poly, 1=Fifths Lead, 2=Solar Wind, 3=FX Echoes, 4=Rain]
+                return isDrift ? Array(0..<poolCount) : [0, 1, 2, 3]  // Rain (4) Drift-only
+            case kTrackPads:
+                // [0=Sweep Pad, 1=Synth Strings, 2=Warm Pad, 3=Space Voice, 4=Halo Pad, 5=Bowed Glass]
+                return isDrift ? [0, 1, 2, 4, 5] : Array(0..<poolCount)  // Space Voice (3) excluded from Drift random
+            case kTrackBass:
+                // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3]
+                return isDrift ? [1, 3, 4] : Array(0..<poolCount)  // Moog+Mono Synth excluded from Drift random
+            default: break
+            }
+        }
         guard style == .chill else { return Array(0..<poolCount) }
         let isBlues = songState?.chillBluesVariation == true
         switch trackIndex {
@@ -1757,6 +1791,44 @@ final class AppState: ObservableObject {
                 : [0, 0, 0, 1, 1, 2, 3, 3, 4]
         default:
             return Array(0..<poolCount)
+        }
+    }
+
+    /// Ensures Kosmic Drift bass is never Moog (index 0) — Moog is Kosmic-regular only.
+    /// Fixes stale overrides from prior regular-Kosmic songs where Moog was the default.
+    private func sanitiseDriftInstruments(for state: SongState) {
+        guard state.style == .kosmic, state.isKosmicDrift else { return }
+        var rng = SystemRandomNumberGenerator()
+
+        // Bass: [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3] — Moog excluded from Drift random.
+        let currentBass = instrumentOverrides[kTrackBass] ?? 0
+        if currentBass == 0 {
+            let valid = [1, 2, 3, 4]
+            instrumentOverrides[kTrackBass] = valid[Int.random(in: 0..<valid.count, using: &rng)]
+        }
+
+        // Lead 1: [0=Flute, 1=Brightness, 2=Oboe, 3=Recorder, 4=Warm Pad, 5=Sine Wave, 6=Bottle Blow, 7=Shenai]
+        // Regular-only instruments (0-3) must not appear in Drift — swap to Drift-appropriate.
+        let currentLd1 = instrumentOverrides[kTrackLead1] ?? 0
+        if currentLd1 <= 3 {
+            let valid = [4, 5, 6, 7]
+            instrumentOverrides[kTrackLead1] = valid[Int.random(in: 0..<valid.count, using: &rng)]
+        }
+
+        // Rhythm: [0=Moog, 1=Wurlitzer, 2=Rock Organ, 3=Harpsi Pad, 4=New Age Pad, 5=Synth Mallet, 6=Synth Chime, 7=Mystery Pad]
+        // Regular-only: Wurlitzer/Rock Organ/Harpsi Pad (1-3) — Moog (0) is shared.
+        let currentRhtm = instrumentOverrides[kTrackRhythm] ?? 0
+        if (1...3).contains(currentRhtm) {
+            let valid = [0, 4, 5, 6, 7]
+            instrumentOverrides[kTrackRhythm] = valid[Int.random(in: 0..<valid.count, using: &rng)]
+        }
+
+        // Drums: [0=808 Kit, 1=Machine Kit, 2=Standard Kit, 3=Brush Kit, 4=Jazz Kit]
+        // 808 Kit (0) and Machine Kit (1) are Regular-only — swap to Drift-appropriate.
+        let currentDrums = instrumentOverrides[kTrackDrums] ?? 0
+        if currentDrums == 0 || currentDrums == 1 {
+            let valid = [2, 3, 4]
+            instrumentOverrides[kTrackDrums] = valid[Int.random(in: 0..<valid.count, using: &rng)]
         }
     }
 
@@ -1889,10 +1961,11 @@ final class AppState: ObservableObject {
     private func switchEvolveInstruments(freshTracks: [Int]) {
         guard let anchor = evolveAnchorState else { return }
         let style = anchor.style
+        let isDrift = songState?.isKosmicDrift == true
         var rng = SystemRandomNumberGenerator()
         var entries: [GenerationLogEntry] = []
         for trackIndex in freshTracks {
-            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
             guard programs.count > 1 else { continue }
             let currentIdx = instrumentOverrides[trackIndex] ?? 0
             var newIdx = currentIdx
@@ -1905,9 +1978,9 @@ final class AppState: ObservableObject {
             instrumentOverrides[trackIndex] = newIdx
             setProgram(programs[newIdx], forTrack: trackIndex)
             let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-            let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style)
+            let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
             let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
-            entries.append(GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(iName)", isTitle: false))
+            entries.append(GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false))
         }
         instrumentChangeToken += 1
         if !entries.isEmpty {
@@ -2401,6 +2474,7 @@ final class AppState: ObservableObject {
         replaceOnceOnlyInstruments(style: state.style)
         sanitiseBluesInstruments(for: state)
         sanitiseNoirInstruments(for: state)
+        sanitiseDriftInstruments(for: state)
         applyBluesPadsInstrument(for: state)
         applyAmbientPianoInstrument(for: state)
         restoreLead2Mirror()
@@ -2780,7 +2854,7 @@ final class AppState: ObservableObject {
                     batch.append(GenerationLogEntry(tag: "", description: "", isTitle: false))
                 }
                 let nameStr = loadTitle.isEmpty ? "" : " \(loadTitle)"
-                batch.append(GenerationLogEntry(tag: "FILE", description: "Loading song:\(nameStr)  --Zudio \(loadVersion)", isTitle: false))
+                batch.append(GenerationLogEntry(tag: "FILE", description: "Loading song:\(nameStr) --Zudio \(loadVersion)", isTitle: false))
                 batch.append(contentsOf: state.generationLog)
                 self.appendToLog(batch)
                 let wasPlaying = self.playback.isPlaying
@@ -2985,9 +3059,10 @@ final class AppState: ObservableObject {
         }
         playback.setProgram(program, forTrack: trackIndex)
         let style = selectedStyle
-        let poolPrograms = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+        let isDrift = songState?.isKosmicDrift == true
+        let poolPrograms = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
         if let poolIdx = poolPrograms.firstIndex(of: program) {
-            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style)
+            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
             let cc7 = poolIdx < cc7Values.count ? cc7Values[poolIdx] : 100
             playback.setChannelVolume(cc7, forTrack: trackIndex)
         }
@@ -3123,24 +3198,26 @@ final class AppState: ObservableObject {
         setProgram(programs[newIdx], forTrack: trackIndex)
         instrumentChangeToken += 1
         triggerVisualizerFlash(trackIndex: trackIndex)
+        let isDrift2 = songState?.isKosmicDrift == true
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style)
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift2)
         let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
-        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(iName)", isTitle: false)])
+        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false)])
     }
 
     /// Sets a specific program on a track and records the override index.
     func setInstrument(_ program: Int, forTrack trackIndex: Int) {
-        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
+        let isDrift = songState?.isKosmicDrift == true
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle, isKosmicDrift: isDrift)
         if let idx = programs.firstIndex(of: program) {
             instrumentOverrides[trackIndex] = idx
         }
         setProgram(program, forTrack: trackIndex)
         instrumentChangeToken += 1
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle)
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle, isKosmicDrift: isDrift)
         if let idx = programs.firstIndex(of: program), idx < names.count {
-            appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(names[idx])", isTitle: false)])
+            appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(names[idx])", isTitle: false)])
         }
     }
 
@@ -3148,7 +3225,7 @@ final class AppState: ObservableObject {
     /// Called by TrackRowView.cycleInstrument() which owns the display name.
     func logInstrumentChange(trackIndex: Int, name: String) {
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName)  \(name)", isTitle: false)])
+        appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(name)", isTitle: false)])
     }
 
     /// Removes all active effects from a track.
@@ -3192,12 +3269,14 @@ final class AppState: ObservableObject {
             default:            []
             }
         case .kosmic:
+            // Drift: Sweep on Pads, Pan on Texture, Tremolo on Bass (all ON); Regular: same effects available but OFF
+            let isDriftEffects = songState?.isKosmicDrift == true
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]
             case kTrackLead2:   [.space]
-            case kTrackPads:    [.space, .delay]
-            case kTrackTexture: [.delay, .space]
-            case kTrackBass:    [.reverb]
+            case kTrackPads:    isDriftEffects ? [.space, .delay, .sweep] : [.space, .delay]
+            case kTrackTexture: isDriftEffects ? [.delay, .space, .pan]   : [.delay, .space]
+            case kTrackBass:    isDriftEffects ? [.tremolo] : []
             case kTrackRhythm:  [.delay]
             default:            []
             }
@@ -3207,10 +3286,11 @@ final class AppState: ObservableObject {
             let isTremoloLead = trackIndex == kTrackLead1
                 && idx < mnames.count
                 && (mnames[idx] == "Synth Lead" || mnames[idx] == "Square Lead")
+            let isNoir = songState?.motorikNoirVariation == true
             defaults = switch trackIndex {
             case kTrackLead1:   isTremoloLead ? [.delay, .tremolo] : [.delay]
             case kTrackRhythm:  [.delay]
-            case kTrackPads:    [.space]
+            case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
             default:            []
             }
