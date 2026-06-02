@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-VERSION="1.7"
+VERSION="1.8"
 APP_SRC="${1:-${HOME}/Downloads/Zudio.app}"
 TEAM_ID="K66MA9TR8Z"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
@@ -152,7 +152,7 @@ echo ""
 echo " Verify checklist:"
 echo "   1. Open the DMG — Zudio.app on left, Applications on right, arrow visible"
 echo "   2. Drag Zudio.app to Applications and launch"
-echo "   3. About dialog shows version ${VERSION} (build 123)"
+echo "   3. About dialog shows version ${VERSION} (build 124)"
 echo "   4. spctl --assess --verbose=4 --type exec \"${APP_SRC}\""
 echo "============================================================"
 echo ""

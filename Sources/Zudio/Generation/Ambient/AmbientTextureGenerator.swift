@@ -1,6 +1,6 @@
 // AmbientTextureGenerator.swift — Ambient texture generation
 // Copyright (c) 2026 Zack Urlocker
-// AMB-TEXT-004 (40%): silent
+// AMB-TEXT-000 (40%): silent
 // AMB-TEXT-001 (30%): orbital shimmer — sparse mid-register notes, long hold, velocity 18–32
 // AMB-TEXT-002 (30%): ghost tone — 2–3 long-held notes filling each slot, velocity 22–38, register 48–79
 // Generates a short loop; AmbientLoopTiler tiles to full song length.
@@ -18,7 +18,7 @@ struct AmbientTextureGenerator {
         forceNonSilent: Bool = false
     ) -> [MIDIEvent] {
         let roll = rng.nextDouble()
-        if !forceNonSilent && roll < 0.40 { usedRuleIDs.insert("AMB-TEXT-004"); return [] }
+        if !forceNonSilent && roll < 0.40 { usedRuleIDs.insert("AMB-TEXT-000"); return [] }
 
         let bounds    = kRegisterBounds[kTrackTexture]!  // low:36, high:96
         let loopSteps = loopBars * 16

@@ -42,8 +42,8 @@ struct ChillMusicalFrameGenerator {
         // Blues excludes stGermain and hipHopJazz beat styles.
         // forceBeatStyle from best-first-song/load path takes priority in all cases.
         let beatStyle = forceBeatStyle ?? (bluesVariation
-            ? pickBeatStyleBlues(mood: mood, rng: &rng)
-            : pickBeatStyle(mood: mood, rng: &rng))
+            ? pickBeatStyleBlues(rng: &rng)
+            : pickBeatStyle(rng: &rng))
 
         let swingFeel = false  // swing not yet implemented (requires sub-step timing)
 
@@ -124,68 +124,29 @@ struct ChillMusicalFrameGenerator {
     }
 
     private static func pickLeadInstrument(mood: Mood, rng: inout SeededRNG) -> ChillLeadInstrument {
-        // Lead 1 pool: muted trumpet, tenor sax, alto sax, trumpet, clarinet.
+        // Lead 1 pool: all five horn/reed instruments equally weighted.
         // Soprano sax, vibraphone, trombone, flute are Lead 2 only.
-        // Clarinet at 10% across moods — blues/jazz character; auditioning.
-        switch mood {
-        case .Deep, .Dream:
-            // Muted Trumpet 23%, Alto Sax 27%, Trumpet 20%, Tenor Sax 20%, Clarinet 10%
-            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
-            let weights: [Double]              = [0.23,          0.27,       0.20,     0.20,      0.10]
-            return insts[rng.weightedPick(weights)]
-        case .Free, .Bright:
-            // Muted Trumpet 23%, Trumpet 18%, Tenor Sax 32%, Alto Sax 17%, Clarinet 10%
-            let insts:   [ChillLeadInstrument] = [.mutedTrumpet, .trumpet, .tenorSax, .saxophone, .clarinet]
-            let weights: [Double]              = [0.23,          0.18,     0.32,      0.17,       0.10]
-            return insts[rng.weightedPick(weights)]
-        }
+        let insts: [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
+        return insts[rng.nextInt(upperBound: insts.count)]
     }
 
-    private static func pickBeatStyleBlues(mood: Mood, rng: inout SeededRNG) -> ChillBeatStyle {
-        // Blues excludes stGermain and hipHopJazz; brushKit 40%, neoSoul 35%, electronic 25%.
-        let r = rng.nextDouble()
-        if r < 0.40 { return .brushKit }
-        if r < 0.75 { return .neoSoul }
-        return .electronic
+    private static func pickBeatStyleBlues(rng: inout SeededRNG) -> ChillBeatStyle {
+        // Blues pool: stGermain excluded (four-on-the-floor doesn't suit blues phrasing).
+        // All remaining styles equally weighted.
+        let styles: [ChillBeatStyle] = [.brushKit, .neoSoul, .electronic, .hipHopJazz]
+        return styles[rng.nextInt(upperBound: styles.count)]
     }
 
     private static func pickLeadInstrumentBlues(rng: inout SeededRNG) -> ChillLeadInstrument {
-        // Blues-appropriate horns/reeds — all capable of blues phrasing.
-        let insts:   [ChillLeadInstrument] = [.tenorSax, .saxophone, .clarinet, .mutedTrumpet, .trumpet]
-        let weights: [Double]              = [0.30,       0.22,       0.20,      0.18,          0.10]
-        return insts[rng.weightedPick(weights)]
+        // Blues pool: same five horn/reed instruments, equally weighted.
+        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .clarinet, .mutedTrumpet, .trumpet]
+        return insts[rng.nextInt(upperBound: insts.count)]
     }
 
-    private static func pickBeatStyle(mood: Mood, rng: inout SeededRNG) -> ChillBeatStyle {
-        switch mood {
-        case .Deep:
-            // Electronic 45%, brushKit 35%, hipHopJazz 20%
-            let r = rng.nextDouble()
-            if r < 0.45 { return .electronic }
-            if r < 0.80 { return .brushKit }
-            return .hipHopJazz
-        case .Dream:
-            // brushKit 35%, electronic 30%, hipHopJazz 20%, neoSoul 15%
-            let r = rng.nextDouble()
-            if r < 0.35 { return .brushKit }
-            if r < 0.65 { return .electronic }
-            if r < 0.85 { return .hipHopJazz }
-            return .neoSoul
-        case .Free:
-            // brushKit 35%, neoSoul 30%, hipHopJazz 20%, stGermain 15%
-            let r = rng.nextDouble()
-            if r < 0.35 { return .brushKit }
-            if r < 0.65 { return .neoSoul }
-            if r < 0.85 { return .hipHopJazz }
-            return .stGermain
-        case .Bright:
-            // brushKit 30%, stGermain 30%, hipHopJazz 25%, neoSoul 15%
-            let r = rng.nextDouble()
-            if r < 0.30 { return .brushKit }
-            if r < 0.60 { return .stGermain }
-            if r < 0.85 { return .hipHopJazz }
-            return .neoSoul
-        }
+    private static func pickBeatStyle(rng: inout SeededRNG) -> ChillBeatStyle {
+        // All five beat styles equally weighted — no mood bias.
+        let styles: [ChillBeatStyle] = [.electronic, .neoSoul, .brushKit, .stGermain, .hipHopJazz]
+        return styles[rng.nextInt(upperBound: styles.count)]
     }
 
     // MARK: - Triangular distribution

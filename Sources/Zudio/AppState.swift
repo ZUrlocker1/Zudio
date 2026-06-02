@@ -504,7 +504,7 @@ final class AppState: ObservableObject {
         kTrackRhythm: "Rhythm", kTrackTexture: "Texture", kTrackBass: "Bass", kTrackDrums: "Drums"
     ]
 
-    static func instrumentPoolNames(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [String] {
+    nonisolated static func instrumentPoolNames(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [String] {
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
@@ -592,7 +592,7 @@ final class AppState: ObservableObject {
 
     /// CC7 channel-volume override per pool slot (0 = use default 100).
     /// Entries that differ from 100 are listed explicitly; all others return 100.
-    static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [Int] {
+    nonisolated static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [Int] {
         let names = instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isKosmicDrift)
         return names.map { name in
             switch (trackIndex, style, name) {
@@ -678,9 +678,9 @@ final class AppState: ObservableObject {
         var parts: [String] = []
         for i in 0..<kTrackCount {
             let p = playback.loadedProgram(forTrack: i)
-            if i == kTrackTexture && style == .chill {
-                parts.append("Tx:audio")
-            } else if i == kTrackTexture && style == .ambient,
+            if i == kTrackTexture && style == .chill { continue }   // audio texture omitted
+            if let s = songState, SongLogExporter.isTrackSilent(i, song: s) { continue }
+            if i == kTrackTexture && style == .ambient,
                       let texFile = songState?.ambientAudioTexture {
                 let displayName = Self.ambientAudioDisplayName(texFile)
                 parts.append("Tx:\(displayName)")
@@ -695,6 +695,11 @@ final class AppState: ObservableObject {
         songState?.generationLog.append(instrumentsEntry)
 
         if !warnings.isEmpty { appendToLog(warnings) }
+
+        // Re-assert cachedIsKosmicDrift after all instrument loading is complete.
+        // iOS invalidateProgramCache() and other paths can reset it; this is the canonical
+        // final write so the audio thread always sees the correct value for note velocity scaling.
+        playback.updateKosmicDriftCache(songState?.isKosmicDrift == true)
     }
 
     // MARK: - Sheet triggers (set by key monitor, observed by TopBarView)
@@ -1191,8 +1196,18 @@ final class AppState: ObservableObject {
                 self.sanitiseNoirInstruments(for: state)
                 self.sanitiseDriftInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
-                // Chill texture: always applied last so randomization can't overwrite it.
+                // Chill: sync Lead 1 and Lead 2 overrides to generation-time instruments so log and
+                // playback agree. chillLeadInstrument/chillLead2Instrument drive musical generation
+                // (phrasing, register); instrumentOverrides drives the sampler patch — they must match.
                 if style == .chill {
+                    let l1Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill)
+                    if let idx = l1Pool.firstIndex(of: Int(state.chillLeadInstrument.gmProgram)) {
+                        self.instrumentOverrides[kTrackLead1] = idx
+                    }
+                    let l2Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill)
+                    if let idx = l2Pool.firstIndex(of: Int(state.chillLead2Instrument.gmProgram)) {
+                        self.instrumentOverrides[kTrackLead2] = idx
+                    }
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
                 }
@@ -1694,7 +1709,14 @@ final class AppState: ObservableObject {
     private func randomizeTwoInstruments(style: MusicStyle) {
         let isDrift = songState?.isKosmicDrift == true
         var rng = SystemRandomNumberGenerator()
-        var eligible = Self.randomizableTrackIndices.filter { style != .chill || $0 != kTrackTexture }
+        // Chill: Lead 1 and Lead 2 are always driven by the song's generated chillLeadInstrument /
+        // chillLead2Instrument (register, phrasing rules, and register separation all depend on them).
+        // Exclude them from random variation — only Pads, Rhythm, Bass, Drums vary between songs.
+        // Texture is excluded because the generator already picks the audio file.
+        var eligible = Self.randomizableTrackIndices.filter {
+            if style == .chill { return $0 != kTrackTexture && $0 != kTrackLead1 && $0 != kTrackLead2 }
+            return true
+        }
         var pickedCount = 0
         while pickedCount < 2, !eligible.isEmpty {
             let pos = eligible.indices.randomElement(using: &rng)!
@@ -1713,6 +1735,137 @@ final class AppState: ObservableObject {
                 instrumentOverrides[trackIdx] = newIdx
                 pickedCount += 1
             }
+        }
+    }
+
+    // MARK: - Static instrument selection — callable from batch tests without AppState instance
+
+    /// Full instrument selection pipeline: randomise two tracks, enforce no-repeat, sanitise per substyle.
+    /// Identical logic to the instance methods; uses explicit inout state so batch tests can call it directly.
+    /// `isFirstForStyle` resets overrides to defaults (index 0 = pool default) on the first song.
+    /// `lastUsed` persists across songs for no-repeat enforcement — initialise to [:] at batch start.
+    nonisolated static func selectInstrumentsForSong(
+        state: SongState,
+        isFirstForStyle: Bool,
+        overrides: inout [Int: Int],
+        lastUsed: inout [Int: [MusicStyle: Int]]
+    ) {
+        let style  = state.style
+        let isDrift = state.isKosmicDrift
+        var rng = SystemRandomNumberGenerator()
+
+        if isFirstForStyle {
+            overrides = [:]
+        } else {
+            // Randomise two instruments (same logic as randomizeTwoInstruments)
+            var eligible = randomizableTrackIndices.filter {
+                if style == .chill { return $0 != kTrackTexture && $0 != kTrackLead1 && $0 != kTrackLead2 }
+                return true
+            }
+            var pickedCount = 0
+            while pickedCount < 2, !eligible.isEmpty {
+                let pos      = eligible.indices.randomElement(using: &rng)!
+                let trackIdx = eligible.remove(at: pos)
+                let pool     = instrumentPoolNames(trackIndex: trackIdx, style: style, isKosmicDrift: isDrift)
+                guard pool.count > 1 else { continue }
+                let currentIdx   = overrides[trackIdx] ?? 0
+                let weightedPool = instrumentPickPoolStatic(trackIndex: trackIdx, style: style, poolCount: pool.count, state: state)
+                var newIdx   = currentIdx; var attempts = 0
+                repeat {
+                    newIdx = weightedPool[Int.random(in: 0..<weightedPool.count, using: &rng)]
+                    attempts += 1
+                } while newIdx == currentIdx && attempts < 3
+                if newIdx != currentIdx { overrides[trackIdx] = newIdx; pickedCount += 1 }
+            }
+        }
+
+        // No-repeat enforcement (same logic as replaceOnceOnlyInstruments)
+        for entry in noRepeatInstruments where entry.style == style {
+            let current = overrides[entry.track] ?? 0
+            guard current == entry.poolIndex else { continue }
+            guard lastUsed[entry.track]?[style] == entry.poolIndex else { continue }
+            let pool = instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift)
+            guard pool.count > 1 else { continue }
+            var newIdx = current; var attempts = 0
+            repeat { newIdx = Int.random(in: 0..<pool.count, using: &rng); attempts += 1 }
+            while newIdx == current && attempts < 8
+            overrides[entry.track] = newIdx
+        }
+
+        // Substyle sanitisation (same logic as sanitiseXxx methods)
+        if style == .motorik, state.motorikNoirVariation {
+            let bassNoirOnly: Set<Int> = [4, 5]; let bassRegOnly: Set<Int> = [2, 3]
+            let cb = overrides[kTrackBass] ?? 0
+            if bassRegOnly.contains(cb) { overrides[kTrackBass] = [0,1,4,5][Int.random(in:0..<4,using:&rng)] }
+            let cl = overrides[kTrackLead1] ?? 0
+            if [0,2,3].contains(cl)    { overrides[kTrackLead1] = [1,4,5,6,7][Int.random(in:0..<5,using:&rng)] }
+            let cr = overrides[kTrackRhythm] ?? 0
+            if [0,1,4].contains(cr)    { overrides[kTrackRhythm] = [2,3,5,6,7][Int.random(in:0..<5,using:&rng)] }
+            let cd = overrides[kTrackDrums] ?? 0
+            if cd == 2 { overrides[kTrackDrums] = [0,1,3][Int.random(in:0..<3,using:&rng)] }
+            let _ = bassNoirOnly  // silence unused warning
+        } else if style == .motorik {
+            let cd = overrides[kTrackDrums] ?? 0
+            if cd == 3 { overrides[kTrackDrums] = Int.random(in:0..<3, using:&rng) }
+        }
+        if style == .kosmic, state.isKosmicDrift {
+            let cb = overrides[kTrackBass] ?? 0;   if cb == 0           { overrides[kTrackBass]    = [1,2,3,4][Int.random(in:0..<4,using:&rng)] }
+            let cl = overrides[kTrackLead1] ?? 0;  if cl <= 3           { overrides[kTrackLead1]   = [4,5,6,7][Int.random(in:0..<4,using:&rng)] }
+            let cr = overrides[kTrackRhythm] ?? 0; if (1...3).contains(cr) { overrides[kTrackRhythm] = [0,4,5,6,7][Int.random(in:0..<5,using:&rng)] }
+            let cd = overrides[kTrackDrums] ?? 0;  if cd == 0 || cd == 1{ overrides[kTrackDrums]   = [2,3,4][Int.random(in:0..<3,using:&rng)] }
+        }
+        if style == .chill, state.chillBluesVariation {
+            let pool2 = instrumentPoolNames(trackIndex: kTrackLead2, style: .chill)
+            let vp2   = instrumentPickPoolStatic(trackIndex: kTrackLead2, style: .chill, poolCount: pool2.count, state: state)
+            if let cur = overrides[kTrackLead2], !Set(vp2).contains(cur) {
+                overrides[kTrackLead2] = vp2[Int.random(in:0..<vp2.count, using:&rng)]
+            }
+            overrides[kTrackPads] = Bool.random() ? 0 : 2   // Warm Pad or String Pad
+        }
+
+        // Save last-used for next song's no-repeat check
+        for entry in noRepeatInstruments where entry.style == style {
+            var dict = lastUsed[entry.track] ?? [:]
+            dict[style] = overrides[entry.track] ?? 0
+            lastUsed[entry.track] = dict
+        }
+    }
+
+    /// Static backing for instrumentPickPool — takes explicit SongState instead of self.songState.
+    nonisolated static func instrumentPickPoolStatic(trackIndex: Int, style: MusicStyle, poolCount: Int, state: SongState?) -> [Int] {
+        if style == .motorik && trackIndex == kTrackBass {
+            return state?.motorikNoirVariation == true ? [0,1,4,5] : [0,1,2,3]
+        }
+        if style == .motorik && trackIndex == kTrackLead1 {
+            return state?.motorikNoirVariation == true ? [1,4,5,6,7] : [0,1,2,3,4,6]
+        }
+        if style == .motorik && trackIndex == kTrackDrums {
+            return state?.motorikNoirVariation == true ? [0,1,3] : [0,1,2]
+        }
+        if style == .motorik && trackIndex == kTrackRhythm {
+            return state?.motorikNoirVariation == true ? [2,3,5,6,7] : [0,1,4,5,6]
+        }
+        if style == .kosmic {
+            let isDrift = state?.isKosmicDrift == true
+            switch trackIndex {
+            case kTrackLead1:   return isDrift ? [4,5,6,7]       : [0,1,2,3]
+            case kTrackRhythm:  return isDrift ? [0,4,5,6,7]     : [0,1,2,3]
+            case kTrackDrums:   return isDrift ? [2,3,4]         : [0,1,2]
+            case kTrackTexture: return isDrift ? Array(0..<poolCount) : [0,1,2,3]
+            case kTrackPads:    return isDrift ? [0,1,2,4,5]     : Array(0..<poolCount)
+            case kTrackBass:    return isDrift ? [1,3,4]         : Array(0..<poolCount)
+            default: break
+            }
+        }
+        guard style == .chill else { return Array(0..<poolCount) }
+        let isBlues = state?.chillBluesVariation == true
+        switch trackIndex {
+        case kTrackRhythm:
+            return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4]
+        case kTrackLead2:
+            return isBlues ? [0,0,0,2,2,3,3,3] : [0,0,0,1,1,2,3,3,4]
+        default:
+            return Array(0..<poolCount)
         }
     }
 
@@ -2669,7 +2822,8 @@ final class AppState: ObservableObject {
         var parts: [String] = []
         for i in 0..<kTrackCount {
             if i == kTrackLeadSynth && selectedStyle != .kosmic { continue }
-            if i == kTrackTexture && selectedStyle == .chill { parts.append("Tx:audio"); continue }
+            if i == kTrackTexture && selectedStyle == .chill { continue }   // audio texture omitted
+            if SongLogExporter.isTrackSilent(i, song: song) { continue }
             let pool = Self.instrumentPoolPrograms(trackIndex: i, style: selectedStyle)
             guard !pool.isEmpty else { continue }
             let prog = pool[min(instrumentOverrides[i] ?? 0, pool.count - 1)]

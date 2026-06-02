@@ -5,7 +5,19 @@ Copyright (c) 2026 Zack Urlocker
 
 Chill Blues demonstrated that a musically distinct sub-style surfacing ~20% of the time adds meaningful variety without fragmenting the style identity. It works because it shares the parent style's core engine (same generators, same pipeline) but changes enough musical rules — song structure, harmonic language, instrumentation weight — to feel like a genuinely different idiom.
 
-This document captures three candidate sub-styles, one for each remaining style. Each is designed to appear 10–20% of the time, determined probabilistically at song-generation time (same mechanism as `isChillBlues`).
+This document identifies 3 more sub-styles, one for each remaining style. Each is designed to appear 20-35% of the time, determined probabilistically at song-generation time (same mechanism as `isChillBlues`).
+
+---
+
+## Current Substyle Probabilities (as in code)
+
+These are the live values in the codebase as of this writing. Target release probabilities are noted separately where they differ.
+
+- **Chill Blues** — `20%` of Chill songs (`rng.nextDouble() < 0.20` in `ChillMusicalFrameGenerator.swift`)
+- **Motorik Noir** — `23%` of Motorik songs (`rng.nextDouble() < 0.23` in `SongGenerator.swift`)
+- **Kosmic Drift** — `30%` of Kosmic songs (`rng.nextDouble() < 0.30` in `CosmicMusicalFrameGenerator.swift`)
+- **Kosmic Drift — Dreamscape variant** — `15%` of Drift songs, i.e. ~4.5% of all Kosmic songs (`rng.nextDouble() < 0.15`, also in `CosmicMusicalFrameGenerator.swift`)
+- **Ambient Piano** — `35%` of Ambient songs (`pianoRoll < 0.35` in `SongGenerator.swift`)
 
 ---
 

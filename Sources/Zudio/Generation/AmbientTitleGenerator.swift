@@ -181,7 +181,7 @@ struct AmbientTitleGenerator {
 
     // Craven Faults style — terse obscure geological/topographical single words
     private static let cravenFaultsTerms = [
-        "Drumlins", "Grykes", "Zorvaaks", "Shakeholes", "Erratics", "Zacks",
+        "Drumlins", "Grykes", "Zorvaak", "Shakeholes", "Erratics", "Zacks",
         "Soughs", "Rakes", "Screes", "Swales", "Kettle Holes",
         "Alluvium", "Corries", "Runnels", "Lowess", "Ghylls", "Tikkenboxes",
         "Moraines", "Eskers", "Tarns", "Kames", "Outwash",
@@ -225,7 +225,7 @@ struct AmbientTitleGenerator {
         "Substagna", "Greyform", "Dampworks", "Sedimentia",
         "Murkling", "Fogware", "Drearscape", "Blankwave",
         "Hazura", "Stillence", "Tidemarks", "Vapourings",
-        "Mistform", "Pallor", "Residua", "Zorvaak"
+        "Mistform", "Pallor", "Residua", "Zorvaakian"
     ]
 
     private static let lightConditions = [

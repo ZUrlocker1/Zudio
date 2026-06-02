@@ -21,8 +21,8 @@ struct KosmicMusicalFrameGenerator {
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily,
           isKosmicDrift: Bool, isDriftDreamscape: Bool, driftVelocityBase: Int) {
 
-        // Kosmic Drift sub-style: 50% for extended testing (target 15% for release)
-        let isKosmicDrift = rng.nextDouble() < 0.50
+        // Kosmic Drift sub-style: 30% for release
+        let isKosmicDrift = rng.nextDouble() < 0.30
         // Dreamscape variant: ~10% of Drift songs (must be Drift first)
         let isDriftDreamscape = isKosmicDrift && rng.nextDouble() < 0.15
         // Flat velocity base for BoC-style rules: drawn once per song, 85–92

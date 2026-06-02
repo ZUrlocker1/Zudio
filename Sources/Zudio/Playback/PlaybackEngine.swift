@@ -67,8 +67,21 @@ final class PlaybackEngine: ObservableObject {
     private var delays      = [AVAudioUnitDelay]()
     private var comps       = [AVAudioUnitEffect]()
     private var lowEQs      = [AVAudioUnitEQ]()
-    private var reverbs     = [AVAudioUnitReverb]()
-    private let mixer       = AVAudioMixerNode()
+    // Reverb bus architecture: two shared reverb units replace 7 per-track units.
+    // Each track sends a copy of its post-EQ signal to one of the two buses via a send mixer.
+    // The dry signal goes directly to the main mixer; the bus adds only wet signal (100% wet).
+    private let reverbBusLarge      = AVAudioUnitReverb()   // Cathedral / LargeRoom
+    private let reverbBusSmall      = AVAudioUnitReverb()   // MediumHall / MediumRoom
+    private let reverbBusMixerLarge = AVAudioMixerNode()
+    private let reverbBusMixerSmall = AVAudioMixerNode()
+    private var reverbSendMixers    = [AVAudioMixerNode]()  // one per track; volume = send level
+    private var reverbSendLevels       = Array(repeating: Float(0),  count: kTrackCount)
+    // Per-track reverb presets for offline export — set by each style method to match original intent.
+    // Live playback uses shared buses; export uses these presets for per-track reverb nodes.
+    private var perTrackReverbPresets  = Array(repeating: AVAudioUnitReverbPreset.mediumHall, count: kTrackCount)
+    private var busLargePreset: AVAudioUnitReverbPreset = .cathedral
+    private var busSmallPreset: AVAudioUnitReverbPreset = .mediumHall
+    private let mixer               = AVAudioMixerNode()
 
     // Ambient mode — set before defaultsResetToken fires so setEffect uses Ambient values
     var ambientMode: Bool = false
@@ -79,15 +92,6 @@ final class PlaybackEngine: ObservableObject {
     // Tracks with zero MIDI events in the current song — effects suppressed to avoid processing silence.
     private var emptyTrackSet: Set<Int> = []
 
-    // Per-track Ambient reverb wet values — mediumHall for leads/pads/rhythm, largeRoom for texture, mediumRoom for bass
-    // Order: Lead1, Lead2, Pads, Rhythm, Texture, Bass, Drums, LeadSynth
-    private let ambientReverbWet: [Float]    = [65, 60, 72, 50, 60, 45, 70, 65]
-    // Per-track Chill reverb wet values — mediumHall for leads/rhythm/drums, mediumRoom for bass
-    private let chillReverbWet:   [Float]    = [45, 40, 55, 40,  0, 35, 40, 45]
-    // Per-track Motorik reverb wet values — mediumHall for most, mediumRoom for bass
-    private let motorikReverbWet: [Float]    = [55, 50, 50, 45, 50, 40, 45, 55]
-    // Per-track Kosmic reverb wet values — largeHall for leads/bass, cathedral for pads, mediumHall for texture
-    private let kosmicReverbWet:  [Float]    = [60, 55, 62, 50, 55, 45, 45, 60]
 
     // Per-track Ambient delay config: wet%, feedback%, lowpassHz (-1 = delay not used on this track)
     // Texture (idx 4): 1-beat echo, 18% wet, feedback=35 → 2–3 audible repeats, rolled off at 2.5kHz
@@ -105,7 +109,6 @@ final class PlaybackEngine: ObservableObject {
     // Kosmic: wider lead spread; Motorik: tighter. Rhythm/Texture offset for separation.
     // stopPan() restores to these values when auto-pan LFO is disabled.
     private var trackStaticPan   = Array(repeating: Float(0), count: kTrackCount)
-    private var reverbPresets    = Array(repeating: AVAudioUnitReverbPreset.cathedral, count: kTrackCount)
     // Tracks whether the user's +4.6 dB boost EFFECT is on — separate from boosts[i].outputVolume
     // which is also used as a dynamic animator (Chill pads fade, Kosmic/Ambient drone fades).
     private var boostEffectEnabled  = Array(repeating: false,   count: kTrackCount)
@@ -551,7 +554,7 @@ final class PlaybackEngine: ObservableObject {
         for i in 0..<kTrackCount where panEnabled[i] { stopPan(forTrack: i) }
         // Clear reverb/delay buffers so tails don't bleed through when volume
         // is restored for the next song — applies to all styles.
-        for rev in reverbs { rev.reset() }
+        reverbBusLarge.reset(); reverbBusSmall.reset()
         for del in delays  { del.reset() }
     }
 
@@ -599,6 +602,12 @@ final class PlaybackEngine: ObservableObject {
 
     /// Clears the loaded-program dedup cache so the next setProgram() call for every
     /// track forces a fresh loadSoundBankInstrument(), regardless of the previous program.
+    /// Final write of cachedIsKosmicDrift — called at the end of applyCurrentInstrumentsToPlayback()
+    /// so the audio thread always sees the correct value regardless of intermediate resets.
+    func updateKosmicDriftCache(_ isDrift: Bool) {
+        cachedIsKosmicDrift = kosmicStyle && isDrift
+    }
+
     /// Called on iOS before applyCurrentInstrumentsToPlayback() so that route-change engine
     /// restarts (which reset AUSampler state) are followed by a full reload of all tracks.
     func invalidateProgramCache() {
@@ -608,7 +617,9 @@ final class PlaybackEngine: ObservableObject {
         cachedLead1Program   = 255
         cachedLead2Program   = 255
         cachedIsAmbientPiano  = false
-        cachedIsKosmicDrift   = false
+        // cachedIsKosmicDrift intentionally NOT reset here — it reflects song state set in load(),
+        // not instrument program cache. Resetting it here caused the Drift kick reduction to silently
+        // stop working on iOS (invalidateProgramCache is called during applyCurrentInstruments).
     }
 
     /// Stop the engine once before a batch of setProgram() calls.
@@ -700,10 +711,9 @@ final class PlaybackEngine: ObservableObject {
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 88 / 100))
             } else if trackIndex == kTrackDrums && cachedDrumProgram == 0
                    && cachedIsKosmicDrift
-                   && (fireNote == GMDrum.kick.rawValue || fireNote == GMDrum.kick2.rawValue) {
-                // Standard Kit in Kosmic Drift: kick runs slightly hot — pull back 20% so it
-                // sits under the sparse texture rather than punching through it.
-                fireVelocity = UInt8(max(1, Int(ev.velocity) * 50 / 100))
+                   && (fireNote == GMDrum.snare.rawValue || fireNote == GMDrum.snare2.rawValue) {
+                // Standard Kit in Kosmic Drift: snare runs loud — reduce to 55% to sit in the mix
+                fireVelocity = UInt8(max(1, Int(ev.velocity) * 65 / 100))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -999,7 +1009,7 @@ final class PlaybackEngine: ObservableObject {
             let fileIdx = (program - 60000) / 1000
             actualProgram = UInt8((program - 60000) % 1000)
             bankLSB = 0
-            soundBankURL = externalPianoURL(fileIndex: fileIdx) ?? gmDLSSoundBankURL()
+            soundBankURL = Self.externalPianoURL(fileIndex: fileIdx) ?? gmDLSSoundBankURL()
         } else {
             bankLSB = program >= 1000 ? UInt8(program / 1000) : 0
             actualProgram = program >= 1000 ? UInt8(program % 1000) : UInt8(program)
@@ -1106,6 +1116,13 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.75   // Warm Pad runs hot on Chill Pads — pull back
             } else if trackIndex == kTrackTexture && program == 89 {
                 vol = 0.9    // Warm Pad runs loud on Texture — pull back
+            // Kosmic Texture specific — must sit before the general kTrackTexture catch-all below
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 96 {
+                vol = 0.42   // Rain (Ice Rain) runs loud on Kosmic Texture — pull back
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 11089 {
+                vol = 0.40   // Solar Wind runs loud on Kosmic Texture — pull back
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 102 {
+                vol = 0.50   // FX Echoes — pull back from general 1.4 Texture boost
             } else if trackIndex == kTrackTexture && ambientMode {
                 vol = 2.0    // Ambient Texture instruments run soft — boost
             } else if trackIndex == kTrackTexture {
@@ -1173,17 +1190,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.80   // Kosmic bass slightly quieter overall
             } else if trackIndex == kTrackBass && chillPadsMode {
                 vol = 0.82   // Chill bass slightly quieter overall
-            } else if trackIndex == kTrackTexture && kosmicStyle && program == 96 {
-                vol = 0.60   // Rain (Ice Rain) runs loud on Kosmic Texture — pull back
-            } else if trackIndex == kTrackTexture && kosmicStyle && program == 11089 {
-                vol = 0.58   // Solar Wind runs loud on Kosmic Texture — pull back
-
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 8080 {
                 vol = 0.80   // Sine Wave — lower from initial guess
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 76 {
                 vol = 1.1    // Bottle Blow runs soft — modest boost
-            } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 111 {
-                vol = 1.1    // Shenai — modest boost
+            } else if trackIndex == kTrackLead1 && kosmicStyle && program == 111 {
+                vol = 0.72   // Shenai runs loud on Kosmic Lead 1 — pull back
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 89 {
                 vol = 0.45   // Warm Pad on Drift Lead 1 — pull back further
             } else {
@@ -1219,8 +1231,8 @@ final class PlaybackEngine: ObservableObject {
     struct TrackEffectSnapshot {
         var volume: Float
         var pan: Float
-        var reverbPreset: AVAudioUnitReverbPreset
-        var reverbWetDryMix: Float
+        var reverbPreset: AVAudioUnitReverbPreset   // per-track preset for offline export
+        var reverbWetDryMix: Float                  // 0–100, equivalent to original wetDryMix
         var reverbBypassed: Bool
         var delayTime: Double
         var delayFeedback: Float
@@ -1230,9 +1242,18 @@ final class PlaybackEngine: ObservableObject {
         var compBypassed: Bool
         var lowShelfBypassed: Bool
         var hpfEnabled: Bool
-        /// Static LP cutoff for sweep filter (nil = sweep off / filter fully bypassed).
-        /// Set to the midpoint of the sweep range so the export sounds close to the time-averaged mix.
-        var sweepCutoff: Float?
+        // Sweep LFO — simulated per-block in offline export
+        var sweepEnabled: Bool
+        var sweepFloor: Float       // LP cutoff floor in Hz (filter fully closed)
+        var sweepHalfRange: Float   // half the total cutoff range in Hz
+        var sweepHz: Float          // LFO rate in Hz
+        // Tremolo LFO — simulated per-block in offline export
+        var tremoloEnabled: Bool
+        var tremoloHz: Float        // LFO rate in Hz
+        var tremoloDepth: Float     // modulation depth (0–1); volume swing = 1.0 → (1 - 2×depth)
+        // Auto-pan LFO — simulated per-block in offline export
+        var panEnabled: Bool
+        var panHz: Float            // LFO rate in Hz
     }
 
     /// Captures the current static effect settings for every track.
@@ -1243,28 +1264,31 @@ final class PlaybackEngine: ObservableObject {
             // Always use trackBaseVolume — boosts[i].outputVolume is also used as a dynamic
             // animator (Chill per-note fade, Kosmic/Ambient drone intro) and may be 0.0 at
             // snapshot time even when the track should play at full volume in the export.
-            // Sweep-active tracks get a 0.75 scale: the static midpoint cutoff lets through
-            // more signal on average than the live LFO which spends half its cycle heavily attenuated.
-            let sweepScale: Float = sweepEnabled[i] ? 0.75 : 1.0
-            let volume = (boostEffectEnabled[i] ? 1.7 : 1.0) * boostBaseMultiplier[i] * trackBaseVolume[i] * sweepScale
+            // No sweep scale needed: offline export now simulates the sweep LFO per block.
+            let volume = (boostEffectEnabled[i] ? 1.7 : 1.0) * boostBaseMultiplier[i] * trackBaseVolume[i]
 
-            // Sweep midpoint: if sweep is active, compute the static midpoint of the LFO range
-            // so the export approximates the time-averaged timbre (vs leaving it fully open).
-            let sweepCutoff: Float? = sweepEnabled[i] ? {
-                if ambientMode {
-                    // Ambient: per-track floor + halfRange (arrays already stored on self)
-                    return ambientSweepFloor[i] + ambientSweepHalfRange[i]
-                } else {
-                    return 1700  // midpoint of non-ambient range (300–3100 Hz)
-                }
-            }() : nil
+            // Sweep LFO parameters — Ambient uses per-track floor/range/rate arrays;
+            // non-Ambient sweep uses standard 300–3100 Hz range at 0.07 Hz.
+            // Ambient bass sweep is amplitude-coupled in live playback but approximated as
+            // a standard LFO in export (the per-note fade coupling cannot be reproduced offline).
+            let sFloor:     Float  = ambientMode ? ambientSweepFloor[i]    : 300
+            let sHalfRange: Float  = ambientMode ? ambientSweepHalfRange[i]: 1600
+            let sInc:       Double = ambientMode ? ambientSweepPhaseInc[i] : 0.02199
+            let sweepHz:    Float  = Float(sInc * 20.0 / (2.0 * .pi))   // phaseInc is per 20fps tick
+
+            // Tremolo Hz: slow swells (pads) update at 20fps, fast vibrato at 60fps.
+            let tremUpdateRate: Double = tremPhaseInc[i] < 0.1 ? 20.0 : 60.0
+            let tremoloHz: Float = Float(tremPhaseInc[i] * tremUpdateRate / (2.0 * .pi))
+
+            // Pan Hz: panPhaseInc is always per 20fps tick.
+            let panHz: Float = Float(panPhaseInc[i] * 20.0 / (2.0 * .pi))
 
             return TrackEffectSnapshot(
                 volume:             volume,
                 pan:                trackStaticPan[i],
-                reverbPreset:       reverbPresets[i],
-                reverbWetDryMix:    reverbs[i].wetDryMix,
-                reverbBypassed:     reverbs[i].wetDryMix == 0,
+                reverbPreset:       perTrackReverbPresets[i],
+                reverbWetDryMix:    reverbSendLevels[i] * 100,
+                reverbBypassed:     reverbSendLevels[i] == 0,
                 delayTime:          delays[i].delayTime,
                 delayFeedback:      delays[i].feedback,
                 delayLowPassCutoff: delays[i].lowPassCutoff,
@@ -1273,9 +1297,39 @@ final class PlaybackEngine: ObservableObject {
                 compBypassed:       comps[i].auAudioUnit.shouldBypassEffect,
                 lowShelfBypassed:   lowEQs[i].auAudioUnit.shouldBypassEffect,
                 hpfEnabled:        !lowEQs[i].bands[1].bypass,
-                sweepCutoff:        sweepCutoff
+                sweepEnabled:       sweepEnabled[i],
+                sweepFloor:         sweepEnabled[i] ? sFloor     : 0,
+                sweepHalfRange:     sweepEnabled[i] ? sHalfRange : 0,
+                sweepHz:            sweepEnabled[i] ? sweepHz    : 0,
+                tremoloEnabled:     tremEnabled[i],
+                tremoloHz:          tremEnabled[i]  ? tremoloHz  : 0,
+                tremoloDepth:       tremEnabled[i]  ? tremDepth[i]: 0,
+                panEnabled:         panEnabled[i],
+                panHz:              panEnabled[i]   ? panHz      : 0
             )
         }
+    }
+
+    // MARK: - Reverb bus helpers
+
+    private enum ReverbBus { case large, small }
+
+    /// Loads a factory preset on one or both bus reverbs and keeps the tracking variables in sync.
+    /// Always pair loadFactoryPreset with this — AVAudioUnitReverb has no read-back API.
+    private func setBusPresets(large: AVAudioUnitReverbPreset? = nil, small: AVAudioUnitReverbPreset? = nil) {
+        if let p = large { reverbBusLarge.loadFactoryPreset(p); busLargePreset = p }
+        if let p = small { reverbBusSmall.loadFactoryPreset(p); busSmallPreset = p }
+    }
+
+    /// Assigns a track's send mixer to a bus, sets its send level, and persists both for restore.
+    /// Called per-style at load time (engine not yet running) — safe to rewire.
+    private func connectSend(_ trackIndex: Int, to bus: ReverbBus, level: Float) {
+        guard trackIndex < reverbSendMixers.count else { return }
+        let busMixer = bus == .large ? reverbBusMixerLarge : reverbBusMixerSmall
+        engine.disconnectNodeOutput(reverbSendMixers[trackIndex])
+        engine.connect(reverbSendMixers[trackIndex], to: busMixer, format: nil)
+        reverbSendMixers[trackIndex].outputVolume = level
+        reverbSendLevels[trackIndex] = level
     }
 
     // MARK: - Ambient mode configuration
@@ -1289,18 +1343,26 @@ final class PlaybackEngine: ObservableObject {
             applyStaticPans()
             return
         }
-        // Set per-track reverb presets for Ambient
-        for i in 0..<reverbs.count {
-            let preset: AVAudioUnitReverbPreset
-            switch i {
-            case kTrackDrums:    preset = .plate
-            case kTrackTexture:  preset = .largeRoom
-            case kTrackBass:     preset = .mediumRoom
-            default:             preset = .mediumHall
-            }
-            reverbs[i].loadFactoryPreset(preset)
-            reverbPresets[i] = preset
-        }
+        // Texture on large bus (.largeRoom); all others on small bus (.mediumHall).
+        setBusPresets(large: .largeRoom, small: .mediumHall)
+        connectSend(kTrackLead1,     to: .small, level: 0.65)
+        connectSend(kTrackLead2,     to: .small, level: 0.60)
+        connectSend(kTrackPads,      to: .small, level: 0.72)
+        connectSend(kTrackRhythm,    to: .small, level: 0.50)
+        connectSend(kTrackTexture,   to: .large, level: 0.60)
+        connectSend(kTrackBass,      to: .small, level: 0.45)
+        connectSend(kTrackDrums,     to: .small, level: 0.70)
+        connectSend(kTrackLeadSynth, to: .small, level: 0)
+        // Per-track presets for offline export — original design intent preserved.
+        perTrackReverbPresets[kTrackLead1]     = .mediumHall
+        perTrackReverbPresets[kTrackLead2]     = .mediumHall
+        perTrackReverbPresets[kTrackPads]      = .mediumHall
+        perTrackReverbPresets[kTrackRhythm]    = .mediumHall
+        perTrackReverbPresets[kTrackTexture]   = .largeRoom
+        perTrackReverbPresets[kTrackBass]      = .mediumRoom
+        perTrackReverbPresets[kTrackDrums]     = .plate
+        perTrackReverbPresets[kTrackLeadSynth] = .mediumHall
+
         // Set Ambient delay times based on current song tempo
         let tempo = songState?.frame.tempo ?? 75
         let beatSecs = 60.0 / Double(tempo)
@@ -1310,12 +1372,9 @@ final class PlaybackEngine: ObservableObject {
             delays[i].feedback      = ambientDelayFeedback[i]
             delays[i].lowPassCutoff = ambientDelayLowpass[i]
         }
-        // Ambient Piano: mediumHall reverb at 75% wet, no delay.
+        // Ambient Piano: smaller reverb (0.28 send instead of 0.65), no delay.
         if songState?.isAmbientPiano == true {
-            reverbs[kTrackLead1].loadFactoryPreset(.mediumHall)
-            reverbPresets[kTrackLead1] = .mediumHall
-            reverbs[kTrackLead1].auAudioUnit.shouldBypassEffect = false
-            reverbs[kTrackLead1].wetDryMix    = 75
+            connectSend(kTrackLead1, to: .small, level: 0.28)
             delays[kTrackLead1].feedback      = 0
             delays[kTrackLead1].lowPassCutoff = 2000
             setEffect(.delay, enabled: false, forTrack: kTrackLead1)
@@ -1339,23 +1398,31 @@ final class PlaybackEngine: ObservableObject {
         chillPadsMode = enabled
         if !enabled {
             stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
-            reverbs[kTrackPads].loadFactoryPreset(.cathedral)  // restore Pads to init preset
-            reverbPresets[kTrackPads] = .cathedral
             applyStaticPans()
             return
         }
-        // Chill reverb presets — lighter than the cathedral/largeChamber init defaults.
-        reverbs[kTrackLead1].loadFactoryPreset(.mediumHall);   reverbPresets[kTrackLead1]  = .mediumHall
-        reverbs[kTrackLead2].loadFactoryPreset(.mediumHall);   reverbPresets[kTrackLead2]  = .mediumHall
-        reverbs[kTrackPads].loadFactoryPreset(.mediumHall);    reverbPresets[kTrackPads]   = .mediumHall
-        reverbs[kTrackRhythm].loadFactoryPreset(.mediumHall);  reverbPresets[kTrackRhythm] = .mediumHall
-        reverbs[kTrackBass].loadFactoryPreset(.mediumRoom);    reverbPresets[kTrackBass]   = .mediumRoom
-        reverbs[kTrackDrums].loadFactoryPreset(.mediumHall);   reverbPresets[kTrackDrums]  = .mediumHall
+        // All active tracks on the small bus (.mediumHall).
+        // Texture sampler is unused in Chill (AudioTexturePlayer handles it) — zero send.
+        setBusPresets(small: .mediumHall)
+        connectSend(kTrackLead1,     to: .small, level: 0.45)
+        connectSend(kTrackLead2,     to: .small, level: 0.40)
+        connectSend(kTrackPads,      to: .small, level: 0.55)
+        connectSend(kTrackRhythm,    to: .small, level: 0.40)
+        connectSend(kTrackTexture,   to: .small, level: 0)
+        connectSend(kTrackBass,      to: .small, level: 0.35)
+        connectSend(kTrackDrums,     to: .small, level: 0.40)
+        connectSend(kTrackLeadSynth, to: .small, level: 0)
+        perTrackReverbPresets[kTrackLead1]     = .mediumHall
+        perTrackReverbPresets[kTrackLead2]     = .mediumHall
+        perTrackReverbPresets[kTrackPads]      = .mediumHall
+        perTrackReverbPresets[kTrackRhythm]    = .mediumHall
+        perTrackReverbPresets[kTrackTexture]   = .mediumHall
+        perTrackReverbPresets[kTrackBass]      = .mediumRoom
+        perTrackReverbPresets[kTrackDrums]     = .mediumHall
+        perTrackReverbPresets[kTrackLeadSynth] = .mediumHall
         // kTrackTexture sampler is unused in Chill — suppress its effect chain.
         // (setEffect guards against re-enabling it; this covers the init low-shelf which is always on.)
         lowEQs[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
-        reverbs[kTrackTexture].auAudioUnit.shouldBypassEffect = true
-        reverbs[kTrackTexture].wetDryMix                      = 0
         delays[kTrackTexture].auAudioUnit.shouldBypassEffect  = true
         // Tempo-synced delay for Chill Lead 1 (dotted-quarter) and Lead 2 (quarter note).
         // Blues bypasses delay on both leads — dry saxophone/clarinet tone is more authentic.
@@ -1378,12 +1445,24 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func applyMotorikAudio() {
-        // Reverb presets — lighter than cathedral/largeChamber init defaults
-        for i in 0..<reverbs.count {
-            let preset: AVAudioUnitReverbPreset = i == kTrackBass ? .mediumRoom : .mediumHall
-            reverbs[i].loadFactoryPreset(preset)
-            reverbPresets[i] = preset
-        }
+        // All tracks on the small bus (.mediumHall); bass slightly lower send level.
+        setBusPresets(small: .mediumHall)
+        connectSend(kTrackLead1,     to: .small, level: 0.55)
+        connectSend(kTrackLead2,     to: .small, level: 0.50)
+        connectSend(kTrackPads,      to: .small, level: 0.50)
+        connectSend(kTrackRhythm,    to: .small, level: 0.45)
+        connectSend(kTrackTexture,   to: .small, level: 0.50)
+        connectSend(kTrackBass,      to: .small, level: 0.40)
+        connectSend(kTrackDrums,     to: .small, level: 0.45)
+        connectSend(kTrackLeadSynth, to: .small, level: 0.55)
+        perTrackReverbPresets[kTrackLead1]     = .mediumHall
+        perTrackReverbPresets[kTrackLead2]     = .mediumHall
+        perTrackReverbPresets[kTrackPads]      = .mediumHall
+        perTrackReverbPresets[kTrackRhythm]    = .mediumHall
+        perTrackReverbPresets[kTrackTexture]   = .mediumHall
+        perTrackReverbPresets[kTrackBass]      = .mediumRoom
+        perTrackReverbPresets[kTrackDrums]     = .mediumHall
+        perTrackReverbPresets[kTrackLeadSynth] = .mediumHall
         // Tempo-synced delays: Lead 1 = 16th note (tight doubling), Rhythm = 8th note (syncopated echo)
         let tempo    = songState?.frame.tempo ?? 120
         let beatSecs = 60.0 / Double(tempo)
@@ -1397,14 +1476,26 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func applyKosmicAudio() {
-        // Reverb presets — lighter than cathedral/largeChamber init defaults
-        reverbs[kTrackLead1].loadFactoryPreset(.largeHall);    reverbPresets[kTrackLead1]   = .largeHall
-        reverbs[kTrackLead2].loadFactoryPreset(.largeHall);    reverbPresets[kTrackLead2]   = .largeHall
-        reverbs[kTrackPads].loadFactoryPreset(.cathedral);     reverbPresets[kTrackPads]    = .cathedral
-        reverbs[kTrackTexture].loadFactoryPreset(.mediumHall); reverbPresets[kTrackTexture] = .mediumHall
-        reverbs[kTrackBass].loadFactoryPreset(.largeHall);     reverbPresets[kTrackBass]    = .largeHall
-        reverbs[kTrackRhythm].loadFactoryPreset(.mediumHall);  reverbPresets[kTrackRhythm]  = .mediumHall
-        reverbs[kTrackDrums].loadFactoryPreset(.mediumHall);   reverbPresets[kTrackDrums]   = .mediumHall
+        // Large bus (.cathedral): Pads, Leads, Bass, LeadSynth (mirrors Lead1, currently dry).
+        // Small bus (.mediumHall): Texture, Rhythm, Drums.
+        setBusPresets(large: .cathedral, small: .mediumHall)
+        connectSend(kTrackLead1,     to: .large, level: 0.60)
+        connectSend(kTrackLead2,     to: .large, level: 0.55)
+        connectSend(kTrackPads,      to: .large, level: 0.62)
+        connectSend(kTrackBass,      to: .large, level: 0.45)
+        connectSend(kTrackLeadSynth, to: .large, level: 0)
+        connectSend(kTrackTexture,   to: .small, level: 0.55)
+        connectSend(kTrackRhythm,    to: .small, level: 0.50)
+        connectSend(kTrackDrums,     to: .small, level: 0.45)
+        // Per-track presets for offline export — original per-track design intent.
+        perTrackReverbPresets[kTrackLead1]     = .largeHall
+        perTrackReverbPresets[kTrackLead2]     = .largeHall
+        perTrackReverbPresets[kTrackPads]      = .cathedral
+        perTrackReverbPresets[kTrackTexture]   = .mediumHall
+        perTrackReverbPresets[kTrackBass]      = .largeHall
+        perTrackReverbPresets[kTrackRhythm]    = .mediumHall
+        perTrackReverbPresets[kTrackDrums]     = .mediumHall
+        perTrackReverbPresets[kTrackLeadSynth] = .largeHall
         // Tempo-synced delays
         let tempo    = songState?.frame.tempo ?? 110
         let beatSecs = 60.0 / Double(tempo)
@@ -1486,23 +1577,9 @@ final class PlaybackEngine: ObservableObject {
             comps[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .lowShelf:
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-        case .reverb:
-            let wet: Float = ambientMode   && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
-                : chillPadsMode            && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
-                : motorikStyle             && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
-                : kosmicStyle              && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
-                : 50
-            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            reverbs[trackIndex].wetDryMix = enabled ? wet : 0
-        case .space:
-            let wet: Float = ambientMode && trackIndex == kTrackLead1 && songState?.isAmbientPiano == true ? 28
-                : ambientMode          && trackIndex < ambientReverbWet.count  ? ambientReverbWet[trackIndex]
-                : chillPadsMode        && trackIndex < chillReverbWet.count    ? chillReverbWet[trackIndex]
-                : motorikStyle         && trackIndex < motorikReverbWet.count  ? motorikReverbWet[trackIndex]
-                : kosmicStyle          && trackIndex < kosmicReverbWet.count   ? kosmicReverbWet[trackIndex]
-                : 70
-            reverbs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
-            reverbs[trackIndex].wetDryMix = enabled ? wet : 0
+        case .reverb, .space:
+            // Bus architecture: bypass = zero send level; restore = persisted send level from style setup.
+            reverbSendMixers[trackIndex].outputVolume = enabled ? reverbSendLevels[trackIndex] : 0
         }
     }
 
@@ -1713,6 +1790,34 @@ final class PlaybackEngine: ObservableObject {
     // Uses boosts[kTrackBass/kTrackPads].outputVolume (separate from sampler mute volume).
     // Intro: 0 → 1 over the intro section duration.
     // Outro: 1 → 0 over the outro section duration.
+
+    /// Shared linear fade-ramp using a DispatchSource timer (100 ms ticks).
+    /// Sets `engine.mainMixerNode.outputVolume = startProgress × linearFade` on each tick.
+    /// Calls `onTick(linearFade)` every tick for style-specific side effects.
+    /// Calls `onComplete()` once when linearFade reaches 0 and cancels the source.
+    /// Returns the live DispatchSourceTimer — caller must retain it and cancel on stop.
+    private func makeLinearFadeTimer(
+        startProgress: Float,
+        remainingSecs: Double,
+        schedulerID: Int,
+        onTick: @escaping (Float) -> Void,
+        onComplete: @escaping () -> Void
+    ) -> DispatchSourceTimer {
+        let startNanos = DispatchTime.now().uptimeNanoseconds
+        engine.mainMixerNode.outputVolume = startProgress
+        let src = DispatchSource.makeTimerSource(queue: .main)
+        src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
+        src.setEventHandler { [weak self] in
+            guard let self, self.currentSchedulerID == schedulerID else { return }
+            let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
+            let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
+            self.engine.mainMixerNode.outputVolume = startProgress * linearFade
+            onTick(linearFade)
+            if linearFade <= 0.0 { onComplete() }
+        }
+        src.resume()
+        return src
+    }
 
     private func startKosmicDroneFades(state: SongState) {
         // Cancel timers only — do NOT call stopKosmicDroneFades(), which would flash
@@ -1945,27 +2050,18 @@ final class PlaybackEngine: ObservableObject {
                 let remainingSecs  = Double(totalSteps - elapsedInOutro) * sps
                 let startNanos     = DispatchTime.now().uptimeNanoseconds
 
-                self.engine.mainMixerNode.outputVolume = startProgress
-
-                let src = DispatchSource.makeTimerSource(queue: .main)
-                src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
-                src.setEventHandler { [weak self] in
-                    guard let self, self.currentSchedulerID == schedulerID else { return }
-                    let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                    let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
-                    self.engine.mainMixerNode.outputVolume = startProgress * linearFade
-                    if linearFade <= 0.0 {
+                self.motorikFadeTimers[1] = self.makeLinearFadeTimer(
+                    startProgress: startProgress, remainingSecs: remainingSecs,
+                    schedulerID: schedulerID,
+                    onTick: { _ in },
+                    onComplete: {
                         self.motorikFadeTimers[1]?.cancel()
                         self.motorikFadeTimers[1] = nil
-                        // Clear effect buffers so reverb/delay tails don't bleed through
-                        // when mainMixerNode volume is restored for the next song.
                         self.allNotesOff()
-                        for rev in self.reverbs { rev.reset() }
+                        self.reverbBusLarge.reset(); self.reverbBusSmall.reset()
                         for del in self.delays  { del.reset() }
                     }
-                }
-                src.resume()
-                self.motorikFadeTimers[1] = src
+                )
             }
         }
     }
@@ -2073,32 +2169,25 @@ final class PlaybackEngine: ObservableObject {
                 let remainingSecs  = Double(totalSteps - elapsedInOutro) * sps
                 let startNanos     = DispatchTime.now().uptimeNanoseconds
 
-                self.engine.mainMixerNode.outputVolume = startProgress
-
                 // Fire allNotesOff() early so Ambient release envelopes (up to 2s) complete
-                // and the reverb drains before the fade reaches 0.  By the time outputVolume
-                // is restored for the next song there is nothing left in the reverb buffers.
+                // and the reverb drains before the fade reaches 0.
                 var notesOffFired = false
-                let src = DispatchSource.makeTimerSource(queue: .main)
-                src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
-                src.setEventHandler { [weak self] in
-                    guard let self, self.currentSchedulerID == schedulerID else { return }
-                    let elapsed    = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
-                    let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
-                    self.engine.mainMixerNode.outputVolume = startProgress * linearFade
-                    if linearFade <= 0.15 && !notesOffFired {
-                        notesOffFired = true
-                        self.allNotesOff()
-                    }
-                    if linearFade <= 0.0 {
+                self.ambientOutroFadeTimer = self.makeLinearFadeTimer(
+                    startProgress: startProgress, remainingSecs: remainingSecs,
+                    schedulerID: schedulerID,
+                    onTick: { fade in
+                        if fade <= 0.15 && !notesOffFired {
+                            notesOffFired = true
+                            self.allNotesOff()
+                        }
+                    },
+                    onComplete: {
                         self.ambientOutroFadeTimer?.cancel()
                         self.ambientOutroFadeTimer = nil
-                        for rev in self.reverbs { rev.reset() }
+                        self.reverbBusLarge.reset(); self.reverbBusSmall.reset()
                         for del in self.delays  { del.reset() }
                     }
-                }
-                src.resume()
-                self.ambientOutroFadeTimer = src
+                )
             }
         }
     }
@@ -2187,6 +2276,21 @@ final class PlaybackEngine: ObservableObject {
         engine.attach(mixer)
         engine.connect(mixer, to: engine.mainMixerNode, format: nil)
 
+        // Reverb buses: 100% wet — each bus adds only the reverb tail; dry signal bypasses via fan-out.
+        reverbBusLarge.loadFactoryPreset(busLargePreset)
+        reverbBusLarge.wetDryMix = 100
+        reverbBusSmall.loadFactoryPreset(busSmallPreset)
+        reverbBusSmall.wetDryMix = 100
+
+        engine.attach(reverbBusMixerLarge)
+        engine.attach(reverbBusMixerSmall)
+        engine.attach(reverbBusLarge)
+        engine.attach(reverbBusSmall)
+        engine.connect(reverbBusMixerLarge, to: reverbBusLarge, format: nil)
+        engine.connect(reverbBusMixerSmall, to: reverbBusSmall, format: nil)
+        engine.connect(reverbBusLarge,      to: mixer,          format: nil)
+        engine.connect(reverbBusSmall,      to: mixer,          format: nil)
+
         for i in 0..<kTrackCount {
             let sampler      = AVAudioUnitSampler()
             let boost        = AVAudioMixerNode()   // outputVolume > 1 = boost; pan = auto-pan
@@ -2194,7 +2298,7 @@ final class PlaybackEngine: ObservableObject {
             let delay        = AVAudioUnitDelay()
             let comp         = AVAudioUnitEffect(audioComponentDescription: Self.compDesc)
             let lowEQ        = AVAudioUnitEQ(numberOfBands: 2)
-            let reverb       = AVAudioUnitReverb()
+            let sendMixer    = AVAudioMixerNode()   // reverb send tap — volume = send level (0 until style set)
 
             // Boost: unity gain, centre pan by default
             boost.outputVolume = 1.0
@@ -2233,14 +2337,8 @@ final class PlaybackEngine: ObservableObject {
             lowEQ.bands[1].bypass     = true
             lowEQ.auAudioUnit.shouldBypassEffect = true
 
-            // Reverb: cathedral for atmospheric tracks (Lead1, Lead2, Pads, Texture);
-            // large chamber for rhythmic tracks (Rhythm, Bass, Drums)
-            let atmosphericTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackPads, kTrackTexture, kTrackLeadSynth]
-            let initPreset: AVAudioUnitReverbPreset = atmosphericTracks.contains(i) ? .cathedral : .largeChamber
-            reverb.loadFactoryPreset(initPreset)
-            reverbPresets[i] = initPreset
-            reverb.wetDryMix = 0
-            reverb.auAudioUnit.shouldBypassEffect = true
+            // Send mixer: starts silent; style methods set the level and bus assignment.
+            sendMixer.outputVolume = 0
 
             engine.attach(sampler)
             engine.attach(boost)
@@ -2248,16 +2346,20 @@ final class PlaybackEngine: ObservableObject {
             engine.attach(delay)
             engine.attach(comp)
             engine.attach(lowEQ)
-            engine.attach(reverb)
+            engine.attach(sendMixer)
 
-            // Chain: sampler → boost → sweep → delay → comp → lowEQ → reverb → mixer
+            // Chain: sampler → boost → sweep → delay → comp → lowEQ ─┬→ mixer (dry)
+            //                                                          └→ sendMixer → small bus (default)
             engine.connect(sampler,     to: boost,       format: nil)
             engine.connect(boost,       to: sweepFilter, format: nil)
             engine.connect(sweepFilter, to: delay,       format: nil)
             engine.connect(delay,       to: comp,        format: nil)
             engine.connect(comp,        to: lowEQ,       format: nil)
-            engine.connect(lowEQ,       to: reverb,      format: nil)
-            engine.connect(reverb,      to: mixer,       format: nil)
+            engine.connect(lowEQ, to: [
+                AVAudioConnectionPoint(node: mixer,              bus: AVAudioNodeBus(i)),
+                AVAudioConnectionPoint(node: sendMixer,          bus: 0)
+            ], fromBus: 0, format: nil)
+            engine.connect(sendMixer, to: reverbBusMixerSmall, format: nil)
 
             samplers.append(sampler)
             boosts.append(boost)
@@ -2265,7 +2367,7 @@ final class PlaybackEngine: ObservableObject {
             delays.append(delay)
             comps.append(comp)
             lowEQs.append(lowEQ)
-            reverbs.append(reverb)
+            reverbSendMixers.append(sendMixer)
         }
         loadGMPrograms()
     }
@@ -2305,7 +2407,8 @@ private func loadGMPrograms() {
     }
 
 
-    private func externalPianoURL(fileIndex: Int) -> URL? {
+    /// Single source of truth for external piano SF2 URLs — also used by OfflineExport.
+    nonisolated static func externalPianoURL(fileIndex: Int) -> URL? {
         fileIndex == 1 ? Bundle.main.url(forResource: "SC55 Piano_V2", withExtension: "sf2") : nil
     }
 
@@ -2330,6 +2433,10 @@ private func loadGMPrograms() {
             let effectiveMute = (i == kTrackLeadSynth) ? muteState[kTrackLead1] : muteState[i]
             let muted = effectiveMute || (anySolo && !effectiveSolo)
             samplers[i].volume = muted ? 0.0 : trackBaseVolume[i]
+            // Zero the reverb send when muted so the shared bus tail doesn't continue from a muted track.
+            if i < reverbSendMixers.count {
+                reverbSendMixers[i].outputVolume = muted ? 0.0 : reverbSendLevels[i]
+            }
         }
     }
 

@@ -1,9 +1,20 @@
 # Zudio Change Log
 
+## V 1.8 (Build 124)  Reverb bus and performance
+
+- **Reverb bus architecture** — Replaced 7 independent per-track `AVAudioUnitReverb` instances with 2 shared reverb buses for live playback: a large bus (Cathedral for Kosmic, Large Room for Ambient) and a small bus (Medium Hall for all styles). Each track sends a configurable amount of its post-EQ signal to the appropriate bus; the dry signal travels directly to the main mixer. Result: **over 50% reduction in CPU load**. Playback without the visualizer now runs under 10% CPU; with the visualizer generally under 20%, compared to over 35% before. 
+- **Higher fidelity M4A audio export** — M4A audio export continues to use per-track reverbs with the original presets for full audio fidelity.  The offline audio export now simulates all track effects that were previously missing: auto-pan, tremolo, and sweep filter, especially important for Kosmic Drift and Ambient styles. 
+
+---
+
 ## V 1.7 (Build 123)  Kosmic Drift
 
 - **Kosmic Drift** — New Kosmic sub-style appearing in ~50% of Kosmic songs. Inspired by Boards of Canada, Portishead, and Sigur Ros. Slower tempo (70–90 BPM), sparse and meditative. Features three new drum rules (Loping Groove, Half-Time Lope, Dreamscape Float), four new bass rules, three new lead rules (Tycho Phrase, Drift Memory, Sigur Ros late entry float), and five new rhythm rules (Chord Tremolo, Slow Chord Pulse, Four-Bar Chord Hold, Chromatic Tremolo, Downbeat Chord) all drawn from MIDI analysis of reference tracks. A Dreamscape variant (~10% of Drift songs) produces the most extreme spaciousness.
 - **Expanded Kosmic instrument pools** — Kosmic Pads gains Halo Pad and Bowed Glass for warmer choices. Kosmic Texture gains Solar Wind and FX Echoes for added atmospheric depth. Drift Lead 1 uses Warm Pad, Sine Wave, Bottle Blow, and Shenai. Drift Rhythm uses Moog, New Age Pad, Synth Mallet, Synth Chime, and Mystery Pad. Tremolo added to Kosmic Bass effects chip, replacing Low Filter.
+- **Kosmic bass improvements** — KOS-BASS-001 Berlin School drone gains breathing gaps, duration variety and colour notes to make it a slow-evolving drone. The dual-bass layer (KOS-BASS-007 tremolo) now suppresses when the primary bass is on a sustained major-7th note to avoid semitone clashes.
+- **Chill instrument selection simplified** — Removed incorrect mood-weighted Lead 1 and Lead 2 instrument selection.
+- **Chill horn harmony in regular Chill** — The second-horn harmony previously  only in Chill Blues now appears in ~20% of regular Chill songs. Harmony is diatonic (a third or sixth below) or unison.
+- **Generation log improvements** — Shortened and cleaned up descriptions for clarity and consistency.
 
 ---
 

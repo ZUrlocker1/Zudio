@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Zack Urlocker
 // AMB-DRUM-004 (45%): hand percussion — congas, bongos, shakers, maracas, claves
 // AMB-DRUM-001 (30%): brush kit — sparse ride/hat hits + occasional cymbal shimmer
-// AMB-DRUM-003 (20%): no percussion
+// AMB-DRUM-000 (20%): no percussion
 // AMB-DRUM-002  (5%): soft pulse — gentle kick on beat 1, hat on beat 3
 
 import Foundation
@@ -25,7 +25,7 @@ struct AmbientDrumGenerator {
             usedRuleIDs.insert("AMB-DRUM-001")
             return textural(frame: frame, structure: structure, rng: &rng)
         case .absent:
-            usedRuleIDs.insert("AMB-DRUM-003")
+            usedRuleIDs.insert("AMB-DRUM-000")
             return []
         case .softPulse:
             usedRuleIDs.insert("AMB-DRUM-002")

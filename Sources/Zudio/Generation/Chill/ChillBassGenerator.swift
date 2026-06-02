@@ -723,7 +723,7 @@ struct ChillBassGenerator {
         let usePickup    = roll >= 0.20 && roll < 0.42
         let useAscending = roll >= 0.42 && roll < 0.64
         let useWalking   = roll >= 0.64 && roll < 0.78
-        let usePulse     = roll >= 0.90
+        let usePulse     = roll >= 0.78 && roll < 0.90   // fixed: was >= 0.90, leaving 0.78–0.90 unmapped
 
         if useRumba          { usedRuleIDs.insert("CHL-BASS-012") }
         else if usePickup    { usedRuleIDs.insert("CHL-BASS-009") }

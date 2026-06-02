@@ -94,8 +94,8 @@ struct SongLogExporter {
             lines.append("  \(label) \(col(range, 20)) \(len)")
         }
         // Ambient-only: log co-prime loop lengths so QA can check for duplicate assignments.
-        // Only show a track's loop length if it produced events — silent tracks (e.g. AMB-BASS-002,
-        // AMB-RTHM-004) are omitted so the log isn't misleading.
+        // Only show a track's loop length if it produced events — silent tracks (e.g. AMB-BASS-000,
+        // AMB-RTHM-000) are omitted so the log isn't misleading.
         if let loops = song.ambientLoopLengths {
             let te = song.trackEvents
             var loopLines: [String] = []
@@ -168,6 +168,28 @@ struct SongLogExporter {
         String(format: "%3d", bar + 1)
     }
 
+    /// Returns true when a track should be omitted from the Instruments line:
+    /// either its events are completely empty (Ambient Piano silent tracks, etc.)
+    /// or the generation log contains an explicit absence rule (KOS-BASS-000, AMB-DRUM-000, etc.).
+    static func isTrackSilent(_ trackIndex: Int, song: SongState) -> Bool {
+        if song.trackEvents.indices.contains(trackIndex) && song.trackEvents[trackIndex].isEmpty {
+            return true
+        }
+        // -000 suffix convention = absent track; map track index to relevant tag substrings
+        let patterns: [(Int, [String])] = [
+            (kTrackBass,    ["-BASS-000"]),
+            (kTrackPads,    ["-PADS-000", "-PAD-000"]),
+            (kTrackDrums,   ["-DRUM-000"]),
+            (kTrackRhythm,  ["-RTHM-000", "-RHY-000"]),
+            (kTrackTexture, ["-TEXT-000", "-TEX-000"]),
+            (kTrackLead2,   ["-LD2-000"]),
+        ]
+        for (track, subs) in patterns where track == trackIndex {
+            return song.generationLog.contains { entry in subs.contains { entry.tag.contains($0) } }
+        }
+        return false
+    }
+
     /// Derives the Instruments line from SongState without requiring PlaybackEngine.
     /// Used by batch tests which never call applyCurrentInstrumentsToPlayback().
     /// Chill Lead 1/2 use the generation instrument (chillLeadInstrument/chillLead2Instrument);
@@ -176,11 +198,9 @@ struct SongLogExporter {
         let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
         var parts: [String] = []
         for i in 0..<kTrackCount {
-            if i == kTrackTexture && song.style == .chill {
-                parts.append("Tx:audio")
-                continue
-            }
+            if i == kTrackTexture && song.style == .chill { continue }   // audio texture omitted
             if i == kTrackLeadSynth && song.style != .kosmic { continue }
+            if isTrackSilent(i, song: song) { continue }
             let p = generationProgram(forTrack: i, song: song)
             if p != 255 { parts.append("\(shortNames[i]):\(p)") }
         }

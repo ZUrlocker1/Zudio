@@ -87,7 +87,7 @@ enum OfflineExport {
             let trackSF2: URL
             if programs[t] >= 60000 {
                 let fileIdx = (programs[t] - 60000) / 1000
-                trackSF2 = Self.externalPianoURL(fileIndex: fileIdx) ?? sf2URL
+                trackSF2 = PlaybackEngine.externalPianoURL(fileIndex: fileIdx) ?? sf2URL
             } else {
                 trackSF2 = sf2URL
             }
@@ -114,7 +114,7 @@ enum OfflineExport {
 
         let sps = 60.0 / Double(state.frame.tempo) / 4.0
         let eventLists: [[SampleEvent]] = samplers.map { item in
-            buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps, velocityFloor: 0)
+            buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps)
         }
         var evtIdxs = [Int](repeating: 0, count: samplers.count)
 
@@ -181,8 +181,19 @@ enum OfflineExport {
         // MARK: Phase 2 — offline AVAudioEngine with effects chain
 
         let fxEngine = AVAudioEngine()
-        var players  = [AVAudioPlayerNode]()
+        var players         = [AVAudioPlayerNode]()
+        var sweepNodes      = [AVAudioUnitEffect]()
+        var tremoloGains    = [AVAudioMixerNode]()
+        var allSnaps        = [PlaybackEngine.TrackEffectSnapshot]()
 
+        // Per-track chain with LFO effects — sweep, tremolo, and auto-pan are simulated per render
+        // block by updating node parameters between renderOffline() calls.
+        //
+        // Chain: player → tremoloGain → sweep → delay → comp → eq → reverb → mainMixer
+        //
+        // tremoloGain: always present; outputVolume = 1.0 when tremolo is off, LFO value when on.
+        // sweep:       bypassed when sweep is off; starts at floor cutoff (fully closed) when on.
+        // player.pan:  static when pan is off; updated per block when on.
         for i in 0..<samplers.count {
             let trackIdx = samplers[i].trackIdx
             let snap     = trackIdx < snapshots.count ? snapshots[trackIdx]
@@ -192,20 +203,22 @@ enum OfflineExport {
                                delayTime: 0.125, delayFeedback: 40, delayLowPassCutoff: 6000,
                                delayWetDryMix: 0, delayBypassed: true,
                                compBypassed: true, lowShelfBypassed: true, hpfEnabled: false,
-                               sweepCutoff: nil)
+                               sweepEnabled: false, sweepFloor: 0, sweepHalfRange: 0, sweepHz: 0,
+                               tremoloEnabled: false, tremoloHz: 0, tremoloDepth: 0,
+                               panEnabled: false, panHz: 0)
+            allSnaps.append(snap)
 
-            let player = AVAudioPlayerNode()
+            let player      = AVAudioPlayerNode()
+            let tremoloGain = AVAudioMixerNode()
 
-            // Sweep LP filter — static midpoint of LFO range when sweep was active.
-            // Approximates the time-averaged timbre without needing a live LFO.
+            // Sweep LP filter: start at floor cutoff (fully closed) if active; bypassed if not.
             let sweep = AVAudioUnitEffect(audioComponentDescription: lpDesc)
-            if let cutoff = snap.sweepCutoff {
-                AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
-                AudioUnitSetParameter(sweep.audioUnit, 1, kAudioUnitScope_Global, 0,    3.0, 0)
+            AudioUnitSetParameter(sweep.audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0)  // resonance
+            if snap.sweepEnabled {
+                AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0, snap.sweepFloor, 0)
                 sweep.auAudioUnit.shouldBypassEffect = false
             } else {
                 AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
-                AudioUnitSetParameter(sweep.audioUnit, 1, kAudioUnitScope_Global, 0,  3.0, 0)
                 sweep.auAudioUnit.shouldBypassEffect = true
             }
 
@@ -240,22 +253,28 @@ enum OfflineExport {
             eq.auAudioUnit.shouldBypassEffect = snap.lowShelfBypassed
 
             fxEngine.attach(player)
+            fxEngine.attach(tremoloGain)
             fxEngine.attach(sweep)
             fxEngine.attach(delay)
             fxEngine.attach(comp)
             fxEngine.attach(eq)
             fxEngine.attach(reverb)
-            // Chain: player → sweep → delay → comp → eq → reverb → mainMixer
-            fxEngine.connect(player, to: sweep,                   format: avFormat)
-            fxEngine.connect(sweep,  to: delay,                   format: avFormat)
-            fxEngine.connect(delay,  to: comp,                    format: avFormat)
-            fxEngine.connect(comp,   to: eq,                      format: avFormat)
-            fxEngine.connect(eq,     to: reverb,                  format: avFormat)
-            fxEngine.connect(reverb, to: fxEngine.mainMixerNode,  format: avFormat)
+            fxEngine.connect(player,      to: tremoloGain,           format: avFormat)
+            fxEngine.connect(tremoloGain, to: sweep,                 format: avFormat)
+            fxEngine.connect(sweep,       to: delay,                 format: avFormat)
+            fxEngine.connect(delay,       to: comp,                  format: avFormat)
+            fxEngine.connect(comp,        to: eq,                    format: avFormat)
+            fxEngine.connect(eq,          to: reverb,                format: avFormat)
+            fxEngine.connect(reverb,      to: fxEngine.mainMixerNode,format: avFormat)
 
-            player.volume = snap.volume
-            player.pan    = snap.pan
+            player.volume            = 1.0          // unity — volume applied on tremoloGain (supports > 1.0)
+            player.pan               = 0           // always centre — pan is applied on tremoloGain below
+            tremoloGain.pan          = snap.panEnabled ? 0 : snap.pan  // static pan at mixer output
+            tremoloGain.outputVolume = snap.volume  // calibrated volume; AVAudioMixerNode supports > 1.0
+
             players.append(player)
+            sweepNodes.append(sweep)
+            tremoloGains.append(tremoloGain)
         }
 
         // Audio texture track (Chill/Ambient rain, wind, vinyl, etc.)
@@ -353,9 +372,40 @@ enum OfflineExport {
         )
         let outBuf = AVAudioPCMBuffer(pcmFormat: avFormat, frameCapacity: 4096)!
 
+        // LFO phase accumulators — one per track, updated each block.
+        // Phases are advanced by exactly (2π × hz × blockFrames / sampleRate) per block,
+        // giving accurate LFO simulation regardless of block size.
+        var sweepPhases   = [Double](repeating: 0, count: samplers.count)
+        var tremoloPhases = [Double](repeating: 0, count: samplers.count)
+        var panPhases     = [Double](repeating: 0, count: samplers.count)
+
         while phase2Done < phase2Total {
             if isCancelled() { throw CancellationError() }
             let thisFrames = AVAudioFrameCount(min(4096, phase2Total - phase2Done))
+            let dt = Double(thisFrames) / sampleRate   // elapsed seconds this block
+
+            // Update LFO parameters before rendering so this block uses current LFO values.
+            for i in 0..<samplers.count {
+                let snap = allSnaps[i]
+
+                if snap.sweepEnabled {
+                    sweepPhases[i] += 2 * .pi * Double(snap.sweepHz) * dt
+                    let cutoff = snap.sweepFloor + snap.sweepHalfRange * Float(1 + sin(sweepPhases[i]))
+                    AudioUnitSetParameter(sweepNodes[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+                }
+
+                if snap.tremoloEnabled {
+                    tremoloPhases[i] += 2 * .pi * Double(snap.tremoloHz) * dt
+                    let factor = Float(1.0 - Double(snap.tremoloDepth) * (1.0 + sin(tremoloPhases[i])))
+                    tremoloGains[i].outputVolume = max(0, snap.volume * factor)
+                }
+
+                if snap.panEnabled {
+                    panPhases[i] += 2 * .pi * Double(snap.panHz) * dt
+                    tremoloGains[i].pan = Float(sin(panPhases[i]))
+                }
+            }
+
             let status = try fxEngine.renderOffline(thisFrames, to: outBuf)
             guard status == .success else { break }
             try audioFile.write(from: outBuf)
@@ -372,9 +422,7 @@ enum OfflineExport {
 
     // MARK: - Helpers
 
-    private static func externalPianoURL(fileIndex: Int) -> URL? {
-        fileIndex == 1 ? Bundle.main.url(forResource: "SC55 Piano_V2", withExtension: "sf2") : nil
-    }
+    // externalPianoURL is defined in PlaybackEngine as a static func — delegates there.
 
     private static func makeSampler(sf2: URL, encodedProgram: Int, bankMSB: UInt8) throws -> AudioUnit {
         let bankLSB: UInt8
@@ -418,14 +466,13 @@ enum OfflineExport {
     }
 
     private static func buildEvents(_ trackEvents: [MIDIEvent],
-                                    sampleRate: Double, sps: Double, velocityFloor: Int = 0) -> [SampleEvent] {
+                                    sampleRate: Double, sps: Double) -> [SampleEvent] {
         var evts = [SampleEvent]()
         evts.reserveCapacity(trackEvents.count * 2)
         for e in trackEvents {
             let on  = Int64(Double(e.stepIndex)                   * sampleRate * sps)
             let off = Int64(Double(e.stepIndex + e.durationSteps) * sampleRate * sps)
-            let vel = velocityFloor > 0 ? UInt8(max(velocityFloor, Int(e.velocity))) : e.velocity
-            evts.append(SampleEvent(pos: on,  status: 0x90, note: e.note, vel: vel))
+            evts.append(SampleEvent(pos: on,  status: 0x90, note: e.note, vel: e.velocity))
             evts.append(SampleEvent(pos: off, status: 0x80, note: e.note, vel: 0))
         }
         return evts.sorted { $0.pos < $1.pos }

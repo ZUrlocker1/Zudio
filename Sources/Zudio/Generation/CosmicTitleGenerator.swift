@@ -60,7 +60,7 @@ struct KosmicTitleGenerator {
         "Empyrion", "Orpheon", "Elyseon", "Zephyron", "Kroneon",
         "Aureon",   "Hezperon", "Logion",  "Pneumex",  "Aionex",
         "Zatarax",  "Pyreon",   "Zodeon",  "Hypereon", "Chthonon",
-        "Eideon",   "Zopheon",  "Zaerion", "Thyreon",  "Aztraeon", "Zorvaak"
+        "Eideon",   "Zopheon",  "Zaerion", "Thyreon",  "Aztraeon", "Gyro"
     ]
 
     /// Poetic space adjectives — atmospheric, distinct from Motorik's German register

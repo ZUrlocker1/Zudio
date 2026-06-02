@@ -1,7 +1,7 @@
 // AmbientBassGenerator.swift — Ambient bass generation
 // Copyright (c) 2026 Zack Urlocker
 // AMB-BASS-001: Root-held drone — long holds using the active chord root, with silences.
-// AMB-BASS-002: Bass absent (30% chance).
+// AMB-BASS-000: Bass absent (30% chance).
 // AMB-BASS-003: Root+fifth drone — holds alternate root / fifth; occasional major third (10%).
 // AMB-BASS-004: ECM pluck — short staccato plucks (6–10 steps) spaced 3–5 bars apart,
 //               walking stepwise through scale tones. Eberhard Weber / ECM records feel.
@@ -32,7 +32,7 @@ struct AmbientBassGenerator {
     ) -> [MIDIEvent] {
         // 30% absent (suppressable by forcing a specific rule)
         if forceRuleID == nil && rng.nextDouble() < 0.30 {
-            usedRuleIDs.insert("AMB-BASS-002")
+            usedRuleIDs.insert("AMB-BASS-000")
             return []
         }
 

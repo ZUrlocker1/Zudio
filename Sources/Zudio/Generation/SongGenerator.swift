@@ -540,7 +540,7 @@ struct SongGenerator {
             } else if drumRules.contains("KOS-DRUM-008") {
                 drumDropoutConfig = (firstOffsetRange: 6, winMin: 2, winMax: 4, gapMin: 12, gapMax: 18)
             } else {
-                drumDropoutConfig = nil   // KOS-DRUM-001 Minimal and KOS-DRUM-003 Absent: no additional dropout
+                drumDropoutConfig = nil   // KOS-DRUM-001 Minimal and KOS-DRUM-000 Absent: no additional dropout
             }
             if let cfg = drumDropoutConfig {
                 var dropoutRNG = SeededRNG(seed: seed &+ 0xD9)
@@ -705,9 +705,10 @@ struct SongGenerator {
         let title: String = {
             let raw = KosmicTitleGenerator.generate(frame: frame, rng: &rng)
             guard isKosmicDrift && !raw.contains(" ") else { return raw }
-            let prefixes = ["Slow", "Dissolving", "Liminal", "Deep", "Amber", "Warm", "Spectral", "Saturated",
-                            "Stereophonic", "Post-Rock", "Lo-Fi", "Hazy", "Loping"]
-            let suffixes = ["Sequence", "Tape", "Drift", "Float", "Dream", "Fog", "Wave", "in Stereo", "Panorama"]
+            let prefixes = ["Slow", "Dissolving", "Liminal", "Deep", "Amber", "Warm", "Spectral", "Saturated", "Duophonic", "Ambiophonic", "New Orthophonic", "Paraphonic",
+                    "Stereophonic", "Post-Rock", "Lo-Fi", "Hazy", "Loping"]
+            let suffixes = ["Sequencer", "Tape", "Drift", "Float", "Dream", "Fog", "Wave",
+                            "in Stereo", "Panorama", "Ultrasonic", "Plethora", "Echo"]
             if rng.nextDouble() < 0.50 {
                 return "\(prefixes[rng.nextInt(upperBound: prefixes.count)]) \(raw)"
             } else {
@@ -795,7 +796,7 @@ struct SongGenerator {
         // pianoRuleRoll is consumed regardless so non-piano songs produce the same frame as before.
         let pianoRoll     = rng.nextDouble()
         let pianoRuleRoll = rng.nextDouble()
-        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.40
+        let isAmbientPiano = forceAmbientPianoRule != nil || pianoRoll < 0.35
         let pianoRule: String = {
             if let f = forceAmbientPianoRule { return f }
             return pianoRuleRoll < 0.35 ? "AMB-PNO-001" : (pianoRuleRoll < 0.65 ? "AMB-PNO-002" : "AMB-PNO-003")
@@ -1074,15 +1075,7 @@ struct SongGenerator {
         var texRules: Set<String> = []
         if let audioFile = ambientAudioTexture {
             // Audio texture replaces MIDI — leave track empty, mark with a per-file rule ID for the log.
-            switch audioFile {
-            case "light_rain.m4a":   texRules.insert("AMB-TEXT-003")
-            case "rain-and-thunder.m4a":   texRules.insert("AMB-TEXT-005")
-            case "ocean_waves.m4a":  texRules.insert("AMB-TEXT-006")
-            case "zen-bells.m4a":    texRules.insert("AMB-TEXT-007")
-            case "wind-stoorm.m4a":  texRules.insert("AMB-TEXT-008")
-            case "desert-winds.m4a": texRules.insert("AMB-TEXT-009")
-            default:                 texRules.insert("AMB-TEXT-003")
-            }
+            texRules.insert(Self.ambientAudioTextureRuleID(for: audioFile))
         } else {
             let texLoop = AmbientTextureGenerator.generate(frame: frame, tonalMap: tonalMap,
                                                             loopBars: loopLengths.texture, rng: &texRNG,
@@ -1273,7 +1266,7 @@ struct SongGenerator {
                     bar: blockStart + 1, frame: frame, tonalMap: tonalMap, rng: &lead1RNG)
                 trackEvents[kTrackLead1] = (trackEvents[kTrackLead1] + whistleEvents)
                     .sorted { $0.stepIndex < $1.stepIndex }
-                lead1Rules.insert("AMB-XFILES-001")
+                // AMB-XFILES-001 intentionally not logged — playback annotation "Bar N  Spooky X-Files theme" is sufficient
                 ambientXFilesBars = [blockStart + 1]
             }
         }
@@ -1323,6 +1316,9 @@ struct SongGenerator {
                     .map { $0.note } ?? pool[pool.count / 2]
                 trackEvents[kTrackPads].append(
                     MIDIEvent(stepIndex: fillStep, note: refNote, velocity: 40, durationSteps: 20))
+            }
+            // Sort once after all void fills rather than after each insert
+            if !voids.isEmpty {
                 trackEvents[kTrackPads].sort { $0.stepIndex < $1.stepIndex }
             }
         }
@@ -1514,12 +1510,14 @@ struct SongGenerator {
                 events = isSectionSolo ? loop
                     : AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
             } else if isKosmic {
-                var discardedBaseRule = ""
-                var discardedXFiles: [Int] = []
+                // lead1BaseRule and xFilesBars are needed during initial song generation
+                // (Lead 2 and Arpeggio reference them) but are unused in single-track regen.
+                var unusedBaseRule = ""
+                var unusedXFilesBars: [Int] = []
                 events = KosmicLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
-                    lead1BaseRule: &discardedBaseRule, xFilesBars: &discardedXFiles)
+                    lead1BaseRule: &unusedBaseRule, xFilesBars: &unusedXFilesBars)
             } else if isChill {
                 (events, _, _) = ChillLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
@@ -1610,15 +1608,7 @@ struct SongGenerator {
                     events = []
                     regenAmbientAudioTexture = file
                     regenAmbientAudioOffset  = offset
-                    switch file {
-                    case "light_rain.m4a":   usedRules.insert("AMB-TEXT-003")
-                    case "rain-and-thunder.m4a":   usedRules.insert("AMB-TEXT-005")
-                    case "ocean_waves.m4a":  usedRules.insert("AMB-TEXT-006")
-                    case "zen-bells.m4a":    usedRules.insert("AMB-TEXT-007")
-                    case "wind-stoorm.m4a":  usedRules.insert("AMB-TEXT-008")
-                    case "desert-winds.m4a": usedRules.insert("AMB-TEXT-009")
-                    default:                usedRules.insert("AMB-TEXT-003")
-                    }
+                    usedRules.insert(Self.ambientAudioTextureRuleID(for: file))
                 } else {
                     // MIDI texture path (55%)
                     let loop = AmbientTextureGenerator.generate(
@@ -1666,6 +1656,36 @@ struct SongGenerator {
     }
 
     /// Route a ruleID to the correct description function by trackIndex.
+    /// Maps an Ambient audio texture filename to its rule ID.
+    /// Single source of truth — used during both initial generation and regenerateTrack().
+    private static func ambientAudioTextureRuleID(for filename: String) -> String {
+        switch filename {
+        case "light_rain.m4a":       return "AMB-TEXT-003"
+        case "rain-and-thunder.m4a": return "AMB-TEXT-005"
+        case "ocean_waves.m4a":      return "AMB-TEXT-006"
+        case "zen-bells.m4a":        return "AMB-TEXT-007"
+        case "wind-stoorm.m4a":      return "AMB-TEXT-008"
+        case "desert-winds.m4a":     return "AMB-TEXT-009"
+        default:                     return "AMB-TEXT-003"
+        }
+    }
+
+    /// Builds the Chords log description: key + abbreviated mode + cleaned family label.
+    /// Strips "Static " prefix and chord annotations (i ♭VII, sus4 etc.) from family labels.
+    private static func chordsDescription(key: String, mode: Mode, familyLabel: String) -> String {
+        let modeStr: String
+        switch mode {
+        case .MajorPentatonic: modeStr = "Maj Pentatonic"
+        case .MinorPentatonic: modeStr = "Min Pentatonic"
+        default:               modeStr = mode.rawValue
+        }
+        var label = familyLabel.hasPrefix("Static ") ? String(familyLabel.dropFirst(7)) : familyLabel
+        for token in [" i ", " ♭", " sus4", " bVI", " bVII", " bII", " bIII", " bV"] {
+            if let r = label.range(of: token) { label = String(label[..<r.lowerBound]); break }
+        }
+        return "\(key) \(modeStr) \(label.trimmingCharacters(in: .whitespaces))"
+    }
+
     private static func ruleDescription(_ ruleID: String, trackIndex: Int) -> String {
         if ruleID.hasPrefix("AMB-") { return ambientRuleDescription(ruleID) }
         if ruleID.hasPrefix("KOS-RTHM-") { return kosmicRthmRuleDescription(ruleID) }
@@ -1708,15 +1728,15 @@ struct SongGenerator {
         // Song title
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
 
-        // Sub-style tag
-        if isNoir { log.append(GenerationLogEntry(tag: "Style", description: "Motorik Noir")) }
+        // Style / sub-style tag — always present for consistency with all other styles
+        log.append(GenerationLogEntry(tag: "Style", description: "\(isNoir ? "Motorik Noir" : "Motorik") – \(frame.tempo) bpm"))
 
         // Structure form rule
         log.append(GenerationLogEntry(tag: "Form", description: formLabel(form)))
 
         // Chord progression — key/mode + progression family
         let progLabel = progressionFamilyLabel(frame.progressionFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progLabel)))
 
         // Drums
         for ruleID in drumRules.sorted() {
@@ -1738,7 +1758,7 @@ struct SongGenerator {
         // Pads — may be multiple rules; MOT-PADS-000 means track was suppressed
         let sortedPadRules = padRules.sorted()
         if padRules.contains("MOT-PADS-000") {
-            log.append(GenerationLogEntry(tag: "MOT-PADS-000", description: "No Pads"))
+            log.append(GenerationLogEntry(tag: "MOT-PADS-000", description: "No pads"))
         } else {
             for ruleID in sortedPadRules {
                 log.append(GenerationLogEntry(tag: ruleID, description: padRuleDescription(ruleID)))
@@ -1760,10 +1780,10 @@ struct SongGenerator {
 
         // Lead 2 — MOT-LD2-000 means track was suppressed for Noir
         if lead2Rules.contains("MOT-LD2-000") {
-            log.append(GenerationLogEntry(tag: "MOT-LD2-000", description: "No Lead 2"))
+            log.append(GenerationLogEntry(tag: "MOT-LD2-000", description: "No lead 2"))
         } else {
             for ruleID in lead2Rules.sorted() {
-                if ruleID.hasPrefix("CHL-LD2-HARM-B") || ruleID.hasPrefix("CHL-LD2-UNIS-B") {
+                if ruleID.hasPrefix("CHL-LD2-HARM-") || ruleID.hasPrefix("CHL-LD2-UNIS-") {
                     let barStr = ruleID.components(separatedBy: "-B").last ?? "?"
                     log.append(GenerationLogEntry(tag: "Bar \(barStr)", description: lead2RuleDescription(ruleID)))
                 } else {
@@ -1787,7 +1807,7 @@ struct SongGenerator {
 
         // Texture — MOT-TEX-000 means track was suppressed for Noir
         if texRules.contains("MOT-TEX-000") {
-            log.append(GenerationLogEntry(tag: "MOT-TEX-000", description: "No Texture"))
+            log.append(GenerationLogEntry(tag: "MOT-TEX-000", description: "No texture"))
         } else {
             for ruleID in texRules.sorted() {
                 log.append(GenerationLogEntry(tag: ruleID, description: textureRuleDescription(ruleID)))
@@ -1916,7 +1936,7 @@ struct SongGenerator {
         // Kosmic drum rules (shared lookup for regen log)
         case "KOS-DRUM-001": return "Minimal JMJ Pop"
         case "KOS-DRUM-002": return "Basic Channel minimal dub"
-        case "KOS-DRUM-003": return "No percussion"
+        case "KOS-DRUM-000": return "No percussion"
         case "KOS-DRUM-004": return "Electric Buddha Groove"
         case "KOS-DRUM-005": return "Electric Buddha Pulse"
         case "KOS-DRUM-006": return "Electric Buddha Restrained"
@@ -1954,7 +1974,7 @@ struct SongGenerator {
         case "KOS-BASS-002": return "Root-Fifth Slow Walk"
         case "KOS-BASS-003": return "TD pulse"
         case "KOS-BASS-004": return "Moroder Drift"
-        case "KOS-BASS-005": return "No bass"
+        case "KOS-BASS-000": return "No bass"
         case "KOS-BASS-006": return "Additive dual bass"
         case "KOS-BASS-007": return "Berlin school tremolo"
         case "KOS-BASS-008": return "Hallogallo Lock"
@@ -1988,11 +2008,10 @@ struct SongGenerator {
     }
 
     private static func lead2RuleDescription(_ ruleID: String) -> String {
-        // Blues harmony/unison entries — bar number is shown in the tag, not here
-        if ruleID.hasPrefix("CHL-LD2-HARM-B") { return "Lead 2 harmony" }
-        if ruleID.hasPrefix("CHL-LD2-UNIS-B") { return "Lead 2 unison" }
+        if ruleID.hasPrefix("CHL-LD2-HARM-") { return "Lead 2 harmony" }
+        if ruleID.hasPrefix("CHL-LD2-UNIS-") { return "Lead 2 unison" }
         switch ruleID {
-        case "MOT-LD2-000": return "No Lead 2"
+        case "MOT-LD2-000": return "No lead 2"
         case "MOT-LD2-001": return "Counter-response"
         case "MOT-LD2-002": return "Sustained Drone"
         case "MOT-LD2-003": return "Rhythmic Counter"
@@ -2008,7 +2027,7 @@ struct SongGenerator {
 
     private static func padRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "MOT-PADS-000": return "No Pads"
+        case "MOT-PADS-000": return "No pads"
         case "MOT-PADS-001": return "Harmonia sustained notes"
         case "MOT-PADS-008": return "Transmission Block"
         case "MOT-PADS-002": return "Power Drone"
@@ -2042,7 +2061,7 @@ struct SongGenerator {
 
     private static func textureRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "MOT-TEX-000":  return "No Texture"
+        case "MOT-TEX-000":  return "No texture"
         case "MOT-TEXT-001": return "Cluster sparse"
         case "MOT-TEXT-002": return "Transition swell"
         case "MOT-TEXT-003": return "Spatial sweep"
@@ -2066,7 +2085,7 @@ struct SongGenerator {
         switch ruleID {
         case "KOS-DRUM-001": return "JMJ Mini Pops"
         case "KOS-DRUM-002": return "Basic Channel minimal dub"
-        case "KOS-DRUM-003": return "No percussion"
+        case "KOS-DRUM-000": return "No percussion"
         case "KOS-DRUM-004": return "Electric Buddha groove"
         case "KOS-DRUM-005": return "Electric Buddha minimal beat"
         case "KOS-DRUM-006": return "Electric Buddha restrained"
@@ -2082,7 +2101,7 @@ struct SongGenerator {
         case "KOS-BASS-002":  return "Root-Fifth Slow Walk"
         case "KOS-BASS-003":  return "Tangerine Dream pulse"
         case "KOS-BASS-004":  return "Moroder Drift"
-        case "KOS-BASS-005":  return "No bass"
+        case "KOS-BASS-000":  return "No bass"
         case "KOS-BASS-006":  return "Additive dual bass"
         case "KOS-BASS-007":  return "Berlin school tremolo"
         case "KOS-BASS-008":  return "Hallogallo Lock"
@@ -2091,11 +2110,10 @@ struct SongGenerator {
         case "KOS-BASS-011":  return "Kraftwerk driving bass"
         case "KOS-BASS-012":  return "McCartney melodic drive"
         case "KOS-BASS-013":  return "Loscil sub-bass pulse"
-        case "KOS-BASS-000":  return "No bass"
-        case "KOS-BASS-014":  return "Smooth arpeggio — root-third-fifth"
+        case "KOS-BASS-014":  return "Smooth arpeggio root, third, fifth"
         case "KOS-BASS-015":  return "Drift groove — step-6 syncopation"
         case "KOS-BASS-016":  return "BoC loop — repeating cell"
-        case "KOS-BASS-017":  return "Four-bar hold — root sustain"
+        case "KOS-BASS-017":  return "Four-bar hold  root sustain"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
         default:              return ruleID.hasPrefix("KOS-") ? ruleID : "Unknown bass rule"
@@ -2109,7 +2127,7 @@ struct SongGenerator {
         case "KOS-PADS-003":  return "Steve Roach unsync layers"
         case "KOS-PADS-004":  return "Suspended sus4 minor"
         case "KOS-PADS-005":  return "Stacked fourths"
-        case "KOS-PADS-006":  return "Electric Buddha cloud shimmer"
+        case "KOS-PADS-006":  return "Electric Buddha shimmer"
         case "KOS-PADS-007":  return "Probabilistic gated chord pulse"
         case "KOS-PADS-008":  return "bIII colour chord layer"
         default:              return ruleID
@@ -2127,17 +2145,17 @@ struct SongGenerator {
         case "KOS-LEAD-007": return "TD skip sequence"
         case "KOS-LEAD-008": return "Caligari solo"
         case "KOS-LEAD-009": return "Dark Sun solo"
-        case "KOS-LD1-010": return "Tycho phrase — rise and fall"
+        case "KOS-LD1-010": return "Tycho rise and fall"
         case "KOS-LD1-011": return "Drift memory"
         case "KOS-LD1-012": return "Sigur Ros late entry float"
-        case "KOS-LD2-000":  return "Lead 2 silent"
+        case "KOS-LD2-000":  return "No lead 2"
         default:             return ruleID
         }
     }
 
     private static func kosmicRthmRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "KOS-RTHM-001": return "Probabilistic TD sequencer"
+        case "KOS-RTHM-001": return "Stochastic TD sequencer"
         case "KOS-RTHM-002": return "Stochastic JMJ melodic hook"
         case "KOS-RTHM-003": return "JMJ oscillation"
         case "KOS-RTHM-004": return "Electric Buddha groove"
@@ -2171,7 +2189,7 @@ struct SongGenerator {
         case .static_drone:          return "Static Drone"
         case .two_chord_pendulum:    return "Two chord pendulum i bVI"
         case .modal_drift:           return "Modal Drift i bVII bVI"
-        case .suspended_resolution:  return "Suspended Resolution sus4 minor"
+        case .suspended_resolution:  return "Sus Resolution"
         case .quartal_stack:         return "Stacked fourths"
         }
     }
@@ -2205,7 +2223,7 @@ struct SongGenerator {
 
         // Style identifier
         let styleDesc = isDriftDreamscape ? "Kosmic Drift — Dreamscape" : isKosmicDrift ? "Kosmic Drift" : "Kosmic"
-        log.append(GenerationLogEntry(tag: "Style", description: styleDesc))
+        log.append(GenerationLogEntry(tag: "Style", description: "\(styleDesc) – \(frame.tempo) bpm"))
 
         // Kosmic form
         let kosmicFormLabel: String
@@ -2224,7 +2242,7 @@ struct SongGenerator {
 
         // Chord progression — key/mode + progression family
         let progFamilyLabel = kosmicProgressionFamilyLabel(kosmicProgFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progFamilyLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progFamilyLabel)))
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {
@@ -2319,7 +2337,7 @@ struct SongGenerator {
         var log: [GenerationLogEntry] = []
 
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
-        log.append(GenerationLogEntry(tag: "Style", description: isAmbientPiano ? "Ambient Piano" : "Ambient"))
+        log.append(GenerationLogEntry(tag: "Style", description: "\(isAmbientPiano ? "Ambient Piano" : "Ambient") – \(frame.tempo) bpm"))
 
         // Song form / structure shape
         let hasIntro = structure.introSection != nil
@@ -2337,16 +2355,16 @@ struct SongGenerator {
 
         // Chord plan — key/mode + progression family
         let progLabel = ambientProgressionFamilyLabel(ambientProgFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(progLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progLabel)))
 
         // Loop lengths — omitted for Ambient Piano (full-song events, no tiler)
         if !isAmbientPiano {
-            let loopDesc = "pd \(loopLengths.pads) l1 \(loopLengths.lead1) l2 \(loopLengths.lead2) ry \(loopLengths.rhythm) tx \(loopLengths.texture) bs \(loopLengths.bass)"
+            let loopDesc = "Pd:\(loopLengths.pads) L1:\(loopLengths.lead1) L2:\(loopLengths.lead2) Ry:\(loopLengths.rhythm) Tx:\(loopLengths.texture) Bs:\(loopLengths.bass)"
             log.append(GenerationLogEntry(tag: "Loops", description: loopDesc))
         }
 
         if padRules.isEmpty && isAmbientPiano {
-            log.append(GenerationLogEntry(tag: "AMB-PADS-000", description: "No Pads"))
+            log.append(GenerationLogEntry(tag: "AMB-PADS-000", description: "No pads"))
         } else {
             for ruleID in padRules.sorted() {
                 log.append(GenerationLogEntry(tag: ruleID, description: ambientRuleDescription(ruleID)))
@@ -2397,7 +2415,7 @@ struct SongGenerator {
         case "AMB-PADS-003":    return "Modal cloud"
         // Bass
         case "AMB-BASS-001":  return "Loscil drone root"
-        case "AMB-BASS-002":  return "No bass"
+        case "AMB-BASS-000":  return "No bass"
         case "AMB-BASS-003":  return "Root+fifth drone"
         case "AMB-BASS-004":  return "ECM pluck"
         case "AMB-BASS-005":  return "Octave double"
@@ -2419,14 +2437,14 @@ struct SongGenerator {
         case "AMB-RTHM-001": return "Single-tone pulse"
         case "AMB-RTHM-002": return "Sparse arpeggio"
         case "AMB-RTHM-003": return "Stochastic phrase"
-        case "AMB-RTHM-004": return "No rhythm"
+        case "AMB-RTHM-000": return "No rhythm"
         case "AMB-RTHM-005": return "Celestial phrase"
         case "AMB-RTHM-006": return "Craven Faults bell cell"
         // Texture
         case "AMB-TEXT-001": return "Orbital shimmer"
         case "AMB-TEXT-002": return "Ghost tone"
         case "AMB-TEXT-003": return "Audio: Light Rain"
-        case "AMB-TEXT-004": return "No texture"
+        case "AMB-TEXT-000": return "No texture"
         case "AMB-TEXT-005": return "Audio: Rain & Thunder"
         case "AMB-TEXT-006": return "Audio: Ocean Waves"
         case "AMB-TEXT-007": return "Audio: Zen Bells"
@@ -2436,7 +2454,7 @@ struct SongGenerator {
         case "AMB-DRUM-004": return "Claude hand percussion"
         case "AMB-DRUM-001": return "Sparse ride, cymbals"
         case "AMB-DRUM-002": return "Soft pulse"
-        case "AMB-DRUM-003": return "No percussion"
+        case "AMB-DRUM-000": return "No percussion"
         default:                   return ruleID
         }
     }
@@ -2807,6 +2825,8 @@ struct SongGenerator {
         let isRideGroove = drumRules.contains("MOT-DRUM-003") || drumRules.contains("CHL-DRUM-004")
         if includeDrumFills && kTrackDrums < trackEvents.count {
             var prevCymbalMode: String? = nil
+            var rideAnnounceCount   = 0   // suppress after 2 — rapid back-and-forth is noisy
+            var hatBackAnnounceCount = 0
             for bar in 0..<totalBars {
                 guard !allFillBars.contains(bar),
                       let sec = structure.section(atBar: bar),
@@ -2831,21 +2851,21 @@ struct SongGenerator {
                 if mode != prevCymbalMode {
                     switch mode {
                     case "ride":
-                        // Don't announce ride when ride IS the normal pattern for this song
-                        if !isRideGroove {
+                        if !isRideGroove && rideAnnounceCount < 2 {
                             fireBar(bar, tag: "Drums", desc: "switching to ride")
+                            rideAnnounceCount += 1
                         }
                     case "crash":
                         fireBar(bar, tag: "Drums", desc: "crash + open hat")
                     case "openHat":
                         fireBar(bar, tag: "Drums", desc: "open hat on & of 4")
                     case "hat":
-                        // Only announce the switch back if we were in a named variation
-                        if prevCymbalMode != nil && prevCymbalMode != "hat" {
+                        if prevCymbalMode != nil && prevCymbalMode != "hat" && hatBackAnnounceCount < 2 {
                             fireBar(bar, tag: "Drums", desc: "back on hi-hat")
+                            hatBackAnnounceCount += 1
                         }
                     default: break
-                     }
+                    }
                     prevCymbalMode = mode
                 }
             }
@@ -2980,7 +3000,7 @@ struct SongGenerator {
                     let union  = steps.union(prev).count
                     let common = steps.intersection(prev).count
                     if union > 0 && Double(common) / Double(union) < 0.55 {
-                        fireBar(section.startBar, tag: patternTag, desc: "rhythm pattern changes")
+                        fireBar(section.startBar, tag: patternTag, desc: "pattern changes")
                     }
                 }
                 if !steps.isEmpty { prevStepFP = steps }
@@ -3055,7 +3075,30 @@ struct SongGenerator {
             }
         }
 
-        return out
+        // Suppress repeated identical annotations: allow at most 2 consecutive occurrences
+        // of the same description with no other message between them. Any different description
+        // at any intervening bar resets the streak. This reduces clutter from drum fills and
+        // cymbal patterns that may repeat many times without adding new information.
+        var streakDesc: String? = nil
+        var streakCount = 0
+        var filtered: [Int: [GenerationLogEntry]] = [:]
+        for (step, entries) in out.sorted(by: { $0.key < $1.key }) {
+            var kept: [GenerationLogEntry] = []
+            for entry in entries {
+                let desc = entry.description
+                if desc == streakDesc {
+                    streakCount += 1
+                    if streakCount <= 2 { kept.append(entry) }
+                    // 3rd+ consecutive identical: silently drop
+                } else {
+                    streakDesc = desc
+                    streakCount = 1
+                    kept.append(entry)
+                }
+            }
+            if !kept.isEmpty { filtered[step] = kept }
+        }
+        return filtered
     }
 
     // MARK: - Chill generation path
@@ -3173,10 +3216,64 @@ struct SongGenerator {
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
         var lead2EventsFinal = lead2Events
-        var harmonyStepAnnotation:  (bar: Int, isUnison: Bool)? = nil
-        var finaleStepAnnotation:   (bar: Int, isUnison: Bool)? = nil
+        var harmonyStepAnnotation:  (bar: Int, isUnison: Bool, intervalSteps: Int)? = nil
+        var finaleStepAnnotation:   (bar: Int, isUnison: Bool, intervalSteps: Int)? = nil
 
-        // Blues harmony/unison sections — 80% TESTING MODE (normal: 25%).
+        // Regular Chill harmony — 20% of non-blues songs get a second horn joining Lead 1
+        // briefly in section A and (if present) section B. Same applyBluesHarmony function,
+        // different window selection: ~40% into section A, ~30% into section B, 4-bar spans.
+        if !bluesVariation && lead2RNG.nextDouble() < 0.20 {
+            let useUnison     = lead2RNG.nextDouble() < 0.25
+            let intervalSteps = lead2RNG.nextDouble() < 0.70 ? 2 : 5
+
+            func applyRegularHarmonyWindow(_ sec: SongSection, annotSlot: inout (bar: Int, isUnison: Bool, intervalSteps: Int)?,
+                                           minOffsetFraction: Double) {
+                let winSize = 6   // wider window catches more Lead 1 phrases
+                guard sec.lengthBars >= winSize + 4 else { return }
+
+                // Find the 6-bar window with the most Lead 1 events — avoids landing in sparse stretches
+                let scanFrom = sec.startBar + max(4, Int(Double(sec.lengthBars) * minOffsetFraction))
+                let scanTo   = sec.endBar - winSize - 2
+                guard scanTo > scanFrom else { return }
+                var bestStart = scanFrom
+                var bestCount = 0
+                for start in scanFrom...scanTo {
+                    let n = lead1Events.filter {
+                        let b = $0.stepIndex / 16; return b >= start && b < start + winSize
+                    }.count
+                    if n > bestCount { bestCount = n; bestStart = start }
+                }
+                guard bestCount > 0 else { return }   // no Lead 1 activity in any window
+
+                let harmSet = Set(bestStart..<bestStart + winSize)
+                let beforeCount = lead2EventsFinal.filter({ harmSet.contains($0.stepIndex / 16) }).count
+                ChillLeadGenerator.applyBluesHarmony(
+                    lead1Events: lead1Events, lead2Events: &lead2EventsFinal,
+                    harmonyBars: harmSet, useUnison: useUnison,
+                    intervalSteps: intervalSteps, maxPhrases: 4,   // allow up to 4 phrases
+                    frame: frame, rng: &lead2RNG
+                )
+                // Only log and annotate if harmony notes were actually added
+                let harmonyNotes = lead2EventsFinal.filter({ harmSet.contains($0.stepIndex / 16) })
+                guard harmonyNotes.count > beforeCount else { return }
+
+                let tag = useUnison ? "CHL-LD2-UNIS-\(bestStart + 1)" : "CHL-LD2-HARM-\(bestStart + 1)"
+                lead2Rules.insert(tag)
+                if annotSlot == nil,
+                   let first = harmonyNotes.min(by: { $0.stepIndex < $1.stepIndex }) {
+                    annotSlot = (first.stepIndex / 16, useUnison, intervalSteps)
+                }
+            }
+
+            if let secA = structure.sections.first(where: { $0.label == .A }) {
+                applyRegularHarmonyWindow(secA, annotSlot: &harmonyStepAnnotation, minOffsetFraction: 0.30)
+            }
+            if let secB = structure.sections.first(where: { $0.label == .B }) {
+                applyRegularHarmonyWindow(secB, annotSlot: &finaleStepAnnotation, minOffsetFraction: 0.20)
+            }
+        }
+
+        // Blues harmony/unison sections — 25% of blues songs.
         // One roll decides if this song gets harmony. If yes, both windows always fire:
         //   (1) second time through the 16-bar form, (2) finale = last pass (3+ passes only).
         // Each window: at most 2 phrases harmonized.
@@ -3205,7 +3302,9 @@ struct SongGenerator {
                 // Zack hears it, not at the (potentially silent) window start bar.
                 if let firstNote = lead2EventsFinal.filter({ harmonySet.contains($0.stepIndex / 16) })
                                                     .min(by: { $0.stepIndex < $1.stepIndex }) {
-                    harmonyStepAnnotation = (firstNote.stepIndex / 16, useUnison)
+                    harmonyStepAnnotation = (firstNote.stepIndex / 16, useUnison, intervalSteps)
+                    // Tag for Form "- harmony" display — only when notes actually fired
+                    lead2Rules.insert(useUnison ? "CHL-LD2-UNIS-\(harmonyStart + 1)" : "CHL-LD2-HARM-\(harmonyStart + 1)")
                 }
 
                 // Window 2 — finale (last pass), when song has 3+ passes
@@ -3220,7 +3319,7 @@ struct SongGenerator {
                     )
                     if let firstNote = lead2EventsFinal.filter({ finaleSet.contains($0.stepIndex / 16) })
                                                         .min(by: { $0.stepIndex < $1.stepIndex }) {
-                        finaleStepAnnotation = (firstNote.stepIndex / 16, useUnison)
+                        finaleStepAnnotation = (firstNote.stepIndex / 16, useUnison, intervalSteps)
                     }
                 }
             }
@@ -3371,13 +3470,16 @@ struct SongGenerator {
             bluesVariation: bluesVariation,
             bluesIVVDesc: bluesIVVDesc
         )
+        func harmonyDesc(_ h: (bar: Int, isUnison: Bool, intervalSteps: Int)) -> String {
+            if h.isUnison      { return "Lead 2 harmony - unison" }
+            if h.intervalSteps == 2 { return "Lead 2 harmony - third" }
+            return "Lead 2 harmony - sixth"
+        }
         if let ha = harmonyStepAnnotation {
-            let desc = ha.isUnison ? "Lead 2 unison" : "Lead 2 harmony"
-            stepAnnotations[ha.bar * 16, default: []].append(GenerationLogEntry(tag: "", description: desc))
+            stepAnnotations[ha.bar * 16, default: []].append(GenerationLogEntry(tag: "", description: harmonyDesc(ha)))
         }
         if let fa = finaleStepAnnotation {
-            let desc = fa.isUnison ? "Lead 2 unison" : "Lead 2 harmony"
-            stepAnnotations[fa.bar * 16, default: []].append(GenerationLogEntry(tag: "", description: desc))
+            stepAnnotations[fa.bar * 16, default: []].append(GenerationLogEntry(tag: "", description: harmonyDesc(fa)))
         }
 
         var forced: [String: String] = [:]
@@ -3509,7 +3611,7 @@ struct SongGenerator {
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
         log.append(GenerationLogEntry(tag: "SONG",  description: title, isTitle: true))
-        log.append(GenerationLogEntry(tag: "Style", description: bluesVariation ? "Chill Blues" : "Chill"))
+        log.append(GenerationLogEntry(tag: "Style", description: "\(bluesVariation ? "Chill Blues" : "Chill") – \(frame.tempo) bpm"))
 
         // Form — simple label matching the style of other generators
         let hasBreakdown = structure.sections.contains { $0.label == .bridge }
@@ -3520,11 +3622,13 @@ struct SongGenerator {
         case .harmonicDrone: breakdownLabel = "harmonic drone"
         case .groovePocket:  breakdownLabel = "groove pocket"
         }
+        let hasHarmony = lead2Rules.contains { $0.hasPrefix("CHL-LD2-HARM-") || $0.hasPrefix("CHL-LD2-UNIS-") }
+        let harmonyTag = hasHarmony ? " - harmony" : ""
         let formDesc: String
         if bluesVariation {
-            formDesc = "16-bar blues I-IV-V"
+            formDesc = "16-bar blues I-IV-V\(harmonyTag)"
         } else {
-            formDesc = hasBreakdown ? "Groove - breakdown" : "Groove"
+            formDesc = hasBreakdown ? "Groove - breakdown\(harmonyTag)" : "Groove\(harmonyTag)"
         }
         log.append(GenerationLogEntry(tag: "Form", description: formDesc))
 
@@ -3536,23 +3640,27 @@ struct SongGenerator {
         case .minor_blues:        familyLabel = "Minor blues"
         case .modal_drift:        familyLabel = "Modal drift"
         }
-        log.append(GenerationLogEntry(tag: "Chords", description: "\(frame.key) \(frame.mode.rawValue) \(familyLabel)"))
+        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: familyLabel)))
 
         // Audio texture
-        let textureDesc = chillAudioTexture.map { name in
-            name.replacingOccurrences(of: ".m4a", with: "").replacingOccurrences(of: "_", with: " ")
-        } ?? "none"
-        log.append(GenerationLogEntry(tag: "Texture", description: textureDesc))
+        if let texName = chillAudioTexture {
+            let textureDesc = texName.replacingOccurrences(of: ".m4a", with: "").replacingOccurrences(of: "_", with: " ")
+            log.append(GenerationLogEntry(tag: "Texture", description: textureDesc))
+        } else {
+            log.append(GenerationLogEntry(tag: "CHL-TEXT-000", description: "No texture"))
+        }
 
         // Per-track rules with descriptions
         // CHL-BLUES-IVV-* are internal data carriers — they surface as bar-level "Blues" annotations
         // in buildStepAnnotations, not as standalone rule entries.
         let displayRules = drumRules.union(bassRules).union(padRules)
                             .union(lead1Rules).union(lead2Rules).union(rhythmRules)
-                            .filter { !$0.hasPrefix("CHL-BLUES-IVV-") }
+                            .filter { !$0.hasPrefix("CHL-BLUES-IVV-")
+                                   && !$0.hasPrefix("CHL-LD2-HARM-")   // shown at playback via step annotations
+                                   && !$0.hasPrefix("CHL-LD2-UNIS-") }
         for ruleID in displayRules.sorted() {
-            if ruleID.hasPrefix("CHL-LD2-HARM-B") || ruleID.hasPrefix("CHL-LD2-UNIS-B") {
-                let barStr = ruleID.components(separatedBy: "-B").last ?? "?"
+            if ruleID.hasPrefix("CHL-LD2-HARM-") || ruleID.hasPrefix("CHL-LD2-UNIS-") {
+                let barStr = ruleID.components(separatedBy: "-").last ?? "?"
                 log.append(GenerationLogEntry(tag: "Bar \(barStr)", description: chillRuleDescription(ruleID)))
             } else {
                 log.append(GenerationLogEntry(tag: ruleID, description: chillRuleDescription(ruleID)))
@@ -3563,15 +3671,15 @@ struct SongGenerator {
     }
 
     private static func chillRuleDescription(_ ruleID: String) -> String {
-        if ruleID.hasPrefix("CHL-LD2-HARM-B") { return "Lead 2 harmony" }
-        if ruleID.hasPrefix("CHL-LD2-UNIS-B") { return "Lead 2 unison" }
+        if ruleID.hasPrefix("CHL-LD2-HARM-") { return "Lead 2 harmony" }
+        if ruleID.hasPrefix("CHL-LD2-UNIS-") { return "Lead 2 unison" }
         switch ruleID {
         case "CHL-DRUM-001": return "Moby minimal syncopated"
         case "CHL-DRUM-002": return "Neo soul ghost note groove"
         case "CHL-DRUM-003": return "Jazz quarter-note pulse"
         case "CHL-DRUM-004": return "St Germain four-on-floor"
         case "CHL-DRUM-005": return "Hip-hop jazz pulse"
-        case "CHL-DRUM-006": return "Blues 3+3+2 side-stick"
+        case "CHL-DRUM-006": return "Blues side-stick"
         case "CHL-DRUM-007": return "Blues pushed groove"
         case "CHL-DRUM-008": return "Blues turnaround bar 16"
         case "CHL-BASS-001": return "Moby root sustain"
@@ -3592,7 +3700,7 @@ struct SongGenerator {
         case "CHL-PAD-004":  return "Open fifth hold"
         case "CHL-PAD-005":  return "Slow chord build"
         case "CHL-PAD-006":  return "String hold"
-        case "CHL-PAD-007":  return "No pads"
+        case "CHL-PAD-000":  return "No pads"
         case "CHL-LD1-001":  return "Long phrase"
         case "CHL-LD1-002":  return "Short punch"
         case "CHL-LD1-003":  return "Sparse melodic solo"
@@ -3604,8 +3712,8 @@ struct SongGenerator {
         case "CHL-LD1-009":  return "Jazzy blues lead"
         case "CHL-LD2-001":  return "Counter-melody"
         case "CHL-LD2-002":  return "Shadow hold"
-        case "CHL-RHY-001":  return "St Germain beat 1 + and-of-2"
-        case "CHL-RHY-002":  return "Moby backbeat beats 2+4"
+        case "CHL-RHY-001":  return "St Germain beat"
+        case "CHL-RHY-002":  return "Moby backbeat beat"
         case "CHL-RHY-003":  return "Bosa Moon broken chord"
         case "CHL-RHY-004":  return "Acid jazz off-beat stab"
         default:             return ruleID

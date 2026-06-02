@@ -1,6 +1,6 @@
 // AmbientRhythmGenerator.swift — Ambient rhythm/arpeggio generation
 // Copyright (c) 2026 Zack Urlocker
-// AMB-RTHM-004 (60%): silent
+// AMB-RTHM-000 (60%): silent
 // AMB-RTHM-001 (18%): single tone pulse — sparse repeated note, velocity 30–54
 // AMB-RTHM-002 (9%):  sparse arpeggio — 3–4 chord tones cycled slowly
 // AMB-RTHM-003 (4%):  stochastic phrase — random scale tones, 12% hit rate per window
@@ -32,7 +32,7 @@ struct AmbientRhythmGenerator {
             ruleID = forced
         } else {
             let roll = rng.nextDouble()
-            if roll < 0.60      { ruleID = "AMB-RTHM-004" }
+            if roll < 0.60      { ruleID = "AMB-RTHM-000" }
             else if roll < 0.78 { ruleID = "AMB-RTHM-001" }
             else if roll < 0.87 { ruleID = "AMB-RTHM-002" }
             else if roll < 0.91 { ruleID = "AMB-RTHM-003" }
@@ -42,7 +42,7 @@ struct AmbientRhythmGenerator {
         usedRuleIDs.insert(ruleID)
 
         switch ruleID {
-        case "AMB-RTHM-004": return []
+        case "AMB-RTHM-000": return []
         case "AMB-RTHM-001":
             let chordPCs1   = tonalMap.entry(atBar: 0)?.chordWindow.chordTones ?? scalePCs
             let chordNotes1 = notesInRegister(pitchClasses: chordPCs1, low: bounds.low, high: bounds.high)

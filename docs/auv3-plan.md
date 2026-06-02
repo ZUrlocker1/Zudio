@@ -364,3 +364,356 @@ Phase 5: 3–5 days (multi-host hardening)
 **Open decisions mid-implementation.** The unresolved items (MIDI input, preset system, loop mode, per-track mute/solo) will get answered during implementation rather than before it, and some answers will require rework of already-written code.
 
 **Realistic timeline: 5–7 weeks** using the phased approach above. The original 3–5 week estimate assumed the framework extraction was trivial and that multi-host testing would be quick — neither is reliable. Compare to a new substyle (~1 week) or the reverb bus refactor (~4–6 days). This project is best approached as a standalone sprint with no other music generation work in parallel. The phased structure means each phase ships something testable, so the project can pause between phases without losing progress.
+
+---
+
+## Implementation Reference — Coding-Level Details
+
+This section documents non-obvious API behaviour and common mistakes sourced from Apple DTS, JUCE engineering notes, and the developer forums. Read this before writing Phase 1 or Phase 2 code.
+
+---
+
+### Host Compatibility: GarageBand Does Not Support `aumi`
+
+**This is the most important correction to the plan.** GarageBand (both macOS and iOS) does not list or load `aumi` (`kAudioUnitType_MIDIProcessor`) plugins. It only loads `aumu` (Instrument) and `aufx`/`aumf` (Effects). Logic Pro added proper `aumi` support in version 10.7.3. AUM, Loopy Pro, and most third-party hosts support `aumi` correctly.
+
+**Practical consequence:** If GarageBand support is a goal, a separate `aumu` (Instrument) target will be needed alongside the `aumi` target — or GarageBand is simply not supported in the initial release. Decide this before Phase 1. The Mac-only first release approach in the plan sidesteps this for the initial launch.
+
+---
+
+### The Sample Rate Trap with Pure `aumi`
+
+A pure `aumi` plugin with no audio buses has no `outputBusses[0].format` to query for the host's sample rate. The sample rate is needed to convert Zudio's BPM-based tick positions into sample-accurate event times.
+
+**Workaround:** Declare one dummy audio output bus with a standard format (44100 Hz stereo float). The host will set the actual sample rate on it before calling `allocateRenderResources()`. Even this has a confirmed Logic bug (FB12042397) where the sample rate isn't updated after a mid-session change — but it covers 99% of cases. Do **not** use `AVAudioSession.sharedInstance.sampleRate` — it returns the hardware rate, not the host's processing rate, which can differ.
+
+---
+
+### `AUMIDIOutputEventBlock` — Exact Signature and Timing
+
+```swift
+// Typedef (from AudioToolbox):
+// (AUEventSampleTime, UInt8 cable, NSInteger length, const UInt8* midiBytes) -> OSStatus
+```
+
+- `eventSampleTime`: Absolute host sample time. For a note at a specific frame within the current render buffer: `timestamp.pointee.mSampleTime + Double(frameOffset)`. Do **not** pass buffer-relative offsets — they must be absolute.
+- `AUEventSampleTimeImmediate` is `0xffffffff00000000` — a sentinel meaning "start of this buffer." Use it only when sub-buffer accuracy doesn't matter. For musical timing, compute the absolute sample time.
+- `cable`: Always `0` unless you return multiple names from `midiOutputNames`.
+- **Always nil-check before calling.** `auval` leaves this block nil to test your nil-safety. An unchecked call crashes the process.
+
+Beat position → sample time formula:
+```swift
+let beatsPerSecond = tempo / 60.0
+let beatOffset     = targetBeatPosition - currentBeatPosition   // from musicalContextBlock
+let sampleOffset   = beatOffset / beatsPerSecond * sampleRate
+let eventTime      = bufferStartSampleTime + sampleOffset
+// Emit if eventTime ∈ [bufferStart, bufferStart + frameCount)
+```
+
+---
+
+### `internalRenderBlock` — ARC Avoidance Pattern
+
+The render block **cannot retain or release Swift/ObjC objects** — this means no `self`, no `[weak self]`, no optional chains. The canonical pattern using a raw pointer to a pre-allocated render state struct:
+
+```swift
+// A plain C-compatible struct — no ARC, no class references
+struct RenderState {
+    var eventBuffer: UnsafeMutablePointer<MIDIEventEntry>?
+    var eventCount: Int32
+    var eventIndex: Int32   // atomic in practice — use os_atomic_load/store
+    var isPlaying: Bool
+    // ... other render-time values
+}
+
+override var internalRenderBlock: AUInternalRenderBlock {
+    // Capture all needed values as plain pointers/values OUTSIDE the closure
+    let statePtr  = UnsafeMutablePointer<RenderState>.allocate(capacity: 1)
+    statePtr.initialize(to: renderState)
+    let midiOut   = _capturedMidiOutput   // AUMIDIOutputEventBlock? — captured as ivar
+    let musCtx    = _capturedMusicalCtx   // AUHostMusicalContextBlock? — captured as ivar
+    let transCtx  = _capturedTransport    // AUHostTransportStateBlock? — captured as ivar
+
+    return { actionFlags, timestamp, frameCount, outputBusNumber,
+             outputData, renderEvents, pullInput in
+        // Audio thread: only statePtr, midiOut, musCtx, transCtx — no self
+        var tempo: Double = 120; var beatPos: Double = 0; var tsNum: Double = 4; var tsDen: Int = 4
+        var nextBeatSamples: Int = 0; var measureDownbeat: Double = 0
+        _ = musCtx?(&tempo, &tsNum, &tsDen, &beatPos, &nextBeatSamples, &measureDownbeat)
+        // ... walk event list and fire via midiOut
+        return noErr
+    }
+}
+```
+
+`internalRenderBlock` is fetched by the framework **multiple times** during graph construction, before `allocateRenderResources()`. The pointer-capture pattern is immune to this; capturing `self` is not — any uninitialized property access causes a crash.
+
+---
+
+### `allocateRenderResources()` — What Must Happen Here
+
+This method is called **once** before the first render, after all buses are configured. It is the only place where you know the sample rate and can safely allocate memory.
+
+Required in this method (call `try super.allocateRenderResources()` first):
+
+```swift
+override func allocateRenderResources() throws {
+    try super.allocateRenderResources()
+
+    // 1. Snapshot sample rate — the only reliable place to read it
+    let sampleRate = outputBusses[0].format.sampleRate
+
+    // 2. Capture host blocks before the render block closes over them
+    _capturedMidiOutput  = self.MIDIOutputEventBlock
+    _capturedMusicalCtx  = self.musicalContextBlock
+    _capturedTransport   = self.transportStateBlock
+
+    // 3. Allocate pre-serialised event buffer (no alloc in render block)
+    let bufferCapacity   = 8192   // max MIDI events per song
+    _eventBuffer         = UnsafeMutableBufferPointer<MIDIEventEntry>.allocate(capacity: bufferCapacity)
+
+    // 4. Reset playback state
+    _renderState         = RenderState()
+}
+```
+
+The host can set `MIDIOutputEventBlock` before **or** after init on different hosts — capturing it in `allocateRenderResources()` (not in `init()`, not in the render block) is the reliable middle ground.
+
+Counterpart:
+```swift
+override func deallocateRenderResources() {
+    _capturedMidiOutput = nil
+    _capturedMusicalCtx = nil
+    _capturedTransport  = nil
+    _eventBuffer?.deallocate()
+    _eventBuffer = nil
+    super.deallocateRenderResources()
+}
+```
+
+---
+
+### `AUHostMusicalContextBlock` — Full Calling Convention
+
+```swift
+// All parameters are optional (pass nil for what you don't need)
+var tempo: Double = 0
+var tsNumerator: Double = 0
+var tsDenominator: Int = 0
+var currentBeat: Double = 0
+var samplesToNextBeat: Int = 0      // samples from buffer start to next beat boundary
+var measureDownbeat: Double = 0     // beat position of this bar's downbeat
+
+let ok = musCtx?(&tempo, &tsNumerator, &tsDenominator,
+                 &currentBeat, &samplesToNextBeat, &measureDownbeat)
+// ok == true means the host provided valid values
+```
+
+`samplesToNextBeat` is useful for snapping events to beat grids without the division.
+
+**Do not cache `currentBeat` across render calls.** The host may have scrubbed the playhead. Re-query on every render call.
+
+---
+
+### Transport State — Stop Detection and All-Notes-Off
+
+```swift
+// In render state struct — persistent across render calls:
+var prevIsMoving: Bool = false
+
+// In render block:
+var transportFlags: AUHostTransportStateFlags = []
+transCtx?(&transportFlags, nil, nil, nil)
+let isMoving = transportFlags.contains(.moving)
+
+if prevIsMoving && !isMoving {
+    sendAllNotesOff(via: midiOut, at: AUEventSampleTimeImmediate)
+}
+statePtr.pointee.prevIsMoving = isMoving
+```
+
+All-notes-off — send **both** CC 120 (All Sound Off) and CC 123 (All Notes Off) on every channel you use. Many synths respond to one but not the other:
+
+```swift
+func sendAllNotesOff(via block: AUMIDIOutputEventBlock?, at time: AUEventSampleTime) {
+    guard let block = block else { return }
+    let channels: [UInt8] = [0, 1, 2, 3, 4, 5, 9]   // channels 1–6 and 10 (0-indexed)
+    for ch in channels {
+        var allSoundOff: [UInt8]  = [0xB0 | ch, 0x78, 0x00]
+        var allNotesOff: [UInt8]  = [0xB0 | ch, 0x7B, 0x00]
+        _ = block(time, 0, 3, &allSoundOff)
+        _ = block(time, 0, 3, &allNotesOff)
+    }
+}
+```
+
+**Loopy Pro edge case**: Some hosts rewind the playhead to beat 0 at the same instant transport stops. If you reference `currentBeat` from `musicalContextBlock` when generating note-offs, you get 0 instead of the last playing position. Cache `prevBeatPosition` from the previous render call and use that for note-off timing.
+
+---
+
+### Info.plist — Full Required Structure
+
+```xml
+<key>NSExtension</key>
+<dict>
+    <key>NSExtensionPointIdentifier</key>
+    <string>com.apple.AudioUnit-UI</string>
+    <!-- Use "com.apple.AudioUnit" (no -UI suffix) only if there is no custom view controller -->
+
+    <key>NSExtensionAttributes</key>
+    <dict>
+        <key>AudioComponents</key>
+        <array>
+            <dict>
+                <key>type</key>         <string>aumi</string>
+                <key>subtype</key>      <string>zdmg</string>   <!-- 4-char, lowercase -->
+                <key>manufacturer</key> <string>Zrlo</string>   <!-- 4-char, must match AUAudioUnit init -->
+                <key>name</key>         <string>Zudio: MIDI Generator</string>
+                <key>version</key>      <integer>1</integer>
+                <key>sandboxSafe</key>  <true/>    <!-- REQUIRED for in-process loading in Logic -->
+                <key>tags</key>
+                <array><string>MIDI</string></array>
+            </dict>
+        </array>
+    </dict>
+
+    <key>NSExtensionPrincipalClass</key>
+    <string>$(PRODUCT_MODULE_NAME).ZudioAUViewController</string>
+    <!-- or NSExtensionMainStoryboard if using a storyboard -->
+</dict>
+```
+
+**Critical notes:**
+- `sandboxSafe: true` is required for Logic Pro to load in-process. `false` forces XPC with 1–3 ms overhead per render call.
+- `NSExtensionPointIdentifier` must be exactly `com.apple.AudioUnit-UI` — the alternative `com.apple.audio-unit` is wrong and silently fails.
+- The container app does **not** need an `AudioComponents` entry — the OS registers the extension automatically by scanning the `.appex` bundle.
+- The `type`/`subtype`/`manufacturer` triple in the plist must **exactly** match the `AudioComponentDescription` you pass to the `AUAudioUnit` initializer and any `AudioComponentRegister` calls.
+
+---
+
+### `AUParameterTree` for the Style Picker
+
+Prefer `AUParameterTree` over custom `fullState` for the style picker — it gives Logic and AUM a dropdown menu and handles preset serialization automatically:
+
+```swift
+let styleParam = AUParameterTree.createParameter(
+    withIdentifier: "style",
+    name:           "Style",
+    address:        0,
+    min:            0,
+    max:            Float(MusicStyle.allCases.count - 1),
+    unit:           .indexed,          // tells the host it's a discrete picker, not a slider
+    unitName:       nil,
+    flags:          [.flag_IsReadable, .flag_IsWritable],
+    valueStrings:   ["Ambient", "Chill", "Kosmic", "Motorik"],
+    dependentParameters: nil
+)
+parameterTree = AUParameterTree.createTree(withChildren: [styleParam])
+
+// Important: round to int when reading — hosts automate with float ramps
+parameterTree?.implementorValueObserver = { param, value in
+    let styleIndex = Int(value.rounded())
+    // trigger new generation with MusicStyle.allCases[styleIndex]
+}
+```
+
+Use `fullState` only for data that must not appear as an automatable parameter — for example, the current song seed (a UInt64, not mappable to a float parameter).
+
+---
+
+### `midiOutputEventBlock` — Capture Order
+
+The host sets `MIDIOutputEventBlock` before calling `allocateRenderResources()` on some hosts and after on others. **Capture it only inside `allocateRenderResources()`**, never in `init()` (too early) and never inside the render block via `self.MIDIOutputEventBlock` (not real-time safe):
+
+```swift
+// Correct:
+override func allocateRenderResources() throws {
+    try super.allocateRenderResources()
+    _capturedMidiOutput = self.MIDIOutputEventBlock  // safe here
+}
+
+// Wrong — self access in render block:
+return { ... in
+    let block = self.MIDIOutputEventBlock   // ARC + ObjC on audio thread = crash
+}
+```
+
+If you split the AU into a `AUAudioUnit` subclass and a `DSPKernelAdapter` (as Apple's template does), the `MIDIOutputEventBlock` property belongs to `AUAudioUnit` — capture it in `allocateRenderResources()` and pass it to the adapter as a plain ivar, not via the adapter calling back to the AU.
+
+---
+
+### `auval` Failure Modes to Watch For
+
+Run after every Phase 1 or Phase 2 build. **Clear the component cache first every time:**
+```bash
+killall -9 AudioComponentRegistrar
+# or on older macOS:
+sudo killall coreaudiod
+```
+
+Common failures specific to `aumi` MIDI generators:
+- **Error -66745 (kAudioUnitErr_RenderTimeout)**: render block takes too long or deadlocks under `auval`'s stress-test render calls. Ensure truly lock-free.
+- **Error 4099**: Bus configuration mismatch — `aumi` must have zero audio input buses and zero (or one dummy) audio output buses.
+- **Error -10879 (kAudioUnitErr_InvalidProperty)**: C-API hosts trying to set `kAudioUnitProperty_MIDIOutputCallback`. This is an Apple framework gap — harmless with ObjC/Swift hosts (Logic, AUM), but `auval` may still report it. File a radar and document it.
+- **Stuck-notes test failure**: `auval` sends notes and stops transport without sending note-offs to test your cleanup. The All Sound Off + All Notes Off pattern above passes this.
+- **Nil `MIDIOutputEventBlock` crash**: `auval` leaves the block nil on some test passes. Always nil-check.
+
+---
+
+### Shared State Between Container App and Extension
+
+`UserDefaults.standard` is **siloed** — in the extension it maps to the extension's own container, not the main app's container. Use an App Group for any state the extension and the main app need to share (e.g. saved seeds, recent songs):
+
+```swift
+// Create an App Group in both targets' entitlements:
+// group.com.zudio.app
+
+// Shared UserDefaults:
+let sharedDefaults = UserDefaults(suiteName: "group.com.zudio.app")
+
+// Shared file container:
+let sharedContainer = FileManager.default
+    .containerURL(forSecurityApplicationGroupIdentifier: "group.com.zudio.app")
+```
+
+The generation code in ZudioCore does not use `UserDefaults`, so this is only relevant for the plugin UI layer (style persistence, recent seeds). The extension binary itself is sandboxed even when loaded in-process by Logic — the App Group is the only reliable cross-process-boundary storage.
+
+---
+
+### Double-Buffer Event Handoff — Atomic Pointer Swap
+
+The main thread generates events (non-real-time), the render thread reads them (real-time). The handoff:
+
+```swift
+// Main thread: after generation completes
+let newBuffer = serialisedEvents(from: newSongState)   // allocates on main thread
+// Atomic pointer swap — render thread picks up new buffer on next render call:
+OSAtomicCompareAndSwapPtrBarrier(
+    UnsafeMutableRawPointer(_activeBuffer),
+    UnsafeMutableRawPointer(newBuffer),
+    &_activeBuffer
+)
+// The render thread MUST check the pointer at the start of each render call,
+// not cache it across calls.
+```
+
+In Swift, `nonisolated(unsafe)` on the buffer pointer variable is required for the same reason as `cachedIsKosmicDrift` in PlaybackEngine — the render block runs on an unmanaged thread outside Swift's actor system.
+
+---
+
+### Pre-Extraction Audit — What to Check Before Phase 0
+
+Before moving a single file to ZudioCore, grep every generator for:
+```bash
+grep -rn "import AppKit\|import UIKit\|AppState\|PlaybackEngine\|UserDefaults\|Bundle.main\|#if os(macOS)" Sources/Zudio/Generation/ Sources/Zudio/Models/
+```
+Any hit is a blocker — that dependency must be removed or extracted to a separate layer before the file can move to ZudioCore. There should be none (the generators were designed to be pure), but verify before starting.
+
+Also check that all types the extension will use have `public` access. The minimum set:
+- `MusicStyle` (enum) — `public`
+- `SongState` (struct) — `public` init + all properties read by the AU
+- `MIDIEvent` (struct) — `public` (all properties)
+- `SeededRNG` (struct) — `public` (init + all mutating funcs)
+- `SongGenerator.generate(...)` — `public static`
+- `kTrackCount`, `kTrackLead1` ... `kTrackDrums` — `public let`
+- All sub-generator `generate(...)` funcs if called directly from the AU (probably not needed — only `SongGenerator.generate` is the entry point)

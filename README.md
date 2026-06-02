@@ -17,11 +17,13 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.7/Zudio-1.7.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v1.8/Zudio-1.8.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `1.7` (build 123). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `1.8` (build 124). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v1.7:**
+**What's new in v1.8:**
+- **Major performance improvement** — A rearchitected reverb bus replaces 7 independent per-track reverb units with 2 shared buses, cutting audio thread CPU usage by over 50%. Playback now runs under 10% CPU without the visualizer and generally under 20% with it, compared to over 35% previously. The improvement is consistent across all styles and is completely inaudible.
+- **Higher fidelity M4A audio export** — Exported audio now includes all live effects — auto-pan, tremolo, and sweep filter modulation — so the M4A matches what you hear during playback, especially for Kosmic Drift and Ambient styles.
 - **Kosmic Drift** — New Kosmic sub-style at 70–90 BPM. Inspired by Boards of Canada, Portishead, and Sigur Rós — meditative, sparse, floating. New loping groove drum rules, sustained chord rhythm patterns, and very late-entering melodic leads.
 - **Smoother track view animation** — Playhead now computed from wall-clock time, eliminating lag during playback.
 

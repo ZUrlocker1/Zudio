@@ -22,7 +22,7 @@ struct KosmicDrumGenerator {
 
         switch percussionStyle {
         case .absent:
-            usedRuleIDs.insert("KOS-DRUM-003")
+            usedRuleIDs.insert("KOS-DRUM-000")
             return []
 
         case .sparse:
@@ -55,7 +55,7 @@ struct KosmicDrumGenerator {
             return generateHalfTimeLope(frame: frame, structure: structure, rng: &rng, velBase: driftVelocityBase)
 
         default:
-            usedRuleIDs.insert("KOS-DRUM-003")
+            usedRuleIDs.insert("KOS-DRUM-000")
             return []
         }
     }
@@ -598,11 +598,19 @@ struct KosmicDrumGenerator {
 
             let outroVelScale: Double
             if section.label == .outro {
-                let sectionLen = max(1, section.endBar - section.startBar)
-                let progress   = Double(barInSection) / Double(sectionLen)
-                outroVelScale  = max(0.20, 1.0 - progress * 0.80)
+                let sectionLen   = max(1, section.endBar - section.startBar)
+                let barClamped   = max(0, barInSection)   // guard against negative barInSection
+                let progress     = min(1.0, Double(barClamped) / Double(sectionLen))
+                let raw          = max(0.20, 1.0 - progress * 0.80)
+                outroVelScale    = raw.isFinite ? raw : 1.0   // NaN/inf safety
             } else {
                 outroVelScale = 1.0
+            }
+            // Safe velocity helper: clamps in Double space before Int conversion so
+            // NaN/infinity from any path cannot reach Int() — which traps on non-finite input.
+            func sv(_ base: Int, floor: Int) -> UInt8 {
+                let v = max(Double(floor), min(127.0, Double(base) * outroVelScale))
+                return UInt8(v.isFinite ? Int(v) : floor)
             }
 
             let isStripped  = strippedBars.contains(bar) && section.label != .outro
@@ -620,9 +628,8 @@ struct KosmicDrumGenerator {
 
             // Crash on section entry
             if bodySectionEntryBars.contains(bar) {
-                let vel = UInt8(min(127, max(20, Int(Double(38 + rng.nextInt(upperBound: 10)) * outroVelScale))))
                 events.append(MIDIEvent(stepIndex: barStart, note: GMDrum.crash2.rawValue,
-                                        velocity: vel, durationSteps: 1))
+                                        velocity: sv(38 + rng.nextInt(upperBound: 10), floor: 20), durationSteps: 1))
             }
 
             // Ride: every beat — absent only in mode 3 and mode 5
@@ -630,33 +637,29 @@ struct KosmicDrumGenerator {
             if rideActive {
                 let baseVel = isStripped ? 32 : 43
                 for beat in 0..<4 {
-                    let vel = UInt8(min(127, max(10, Int(Double(baseVel + rng.nextInt(upperBound: 8)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + beat * 4, note: GMDrum.ride.rawValue,
-                                            velocity: vel, durationSteps: 1))
+                                            velocity: sv(baseVel + rng.nextInt(upperBound: 8), floor: 10), durationSteps: 1))
                 }
             }
 
             // Ride bell beat 1.5 — always present unless stripped (then 50% chance)
             if outroVelScale > 0.35 && (!isStripped || rng.nextDouble() < 0.50) {
-                let vel = UInt8(min(127, max(14, Int(Double(36 + rng.nextInt(upperBound: 8)) * outroVelScale))))
                 events.append(MIDIEvent(stepIndex: barStart + 2, note: GMDrum.rideBell.rawValue,
-                                        velocity: vel, durationSteps: 1))
+                                        velocity: sv(36 + rng.nextInt(upperBound: 8), floor: 14), durationSteps: 1))
             }
 
             // Pedal hat off-beats — absent in modes 1 and 4 (kick-led motor feel)
             if dropMode != 1 && dropMode != 4 {
                 for offbeat in [2, 6, 10, 14] {
-                    let vel = UInt8(min(127, max(8, Int(Double(18 + rng.nextInt(upperBound: 12)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + offbeat, note: GMDrum.pedalHat.rawValue,
-                                            velocity: vel, durationSteps: 1))
+                                            velocity: sv(18 + rng.nextInt(upperBound: 12), floor: 8), durationSteps: 1))
                 }
             }
 
             // Sidestick: only in mode 5 (extremely sparse) — beat 3 (step 8)
             if dropMode == 5 {
-                let vel = UInt8(min(127, max(20, Int(Double(42 + rng.nextInt(upperBound: 14)) * outroVelScale))))
                 events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.sidestick.rawValue,
-                                        velocity: vel, durationSteps: 1))
+                                        velocity: sv(42 + rng.nextInt(upperBound: 14), floor: 20), durationSteps: 1))
             }
 
             // Kick: never in stripped zones; half-time (beats 1+3) when isHalfTime or mode 4
@@ -666,18 +669,15 @@ struct KosmicDrumGenerator {
                 let useHalfTime = isHalfTime || dropMode == 4
                 let kickBeats: [Int] = useHalfTime ? [0, 8] : [0, 4, 8, 12]
                 for step in kickBeats {
-                    let vel = UInt8(min(127, max(20, Int(Double(48 + rng.nextInt(upperBound: 10)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
-                                            velocity: vel, durationSteps: 1))
+                                            velocity: sv(48 + rng.nextInt(upperBound: 10), floor: 20), durationSteps: 1))
                 }
                 if useHalfTime {
-                    let vel = UInt8(min(127, max(12, Int(Double(22 + rng.nextInt(upperBound: 10)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.highFloorTom.rawValue,
-                                            velocity: vel, durationSteps: 1))
+                                            velocity: sv(22 + rng.nextInt(upperBound: 10), floor: 12), durationSteps: 1))
                 } else {
-                    let vel = UInt8(min(127, max(14, Int(Double(24 + rng.nextInt(upperBound: 6)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.kick.rawValue,
-                                            velocity: vel, durationSteps: 1))
+                                            velocity: sv(24 + rng.nextInt(upperBound: 6), floor: 14), durationSteps: 1))
                 }
             }
 
@@ -686,9 +686,8 @@ struct KosmicDrumGenerator {
             let snareOutDropout = section.label == .outro && outroVelScale < 0.25
             if snareActive && !snareOutDropout {
                 for snareStep in [4, 12] {
-                    let vel = UInt8(min(127, max(20, Int(Double(58 + rng.nextInt(upperBound: 14)) * outroVelScale))))
                     events.append(MIDIEvent(stepIndex: barStart + snareStep, note: GMDrum.snare.rawValue,
-                                            velocity: vel, durationSteps: 1))
+                                            velocity: sv(58 + rng.nextInt(upperBound: 14), floor: 20), durationSteps: 1))
                 }
             }
         }

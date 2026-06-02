@@ -37,7 +37,7 @@ struct KosmicBassGenerator {
                            0.10,           0.08,           0.05]
             }
         } else {
-            rules   = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-005",
+            rules   = ["KOS-BASS-001", "KOS-BASS-002", "KOS-BASS-003", "KOS-BASS-004", "KOS-BASS-000",
                        "KOS-BASS-008", "KOS-BASS-009", "KOS-BASS-010",
                        "KOS-BASS-011", "KOS-BASS-012", "KOS-BASS-013"]
             weights = [0.09,           0.07,          0.11,           0.09,           0.06,
@@ -48,10 +48,10 @@ struct KosmicBassGenerator {
         let validForce = forceRuleID.flatMap { rules.contains($0) ? $0 : nil }
         let ruleID = validForce ?? rules[rng.weightedPick(weights)]
 
-        // KOS-BASS-005 = truly absent bass in body sections (intro/outro still get a root note).
+        // KOS-BASS-000 = truly absent bass in body sections (intro/outro still get a root note).
         // Always logged so the status shows "Bass absent in main section".
         // Blocks 006 and 007: no point layering over silence.
-        let bassAbsent = ruleID == "KOS-BASS-005"
+        let bassAbsent = ruleID == "KOS-BASS-000"
         usedRuleIDs.insert(ruleID)
 
         // KOS-BASS-006: staccato dual layer — blocked with KOS-BASS-004 (chromatic neighbour
@@ -182,7 +182,7 @@ struct KosmicBassGenerator {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
 
-            // KOS-BASS-005: truly absent in body — no notes at all
+            // KOS-BASS-000: truly absent in body — no notes at all
             if bassAbsent && section.label != .intro && section.label != .outro { continue }
 
             // Intro: single sustained drone — no retriggers, no velocity ramp.
@@ -422,16 +422,26 @@ struct KosmicBassGenerator {
             }
 
             // Pulsating tremolo layer (KOS-RULE-23)
+            // Suppressed when the primary bass rule sustains a non-chord-tone note long enough
+            // to clash audibly with the tremolo's root/fifth.
+            // KOS-BASS-002: when useB7=true and in upper phase (bar%8 >= 4), the b7 snaps to
+            // the major 7th in Ionian modes (G→G# in A Ionian) — a semitone against the
+            // tremolo root that lasts 22 steps (~2 seconds). Suppressed for the full upper window.
+            // Note: approach notes (useApproach) are only 2 steps and cause no noticeable clash —
+            // suppressing for an entire 4-bar window over a 2-step grace note is over-correction.
             if usePulsatingLayer {
-                let bodyStartBar  = structure.introSection?.endBar ?? 0
-                let barInBody     = bar - bodyStartBar
-                // Primary trigger: every 4 bars (unchanged)
-                let primaryFire   = bar % 4 == 0
-                // After 12 bars: occasional phase-shifted trigger on bar%4==2 (~30%)
-                let altFire       = barInBody >= 12 && bar % 4 == 2 && rng.nextDouble() < 0.30
-                if primaryFire || altFire {
-                    events += pulsatingTremoloLayer(barStart: barStart, entry: entry, frame: frame,
-                                                    barInBody: barInBody, rng: &rng)
+                let bass002OnUpperPhase = bar % 8 >= 4
+                let primaryOnPassingNote = ruleID == "KOS-BASS-002" &&
+                    (bass002UseB7 && bass002OnUpperPhase)
+                if !primaryOnPassingNote {
+                    let bodyStartBar  = structure.introSection?.endBar ?? 0
+                    let barInBody     = bar - bodyStartBar
+                    let primaryFire   = bar % 4 == 0
+                    let altFire       = barInBody >= 12 && bar % 4 == 2 && rng.nextDouble() < 0.30
+                    if primaryFire || altFire {
+                        events += pulsatingTremoloLayer(barStart: barStart, entry: entry, frame: frame,
+                                                        barInBody: barInBody, rng: &rng)
+                    }
                 }
             }
         }
@@ -506,7 +516,7 @@ struct KosmicBassGenerator {
         case "KOS-BASS-003": return pedalPulseBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                    structure: structure, totalBars: totalBars, rng: &rng)
         case "KOS-BASS-004": return moroderDriftBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "KOS-BASS-005": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
+        case "KOS-BASS-000": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                   rng: &rng, totalBars: totalBars, isBody: false)
         case "KOS-BASS-008": return hallogalloLockBar(barStart: barStart, bar: bar, entry: entry,
                                                        frame: frame, useVariation: useVariation)
@@ -549,28 +559,67 @@ struct KosmicBassGenerator {
         rng: inout SeededRNG, totalBars: Int, isBody: Bool
     ) -> [MIDIEvent] {
         guard bar % 2 == 0 else { return [] }
-        let root = bassRoot(entry: entry, frame: frame)
 
-        // Occasional fifth breath: only in body, past the first 8 bars,
-        // not in the final 8 bars, and only ~1-in-6 four-bar windows.
-        // Four-bar window index used as a deterministic seed so the pattern is
-        // stable for 4 bars at a time.
         let windowIdx = bar / 4
         let nearEnd   = bar >= totalBars - 8
+        let rootPC    = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        let scalePCs  = frame.scalePCs
+        let root      = bassRoot(entry: entry, frame: frame)
+
+        // B: Breathing gap — 1 in 10 windows silent (~10%), body only.
+        // Slot 2 of mod-10 cycle keeps it away from the fifth/b7 slots below.
+        if isBody && windowIdx % 10 == 2 { return [] }
+
+        // D+G: Note pitch selection — deterministic per window, body only past bar 8.
+        // Mod-12 cycle assigns variety without RNG so pattern is seed-stable.
+        //   slot 3:  fifth — characteristic Berlin School bass breath
+        //   slot 7:  b7   — Dorian colour (Bb in C Dorian)
+        //   slot 10: minor third — very rare colour note (50% chance, past bar 16)
+        let note: UInt8
         if isBody && bar >= 8 && !nearEnd {
-            // Use window index to decide — roughly every 6th window gets a fifth
-            let rootPC  = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
-            let fifthPC = (rootPC + 7) % 12
-            let fifthMidi = clampToRegister(36 + fifthPC, low: 40, high: 55)
-            // Seeded decision: modulo keeps it stable, small random push from rng
-            let doFifth = (windowIdx % 6 == 4) && rng.nextDouble() < 0.60
-            if doFifth {
-                return [MIDIEvent(stepIndex: barStart, note: UInt8(fifthMidi),
-                                  velocity: 58, durationSteps: 30)]
+            switch windowIdx % 12 {
+            case 3:
+                let fifthPC = snapToScale((rootPC + 7) % 12, scalePCs: scalePCs)
+                note = UInt8(clampToRegister(36 + fifthPC, low: 40, high: 55))
+            case 7:
+                let b7PC = snapToScale((rootPC + 10) % 12, scalePCs: scalePCs)
+                note = UInt8(clampToRegister(36 + b7PC, low: 40, high: 55))
+            case 10 where bar >= 16:
+                // G: Minor third — rare colour, 50% chance when window qualifies
+                if rng.nextDouble() < 0.50 {
+                    let thirdPC = snapToScale((rootPC + 3) % 12, scalePCs: scalePCs)
+                    note = UInt8(clampToRegister(36 + thirdPC, low: 40, high: 55))
+                } else {
+                    note = root
+                }
+            default:
+                note = root
             }
+        } else {
+            note = root
         }
 
-        return [MIDIEvent(stepIndex: barStart, note: root, velocity: 65, durationSteps: 30)]
+        // C: Duration variety — medium or full hold per window (no staccato).
+        // Mod-4 cycle: 25% medium hold, 75% full sustain.
+        let mainDur: Int
+        switch windowIdx % 4 {
+        case 0:   mainDur = 16   // medium hold — creates slight release before next attack
+        default:  mainDur = 30   // full Berlin School sustain
+        }
+
+        // E: Sub-bass drop — every ~10th window drops an octave for one cycle.
+        // Low register (MIDI 28–42) creates deep rumble; body only past bar 12.
+        let useSubBass = isBody && bar >= 12 && !nearEnd && windowIdx % 10 == 7
+        let finalNote: UInt8
+        if useSubBass {
+            let lowPC = Int(note) % 12
+            finalNote = UInt8(clampToRegister(24 + lowPC, low: 28, high: 42))
+        } else {
+            finalNote = note
+        }
+
+        let vel: UInt8 = useSubBass ? 72 : 65   // sub-bass slightly louder to project
+        return [MIDIEvent(stepIndex: barStart, note: finalNote, velocity: vel, durationSteps: mainDur)]
     }
 
     // MARK: - KOS-BAS-002: Root-Fifth Slow Walk
@@ -1249,15 +1298,20 @@ struct KosmicBassGenerator {
     }
 
     // MARK: - KOS-BASS-014: Smooth Arpeggio (Drift)
-    // Continuous quarter-note cycling: root → 3rd → 5th → 3rd.
-    // Flat velocity. Mode-aware 3rd (minor in Aeolian/Dorian, major in Mixolydian/Ionian).
-    // B-section variation: inserts b7 between 5th and returning 3rd.
-    // MARK: - KOS-BASS-014: Smooth Arpeggio (Drift)
+    // Root → 3rd → 5th arpeggio across beats 1–3. Three notes per bar:
+    //   Step 0: root  (6 steps — main attack with kick)
+    //   Step 6: 3rd   (2 steps — short pickup connecting root to 5th)
+    //   Step 8: 5th   (8 steps — lands on snare/kick beat 3)
+    // Main attacks (0 and 8) are drum-aligned for all Drift patterns.
+    // Step 6 ("and-of-2") is a natural pickup position — ghost snare on floating,
+    // optional kick push on half-time, open on clean/lopsided — safe on all patterns.
+    // This recovers the arpeggio feel while avoiding the beat-2/beat-4 attack problem.
     // varType (rolled every 8 bars):
-    //   0 = normal: root→3rd→5th→3rd
-    //   1 = color:  beat-4 3rd replaced by b7 (Dorian colour), or sus4 for Mixolydian
-    //   2 = syncopation: beat-2 note shifts from step 4 to step 5 (one 16th later — subtle groove push)
-    //   3 = note drop: beat-3 note omitted — 3-note bar creates breathing room
+    //   0 = normal:      step 0=root(6), step 6=3rd(2), step 8=5th(8)
+    //   1 = colour:      step 0=root(6), step 6=b7(2),  step 8=3rd(8)  — warmer/darker beat 3
+    //   2 = syncopation: step 0=root(6), step 7=3rd(2), step 9=5th(7)  — pickup shifted one 16th late
+    //   3 = stillness:   step 0=root(8), step 8=5th(8) — no connector, maximum space
+    // B-section: step 0=root(6), step 6=3rd(2), step 8=b7(8) — tension via b7 on beat 3
     private static func smoothArpeggioBar(
         barStart: Int, bar: Int,
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
@@ -1267,39 +1321,49 @@ struct KosmicBassGenerator {
         let thirdOffset = (frame.mode == .Mixolydian || frame.mode == .Ionian) ? 4 : 3
         let fifthOffset = 7
         let b7Offset    = 10
-        let sus4Offset  = 5
 
         func note(_ semitones: Int) -> UInt8 {
             UInt8(clampToRegister(Int(root) + semitones, low: 38, high: 55))
         }
-
         let vb = UInt8(clamping: velBase)
 
         if useVariation {
-            // B-section: root → 3rd → 5th → b7 → 3rd (5 events)
-            let pattern: [(Int, Int)] = [(0,0),(3,thirdOffset),(6,fifthOffset),(9,b7Offset),(12,thirdOffset)]
-            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+            // B-section: root → 3rd pickup → b7 (harmonic tension on beat 3)
+            return [
+                MIDIEvent(stepIndex: barStart + 0, note: note(0),          velocity: vb, durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + 6, note: note(thirdOffset), velocity: vb, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8, note: note(b7Offset),    velocity: vb, durationSteps: 8),
+            ]
         }
 
-        // Body — apply evolution variant
         switch varType {
         case 1:
-            // Colour: beat-4 3rd → b7 (Dorian) or sus4 (Mixolydian)
-            let colorSemitone = (frame.mode == .Mixolydian) ? sus4Offset : b7Offset
-            let pattern: [(Int, Int)] = [(0,0),(4,thirdOffset),(8,fifthOffset),(12,colorSemitone)]
-            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+            // Colour: b7 as connector, 3rd on beat 3 — darker harmonic colour
+            return [
+                MIDIEvent(stepIndex: barStart + 0, note: note(0),          velocity: vb, durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + 6, note: note(b7Offset),    velocity: vb, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8, note: note(thirdOffset), velocity: vb, durationSteps: 8),
+            ]
         case 2:
-            // Syncopation: beat-2 pushed one 16th later (step 4 → step 5)
-            let pattern: [(Int, Int)] = [(0,0),(5,thirdOffset),(8,fifthOffset),(12,thirdOffset)]
-            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+            // Syncopation: pickup and landing both shifted one 16th late
+            return [
+                MIDIEvent(stepIndex: barStart + 0, note: note(0),          velocity: vb, durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + 7, note: note(thirdOffset), velocity: vb, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 9, note: note(fifthOffset), velocity: vb, durationSteps: 7),
+            ]
         case 3:
-            // Note drop: beat-3 omitted — 3-note bar
-            let pattern: [(Int, Int)] = [(0,0),(4,thirdOffset),(12,thirdOffset)]
-            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+            // Stillness: root/5th only, no connector — maximum space
+            return [
+                MIDIEvent(stepIndex: barStart + 0, note: note(0),          velocity: vb, durationSteps: 8),
+                MIDIEvent(stepIndex: barStart + 8, note: note(fifthOffset), velocity: vb, durationSteps: 8),
+            ]
         default:
-            // Normal: root→3rd→5th→3rd
-            let pattern: [(Int, Int)] = [(0,0),(4,thirdOffset),(8,fifthOffset),(12,thirdOffset)]
-            return pattern.map { MIDIEvent(stepIndex: barStart + $0.0, note: note($0.1), velocity: vb, durationSteps: 4) }
+            // Normal: root → 3rd pickup → 5th
+            return [
+                MIDIEvent(stepIndex: barStart + 0, note: note(0),          velocity: vb, durationSteps: 6),
+                MIDIEvent(stepIndex: barStart + 6, note: note(thirdOffset), velocity: vb, durationSteps: 2),
+                MIDIEvent(stepIndex: barStart + 8, note: note(fifthOffset), velocity: vb, durationSteps: 8),
+            ]
         }
     }
 

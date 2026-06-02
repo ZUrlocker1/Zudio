@@ -3,7 +3,7 @@
 // Pads = sustained harmonic layer (Warm Pad default) — NOT Rhodes comping.
 // Pad rules (equally weighted for testing): CHL-PAD-001 chord sustain, CHL-PAD-002 staggered entry,
 //   CHL-PAD-003 Moby anchor, CHL-PAD-004 open fifth hold, CHL-PAD-005 slow chord build,
-//   CHL-PAD-006 Portishead string hold, CHL-PAD-007 absent.
+//   CHL-PAD-006 Portishead string hold, CHL-PAD-000 absent.
 // All voicings snapped to scale (CHL-SYNC-004).
 // Per-note audio fade-in/fade-out is handled by PlaybackEngine.chillPadsMode (boost node ramp),
 // not via MIDI velocity — identical mechanism to Ambient bass/pads.
@@ -91,7 +91,7 @@ struct ChillPadsGenerator {
             usedRuleIDs.insert("CHL-PAD-006")
             events = portisheadStrings(frame: frame, structure: structure, rng: &rng)
         } else {
-            usedRuleIDs.insert("CHL-PAD-007")
+            usedRuleIDs.insert("CHL-PAD-000")
             events = []  // absent — texture-only songs
         }
         // Overlay breakdown pad behavior based on breakdown style

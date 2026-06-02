@@ -428,55 +428,10 @@ struct ChillLeadGenerator {
         let scale      = scaleNotes(frame: frame)
         let pentatonic = pentatonicNotes(frame: frame)
 
-        // Lead 2 instrument: complement Lead 1 — pitched percussion (vibraphone) contrasts brass/reeds;
-        // trombone adds warm low-brass depth when Lead 1 is a reed; flute lightens if Lead 1 is vibraphone.
-        let inst2: ChillLeadInstrument
-        switch lead1Instrument {
-        case .vibraphone:
-            // Vibraphone never used as Lead 1 in blues — flute pairing is regular-Chill only
-            inst2 = .flute
-        case .saxophone:
-            // Alto Sax Lead 1 (regular Chill only — not in blues pool)
-            // Regular: vibraphone 65%, trombone 10%, flute 20%, soprano sax 5%
-            let r0 = rng.nextDouble()
-            if r0 < 0.65      { inst2 = .vibraphone }
-            else if r0 < 0.75 { inst2 = .trombone }
-            else if r0 < 0.95 { inst2 = .flute }
-            else              { inst2 = .sopranoSax }
-        case .flute:
-            // Flute Lead 1 (regular Chill only — not in blues pool)
-            // Regular: vibraphone 80%, trombone 20%
-            inst2 = rng.nextDouble() < 0.80 ? .vibraphone : .trombone
-        case .clarinet:
-            // Clarinet Lead 1 — appears in both regular Chill and blues
-            let rc = rng.nextDouble()
-            if bluesVariation {
-                // Blues: vibraphone 50%, soprano sax 30%, trombone 20% — no flute
-                if rc < 0.50      { inst2 = .vibraphone }
-                else if rc < 0.80 { inst2 = .sopranoSax }
-                else              { inst2 = .trombone }
-            } else {
-                // Regular: vibraphone 55%, trombone 10%, flute 35%
-                if rc < 0.55      { inst2 = .vibraphone }
-                else if rc < 0.65 { inst2 = .trombone }
-                else              { inst2 = .flute }
-            }
-        default:
-            // Brass Lead 1 (muted trumpet, trumpet, tenor sax) — main blues Lead 1 family
-            let r = rng.nextDouble()
-            if bluesVariation {
-                // Blues: soprano sax 40%, vibraphone 40%, trombone 20% — no flute
-                if r < 0.40      { inst2 = .sopranoSax }
-                else if r < 0.80 { inst2 = .vibraphone }
-                else             { inst2 = .trombone }
-            } else {
-                // Regular: vibraphone 50%, flute 35%, soprano sax 10%, trombone 5%
-                if r < 0.50      { inst2 = .vibraphone }
-                else if r < 0.85 { inst2 = .flute }
-                else if r < 0.95 { inst2 = .sopranoSax }
-                else             { inst2 = .trombone }
-            }
-        }
+        // Lead 2 instrument: uniform random from the four L2-appropriate instruments.
+        // Register separation (below) ensures L2 stays out of L1's range regardless of choice.
+        let l2Pool: [ChillLeadInstrument] = [.vibraphone, .flute, .sopranoSax, .trombone]
+        let inst2 = l2Pool[rng.nextInt(upperBound: l2Pool.count)]
         let (regLow1, regHigh1) = register(for: lead1Instrument)
         let (rawLow2, rawHigh2) = register(for: inst2)
         // Lead 2 sits below the midpoint of Lead 1's register (CHL-RULE-12).
@@ -1092,20 +1047,6 @@ struct ChillLeadGenerator {
     }
 
     // MARK: - Helpers
-
-    private static func lead1RuleID(for instrument: ChillLeadInstrument) -> String {
-        switch instrument {
-        case .flute:        return "CHL-LD1-001"
-        case .mutedTrumpet: return "CHL-LD1-002"
-        case .vibraphone:   return "CHL-LD1-003"
-        case .saxophone:    return "CHL-LD1-004"
-        case .sopranoSax:   return "CHL-LD1-006"
-        case .trumpet:      return "CHL-LD1-007"
-        case .tenorSax:     return "CHL-LD1-008"
-        case .trombone:     return "CHL-LD2-002"  // Lead 2 only
-        case .clarinet:     return "CHL-LD1-004"  // blues phrasing is the natural idiom
-        }
-    }
 
     private static func register(for instrument: ChillLeadInstrument) -> (low: Int, high: Int) {
         switch instrument {
