@@ -705,10 +705,11 @@ struct SongGenerator {
         let title: String = {
             let raw = KosmicTitleGenerator.generate(frame: frame, rng: &rng)
             guard isKosmicDrift && !raw.contains(" ") else { return raw }
-            let prefixes = ["Slow", "Dissolving", "Liminal", "Deep", "Amber", "Warm", "Spectral", "Saturated", "Duophonic", "Ambiophonic", "New Orthophonic", "Paraphonic",
-                    "Stereophonic", "Post-Rock", "Lo-Fi", "Hazy", "Loping"]
+            let prefixes = ["Slow", "Dissolving", "Liminal", "Deep", "Amber", "Warm", "Spectral", "Saturated", "Duophonic", "Ambiophonic", "New Orthophonic", "Paraphonic","Polyphonic",
+                    "Neon", "Electric", "Day-glo","Stereophonic", "Post-Rock", "Lo-Fi", "Hazy",
+                    "Loping"]
             let suffixes = ["Sequencer", "Tape", "Drift", "Float", "Dream", "Fog", "Wave",
-                            "in Stereo", "Panorama", "Ultrasonic", "Plethora", "Echo"]
+                            "Boogaloo", "Loop", "in Stereo", "Panorama", "Ultrasonic", "Plethora", "Echo"]
             if rng.nextDouble() < 0.50 {
                 return "\(prefixes[rng.nextInt(upperBound: prefixes.count)]) \(raw)"
             } else {

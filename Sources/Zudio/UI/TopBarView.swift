@@ -933,7 +933,7 @@ struct HelpView: View {
                 #if os(iOS)
                 helpLine("Export Audio (⌘E)", "Exports to an M4A audio file accessible from the Files app.")
                 #else
-                helpLine("Export Audio (⌘E)", "Exports to an M4A audio file. A save dialog lets you choose the destination folder.")
+                helpLine("Export Audio (⌘E)", "Exports M4A audio file(s). A save dialog lets you choose the destination folder.")
                 #endif
                 helpLine("Save Song (⌘S) / Load Song (⌘L)", "Saves a Zudio song file as well as a MIDI version to the default folder. The MIDI file can be opened in any DAW. The Zudio song file is a plain text log file.")
                 helpLine("Reset (⌘R)", "Reset audio, and all tracks and settings to initial state.")

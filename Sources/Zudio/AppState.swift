@@ -243,6 +243,26 @@ final class AppState: ObservableObject {
         let trackOverrides: [String: UInt64]
         // Instrument pool indices per track. Optional so old persisted data decodes as nil.
         let instrumentOverrides: [String: Int]?
+        // Substyle display name (e.g. "Ambient Piano", "Chill Blues"). Optional so old persisted data decodes as nil.
+        var substyleName: String?
+
+        /// Always returns a non-empty display string. Uses the persisted substyleName for new songs;
+        /// infers from forced rule IDs for songs saved before build 125 (when substyleName was added).
+        var displaySubstyleName: String {
+            if let name = substyleName { return name }
+            let vals = Set(forcedRules.values)
+            if forcedRules.values.contains(where: { $0.hasPrefix("AMB-PNO-") })   { return "Ambient Piano" }
+            if forcedRules.values.contains(where: { $0.hasPrefix("CHL-BLUES-") }) { return "Chill Blues" }
+            if !vals.isDisjoint(with: ["MOT-DRUM-005","MOT-DRUM-006","MOT-DRUM-007","MOT-DRUM-008",
+                                       "MOT-BASS-016","MOT-BASS-017","MOT-BASS-018","MOT-BASS-019","MOT-BASS-020","MOT-BASS-021"]) {
+                return "Motorik Noir"
+            }
+            if !vals.isDisjoint(with: ["KOS-DRUM-007","KOS-DRUM-008",
+                                       "KOS-BASS-014","KOS-BASS-015","KOS-BASS-016","KOS-BASS-017"]) {
+                return "Kosmic Drift"
+            }
+            return style.rawValue.capitalized
+        }
 
         init(from state: SongState, instrumentOverrides: [Int: Int] = [:]) {
             seed                    = state.globalSeed
@@ -256,6 +276,7 @@ final class AppState: ObservableObject {
                 state.trackOverrides.map { (String($0.key), $0.value) })
             self.instrumentOverrides = instrumentOverrides.isEmpty ? nil :
                 Dictionary(uniqueKeysWithValues: instrumentOverrides.map { (String($0.key), $0.value) })
+            substyleName            = state.displayStyleName
         }
 
         /// Decodes `instrumentOverrides` (String keys) back to `[Int: Int]`.
@@ -335,8 +356,14 @@ final class AppState: ObservableObject {
                     if !ovr.isEmpty {
                         self.sessionInstrumentOverrides[finalState.globalSeed] = ovr
                     }
+                    // Backfill substyleName for songs saved before build 125.
+                    if song.substyleName == nil,
+                       let idx = self.persistedHistory.firstIndex(where: { $0.seed == song.seed }) {
+                        self.persistedHistory[idx].substyleName = finalState.displayStyleName
+                    }
                 }
             }
+            await MainActor.run { self.savePersistedHistory() }
         }
     }
 
@@ -509,7 +536,7 @@ final class AppState: ObservableObject {
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet"]
-        case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp"]
+        case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
@@ -520,10 +547,10 @@ final class AppState: ObservableObject {
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
-        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass"]
+        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
-        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ"]
-        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells"]
+        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel"]
+        case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
@@ -531,11 +558,11 @@ final class AppState: ObservableObject {
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
-                                                "Solar Wind","Interference"]
+                                                "Solar Wind","Interference","Guitar Fdbk"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
-        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3"]
+        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
@@ -553,7 +580,7 @@ final class AppState: ObservableObject {
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
-        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46]
+        case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111]  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
@@ -563,22 +590,22 @@ final class AppState: ObservableObject {
         case (kTrackLead2, .motorik):  return [90, 100, 39, 30]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
-        case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92]
+        case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
-        case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014]
-        case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18]
+        case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
+        case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096]  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
         case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
         case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96]  // + Rain
-        case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127]
+        case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
-        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038]
+        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039]
         case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
@@ -603,6 +630,8 @@ final class AppState: ObservableObject {
             case (kTrackLead1,   .motorik, "Soft Brass"):    return 80
             case (kTrackRhythm,  .motorik, "Charang"):       return 70
             case (kTrackTexture, .motorik, "Interference"):  return 127
+            case (kTrackBass,    .kosmic,  "Pulse Bass"):    return 115
+            case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
             default: return 100
             }
         }
@@ -1643,21 +1672,21 @@ final class AppState: ObservableObject {
         }
 
         // Rhythm pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang]
-        let rhtmNoirOnly: Set<Int>    = [2, 3, 7]
-        let rhtmRegularOnly: Set<Int> = [0, 1, 4]
+        let rhtmNoirOnly: Set<Int>    = [3, 7]       // Doctor Solo + Charang are Noir-only
+        let rhtmRegularOnly: Set<Int> = [0, 1, 4]    // Guitar Pulse + Crunch Guitar + Acoustic Bass are regular-only
         let currentRhtm = instrumentOverrides[kTrackRhythm] ?? 0
         if isNoir ? rhtmRegularOnly.contains(currentRhtm) : rhtmNoirOnly.contains(currentRhtm) {
-            let valid = isNoir ? [2, 3, 5, 6, 7] : [0, 1, 4, 5, 6]
+            let valid = isNoir ? [2, 3, 5, 6, 7] : [0, 1, 2, 4, 5, 6]
             instrumentOverrides[kTrackRhythm] = valid[Int.random(in: 0..<valid.count, using: &rng)]
         }
 
         // Texture pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes,
-        //                5=Solar Wind, 6=Interference]
-        let texNoirOnly: Set<Int>    = [0, 2, 6]
+        //                5=Solar Wind, 6=Interference, 7=Guitar Fdbk]
+        let texNoirOnly: Set<Int>    = [0, 2, 6, 7]
         let texRegularOnly: Set<Int> = [1, 4]
         let currentTex = instrumentOverrides[kTrackTexture] ?? 0
         if isNoir ? texRegularOnly.contains(currentTex) : texNoirOnly.contains(currentTex) {
-            let valid = isNoir ? [0, 2, 3, 5, 6] : [1, 3, 4, 5]
+            let valid = isNoir ? [0, 2, 3, 5, 6, 7] : [1, 3, 4, 5]
             instrumentOverrides[kTrackTexture] = valid[Int.random(in: 0..<valid.count, using: &rng)]
         }
 
@@ -1678,7 +1707,7 @@ final class AppState: ObservableObject {
     /// User can still change it manually after the song loads.
     private func applyAmbientPianoInstrument(for state: SongState) {
         guard state.isAmbientPiano else { return }
-        // Ambient Lead 1 pool: ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp"]
+        // Ambient Lead 1 pool: ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
         // Stereo Piano is at index 0 (encoded program 61001).
         instrumentOverrides[kTrackLead1] = 0
     }
@@ -1843,7 +1872,7 @@ final class AppState: ObservableObject {
             return state?.motorikNoirVariation == true ? [0,1,3] : [0,1,2]
         }
         if style == .motorik && trackIndex == kTrackRhythm {
-            return state?.motorikNoirVariation == true ? [2,3,5,6,7] : [0,1,4,5,6]
+            return state?.motorikNoirVariation == true ? [2,3,5,6,7] : [0,1,2,4,5,6]
         }
         if style == .kosmic {
             let isDrift = state?.isKosmicDrift == true
@@ -1861,7 +1890,7 @@ final class AppState: ObservableObject {
         let isBlues = state?.chillBluesVariation == true
         switch trackIndex {
         case kTrackRhythm:
-            return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4]
+            return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4,6,6]
         case kTrackLead2:
             return isBlues ? [0,0,0,2,2,3,3,3] : [0,0,0,1,1,2,3,3,4]
         default:
@@ -1897,8 +1926,8 @@ final class AppState: ObservableObject {
             // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang]
             // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
             return songState?.motorikNoirVariation == true
-                ? [2, 3, 5, 6, 7]   // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
-                : [0, 1, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Acoustic Bass + Pick Bass + Synth Bass 3
+                ? [2, 3, 5, 6, 7]      // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
+                : [0, 1, 2, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Fuzz Guitar + Acoustic Bass + Pick Bass + Synth Bass 3
         }
         // Kosmic: unified pool (Regular + Drift-exclusive); substyle restricts random picks.
         if style == .kosmic {
@@ -1917,8 +1946,8 @@ final class AppState: ObservableObject {
                 // [0=Pad 3 Poly, 1=Fifths Lead, 2=Solar Wind, 3=FX Echoes, 4=Rain]
                 return isDrift ? Array(0..<poolCount) : [0, 1, 2, 3]  // Rain (4) Drift-only
             case kTrackPads:
-                // [0=Sweep Pad, 1=Synth Strings, 2=Warm Pad, 3=Space Voice, 4=Halo Pad, 5=Bowed Glass]
-                return isDrift ? [0, 1, 2, 4, 5] : Array(0..<poolCount)  // Space Voice (3) excluded from Drift random
+                // [0=Sweep Pad, 1=Synth Strings, 2=Warm Pad, 3=Space Voice, 4=Halo Pad, 5=Bowed Glass, 6=Fantasia 2]
+                return isDrift ? [0, 1, 2, 4, 5, 6] : Array(0..<poolCount)  // Space Voice (3) excluded from Drift random
             case kTrackBass:
                 // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3]
                 return isDrift ? [1, 3, 4] : Array(0..<poolCount)  // Moog+Mono Synth excluded from Drift random
@@ -2785,12 +2814,10 @@ final class AppState: ObservableObject {
         let midiURL = zudioURL.deletingPathExtension().appendingPathExtension("MID")
         do {
             try MIDIFileExporter.export(song, to: midiURL)
-            try? SongLogExporter.export(song, midiURL: midiURL)  // writes .zudio alongside midiURL
+            try? SongLogExporter.export(song, midiURL: midiURL)
             lastSaveURL = zudioURL
             print("Song saved: \(zudioURL.path)")
-            appendToLog([
-                GenerationLogEntry(tag: "FILE", description: "Saved \(zudioURL.lastPathComponent)")
-            ])
+            appendToLog([GenerationLogEntry(tag: "FILE", description: "Saved \(zudioURL.lastPathComponent)")])
             savedSongSeed = songState?.globalSeed
         } catch {
             print("MIDI export error: \(error)")
@@ -2801,48 +2828,12 @@ final class AppState: ObservableObject {
             lastSaveURL = url
             print("MIDI saved: \(url.path)")
             try? SongLogExporter.export(song, midiURL: url)
-            appendToLog([
-                GenerationLogEntry(tag: "FILE", description: "Saved as MIDI \(url.lastPathComponent)")
-            ])
+            appendToLog([GenerationLogEntry(tag: "FILE", description: "Saved \(url.lastPathComponent)")])
             savedSongSeed = songState?.globalSeed
         } catch {
             print("MIDI export error: \(error)")
         }
         #endif
-    }
-
-    /// Saves the current song as a .zudio file to the user-visible Documents folder
-    /// (~/Documents on iOS — appears as "On My iPhone/iPad > Zudio" in Files).
-    /// Silent save: no picker, same pattern as saveMIDI().
-    func saveZudio() {
-        guard var song = songState else { return }
-        // Refresh the Instruments log entry from the current instrumentOverrides so a
-        // post-regen save captures the active instruments, not the generation-time defaults.
-        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
-        var parts: [String] = []
-        for i in 0..<kTrackCount {
-            if i == kTrackLeadSynth && selectedStyle != .kosmic { continue }
-            if i == kTrackTexture && selectedStyle == .chill { continue }   // audio texture omitted
-            if SongLogExporter.isTrackSilent(i, song: song) { continue }
-            let pool = Self.instrumentPoolPrograms(trackIndex: i, style: selectedStyle)
-            guard !pool.isEmpty else { continue }
-            let prog = pool[min(instrumentOverrides[i] ?? 0, pool.count - 1)]
-            if prog != 255 { parts.append("\(shortNames[i]):\(prog)") }
-        }
-        song.generationLog.removeAll { $0.tag == "Instruments" }
-        song.generationLog.append(GenerationLogEntry(tag: "Instruments",
-                                                     description: parts.joined(separator: " "),
-                                                     isTitle: false))
-        let dir = AudioFileExporter.exportDirectory()
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = AudioFileExporter.incrementingURL(in: dir, base: AudioFileExporter.sanitizedName(song.title), ext: "zudio")
-        do {
-            try SongLogExporter.export(song, midiURL: url)
-            print("Zudio saved: \(url.path)")
-            savedSongSeed = songState?.globalSeed
-        } catch {
-            print("Zudio save error: \(error)")
-        }
     }
 
     // MARK: - Load from log
@@ -3044,8 +3035,9 @@ final class AppState: ObservableObject {
 
     // MARK: - Audio export
 
-    @Published var isFastExporting:       Bool   = false
-    @Published var isExportingAudio:      Bool   = false
+    @Published var isFastExporting:          Bool   = false
+    @Published var exportingSeparateTracks:  Bool   = false
+    @Published var isExportingAudio:         Bool   = false
     @Published var audioExportProgress:   Double = 0
     @Published var audioExportFilename:   String = ""
     @Published var showExportConfirmation: Bool  = false
@@ -3590,8 +3582,8 @@ final class AppState: ObservableObject {
             alert.addButton(withTitle: "Export Anyway")
             guard alert.runModal() == .alertSecondButtonReturn else { return }
         }
-        guard let url = AudioFileExporter.presentFastExportPanel(songName: song.title) else { return }
-        launchFastExport(song: song, url: url)
+        guard let result = AudioFileExporter.presentFastExportPanel(songName: song.title) else { return }
+        launchFastExport(song: song, url: result.url, separateTracks: result.separateTracks)
         #else
         let url = AudioFileExporter.nextURL(songName: song.title)
         if !hasSufficientDiskSpace() {
@@ -3603,7 +3595,7 @@ final class AppState: ObservableObject {
         #endif
     }
 
-    private func launchFastExport(song: SongState, url: URL) {
+    private func launchFastExport(song: SongState, url: URL, separateTracks: Bool = false) {
         var programs        = (0..<kTrackCount).map { playback.loadedProgram(forTrack: $0) }
         // Lead Synth is a fixed Polysynth (90) doubler — it has no instrument pool and
         // loadedProgram() returns 255 on iOS after cache invalidation. Restore the default
@@ -3647,20 +3639,23 @@ final class AppState: ObservableObject {
         let exportEncoder = "Zudio \(exportVersion)"
         let exportKey     = "\(song.frame.key) \(song.frame.mode.rawValue)"
 
-        audioExportFilename = url.lastPathComponent
-        audioExportProgress = 0
-        isExportingAudio    = true
-        isFastExporting     = true
-        fastExportCancelled = false
+        audioExportFilename        = url.lastPathComponent
+        audioExportProgress        = 0
+        isExportingAudio           = true
+        isFastExporting            = true
+        exportingSeparateTracks    = separateTracks
+        fastExportCancelled        = false
 
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
-                try OfflineExport.render(
+                let renderResult = try OfflineExport.render(
                     state: song,
                     programs: programs,
                     snapshots: snapshots,
+                    rawSnapshots: separateTracks ? rawSnapshots : nil,
                     textureSnapshot: textureSnapshot,
                     outputURL: url,
+                    separateTracks: separateTracks,
                     onProgress: { p in
                         Task { @MainActor [weak self] in self?.audioExportProgress = p }
                     },
@@ -3679,12 +3674,31 @@ final class AppState: ObservableObject {
                     encoder:       exportEncoder,
                     comment:       exportComment
                 )
+                for item in renderResult.trackURLs {
+                    let label = item.trackIdx < kTrackNames.count
+                        ? kTrackNames[item.trackIdx] : "Track \(item.trackIdx)"
+                    await AudioFileExporter.addMetadata(
+                        to: item.url,
+                        title:         "\(song.title) – \(label)",
+                        artist:        "Zudio",
+                        genre:         genre,
+                        bpm:           song.frame.tempo,
+                        year:          exportYear,
+                        keySignature:  exportKey,
+                        timeSignature: "4/4",
+                        encoder:       exportEncoder,
+                        comment:       ""
+                    )
+                }
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.isExportingAudio = false
-                    self.isFastExporting  = false
+                    self.isExportingAudio          = false
+                    self.isFastExporting           = false
+                    self.exportingSeparateTracks   = false
+                    let stemNote = renderResult.trackURLs.isEmpty
+                        ? "" : " + \(renderResult.trackURLs.count) stems"
                     self.appendToLog([GenerationLogEntry(tag: "FILE",
-                        description: "Fast export: \(url.lastPathComponent)")])
+                        description: "Fast export: \(url.lastPathComponent)\(stemNote)")])
                     #if !os(macOS)
                     self.fastExportedFileURL = url
                     #endif
@@ -3692,8 +3706,9 @@ final class AppState: ObservableObject {
             } catch {
                 try? FileManager.default.removeItem(at: url)
                 await MainActor.run { [weak self] in
-                    self?.isExportingAudio = false
-                    self?.isFastExporting  = false
+                    self?.isExportingAudio         = false
+                    self?.isFastExporting          = false
+                    self?.exportingSeparateTracks  = false
                     if !(error is CancellationError) {
                         let msg = error.localizedDescription
                         self?.fastExportErrorMessage = msg

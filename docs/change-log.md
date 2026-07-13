@@ -1,9 +1,23 @@
 # Zudio Change Log
 
-## V 1.8 (Build 124)  Reverb bus and performance
+## V 2.2 (Build 126)  Optional stem export + new icon + new instruments
+- **Audio export** — When exporting on the Mac the user can select an option to export separate track stems for bass, drums, leads and so on with full EQ and reverb 
+- **New app icon** — Redesigned icon replaces "Z!" with a periodic-table style "Zu"
+- **New instruments** — Guitar Fdbk added to Motorik Noir Texture; Fantasia 2 added to Kosmic Pads; Kalimba added to Ambient Rhythm 
 
-- **Reverb bus architecture** — Replaced 7 independent per-track `AVAudioUnitReverb` instances with 2 shared reverb buses for live playback: a large bus (Cathedral for Kosmic, Large Room for Ambient) and a small bus (Medium Hall for all styles). Each track sends a configurable amount of its post-EQ signal to the appropriate bus; the dry signal travels directly to the main mixer. Result: **over 50% reduction in CPU load**. Playback without the visualizer now runs under 10% CPU; with the visualizer generally under 20%, compared to over 35% before. 
-- **Higher fidelity M4A audio export** — M4A audio export continues to use per-track reverbs with the original presets for full audio fidelity.  The offline audio export now simulates all track effects that were previously missing: auto-pan, tremolo, and sweep filter, especially important for Kosmic Drift and Ambient styles. 
+---
+
+## V 2.1 (Build 125)  Substyle shown in song list 
+- **Song list shows substyle** — The saved song list now displays the substyle name where applicable (e.g. "Ambient Piano", "Chill Blues", "Motorik Noir", "Kosmic Drift") instead of just the base style.
+- **iOS Save Song fix** — Fixed a bug where Save Song on iPhone and iPad did not export the MIDI file.
+- **New instruments** — Shakuhachi added to Ambient Lead 1; Tonewheel organ added to Chill Rhythm; Pulse Bass added to Kosmic Bass; Fuzz Guitar now available in regular Motorik as well as Motorik Noir.
+
+
+---
+
+## V 2.0 (Build 124)  Reduced CPU by 50% with reverb bus
+- **Reverb bus architecture** — Replaced 7 independent per-track `AVAudioUnitReverb` instances with 2 shared reverb buses for playback: a large bus (Cathedral, Large Room) and a small bus (Medium Hall). Each track sends its post-EQ signal to the appropriate bus; the dry signal travels directly to the main mixer. Result: **over 50% reduction in CPU load**. Playback without the visualizer now runs under 10% CPU; with the visualizer generally under 20%, compared to over 35% before. 
+- **Higher fidelity M4A audio export** — M4A audio export continues to use per-track reverbs with the original presets for full audio fidelity.  The offline audio export now simulates all track effects including auto-pan, tremolo, and sweep filter, which are critical for Kosmic Drift and Ambient styles. 
 
 ---
 

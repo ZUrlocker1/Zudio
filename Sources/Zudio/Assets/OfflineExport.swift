@@ -58,13 +58,18 @@ enum OfflineExport {
         state: SongState,
         programs: [Int],
         snapshots: [PlaybackEngine.TrackEffectSnapshot],
+        rawSnapshots: [PlaybackEngine.TrackEffectSnapshot]? = nil,
         textureSnapshot: AudioTexturePlayer.ExportSnapshot?,
         outputURL: URL,
+        separateTracks: Bool = false,
         onProgress: @escaping (Double) -> Void,
         isCancelled: @escaping () -> Bool
-    ) throws -> (songSeconds: Double, elapsed: Double) {
+    ) throws -> (songSeconds: Double, elapsed: Double, trackURLs: [(trackIdx: Int, url: URL)]) {
 
-        let wallStart = CFAbsoluteTimeGetCurrent()
+        let wallStart  = CFAbsoluteTimeGetCurrent()
+        let phase1End  = separateTracks ? 0.25 : 0.50
+        let phase2End  = separateTracks ? 0.50 : 1.00
+        var trackURLs: [(trackIdx: Int, url: URL)] = []
 
         guard let sf2URL = Bundle.main.url(forResource: "Zudio", withExtension: "sf2")
                         ?? Bundle.main.url(forResource: "GeneralUser_GS_v1.471", withExtension: "sf2") else {
@@ -174,7 +179,7 @@ enum OfflineExport {
             rendered = blockEnd
 
             // Phase 1 is 0…0.5 of total progress
-            onProgress(0.5 * Double(rendered) / Double(totalSamples))
+            onProgress(phase1End * Double(rendered) / Double(totalSamples))
         }
         tempFiles.removeAll()   // flush and close all temp files
 
@@ -411,13 +416,230 @@ enum OfflineExport {
             try audioFile.write(from: outBuf)
             phase2Done += Int64(thisFrames)
             // Phase 2 is 0.5…1.0 of total progress
-            onProgress(0.5 + 0.5 * Double(phase2Done) / Double(phase2Total))
+            onProgress(phase1End + (phase2End - phase1End) * Double(phase2Done) / Double(phase2Total))
         }
         fxEngine.stop()
 
+        // MARK: Phase 3 — per-track stems with effects
+        if separateTracks {
+            let stem           = outputURL.deletingPathExtension().lastPathComponent
+            let dir            = outputURL.deletingLastPathComponent()
+            let hasTextureStem = textureSnapshot != nil && textureLoopBuf != nil
+            let numTracks      = samplers.count + (hasTextureStem ? 1 : 0)
+
+            for (loopIdx, samplerInfo) in samplers.enumerated() {
+                let trackIdx = samplerInfo.trackIdx
+
+                // Use raw (unmuted) snapshot so stems are always at full volume.
+                let snap: PlaybackEngine.TrackEffectSnapshot
+                if let raw = rawSnapshots, trackIdx < raw.count {
+                    snap = raw[trackIdx]
+                } else if trackIdx < snapshots.count {
+                    snap = snapshots[trackIdx]
+                } else {
+                    snap = PlaybackEngine.TrackEffectSnapshot(
+                        volume: 1, pan: 0,
+                        reverbPreset: .mediumHall, reverbWetDryMix: 0, reverbBypassed: true,
+                        delayTime: 0.125, delayFeedback: 40, delayLowPassCutoff: 6000,
+                        delayWetDryMix: 0, delayBypassed: true,
+                        compBypassed: true, lowShelfBypassed: true, hpfEnabled: false,
+                        sweepEnabled: false, sweepFloor: 0, sweepHalfRange: 0, sweepHz: 0,
+                        tremoloEnabled: false, tremoloHz: 0, tremoloDepth: 0,
+                        panEnabled: false, panHz: 0)
+                }
+
+                let safeName = AudioFileExporter.sanitizedName(kTrackNames[trackIdx])
+                let trackURL = AudioFileExporter.incrementingURL(
+                    in: dir, base: "\(stem)-\(safeName)", ext: "m4a")
+
+                let trackEngine = AVAudioEngine()
+                let player      = AVAudioPlayerNode()
+                let tremoloGain = AVAudioMixerNode()
+
+                let sweep = AVAudioUnitEffect(audioComponentDescription: lpDesc)
+                AudioUnitSetParameter(sweep.audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0)
+                if snap.sweepEnabled {
+                    AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0,
+                                          snap.sweepFloor, 0)
+                    sweep.auAudioUnit.shouldBypassEffect = false
+                } else {
+                    AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
+                    sweep.auAudioUnit.shouldBypassEffect = true
+                }
+
+                let reverb = AVAudioUnitReverb()
+                reverb.loadFactoryPreset(snap.reverbPreset)
+                reverb.wetDryMix = snap.reverbBypassed ? 0 : snap.reverbWetDryMix
+
+                let delay = AVAudioUnitDelay()
+                delay.delayTime     = snap.delayTime
+                delay.feedback      = snap.delayFeedback
+                delay.lowPassCutoff = snap.delayLowPassCutoff
+                delay.wetDryMix     = snap.delayBypassed ? 0 : snap.delayWetDryMix
+                delay.auAudioUnit.shouldBypassEffect = snap.delayBypassed
+
+                let comp = AVAudioUnitEffect(audioComponentDescription: compDesc)
+                AudioUnitSetParameter(comp.audioUnit, 0, kAudioUnitScope_Global, 0, -15.0, 0)
+                AudioUnitSetParameter(comp.audioUnit, 1, kAudioUnitScope_Global, 0,   5.0, 0)
+                AudioUnitSetParameter(comp.audioUnit, 2, kAudioUnitScope_Global, 0,   1.0, 0)
+                AudioUnitSetParameter(comp.audioUnit, 4, kAudioUnitScope_Global, 0, 0.002, 0)
+                AudioUnitSetParameter(comp.audioUnit, 5, kAudioUnitScope_Global, 0,  0.08, 0)
+                AudioUnitSetParameter(comp.audioUnit, 6, kAudioUnitScope_Global, 0,   4.0, 0)
+                comp.auAudioUnit.shouldBypassEffect = snap.compBypassed
+
+                let eq = AVAudioUnitEQ(numberOfBands: 2)
+                eq.bands[0].filterType = .lowShelf
+                eq.bands[0].frequency  = 80
+                eq.bands[0].gain       = 5.0
+                eq.bands[0].bypass     = false
+                eq.bands[1].filterType = .highPass
+                eq.bands[1].frequency  = 250
+                eq.bands[1].bypass     = !snap.hpfEnabled
+                eq.auAudioUnit.shouldBypassEffect = snap.lowShelfBypassed
+
+                trackEngine.attach(player);      trackEngine.attach(tremoloGain)
+                trackEngine.attach(sweep);       trackEngine.attach(delay)
+                trackEngine.attach(comp);        trackEngine.attach(eq)
+                trackEngine.attach(reverb)
+                trackEngine.connect(player,      to: tremoloGain,               format: avFormat)
+                trackEngine.connect(tremoloGain, to: sweep,                     format: avFormat)
+                trackEngine.connect(sweep,       to: delay,                     format: avFormat)
+                trackEngine.connect(delay,       to: comp,                      format: avFormat)
+                trackEngine.connect(comp,        to: eq,                        format: avFormat)
+                trackEngine.connect(eq,          to: reverb,                    format: avFormat)
+                trackEngine.connect(reverb,      to: trackEngine.mainMixerNode, format: avFormat)
+
+                player.volume            = 1.0
+                tremoloGain.pan          = snap.panEnabled ? 0 : snap.pan
+                tremoloGain.outputVolume = snap.volume
+
+                try trackEngine.enableManualRenderingMode(.offline, format: avFormat,
+                                                           maximumFrameCount: 4096)
+                try trackEngine.start()
+
+                // tempURLs[loopIdx] is the dry CAF for this track — still present (defer fires on return)
+                let cafFile = try AVAudioFile(forReading: tempURLs[loopIdx])
+                player.scheduleFile(cafFile, at: nil, completionHandler: nil)
+                player.play()
+
+                let trackFile = try AVAudioFile(
+                    forWriting: trackURL,
+                    settings: [AVFormatIDKey:         kAudioFormatMPEG4AAC,
+                               AVSampleRateKey:       sampleRate,
+                               AVNumberOfChannelsKey: nChannels,
+                               AVEncoderBitRateKey:   128_000])
+                let trackBuf = AVAudioPCMBuffer(pcmFormat: avFormat, frameCapacity: 4096)!
+
+                // LFO accumulators start at 0 — same as Phase 2, so shape matches the mix
+                var sweepPhase:   Double = 0
+                var tremoloPhase: Double = 0
+                var panPhase:     Double = 0
+                var phase3Done:   Int64  = 0
+
+                while phase3Done < phase2Total {
+                    if isCancelled() { throw CancellationError() }
+                    let thisFrames = AVAudioFrameCount(min(4096, phase2Total - phase3Done))
+                    let dt = Double(thisFrames) / sampleRate
+
+                    if snap.sweepEnabled {
+                        sweepPhase += 2 * .pi * Double(snap.sweepHz) * dt
+                        let cutoff = snap.sweepFloor + snap.sweepHalfRange * Float(1 + sin(sweepPhase))
+                        AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+                    }
+                    if snap.tremoloEnabled {
+                        tremoloPhase += 2 * .pi * Double(snap.tremoloHz) * dt
+                        let factor = Float(1.0 - Double(snap.tremoloDepth) * (1.0 + sin(tremoloPhase)))
+                        tremoloGain.outputVolume = max(0, snap.volume * factor)
+                    }
+                    if snap.panEnabled {
+                        panPhase += 2 * .pi * Double(snap.panHz) * dt
+                        tremoloGain.pan = Float(sin(panPhase))
+                    }
+
+                    let status = try trackEngine.renderOffline(thisFrames, to: trackBuf)
+                    guard status == .success else { break }
+                    try trackFile.write(from: trackBuf)
+                    phase3Done += Int64(thisFrames)
+
+                    let trackFraction = (Double(loopIdx) + Double(phase3Done) / Double(phase2Total))
+                                        / Double(numTracks)
+                    onProgress(phase2End + (1.0 - phase2End) * trackFraction)
+                }
+                trackEngine.stop()
+                trackURLs.append((trackIdx: trackIdx, url: trackURL))
+            }
+
+            // Texture stem — exported when AudioTexturePlayer audio is active
+            if let tex = textureSnapshot, let texBuf = textureLoopBuf {
+                let safeName = AudioFileExporter.sanitizedName(kTrackNames[kTrackTexture])
+                let trackURL = AudioFileExporter.incrementingURL(
+                    in: dir, base: "\(stem)-\(safeName)", ext: "m4a")
+
+                let texEngine = AVAudioEngine()
+                let tPlayer   = AVAudioPlayerNode()
+                let tReverb   = AVAudioUnitReverb()
+                let tEQ       = AVAudioUnitEQ(numberOfBands: 2)
+
+                tEQ.bands[1].bypass = true
+                tEQ.auAudioUnit.shouldBypassEffect = false
+                if tex.isAmbient {
+                    tEQ.bands[0].filterType = .lowPass
+                    tEQ.bands[0].frequency  = 3500
+                    tEQ.bands[0].bypass     = false
+                    tReverb.loadFactoryPreset(.smallRoom)
+                    tReverb.wetDryMix = tex.reverbBypassed ? 0 : 10
+                } else {
+                    tEQ.bands[0].filterType = .lowShelf
+                    tEQ.bands[0].frequency  = 80
+                    tEQ.bands[0].gain       = 5.0
+                    tEQ.bands[0].bypass     = !tex.lowShelfEnabled
+                    tReverb.loadFactoryPreset(.mediumHall)
+                    tReverb.wetDryMix = tex.reverbBypassed ? 0 : tex.reverbWetDryMix
+                }
+                let boostGain: Float = tex.boostEnabled ? 1.7 : 1.0
+                tPlayer.volume = tex.volume * boostGain
+
+                texEngine.attach(tPlayer)
+                texEngine.attach(tEQ)
+                texEngine.attach(tReverb)
+                texEngine.connect(tPlayer, to: tEQ,                     format: nil)
+                texEngine.connect(tEQ,     to: tReverb,                 format: nil)
+                texEngine.connect(tReverb, to: texEngine.mainMixerNode, format: avFormat)
+
+                try texEngine.enableManualRenderingMode(.offline, format: avFormat,
+                                                        maximumFrameCount: 4096)
+                try texEngine.start()
+                tPlayer.scheduleBuffer(texBuf, at: nil, options: .loops, completionHandler: nil)
+                tPlayer.play()
+
+                let texFile = try AVAudioFile(
+                    forWriting: trackURL,
+                    settings: [AVFormatIDKey:         kAudioFormatMPEG4AAC,
+                               AVSampleRateKey:       sampleRate,
+                               AVNumberOfChannelsKey: nChannels,
+                               AVEncoderBitRateKey:   128_000])
+                let texOutBuf  = AVAudioPCMBuffer(pcmFormat: avFormat, frameCapacity: 4096)!
+                var phase3Done: Int64 = 0
+
+                while phase3Done < phase2Total {
+                    if isCancelled() { throw CancellationError() }
+                    let thisFrames = AVAudioFrameCount(min(4096, phase2Total - phase3Done))
+                    let status = try texEngine.renderOffline(thisFrames, to: texOutBuf)
+                    guard status == .success else { break }
+                    try texFile.write(from: texOutBuf)
+                    phase3Done += Int64(thisFrames)
+                    let texFraction = (Double(samplers.count) + Double(phase3Done) / Double(phase2Total))
+                                      / Double(numTracks)
+                    onProgress(phase2End + (1.0 - phase2End) * texFraction)
+                }
+                texEngine.stop()
+                trackURLs.append((trackIdx: kTrackTexture, url: trackURL))
+            }
+        }
+
         let songSecs = Double(totalSamples) / sampleRate
         let elapsed  = CFAbsoluteTimeGetCurrent() - wallStart
-        return (songSecs, elapsed)
+        return (songSecs, elapsed, trackURLs)
     }
 
     // MARK: - Helpers

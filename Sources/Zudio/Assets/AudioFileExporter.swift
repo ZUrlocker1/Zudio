@@ -136,12 +136,21 @@ struct AudioFileExporter {
         return container
     }
 
-    /// Fast Export panel — simple save panel, no duration estimate or mode options.
-    /// Returns the chosen .m4a URL, or nil if the user cancelled.
+    private final class FastExportCoordinator: NSObject {
+        private static let defaultsKey = "exportSeparateTracks"
+        private(set) var separateTracks: Bool = UserDefaults.standard.bool(forKey: defaultsKey)
+        @objc func checkboxChanged(_ sender: NSButton) {
+            separateTracks = sender.state == .on
+            UserDefaults.standard.set(separateTracks, forKey: FastExportCoordinator.defaultsKey)
+        }
+    }
+
+    /// Fast Export panel — save panel with optional separate stems checkbox.
+    /// Returns (url, separateTracks), or nil if the user cancelled.
     @MainActor
-    static func presentFastExportPanel(songName: String) -> URL? {
+    static func presentFastExportPanel(songName: String) -> (url: URL, separateTracks: Bool)? {
         let panel = NSSavePanel()
-        panel.title = "Fast Export Audio"
+        panel.title = "Export Audio"
         panel.prompt = "Export"
         panel.allowedContentTypes = [UTType.mpeg4Audio]
         panel.canCreateDirectories = true
@@ -149,7 +158,21 @@ struct AudioFileExporter {
         panel.nameFieldStringValue = "\(sanitizedName(songName)).m4a"
         panel.minSize = NSSize(width: 400, height: panel.minSize.height)
         DispatchQueue.main.async { setPanelWidth(900, panel: panel) }
-        return panel.runModal() == .OK ? panel.url : nil
+
+        let coord = FastExportCoordinator()
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 30))
+        let checkbox = NSButton(checkboxWithTitle: "Export separate track stems",
+                                target: coord,
+                                action: #selector(FastExportCoordinator.checkboxChanged(_:)))
+        checkbox.state = coord.separateTracks ? .on : .off
+        checkbox.frame = NSRect(x: 0, y: 4, width: 240, height: 22)
+        container.addSubview(checkbox)
+        panel.accessoryView = container
+
+        // withExtendedLifetime keeps coord alive — NSButton.target is a weak reference
+        let response = withExtendedLifetime(coord) { panel.runModal() }
+        guard response == .OK, let url = panel.url else { return nil }
+        return (url, coord.separateTracks)
     }
 
     /// Save Song panel — shows .zudio as the primary filename; saveMIDI() derives the .MID path.

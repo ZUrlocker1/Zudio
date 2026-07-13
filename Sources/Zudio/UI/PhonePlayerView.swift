@@ -114,7 +114,7 @@ struct PhonePlayerView: View {
                 ZStack {
                     Color.black.opacity(0.55).ignoresSafeArea()
                     VStack(spacing: 18) {
-                        Text("Exporting Audio…")
+                        Text(appState.exportingSeparateTracks ? "Exporting Audio Stems…" : "Exporting Audio…")
                             .font(.headline)
                             .foregroundStyle(.white)
                         ProgressView(value: appState.audioExportProgress)
@@ -617,7 +617,7 @@ struct PhonePlayerView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Button {
-                    appState.saveZudio()
+                    appState.saveMIDI()
                     hapticSuccess.toggle()
                 } label: {
                     Label("Save", systemImage: "square.and.arrow.down")
@@ -686,7 +686,7 @@ struct PhonePlayerView: View {
                                                 .font(.system(size: 16, weight: .semibold))
                                                 .foregroundStyle(.white)
                                                 .lineLimit(1)
-                                            Text(song.style.rawValue.capitalized)
+                                            Text(song.displaySubstyleName)
                                                 .font(.system(size: 12))
                                                 .foregroundStyle(Color.white.opacity(0.50))
                                         }
@@ -878,7 +878,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v1.8")
+                    Text("Generative music · v2.2")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)

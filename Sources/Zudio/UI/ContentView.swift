@@ -462,7 +462,7 @@ struct ContentView: View {
                 ZStack {
                     Color.black.opacity(0.55).ignoresSafeArea()
                     VStack(spacing: 18) {
-                        Text("Exporting Audio…")
+                        Text(appState.exportingSeparateTracks ? "Exporting Audio Stems…" : "Exporting Audio…")
                             .font(.headline)
                             .foregroundStyle(.white)
                         ProgressView(value: appState.audioExportProgress)
@@ -568,7 +568,7 @@ struct ContentView: View {
                 ZStack {
                     Color.black.opacity(0.55).ignoresSafeArea()
                     VStack(spacing: 18) {
-                        Text("Exporting Audio…")
+                        Text(appState.exportingSeparateTracks ? "Exporting Audio Stems…" : "Exporting Audio…")
                             .font(.headline)
                             .foregroundStyle(.white)
                         ProgressView(value: appState.audioExportProgress)
@@ -833,7 +833,7 @@ struct ContentView: View {
                                         .font(.system(size: 16, weight: .semibold))
                                         .foregroundStyle(.white)
                                         .lineLimit(1)
-                                    Text(song.style.rawValue.capitalized)
+                                    Text(song.displaySubstyleName)
                                         .font(.system(size: 12))
                                         .foregroundStyle(Color.white.opacity(0.50))
                                 }
@@ -1013,7 +1013,7 @@ struct ContentView: View {
                                             .font(.system(size: 12, weight: .semibold))
                                             .foregroundStyle(.white)
                                             .lineLimit(1)
-                                        Text(song.style.rawValue.capitalized)
+                                        Text(song.displaySubstyleName)
                                             .font(.system(size: 10))
                                             .foregroundStyle(Color.white.opacity(0.50))
                                     }
