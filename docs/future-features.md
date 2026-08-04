@@ -50,6 +50,12 @@ Japanese three-string lute with a sharp, buzzy attack and quick decay. Unusual a
 **Fantasia 2** (`12088`) → Pads (Done build 126)
 A second variant of the Fantasia / New Age Pad voice. The current pool uses New Age Pad (88) in the Rhythm track. Fantasia 2 has a slightly different harmonic envelope and could add variety to the Pads pool as a dreamy, evolving alternative to Sweep Pad and Halo Pad.
 
+**Tonewheel Organ** (`16`) → Bass (Done build 128)
+Classic Hammond B3 voice played in bass register. Warm, sustained, rotary-speaker character. Added for atmospheric low-end variety in both regular Kosmic and Drift.
+
+**Warm Pad** (`89`) → Bass (Done build 128)
+Smooth, slow-attack synth pad used in bass register. No percussive transient, just a soft sustained low tone. Organ-adjacent character — more atmospheric than the synth bass options already in the pool.
+
 ---
 
 ### Motorik
@@ -68,23 +74,26 @@ All suggestions are for additions beyond the existing reverb, delay, tremolo, sw
 
 ---
 
-### Chorus — Apple built-in AU, trivial to add
+### Chorus — NOT FEASIBLE with built-in Apple AUs
 
-`kAudioUnitSubType_Chorus` is a standard Apple AudioUnit effect available on both macOS and iOS. Parameters: rate (Hz), depth, delay time, feedback, and mix. CPU cost: very low — lighter than delay.
+Apple does **not** provide a built-in chorus AU on macOS or iOS. The constant `kAudioUnitSubType_Chorus` does not exist in any Apple SDK. The complete list of Apple-manufactured Effect AUs available at runtime includes: Band/High/Low Pass Filter, High/Low Shelf, Parametric EQ, Graphic EQ, N-Band EQ, Delay, Sample Delay, Distortion, Dynamics Compressor, MultiBand Compressor, Limiter, Matrix Reverb, Reverb2, New Time Pitch, Time Pitch, AU Filter, Net Send. No chorus, flanger, phaser, or ring modulator.
 
-**Best use:** Kosmic pads (in place of sweep), Lead 2 or Rhythm, could widen sound. A chorus rate of 0.3–0.8 Hz with 15–25ms delay time gives the characteristic shimmer without sounding like an effect.
+Implementing a real chorus effect would require either:
+- A parallel audio path (dry + pitch-shifted copy at 50% each) — significant engine restructuring
+- A third-party AU plugin bundled with the app
+- Manual LFO parameter updates on a SampleDelay node per render block
 
-Implementation: one `AVAudioUnitEffect` with `kAudioUnitSubType_Chorus`, added to the per-track chain between the EQ and reverb. The effect chip toggle in TrackRowView gets a new `.chorus` case. Estimated effort: 1–2 days.
+Estimated effort: significant (multi-day). Not a quick add. Best deferred unless chorus becomes a high priority.
 
 ---
 
-### Distortion — Apple built-in AU, trivial to add
+### Distortion — DONE Build 128
 
 `kAudioUnitSubType_Distortion` is a standard Apple AudioUnit effect with 18 parameters covering multiple distortion types: soft saturation, hard clip, linear fold-over, square fold-over, bit reduction, and more. CPU cost: very low.
 
-**Best use:** Motorik Noir bass and rhythm (gritty, post-punk quality), Kosmic Drift rhythm (subtle tape saturation). The soft-saturation modes add warmth without harshness; the harder modes add aggression. A `.distortion` effect chip on Rhythm and Bass tracks for Motorik and Kosmic would meaningfully expand the sonic palette.
+**Implemented:** Soft-clip saturation (SoftClipGain +6 dB, FinalMix 50%) added as a "Dist." effect chip on Motorik Bass and Motorik Rhythm, replacing the Low and Boost chips respectively. Post-distortion gain compensation of −3 dB applied via the fanMixer to keep perceived loudness consistent. Applied probabilistically: Motorik Noir Bass and Rhythm each 75% on by default (independent rolls); regular Motorik Bass 20% on by default. All flags stored in SongState so each song's distortion state is reproducible. Old saved songs default to no distortion.
 
-Implementation: same pattern as existing effects — one AU per track, bypass by default, toggle via chip. Could be combined with the Low Shelf EQ for bass warmth. Estimated effort: 1–2 days.
+**Still to explore:** Kosmic Drift rhythm (subtle tape saturation). The harder distortion modes (hard clip, fold-over) could add more aggression for Noir if the soft-clip default feels too subtle.
 
 ---
 
@@ -105,18 +114,6 @@ CPU cost: essentially zero (a few multiply/round operations per sample).
 **Best use:** A potential Lo-Fi Chill substyle (see Section 3) — bitcrushing the Rhodes or rhythm track to 10–12 bits adds the characteristic lo-fi warmth. Also works for Kosmic Drift's degraded/tape-worn aesthetic on leads or texture. The depth parameter (bits: 8–16) can be interpolated smoothly.
 
 Implementation: custom class wrapping `installTap` on the boost mixer node. Estimated effort: 1–2 days, no external dependencies.
-
----
-
-### Ring Modulator — pure Swift DSP
-
-Multiplies the audio signal by a sine wave at a carrier frequency, producing sum and difference sidebands. Creates metallic, bell-like, or alien overtones depending on the carrier frequency. Formula: `output = input × sin(2π × carrierHz × t)`.
-
-CPU cost: one sine computation per sample — negligible.
-
-**Best use:** Kosmic Texture track for a Dalek/space-radio quality on sustained sounds. Ambient Texture for more experimental colour. Unlike chorus or distortion, ring modulation is distinctly unusual and would give Kosmic a unique character not easily achieved with standard effects. The carrier frequency (40–400 Hz) is the primary timbral control.
-
-Implementation: same installTap approach as bit crusher. Could share a custom DSP node class. Estimated effort: 1–2 days.
 
 ---
 

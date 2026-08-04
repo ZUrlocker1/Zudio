@@ -562,7 +562,7 @@ final class AppState: ObservableObject {
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
-        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass"]
+        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel Org","Warm Pad"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
@@ -605,7 +605,7 @@ final class AppState: ObservableObject {
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
-        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039]
+        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89]
         case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
@@ -1949,8 +1949,8 @@ final class AppState: ObservableObject {
                 // [0=Sweep Pad, 1=Synth Strings, 2=Warm Pad, 3=Space Voice, 4=Halo Pad, 5=Bowed Glass, 6=Fantasia 2]
                 return isDrift ? [0, 1, 2, 4, 5, 6] : Array(0..<poolCount)  // Space Voice (3) excluded from Drift random
             case kTrackBass:
-                // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3]
-                return isDrift ? [1, 3, 4] : Array(0..<poolCount)  // Moog+Mono Synth excluded from Drift random
+                // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel Org, 7=Warm Pad]
+                return isDrift ? [1, 3, 4, 6, 7] : Array(0..<poolCount)  // Moog+Mono Synth excluded from Drift random
             default: break
             }
         }
@@ -1982,10 +1982,10 @@ final class AppState: ObservableObject {
         guard state.style == .kosmic, state.isKosmicDrift else { return }
         var rng = SystemRandomNumberGenerator()
 
-        // Bass: [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3] — Moog excluded from Drift random.
+        // Bass: [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel Org, 7=Warm Pad] — Moog excluded from Drift random.
         let currentBass = instrumentOverrides[kTrackBass] ?? 0
         if currentBass == 0 {
-            let valid = [1, 2, 3, 4]
+            let valid = [1, 2, 3, 4, 6, 7]
             instrumentOverrides[kTrackBass] = valid[Int.random(in: 0..<valid.count, using: &rng)]
         }
 
@@ -3415,7 +3415,6 @@ final class AppState: ObservableObject {
             default:            []
             }
         case .kosmic:
-            // Drift: Sweep on Pads, Pan on Texture, Tremolo on Bass (all ON); Regular: same effects available but OFF
             let isDriftEffects = songState?.isKosmicDrift == true
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]
@@ -3432,12 +3431,16 @@ final class AppState: ObservableObject {
             let isTremoloLead = trackIndex == kTrackLead1
                 && idx < mnames.count
                 && (mnames[idx] == "Synth Lead" || mnames[idx] == "Square Lead")
-            let isNoir = songState?.motorikNoirVariation == true
+            let isNoir           = songState?.motorikNoirVariation        == true
+            let isBassDistortion = songState?.motorikBassDistortion       == true
+            let isNoirBassDist   = songState?.motorikNoirBassDistortion   == true
+            let isNoirRhythmDist = songState?.motorikNoirRhythmDistortion == true
             defaults = switch trackIndex {
             case kTrackLead1:   isTremoloLead ? [.delay, .tremolo] : [.delay]
-            case kTrackRhythm:  [.delay]
+            case kTrackRhythm:  isNoirRhythmDist ? [.delay, .distortion] : [.delay]
             case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
+            case kTrackBass:    isNoirBassDist || isBassDistortion ? [.distortion] : []
             default:            []
             }
         }

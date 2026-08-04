@@ -274,12 +274,7 @@ struct PhonePlayerView: View {
 
     private var songTitleRow: some View {
         HStack {
-            if appState.isGenerating {
-                ProgressView().tint(.white).scaleEffect(0.75)
-                Text("Generating…")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.7))
-            } else if let song = appState.songState {
+            if let song = appState.songState {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title)
                         .font(.system(size: song.style == .ambient ? 16 : 20, weight: .semibold))
@@ -878,7 +873,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v2.2")
+                    Text("Generative music · v2.3")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)

@@ -19,13 +19,15 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.0/Zudio-2.0.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `2.1` (build 125). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `2.3` (build 128). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v2.1:**
-- **Major performance improvement** — A rearchitected reverb bus replaces 7 independent per-track reverb units with 2 shared buses, cutting audio thread CPU usage by over 50%. Playback now runs under 10% CPU without the visualizer and generally under 20% with it, compared to over 35% previously. The improvement is consistent across all styles and is completely inaudible.
-- **Higher fidelity M4A audio export** — Exported audio now includes all live effects — auto-pan, tremolo, and sweep filter modulation — so the M4A matches what you hear during playback, especially for Kosmic Drift and Ambient styles.
-- **Kosmic Drift** — New Kosmic sub-style at 70–90 BPM. Inspired by Boards of Canada, Portishead, and Sigur Rós — meditative, sparse, floating. New loping groove drum rules, sustained chord rhythm patterns, and very late-entering melodic leads.
-- **Smoother track view animation** — Playhead now computed from wall-clock time, eliminating lag during playback.
+**What's new in v2.3:**
+- **Distortion effect** — New Dist. chip on Motorik Bass and Rhythm tracks. Soft-clip saturation for a warm, gritty character. Applied automatically by default on Motorik Noir; toggleable by the user.
+- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass.
+- **Audio engine crash fix** — Fixed a rare Mac crash after extended playback (2+ hours) caused by a legacy audio unit fanning output to two destinations simultaneously.
+- **Audio export** — When exporting on the Mac the user can select an option to export separate track stems for bass, drums, leads and so on with full EQ and reverb
+- **New instruments** — Guitar Fdbk added to Motorik Noir Texture; Fantasia 2 added to Kosmic Pads; Kalimba added to Ambient Rhythm
+- **New app icon** — Redesigned icon replaces "Z!" with a periodic-table style "Zu"
 
 ---
 

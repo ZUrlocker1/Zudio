@@ -44,7 +44,12 @@ enum OfflineExport {
         componentManufacturer: kAudioUnitManufacturer_Apple,
         componentFlags: 0, componentFlagsMask: 0
     )
-
+    private static let distDesc = AudioComponentDescription(
+        componentType: kAudioUnitType_Effect,
+        componentSubType: kAudioUnitSubType_Distortion,
+        componentManufacturer: kAudioUnitManufacturer_Apple,
+        componentFlags: 0, componentFlagsMask: 0
+    )
     // MARK: - Public render entry point
 
     /// Two-phase render: dry AUSampler per track → per-track CAF → offline effects engine → M4A.
@@ -207,7 +212,8 @@ enum OfflineExport {
                                reverbPreset: .mediumHall, reverbWetDryMix: 0, reverbBypassed: true,
                                delayTime: 0.125, delayFeedback: 40, delayLowPassCutoff: 6000,
                                delayWetDryMix: 0, delayBypassed: true,
-                               compBypassed: true, lowShelfBypassed: true, hpfEnabled: false,
+                               compBypassed: true, distortionBypassed: true, lowShelfBypassed: true,
+                               hpfEnabled: false,
                                sweepEnabled: false, sweepFloor: 0, sweepHalfRange: 0, sweepHz: 0,
                                tremoloEnabled: false, tremoloHz: 0, tremoloDepth: 0,
                                panEnabled: false, panHz: 0)
@@ -247,6 +253,11 @@ enum OfflineExport {
             AudioUnitSetParameter(comp.audioUnit, 6, kAudioUnitScope_Global, 0,   4.0, 0)
             comp.auAudioUnit.shouldBypassEffect = snap.compBypassed
 
+            let dist = AVAudioUnitEffect(audioComponentDescription: distDesc)
+            AudioUnitSetParameter(dist.audioUnit, 14, kAudioUnitScope_Global, 0,  6.0, 0) // SoftClipGain dB
+            AudioUnitSetParameter(dist.audioUnit, 15, kAudioUnitScope_Global, 0, 50.0, 0) // FinalMix %
+            dist.auAudioUnit.shouldBypassEffect = snap.distortionBypassed
+
             let eq = AVAudioUnitEQ(numberOfBands: 2)
             eq.bands[0].filterType = .lowShelf
             eq.bands[0].frequency  = 80
@@ -262,13 +273,15 @@ enum OfflineExport {
             fxEngine.attach(sweep)
             fxEngine.attach(delay)
             fxEngine.attach(comp)
+            fxEngine.attach(dist)
             fxEngine.attach(eq)
             fxEngine.attach(reverb)
             fxEngine.connect(player,      to: tremoloGain,           format: avFormat)
             fxEngine.connect(tremoloGain, to: sweep,                 format: avFormat)
             fxEngine.connect(sweep,       to: delay,                 format: avFormat)
             fxEngine.connect(delay,       to: comp,                  format: avFormat)
-            fxEngine.connect(comp,        to: eq,                    format: avFormat)
+            fxEngine.connect(comp,        to: dist,                  format: avFormat)
+            fxEngine.connect(dist,        to: eq,                    format: avFormat)
             fxEngine.connect(eq,          to: reverb,                format: avFormat)
             fxEngine.connect(reverb,      to: fxEngine.mainMixerNode,format: avFormat)
 
@@ -442,7 +455,8 @@ enum OfflineExport {
                         reverbPreset: .mediumHall, reverbWetDryMix: 0, reverbBypassed: true,
                         delayTime: 0.125, delayFeedback: 40, delayLowPassCutoff: 6000,
                         delayWetDryMix: 0, delayBypassed: true,
-                        compBypassed: true, lowShelfBypassed: true, hpfEnabled: false,
+                        compBypassed: true, distortionBypassed: true, lowShelfBypassed: true,
+                        hpfEnabled: false,
                         sweepEnabled: false, sweepFloor: 0, sweepHalfRange: 0, sweepHz: 0,
                         tremoloEnabled: false, tremoloHz: 0, tremoloDepth: 0,
                         panEnabled: false, panHz: 0)
@@ -487,6 +501,11 @@ enum OfflineExport {
                 AudioUnitSetParameter(comp.audioUnit, 6, kAudioUnitScope_Global, 0,   4.0, 0)
                 comp.auAudioUnit.shouldBypassEffect = snap.compBypassed
 
+                let dist = AVAudioUnitEffect(audioComponentDescription: distDesc)
+                AudioUnitSetParameter(dist.audioUnit, 14, kAudioUnitScope_Global, 0,  6.0, 0) // SoftClipGain dB
+                AudioUnitSetParameter(dist.audioUnit, 15, kAudioUnitScope_Global, 0, 50.0, 0) // FinalMix %
+                dist.auAudioUnit.shouldBypassEffect = snap.distortionBypassed
+
                 let eq = AVAudioUnitEQ(numberOfBands: 2)
                 eq.bands[0].filterType = .lowShelf
                 eq.bands[0].frequency  = 80
@@ -499,13 +518,14 @@ enum OfflineExport {
 
                 trackEngine.attach(player);      trackEngine.attach(tremoloGain)
                 trackEngine.attach(sweep);       trackEngine.attach(delay)
-                trackEngine.attach(comp);        trackEngine.attach(eq)
-                trackEngine.attach(reverb)
+                trackEngine.attach(comp);        trackEngine.attach(dist)
+                trackEngine.attach(eq);          trackEngine.attach(reverb)
                 trackEngine.connect(player,      to: tremoloGain,               format: avFormat)
                 trackEngine.connect(tremoloGain, to: sweep,                     format: avFormat)
                 trackEngine.connect(sweep,       to: delay,                     format: avFormat)
                 trackEngine.connect(delay,       to: comp,                      format: avFormat)
-                trackEngine.connect(comp,        to: eq,                        format: avFormat)
+                trackEngine.connect(comp,        to: dist,                      format: avFormat)
+                trackEngine.connect(dist,        to: eq,                        format: avFormat)
                 trackEngine.connect(eq,          to: reverb,                    format: avFormat)
                 trackEngine.connect(reverb,      to: trackEngine.mainMixerNode, format: avFormat)
 

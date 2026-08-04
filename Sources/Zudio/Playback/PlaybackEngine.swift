@@ -66,6 +66,7 @@ final class PlaybackEngine: ObservableObject {
     private var sweepFilters = [AVAudioUnitEffect]()   // LFO-driven low-pass for Sweep effect
     private var delays      = [AVAudioUnitDelay]()
     private var comps       = [AVAudioUnitEffect]()
+    private var distortions = [AVAudioUnitEffect]()    // kAudioUnitSubType_Distortion — soft-clip saturation
     private var lowEQs      = [AVAudioUnitEQ]()
     // Reverb bus architecture: two shared reverb units replace 7 per-track units.
     // Each track sends a copy of its post-EQ signal to one of the two buses via a send mixer.
@@ -75,6 +76,7 @@ final class PlaybackEngine: ObservableObject {
     private let reverbBusMixerLarge = AVAudioMixerNode()
     private let reverbBusMixerSmall = AVAudioMixerNode()
     private var reverbSendMixers    = [AVAudioMixerNode]()  // one per track; volume = send level
+    private var fanMixers           = [AVAudioMixerNode]()  // V3-native fan-out source between lowEQ and dry/send split
     private var reverbSendLevels       = Array(repeating: Float(0),  count: kTrackCount)
     // Per-track reverb presets for offline export — set by each style method to match original intent.
     // Live playback uses shared buses; export uses these presets for per-track reverb nodes.
@@ -251,6 +253,13 @@ final class PlaybackEngine: ObservableObject {
         componentManufacturer: kAudioUnitManufacturer_Apple,
         componentFlags: 0, componentFlagsMask: 0
     )
+    private static let distDesc = AudioComponentDescription(
+        componentType: kAudioUnitType_Effect,
+        componentSubType: kAudioUnitSubType_Distortion,
+        componentManufacturer: kAudioUnitManufacturer_Apple,
+        componentFlags: 0, componentFlagsMask: 0
+    )
+    private static let distCompGain: Float = 0.707  // −3 dB post-distortion output compensation
     private var scheduler: StepScheduler?
 
     // MARK: - Song state
@@ -1240,6 +1249,7 @@ final class PlaybackEngine: ObservableObject {
         var delayWetDryMix: Float
         var delayBypassed: Bool
         var compBypassed: Bool
+        var distortionBypassed: Bool
         var lowShelfBypassed: Bool
         var hpfEnabled: Bool
         // Sweep LFO — simulated per-block in offline export
@@ -1265,7 +1275,9 @@ final class PlaybackEngine: ObservableObject {
             // animator (Chill per-note fade, Kosmic/Ambient drone intro) and may be 0.0 at
             // snapshot time even when the track should play at full volume in the export.
             // No sweep scale needed: offline export now simulates the sweep LFO per block.
+            let distActive = !distortions[i].auAudioUnit.shouldBypassEffect
             let volume = (boostEffectEnabled[i] ? 1.7 : 1.0) * boostBaseMultiplier[i] * trackBaseVolume[i]
+                       * (distActive ? Self.distCompGain : 1.0)
 
             // Sweep LFO parameters — Ambient uses per-track floor/range/rate arrays;
             // non-Ambient sweep uses standard 300–3100 Hz range at 0.07 Hz.
@@ -1295,6 +1307,7 @@ final class PlaybackEngine: ObservableObject {
                 delayWetDryMix:     delays[i].wetDryMix,
                 delayBypassed:      delays[i].auAudioUnit.shouldBypassEffect,
                 compBypassed:       comps[i].auAudioUnit.shouldBypassEffect,
+                distortionBypassed: distortions[i].auAudioUnit.shouldBypassEffect,
                 lowShelfBypassed:   lowEQs[i].auAudioUnit.shouldBypassEffect,
                 hpfEnabled:        !lowEQs[i].bands[1].bypass,
                 sweepEnabled:       sweepEnabled[i],
@@ -1575,6 +1588,11 @@ final class PlaybackEngine: ObservableObject {
             else       { stopTremolo(forTrack: trackIndex) }
         case .compression:
             comps[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
+        case .distortion:
+            distortions[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
+            // Post-distortion gain reduction on the V3-native fanMixer (sits after dist in chain).
+            // Compensates for the loudness increase from soft-clip harmonic generation.
+            fanMixers[trackIndex].outputVolume = enabled ? Self.distCompGain : 1.0
         case .lowShelf:
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb, .space:
@@ -2297,8 +2315,10 @@ final class PlaybackEngine: ObservableObject {
             let sweepFilter  = AVAudioUnitEffect(audioComponentDescription: Self.lpDesc)
             let delay        = AVAudioUnitDelay()
             let comp         = AVAudioUnitEffect(audioComponentDescription: Self.compDesc)
+            let distortion   = AVAudioUnitEffect(audioComponentDescription: Self.distDesc)
             let lowEQ        = AVAudioUnitEQ(numberOfBands: 2)
             let sendMixer    = AVAudioMixerNode()   // reverb send tap — volume = send level (0 until style set)
+            let fanMixer     = AVAudioMixerNode()   // V3-native pass-through; fan-out source to dry path + send
 
             // Boost: unity gain, centre pan by default
             boost.outputVolume = 1.0
@@ -2325,6 +2345,11 @@ final class PlaybackEngine: ObservableObject {
             AudioUnitSetParameter(comp.audioUnit, 6, kAudioUnitScope_Global, 0,   4.0, 0)
             comp.auAudioUnit.shouldBypassEffect = true
 
+            // Distortion: soft-clip saturation — SoftClipGain +6 dB, FinalMix 50%; bypassed until enabled
+            AudioUnitSetParameter(distortion.audioUnit, 14, kAudioUnitScope_Global, 0,  6.0, 0) // SoftClipGain dB
+            AudioUnitSetParameter(distortion.audioUnit, 15, kAudioUnitScope_Global, 0, 50.0, 0) // FinalMix %
+            distortion.auAudioUnit.shouldBypassEffect = true
+
             // Low shelf: +5 dB at 80 Hz, bypassed until enabled
             lowEQ.bands[0].filterType = .lowShelf
             lowEQ.bands[0].frequency  = 80
@@ -2345,19 +2370,26 @@ final class PlaybackEngine: ObservableObject {
             engine.attach(sweepFilter)
             engine.attach(delay)
             engine.attach(comp)
+            engine.attach(distortion)
             engine.attach(lowEQ)
             engine.attach(sendMixer)
+            engine.attach(fanMixer)
 
-            // Chain: sampler → boost → sweep → delay → comp → lowEQ ─┬→ mixer (dry)
-            //                                                          └→ sendMixer → small bus (default)
+            // Chain: sampler → boost → sweep → delay → comp → dist → lowEQ → fanMixer ─┬→ mixer (dry)
+            //                                                                             └→ sendMixer → small bus (default)
+            // fanMixer is a V3-native AVAudioMixerNode inserted between the V2-bridged lowEQ and the
+            // fan-out destinations. Fanning out from a V2 unit directly caused recursive render loops
+            // on macOS 26 after extended runtime (crash: EXC_BAD_ACCESS on com.apple.audio.IOThread.client).
             engine.connect(sampler,     to: boost,       format: nil)
             engine.connect(boost,       to: sweepFilter, format: nil)
             engine.connect(sweepFilter, to: delay,       format: nil)
             engine.connect(delay,       to: comp,        format: nil)
-            engine.connect(comp,        to: lowEQ,       format: nil)
-            engine.connect(lowEQ, to: [
-                AVAudioConnectionPoint(node: mixer,              bus: AVAudioNodeBus(i)),
-                AVAudioConnectionPoint(node: sendMixer,          bus: 0)
+            engine.connect(comp,        to: distortion,  format: nil)
+            engine.connect(distortion,  to: lowEQ,       format: nil)
+            engine.connect(lowEQ,       to: fanMixer,    format: nil)
+            engine.connect(fanMixer, to: [
+                AVAudioConnectionPoint(node: mixer,     bus: AVAudioNodeBus(i)),
+                AVAudioConnectionPoint(node: sendMixer, bus: 0)
             ], fromBus: 0, format: nil)
             engine.connect(sendMixer, to: reverbBusMixerSmall, format: nil)
 
@@ -2366,8 +2398,10 @@ final class PlaybackEngine: ObservableObject {
             sweepFilters.append(sweepFilter)
             delays.append(delay)
             comps.append(comp)
+            distortions.append(distortion)
             lowEQs.append(lowEQ)
             reverbSendMixers.append(sendMixer)
+            fanMixers.append(fanMixer)
         }
         loadGMPrograms()
     }

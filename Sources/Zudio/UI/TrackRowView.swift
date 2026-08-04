@@ -329,7 +329,9 @@ struct TrackRowView: View {
             if isChill   { return [.space, .sweep, .boost] }
             return isAmbient ? [.sweep, .tremolo, .space] : [.sweep, .delay, .space]
         case kTrackRhythm:
-            if isChill   { return [.tremolo, .space, .compression] }
+            if isChill                 { return [.tremolo, .space, .compression] }
+            if activeStyle == .motorik { return [.distortion, .delay, .reverb] }
+            if activeStyle == .kosmic  { return [.boost, .delay, .reverb] }
             return [.boost, .delay, .reverb]
         case kTrackTexture:
             if isChill   { return [.boost, .lowShelf, .reverb] }
@@ -341,7 +343,8 @@ struct TrackRowView: View {
         case kTrackBass:
             if isChill          { return [.lowShelf, .compression, .reverb] }
             if isAmbient        { return [.sweep, .delay, .reverb] }
-            if activeStyle == .kosmic { return [.tremolo, .delay, .reverb] }   // Kosmic/Drift: Trem replaces Low Filter
+            if activeStyle == .kosmic  { return [.tremolo, .delay, .reverb] }   // Kosmic/Drift: Trem replaces Low Filter
+            if activeStyle == .motorik { return [.distortion, .delay, .reverb] }
             return [.lowShelf, .delay, .reverb]
         case kTrackDrums:
             if isChill   { return [.compression, .space, .lowShelf] }
@@ -429,12 +432,16 @@ struct TrackRowView: View {
             let motTremoloLead = trackIndex == kTrackLead1
                 && idx < mnames.count
                 && (mnames[idx] == "Synth Lead" || mnames[idx] == "Square Lead")
-            let isNoir = appState.songState?.motorikNoirVariation == true
+            let isNoir               = appState.songState?.motorikNoirVariation        == true
+            let isBassDistortion     = appState.songState?.motorikBassDistortion       == true
+            let isNoirBassDist       = appState.songState?.motorikNoirBassDistortion   == true
+            let isNoirRhythmDist     = appState.songState?.motorikNoirRhythmDistortion == true
             defaults = switch trackIndex {
             case kTrackLead1:   motTremoloLead ? [.delay, .tremolo] : [.delay]
-            case kTrackRhythm:  [.delay]
+            case kTrackRhythm:  isNoirRhythmDist ? [.delay, .distortion] : [.delay]
             case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
+            case kTrackBass:    isNoirBassDist || isBassDistortion ? [.distortion] : []
             default:            []
             }
         }

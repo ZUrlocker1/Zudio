@@ -118,6 +118,11 @@ struct SongGenerator {
 
         // Motorik Noir: was 75% during testing, 50% in early release, 20% then 23%.
         let isNoir = rng.nextDouble() < 0.23
+        // Bass distortion: 20% of regular (non-Noir) Motorik songs get Dist. on bass by default.
+        let motorikBassDistortion = !isNoir && rng.nextDouble() < 0.20
+        // Noir distortion: 75% chance independently for Bass and Rhythm.
+        let motorikNoirBassDistortion    = isNoir && rng.nextDouble() < 0.75
+        let motorikNoirRhythmDistortion  = isNoir && rng.nextDouble() < 0.75
 
         // Step 1 — Global musical frame
         let frame = MusicalFrameGenerator.generate(
@@ -275,6 +280,9 @@ struct SongGenerator {
             generationLog: log,
             stepAnnotations: stepAnnotations,
             motorikNoirVariation: isNoir,
+            motorikBassDistortion: motorikBassDistortion,
+            motorikNoirBassDistortion: motorikNoirBassDistortion,
+            motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
             forcedRules: forced,
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,

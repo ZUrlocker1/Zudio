@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-VERSION="2.1"
+VERSION="2.3"
 APP_SRC="${1:-${HOME}/Downloads/Zudio.app}"
 TEAM_ID="K66MA9TR8Z"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
