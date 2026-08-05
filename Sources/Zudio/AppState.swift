@@ -562,7 +562,7 @@ final class AppState: ObservableObject {
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
-        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel Org","Warm Pad"]
+        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
@@ -1882,7 +1882,7 @@ final class AppState: ObservableObject {
             case kTrackDrums:   return isDrift ? [2,3,4]         : [0,1,2]
             case kTrackTexture: return isDrift ? Array(0..<poolCount) : [0,1,2,3]
             case kTrackPads:    return isDrift ? [0,1,2,4,5]     : Array(0..<poolCount)
-            case kTrackBass:    return isDrift ? [1,3,4]         : Array(0..<poolCount)
+            case kTrackBass:    return isDrift ? [1,3,4,6,7]     : Array(0..<poolCount)
             default: break
             }
         }
@@ -1949,7 +1949,7 @@ final class AppState: ObservableObject {
                 // [0=Sweep Pad, 1=Synth Strings, 2=Warm Pad, 3=Space Voice, 4=Halo Pad, 5=Bowed Glass, 6=Fantasia 2]
                 return isDrift ? [0, 1, 2, 4, 5, 6] : Array(0..<poolCount)  // Space Voice (3) excluded from Drift random
             case kTrackBass:
-                // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel Org, 7=Warm Pad]
+                // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel, 7=Warm Pad]
                 return isDrift ? [1, 3, 4, 6, 7] : Array(0..<poolCount)  // Moog+Mono Synth excluded from Drift random
             default: break
             }
@@ -1982,7 +1982,7 @@ final class AppState: ObservableObject {
         guard state.style == .kosmic, state.isKosmicDrift else { return }
         var rng = SystemRandomNumberGenerator()
 
-        // Bass: [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel Org, 7=Warm Pad] — Moog excluded from Drift random.
+        // Bass: [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel, 7=Warm Pad] — Moog excluded from Drift random.
         let currentBass = instrumentOverrides[kTrackBass] ?? 0
         if currentBass == 0 {
             let valid = [1, 2, 3, 4, 6, 7]
