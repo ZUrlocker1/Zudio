@@ -524,6 +524,7 @@ final class AppState: ObservableObject {
         (kTrackTexture, .motorik, 6), // Interference     patch 11127
         (kTrackTexture, .kosmic,  3), // FX Echoes        patch 102  (index shifted: FX Atmosphere removed)
         (kTrackRhythm,  .kosmic,  6), // Synth Chime      patch 11098 (index shifted: Crystal Bells removed)
+        (kTrackBass,    .kosmic,  7), // Warm Pad         patch 89
     ]
 
     private static let trackDisplayName: [Int: String] = [
