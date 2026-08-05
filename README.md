@@ -23,10 +23,9 @@ Current release: `2.3` (build 128). Universal binary — runs natively on both A
 
 **What's new in v2.3:**
 - **Distortion effect** — New Dist. chip on Motorik Bass and Rhythm tracks. Soft-clip saturation for a warm, gritty character. Applied automatically by default on Motorik Noir; toggleable by the user.
-- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass.
+- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass, Guitar Fdbk added to Motorik Noir Texture; Fantasia 2 added to Kosmic Pads; Kalimba added to Ambient Rhythm.
 - **Audio engine crash fix** — Fixed a rare Mac crash after extended playback (2+ hours) caused by a legacy audio unit fanning output to two destinations simultaneously.
 - **Audio export** — When exporting on the Mac the user can select an option to export separate track stems for bass, drums, leads and so on with full EQ and reverb
-- **New instruments** — Guitar Fdbk added to Motorik Noir Texture; Fantasia 2 added to Kosmic Pads; Kalimba added to Ambient Rhythm
 - **New app icon** — Redesigned icon replaces "Z!" with a periodic-table style "Zu"
 
 ---

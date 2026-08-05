@@ -3,7 +3,7 @@
 ## V 2.3 (Build 128)  Audio engine crash fix
 - **Crash fix** — Fixed a rare crash in the audio engine that could occur after extended playback (2+ hours). A legacy audio unit was fanning its output to two destinations simultaneously, which caused CoreAudio's render thread to enter infinite recursion on macOS 26 and crash with a segfault. Fixed by routing through a native pass-through node instead.
 - **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass instrument pool.
-- **Distortion effect** — New "Dist." effect chip on Motorik Bass and Rhythm tracks (replaces Low and Boost chips). Uses soft-clip saturation for a warm, gritty character. Applied automatically by default: Motorik Noir bass and rhythm each distorted ~75% of the time independently; regular Motorik bass distorted ~20% of the time. User can toggle the chip on or off manually.
+- **Distortion effect** — New "Dist." effect chip on Motorik Bass and Rhythm tracks (replaces Low and Boost chips). Uses soft-clip saturation for a warm, gritty character. Applied automatically by default: Motorik Noir bass and rhythm each distorted ~75% of the time independently; regular Motorik bass distorted ~20% of the time. Note distortion is off for Acoustic Bass and Fuzz Guitar by default, as a matter of taste.
 - **iOS bug fixes** — Fixed a bug where regenerating an instrument track in a Motorik Noir song incorrectly changed the substyle to Motorik. Also removed a distracting "Generating…" flash in the iPhone player when regenerating a single track.
 
 ---

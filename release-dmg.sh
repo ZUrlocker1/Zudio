@@ -5,8 +5,17 @@
 
 set -euo pipefail
 
-VERSION="2.3"
 APP_SRC="${1:-${HOME}/Downloads/Zudio.app}"
+
+if [ ! -d "${APP_SRC}" ]; then
+    echo "ERROR: App not found at: ${APP_SRC}"
+    exit 1
+fi
+
+PLIST="${APP_SRC}/Contents/Info.plist"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "${PLIST}")
+BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "${PLIST}")
+
 TEAM_ID="K66MA9TR8Z"
 SIGNING_IDENTITY="Developer ID Application: Zack Urlocker (${TEAM_ID})"
 OUTPUT_DMG="${HOME}/Downloads/Zudio-${VERSION}.dmg"
@@ -19,11 +28,6 @@ DMG_BACKGROUND="${DMG_WORK}/background.png"
 WINDOW_W=560
 WINDOW_H=340
 ICON_SIZE=100
-
-if [ ! -d "${APP_SRC}" ]; then
-    echo "ERROR: App not found at: ${APP_SRC}"
-    exit 1
-fi
 
 echo ""
 echo "==> Source app: ${APP_SRC}"
@@ -152,7 +156,7 @@ echo ""
 echo " Verify checklist:"
 echo "   1. Open the DMG — Zudio.app on left, Applications on right, arrow visible"
 echo "   2. Drag Zudio.app to Applications and launch"
-echo "   3. About dialog shows version ${VERSION} (build 125)"
+echo "   3. About dialog shows version ${VERSION} (build ${BUILD})"
 
 echo "   4. spctl --assess --verbose=4 --type exec \"${APP_SRC}\""
 echo "============================================================"

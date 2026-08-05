@@ -162,6 +162,8 @@ struct TrackRowView: View {
                         Button {
                             instrumentIndex = Int.random(in: 0..<instruments.count)
                             appState.setProgram(instruments[instrumentIndex].program, forTrack: trackIndex)
+                            appState.instrumentOverrides[trackIndex] = instrumentIndex
+                            applyDefaultEffects()
                             appState.regenerateTrack(trackIndex)
                         } label: {
                             Image(systemName: "bolt.fill")
@@ -250,6 +252,11 @@ struct TrackRowView: View {
             // Ambient texture regen may switch between audio and MIDI — re-apply effect defaults
             // so Pan/Sweep chips show the correct active state without a full song regeneration.
             if trackIndex == kTrackTexture && activeStyle == .ambient {
+                applyDefaultEffects()
+            }
+            // Motorik Noir rhythm: re-evaluate distortion chip for exempt/non-exempt instruments.
+            if trackIndex == kTrackRhythm, activeStyle == .motorik,
+               appState.songState?.motorikNoirRhythmDistortion == true {
                 applyDefaultEffects()
             }
         }
@@ -436,9 +443,10 @@ struct TrackRowView: View {
             let isBassDistortion     = appState.songState?.motorikBassDistortion       == true
             let isNoirBassDist       = appState.songState?.motorikNoirBassDistortion   == true
             let isNoirRhythmDist     = appState.songState?.motorikNoirRhythmDistortion == true
+            let rhythmExemptsDistortion = [2, 4].contains(appState.instrumentOverrides[kTrackRhythm] ?? 0)
             defaults = switch trackIndex {
             case kTrackLead1:   motTremoloLead ? [.delay, .tremolo] : [.delay]
-            case kTrackRhythm:  isNoirRhythmDist ? [.delay, .distortion] : [.delay]
+            case kTrackRhythm:  isNoirRhythmDist && !rhythmExemptsDistortion ? [.delay, .distortion] : [.delay]
             case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
             case kTrackBass:    isNoirBassDist || isBassDistortion ? [.distortion] : []

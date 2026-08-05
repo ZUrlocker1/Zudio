@@ -3342,6 +3342,10 @@ final class AppState: ObservableObject {
         guard newIdx != currentIdx else { return }
         instrumentOverrides[trackIndex] = newIdx
         setProgram(programs[newIdx], forTrack: trackIndex)
+        if trackIndex == kTrackRhythm,
+           songState?.motorikNoirRhythmDistortion == true {
+            setEffect(.distortion, enabled: ![2, 4].contains(newIdx), forTrack: trackIndex)
+        }
         instrumentChangeToken += 1
         triggerVisualizerFlash(trackIndex: trackIndex)
         let isDrift2 = songState?.isKosmicDrift == true
@@ -3435,9 +3439,11 @@ final class AppState: ObservableObject {
             let isBassDistortion = songState?.motorikBassDistortion       == true
             let isNoirBassDist   = songState?.motorikNoirBassDistortion   == true
             let isNoirRhythmDist = songState?.motorikNoirRhythmDistortion == true
+            // Fuzz Guitar (idx 2) and Acoustic Bass (idx 4) sound wrong with distortion — exempt them.
+            let rhythmExemptsDistortion = [2, 4].contains(instrumentOverrides[kTrackRhythm] ?? 0)
             defaults = switch trackIndex {
             case kTrackLead1:   isTremoloLead ? [.delay, .tremolo] : [.delay]
-            case kTrackRhythm:  isNoirRhythmDist ? [.delay, .distortion] : [.delay]
+            case kTrackRhythm:  isNoirRhythmDist && !rhythmExemptsDistortion ? [.delay, .distortion] : [.delay]
             case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
             case kTrackBass:    isNoirBassDist || isBassDistortion ? [.distortion] : []
