@@ -22,11 +22,13 @@ This repository contains the macOS app source, implementation notes, and support
 Current release: `2.3` (build 128). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 **What's new in v2.3:**
-- **Distortion effect** — New Dist. chip on Motorik Bass and Rhythm tracks. Soft-clip saturation for a warm, gritty character. Applied automatically by default on Motorik Noir; toggleable by the user.
-- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass, Guitar Fdbk added to Motorik Noir Texture; Fantasia 2 added to Kosmic Pads; Kalimba added to Ambient Rhythm.
-- **Audio engine crash fix** — Fixed a rare Mac crash after extended playback (2+ hours) caused by a legacy audio unit fanning output to two destinations simultaneously.
-- **Audio export** — When exporting on the Mac the user can select an option to export separate track stems for bass, drums, leads and so on with full EQ and reverb
-- **New app icon** — Redesigned icon replaces "Z!" with a periodic-table style "Zu"
+- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass.
+- **Distortion effect** — New Dist. chip on Motorik Bass and Rhythm. Soft-clip saturation applied automatically on Motorik Noir; toggleable by the user.
+- **Vibrato effect** — New Vibrato chip on Chill and Kosmic leads. Applied probabilistically on instruments where it fits (flute, sax, oboe, etc.).
+- **Air effect** — New Air chip on Motorik leads. A two-band EQ boost (4 kHz presence + 8 kHz shelf) that adds brightness and openness. Applied probabilistically on Lead 1.
+- **Probabilistic effects** — Several effects (Sweep, Tremolo, Pan, Delay) now applied probabilistically on Kosmic and Motorik tracks so songs sound different from each other even within the same style.
+- **Style chip** — The song style or substyle is now displayed on Mac and iPad matching the iPhone display.
+- **Crash fix** — Fixed a rare Mac crash after extended playback (2+ hours).
 
 ---
 

@@ -163,7 +163,7 @@ struct ContentView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                    if contentWidth >= 800 { infoChip("Mood",   song.frame.mood.rawValue.capitalized) }
+                    if contentWidth >= 800 { infoChip(song.displayStyleName) }
                     if contentWidth >= 950 { infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)") }
                     if contentWidth >= 1100 { infoChip("BPM",    "\(song.frame.tempo)") }
                     infoChip("Length", songLength(song))
@@ -680,7 +680,7 @@ struct ContentView: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                infoChip("Mood",   song.frame.mood.rawValue.capitalized)
+                infoChip(song.displayStyleName)
                 infoChip("Key",    "\(song.frame.key) \(song.frame.mode.rawValue)")
                 infoChip("BPM",    "\(song.frame.tempo)")
                 infoChip("Length", songLength(song))
@@ -1058,6 +1058,16 @@ struct ContentView: View {
         .padding(.vertical, 3)
         .background(Color.white.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    private func infoChip(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     private func songLength(_ song: SongState) -> String {

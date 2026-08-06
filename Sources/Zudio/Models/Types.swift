@@ -31,7 +31,9 @@ enum TrackEffect: String, CaseIterable {
     case sweep       = "Sweep"   // LFO-driven low-pass filter sweep
     case pan         = "Pan"     // LFO-driven auto-pan
     case space       = "Hall"    // Hall/chamber reverb (large acoustic space)
+    case air         = "Air"     // High-shelf presence boost at 12 kHz — adds shimmer and openness
     case distortion  = "Dist."   // Apple kAudioUnitSubType_Distortion — soft-clip saturation
+    case vibrato     = "Vibrato" // LFO pitch modulation via AVAudioUnitSampler.masterTuning
 }
 
 // MARK: - Musical enumerations

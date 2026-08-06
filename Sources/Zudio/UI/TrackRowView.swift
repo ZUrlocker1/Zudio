@@ -325,13 +325,13 @@ struct TrackRowView: View {
         let isChill   = activeStyle == .chill
         switch trackIndex {
         case kTrackLead1:
-            if isChill   { return [.space, .delay, .compression] }
+            if isChill   { return [.space, .delay, .vibrato] }
             if isAmbient { return [.sweep, .delay, .space] }
-            return isKosmic ? [.boost, .delay, .space] : [.boost, .delay, .tremolo]
+            return isKosmic ? [.vibrato, .delay, .space] : [.air, .delay, .tremolo]
         case kTrackLead2:
-            if isChill   { return [.space, .delay, .compression] }
+            if isChill   { return [.space, .delay, .vibrato] }
             if isAmbient { return [.tremolo, .delay, .space] }   // delay chip visible whether locked or not
-            return isKosmic ? [.boost, .delay, .space] : [.boost, .delay, .reverb]
+            return isKosmic ? [.vibrato, .delay, .space] : [.air, .delay, .reverb]
         case kTrackPads:
             if isChill   { return [.space, .sweep, .boost] }
             return isAmbient ? [.sweep, .tremolo, .space] : [.sweep, .delay, .space]
@@ -411,11 +411,25 @@ struct TrackRowView: View {
             default:            []
             }
         } else if activeStyle == .chill {
-            let isBlues = appState.songState?.chillBluesVariation == true
+            let isBlues    = appState.songState?.chillBluesVariation == true
+            let baseLeadFX: [TrackEffect] = isBlues ? [.space] : [.space, .delay]
+
+            // Rhythm organ tremolo: Blues 50% for B3(2)/Perc(3)/Rock(5); regular 20% for B3(2)/Tonewheel(6)
+            let rhythmIdx  = trackIndex == kTrackRhythm ? (appState.instrumentOverrides[kTrackRhythm] ?? 0) : -1
+            let rhythmTrem = isBlues
+                ? [2, 3, 5].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.50
+                : [2, 6].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.20
+
+            // Lead vibrato 20%: Lead1 Tenor Sax(1)/Alto Sax(2)/Trumpet(3); Lead2 Flute(1)/Soprano Sax(2)/Trombone(3)
+            let l1Idx = trackIndex == kTrackLead1 ? (appState.instrumentOverrides[kTrackLead1] ?? 0) : -1
+            let l1Vib = [1, 2, 3].contains(l1Idx) && Float.random(in: 0..<1) < 0.20
+            let l2Idx = trackIndex == kTrackLead2 ? (appState.instrumentOverrides[kTrackLead2] ?? 0) : -1
+            let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
+
             defaults = switch trackIndex {
-            case kTrackLead1:   isBlues ? [.space] : [.space, .delay]
-            case kTrackLead2:   isBlues ? [.space] : [.space, .delay]
-            case kTrackRhythm:  [.space]
+            case kTrackLead1:   l1Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
+            case kTrackLead2:   l2Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
+            case kTrackRhythm:  rhythmTrem ? [.space, .tremolo]       : [.space]
             case kTrackPads:    [.sweep, .tremolo]
             case kTrackTexture: [.lowShelf, .reverb]
             case kTrackBass:    [.reverb]
@@ -423,13 +437,27 @@ struct TrackRowView: View {
             default:            []
             }
         } else if activeStyle == .kosmic {
-            let isDrift = appState.songState?.isKosmicDrift == true
+            let isDrift       = appState.songState?.isKosmicDrift == true
+            let kl1VibProb: Float = isDrift ? 0.75 : 0.20
+            let kl2VibProb: Float = isDrift ? 0.50 : 0.20
+
+            // Lead 1 eligible: Flute(0)/Oboe(2)/Recorder(3)/Sine Wave(5)/Bottle Blow(6)/Shenai(7)
+            let kl1Idx = trackIndex == kTrackLead1 ? (appState.instrumentOverrides[kTrackLead1] ?? 0) : -1
+            let kl1Vib = [0, 2, 3, 5, 6, 7].contains(kl1Idx) && Float.random(in: 0..<1) < kl1VibProb
+            // Lead 2 eligible: Bassoon(1)/Charang(2)/Vox Solo(3)
+            let kl2Idx = trackIndex == kTrackLead2 ? (appState.instrumentOverrides[kTrackLead2] ?? 0) : -1
+            let kl2Vib = [1, 2, 3].contains(kl2Idx) && Float.random(in: 0..<1) < kl2VibProb
+            // Probabilistic additions for regular Kosmic (Drift already has these always on)
+            let padsSwp  = !isDrift && trackIndex == kTrackPads    && Float.random(in: 0..<1) < 0.20
+            let bassTrem = !isDrift && trackIndex == kTrackBass    && Float.random(in: 0..<1) < 0.15
+            let texPan   = !isDrift && trackIndex == kTrackTexture && Float.random(in: 0..<1) < 0.15
+
             defaults = switch trackIndex {
-            case kTrackLead1:    [.delay, .space]
-            case kTrackLead2:    [.space]
-            case kTrackPads:     isDrift ? [.space, .delay, .sweep] : [.space, .delay]
-            case kTrackTexture:  isDrift ? [.delay, .space, .pan]   : [.delay, .space]
-            case kTrackBass:     isDrift ? [.tremolo] : []
+            case kTrackLead1:    kl1Vib ? [.delay, .space, .vibrato] : [.delay, .space]
+            case kTrackLead2:    kl2Vib ? [.space, .vibrato]         : [.space]
+            case kTrackPads:     (isDrift || padsSwp)  ? [.space, .delay, .sweep] : [.space, .delay]
+            case kTrackTexture:  (isDrift || texPan)   ? [.delay, .space, .pan]   : [.delay, .space]
+            case kTrackBass:     (isDrift || bassTrem) ? [.tremolo] : []
             case kTrackRhythm:   [.delay]
             default:             []
             }
@@ -444,10 +472,16 @@ struct TrackRowView: View {
             let isNoirBassDist       = appState.songState?.motorikNoirBassDistortion   == true
             let isNoirRhythmDist     = appState.songState?.motorikNoirRhythmDistortion == true
             let rhythmExemptsDistortion = [2, 4].contains(appState.instrumentOverrides[kTrackRhythm] ?? 0)
+            let airProb: Float       = isNoir ? 0.45 : 0.25
+            let ml1Air               = trackIndex == kTrackLead1 && Float.random(in: 0..<1) < airProb
+            let lead1Base: [TrackEffect] = motTremoloLead ? [.delay, .tremolo] : [.delay]
+            let padsSwpMot = !isNoir && trackIndex == kTrackPads   && Float.random(in: 0..<1) < 0.15
+            let ml2Delay   = trackIndex == kTrackLead2             && Float.random(in: 0..<1) < 0.20
             defaults = switch trackIndex {
-            case kTrackLead1:   motTremoloLead ? [.delay, .tremolo] : [.delay]
+            case kTrackLead1:   ml1Air ? lead1Base + [.air] : lead1Base
+            case kTrackLead2:   ml2Delay ? [.delay] : []
             case kTrackRhythm:  isNoirRhythmDist && !rhythmExemptsDistortion ? [.delay, .distortion] : [.delay]
-            case kTrackPads:    isNoir ? [.space, .sweep] : [.space]
+            case kTrackPads:    (isNoir || padsSwpMot) ? [.space, .sweep] : [.space]
             case kTrackTexture: [.pan]
             case kTrackBass:    isNoirBassDist || isBassDistortion ? [.distortion] : []
             default:            []

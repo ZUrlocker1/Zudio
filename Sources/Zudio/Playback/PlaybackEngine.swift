@@ -68,6 +68,7 @@ final class PlaybackEngine: ObservableObject {
     private var comps       = [AVAudioUnitEffect]()
     private var distortions = [AVAudioUnitEffect]()    // kAudioUnitSubType_Distortion — soft-clip saturation
     private var lowEQs      = [AVAudioUnitEQ]()
+    private var airEQs      = [AVAudioUnitEQ]()
     // Reverb bus architecture: two shared reverb units replace 7 per-track units.
     // Each track sends a copy of its post-EQ signal to one of the two buses via a send mixer.
     // The dry signal goes directly to the main mixer; the bus adds only wet signal (100% wet).
@@ -114,6 +115,7 @@ final class PlaybackEngine: ObservableObject {
     // Tracks whether the user's +4.6 dB boost EFFECT is on — separate from boosts[i].outputVolume
     // which is also used as a dynamic animator (Chill pads fade, Kosmic/Ambient drone fades).
     private var boostEffectEnabled  = Array(repeating: false,   count: kTrackCount)
+    private var airEnabled          = Array(repeating: false,   count: kTrackCount)
     // Instrument-level output gain multiplier applied via boosts[i].outputVolume.
     // Lets external SF2 pianos exceed unity gain without being clamped by AVAudioUnitSampler.volume.
     private var boostBaseMultiplier = Array(repeating: Float(1.0), count: kTrackCount)
@@ -145,6 +147,12 @@ final class PlaybackEngine: ObservableObject {
     private var panEnabled   = Array(repeating: false, count: kTrackCount)
     private var panPhase     = Array(repeating: Double(0), count: kTrackCount)
     private var panPhaseInc  = Array(repeating: Double(0), count: kTrackCount)  // per-track hz baked in
+
+    // Vibrato LFO (pitch modulation via AVAudioUnitSampler.masterTuning)
+    private var vibEnabled    = Array(repeating: false,    count: kTrackCount)
+    private var vibPhase      = Array(repeating: Double(0), count: kTrackCount)
+    private var vibPhaseInc   = Array(repeating: Double(0.5760), count: kTrackCount)  // 2π × 5.5 Hz / 60 fps
+    private var vibDepth      = Array(repeating: Float(12.0),    count: kTrackCount)  // ±12 cents
 
     // Shared LFO timer — replaces per-effect-per-track timers.
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
@@ -1206,7 +1214,9 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 111 {
                 vol = 0.72   // Shenai runs loud on Kosmic Lead 1 — pull back
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 89 {
-                vol = 0.45   // Warm Pad on Drift Lead 1 — pull back further
+                vol = 0.25   // Warm Pad on Drift Lead 1 — pull back hard
+            } else if trackIndex == kTrackLead1 && kosmicStyle && program == 89 {
+                vol = 0.25   // Warm Pad runs hot on Kosmic Lead 1 — pull back hard
             } else {
                 vol = 1.0
             }
@@ -1251,6 +1261,7 @@ final class PlaybackEngine: ObservableObject {
         var compBypassed: Bool
         var distortionBypassed: Bool
         var lowShelfBypassed: Bool
+        var airEnabled: Bool
         var hpfEnabled: Bool
         // Sweep LFO — simulated per-block in offline export
         var sweepEnabled: Bool
@@ -1264,6 +1275,10 @@ final class PlaybackEngine: ObservableObject {
         // Auto-pan LFO — simulated per-block in offline export
         var panEnabled: Bool
         var panHz: Float            // LFO rate in Hz
+        // Vibrato LFO — simulated per-block in offline export
+        var vibratoEnabled: Bool
+        var vibratoHz: Float          // LFO rate in Hz
+        var vibratoDepthCents: Float  // pitch swing in cents (±)
     }
 
     /// Captures the current static effect settings for every track.
@@ -1295,6 +1310,9 @@ final class PlaybackEngine: ObservableObject {
             // Pan Hz: panPhaseInc is always per 20fps tick.
             let panHz: Float = Float(panPhaseInc[i] * 20.0 / (2.0 * .pi))
 
+            // Vibrato Hz: always 60fps.
+            let vibHz: Float = Float(vibPhaseInc[i] * 60.0 / (2.0 * .pi))
+
             return TrackEffectSnapshot(
                 volume:             volume,
                 pan:                trackStaticPan[i],
@@ -1309,6 +1327,7 @@ final class PlaybackEngine: ObservableObject {
                 compBypassed:       comps[i].auAudioUnit.shouldBypassEffect,
                 distortionBypassed: distortions[i].auAudioUnit.shouldBypassEffect,
                 lowShelfBypassed:   lowEQs[i].auAudioUnit.shouldBypassEffect,
+                airEnabled:         airEnabled[i],
                 hpfEnabled:        !lowEQs[i].bands[1].bypass,
                 sweepEnabled:       sweepEnabled[i],
                 sweepFloor:         sweepEnabled[i] ? sFloor     : 0,
@@ -1318,7 +1337,10 @@ final class PlaybackEngine: ObservableObject {
                 tremoloHz:          tremEnabled[i]  ? tremoloHz  : 0,
                 tremoloDepth:       tremEnabled[i]  ? tremDepth[i]: 0,
                 panEnabled:         panEnabled[i],
-                panHz:              panEnabled[i]   ? panHz      : 0
+                panHz:              panEnabled[i]   ? panHz      : 0,
+                vibratoEnabled:     vibEnabled[i],
+                vibratoHz:          vibEnabled[i]   ? vibHz      : 0,
+                vibratoDepthCents:  vibEnabled[i]   ? vibDepth[i]: 0
             )
         }
     }
@@ -1586,6 +1608,9 @@ final class PlaybackEngine: ObservableObject {
         case .tremolo:
             if enabled { startTremolo(forTrack: trackIndex) }
             else       { stopTremolo(forTrack: trackIndex) }
+        case .vibrato:
+            if enabled { startVibrato(forTrack: trackIndex) }
+            else       { stopVibrato(forTrack: trackIndex) }
         case .compression:
             comps[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .distortion:
@@ -1595,6 +1620,9 @@ final class PlaybackEngine: ObservableObject {
             fanMixers[trackIndex].outputVolume = enabled ? Self.distCompGain : 1.0
         case .lowShelf:
             lowEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
+        case .air:
+            airEnabled[trackIndex] = enabled
+            airEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb, .space:
             // Bus architecture: bypass = zero send level; restore = persisted send level from style setup.
             reverbSendMixers[trackIndex].outputVolume = enabled ? reverbSendLevels[trackIndex] : 0
@@ -1622,7 +1650,7 @@ final class PlaybackEngine: ObservableObject {
 
     private func stopSharedLFOIfIdle() {
         let anyActive = tremEnabled.contains(true) || sweepEnabled.contains(true)
-                     || panEnabled.contains(true)
+                     || panEnabled.contains(true) || vibEnabled.contains(true)
         anyLFOActive = anyActive
         guard !anyActive else { return }
         lfoTimer?.cancel()
@@ -1649,6 +1677,15 @@ final class PlaybackEngine: ObservableObject {
             let muted = muteState[i] || (anySolo && !soloState[i])
             let tremVol = tremBaseVolume[i] * Float(1.0 - Double(tremDepth[i]) * (1.0 + sin(tremPhase[i])))
             samplers[i].volume = muted ? 0.0 : tremVol
+        }
+
+        // Vibrato — 60fps pitch modulation via MIDI pitch bend (±200 cents default range)
+        for i in 0..<kTrackCount where vibEnabled[i] {
+            vibPhase[i] += vibPhaseInc[i]
+            let cents   = Double(vibDepth[i]) * sin(vibPhase[i])
+            let bend14  = max(0, min(16383, Int(8192.0 + cents / 200.0 * 8192.0)))
+            let ch      = kTrackMIDIChannels[i]
+            samplers[i].sendMIDIEvent(0xE0 | ch, data1: UInt8(bend14 & 0x7F), data2: UInt8(bend14 >> 7))
         }
 
         guard do20fps else { return }
@@ -1735,6 +1772,25 @@ final class PlaybackEngine: ObservableObject {
         tremPhase[i]      = 0.0
         tremBaseVolume[i] = 1.0
         samplers[i].volume = trackBaseVolume[i]
+        stopSharedLFOIfIdle()
+    }
+
+    // MARK: - Vibrato LFO
+
+    private func startVibrato(forTrack i: Int) {
+        vibPhaseInc[i] = 0.5760   // 2π × 5.5 Hz / 60 fps
+        vibDepth[i]    = 12.0     // ±12 cents
+        vibEnabled[i]  = true
+        vibPhase[i]    = 0.0
+        anyLFOActive   = true
+        startSharedLFO()
+    }
+
+    private func stopVibrato(forTrack i: Int) {
+        vibEnabled[i] = false
+        vibPhase[i]   = 0.0
+        let ch = kTrackMIDIChannels[i]
+        samplers[i].sendMIDIEvent(0xE0 | ch, data1: 0x00, data2: 0x40)  // reset pitch bend to center
         stopSharedLFOIfIdle()
     }
 
@@ -2371,13 +2427,26 @@ final class PlaybackEngine: ObservableObject {
             engine.attach(delay)
             engine.attach(comp)
             engine.attach(distortion)
+            let airEQ = AVAudioUnitEQ(numberOfBands: 2)
+            airEQ.bands[0].filterType = .parametric  // presence peak: upper-mid bite (Fender presence zone)
+            airEQ.bands[0].frequency  = 4000
+            airEQ.bands[0].gain       = 5.0
+            airEQ.bands[0].bandwidth  = 1.5          // broad, natural-sounding peak
+            airEQ.bands[0].bypass     = false
+            airEQ.bands[1].filterType = .highShelf   // air shelf: opens up top end
+            airEQ.bands[1].frequency  = 8000
+            airEQ.bands[1].gain       = 7.5
+            airEQ.bands[1].bypass     = false
+            airEQ.auAudioUnit.shouldBypassEffect = true  // bypassed until Air chip is enabled
+
             engine.attach(lowEQ)
+            engine.attach(airEQ)
             engine.attach(sendMixer)
             engine.attach(fanMixer)
 
-            // Chain: sampler → boost → sweep → delay → comp → dist → lowEQ → fanMixer ─┬→ mixer (dry)
-            //                                                                             └→ sendMixer → small bus (default)
-            // fanMixer is a V3-native AVAudioMixerNode inserted between the V2-bridged lowEQ and the
+            // Chain: sampler → boost → sweep → delay → comp → dist → lowEQ → airEQ → fanMixer ─┬→ mixer (dry)
+            //                                                                                     └→ sendMixer → small bus (default)
+            // fanMixer is a V3-native AVAudioMixerNode inserted between the V2-bridged airEQ and the
             // fan-out destinations. Fanning out from a V2 unit directly caused recursive render loops
             // on macOS 26 after extended runtime (crash: EXC_BAD_ACCESS on com.apple.audio.IOThread.client).
             engine.connect(sampler,     to: boost,       format: nil)
@@ -2386,7 +2455,8 @@ final class PlaybackEngine: ObservableObject {
             engine.connect(delay,       to: comp,        format: nil)
             engine.connect(comp,        to: distortion,  format: nil)
             engine.connect(distortion,  to: lowEQ,       format: nil)
-            engine.connect(lowEQ,       to: fanMixer,    format: nil)
+            engine.connect(lowEQ,       to: airEQ,       format: nil)
+            engine.connect(airEQ,       to: fanMixer,    format: nil)
             engine.connect(fanMixer, to: [
                 AVAudioConnectionPoint(node: mixer,     bus: AVAudioNodeBus(i)),
                 AVAudioConnectionPoint(node: sendMixer, bus: 0)
@@ -2400,6 +2470,7 @@ final class PlaybackEngine: ObservableObject {
             comps.append(comp)
             distortions.append(distortion)
             lowEQs.append(lowEQ)
+            airEQs.append(airEQ)
             reverbSendMixers.append(sendMixer)
             fanMixers.append(fanMixer)
         }

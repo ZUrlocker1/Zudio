@@ -194,6 +194,7 @@ enum OfflineExport {
         var players         = [AVAudioPlayerNode]()
         var sweepNodes      = [AVAudioUnitEffect]()
         var tremoloGains    = [AVAudioMixerNode]()
+        var vibratoNodes    = [AVAudioUnitTimePitch]()
         var allSnaps        = [PlaybackEngine.TrackEffectSnapshot]()
 
         // Per-track chain with LFO effects — sweep, tremolo, and auto-pan are simulated per render
@@ -212,15 +213,18 @@ enum OfflineExport {
                                reverbPreset: .mediumHall, reverbWetDryMix: 0, reverbBypassed: true,
                                delayTime: 0.125, delayFeedback: 40, delayLowPassCutoff: 6000,
                                delayWetDryMix: 0, delayBypassed: true,
-                               compBypassed: true, distortionBypassed: true, lowShelfBypassed: true,
+                               compBypassed: true, distortionBypassed: true, lowShelfBypassed: true, airEnabled: false,
                                hpfEnabled: false,
                                sweepEnabled: false, sweepFloor: 0, sweepHalfRange: 0, sweepHz: 0,
                                tremoloEnabled: false, tremoloHz: 0, tremoloDepth: 0,
-                               panEnabled: false, panHz: 0)
+                               panEnabled: false, panHz: 0,
+                               vibratoEnabled: false, vibratoHz: 0, vibratoDepthCents: 0)
             allSnaps.append(snap)
 
             let player      = AVAudioPlayerNode()
             let tremoloGain = AVAudioMixerNode()
+            let vibratoNode = AVAudioUnitTimePitch()
+            vibratoNode.pitch = 0
 
             // Sweep LP filter: start at floor cutoff (fully closed) if active; bypassed if not.
             let sweep = AVAudioUnitEffect(audioComponentDescription: lpDesc)
@@ -268,21 +272,37 @@ enum OfflineExport {
             eq.bands[1].bypass     = !snap.hpfEnabled
             eq.auAudioUnit.shouldBypassEffect = snap.lowShelfBypassed
 
+            let airEQ = AVAudioUnitEQ(numberOfBands: 2)
+            airEQ.bands[0].filterType = .parametric
+            airEQ.bands[0].frequency  = 4000
+            airEQ.bands[0].gain       = 5.0
+            airEQ.bands[0].bandwidth  = 1.5
+            airEQ.bands[0].bypass     = false
+            airEQ.bands[1].filterType = .highShelf
+            airEQ.bands[1].frequency  = 8000
+            airEQ.bands[1].gain       = 7.5
+            airEQ.bands[1].bypass     = false
+            airEQ.auAudioUnit.shouldBypassEffect = !snap.airEnabled
+
             fxEngine.attach(player)
+            fxEngine.attach(vibratoNode)
             fxEngine.attach(tremoloGain)
             fxEngine.attach(sweep)
             fxEngine.attach(delay)
             fxEngine.attach(comp)
             fxEngine.attach(dist)
             fxEngine.attach(eq)
+            fxEngine.attach(airEQ)
             fxEngine.attach(reverb)
-            fxEngine.connect(player,      to: tremoloGain,           format: avFormat)
+            fxEngine.connect(player,      to: vibratoNode,           format: avFormat)
+            fxEngine.connect(vibratoNode, to: tremoloGain,           format: avFormat)
             fxEngine.connect(tremoloGain, to: sweep,                 format: avFormat)
             fxEngine.connect(sweep,       to: delay,                 format: avFormat)
             fxEngine.connect(delay,       to: comp,                  format: avFormat)
             fxEngine.connect(comp,        to: dist,                  format: avFormat)
             fxEngine.connect(dist,        to: eq,                    format: avFormat)
-            fxEngine.connect(eq,          to: reverb,                format: avFormat)
+            fxEngine.connect(eq,          to: airEQ,                 format: avFormat)
+            fxEngine.connect(airEQ,       to: reverb,                format: avFormat)
             fxEngine.connect(reverb,      to: fxEngine.mainMixerNode,format: avFormat)
 
             player.volume            = 1.0          // unity — volume applied on tremoloGain (supports > 1.0)
@@ -293,6 +313,7 @@ enum OfflineExport {
             players.append(player)
             sweepNodes.append(sweep)
             tremoloGains.append(tremoloGain)
+            vibratoNodes.append(vibratoNode)
         }
 
         // Audio texture track (Chill/Ambient rain, wind, vinyl, etc.)
@@ -396,6 +417,7 @@ enum OfflineExport {
         var sweepPhases   = [Double](repeating: 0, count: samplers.count)
         var tremoloPhases = [Double](repeating: 0, count: samplers.count)
         var panPhases     = [Double](repeating: 0, count: samplers.count)
+        var vibratoPhases = [Double](repeating: 0, count: samplers.count)
 
         while phase2Done < phase2Total {
             if isCancelled() { throw CancellationError() }
@@ -421,6 +443,11 @@ enum OfflineExport {
                 if snap.panEnabled {
                     panPhases[i] += 2 * .pi * Double(snap.panHz) * dt
                     tremoloGains[i].pan = Float(sin(panPhases[i]))
+                }
+
+                if snap.vibratoEnabled {
+                    vibratoPhases[i] += 2 * .pi * Double(snap.vibratoHz) * dt
+                    vibratoNodes[i].pitch = snap.vibratoDepthCents * Float(sin(vibratoPhases[i]))
                 }
             }
 
@@ -455,11 +482,12 @@ enum OfflineExport {
                         reverbPreset: .mediumHall, reverbWetDryMix: 0, reverbBypassed: true,
                         delayTime: 0.125, delayFeedback: 40, delayLowPassCutoff: 6000,
                         delayWetDryMix: 0, delayBypassed: true,
-                        compBypassed: true, distortionBypassed: true, lowShelfBypassed: true,
+                        compBypassed: true, distortionBypassed: true, lowShelfBypassed: true, airEnabled: false,
                         hpfEnabled: false,
                         sweepEnabled: false, sweepFloor: 0, sweepHalfRange: 0, sweepHz: 0,
                         tremoloEnabled: false, tremoloHz: 0, tremoloDepth: 0,
-                        panEnabled: false, panHz: 0)
+                        panEnabled: false, panHz: 0,
+                        vibratoEnabled: false, vibratoHz: 0, vibratoDepthCents: 0)
                 }
 
                 let safeName = AudioFileExporter.sanitizedName(kTrackNames[trackIdx])
@@ -469,6 +497,8 @@ enum OfflineExport {
                 let trackEngine = AVAudioEngine()
                 let player      = AVAudioPlayerNode()
                 let tremoloGain = AVAudioMixerNode()
+                let vibratoNode = AVAudioUnitTimePitch()
+                vibratoNode.pitch = 0
 
                 let sweep = AVAudioUnitEffect(audioComponentDescription: lpDesc)
                 AudioUnitSetParameter(sweep.audioUnit, 1, kAudioUnitScope_Global, 0, 3.0, 0)
@@ -516,17 +546,27 @@ enum OfflineExport {
                 eq.bands[1].bypass     = !snap.hpfEnabled
                 eq.auAudioUnit.shouldBypassEffect = snap.lowShelfBypassed
 
-                trackEngine.attach(player);      trackEngine.attach(tremoloGain)
-                trackEngine.attach(sweep);       trackEngine.attach(delay)
-                trackEngine.attach(comp);        trackEngine.attach(dist)
-                trackEngine.attach(eq);          trackEngine.attach(reverb)
-                trackEngine.connect(player,      to: tremoloGain,               format: avFormat)
+                let airEQ = AVAudioUnitEQ(numberOfBands: 1)
+                airEQ.bands[0].filterType = .highShelf
+                airEQ.bands[0].frequency  = 12000
+                airEQ.bands[0].gain       = 3.5
+                airEQ.bands[0].bypass     = false
+                airEQ.auAudioUnit.shouldBypassEffect = !snap.airEnabled
+
+                trackEngine.attach(player);      trackEngine.attach(vibratoNode)
+                trackEngine.attach(tremoloGain); trackEngine.attach(sweep)
+                trackEngine.attach(delay);       trackEngine.attach(comp)
+                trackEngine.attach(dist);        trackEngine.attach(eq)
+                trackEngine.attach(airEQ);       trackEngine.attach(reverb)
+                trackEngine.connect(player,      to: vibratoNode,               format: avFormat)
+                trackEngine.connect(vibratoNode, to: tremoloGain,               format: avFormat)
                 trackEngine.connect(tremoloGain, to: sweep,                     format: avFormat)
                 trackEngine.connect(sweep,       to: delay,                     format: avFormat)
                 trackEngine.connect(delay,       to: comp,                      format: avFormat)
                 trackEngine.connect(comp,        to: dist,                      format: avFormat)
                 trackEngine.connect(dist,        to: eq,                        format: avFormat)
-                trackEngine.connect(eq,          to: reverb,                    format: avFormat)
+                trackEngine.connect(eq,          to: airEQ,                     format: avFormat)
+                trackEngine.connect(airEQ,       to: reverb,                    format: avFormat)
                 trackEngine.connect(reverb,      to: trackEngine.mainMixerNode, format: avFormat)
 
                 player.volume            = 1.0
@@ -554,6 +594,7 @@ enum OfflineExport {
                 var sweepPhase:   Double = 0
                 var tremoloPhase: Double = 0
                 var panPhase:     Double = 0
+                var vibratoPhase: Double = 0
                 var phase3Done:   Int64  = 0
 
                 while phase3Done < phase2Total {
@@ -574,6 +615,10 @@ enum OfflineExport {
                     if snap.panEnabled {
                         panPhase += 2 * .pi * Double(snap.panHz) * dt
                         tremoloGain.pan = Float(sin(panPhase))
+                    }
+                    if snap.vibratoEnabled {
+                        vibratoPhase += 2 * .pi * Double(snap.vibratoHz) * dt
+                        vibratoNode.pitch = snap.vibratoDepthCents * Float(sin(vibratoPhase))
                     }
 
                     let status = try trackEngine.renderOffline(thisFrames, to: trackBuf)

@@ -1,10 +1,14 @@
 # Zudio Change Log
 
 ## V 2.3 (Build 128)  Audio engine crash fix
-- **Crash fix** — Fixed a rare crash in the audio engine that could occur after extended playback (2+ hours). A legacy audio unit was fanning its output to two destinations simultaneously, which caused CoreAudio's render thread to enter infinite recursion on macOS 26 and crash with a segfault. Fixed by routing through a native pass-through node instead.
 - **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass instrument pool.
 - **Distortion effect** — New "Dist." effect chip on Motorik Bass and Rhythm tracks (replaces Low and Boost chips). Uses soft-clip saturation for a warm, gritty character. Applied automatically by default: Motorik Noir bass and rhythm each distorted ~75% of the time independently; regular Motorik bass distorted ~20% of the time. Note distortion is off for Acoustic Bass and Fuzz Guitar by default, as a matter of taste.
+- **Vibrato effect** — New "Vibrato" chip on Chill Lead 1, Lead 2 and Kosmic Lead 1, Lead 2. Applied probabilistically (~20% regular, 50% Kosmic Drift) and only for instruments where it is musically appropriate (e.g. flute, sax, trumpet, trombone on Chill; flute, oboe, sine wave, bassoon, vox on Kosmic). This replaces Boost and Comp effects.
+- **Air effect** — New "Air" chip on Motorik Lead 1 and Lead 2. A two-band EQ boost (presence at 4 kHz + high shelf at 8 kHz) that adds brightness, bite and openness to synth leads. Applied probabilistically on Lead 1: ~25% of regular Motorik songs, ~45% of Motorik Noir songs. The chip is also available manually on Lead 2.
+- **Probabilistic effects** — Several effects are now applied randomly on each new song generation to increase variety: Air on Motorik Lead 1 (~25% regular, ~45% Noir), Tremolo on Motorik Lead 1 for certain patches, Sweep on Kosmic Pads (~20%) and Motorik Pads (~15%), Tremolo on Kosmic Bass (~15%), Pan on Kosmic Texture (~15%), and Delay on Motorik Lead 2 (~20%). Kosmic Drift already had Sweep, Pan, and Tremolo always on; these additions bring the same textural variety to regular Kosmic.
+- **Style chip** — The Mood chip next to the song title on Mac and iPad is replaced with the style or substyle (e.g. "Motorik", "Chill Blues"), matching the iPhone display.
 - **iOS bug fixes** — Fixed a bug where regenerating an instrument track in a Motorik Noir song incorrectly changed the substyle to Motorik. Also removed a distracting "Generating…" flash in the iPhone player when regenerating a single track.
+- **Crash fix** — Fixed a rare Mac crash that could occur after extended playback (2+ hours). A legacy audio unit was fanning its output to two destinations simultaneously, which caused CoreAudio's render thread to enter infinite recursion and crash with a segfault. Fixed by routing through a native pass-through node instead.
 
 ---
 

@@ -47,13 +47,13 @@ A synth bass with a pulsing, gated quality — more rhythmically alive than the 
 **Shamisen** (`106`) → Lead 1 (Drift pool)  
 Japanese three-string lute with a sharp, buzzy attack and quick decay. Unusual and distinctive — fits the eclectic Kosmic Drift Lead 1 pool (which already includes Shenai and Bottle Blow). Creates an unexpected, slightly alien texture against heavily-reverbed pads.
 
-**Fantasia 2** (`12088`) → Pads (Done build 126)
+**Fantasia 2** (`12088`) → Pads (DONE build 126)
 A second variant of the Fantasia / New Age Pad voice. The current pool uses New Age Pad (88) in the Rhythm track. Fantasia 2 has a slightly different harmonic envelope and could add variety to the Pads pool as a dreamy, evolving alternative to Sweep Pad and Halo Pad.
 
-**Tonewheel Organ** (`16`) → Bass (Done build 128)
+**Tonewheel Organ** (`16`) → Bass (DONE build 128)
 Classic Hammond B3 voice played in bass register. Warm, sustained, rotary-speaker character. Added for atmospheric low-end variety in both regular Kosmic and Drift.
 
-**Warm Pad** (`89`) → Bass (Done build 128)
+**Warm Pad** (`89`) → Bass (DONE build 128)
 Smooth, slow-attack synth pad used in bass register. No percussive transient, just a soft sustained low tone. Organ-adjacent character — more atmospheric than the synth bass options already in the pool.
 
 ---
@@ -70,76 +70,86 @@ Unusual choice but historically grounded — Baroque keyboard sounds appear in K
 
 ## 2. New Audio Effects
 
-All suggestions are for additions beyond the existing reverb, delay, tremolo, sweep filter, and auto-pan already implemented.
+All suggestions are for additions beyond the existing reverb, delay, tremolo, sweep filter, auto-pan, and distortion already implemented. Apple's built-in Effect AUs available at runtime: Band/High/Low Pass Filter, High/Low Shelf, Parametric EQ, Graphic EQ, N-Band EQ, Delay, Sample Delay, Distortion, Dynamics Compressor, MultiBand Compressor, Limiter, Matrix Reverb, Reverb2, New Time Pitch, Time Pitch, AU Filter. No chorus, flanger, phaser, or ring modulator.
 
 ---
 
-### Chorus — NOT FEASIBLE with built-in Apple AUs
+### Chorus / Flanger / Phaser — NOT FEASIBLE with built-in Apple AUs
 
-Apple does **not** provide a built-in chorus AU on macOS or iOS. The constant `kAudioUnitSubType_Chorus` does not exist in any Apple SDK. The complete list of Apple-manufactured Effect AUs available at runtime includes: Band/High/Low Pass Filter, High/Low Shelf, Parametric EQ, Graphic EQ, N-Band EQ, Delay, Sample Delay, Distortion, Dynamics Compressor, MultiBand Compressor, Limiter, Matrix Reverb, Reverb2, New Time Pitch, Time Pitch, AU Filter, Net Send. No chorus, flanger, phaser, or ring modulator.
-
-Implementing a real chorus effect would require either:
-- A parallel audio path (dry + pitch-shifted copy at 50% each) — significant engine restructuring
-- A third-party AU plugin bundled with the app
-- Manual LFO parameter updates on a SampleDelay node per render block
-
-Estimated effort: significant (multi-day). Not a quick add. Best deferred unless chorus becomes a high priority.
+Apple provides none of these as built-in AUs. Implementing any of them would require a parallel audio path, a bundled third-party AU plugin, or manual per-render-block DSP via `installTap`. Estimated effort: significant (multi-day). Not worth pursuing.
 
 ---
 
 ### Distortion — DONE Build 128
 
-`kAudioUnitSubType_Distortion` is a standard Apple AudioUnit effect with 18 parameters covering multiple distortion types: soft saturation, hard clip, linear fold-over, square fold-over, bit reduction, and more. CPU cost: very low.
+`kAudioUnitSubType_Distortion` — soft-clip saturation added as a "Dist." effect chip on Motorik Bass and Motorik Rhythm. SoftClipGain +6 dB, FinalMix 50%, post-distortion −3 dB gain compensation. Applied probabilistically by default: Motorik Noir Bass and Rhythm each 75%; regular Motorik Bass 20%. Fuzz Guitar and Acoustic Bass exempt from rhythm distortion. Flags stored in SongState for reproducibility.
 
-**Implemented:** Soft-clip saturation (SoftClipGain +6 dB, FinalMix 50%) added as a "Dist." effect chip on Motorik Bass and Motorik Rhythm, replacing the Low and Boost chips respectively. Post-distortion gain compensation of −3 dB applied via the fanMixer to keep perceived loudness consistent. Applied probabilistically: Motorik Noir Bass and Rhythm each 75% on by default (independent rolls); regular Motorik Bass 20% on by default. All flags stored in SongState so each song's distortion state is reproducible. Old saved songs default to no distortion.
-
-**Still to explore:** Kosmic Drift rhythm (subtle tape saturation). The harder distortion modes (hard clip, fold-over) could add more aggression for Noir if the soft-clip default feels too subtle.
 
 ---
 
-### Bit Crusher — pure Swift DSP via installTap
+### Vibrato — DONE (Build 128)
 
-A bit crusher reduces the bit depth of the audio signal, creating lo-fi quantization noise. It can be implemented with no additional AudioUnit — just an `installTap` on an `AVAudioMixerNode` that processes each buffer:
+A pitch LFO: the note's frequency gently wobbles rather than its volume (tremolo) or pan position. Implemented via MIDI pitch bend (14-bit, ±12 cents at 5.5 Hz) driven by the shared 60fps LFO timer — the same pattern as tremolo. Think: Fender Stratocaster vibrato arm, flute breath vibrato, tape machine wow/flutter.
 
-```swift
-// Quantize to `bits` bit depth
-let levels = Float(pow(2.0, Double(bits)))
-for i in 0..<frameCount {
-    channelData[i] = round(channelData[i] * levels) / levels
-}
-```
-
-CPU cost: essentially zero (a few multiply/round operations per sample).
-
-**Best use:** A potential Lo-Fi Chill substyle (see Section 3) — bitcrushing the Rhodes or rhythm track to 10–12 bits adds the characteristic lo-fi warmth. Also works for Kosmic Drift's degraded/tape-worn aesthetic on leads or texture. The depth parameter (bits: 8–16) can be interpolated smoothly.
-
-Implementation: custom class wrapping `installTap` on the boost mixer node. Estimated effort: 1–2 days, no external dependencies.
+**Implemented on:**
+- Chill Lead 1 and Lead 2 — applied probabilistically (~20%) for eligible instruments (flute, sax, trumpet, trombone, vibraphone, xylophone). Never on clarinet.
+- Kosmic Lead 1 and Lead 2 — applied probabilistically (~20% regular Kosmic, 75%/50% Kosmic Drift) for eligible instruments (flute, oboe, recorder, sine wave, bottle blow, shenai on Lead 1; bassoon, charang, vox on Lead 2).
+- Replaces the Boost chip on Kosmic leads and the Comp chip on Chill leads.
 
 ---
 
-### Sample Rate Reduction — pure Swift DSP
+### Air (Presence + High Shelf) — DONE (Build 128)
 
-Related to bit crushing: downsamples the audio to a lower effective sample rate (e.g. 8000 Hz, 11025 Hz) then upsamples back, creating aliasing and the characteristic lo-fi texture of early digital audio or cheap samplers. Can be combined with bit crushing.
+A two-band EQ boost that adds brightness, bite and openness to synth leads: a broad parametric peak at 4 kHz (+5 dB) for upper-mid presence/bite (inspired by the Fender amp presence knob), plus a high shelf at 8 kHz (+7.5 dB) for air and shimmer.
 
-```swift
-// Hold every Nth sample (effectively reduces sample rate by N)
-let holdN = Int(sampleRate / targetRate)
-var held: Float = 0
-for i in 0..<frameCount {
-    if i % holdN == 0 { held = channelData[i] }
-    channelData[i] = held
-}
-```
+**Implemented on:**
+- Motorik Lead 1 — chip replaces Boost; auto-applied probabilistically (~25% regular Motorik, ~45% Motorik Noir). All instruments eligible.
+- Motorik Lead 2 — chip available for manual use; not auto-applied.
 
-**Best use:** Lo-Fi Chill substyle. Also vintage drum machine textures for Motorik.
+**Future candidates:**
+- Chill Horns (flute, sax, trumpet on Lead 1/Lead 2) — Air could add a live, breathy quality to horn patches. Worth investigating separately.
 
 ---
 
-### Haas Effect / Stereo Widener — using existing AVAudioUnitDelay
+### Haas Stereo Widener — FEASIBLE
 
-The Haas effect uses a very short delay (10–35ms) on one channel to create perceived stereo width from a mono source without adding audible echo. This can be achieved with the existing `AVAudioUnitDelay` at very short delay times (< 35ms) and 100% wet, applied to one channel via panning tricks.
+A very short delay (15–25ms) on one channel using the existing `AVAudioUnitDelay` node creates perceived stereo width from a mono source without audible echo. No new AU needed. The channel routing requires some care (the current engine may need a brief re-wiring to split L/R), but no new infrastructure.
 
-**Best use:** Ambient and Kosmic pads and texture tracks — adds width to mono synth sources, making them feel more enveloping without using CPU-heavy reverb. Simple parameter change to existing delay node.
+**Best use:** Ambient and Kosmic pads and texture tracks — adds enveloping width without more reverb CPU cost. Also effective on Motorik leads.
+
+**Effort:** ~one day, mostly channel routing.
+
+#### Haas Implementation Details
+
+**Algorithm — dual-path split.** Route the post-`airEQ` signal to two parallel paths in a fixed topology:
+
+- Path 1: `haasLMixer` (pan = −1.0) → `fanMixer` — the direct (undelayed) signal, hard left
+- Path 2: `haasDelay` (20ms, 100% wet, 0% feedback) → `haasRMixer` (pan = +1.0) → `fanMixer` — the delayed signal, hard right
+
+`fanMixer` already accepts multiple inputs (it fans to both the dry mixer and the reverb send bus), so no new fan-out infrastructure is needed. The existing `airEQ → fanMixer` connection is replaced by the two-path split at setup time. Bypass state is controlled entirely via node properties — no dynamic graph rewiring during playback.
+
+**Bypass (Haas OFF):** `haasLMixer.pan = 0`, `outputVolume = 1.0` (unity passthrough); `haasDelay.shouldBypassEffect = true`; `haasRMixer.outputVolume = 0.0`. CPU cost: near zero — the delay AU does no work when bypassed, and the muted mixer contributes nothing.
+
+**Active (Haas ON):** `haasLMixer.pan = −1.0`; `haasDelay.shouldBypassEffect = false`, `delayTime = 0.020`, `wetDryMix = 100%`, `feedback = 0%`; `haasRMixer.pan = +1.0`, `outputVolume = 1.0`. No level compensation needed — L and R paths write to different channels in `fanMixer` so there is no in-phase summing that would clip.
+
+**Delay time:** 20ms recommended. Below 15ms creates flangey comb filtering; above 30ms some listeners hear the delayed copy as a separate event. Not exposed as a user parameter.
+
+**CPU cost when ON:** one `AVAudioUnitDelay` (fixed 20ms ring buffer read) plus two trivial mixer nodes per active track — roughly the same as the musical Delay chip already paid per track. For 2–3 tracks with Haas on, estimated +3–5% CPU. The fixed topology means even tracks without Haas carry two mixer nodes in bypass, but both are near zero cost in that state.
+
+**Files to change:**
+- `Types.swift` — add `case haas = "Haas"` to `TrackEffect`
+- `PlaybackEngine.swift` — three new node arrays (`haasLMixers`, `haasDelays`, `haasRMixers`), `haasEnabled[]` state, wiring in `setupEngine()`, `setEffect(.haas)` case, `TrackEffectSnapshot.haasEnabled` field
+- `TrackRowView.swift` — add `.haas` chip and `applyDefaultEffects` defaults
+- `AppState.swift` — mirror defaults in `restoreDefaultEffects`
+- `OfflineExport.swift` — add `haasEnabled: Bool` to snapshot; conditionally build the same two-path graph in Phase 2 and Phase 3 (each export creates a fresh engine so conditional connection is fine)
+
+**Best candidate tracks:**
+- Ambient Pads — excellent; long sustained notes, high probability or always on
+- Kosmic Pads — excellent; ~50% regular, always on for Drift
+- Kosmic Texture — good, but mutually exclusive with the Pan LFO (Haas + sweeping auto-pan are redundant)
+- Motorik Lead 1 — possible, but the 20ms inter-channel gap can create a subtle "flam" smear on fast melodic lines; worth testing before committing to defaults. 15ms reduces the risk.
+
+**Risk:** Psychoacoustic widening works clearly on sustained pads and long tones but may be inaudible or distracting on melodic leads — worth a listening test before broadening the scope.
 
 ---
 
