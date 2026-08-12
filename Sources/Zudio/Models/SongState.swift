@@ -54,6 +54,8 @@ struct SongState: Sendable {
     let chillBluesVariation: Bool
     /// Motorik-only: true when the Motorik Noir sub-style is active (dark minor, low BPM, sparse melodic lead).
     let motorikNoirVariation: Bool
+    /// Motorik-only: true when the Motorik Arcade sub-style is active (4-on-floor, arpeggios, bright modes).
+    let motorikArcadeVariation: Bool
     /// Motorik (non-Noir) only: true when bass distortion is applied for this song (~20% of regular Motorik songs).
     /// Defaults to false so old saved songs never get unexpected distortion.
     let motorikBassDistortion: Bool
@@ -101,6 +103,7 @@ struct SongState: Sendable {
         if isAmbientPiano { return "Ambient Piano" }
         if chillBluesVariation { return "Chill Blues" }
         if motorikNoirVariation { return "Motorik Noir" }
+        if motorikArcadeVariation { return "Motorik Arcade" }
         if isKosmicDrift { return "Kosmic Drift" }
         return style.rawValue.capitalized
     }
@@ -133,6 +136,7 @@ struct SongState: Sendable {
         chillSwingFeel: Bool = false,
         chillBluesVariation: Bool = false,
         motorikNoirVariation: Bool = false,
+        motorikArcadeVariation: Bool = false,
         motorikBassDistortion: Bool = false,
         motorikNoirBassDistortion: Bool = false,
         motorikNoirRhythmDistortion: Bool = false,
@@ -172,6 +176,7 @@ struct SongState: Sendable {
         self.chillSwingFeel          = chillSwingFeel
         self.chillBluesVariation     = chillBluesVariation
         self.motorikNoirVariation        = motorikNoirVariation
+        self.motorikArcadeVariation      = motorikArcadeVariation
         self.motorikBassDistortion       = motorikBassDistortion
         self.motorikNoirBassDistortion   = motorikNoirBassDistortion
         self.motorikNoirRhythmDistortion = motorikNoirRhythmDistortion
@@ -212,6 +217,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  motorikArcadeVariation: motorikArcadeVariation,
                   motorikBassDistortion: motorikBassDistortion,
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -237,6 +243,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  motorikArcadeVariation: motorikArcadeVariation,
                   motorikBassDistortion: motorikBassDistortion,
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -262,6 +269,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  motorikArcadeVariation: motorikArcadeVariation,
                   motorikBassDistortion: motorikBassDistortion,
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -287,6 +295,7 @@ struct SongState: Sendable {
                   chillLead2Instrument: chillLead2Instrument,
                   chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
                   chillBluesVariation: chillBluesVariation, motorikNoirVariation: motorikNoirVariation,
+                  motorikArcadeVariation: motorikArcadeVariation,
                   motorikBassDistortion: motorikBassDistortion,
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -323,6 +332,7 @@ struct SongState: Sendable {
                   chillSwingFeel: anchor.chillSwingFeel,
                   chillBluesVariation: anchor.chillBluesVariation,
                   motorikNoirVariation: anchor.motorikNoirVariation,
+                  motorikArcadeVariation: anchor.motorikArcadeVariation,
                   motorikBassDistortion: anchor.motorikBassDistortion,
                   motorikNoirBassDistortion: anchor.motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: anchor.motorikNoirRhythmDistortion,

@@ -27,7 +27,8 @@ struct ArrangementFilter {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         seed: UInt64,
-        lead1SoloRange: Range<Int>? = nil   // bars containing LD1-007/008 solo — never rested
+        lead1SoloRange: Range<Int>? = nil,   // bars containing LD1-007/008 solo — never rested
+        arcadeVariation: Bool = false         // Arcade: Lead 1 is always protected from block silencing
     ) -> [[MIDIEvent]] {
         var events = trackEvents
         // Arrangement-specific sub-seed — differs from all per-track seeds
@@ -93,7 +94,7 @@ struct ArrangementFilter {
             }()
 
             for track in activeTracks where !spotlight.contains(track) {
-                if track == kTrackLead1 && soloOverlaps { continue }
+                if track == kTrackLead1 && (soloOverlaps || arcadeVariation) { continue }
                 let roll = rng.nextDouble()
                 if roll < 0.45 {
                     // Complete rest — remove all notes in this block

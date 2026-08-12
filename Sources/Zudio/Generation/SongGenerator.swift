@@ -116,10 +116,12 @@ struct SongGenerator {
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
-        // Motorik Noir: was 75% during testing, 50% in early release, 20% then 23%.
-        let isNoir = rng.nextDouble() < 0.23
-        // Bass distortion: 20% of regular (non-Noir) Motorik songs get Dist. on bass by default.
-        let motorikBassDistortion = !isNoir && rng.nextDouble() < 0.20
+        // Motorik substyle: Noir/Arcade/base. Testing: 23/46/31. Production target: ~23/19/58.
+        let substyleRoll = rng.nextDouble()
+        let isNoir    = substyleRoll < 0.23
+        let isArcade  = !isNoir && substyleRoll < 0.69
+        // Bass distortion: 20% of regular (non-Noir, non-Arcade) Motorik songs get Dist. on bass by default.
+        let motorikBassDistortion = !isNoir && !isArcade && rng.nextDouble() < 0.20
         // Noir distortion: 75% chance independently for Bass and Rhythm.
         let motorikNoirBassDistortion    = isNoir && rng.nextDouble() < 0.75
         let motorikNoirRhythmDistortion  = isNoir && rng.nextDouble() < 0.75
@@ -130,11 +132,12 @@ struct SongGenerator {
             keyOverride: keyOverride,
             tempoOverride: tempoOverride,
             moodOverride: moodOverride,
-            motorikNoir: isNoir
+            motorikNoir: isNoir,
+            motorikArcade: isArcade
         )
 
         // Step 2 — Song structure + chord plan
-        let structure = StructureGenerator.generate(frame: frame, rng: &rng)
+        let structure = StructureGenerator.generate(frame: frame, rng: &rng, arcade: isArcade)
 
         // Step 3 — Tonal governance map
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
@@ -153,39 +156,45 @@ struct SongGenerator {
 
         // Step 4 — Drums
         var drumRules: Set<String> = []
-        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: forceDrumRuleID, noirVariation: isNoir)
+        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: forceDrumRuleID, noirVariation: isNoir, arcadeVariation: isArcade)
 
-        // Step 5 — Bass
-        var bassRules: Set<String> = []
-        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID, noirVariation: isNoir)
-
-        // Step 6 — Pads
-        var padRules: Set<String> = []
-        trackEvents[kTrackPads]    = PadsGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &padsRNG, usedRuleIDs: &padRules, noirVariation: isNoir)
-
-        // Step 7 — Leads
+        // Step 5 — Lead 1 (generated before Bass so bass can react to melodic density)
         var lead1Rules: Set<String> = []
         var lead2Rules: Set<String> = []
-        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir)
+        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade)
         trackEvents[kTrackLead1] = lead1Events
+
+        // When Lead 1 picks a dense arp rule, bias Bass and Lead 2 toward sparse/pulse roles.
+        let arcadeDenseArpRules: Set<String> = ["MOT-LD1-015","MOT-LD1-017","MOT-LD1-018","MOT-LD1-019"]
+        let arcadeDenseMelody = isArcade && !lead1Rules.isDisjoint(with: arcadeDenseArpRules)
+
+        // Step 6 — Bass
+        var bassRules: Set<String> = []
+        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID, noirVariation: isNoir, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody)
+
+        // Step 7 — Pads
+        var padRules: Set<String> = []
+        trackEvents[kTrackPads]    = PadsGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &padsRNG, usedRuleIDs: &padRules, noirVariation: isNoir, arcadeVariation: isArcade)
+
+        // Step 8 — Lead 2
         // Noir always suppresses Lead 2 — skip generation entirely (lead2RNG is not consumed elsewhere)
         if !isNoir {
-            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange)
+            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody)
         }
 
         // Step 8 — Rhythm
         var rhythmRules: Set<String> = []
-        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID, noirVariation: isNoir)
+        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID, noirVariation: isNoir, arcadeVariation: isArcade)
 
         // Step 9 — Texture
         var texRules: Set<String> = []
-        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir)
+        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade)
 
         // Step 10 — Collision / density simplification pass
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
 
         // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
-        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange)
+        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, arcadeVariation: isArcade)
 
         // Step 10.7 — Pads gate: when Lead 1 is on a solo rule (< 30 notes), thin pads outside
         // the solo window to avoid a dense shimmer wall with nothing cutting through it.
@@ -217,12 +226,23 @@ struct SongGenerator {
 
         // Step 13 — Drum variation engine: fills at section transitions and instrument entrances,
         //            plus cymbal variations on 16+-bar identical runs
-        trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, noirVariation: isNoir)
-
-        // Title generation — Noir single-word titles get a prepend or append phrase
+        trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, noirVariation: isNoir, arcadeVariation: isArcade)
+        // Title generation — Noir/Arcade titles with short words get a suffix or variant
         let title: String = {
-            let raw = TitleGenerator.generate(frame: frame, rng: &rng)
-            guard isNoir && !raw.contains(" ") else { return raw }
+            let raw   = TitleGenerator.generate(frame: frame, rng: &rng)
+            let words = raw.components(separatedBy: " ")
+            let isSingleWord = words.count == 1
+            if isArcade && (isSingleWord || words.contains(where: { $0.count <= 2 })) {
+                let arcadeWords = ["Overdrive", "Blast", "Zap", "Warp", "1999", "Grid", "Vector", "System", "Circuit", "Level", "Zero", "2000", "4k", "Alien"]
+                let prob: Double = raw.count < 12 ? 0.80 : 0.0
+                if rng.nextDouble() < prob {
+                    return "\(raw) \(arcadeWords[rng.nextInt(upperBound: arcadeWords.count)])"
+                }
+                return raw
+            }
+            guard isNoir && (isSingleWord || words.contains(where: { $0.count <= 2 })) else { return raw }
+            let prob: Double = raw.count < 12 ? 0.75 : 0.0
+            guard rng.nextDouble() < prob else { return raw }
             let appendPhrases = ["After Dark", "Apocalypse", "Midnight", "Noir"]
             let prependWords  = ["Post-Punk", "Bleak", "Darker", "Black", "Dunkel"]
             if rng.nextDouble() < 0.50 {
@@ -232,12 +252,17 @@ struct SongGenerator {
             }
         }()
 
-        // Noir track suppression — drawn after title so frame/structure/title are unaffected
+        // Track suppression — drawn after title so frame/structure/title are unaffected
         if isNoir {
             // Lead 2 was already skipped above; just set the log rule
             lead2Rules = ["MOT-LD2-000"]
         }
         if isNoir && rng.nextDouble() < 0.50 {
+            trackEvents[kTrackTexture] = []
+            texRules = ["MOT-TEX-000"]
+        }
+        // Arcade: 40% texture suppression (less than Noir's 50% — still has occasional atmospheric colour)
+        if isArcade && rng.nextDouble() < 0.40 {
             trackEvents[kTrackTexture] = []
             texRules = ["MOT-TEX-000"]
         }
@@ -254,7 +279,7 @@ struct SongGenerator {
             title: title, frame: frame, structure: structure, form: form,
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
-            rhythmRules: rhythmRules, texRules: texRules, isNoir: isNoir
+            rhythmRules: rhythmRules, texRules: texRules, isNoir: isNoir, isArcade: isArcade
         )
 
         let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }))
@@ -280,6 +305,7 @@ struct SongGenerator {
             generationLog: log,
             stepAnnotations: stepAnnotations,
             motorikNoirVariation: isNoir,
+            motorikArcadeVariation: isArcade,
             motorikBassDistortion: motorikBassDistortion,
             motorikNoirBassDistortion: motorikNoirBassDistortion,
             motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -1436,10 +1462,10 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules, fillBars: &ignoredFills)
             } else {
-                let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation)
+                let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
                 var scratch = songState.trackEvents
                 scratch[kTrackDrums] = rawDrum
-                events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed, noirVariation: songState.motorikNoirVariation)[kTrackDrums]
+                events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)[kTrackDrums]
             }
         case kTrackBass:
             if isAmbPiano {
@@ -1467,7 +1493,7 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation)
+                let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
                 var scratch = songState.trackEvents
                 scratch[kTrackBass] = rawBass
                 scratch = PatternEvolver.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, seed: newTrackSeed)
@@ -1490,7 +1516,8 @@ struct SongGenerator {
                 events = KosmicPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, kosmicProgFamily: songState.kosmicProgFamily,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules,
+                    isKosmicDrift: songState.isKosmicDrift)
             } else if isChill {
                 events = ChillPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1498,7 +1525,7 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation)
+                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
         case kTrackLead1:
             if isAmbPiano {
@@ -1526,7 +1553,9 @@ struct SongGenerator {
                 events = KosmicLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
-                    lead1BaseRule: &unusedBaseRule, xFilesBars: &unusedXFilesBars)
+                    lead1BaseRule: &unusedBaseRule, xFilesBars: &unusedXFilesBars,
+                    isKosmicDrift: songState.isKosmicDrift,
+                    isDriftDreamscape: songState.isDriftDreamscape)
             } else if isChill {
                 (events, _, _) = ChillLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
@@ -1536,7 +1565,7 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation)
+                (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
         case kTrackLead2:
             if isAmbPiano {
@@ -1577,7 +1606,7 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules).events
             } else {
-                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules)
+                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, arcadeVariation: songState.motorikArcadeVariation)
             }
         case kTrackRhythm:
             if isAmbPiano {
@@ -1591,7 +1620,8 @@ struct SongGenerator {
             } else if isKosmic {
                 events = KosmicArpeggioGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
+                    isKosmicDrift: songState.isKosmicDrift)
             } else if isChill {
                 events = ChillRhythmGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1601,7 +1631,7 @@ struct SongGenerator {
                     bluesVariation: songState.chillBluesVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation)
+                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
         case kTrackTexture:
             if isAmbPiano {
@@ -1630,12 +1660,15 @@ struct SongGenerator {
             } else if isKosmic {
                 events = KosmicTextureGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules)
+                    tonalMap: songState.tonalMap,
+                    kosmicProgFamily: songState.kosmicProgFamily,
+                    rng: &rng, usedRuleIDs: &usedRules,
+                    isKosmicDrift: songState.isKosmicDrift)
             } else if isChill {
                 // Chill texture is audio-only; regen is a no-op for the MIDI track.
                 events = []
             } else {
-                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation)
+                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
         default:
             return songState
@@ -1730,7 +1763,8 @@ struct SongGenerator {
         lead2Rules: Set<String>,
         rhythmRules: Set<String>,
         texRules: Set<String>,
-        isNoir: Bool = false
+        isNoir: Bool = false,
+        isArcade: Bool = false
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -1738,7 +1772,8 @@ struct SongGenerator {
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
 
         // Style / sub-style tag — always present for consistency with all other styles
-        log.append(GenerationLogEntry(tag: "Style", description: "\(isNoir ? "Motorik Noir" : "Motorik") – \(frame.tempo) bpm"))
+        let substyleLabel = isNoir ? "Motorik Noir" : isArcade ? "Motorik Arcade" : "Motorik"
+        log.append(GenerationLogEntry(tag: "Style", description: "\(substyleLabel) – \(frame.tempo) bpm"))
 
         // Structure form rule
         log.append(GenerationLogEntry(tag: "Form", description: formLabel(form)))
@@ -1942,6 +1977,11 @@ struct SongGenerator {
         case "MOT-DRUM-006": return "Post-Punk March"
         case "MOT-DRUM-007": return "Inverted Beat"
         case "MOT-DRUM-008": return "Tribal"
+        case "MOT-DRUM-000": return "No Drums"
+        case "MOT-DRUM-009": return "Four on the Floor"
+        case "MOT-DRUM-010": return "Machine Step"
+        case "MOT-DRUM-011": return "Light Four"
+        case "MOT-DRUM-012": return "Sparse Fills"
         // Kosmic drum rules (shared lookup for regen log)
         case "KOS-DRUM-001": return "Minimal JMJ Pop"
         case "KOS-DRUM-002": return "Basic Channel minimal dub"
@@ -1976,6 +2016,10 @@ struct SongGenerator {
         case "MOT-BASS-019": return "Religion Groove"
         case "MOT-BASS-020": return "Shadowplay Pulse"
         case "MOT-BASS-021": return "Modal Bass Walk"
+        case "MOT-BASS-022": return "Chrome Walk"
+        case "MOT-BASS-023": return "Acid Sweep"
+        case "MOT-BASS-024": return "Arcade Drive"
+        case "MOT-BASS-025": return "Electro Pump"
         case "BASS-EVOL":    return "Evolving pattern"
         case "BASS-DEVOL":   return "Devolving pattern"
         // Kosmic bass rules (shared lookup for regen log)
@@ -2012,6 +2056,12 @@ struct SongGenerator {
         case "MOT-LD1-012": return "Chromatic Descent"
         case "MOT-LD1-013": return "Slow arc"
         case "MOT-LD1-014": return "Rising phrase"
+        case "MOT-LD1-015": return "Arcade Riff"
+        case "MOT-LD1-016": return "Machine Answer"
+        case "MOT-LD1-017": return "Pentatonic Blitz"
+        case "MOT-LD1-018": return "Octave Bounce"
+        case "MOT-LD1-019": return "Triad Climb"
+        case "MOT-LD1-020": return "Synth Hook"
         default:            return ruleID
         }
     }
@@ -2027,6 +2077,10 @@ struct SongGenerator {
         case "MOT-LD2-004": return "Neu! counter melody"
         case "MOT-LD2-005": return "Descending line"
         case "MOT-LD2-006": return "Neu! harmony"
+        case "MOT-LD2-007": return "Arcade Arp"
+        case "MOT-LD2-008": return "Gate Arp"
+        case "MOT-LD2-009": return "Bounce Arp"
+        case "MOT-LD2-010": return "Blip"
         // Ambient Lead 2 rules
         case "AMB-LEAD-005": return "Tonal cell"
         case "AMB-LEAD-006": return "Descending phrase"

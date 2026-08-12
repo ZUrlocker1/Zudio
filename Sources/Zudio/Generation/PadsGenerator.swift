@@ -26,11 +26,16 @@ struct PadsGenerator {
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false
     ) -> [MIDIEvent] {
-        // Motorik Noir: pads absent 50% of songs — industrial austerity without wasting
-        // the Noir-specific rules. Joy Division used pads meaningfully (Transmission, LWTUA).
+        // Motorik Noir: pads absent 50% of songs — industrial austerity.
         if noirVariation && rng.nextDouble() < 0.50 {
+            usedRuleIDs.insert("MOT-PADS-000")
+            return []
+        }
+        // Motorik Arcade: pads absent 25% of songs (more active than Noir, less than base Motorik).
+        if arcadeVariation && rng.nextDouble() < 0.25 {
             usedRuleIDs.insert("MOT-PADS-000")
             return []
         }
@@ -38,11 +43,15 @@ struct PadsGenerator {
         var events: [MIDIEvent] = []
 
         // Weighted style selection — all rules are atmospheric/harmonic
-        // Noir fallback: bias toward the sparsest rule (PAD-003 pulsed) when pads do fire.
+        // Arcade: staccato/pulsed pads dominant; 007 Backbeat Stabs from Noir valid; sustained de-weighted.
+        // Noir:   bias toward sparse (PAD-003 pulsed) when pads do fire.
         //                             001   002   003   004   005   006   007   008
         let padRules:   [String] = ["MOT-PADS-001","MOT-PADS-002","MOT-PADS-003","MOT-PADS-004",
                                     "MOT-PADS-005","MOT-PADS-006","MOT-PADS-007","MOT-PADS-008"]
-        let padWeights: [Double] = noirVariation
+        let padWeights: [Double] = arcadeVariation
+            // 003 Pulsed dominant; 007 Backbeat Stabs from Noir valid; 002/005/008 excluded
+            ? [0.10, 0.00, 0.35, 0.20, 0.00, 0.10, 0.25, 0.00]
+            : noirVariation
             // 002/007/008 Noir-only; 005 excluded
             ? [0.05, 0.17, 0.20, 0.08, 0.00, 0.20, 0.15, 0.15]
             // 002/007/008 excluded; 005 Regular-only

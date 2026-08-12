@@ -1,5 +1,9 @@
 # Zudio Change Log
 
+## V 2.4 (Build 129)  Motorik Arcade
+- **Motorik Arcade** — New Motorik substyle inspired by the fast, bright, arpeggiated sound of classic arcade and early video game music (Tempest 2000, Contra, Sonic). Features 4-on-the-floor kick, mid-register bass, Lydian/Mixolydian modes, and new arpeggio-driven lead rules including Octave Bounce, Triad Climb, Arcade Arp, and Gate Arp. Motorik Arcade reuses a few rules and instruments from Motorik regular, but adds several unique instruments and rules. It has a mix of major and minor scales. 
+---
+
 ## V 2.3 (Build 128)  Audio engine crash fix
 - **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass instrument pool.
 - **Distortion effect** — New "Dist." effect chip on Motorik Bass and Rhythm tracks (replaces Low and Boost chips). Uses soft-clip saturation for a warm, gritty character. Applied automatically by default: Motorik Noir bass and rhythm each distorted ~75% of the time independently; regular Motorik bass distorted ~20% of the time. Note distortion is off for Acoustic Bass and Fuzz Guitar by default, as a matter of taste.

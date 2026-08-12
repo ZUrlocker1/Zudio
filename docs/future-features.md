@@ -262,10 +262,14 @@ One proposed substyle for each of the four existing styles. These are sketch-lev
 
 ---
 
-### Motorik — "Post-Punk"
+### Motorik — "Arcade" DONE (Build 129)
 
-**Inspired by:** Wire, Gang of Four, The Fall, early Talking Heads, Cabaret Voltaire  
-**Character:** Angular, minimal, tense. The steady 4/4 motorik pulse is there but the textures are spare and abrasive rather than hypnotic. Bass is prominent and melodic (often the lead voice). Guitar rhythm is choppy, staccato. Leads are skronky or minimal. No warmth — everything is slightly cold and functional.  
-**Distinguishing features vs existing Motorik:** Different from Motorik Noir (which is darker, more sustained, more bass-heavy). Post-Punk is faster and more angular (120–145 BPM). Rhythm uses Distortion Guitar or Feedback Guitar rather than synth-heavy options. Bass is more melodic and forward in the mix (Pick Bass, Fretless Bass). Lead uses Square Wave or Sawtooth Stab for a raw, unprocessed quality. Pads are minimal or absent. Fewer effects overall — drier sound than standard Motorik. Fills are sparse, drum patterns simple and insistent.
+**Inspired by:** Jeff Minter's Tempest 2000, the Atari Recharged series (Megan McDuffee), Carpenter Brut, Perturbator, classic arcade OSTs (Konami, Capcom, Sega)
+
+**Character:** Kinetic, relentless, mechanical. High-energy electronic music drawing from UK techno and chiptune-influenced synthwave. Where Motorik Noir is nocturnal and claustrophobic, Arcade is frantic and propulsive — 4-on-floor kick, 16th-note hi-hat, locked synth bass, staccato lead riffs, and an active Lead 2 arpeggio. Songs evoke high-intensity arcade action without sounding retro — the palette is fully synthesized and modern.
+
+**Target BPM:** 130–155. **Modes:** Dorian (40%), Mixolydian (25%), Aeolian (20%), Phrygian (10%). **Song length:** 180–240s.
+
+**Feasibility:** High — comparable scope to Motorik Noir. Requires ~7 new rules (2 drum, 3 bass, 3 lead/Lead 2), Phrygian mode support, and possible Crystal pad instrument addition. Full implementation details, MIDI analysis findings, rule catalog, and pool weights are in [docs/motorik-arcade-plan.md](motorik-arcade-plan.md).
 
 ---

@@ -52,7 +52,8 @@ struct DrumGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false
     ) -> [MIDIEvent] {
         let ruleID: String
         if let forced = forceRuleID {
@@ -69,6 +70,17 @@ struct DrumGenerator {
             case 6:  ruleID = "MOT-DRUM-008"
             default: ruleID = "MOT-DRUM-001"
             }
+        } else if arcadeVariation {
+            // Arcade: Sparse Fills 15%, Light Four 25%, Four-on-Floor 16%, Machine Step 14%, Classic 15%, Albatross 15%
+            let ruleWeights: [Double] = [0.15, 0.25, 0.16, 0.14, 0.15, 0.15]
+            switch rng.weightedPick(ruleWeights) {
+            case 1:  ruleID = "MOT-DRUM-011"
+            case 2:  ruleID = "MOT-DRUM-009"
+            case 3:  ruleID = "MOT-DRUM-010"
+            case 4:  ruleID = "MOT-DRUM-001"
+            case 5:  ruleID = "MOT-DRUM-005"
+            default: ruleID = "MOT-DRUM-012"
+            }
         } else {
             // Weighted rule selection: DRM-001 30%, DRM-002 25%, DRM-003 20%, DRM-004 25%
             let ruleWeights: [Double] = [0.30, 0.25, 0.20, 0.25]
@@ -81,6 +93,7 @@ struct DrumGenerator {
             }
         }
         usedRuleIDs.insert(ruleID)
+        if ruleID == "MOT-DRUM-000" { return [] }
 
         var events: [MIDIEvent] = []
 
@@ -90,6 +103,32 @@ struct DrumGenerator {
         var marchReliefLen = 0
         var marchReliefType = 0  // 0 = half-march, 1 = ride groove
         var marchCap       = ruleID == "MOT-DRUM-006" ? 4 + rng.nextInt(upperBound: 4) : 0
+
+        // MOT-DRUM-011 kick-phase state: starts with 4–12 bars no kick, then alternates
+        // kick-on (6–13 bars) and kick-off (4–10 bars) to achieve ~40% no-kick overall.
+        var lf4KickOn         = false
+        var lf4PhaseRemaining = ruleID == "MOT-DRUM-011" ? 4 + rng.nextInt(upperBound: 9) : 0
+
+        // MOT-DRUM-012 Sparse Fills: one silent window early in the song, timekeeping everywhere else.
+        // Timekeeping style chosen per song: 60% Option A (8th hats + soft snare backbeat),
+        //                                    40% Option B (quarter hats + sidestick on 2+4).
+        let s012SilentStart: Int
+        let s012SilentEnd:   Int
+        let s012UseBackbeat: Bool
+        if ruleID == "MOT-DRUM-012" {
+            let bodyStart = structure.bodySections.first?.startBar ?? 4
+            let bodyEnd   = structure.outroSection?.startBar ?? frame.totalBars
+            let halfBody  = bodyStart + max(4, (bodyEnd - bodyStart) / 2)
+            let winLen    = 4 + rng.nextInt(upperBound: 5)           // 4–8 bars
+            let earliest  = bodyStart + 2
+            let latest    = max(earliest, halfBody - winLen)
+            let range     = max(1, latest - earliest + 1)
+            s012SilentStart = earliest + rng.nextInt(upperBound: range)
+            s012SilentEnd   = s012SilentStart + winLen
+            s012UseBackbeat = rng.nextDouble() < 0.60
+        } else {
+            s012SilentStart = 0; s012SilentEnd = 0; s012UseBackbeat = true
+        }
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
@@ -127,6 +166,22 @@ struct DrumGenerator {
                             }
                         }
                     }
+                } else if ruleID == "MOT-DRUM-011" {
+                    if lf4PhaseRemaining == 0 {
+                        lf4KickOn = !lf4KickOn
+                        lf4PhaseRemaining = lf4KickOn
+                            ? 6 + rng.nextInt(upperBound: 8)   // kick on: 6–13 bars
+                            : 4 + rng.nextInt(upperBound: 7)   // kick off: 4–10 bars
+                    }
+                    lf4PhaseRemaining -= 1
+                    events += lightFourBar(bar: bar, intensity: intensity, barStart: barStart, kickEnabled: lf4KickOn)
+                } else if ruleID == "MOT-DRUM-012" {
+                    let inSilentWindow = bar >= s012SilentStart && bar < s012SilentEnd
+                    if !inSilentWindow {
+                        events += s012UseBackbeat
+                            ? sparseFillsBackbeatBar(barStart: barStart)
+                            : sparseFillsRimshotBar(barStart: barStart)
+                    }
                 } else {
                     events += bodyBar(bar: bar, ruleID: ruleID, intensity: intensity, barStart: barStart, rng: &rng)
                 }
@@ -149,6 +204,8 @@ struct DrumGenerator {
         case "MOT-DRUM-006": return annalisaMarchBar(bar: bar, intensity: intensity, barStart: barStart, rng: &rng)
         case "MOT-DRUM-007": return invertedBeatBar(bar: bar, intensity: intensity, barStart: barStart)
         case "MOT-DRUM-008": return tribalBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-009": return fourOnFloorBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-010": return machineStepBar(bar: bar, intensity: intensity, barStart: barStart)
         default:             return classicMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
         }
     }
@@ -424,6 +481,110 @@ struct DrumGenerator {
         ]
     }
 
+    // MARK: - MOT-DRUM-009: Four-on-Floor — defining Arcade kick pattern
+    // Kick on every quarter note (steps 0,4,8,12). Snare on beats 2+4 (steps 4,12) — shared with kick.
+    // 16th-note hi-hat at moderate velocity with beat-position accent (+8). Open hat on steps 6 and 14
+    // (the "and of 2" and "and of 4") — classic house/techno open-hat flourish.
+    // Low intensity: 8th-note hat, open hat suppressed. Arcade drum pool weight: 45%.
+
+    private static func fourOnFloorBar(bar: Int, intensity: SectionIntensity, barStart: Int) -> [MIDIEvent] {
+        switch intensity {
+        case .low:    return fourOnFloorSparseBar(barStart: barStart)
+        case .medium: return fourOnFloorCoreBar(barStart: barStart, addOpenHat: true)
+        case .high:   return fourOnFloorCoreBar(barStart: barStart, addOpenHat: true)
+        }
+    }
+
+    private static func fourOnFloorCoreBar(barStart: Int, addOpenHat: Bool) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // 16th-note hi-hats with beat-position accent (+8 on beat positions)
+        for step in 0..<16 {
+            let isBeat = step % 4 == 0
+            let vel: UInt8 = isBeat ? 72 : 62
+            // Open hat replaces closed hat at steps 6 and 14
+            let isOpenHatStep = addOpenHat && (step == 6 || step == 14)
+            if isOpenHatStep {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.openHat.rawValue,
+                                        velocity: 70, durationSteps: 2))
+            } else {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                        velocity: vel, durationSteps: 1))
+            }
+        }
+
+        // 4-on-the-floor kick (all 4 beats) — the defining Arcade character
+        events.append(MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue, velocity: 105, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue, velocity: 92,  durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 90,  durationSteps: 1))
+
+        // Snare on beats 2+4 — shared accent with kick on those steps
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 95, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 92, durationSteps: 1))
+
+        return events
+    }
+
+    private static func fourOnFloorSparseBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        // 8th-note hats (reduced density for low intensity)
+        for step in Swift.stride(from: 0, to: 16, by: 2) {
+            let vel: UInt8 = (step % 8 == 0) ? 60 : 50
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+        // 4-on-floor kick and snare still present — just quieter
+        events.append(MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue,  velocity: 90, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue,  velocity: 78, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue,  velocity: 86, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue,  velocity: 76, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 78, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 75, durationSteps: 1))
+        return events
+    }
+
+    // MARK: - MOT-DRUM-010: Machine Step — 4-on-floor with doubled 8th-note hat feel
+    // Identical kick+snare to MOT-DRUM-009. Hat: 8th-note base with an additional 16th on
+    // steps 6 and 14 (the "and of beats 2 and 4") — creates a subtle syncopated swing without
+    // breaking the machine feel. Open hat suppressed — the identity is the doubled-8th pattern.
+    // At max intensity: stays at the doubled-8th pattern (never fills to 16 steps, preserving
+    // the distinction from Four-on-Floor's dense 16th-note grid). Arcade drum pool weight: 30%.
+
+    private static func machineStepBar(bar: Int, intensity: SectionIntensity, barStart: Int) -> [MIDIEvent] {
+        switch intensity {
+        case .low: return fourOnFloorSparseBar(barStart: barStart)  // shared sparse fallback
+        default:   return machineStepCoreBar(barStart: barStart)
+        }
+    }
+
+    private static func machineStepCoreBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // 8th-note hi-hats (steps 0,2,4,6,8,10,12,14) — the base grid
+        for step in Swift.stride(from: 0, to: 16, by: 2) {
+            let isBeat = step % 4 == 0
+            let vel: UInt8 = isBeat ? 70 : 60
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+        // Extra 16th-note closed hat on steps 6 and 14 — the syncopated "skip" that defines Machine Step
+        events.append(MIDIEvent(stepIndex: barStart + 6,  note: GMDrum.closedHat.rawValue, velocity: 54, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.closedHat.rawValue, velocity: 54, durationSteps: 1))
+
+        // 4-on-the-floor kick — same as Four-on-Floor
+        events.append(MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue, velocity: 105, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue, velocity: 92,  durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 90,  durationSteps: 1))
+
+        // Snare on beats 2+4
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 95, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 92, durationSteps: 1))
+
+        return events
+    }
+
     // MARK: - DRM-002: Open Pocket
     // Kick 1+3, snare 2+4, 8th hats, open hat accent on beat 1, ghost snares
 
@@ -690,6 +851,132 @@ struct DrumGenerator {
             MIDIEvent(stepIndex: barStart + 15, note: GMDrum.crash1.rawValue,        velocity: 115, durationSteps: 1),
             MIDIEvent(stepIndex: barStart + 15, note: GMDrum.kick.rawValue,          velocity: 115, durationSteps: 1),
         ]
+    }
+
+    // MARK: - MOT-DRUM-011: Light Four
+    // Phase-based kick scheduling: starts 4–12 bars no kick, then alternates kick-on (6–13 bars)
+    // and kick-off (4–10 bars) — ~40% of body bars have no kick. Within kick-on phases, beats 2+4
+    // carry a soft kick 2-of-every-3 bars, and bars 12–15 of every 16-bar cycle drop to quiet
+    // 8th-hat timekeeping. No-kick phases use full 16th hats + normal snare — musical, not minimal.
+
+    private static func lightFourBar(bar: Int, intensity: SectionIntensity, barStart: Int, kickEnabled: Bool) -> [MIDIEvent] {
+        if intensity == .low { return lightFourSparseBar(barStart: barStart) }
+        if !kickEnabled      { return lightFourNoKickBar(bar: bar, barStart: barStart) }
+        if bar % 16 >= 12   { return lightFourTimeKeepBar(barStart: barStart) }
+        return lightFourCoreBar(bar: bar, barStart: barStart)
+    }
+
+    private static func lightFourCoreBar(bar: Int, barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        // 16th-note hi-hat with open hat at "and of 2" (step 6) and "and of 4" (step 14)
+        for step in 0..<16 {
+            if step == 6 || step == 14 {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.openHat.rawValue,
+                                        velocity: 66, durationSteps: 2))
+            } else {
+                let isBeat = step % 4 == 0
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                        velocity: isBeat ? 70 : 60, durationSteps: 1))
+            }
+        }
+
+        // Beats 1 and 3: always present, full strength
+        events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue, velocity: 105, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue, velocity: 98,  durationSteps: 1))
+
+        // Beat 2: soft kick, present when bar % 3 != 2
+        if bar % 3 != 2 {
+            events.append(MIDIEvent(stepIndex: barStart + 4, note: GMDrum.kick.rawValue, velocity: 62, durationSteps: 1))
+        }
+        // Beat 4: soft kick, present when bar % 3 != 0 (offset phase from beat 2)
+        if bar % 3 != 0 {
+            events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 58, durationSteps: 1))
+        }
+
+        // Snare on beats 2+4 — slightly lighter than Four-on-Floor (88/85 vs 95/92)
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 88, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 85, durationSteps: 1))
+
+        return events
+    }
+
+    // No-kick phase: full 16th hats + open hat + normal snare — feels musical, not stripped
+    private static func lightFourNoKickBar(bar: Int, barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for step in 0..<16 {
+            if step == 6 || step == 14 {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.openHat.rawValue,
+                                        velocity: 60, durationSteps: 2))
+            } else {
+                let isBeat = step % 4 == 0
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                        velocity: isBeat ? 64 : 54, durationSteps: 1))
+            }
+        }
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 85, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 82, durationSteps: 1))
+        return events
+    }
+
+    // Kick-free timekeeping: bars 12–15 of every 16-bar kick-on cycle — quiet 8th hats + ghost snare
+    private static func lightFourTimeKeepBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for step in Swift.stride(from: 0, to: 16, by: 2) {
+            let vel: UInt8 = (step % 8 == 0) ? 52 : 44
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+        // Ghost snares on beats 2 and 4 — barely audible, just marking time
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 52, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 48, durationSteps: 1))
+        return events
+    }
+
+    // MARK: - MOT-DRUM-012: Sparse Fills
+    // One silent window (4–8 bars) placed early in the song; timekeeping everywhere else.
+    // Style chosen per song: 60% Option A (backbeat snare), 40% Option B (sidestick + quarter hats).
+    // Section-boundary crashes fire naturally via the isFirstBarOfBodySection path.
+
+    // Option A: 8th hats + very soft snare on 2+4 — clear backbeat pulse, no kick
+    private static func sparseFillsBackbeatBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for step in Swift.stride(from: 0, to: 16, by: 2) {
+            let vel: UInt8 = step % 8 == 0 ? 48 : 38
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 50, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 46, durationSteps: 1))
+        return events
+    }
+
+    // Option B: quarter-note hats + sidestick on 2+4 — dry rimshot tick, more minimal feel
+    private static func sparseFillsRimshotBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for step in [0, 4, 8, 12] {
+            let vel: UInt8 = step == 0 ? 52 : 44
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.sidestick.rawValue, velocity: 54, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.sidestick.rawValue, velocity: 50, durationSteps: 1))
+        return events
+    }
+
+    // Low intensity: beats 1+3 kick only, 8th hats, lighter snare
+    private static func lightFourSparseBar(barStart: Int) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        for step in Swift.stride(from: 0, to: 16, by: 2) {
+            let vel: UInt8 = (step % 8 == 0) ? 56 : 46
+            events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+        events.append(MIDIEvent(stepIndex: barStart + 0, note: GMDrum.kick.rawValue,  velocity: 88, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,  velocity: 82, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 72, durationSteps: 1))
+        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 68, durationSteps: 1))
+        return events
     }
 
 }

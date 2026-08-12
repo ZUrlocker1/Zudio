@@ -525,6 +525,7 @@ final class AppState: ObservableObject {
         (kTrackTexture, .kosmic,  3), // FX Echoes        patch 102  (index shifted: FX Atmosphere removed)
         (kTrackRhythm,  .kosmic,  6), // Synth Chime      patch 11098 (index shifted: Crystal Bells removed)
         (kTrackBass,    .kosmic,  7), // Warm Pad         patch 89
+        (kTrackBass,    .motorik, 6), // Synth Bass 1     patch 38
     ]
 
     private static let trackDisplayName: [Int: String] = [
@@ -544,7 +545,7 @@ final class AppState: ObservableObject {
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Xylophone"]
         case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal"]
-        case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar"]
+        case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar","Square Lead","Synth Lead","Saw Lead","5th Saw Wave"]
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
@@ -553,18 +554,18 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad"]
-        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang"]
+        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1","Clavinet"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
         case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
-                                                "Solar Wind","Interference","Guitar Fdbk"]
+                                                "Solar Wind","Interference","Guitar Fdbk","Metal Pad","Ice Rain","Mystery Pad"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
         case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad"]
-        case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass"]
+        case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 1"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
@@ -588,7 +589,7 @@ final class AppState: ObservableObject {
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 13]
         case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
         case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98]
-        case (kTrackLead2, .motorik):  return [90, 100, 39, 30]
+        case (kTrackLead2, .motorik):  return [90, 100, 39, 30, 80, 87, 81, 86]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
@@ -597,17 +598,17 @@ final class AppState: ObservableObject {
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096]  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
-        case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84]
+        case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84, 11088, 4, 7]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
         case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96]  // + Rain
-        case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031]
+        case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031, 93, 96, 11096]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
         case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89]
-        case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038]
+        case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 38]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
         case (kTrackDrums, .ambient):  return [0, 40]
@@ -1225,6 +1226,7 @@ final class AppState: ObservableObject {
                 self.sanitiseBluesInstruments(for: state)
                 self.sanitiseNoirInstruments(for: state)
                 self.sanitiseDriftInstruments(for: state)
+                self.sanitiseArcadeInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
                 // Chill: sync Lead 1 and Lead 2 overrides to generation-time instruments so log and
                 // playback agree. chillLeadInstrument/chillLead2Instrument drive musical generation
@@ -1697,10 +1699,40 @@ final class AppState: ObservableObject {
             // Dance Drums not available in Noir — swap to Rock Kit, Brush Kit, or Machine Kit
             let valid = [0, 1, 3]
             instrumentOverrides[kTrackDrums] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        } else if !isNoir && currentDrums == 3 {
+        } else if !isNoir && !state.motorikArcadeVariation && currentDrums == 3 {
             // Machine Kit not available in Regular — swap to Rock Kit, Brush Kit, or Dance Drums
             instrumentOverrides[kTrackDrums] = Int.random(in: 0..<3, using: &rng)
         }
+    }
+
+    private func sanitiseArcadeInstruments(for state: SongState) {
+        guard state.style == .motorik, state.motorikArcadeVariation else { return }
+        var rng = SystemRandomNumberGenerator()
+        // Drums pool [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit] — Arcade: [2,3] only
+        let cd = instrumentOverrides[kTrackDrums] ?? 0
+        if ![2, 3].contains(cd) { instrumentOverrides[kTrackDrums] = Bool.random(using: &rng) ? 2 : 3 }
+        // Lead 2 pool [0=Polysynth, 1=Brightness, 2=Moog, 3=Elec Guitar, 4=Square Lead, 5=Synth Lead, 6=Saw Lead, 7=5th Saw Wave]
+        // Arcade: Moog + Square Lead + Synth Lead + Saw Lead + 5th Saw Wave
+        let cl2 = instrumentOverrides[kTrackLead2] ?? 0
+        if ![2, 5, 7].contains(cl2) { instrumentOverrides[kTrackLead2] = [2, 5, 7][Int.random(in: 0..<3, using: &rng)] }
+        // Bass pool [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
+        let cb = instrumentOverrides[kTrackBass] ?? 0
+        if ![1, 3, 4, 5, 6].contains(cb) { instrumentOverrides[kTrackBass] = [1, 3, 4, 5, 6][Int.random(in: 0..<5, using: &rng)] }
+        // Lead 1 pool [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
+        let cl1 = instrumentOverrides[kTrackLead1] ?? 0
+        if ![0, 1, 6, 7].contains(cl1) { instrumentOverrides[kTrackLead1] = [0, 1, 6, 7][Int.random(in: 0..<4, using: &rng)] }
+        // Rhythm pool [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass,
+        //              5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1, 10=Clavi]
+        // Charang, Doctor Solo, Crunch Guitar, Harpsi Pad are excluded from Arcade.
+        let cr = instrumentOverrides[kTrackRhythm] ?? 0
+        if ![0, 6, 9, 10].contains(cr) { instrumentOverrides[kTrackRhythm] = [0, 6, 9, 10][Int.random(in: 0..<4, using: &rng)] }
+        // Pads pool [0=Halo Pad, 1=Sweep Pad, 2=Bowed Glass, 3=Synth Strings] — Arcade excludes Bowed Glass
+        let cp = instrumentOverrides[kTrackPads] ?? 0
+        if cp == 2 { instrumentOverrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
+        // Texture pool [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk, 8=Metal Pad, 9=Ice Rain, 10=Mystery Pad]
+        // Arcade: electronic textures only; 8/9/10 are Arcade-exclusive
+        let ct = instrumentOverrides[kTrackTexture] ?? 0
+        if ![0, 3, 5, 6, 8, 9, 10].contains(ct) { instrumentOverrides[kTrackTexture] = [0, 3, 5, 6, 8, 9, 10][Int.random(in: 0..<7, using: &rng)] }
     }
 
     /// Forces Lead 1 to Stereo Piano (pool index 0) for Ambient Piano songs.
@@ -1834,6 +1866,22 @@ final class AppState: ObservableObject {
             let cd = overrides[kTrackDrums] ?? 0
             if cd == 2 { overrides[kTrackDrums] = [0,1,3][Int.random(in:0..<3,using:&rng)] }
             let _ = bassNoirOnly  // silence unused warning
+        } else if style == .motorik, state.motorikArcadeVariation {
+            // Arcade: enforce restricted pools — covers first song (index 0 default) and cross-style bleed
+            let cd = overrides[kTrackDrums] ?? 0
+            if ![2, 3].contains(cd) { overrides[kTrackDrums] = Bool.random(using: &rng) ? 2 : 3 }
+            let cl2 = overrides[kTrackLead2] ?? 0
+            if ![2, 5, 7].contains(cl2) { overrides[kTrackLead2] = [2, 5, 7][Int.random(in: 0..<3, using: &rng)] }
+            let cb = overrides[kTrackBass] ?? 0
+            if ![1, 3, 4, 5, 6].contains(cb) { overrides[kTrackBass] = [1, 3, 4, 5, 6][Int.random(in: 0..<5, using: &rng)] }
+            let cl1 = overrides[kTrackLead1] ?? 0
+            if ![0, 1, 5, 6, 7].contains(cl1) { overrides[kTrackLead1] = [0, 1, 5, 6, 7][Int.random(in: 0..<5, using: &rng)] }
+            let cr = overrides[kTrackRhythm] ?? 0
+            if ![0, 6, 9, 10].contains(cr) { overrides[kTrackRhythm] = [0, 6, 9, 10][Int.random(in: 0..<4, using: &rng)] }
+            let cp = overrides[kTrackPads] ?? 0
+            if cp == 2 { overrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
+            let ct = overrides[kTrackTexture] ?? 0
+            if ![0, 3, 5, 6, 8, 9, 10].contains(ct) { overrides[kTrackTexture] = [0, 3, 5, 6, 8, 9, 10][Int.random(in: 0..<7, using: &rng)] }
         } else if style == .motorik {
             let cd = overrides[kTrackDrums] ?? 0
             if cd == 3 { overrides[kTrackDrums] = Int.random(in:0..<3, using:&rng) }
@@ -1864,16 +1912,33 @@ final class AppState: ObservableObject {
     /// Static backing for instrumentPickPool — takes explicit SongState instead of self.songState.
     nonisolated static func instrumentPickPoolStatic(trackIndex: Int, style: MusicStyle, poolCount: Int, state: SongState?) -> [Int] {
         if style == .motorik && trackIndex == kTrackBass {
+            if state?.motorikArcadeVariation == true { return [1,3,4,5,6] }
             return state?.motorikNoirVariation == true ? [0,1,4,5] : [0,1,2,3]
         }
         if style == .motorik && trackIndex == kTrackLead1 {
+            if state?.motorikArcadeVariation == true { return [0,1,6,7] }
             return state?.motorikNoirVariation == true ? [1,4,5,6,7] : [0,1,2,3,4,6]
         }
+        if style == .motorik && trackIndex == kTrackLead2 {
+            if state?.motorikArcadeVariation == true { return [2,5,7] }  // Arcade: Moog + Synth Lead + 5th Saw Wave
+            return Array(0..<poolCount)
+        }
         if style == .motorik && trackIndex == kTrackDrums {
+            if state?.motorikArcadeVariation == true { return [2,3] }
             return state?.motorikNoirVariation == true ? [0,1,3] : [0,1,2]
         }
         if style == .motorik && trackIndex == kTrackRhythm {
+            if state?.motorikArcadeVariation == true { return [0,1,6,8,9,10] }
             return state?.motorikNoirVariation == true ? [2,3,5,6,7] : [0,1,2,4,5,6]
+        }
+        if style == .motorik && trackIndex == kTrackPads {
+            if state?.motorikArcadeVariation == true { return [0,1,3] }
+            return Array(0..<poolCount)
+        }
+        if style == .motorik && trackIndex == kTrackTexture {
+            // Pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk]
+            if state?.motorikArcadeVariation == true { return [0, 3, 5, 6, 8, 9, 10] }  // Arcade: electronic textures only
+            return state?.motorikNoirVariation == true ? [0, 2, 3, 5, 6, 7] : Array(0..<poolCount)
         }
         if style == .kosmic {
             let isDrift = state?.isKosmicDrift == true
@@ -1905,7 +1970,8 @@ final class AppState: ObservableObject {
     /// Motorik kTrackBass: Noir restricts to cold/synthetic sounds; regular restricts to organic sounds.
     private func instrumentPickPool(trackIndex: Int, style: MusicStyle, poolCount: Int) -> [Int] {
         if style == .motorik && trackIndex == kTrackBass {
-            // Pool: [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass]
+            // Pool: [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
+            if songState?.motorikArcadeVariation == true { return [1, 3, 4, 5, 6] }  // Arcade: Lead Bass + Elec Bass + Mean Saw + Techno + Synth Bass 1
             return songState?.motorikNoirVariation == true
                 ? [0, 1, 4, 5]   // Noir: Moog + Lead Bass (shared) + Mean Saw Bass + Techno Bass
                 : [0, 1, 2, 3]   // Regular: Moog + Lead Bass (shared) + Rock Bass + Elec Bass
@@ -1913,22 +1979,41 @@ final class AppState: ObservableObject {
         if style == .motorik && trackIndex == kTrackLead1 {
             // Pool: [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
             // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
+            if songState?.motorikArcadeVariation == true { return [0, 1, 6, 7] }  // Arcade: Mono Synth + Saw Lead 3 + Synth Lead + Saw Stack
             return songState?.motorikNoirVariation == true
                 ? [1, 4, 5, 6, 7]      // Noir: Saw Lead 3 + Chiff Lead + Square Lead + Synth Lead + Saw Stack
                 : [0, 1, 2, 3, 4, 6]   // Regular: Mono Synth + Saw Lead 3 + Soft Brass + Polysynth + Chiff Lead + Synth Lead
         }
+        if style == .motorik && trackIndex == kTrackLead2 {
+            // Pool: [0=Polysynth, 1=Brightness, 2=Moog, 3=Elec Guitar, 4=Square Lead, 5=Synth Lead]
+            // Synth Lead (87) excluded from Arcade: it's a dual-voice "fifths" patch, too thick for fast arpeggios.
+            if songState?.motorikArcadeVariation == true { return [2, 5, 7] }  // Arcade: Moog + Synth Lead + 5th Saw Wave
+            return Array(0..<poolCount)
+        }
         if style == .motorik && trackIndex == kTrackDrums {
             // Pool: [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit]
+            if songState?.motorikArcadeVariation == true { return [2, 3] }  // Arcade: Dance Drums + Machine Kit only
             return songState?.motorikNoirVariation == true
                 ? [0, 1, 3]   // Noir: Rock Kit + Brush Kit + Machine Kit — no Dance Drums
                 : [0, 1, 2]   // Regular: Rock Kit + Brush Kit + Dance Drums — no Machine Kit
         }
         if style == .motorik && trackIndex == kTrackRhythm {
-            // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang]
+            // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1, 10=Clavi]
             // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
+            if songState?.motorikArcadeVariation == true { return [0, 6, 9, 10] }  // Arcade: Guitar Pulse + Synth Bass 3 + EP1 + Clavi
             return songState?.motorikNoirVariation == true
                 ? [2, 3, 5, 6, 7]      // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
                 : [0, 1, 2, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Fuzz Guitar + Acoustic Bass + Pick Bass + Synth Bass 3
+        }
+        if style == .motorik && trackIndex == kTrackTexture {
+            // Pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk]
+            if songState?.motorikArcadeVariation == true { return [0, 3, 5, 6, 8, 9, 10] }  // Arcade: electronic textures only
+            return songState?.motorikNoirVariation == true ? [0, 2, 3, 5, 6, 7] : Array(0..<poolCount)
+        }
+        if style == .motorik && trackIndex == kTrackPads {
+            // Pool: [0=Halo Pad, 1=Sweep Pad, 2=Bowed Glass, 3=Synth Strings]
+            if songState?.motorikArcadeVariation == true { return [0, 1, 3] }  // Arcade: exclude Bowed Glass
+            return Array(0..<poolCount)
         }
         // Kosmic: unified pool (Regular + Drift-exclusive); substyle restricts random picks.
         if style == .kosmic {

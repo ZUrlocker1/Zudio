@@ -3,17 +3,24 @@
 // Produces a SongStructure: ordered sections + chord plan.
 
 struct StructureGenerator {
-    static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> SongStructure {
-        let form = pickForm(rng: &rng)
+    static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG, arcade: Bool = false) -> SongStructure {
+        let form = pickForm(rng: &rng, arcade: arcade)
         let (sections, introStyle, outroStyle) = buildSections(form: form, totalBars: frame.totalBars, rng: &rng)
-        let chordPlan = buildChordPlan(frame: frame, sections: sections, rng: &rng)
+        let chordPlan = buildChordPlan(frame: frame, sections: sections, rng: &rng, arcade: arcade)
         return SongStructure(sections: sections, chordPlan: chordPlan, introStyle: introStyle, outroStyle: outroStyle)
     }
 
     // MARK: - Form selection
 
-    private static func pickForm(rng: inout SeededRNG) -> SongForm {
-        // Single-A 45%, Subtle A/B 40%, Moderate A/B 15%
+    private static func pickForm(rng: inout SeededRNG, arcade: Bool = false) -> SongForm {
+        if arcade {
+            // Arcade: less single-A (shorter songs need harmonic movement) — Single-A 20%, Subtle A/B 55%, Moderate A/B 25%
+            let r = rng.nextDouble()
+            if r < 0.20 { return .singleA }
+            if r < 0.75 { return .subtleAB }
+            return .moderateAB
+        }
+        // Regular/Noir: Single-A 45%, Subtle A/B 40%, Moderate A/B 15%
         let r = rng.nextDouble()
         if r < 0.45 { return .singleA }
         if r < 0.85 { return .subtleAB }
@@ -120,11 +127,11 @@ struct StructureGenerator {
     // MARK: - Chord plan
 
     private static func buildChordPlan(
-        frame: GlobalMusicalFrame, sections: [SongSection], rng: inout SeededRNG
+        frame: GlobalMusicalFrame, sections: [SongSection], rng: inout SeededRNG, arcade: Bool = false
     ) -> [ChordWindow] {
         var plan: [ChordWindow] = []
         for section in sections {
-            plan.append(contentsOf: buildChordWindows(frame: frame, section: section, rng: &rng))
+            plan.append(contentsOf: buildChordWindows(frame: frame, section: section, rng: &rng, arcade: arcade))
         }
         return anchorIntroToBody(plan: plan, frame: frame, sections: sections)
     }
@@ -156,15 +163,29 @@ struct StructureGenerator {
         }
     }
 
-    /// One chord per section by default; body sections may get 2–3 chord windows.
+    /// One chord per section by default; body sections may get 2–4 chord windows.
+    /// Arcade uses more chords per section to counteract harmonic repetitiveness.
     private static func buildChordWindows(
-        frame: GlobalMusicalFrame, section: SongSection, rng: inout SeededRNG
+        frame: GlobalMusicalFrame, section: SongSection, rng: inout SeededRNG, arcade: Bool = false
     ) -> [ChordWindow] {
         let chordCount: Int
         switch section.label {
         case .intro, .outro: chordCount = 1
-        case .A: chordCount = rng.nextDouble() < 0.5 ? 1 : 2
-        case .B: chordCount = rng.nextInt(upperBound: 2) + 2 // 2–3
+        case .A:
+            if arcade {
+                // Arcade A: 2 (50%), 3 (35%), 4 (15%) base; bump up if needed to keep windows ≤ 24 bars
+                let baseCount = rng.weightedPick([0.50, 0.35, 0.15]) + 2
+                chordCount = max(baseCount, (section.lengthBars + 23) / 24)
+            } else {
+                chordCount = rng.nextDouble() < 0.5 ? 1 : 2
+            }
+        case .B:
+            if arcade {
+                // Arcade B: 3 (55%), 4 (45%)
+                chordCount = rng.nextDouble() < 0.55 ? 3 : 4
+            } else {
+                chordCount = rng.nextInt(upperBound: 2) + 2 // 2–3
+            }
         default: chordCount = 1  // bridge / ramp sections: single chord
         }
 

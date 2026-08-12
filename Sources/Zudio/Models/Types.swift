@@ -169,6 +169,15 @@ enum ChordType: String, Codable, Sendable {
         default:                           return false
         }
     }
+
+    /// True for sparse chord types that contain fewer than 3 distinct intervals —
+    /// chromatic passing tones read as dissonance rather than jazz colour against these.
+    var isSparse: Bool {
+        switch self {
+        case .sus2, .sus4, .power, .quartal: return true
+        default:                              return false
+        }
+    }
 }
 
 enum ProgressionFamily: String, Codable, Sendable {

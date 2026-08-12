@@ -106,13 +106,14 @@ struct LeadGenerator {
         usedRuleIDs: inout Set<String>,
         forceLeadRuleID: String? = nil,
         passBodyBars: Int? = nil,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false
     ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
 
         // A: Per-section rule — always consume two draws for RNG determinism across songs.
         // forceLeadRuleID is honoured only for known Motorik-lead IDs; cross-style IDs are ignored.
-        let pickedA        = pickLd1Rule(rng: &rng, noir: noirVariation)
-        let bRuleCandidate = pickLd1Rule(rng: &rng, noir: noirVariation)
+        let pickedA        = pickLd1Rule(rng: &rng, noir: noirVariation, arcade: arcadeVariation)
+        let bRuleCandidate = pickLd1Rule(rng: &rng, noir: noirVariation, arcade: arcadeVariation)
         let aRule: String  = forceLeadRuleID.flatMap { $0.hasPrefix("MOT-LD1-") ? $0 : nil } ?? pickedA
         // Technique D: LD1-003 Punch Solo handles its own silence via punchNextSoloBar; escalate to an active rule for B sections.
         let bRule: String
@@ -123,9 +124,11 @@ struct LeadGenerator {
         }
         usedRuleIDs.insert(aRule)
 
-        // E: Delayed body entry — Lead 1 hard-silent for first 8 or 16 bars of A section
+        // E: Delayed body entry — Lead 1 hard-silent for first 8 or 16 bars of A section,
+        //    capped so Lead 1 never starts past absolute bar 12 (index 11).
         let aStart   = structure.sections.first(where: { $0.label == .A })?.startBar ?? 0
-        let entryBar = aStart + (rng.nextDouble() < 0.7 ? 8 : 16)  // 70% enter after 8 bars, 30% after 16
+        let rawDelay = rng.nextDouble() < 0.7 ? 8 : 16
+        let entryBar = min(aStart + rawDelay, arcadeVariation ? 9 : 11)
 
         // C: Select one v2 starter phrase for LD1-001
         let phraseIdx    = rng.nextInt(upperBound: v2Phrases.count)
@@ -247,7 +250,7 @@ struct LeadGenerator {
         // I: General Lead 1 rest windows — applies to all non-solo rules.
         // Solo rules (007/008) manage their own silence via soloWindow; skip them.
         let ld1RestBars: Set<Int> = !isSoloRule
-            ? buildRestBars(entryBar: entryBar, totalBars: frame.totalBars, rng: &rng)
+            ? buildRestBars(entryBar: entryBar, totalBars: frame.totalBars, rng: &rng, arcade: arcadeVariation)
             : []
 
         var events: [MIDIEvent] = []
@@ -262,7 +265,13 @@ struct LeadGenerator {
             if isBodySection && bar < entryBar && !isSoloRule { continue }
 
             let isIntroOutro = section.label == .intro || section.label == .outro
-            let intensity    = section.subPhaseIntensity(atBar: bar)
+            let rawIntensity = section.subPhaseIntensity(atBar: bar)
+            // Arcade: never fully silent in the first 12 body bars — Lead 1 enters early.
+            // Dense arp rules (015/017/018/019/020) return [] on .low, so a long A section
+            // combined with buildRestBars can push the first note past bar 25+. Cap it.
+            let intensity: SectionIntensity = (arcadeVariation && isBodySection
+                                               && bar < aStart + 12
+                                               && rawIntensity == .low) ? .medium : rawIntensity
             let barStart     = bar * 16
 
             // A: Choose rule based on section label
@@ -477,6 +486,41 @@ struct LeadGenerator {
                         rng: &rng)
                 }
 
+            case "MOT-LD1-020":
+                if !isIntroOutro {
+                    barEvents = lead1SynthHook(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity)
+                }
+
+            case "MOT-LD1-015":
+                if !isIntroOutro {
+                    barEvents = lead1ArcadeRiff(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity, rng: &rng)
+                }
+
+            case "MOT-LD1-016":
+                if !isIntroOutro {
+                    barEvents = lead1MachineAnswer(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity, rng: &rng)
+                }
+
+            case "MOT-LD1-017":
+                if !isIntroOutro {
+                    barEvents = lead1PentatonicBlitz(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity)
+                }
+
+            case "MOT-LD1-018":
+                if !isIntroOutro {
+                    barEvents = lead1OctaveBounce(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity)
+                }
+        case "MOT-LD1-019":
+                if !isIntroOutro {
+                    barEvents = lead1TriadClimb(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                        intensity: intensity, rng: &rng)
+                }
+
             default:
                 barEvents = lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
                     intensity: intensity, isIntroOutro: isIntroOutro, prevNote: prevNote, rng: &rng)
@@ -502,11 +546,38 @@ struct LeadGenerator {
         lead1Events: [MIDIEvent],
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        soloRange: Range<Int>? = nil
+        soloRange: Range<Int>? = nil,
+        arcadeVariation: Bool = false,
+        arcadeDenseMelody: Bool = false
     ) -> [MIDIEvent] {
-        let ld2Rules:   [String] = ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
-        let ld2Weights: [Double] = [0.20,      0.20,      0.10,      0.10,      0.20,      0.20]
+        // Arcade uses a restricted regular pool — Sustained Drone (002) and Neu! counter melody (004) excluded.
+        let ld2Rules:   [String] = arcadeVariation
+            ? ["MOT-LD2-001", "MOT-LD2-003", "MOT-LD2-005"]
+            : ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
+        let ld2Weights: [Double] = arcadeVariation
+            ? [0.45,           0.35,           0.20]
+            : [0.20,           0.20,           0.10,           0.10,           0.20,           0.20]
         var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
+        if arcadeVariation {
+            let arcadeRoll = rng.nextDouble()
+            if arcadeDenseMelody {
+                // Lead 1 is a dense arp — 20% no Lead 2, rest spread across sparse rules and pool.
+                // Distribution: 20% off / 16% Blip / 16% Bounce Arp / 12% Gate Arp / 36% pool.
+                // Pool in dense mode skews toward LD2-001 Counter-response (45%) which self-thins.
+                if arcadeRoll < 0.20 {
+                    usedRuleIDs.insert("MOT-LD2-000")
+                    return []
+                } else if arcadeRoll < 0.36 { ruleID = "MOT-LD2-010" }
+                else if arcadeRoll < 0.52   { ruleID = "MOT-LD2-009" }
+                else if arcadeRoll < 0.64   { ruleID = "MOT-LD2-008" }
+                // else: keep pool pick (36%)
+            } else {
+                // Normal Arcade: 75% arp rules, 25% regular pool.
+                if arcadeRoll < 0.25      { ruleID = "MOT-LD2-007" }
+                else if arcadeRoll < 0.50 { ruleID = "MOT-LD2-008" }
+                else if arcadeRoll < 0.75 { ruleID = "MOT-LD2-009" }
+            }
+        }
         // LD2-006 (Diatonic Shadow) requires Lead 1 notes to harmonize — if Lead 1 is on a solo rule
         // with a sparse window, Lead 2 would be silent for the whole song. Redirect to Counter Response.
         if soloRange != nil && ruleID == "MOT-LD2-006" { ruleID = "MOT-LD2-001" }
@@ -530,8 +601,11 @@ struct LeadGenerator {
             ? Set((0..<ld2006BlockCount).filter { _ in rng.nextDouble() < 0.65 })
             : Set()
 
+        // Track L1 activity and dual-silence state for complementary scheduling.
+        var l1ActiveRun = 0    // consecutive body bars L1 has been active
+        var bothSilentRun = 0  // consecutive body bars both leads silent
+
         for bar in 0..<frame.totalBars {
-            // Silence Lead 2 during the Lead 1 extended solo window
             if let sr = soloRange, sr.contains(bar) { continue }
 
             guard let section = structure.section(atBar: bar),
@@ -541,19 +615,44 @@ struct LeadGenerator {
             let intensity    = section.subPhaseIntensity(atBar: bar)
             let barStart     = bar * 16
 
-            // Update last Lead 1 note for this bar (used by LD2-001 and LD2-006)
             let barL1 = lead1ByBar[bar]
             if let l1Last = barL1.max(by: { $0.stepIndex < $1.stepIndex }) {
                 lead1LastNote = l1Last.note
             }
+            let l1ActiveBody = !barL1.isEmpty && !isIntroOutro
+            if l1ActiveBody { l1ActiveRun += 1 } else if !isIntroOutro { l1ActiveRun = 0 }
 
-            // A — Bar-level silencing: if Lead 1 is active this bar, Lead 2 rests 50% of the time.
-            // Intro/outro exempt (already sparse); LD2-006 exempt (shadow needs L1 to work).
-            if !isIntroOutro && !barL1.isEmpty && ruleID != "MOT-LD2-006" {
-                if rng.nextDouble() < 0.50 { continue }
+            // Force L2 active after 4+ consecutive body bars where both leads are silent.
+            let forcedActive = !isIntroOutro && bothSilentRun >= 4
+
+            let isArpRule = ruleID == "MOT-LD2-007" || ruleID == "MOT-LD2-008" || ruleID == "MOT-LD2-009" || ruleID == "MOT-LD2-010"
+
+            // A — Bar-level silencing (skipped when forced active to break a dead zone).
+            // Non-arp rules: 50% rest when L1 active.
+            // Arp rules: 35% extra rest when L1 has been active ≥8 consecutive bars.
+            if !forcedActive {
+                if !isIntroOutro && l1ActiveBody && !isArpRule && ruleID != "MOT-LD2-006" {
+                    if rng.nextDouble() < 0.50 { bothSilentRun = 0; continue }
+                }
+                if !isIntroOutro && isArpRule && l1ActiveRun >= 8 {
+                    if rng.nextDouble() < 0.35 { bothSilentRun = 0; continue }
+                }
             }
 
+            let priorCount = events.count
             switch ruleID {
+            case "MOT-LD2-007":
+                events += lead2ArcadeArp(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    isIntroOutro: isIntroOutro)
+            case "MOT-LD2-008":
+                events += lead2GateArp(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    isIntroOutro: isIntroOutro)
+            case "MOT-LD2-009":
+                events += lead2BounceArp(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    isIntroOutro: isIntroOutro)
+            case "MOT-LD2-010":
+                events += lead2Blip(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                    isIntroOutro: isIntroOutro)
             case "MOT-LD2-002":
                 events += lead2SustainedDrone(barStart: barStart, entry: entry, frame: frame,
                     isIntroOutro: isIntroOutro, rng: &rng)
@@ -574,6 +673,20 @@ struct LeadGenerator {
                 events += lead2CounterResponse(barStart: barStart, entry: entry, frame: frame,
                     intensity: intensity, isIntroOutro: isIntroOutro,
                     lead1StepSet: lead1StepSet, lead1LastNote: lead1LastNote, rng: &rng)
+            }
+
+            // Fallback: if forced active but the rule still produced nothing (e.g., arp rest bar),
+            // inject a single root quarter-note to break the silence.
+            if forcedActive && events.count == priorCount {
+                let rootPC = chordRootPC(frame: frame, entry: entry)
+                let note = nearestMIDI(pc: rootPC, bounds: RegisterBounds(low: 57, high: 69), prevNote: nil)
+                events.append(MIDIEvent(stepIndex: barStart, note: note, velocity: 58, durationSteps: 4))
+            }
+
+            // Update both-silent counter (body bars only).
+            if !isIntroOutro {
+                if !l1ActiveBody && events.count == priorCount { bothSilentRun += 1 }
+                else { bothSilentRun = 0 }
             }
         }
 
@@ -2296,10 +2409,409 @@ struct LeadGenerator {
         return events
     }
 
+    // MARK: - MOT-LD2-007: Arcade Arp — 16th-note arpeggio (Tempest 2000 / Raiden II texture)
+    // Cycles root–M3–P5–oct–P5–M3 continuously (6 notes per cycle). 4 bars on / 1 bar rest.
+    // Fully staccato (dur=1). Register MIDI 60–76. Delay on 35% probability — set by SongGenerator.
+    // Arcade weight: 55–65% of Arcade songs (determined in generateLead2 via 60% rng roll).
+
+    private static func lead2ArcadeArp(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        isIntroOutro: Bool
+    ) -> [MIDIEvent] {
+        if isIntroOutro { return [] }
+        // 4-bar on / 1-bar rest cycle
+        guard bar % 5 != 4 else { return [] }
+        var events: [MIDIEvent] = []
+        let bounds = kRegisterBounds[kTrackLead2]!
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        // Rotate arp base every 8 bars: root → 3rd → 5th → root…
+        // Transposes the whole 6-note cycle to different chord tones, changing pitch-class fingerprint.
+        let baseShifts = [0, thirdSemis, 7]
+        let basePC = (rootPC + baseShifts[(bar / 8) % 3]) % 12
+        let baseThirdPC  = (basePC + thirdSemis) % 12
+        let baseFifthPC  = (basePC + 7) % 12
+        // 6-note cycle: base, base+3rd, base+5th, base+oct, base+5th, base+3rd
+        let cyclePCs: [Int] = [basePC, baseThirdPC, baseFifthPC, basePC, baseFifthPC, baseThirdPC]
+        let phaseStart = (bar % 5) * 16
+        for step in 0..<16 {
+            let cycleIdx = (phaseStart + step) % 6
+            let pc  = cyclePCs[cycleIdx]
+            let low  = (cycleIdx == 0 || cycleIdx == 3) ? bounds.low : bounds.low + 5
+            let high = bounds.high
+            let note = nearestMIDI(pc: pc, bounds: RegisterBounds(low: low, high: high), prevNote: nil)
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: 50, durationSteps: 1))
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD1-020: Synth Hook — diatonic 2-bar melodic phrase with 2-bar rest (not an arp)
+    // Bar 0 (call): root→M2→3rd→P5 at 8th-note positions (steps 0,2,4,8). Gap at step 6 gives breathing room.
+    // Bar 1 (answer): P5→3rd→M2→root at steps 0,2,6,8; root held a quarter note (dur=4).
+    // Bars 2–3: completely silent — lets Bass and Lead 2 own those bars.
+    // Register MIDI 62–76. Intensity: low=silent; medium=call bar only; high=full phrase.
+    // Not in arcadeDenseArpRules, so coordination layer leaves Bass and Lead 2 at full weights.
+
+    private static func lead1SynthHook(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity
+    ) -> [MIDIEvent] {
+        if intensity == .low { return [] }
+        let phase = bar % 4
+        guard phase < 2 else { return [] }               // bars 2–3 always silent
+        if intensity == .medium && phase == 1 { return [] } // medium: call only
+        let bounds = RegisterBounds(low: 62, high: 76)
+        let rootPC = chordRootPC(frame: frame, entry: entry)
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        let callPCs:   [Int] = [rootPC, (rootPC+2)%12, (rootPC+thirdSemis)%12, (rootPC+7)%12]
+        let answerPCs: [Int] = [(rootPC+7)%12, (rootPC+thirdSemis)%12, (rootPC+2)%12, rootPC]
+        let pcs        = (phase == 0) ? callPCs   : answerPCs
+        let steps      = (phase == 0) ? [0, 2, 4, 8]            : [0, 2, 6, 8]
+        let durs: [Int]     = (phase == 0) ? [2, 2, 2, 2]       : [2, 2, 2, 4]
+        let vels: [UInt8]   = (phase == 0) ? [88, 80, 76, 80]   : [84, 76, 72, 86]
+        var events: [MIDIEvent] = []
+        var prevNote: UInt8? = nil
+        for i in 0..<pcs.count {
+            let note = nearestMIDI(pc: pcs[i], bounds: bounds, prevNote: prevNote)
+            events.append(MIDIEvent(stepIndex: barStart + steps[i], note: note, velocity: vels[i], durationSteps: durs[i]))
+            prevNote = note
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD1-015: Arcade Riff — 2-bar ascending staccato motif (Carpenter Brut / arcade riff-as-ostinato)
+    // A 4–6 note motif at 8th-note spacing (dur=1 staccato). Ascending by 3rds primarily.
+    // Repeats every 2 bars; shifts up by P4 (5 semitones) once after 8–12 bars for an energy-boost.
+    // Register MIDI 64–79. Arcade lead pool weight: 22%.
+
+    private static func lead1ArcadeRiff(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        if intensity == .low                         { return [] }
+        if intensity == .medium && bar % 4 == 3     { return [] }
+        var events: [MIDIEvent] = []
+        let bounds = RegisterBounds(low: 64, high: 79)
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
+        // Energy shift: bars 8–11 push the motif up by 5 semitones (P4)
+        let shiftSemis = (bar >= 8 && bar < 12) ? 5 : 0
+        // Bar-alternating pattern: bar A = ascending riff, bar B = riff from P5
+        let barPhase = bar % 2
+        let basePC: Int
+        if barPhase == 0 {
+            basePC = (rootPC + shiftSemis) % 12
+        } else {
+            basePC = (rootPC + 7 + shiftSemis) % 12  // start from P5
+        }
+        // 4-note motif at 8th-note spacing. Every 8 bars the direction reverses (descending)
+        // to break up long identical runs — 6 bars ascending, 2 bars descending, repeat.
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        let ascending: [Int] = [0, 2, thirdSemis, 7]
+        let motifOffsets = (bar % 8 >= 6) ? ascending.reversed() : ascending
+        var prevNote: UInt8? = nil
+        for (i, offset) in motifOffsets.enumerated() {
+            let pc   = (basePC + offset) % 12
+            let note = nearestMIDI(pc: pc, bounds: bounds, prevNote: prevNote)
+            let step = i * 2
+            let vel: UInt8 = i == 0 ? 90 : 80
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 1))
+            prevNote = note
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD1-016: Machine Answer — 4-bar symmetric call-and-answer (mechanical mirror)
+    // Bars 1–2: ascending "call" figure (3rds + P4/P5). Bars 3–4: same notes reversed (the "answer").
+    // Perfect symmetry = machine aesthetic; unlike organic call-and-answer where response varies.
+    // Register MIDI 60–76. Duration 60% of step (slightly more breath than Arcade Riff). Arcade pool weight: 18%.
+
+    private static func lead1MachineAnswer(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let bounds  = RegisterBounds(low: 60, high: 76)
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        // Rotate base pitch class every 8 bars (root → 3rd → 5th) to prevent long same-chord-window runs.
+        let baseShifts = [0, thirdSemis, 7]
+        let basePC = (rootPC + baseShifts[(bar / 8) % 3]) % 12
+        // 4-note call figure — ascending arc from rotated base
+        let callOffsets: [Int] = [0, thirdSemis, 7, 12]
+        let callPCs = callOffsets.map { (basePC + $0) % 12 }
+        let callNotes: [UInt8] = callPCs.enumerated().map { i, pc in
+            nearestMIDI(pc: pc, bounds: bounds, prevNote: i > 0 ? nearestMIDI(pc: callPCs[i-1], bounds: bounds, prevNote: nil) : nil)
+        }
+        let answerNotes = callNotes.reversed()  // mirror = the machine answer
+        let callOrAnswer = (bar % 4 < 2) ? callNotes : Array(answerNotes)
+        for (i, note) in callOrAnswer.enumerated() {
+            let step = i * 4  // quarter-note spacing: steps 0, 4, 8, 12
+            let vel: UInt8 = i == 0 ? 88 : 78
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 2))
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD1-017: Pentatonic Blitz — 16th-note burst (chiptune fast-arp, BPM ≥ 143 only)
+    // 1-bar cycle: 4 ascending 16ths (root–M2–P4–P5), 2 rests, 4 descending 16ths (P5–P4–M2–root), 2 rests.
+    // At 150 BPM: ~5 notes per second in the bursts (8th notes). Duration staccato. Register MIDI 67–84.
+    // Only fired when frame.tempo ≥ 143 (enforced in generateLead1). Arcade lead pool weight: 15%.
+
+    private static func lead1PentatonicBlitz(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity
+    ) -> [MIDIEvent] {
+        // Periodic breath breaks to prevent relentlessness:
+        // 1-bar gap every 4 bars (bar % 4 == 3); extended to a 2-bar gap every 8 bars (bar % 8 == 6 adds the extra bar).
+        // 8-bar cycle: ✓✓✓ _ ✓✓ _ _ → 5 active, 3 silent.
+        if bar % 4 == 3 || bar % 8 == 6 { return [] }
+        var events: [MIDIEvent] = []
+        let bounds = RegisterBounds(low: 67, high: 84)
+        let rootPC = chordRootPC(frame: frame, entry: entry)
+        // Rotate arp base every 8 bars: root → 3rd → 5th → root…
+        // Changes the pitch-class fingerprint so long chord windows don't stagnate.
+        let thirdSemis = (frame.mode == .Ionian || frame.mode == .Mixolydian || frame.mode == .Lydian) ? 4 : 3
+        let baseShifts = [0, thirdSemis, 7]
+        let basePC = (rootPC + baseShifts[(bar / 8) % 3]) % 12
+        // Ascending burst: base–M2–P4–P5 (pentatonic subset in any mode)
+        let ascOffsets: [Int] = [0, 2, 5, 7]
+        let ascNotes = ascOffsets.map { offset -> UInt8 in
+            nearestMIDI(pc: (basePC + offset) % 12, bounds: bounds, prevNote: nil)
+        }
+        let descNotes = ascNotes.reversed()
+        // Every 4 bars swap order (desc-then-asc) to vary the 1-bar repeating cycle.
+        let firstBurst  = (bar % 4 >= 2) ? Array(descNotes) : ascNotes
+        let secondBurst = (bar % 4 >= 2) ? ascNotes          : Array(descNotes)
+        for (i, note) in firstBurst.enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: 86, durationSteps: 2))
+        }
+        // Gap: steps 8–9 (rest)
+        for (i, note) in secondBurst.prefix(3).enumerated() {
+            events.append(MIDIEvent(stepIndex: barStart + 10 + i * 2, note: note, velocity: 82, durationSteps: 2))
+        }
+        // Gap: steps 16+ (rest — breathing space before next bar)
+        return events
+    }
+
+    // MARK: - MOT-LD1-018: Octave Bounce — Tempest 2000 octave-leap lead (highest Arcade pool weight)
+    // The defining Tempest 2000 gesture: interval analysis showed octave as #1 interval by 5:1 margin.
+    // 2-bar pattern: chord tone → jump up an octave → back down → neighboring chord tone → repeat.
+    // The octave leap fires on every other 8th note — "bouncing ball" regularity reads as mechanical precision.
+    // Register MIDI 55–79 (two octaves). Duration 55% of step. Arcade lead pool weight: 25%.
+
+    private static func lead1OctaveBounce(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let loLow = 55; let loHigh = 67   // lower octave zone
+        let hiLow = 67; let hiHigh = 79   // upper octave zone
+        let rootPC = chordRootPC(frame: frame, entry: entry)
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        let fifthPC = (rootPC + 7) % 12
+        let thirdPC = (rootPC + thirdSemis) % 12
+        // Two alternating chord tones: root and 3rd or root and 5th
+        let toneA = bar % 4 < 2 ? rootPC : thirdPC
+        let toneB = bar % 4 < 2 ? thirdPC : fifthPC
+        // Pattern: lo–hi–lo–lo2   lo–hi–lo–lo2 (toneB on 4th position for color)
+        let lowA  = nearestMIDI(pc: toneA, bounds: RegisterBounds(low: loLow, high: loHigh), prevNote: nil)
+        let highA = nearestMIDI(pc: toneA, bounds: RegisterBounds(low: hiLow, high: hiHigh), prevNote: nil)
+        let lowB  = nearestMIDI(pc: toneB, bounds: RegisterBounds(low: loLow, high: loHigh), prevNote: nil)
+        // Standard: 8 8th-note positions per bar: lo, hi, lo, loB, lo, hi, lo, loB.
+        // Every 8 bars (bar % 8 >= 6): half density — only quarter-note positions (0, 4, 8, 12).
+        // Keeps the octave-bounce character while giving breathing room after a long run.
+        let fullPattern: [(Int, UInt8)] = [
+            (0,  lowA), (2,  highA), (4,  lowA), (6,  lowB),
+            (8,  lowA), (10, highA), (12, lowA), (14, lowB)
+        ]
+        let sparsePattern: [(Int, UInt8)] = [
+            (0,  lowA), (4,  highA), (8,  lowA), (12, highA)
+        ]
+        let pattern = (bar % 8 >= 6) ? sparsePattern : fullPattern
+        for (step, note) in pattern {
+            let vel: UInt8 = (step == 2 || step == 10 || step == 4 || step == 12) ? 92 : 82
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 1))
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD2-010: Blip — ultra-sparse accent stabs (2 bars active / 2 bars silent)
+    // On active bars: root at step 0, P5 at step 8 — two staccato 8th-note accents per bar.
+    // 50% of bars are silent (bar % 4 >= 2), giving Lead 1 plenty of uncontested space.
+    // Register MIDI 60–72. Used by coordination layer when Lead 1 is a dense arp rule.
+
+    private static func lead2Blip(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        isIntroOutro: Bool
+    ) -> [MIDIEvent] {
+        if isIntroOutro { return [] }
+        guard bar % 4 < 2 else { return [] }
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
+        let fifthPC = (rootPC + 7) % 12
+        let root  = nearestMIDI(pc: rootPC,  bounds: RegisterBounds(low: 60, high: 72), prevNote: nil)
+        let fifth = nearestMIDI(pc: fifthPC, bounds: RegisterBounds(low: 60, high: 72), prevNote: root)
+        return [
+            MIDIEvent(stepIndex: barStart + 0, note: root,  velocity: 80, durationSteps: 1),
+            MIDIEvent(stepIndex: barStart + 8, note: fifth, velocity: 68, durationSteps: 1),
+        ]
+    }
+
+    // MARK: - MOT-LD2-009: Bounce Arp — sparse quarter-note bounce between root and P5/oct
+    // Four notes per bar at quarter-note spacing (steps 0/4/8/12): root → P5 → root → oct.
+    // Half the density of Gate Arp (8th notes) — sits lightly under fast Lead 1 rules.
+    // 4-bar on / 1-bar rest. Staccato (dur=1). Register MIDI 60–72.
+
+    private static func lead2BounceArp(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        isIntroOutro: Bool
+    ) -> [MIDIEvent] {
+        if isIntroOutro { return [] }
+        guard bar % 5 != 4 else { return [] }  // 4-on / 1-off
+        var events: [MIDIEvent] = []
+        let rootPC = chordRootPC(frame: frame, entry: entry)
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        // Rotate base every 8 bars: root → 3rd → 5th → root…
+        let baseShifts = [0, thirdSemis, 7]
+        let basePC  = (rootPC + baseShifts[(bar / 8) % 3]) % 12
+        let baseFifthPC = (basePC + 7) % 12
+        let loLow = 60; let loHigh = 68
+        let hiLow = 67; let hiHigh = 72
+        let loNote  = nearestMIDI(pc: basePC,      bounds: RegisterBounds(low: loLow, high: loHigh), prevNote: nil)
+        let midNote = nearestMIDI(pc: baseFifthPC, bounds: RegisterBounds(low: loLow, high: loHigh), prevNote: nil)
+        let hiNote  = nearestMIDI(pc: basePC,      bounds: RegisterBounds(low: hiLow, high: hiHigh), prevNote: nil)
+        // base → base+P5 → base → base+oct (quarter-note bounce)
+        let pattern: [(Int, UInt8, UInt8)] = [
+            (0, loNote, 78), (4, midNote, 68), (8, loNote, 74), (12, hiNote, 68)
+        ]
+        for (step, note, vel) in pattern {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 1))
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD1-019: Triad Climb — ascending broken-chord arpeggios that build over a 4-bar phrase
+    // Each bar plays root → 3rd → 5th → oct at 8th-note spacing (steps 0/2/4/6), rest on 8–15.
+    // Every 2 bars the base pitch shifts up by a third, so the figure climbs across the phrase.
+    // Distinct from Octave Bounce (which oscillates vertically on two fixed pitches) — this moves
+    // forward through the chord. Register MIDI 64–79. Staccato (dur=1). Arcade pool weight: 18%.
+    // Intensity: low = silent; medium = 3-bars-on / 1-off (bar % 4 == 3 rests); high = every bar.
+
+    private static func lead1TriadClimb(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        intensity: SectionIntensity, rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        if intensity == .low                          { return [] }
+        if intensity == .medium && bar % 4 == 3      { return [] }
+        var events: [MIDIEvent] = []
+        let bounds = RegisterBounds(low: 64, high: 79)
+        let rootPC = chordRootPC(frame: frame, entry: entry)
+        let thirdSemis: Int
+        switch frame.mode {
+        case .Ionian, .Mixolydian, .Lydian: thirdSemis = 4
+        default:                            thirdSemis = 3
+        }
+        // Shift up by a third every 2 bars across a 4-bar cycle
+        let shiftSemis = ((bar % 4) / 2) * thirdSemis
+        let basePC = (rootPC + shiftSemis) % 12
+        let motifOffsets: [Int] = [0, thirdSemis, 7, 12]
+        // Duration mode: 40% all 8th (dur=2), 20% alternating 2/1, 20% staccato (dur=1), 20% run-and-land (last note dur=4).
+        let roll = rng.nextDouble()
+        let bodyDur  = roll < 0.80 ? 2 : 1          // 8th or staccato for first 3 notes
+        let lastDur  = roll < 0.20 ? 4 : bodyDur    // 20%: held octave resolution
+        let altMode  = roll >= 0.60 && roll < 0.80  // 20%: alternating dur per note
+        var prevNote: UInt8? = nil
+        for (i, offset) in motifOffsets.enumerated() {
+            let pc   = (basePC + offset) % 12
+            let note = nearestMIDI(pc: pc, bounds: bounds, prevNote: prevNote)
+            let vel: UInt8 = i == 0 ? 90 : (i == 3 ? 84 : 78)
+            let dur: Int
+            if i == 3 {
+                dur = lastDur
+            } else if altMode {
+                dur = i % 2 == 0 ? 2 : 1
+            } else {
+                dur = bodyDur
+            }
+            events.append(MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: vel, durationSteps: dur))
+            prevNote = note
+        }
+        return events
+    }
+
+    // MARK: - MOT-LD2-008: Gate Arp — classic analog arpeggiator feel (root → P5 → oct → P5)
+    // 8th-note cycle: root, fifth, octave(root), fifth — half the note density of Arcade Arp.
+    // Sits lower in the mix (MIDI 55–72), creating space for Lead 1 to cut through.
+    // 4-bar on / 1-bar rest cycle (same as LD2-007). Fully staccato (dur=1).
+    // Hypnotic churning quality — more Boards of Canada analogue arp than chiptune 16th grid.
+    // Arcade LD2 pool: 35% chance alongside LD2-007's 35%.
+
+    private static func lead2GateArp(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        isIntroOutro: Bool
+    ) -> [MIDIEvent] {
+        if isIntroOutro { return [] }
+        guard bar % 5 != 4 else { return [] }  // 4-on / 1-off
+        var events: [MIDIEvent] = []
+        let rootPC  = chordRootPC(frame: frame, entry: entry)
+        let fifthPC = (rootPC + 7) % 12
+        let thirdSemis = (frame.mode == .Ionian || frame.mode == .Mixolydian || frame.mode == .Lydian) ? 4 : 3
+        let thirdPC = (rootPC + thirdSemis) % 12
+        let loLow = 55; let loHigh = 65
+        let hiLow = 65; let hiHigh = 72
+        // Rotate the 3rd into the cycle every 8 bars — changes pitch-class fingerprint while
+        // preserving the analog arp feel. Three phases on an 8-bar clock:
+        //   0–7:  [root, fifth, oct, fifth]  — pure root/fifth
+        //   8–15: [root, third, oct, fifth]  — third replaces first fifth
+        //   16–23:[root, fifth, oct, third]  — third replaces last fifth
+        let phase8 = (bar / 8) % 3
+        let cyclePCs: [Int]
+        switch phase8 {
+        case 1:  cyclePCs = [rootPC, thirdPC, rootPC, fifthPC]
+        case 2:  cyclePCs = [rootPC, fifthPC, rootPC, thirdPC]
+        default: cyclePCs = [rootPC, fifthPC, rootPC, fifthPC]
+        }
+        let cycleHigh: [Bool] = [false, false, true, false]
+        let phaseStart = (bar % 5) * 8  // 8 8th-note positions per bar; continuous across bars
+        for i in 0..<8 {
+            let posInCycle = (phaseStart + i) % 4
+            let pc    = cyclePCs[posInCycle]
+            let isHi  = cycleHigh[posInCycle]
+            let note  = nearestMIDI(pc: pc, bounds: RegisterBounds(low: isHi ? hiLow : loLow,
+                                                                    high: isHi ? hiHigh : loHigh), prevNote: nil)
+            let vel: UInt8 = posInCycle == 0 ? 78 : 68
+            events.append(MIDIEvent(stepIndex: barStart + i * 2, note: note, velocity: vel, durationSteps: 1))
+        }
+        return events
+    }
+
     // MARK: - LD1-001 helpers
 
     /// Picks a new LD1 rule consuming one RNG draw (called twice in generateLead1 for determinism).
-    private static func pickLd1Rule(rng: inout SeededRNG, noir: Bool = false) -> String {
+    private static func pickLd1Rule(rng: inout SeededRNG, noir: Bool = false, arcade: Bool = false) -> String {
         if noir {
             // Noir: sparse, atmospheric leads dominate — long-note anchor, solo phrases, cold chord texture.
             // High-density rules (002 Pentatonic Cell, 003 Ratchet, 004 Syncopated) are suppressed.
@@ -2307,6 +2819,14 @@ struct LeadGenerator {
             // even with minor-scale adjustment; its 4% redistributed 1% each to 010/011/013/014.
             let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
             let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15]
+            return rules[rng.weightedPick(weights)]
+        }
+        if arcade {
+            // Arcade: staccato mechanical leads dominant. Arpeggio rules 018/019 together ~37% of picks.
+            // 020 (Synth Hook) is melodic but not an arp — gives Bass/Lead 2 full weights via coordination layer.
+            // 017 (Pentatonic Blitz) fires only when BPM ≥ 143 — handled inside the bar generator.
+            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-001","MOT-LD1-002"]
+            let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02]
             return rules[rng.weightedPick(weights)]
         }
         let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008"]
@@ -2427,7 +2947,7 @@ struct LeadGenerator {
     // I: Pre-computed rest windows for LD1-002 and LD1-006 — 1 or 2 deliberate 4–8 bar
     // silent stretches per rule in body sections. Decided from seed so silences are
     // structural and repeatable, not per-bar noise.
-    private static func buildRestBars(entryBar: Int, totalBars: Int, rng: inout SeededRNG) -> Set<Int> {
+    private static func buildRestBars(entryBar: Int, totalBars: Int, rng: inout SeededRNG, arcade: Bool = false) -> Set<Int> {
         var restBars = Set<Int>()
         let bodyStart = entryBar
         let bodyEnd   = max(bodyStart, totalBars - 8)
@@ -2435,9 +2955,11 @@ struct LeadGenerator {
         guard bodyLen >= 8 else { return restBars }
         let numWindows = 1 + rng.nextInt(upperBound: 2)  // 1 or 2 rest windows
         for _ in 0..<numWindows {
-            let restLen   = 4 + rng.nextInt(upperBound: 5)   // 4–8 bars
+            let restLen   = 4 + rng.nextInt(upperBound: arcade ? 2 : 5)  // Arcade: 4–5 bars, Base: 4–8 bars
             let maxStart  = max(bodyStart, bodyEnd - restLen)
-            let restStart = bodyStart + rng.nextInt(upperBound: max(1, maxStart - bodyStart))
+            // Guarantee at least 8 active bars before the first rest window.
+            let restFloor = min(bodyStart + 8, maxStart)
+            let restStart = restFloor + rng.nextInt(upperBound: max(1, maxStart - restFloor))
             for rb in restStart..<min(restStart + restLen, bodyEnd) {
                 restBars.insert(rb)
             }

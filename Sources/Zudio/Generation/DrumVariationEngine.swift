@@ -94,7 +94,8 @@ struct DrumVariationEngine {
         structure: SongStructure,
         seed: UInt64,
         chillMode: Bool = false,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false
     ) -> [[MIDIEvent]] {
         var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
         var drumEvents = trackEvents[kTrackDrums]
@@ -103,7 +104,7 @@ struct DrumVariationEngine {
         // MARK: Step 1 — Identify fill bars
 
         let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure,
-                                       chillMode: chillMode, noirVariation: noirVariation)
+                                       chillMode: chillMode, noirVariation: noirVariation, arcadeVariation: arcadeVariation)
 
         // MARK: Step 2 — Apply fills to drums, collecting fill type info
 
@@ -112,13 +113,16 @@ struct DrumVariationEngine {
         for fillBar in fillBars.sorted() {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro else { continue }
+            // Arcade: 100% 1-beat — section transitions only, never intrusive under sparse timekeeping.
             // Noir: 95% 1-beat / 5% 2-beat — fills are rare and subtle; 3-beat excluded entirely.
             // Chill: 80% 1-beat / 20% 2-beat; no 3-beat (tom cascades too rock for jazz).
-            let fillLength = noirVariation
-                ? rng.weightedPick([0.95, 0.05, 0.00])
-                : chillMode
-                    ? rng.weightedPick([0.80, 0.20, 0.00])
-                    : rng.weightedPick([0.70, 0.25, 0.05])
+            let fillLength = arcadeVariation
+                ? 0
+                : noirVariation
+                    ? rng.weightedPick([0.95, 0.05, 0.00])
+                    : chillMode
+                        ? rng.weightedPick([0.80, 0.20, 0.00])
+                        : rng.weightedPick([0.70, 0.25, 0.05])
             drumEvents = applyFill(to: drumEvents, bar: fillBar, fillLength: fillLength,
                                    frame: frame, structure: structure,
                                    chillMode: chillMode, noirVariation: noirVariation, rng: &rng)
@@ -193,7 +197,8 @@ struct DrumVariationEngine {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         chillMode: Bool = false,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false
     ) -> Set<Int> {
         var fillBars = Set<Int>()
 
@@ -214,8 +219,8 @@ struct DrumVariationEngine {
         }
 
         // Instrument entrance fills: non-drum track comes in after ≥2 silent bars.
-        // Skipped in chillMode and noirVariation — both styles prioritise the locked grid.
-        if !chillMode && !noirVariation {
+        // Skipped in chillMode, noirVariation, arcadeVariation — all prioritise the locked grid.
+        if !chillMode && !noirVariation && !arcadeVariation {
             for trackIdx in 0..<kTrackDrums {
                 let tEvents = trackEvents[trackIdx]
                 let presence: [Bool] = (0..<frame.totalBars).map { bar in
@@ -233,8 +238,8 @@ struct DrumVariationEngine {
         }
 
         // Periodic body fills: fire on bars 7, 15, 23 … within each body section.
-        // Suppressed in chillMode and noirVariation — both styles fill only at structural boundaries.
-        if !chillMode && !noirVariation {
+        // Suppressed in chillMode, noirVariation, arcadeVariation — all fill only at structural boundaries.
+        if !chillMode && !noirVariation && !arcadeVariation {
             for bar in 0..<frame.totalBars {
                 guard let sec = structure.section(atBar: bar),
                       sec.label != .intro && sec.label != .outro else { continue }

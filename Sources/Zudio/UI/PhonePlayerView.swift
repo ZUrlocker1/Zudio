@@ -873,7 +873,7 @@ struct PhoneInfoView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
-                    Text("Generative music · v2.3")
+                    Text("Generative music · v2.4")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 8)

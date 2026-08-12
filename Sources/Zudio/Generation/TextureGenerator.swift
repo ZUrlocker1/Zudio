@@ -26,7 +26,8 @@ struct TextureGenerator {
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
@@ -34,9 +35,12 @@ struct TextureGenerator {
         usedRuleIDs.insert("MOT-TEXT-001")
 
         // Select 1–2 supplementary rules per song (equal weights within each pool)
+        // Arcade:  shared + TEXT-006 High Tension Touch (fits "danger" aesthetic)
         // Noir:    shared + TEXT-006, TEXT-008   Regular: shared + TEXT-002, TEXT-005
         let suppCandidates: [String]
-        if noirVariation {
+        if arcadeVariation {
+            suppCandidates = ["MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005", "MOT-TEXT-006", "MOT-TEXT-007"]
+        } else if noirVariation {
             suppCandidates = ["MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-006", "MOT-TEXT-007", "MOT-TEXT-008"]
         } else {
             suppCandidates = ["MOT-TEXT-002", "MOT-TEXT-003", "MOT-TEXT-004", "MOT-TEXT-005", "MOT-TEXT-007"]

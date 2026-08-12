@@ -81,7 +81,9 @@ struct BassGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false,
+        arcadeDenseMelody: Bool = false
     ) -> [MIDIEvent] {
         // Noir bass pool: PIL deep riffs + Joy Division high-register counter-melody + Kraftwerk cold mechanics.
         // Removed: Motorik Drive (too upbeat), Crawling Walk (jazzy), Moroder Chase (too energetic).
@@ -90,6 +92,16 @@ struct BassGenerator {
         if noirVariation {
             rules   = ["MOT-BASS-017","MOT-BASS-016","MOT-BASS-007","MOT-BASS-018","MOT-BASS-008","MOT-BASS-006","MOT-BASS-019","MOT-BASS-020","MOT-BASS-021"]
             weights = [0.17,          0.10,          0.05,          0.16,          0.05,          0.05,          0.16,          0.10,          0.16]
+        } else if arcadeVariation {
+            if arcadeDenseMelody {
+                // Lead 1 is a dense arp — bass pulls back to pulse/rhythmic roles to clear harmonic space.
+                rules   = ["MOT-BASS-008","MOT-BASS-025","MOT-BASS-012","MOT-BASS-022","MOT-BASS-024","MOT-BASS-023"]
+                weights = [0.35,           0.30,           0.15,           0.12,           0.05,           0.03]
+            } else {
+                // Normal Arcade: mid-register (MIDI 40–55). Moroder Pulse primary; new chromatic/arp rules.
+                rules   = ["MOT-BASS-022","MOT-BASS-025","MOT-BASS-024","MOT-BASS-023","MOT-BASS-008","MOT-BASS-012","MOT-BASS-005","MOT-BASS-010","MOT-BASS-001","MOT-BASS-004","MOT-BASS-002"]
+                weights = [0.16,           0.12,           0.14,           0.15,           0.03,           0.07,          0.08,          0.06,          0.07,          0.06,          0.06]
+            }
         } else {
             rules   = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
                         "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
@@ -245,6 +257,10 @@ struct BassGenerator {
                                                         frame: frame)
         case "MOT-BASS-021": return noBirdsWalkBar(barStart: barStart, bar: bar, entry: entry,
                                                     frame: frame)
+        case "MOT-BASS-022": return chromeWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-023": return acidSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-024": return arcadeDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
+        case "MOT-BASS-025": return electroPumpBar(barStart: barStart, entry: entry, frame: frame)
         default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
         }
     }
@@ -884,6 +900,16 @@ struct BassGenerator {
         return UInt8(clamped(nearest ?? target, low: low, high: high))
     }
 
+    // Snaps `target` to the nearest MIDI note in [low…high] whose pitch class is a chord tone.
+    // Falls back to nearestScaleNote when the chord-tone set is empty.
+    private static func nearestChordTone(to target: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, low: Int, high: Int) -> UInt8 {
+        let chordPCs = entry.chordWindow.chordTones
+        guard !chordPCs.isEmpty else { return nearestScaleNote(to: target, frame: frame, low: low, high: high) }
+        let nearest = (low...high).filter { chordPCs.contains($0 % 12) }
+                                  .min(by: { abs($0 - target) < abs($1 - target) })
+        return UInt8(clamped(nearest ?? target, low: low, high: high))
+    }
+
     private static func vitaminHookBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
@@ -1404,6 +1430,134 @@ struct BassGenerator {
                 MIDIEvent(stepIndex: barStart + 12, note: p5,   velocity: 86, durationSteps: 4),
             ]
         }
+    }
+
+    // MARK: - Arcade bass register helper (MIDI 40–55 — mid-register, heard clearly in mix)
+
+    private static func arcadeChordRoot(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> UInt8 {
+        let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+        for oct in 2...4 {
+            let midi = oct * 12 + rootPC
+            if midi >= 40 && midi <= 55 { return UInt8(midi) }
+        }
+        return UInt8(clamped(48 + rootPC, low: 40, high: 55))
+    }
+
+    // MARK: - MOT-BASS-022: Chrome Walk — chromatic descending bass (Sonic Scrap Brain / Street Fighter character)
+    // 2-bar pattern. Bar A descends from P5 to root chromatically across 8th-note steps 0–6; step 7 rest.
+    // Bar B resolves: root, root, M2, root, P4, root across steps 0–5; steps 6–7 rest.
+    // Register: MIDI 40–52 (semi-staccato 75% duration, not legato). Arcade bass pool weight: 20%.
+    // Sparse chords (sus2/sus4/power): Bar A snaps to chord tones only — avoids passing-tone dissonance.
+
+    private static func chromeWalkBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = arcadeChordRoot(entry: entry, frame: frame)
+        let r     = Int(root)
+        var events: [MIDIEvent] = []
+
+        if bar % 2 == 0 {
+            // Bar A: chromatic descent from P5 to root — steps 0,2,4,6,8,10,12; step 14 rest.
+            // Sparse chords (sus2/sus4/power) snap to nearest chord tone to avoid passing-tone dissonance.
+            let useSparse = entry.chordWindow.chordType.isSparse
+            let chromaSteps: [(Int, Int)] = [(0, r+7),(2, r+6),(4, r+5),(6, r+4),(8, r+3),(10, r+2),(12, r+1)]
+            for (step, rawNote) in chromaSteps {
+                let note = useSparse
+                    ? nearestChordTone(to: rawNote, entry: entry, frame: frame, low: 38, high: 56)
+                    : nearestScaleNote(to: rawNote, frame: frame, low: 38, high: 56)
+                events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: UInt8(82 + (step == 0 ? 8 : 0)), durationSteps: 1))
+            }
+            // Root on beat 4 (step 12) is last in descent — already in the loop above
+            // Actually last is step 12 = r+1. Root arrives on next bar. That's the design.
+        } else {
+            // Bar B: anchor and lean — root/root/M2/root/P4/root pattern
+            let second = nearestScaleNote(to: r + 2, frame: frame, low: 38, high: 56)
+            let fourth = nearestScaleNote(to: r + 5, frame: frame, low: 38, high: 56)
+            let pitches: [(Int, UInt8)] = [(0, root),(2, root),(4, second),(6, root),(8, fourth),(10, root)]
+            for (step, note) in pitches {
+                let vel: UInt8 = step == 0 ? 90 : 76
+                events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 1))
+            }
+        }
+        return events
+    }
+
+    // MARK: - MOT-BASS-023: Acid Sweep — 303-style acid bass via Sweep chip
+    // 16-step sequence at 8th-note spacing: root (steps 0,2,8,12), P5 (steps 4,10), b7 (steps 6,14).
+    // Velocity accents on steps 0+8 (+12 above base) simulate the 303 accent function.
+    // Register: MIDI 40–55. Sweep chip enabled by default for this rule. Arcade bass pool weight: 14%.
+
+    private static func acidSweepBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root  = arcadeChordRoot(entry: entry, frame: frame)
+        let fifth = nearestScaleNote(to: Int(root) + 7,  frame: frame, low: 38, high: 58)
+        let flatS = nearestScaleNote(to: Int(root) + 10, frame: frame, low: 38, high: 58)
+        var events: [MIDIEvent] = []
+        // step → (note, baseVelocity, isAccent)
+        let pattern: [(Int, UInt8, Bool)] = [
+            (0,  root,  true),
+            (2,  root,  false),
+            (4,  fifth, false),
+            (6,  flatS, false),
+            (8,  root,  true),
+            (10, fifth, false),
+            (12, root,  false),
+            (14, flatS, false)
+        ]
+        for (step, note, isAccent) in pattern {
+            let vel: UInt8 = isAccent ? 92 : 76
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: 1))
+        }
+        return events
+    }
+
+    // MARK: - MOT-BASS-024: Arcade Drive — arpeggiated chord-tone bass (Contra Stage 5 / shmup character)
+    // 1-bar ascending-then-descending arpeggio through the chord triad:
+    // root(d2)–M3(d2)–P5(d2)–root+oct(d2)–P5(d2)–M3(d2)–root(d4).
+    // Register: MIDI 38–55. The ascending-then-descending arc creates the most kinetic, forward-driving
+    // bass quality in the Arcade palette. Arcade bass pool weight: 18%.
+
+    private static func arcadeDriveBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root   = arcadeChordRoot(entry: entry, frame: frame)
+        let third  = nearestScaleNote(to: Int(root) + 4,  frame: frame, low: 38, high: 58)
+        let fifth  = nearestScaleNote(to: Int(root) + 7,  frame: frame, low: 38, high: 58)
+        let octave = nearestScaleNote(to: Int(root) + 12, frame: frame, low: 44, high: 60)
+        var events: [MIDIEvent] = []
+        // Ascending then descending arc — 7 notes at 2-step spacing
+        let arc: [(Int, UInt8, Int)] = [
+            (0, root,   2), (2, third,  2), (4, fifth,  2),
+            (6, octave, 2), (8, fifth,  2), (10, third, 2), (12, root,  4)
+        ]
+        for (step, note, dur) in arc {
+            let vel: UInt8 = (step == 0 || step == 6) ? 92 : 78
+            events.append(MIDIEvent(stepIndex: barStart + step, note: note, velocity: vel, durationSteps: dur))
+        }
+        return events
+    }
+
+    // MARK: - MOT-BASS-025: Electro Pump — syncopated root + P4 approach (Kraftwerk "Numbers" / early Depeche Mode)
+    // Beat 1 and beat 3 (steps 0, 8): root, sustained 3 steps. Anchors the bar.
+    // "And" of 2 and 4 (steps 6, 14): P4 approach note, staccato. Creates subtle syncopation.
+    // P4 is diatonic in every mode, so it's harmonically safe across all Arcade progressions.
+
+    private static func electroPumpBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+    ) -> [MIDIEvent] {
+        let root   = arcadeChordRoot(entry: entry, frame: frame)
+        let fourth = nearestScaleNote(to: Int(root) + 5, frame: frame, low: 38, high: 58)
+        var events: [MIDIEvent] = []
+        // Root on beats 1 + 3 — the pump
+        for step in [0, 8] {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: root, velocity: 90, durationSteps: 3))
+        }
+        // P4 approach on "and" of 2 + 4 — the syncopation
+        for step in [6, 14] {
+            events.append(MIDIEvent(stepIndex: barStart + step, note: fourth, velocity: 72, durationSteps: 1))
+        }
+        return events
     }
 
     // MARK: - Note helpers

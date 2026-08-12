@@ -1097,6 +1097,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.3    // Saw Lead 3 runs soft on Motorik Lead 1 — boost
             } else if trackIndex == kTrackLead2 && program == 13088 {
                 vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
+            } else if trackIndex == kTrackLead1 && motorikStyle && program == 81 {
+                vol = 1.10   // Mono Synth on Motorik Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 80 {
@@ -1107,10 +1109,18 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.20   // Lead Bass on Kosmic bass — pull back
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 83 {
                 vol = 1.3    // Chiff Lead runs soft on Motorik Lead 1 — boost
+            } else if trackIndex == kTrackBass && motorikStyle && program == 12038 {
+                vol = 0.78   // Mean Saw Bass runs hot on Motorik Arcade bass — pull back
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {
                 vol = 0.30   // Lead Bass runs hot on Motorik bass — pull back
             } else if trackIndex == kTrackBass && program == 87 {
                 vol = 0.56   // Lead Bass runs hot
+            } else if trackIndex == kTrackLead2 && program == 86 {
+                vol = 1.35   // 5th Saw Wave runs soft on Lead 2 — boost for presence
+            } else if trackIndex == kTrackLead2 && motorikStyle && program == 87 {
+                vol = 0.58   // Synth Lead runs hot on Motorik Lead 2 — pull back
+            } else if trackIndex == kTrackLead2 && program == 80 {
+                vol = 0.60   // Square Lead runs hot on Lead 2 — pull back
             } else if trackIndex == kTrackLead2 && program == 46 {
                 vol = 1.30   // Harp runs soft in GM on Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && program == 93 {
@@ -1119,6 +1129,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.50   // Grand Piano runs loud on Ambient Lead 2 — pull back
             } else if trackIndex == kTrackLead2 && program == 99 {
                 vol = 2.0    // FX Atmosphere runs very soft in GM
+            } else if trackIndex == kTrackTexture && program == 93 {
+                vol = 7.0    // Metal Pad runs very soft in GM — boost significantly for texture audibility
             } else if trackIndex == kTrackTexture && kosmicStyle && (program == 90 || program == 86) {
                 vol = 0.48   // Pad 3 Poly (90) and Fifths Lead (86) run loud on Kosmic — pull back
             } else if trackIndex == kTrackTexture && (program == 90 || program == 86) {
@@ -1317,8 +1329,8 @@ final class PlaybackEngine: ObservableObject {
                 volume:             volume,
                 pan:                trackStaticPan[i],
                 reverbPreset:       perTrackReverbPresets[i],
-                reverbWetDryMix:    reverbSendLevels[i] * 100,
-                reverbBypassed:     reverbSendLevels[i] == 0,
+                reverbWetDryMix:    reverbSendMixers[i].outputVolume * 100,
+                reverbBypassed:     reverbSendMixers[i].outputVolume == 0,
                 delayTime:          delays[i].delayTime,
                 delayFeedback:      delays[i].feedback,
                 delayLowPassCutoff: delays[i].lowPassCutoff,
