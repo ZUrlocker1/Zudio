@@ -116,10 +116,10 @@ struct SongGenerator {
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
-        // Motorik substyle: Noir/Arcade/base. Testing: 23/46/31. Production target: ~23/19/58.
+        // Motorik substyle: Noir/Arcade/base. Production split: 21/19/60.
         let substyleRoll = rng.nextDouble()
-        let isNoir    = substyleRoll < 0.23
-        let isArcade  = !isNoir && substyleRoll < 0.69
+        let isNoir    = substyleRoll < 0.21
+        let isArcade  = !isNoir && substyleRoll < 0.40
         // Bass distortion: 20% of regular (non-Noir, non-Arcade) Motorik songs get Dist. on bass by default.
         let motorikBassDistortion = !isNoir && !isArcade && rng.nextDouble() < 0.20
         // Noir distortion: 75% chance independently for Bass and Rhythm.

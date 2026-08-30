@@ -3,6 +3,27 @@
 // Spec §Playback timeline and step timer
 
 import Foundation
+import os
+#if os(iOS)
+import AVFoundation
+#endif
+
+// DIAGNOSTIC LOGGING — lock-screen tempo drift investigation (2026).
+// Set to true to log step-timing internals via os.Logger, visible in Console.app under
+// subsystem "com.zudio.app" category "StepTiming" (search the "StepTiming" text, or filter
+// by category) — this reaches Console.app even when the device isn't tethered to Xcode,
+// unlike plain print(). Leave false for normal builds — this logs on every tick, so it's not
+// free, but it's a plain `if` check, not a compiler flag, so no build setting changes are
+// needed to toggle it. Flip back to false (or delete this block, stepTimingLogger, and its
+// call sites) once the lock-screen investigation is done.
+let kStepTimingDebugLog = false
+
+// Shared logger for StepScheduler.swift and IOSPlatformHost.swift's lock/unlock markers, so
+// both land in Console.app under the same category and can be lined up against each other.
+// All interpolated values below are marked `.public` — none of this is sensitive user data,
+// and os.Logger redacts interpolations as "<private>" by default, which would otherwise hide
+// every number we're trying to look at.
+let stepTimingLogger = Logger(subsystem: "com.zudio.app", category: "StepTiming")
 
 /// Serial queue shared between the step timer and PlaybackEngine.buildStepEventMap.
 /// Using one serial queue for both timer callbacks and map writes guarantees that
@@ -112,6 +133,9 @@ final class StepScheduler {
         guard let renderTime = engine.lastRenderTime,
               renderTime.isSampleTimeValid,
               renderTime.isHostTimeValid else {
+            if kStepTimingDebugLog {
+                stepTimingLogger.notice("sched=\(self.schedulerID, privacy: .public) step=\(self.currentStep, privacy: .public) FALLBACK — lastRenderTime unavailable/invalid")
+            }
             // Fallback — engine hasn't rendered yet or just restarted.
             let ns = Int(songState.frame.secondsPerStep * 1_000_000_000)
             timer?.schedule(deadline: .now() + .nanoseconds(ns),
@@ -130,6 +154,9 @@ final class StepScheduler {
         let elapsedTicks = now > renderTime.hostTime ? now - renderTime.hostTime : 0
         let elapsedNs    = elapsedTicks * tbNum / tbDen
         if elapsedNs > 1_000_000_000 {
+            if kStepTimingDebugLog {
+                stepTimingLogger.notice("sched=\(self.schedulerID, privacy: .public) step=\(self.currentStep, privacy: .public) STALENESS RESET — elapsedNs=\(elapsedNs, privacy: .public) (>1s since last render)")
+            }
             clockReady = false
             let ns = Int(songState.frame.secondsPerStep * 1_000_000_000)
             timer?.schedule(deadline: .now() + .nanoseconds(ns),
@@ -153,6 +180,9 @@ final class StepScheduler {
             samplesPerStep  = audioSampleRate * songState.frame.secondsPerStep
             nextStepSample  = Double(renderTime.sampleTime) + samplesPerStep
             clockReady = true
+            if kStepTimingDebugLog {
+                stepTimingLogger.notice("sched=\(self.schedulerID, privacy: .public) step=\(self.currentStep, privacy: .public) ANCHOR — sampleRate=\(self.audioSampleRate, privacy: .public) samplesPerStep=\(self.samplesPerStep, privacy: .public)")
+            }
         } else {
             nextStepSample += samplesPerStep
         }
@@ -163,8 +193,21 @@ final class StepScheduler {
 
         // How many samples until the next step should fire.
         // Clamp to 10% of a step so we never schedule a negative or negligible delay.
-        let samplesToNext = max(samplesPerStep * 0.10, nextStepSample - currentSample)
+        let gapSamples    = nextStepSample - currentSample
+        let samplesToNext = max(samplesPerStep * 0.10, gapSamples)
         let nsToNext      = Int(samplesToNext / audioSampleRate * 1_000_000_000)
+
+        if kStepTimingDebugLog {
+            #if os(iOS)
+            let bufDur = AVAudioSession.sharedInstance().ioBufferDuration
+            let bufFrames = Int(bufDur * audioSampleRate)
+            #else
+            let bufDur = -1.0
+            let bufFrames = -1
+            #endif
+            let gapMs = gapSamples / audioSampleRate * 1000
+            stepTimingLogger.notice("sched=\(self.schedulerID, privacy: .public) step=\(self.currentStep, privacy: .public) gapMs=\(gapMs, format: .fixed(precision: 2), privacy: .public) elapsedNs=\(elapsedNs, privacy: .public) ioBufDur=\(bufDur, format: .fixed(precision: 4), privacy: .public) ioBufFrames=\(bufFrames, privacy: .public) nsToNext=\(nsToNext, privacy: .public)")
+        }
 
         timer?.schedule(deadline: .now() + .nanoseconds(nsToNext),
                         repeating: .never, leeway: leeway)

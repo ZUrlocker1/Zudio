@@ -32,6 +32,23 @@ final class IOSPlatformHost: ZudioPlatformHost {
         ) { [weak self] note in
             self?.handleInterruption(note)
         }
+
+        // DIAGNOSTIC LOGGING — lock-screen tempo drift investigation (2026).
+        // protectedDataWillBecomeUnavailable/DidBecomeAvailable fire precisely on device
+        // lock/unlock (data-protection boundary), which is a tighter correlate than
+        // app background/foreground. Gated on the same kStepTimingDebugLog flag as the
+        // StepScheduler logging so both can be toggled with one flip. Safe to delete
+        // this whole block (and the flag/prints in StepScheduler.swift) once done.
+        if kStepTimingDebugLog {
+            NotificationCenter.default.addObserver(
+                forName: UIApplication.protectedDataWillBecomeUnavailableNotification,
+                object: nil, queue: .main
+            ) { _ in stepTimingLogger.notice("==== SCREEN LOCK (protectedDataWillBecomeUnavailable) ====") }
+            NotificationCenter.default.addObserver(
+                forName: UIApplication.protectedDataDidBecomeAvailableNotification,
+                object: nil, queue: .main
+            ) { _ in stepTimingLogger.notice("==== SCREEN UNLOCK (protectedDataDidBecomeAvailable) ====") }
+        }
     }
 
     func playErrorSound() {

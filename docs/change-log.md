@@ -2,6 +2,9 @@
 
 ## V 2.4 (Build 129)  Motorik Arcade
 - **Motorik Arcade** — New Motorik substyle inspired by the fast, bright, arpeggiated sound of classic arcade and early video game music (Tempest 2000, Contra, Sonic). Features 4-on-the-floor kick, mid-register bass, Lydian/Mixolydian modes, and new arpeggio-driven lead rules including Octave Bounce, Triad Climb, Arcade Arp, and Gate Arp. Motorik Arcade reuses a few rules and instruments from Motorik regular, but adds several unique instruments and rules. It has a mix of major and minor scales. 
+- Testing complete — Motorik substyle probabilities set to production values: Noir 21%, Arcade 19%, base Motorik 60%.
+- **Bug fix** — Opening a Zudio file from finder or from Messages while the app wasn't already running could launch with no window. Fixed.
+- Diagnostic logging for this bug is left in place but off by default. To re-enable: set `kAppOpenDebugLog = true` near the top of `ZudioApp.swift`, rebuild, then filter Console.app (or `log stream`) for subsystem `com.zudio.app`, category `AppOpen`. THis will log to zudio-log-live.txt.
 ---
 
 ## V 2.3 (Build 128)  Audio engine crash fix

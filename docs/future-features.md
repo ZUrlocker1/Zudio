@@ -273,3 +273,22 @@ One proposed substyle for each of the four existing styles. These are sketch-lev
 **Feasibility:** High — comparable scope to Motorik Noir. Requires ~7 new rules (2 drum, 3 bass, 3 lead/Lead 2), Phrygian mode support, and possible Crystal pad instrument addition. Full implementation details, MIDI analysis findings, rule catalog, and pool weights are in [docs/motorik-arcade-plan.md](motorik-arcade-plan.md).
 
 ---
+
+## Diagnostic logging on standby: lock-screen tempo drift
+
+An old bug resurfaced (Aug 2026): on iPhone, locking the screen during playback can cause a brief, subtle tempo slowdown followed by a speedup to catch up. This was fixed once before (audio-clock-anchored step timer in `StepScheduler.swift` + IO buffer duration pin in `IOSPlatformHost.swift`), and that fix is still intact in the code — the cause of the regression wasn't found in this pass.
+
+To investigate, `StepScheduler.swift` and `IOSPlatformHost.swift` got `os.Logger`-based diagnostic logging (subsystem `com.zudio.app`, category `StepTiming`), gated behind a single flag: `kStepTimingDebugLog` in `StepScheduler.swift`, currently `false`. It logs per-tick timing gaps, IO buffer size, and screen lock/unlock markers, visible live in Console.app on a connected device. This logging is inert when the flag is off — it doesn't touch scheduling, the IO buffer pin, or engine-restart logic, so it couldn't itself have caused any of the results below.
+
+**Status as of Aug 2026: seems to have gone away, for now.** On-device captures showed the IO buffer holding steady and no scheduling anomaly across several lock/unlock cycles (both a normal lock and with Low Power Mode on), with no audible glitch reported either time. But the bug was always intermittent and occasional even when it was clearly present, so two clean tests is encouraging, not conclusive — it may simply be rare rather than gone.
+
+Other potential causes not yet tested or ruled out, if it resurfaces:
+- **Thermal state / sustained CPU load** — the original bug ties to iOS renegotiating the IO buffer size; that renegotiation might be more likely to hitch under thermal throttling or heavy background load than in a quick isolated test.
+- **Longer lock durations** — tests so far only covered ~10-13 second locks; the buffer renegotiation (or whatever iOS does differently after extended screen-off/low-power states) might only kick in after longer idle periods.
+- **Specific iOS version / device combination** — the original bug and fix predate the current iOS version on Zack's phone; Apple may have changed IO buffer or background-audio behavior since, in either direction.
+- **Other apps or system activity competing for audio/background resources** — notifications, other audio apps, Bluetooth audio route changes, or CarPlay could plausibly reintroduce the render-thread stress the original fix targeted.
+- **Battery level / power state edges** — distinct from Low Power Mode itself, very low battery can trigger additional iOS throttling that wasn't specifically tested.
+
+If this needs to be revisited: flip `kStepTimingDebugLog` to `true`, rebuild, and capture a Console.app log next time the glitch is actually heard (rather than a blind proactive test) — that's the comparison point this investigation was missing. The logging can be deleted entirely once the bug is confirmed resolved or its cause is found some other way.
+
+---

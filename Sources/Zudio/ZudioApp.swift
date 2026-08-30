@@ -4,6 +4,35 @@
 import SwiftUI
 #if os(macOS)
 import AppKit
+import os
+#endif
+
+#if os(macOS)
+// DIAGNOSTIC LOGGING — Messages "Open with Zudio" cold-launch window bug (2026).
+// Set to false (or delete this + call sites in AppDelegate) once the investigation is done.
+// Visible in Console.app: subsystem "com.zudio.app", category "AppOpen".
+let kAppOpenDebugLog = false
+let appOpenLogger = Logger(subsystem: "com.zudio.app", category: "AppOpen")
+#endif
+
+#if os(macOS)
+/// Captures SwiftUI's `openWindow` action so AppDelegate (a plain NSObject outside the
+/// SwiftUI environment) can ask SwiftUI itself to create the WindowGroup's window.
+///
+/// Root cause (confirmed via logging, 2026): on a cold launch where macOS delivers a
+/// pending "open this document" request (e.g. Messages' "Open with Zudio", or a Finder
+/// double-click on a .zudio file), SwiftUI never creates its default WindowGroup window at
+/// all — `NSApp.windows.count` stays 0 for the process's entire lifetime until it quits
+/// itself. A plain app launch with no pending document reliably gets a window. This is
+/// consistent with Info.plist declaring `CFBundleTypeRole = Editor` for .zudio files
+/// without any real NSDocument/DocumentGroup backing it — macOS defers to "the document
+/// will supply its own window," which never happens here.
+///
+/// Set from `ZudioApp.body`, which SwiftUI re-evaluates with a real environment context
+/// even before any window exists. Called from `application(_:open:)` only when
+/// `application.windows` is empty, so it's a no-op (and can't cause a duplicate window)
+/// on every already-working path.
+nonisolated(unsafe) var zudioOpenWindowAction: (() -> Void)?
 #endif
 
 extension Notification.Name {
@@ -83,9 +112,29 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     // Owned strongly here — NSMenu only holds a weak reference to its delegate.
     private let sweeper = MenuSweeper()
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        if kAppOpenDebugLog {
+            appOpenLogger.notice("applicationShouldTerminateAfterLastWindowClosed — windows.count=\(sender.windows.count, privacy: .public)")
+        }
+        return true
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if kAppOpenDebugLog {
+            appOpenLogger.notice("applicationWillTerminate — windows.count=\(NSApp.windows.count, privacy: .public)")
+        }
+    }
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        if kAppOpenDebugLog {
+            appOpenLogger.notice("applicationWillFinishLaunching — windows.count=\(NSApp.windows.count, privacy: .public)")
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if kAppOpenDebugLog {
+            appOpenLogger.notice("applicationDidFinishLaunching — windows.count=\(NSApp.windows.count, privacy: .public)")
+        }
         // Attach sweeper as main menu delegate — fires right before menu bar is displayed.
         NSApp.mainMenu?.delegate = sweeper
         // Also attach to View submenu immediately if it already exists.
@@ -130,10 +179,25 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // DIAGNOSTIC LOGGING — delayed re-checks to see whether the WindowGroup's default
+        // window ever appears after this point, or whether it's truly never created, and
+        // whether the process is still alive when it would/should appear. Purely additive —
+        // no behavior change. Delete alongside the rest of the kAppOpenDebugLog block.
+        if kAppOpenDebugLog {
+            for delay in [0.5, 2.0, 5.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    appOpenLogger.notice("delayed check +\(delay, format: .fixed(precision: 1), privacy: .public)s — windows.count=\(NSApp.windows.count, privacy: .public) isActive=\(NSApp.isActive, privacy: .public)")
+                }
+            }
+        }
+
         // Window setup — async because windows aren't fully initialised at this point.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             let content = NSApp.windows.filter { !($0 is NSPanel) }
+            if kAppOpenDebugLog {
+                appOpenLogger.notice("post-launch async tick — windows.count=\(NSApp.windows.count, privacy: .public) content.count=\(content.count, privacy: .public)")
+            }
             content.forEach { win in
                 win.isRestorable = false
                 // minSize must be the window FRAME size (includes title bar).
@@ -175,18 +239,38 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Prevent a new window from opening when the user clicks the Dock icon
     /// while the app is already running and has a visible window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if kAppOpenDebugLog {
+            appOpenLogger.notice("applicationShouldHandleReopen — hasVisibleWindows=\(flag, privacy: .public) windows.count=\(sender.windows.count, privacy: .public)")
+        }
         if flag {
             sender.windows.first(where: { $0.isVisible && !($0 is NSPanel) })?.makeKeyAndOrderFront(nil)
         }
         return !flag
     }
 
-    /// Called by macOS when the user double-clicks a .zudio file in Finder.
+    /// Called by macOS when the user double-clicks a .zudio file in Finder, or when another
+    /// app (e.g. Messages' "Open with Zudio") asks us to open one.
+    ///
+    /// REVERTED to the original, known-good logic (2026) after a retry/broadened-window-match
+    /// attempt at fixing the Messages cold-launch case caused a worse regression (no window on
+    /// EITHER Finder or Messages cold-launch). Logging is kept so we can diagnose properly
+    /// before touching this again — see kAppOpenDebugLog above.
     func application(_ application: NSApplication, open urls: [URL]) {
+        if kAppOpenDebugLog {
+            appOpenLogger.notice("application(_:open:) ENTRY — urls=\(urls.map(\.lastPathComponent).joined(separator: ","), privacy: .public) windows.count=\(application.windows.count, privacy: .public) isActive=\(application.isActive, privacy: .public)")
+        }
         guard let url = urls.first else { return }
         if let window = application.windows.first(where: { $0.isVisible && !($0 is NSPanel) }) {
             window.makeKeyAndOrderFront(nil)
             application.activate(ignoringOtherApps: true)
+        } else if application.windows.isEmpty {
+            // Confirmed via logging: on a cold launch with a pending open-document request,
+            // SwiftUI never creates its default WindowGroup window on its own. Ask SwiftUI's
+            // own window-management API to create one, rather than poking NSWindow directly.
+            if kAppOpenDebugLog {
+                appOpenLogger.notice("application(_:open:) — no window, invoking zudioOpenWindowAction (present=\(zudioOpenWindowAction != nil, privacy: .public))")
+            }
+            zudioOpenWindowAction?()
         }
         Notification.Name.zudioPendingOpenURL = url
         DispatchQueue.main.async {
@@ -232,6 +316,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 struct ZudioApp: App {
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @Environment(\.openWindow) private var openWindow
     #endif
     @StateObject private var appState = AppState()
 
@@ -254,7 +339,14 @@ struct ZudioApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        #if os(macOS)
+        // Re-captured every time body is evaluated (idempotent) — see zudioOpenWindowAction's
+        // doc comment above for why AppDelegate needs this instead of creating an NSWindow itself.
+        // id: "main" matches the WindowGroup(id:) below — this SDK's OpenWindowAction has no
+        // plain no-argument overload.
+        let _ = { zudioOpenWindowAction = { openWindow(id: "main") } }()
+        #endif
+        WindowGroup(id: "main") {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(appState.playback)
