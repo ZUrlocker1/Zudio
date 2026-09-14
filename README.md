@@ -25,8 +25,7 @@ Current release: `2.5` (build 130). Universal binary — runs natively on both A
 - **Endless mix rebalanced** — More Kosmic and Motorik, slightly less Chill and Ambient, plus a streak cap so Endless mode stops bouncing between the same two styles for long stretches.
 - **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars.
 - **Chill bass levels reduced** — All three Chill bass instruments turned down; Acoustic Bass and Fretless Bass were running noticeably hot. Chill Blues is affected too, since it uses the same pool.
-- **Zudio file type on Mac** — Fixed `.zudio` files showing as text documents and opening in the iPad app instead of the Mac app.
-- **Known issue on iOS 26** — Sharing a song over iMessage no longer offers an "Open in Zudio" button. This is an iOS 26 change, confirmed by the same build behaving correctly on iOS 18; the file still opens in Zudio via Save to Files.
+- **Song sharing on iOS** — Zudio now appears in the iOS share sheet, so songs open in the app from Files and other apps. iOS 26 removed the "Open in Zudio" button on shared songs and opening one straight from Messages is unreliable as a result — this affects any text-like attachment, not just Zudio. Also fixed `.zudio` files showing as text documents on Mac.
 - **Air effect in stem export** — Fixed the Air effect using the wrong EQ shape when exporting separate track stems, which made Air-enabled stems duller than the mix. Normal audio export was unaffected.
 
 ---
@@ -62,7 +61,6 @@ Current release: `2.5` (build 130). Universal binary — runs natively on both A
 - [save-as-audio-plan.md](docs/save-as-audio-plan.md) — Audio export (M4A) feature design. (Done)
 - [continuous-play.md](docs/continuous-play.md) — Continuous play and song evolution mode design. (Done)
 - [distribution-plan.md](docs/distribution-plan.md) — macOS distribution and release plan. (Done)
-
 
 ### Future platform
 

@@ -8,7 +8,8 @@ let package = Package(
         .executableTarget(
             name: "Zudio",
             path: "Sources/Zudio",
-            exclude: ["Info.plist"],
+            // Xcode-only build inputs — not sources SPM should try to handle.
+            exclude: ["Info.plist", "iOS-Info.plist", "ZudioiOS.entitlements"],
             resources: [
                 .copy("Resources")
             ],

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Must match SharedSongInbox.appGroupID and the App Group on the ZudioiOS target.
+         Xcode creates the group on the developer portal automatically when you enable
+         App Groups in Signing & Capabilities — no App Store Connect work is needed. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.zudio.app</string>
+    </array>
+</dict>
+</plist>

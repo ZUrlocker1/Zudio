@@ -1173,7 +1173,13 @@ extension PhonePlayerView {
                         MFMessageComposeViewController.canSendAttachments(),
                       let top = shareTopViewController() else { return }
                 let mc = MFMessageComposeViewController()
-                mc.body = "Here's a cool song from Zudio!"
+                // The instructions are not padding. iOS 26 removed the "Open in Zudio"
+                // button that used to appear on a shared song. Tapping the attachment
+                // sometimes opens a preview with a share arrow that leads to Zudio, and
+                // sometimes does nothing at all — the same build behaved both ways within
+                // an hour, so the wording stays deliberately hedged. See the note in
+                // iOS-Info.plist for everything that was ruled out.
+                mc.body = "Here's a cool Zudio song. Click on the file and then if necessary the share arrow to open in Zudio."
                 mc.addAttachmentURL(url, withAlternateFilename: url.lastPathComponent)
                 let delegate = MessageComposeDelegate()
                 mc.messageComposeDelegate = delegate

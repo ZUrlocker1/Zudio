@@ -34,16 +34,32 @@
             <string>com.zudio.song</string>
             <key>UTTypeDescription</key>
             <string>Zudio Song</string>
+            <!-- Deliberately NOT text-conforming, and deliberately different from the
+                 Mac plist. Do not "fix" this to match — see below.
+
+                 On iOS 26 Messages cannot open a text attachment at all. Not a Zudio
+                 problem: a plain .txt behaves identically, and the same build works on
+                 iOS 18 and on Mac. Seven declaration variants were tested on clean
+                 installs (app deleted and reinstalled, since iOS caches UTI registrations
+                 across in-place updates, phone rebooted, freshly sent file, since Messages
+                 stamps an attachment's type when SENT). None produced an Open affordance;
+                 Mail and AirDrop-to-iPhone behave the same way.
+
+                 Given that nothing opens either way, the remaining choice was cosmetic:
+                 text conformance makes Messages resolve up the chain to public.plain-text
+                 and label the file "Text Document" (rendering the log inline), while an
+                 opaque type stops that walk and lets UTTypeDescription through, so it
+                 reads "Zudio Song". We took the correct label. The cost is no inline text
+                 preview of .zudio files on iPhone/iPad.
+
+                 macOS is unaffected: Info.plist still conforms to public.json ->
+                 public.text, so Finder Quick Look previews as text and Open With still
+                 offers TextEdit, Xcode, Chrome and the rest, with Zudio as default. -->
             <key>UTTypeConformsTo</key>
             <array>
-                <string>public.plain-text</string>
                 <string>public.data</string>
+                <string>public.content</string>
             </array>
-            <!-- Do not add public.mime-type here without testing on iOS 18. It was tried
-                 in Sept 2026 to restore the missing "Open in Zudio" chip on iOS 26 and made
-                 no difference: inspection of the Messages database showed .zudio attachments
-                 were already typed correctly as com.zudio.song with no MIME tag at all.
-                 The chip's disappearance is an iOS 26 change, not a typing problem. -->
             <key>UTTypeTagSpecification</key>
             <dict>
                 <key>public.filename-extension</key>
@@ -51,6 +67,21 @@
                     <string>zudio</string>
                 </array>
             </dict>
+        </dict>
+    </array>
+
+    <!-- Lets the ZudioShare extension ask the system to launch the app after it drops a
+         song into the shared App Group container. Internal plumbing only — this scheme is
+         not something users are expected to type or send. See SharedSongInbox.launchURL. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.zudio.app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>zudio</string>
+            </array>
         </dict>
     </array>
 

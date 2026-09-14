@@ -85,17 +85,21 @@ struct DocumentTypeRegistrationTests {
 
     // MARK: - Pinned declarations
     //
-    // The Mac and iOS plists currently declare DIFFERENT conformance. That is tolerated
-    // because both land under public.text in the UTI tree, so text preview works on both:
+    // The Mac and iOS plists declare DIFFERENT conformance ON PURPOSE. Do not unify them.
     //
-    //   Mac: com.zudio.song -> public.json       -> public.text -> public.data
-    //   iOS: com.zudio.song -> public.plain-text -> public.text -> public.data
+    //   Mac: com.zudio.song -> public.json -> public.text -> public.data
+    //        Text-conforming, so Finder Quick Look previews as text and Open With offers
+    //        TextEdit and friends. Verified via `mdls -name kMDItemContentTypeTree`.
     //
-    // Verified on macOS via `mdls -name kMDItemContentTypeTree` on a real .zudio file.
-    // If you unify them, update both expectations below.
+    //   iOS: com.zudio.song -> public.data, public.content
+    //        NOT text-conforming. On iOS 26 Messages cannot open a text attachment at all
+    //        (a plain .txt behaves the same), so the only thing conformance still affects
+    //        is the label: text conformance makes Messages resolve up to public.plain-text
+    //        and say "Text Document", while an opaque type lets UTTypeDescription through
+    //        and it reads "Zudio Song". The cost is no inline preview on iPhone/iPad.
 
     private static let expectedMacConformance: Set<String> = ["public.json"]
-    private static let expectedIOSConformance: Set<String> = ["public.plain-text", "public.data"]
+    private static let expectedIOSConformance: Set<String> = ["public.data", "public.content"]
 
     // MARK: - Exported UTI declaration
 
@@ -132,18 +136,29 @@ struct DocumentTypeRegistrationTests {
     // This is the assertion that would have caught Build 103. public.data alone is NOT
     // text-conforming, and Quick Look silently stopped previewing .zudio files as text.
 
-    @Test func bothPlatformsKeepTextPreview() throws {
-        for (label, url) in [("Mac", Self.macPlistURL), ("iOS", Self.iosPlistURL)] {
-            let plist = try Self.loadPlist(url)
-            let decl = try #require(Self.zudioExportedType(plist))
-            let conforms = Set(decl["UTTypeConformsTo"] as? [String] ?? [])
+    @Test func macKeepsTextPreview() throws {
+        let plist = try Self.loadPlist(Self.macPlistURL)
+        let decl = try #require(Self.zudioExportedType(plist))
+        let conforms = Set(decl["UTTypeConformsTo"] as? [String] ?? [])
 
-            #expect(!conforms.isDisjoint(with: Self.textConformingTypes),
-                    """
-                    \(label) declares \(conforms.sorted()), none of which conform to public.text.
-                    .zudio files are UTF-8 logs and must stay text-previewable in Quick Look.
-                    """)
-        }
+        #expect(!conforms.isDisjoint(with: Self.textConformingTypes),
+                """
+                Mac declares \(conforms.sorted()), none of which conform to public.text.
+                .zudio files are UTF-8 logs and must stay text-previewable in Finder Quick
+                Look, and openable with TextEdit via Open With.
+                """)
+    }
+
+    /// The mirror of the above. iOS must NOT be text-conforming, or Messages resolves the
+    /// file up to public.plain-text and labels it "Text Document" instead of "Zudio Song".
+    /// See the note on expectedIOSConformance for why the platforms deliberately disagree.
+    @Test func iosIsNotTextConforming() throws {
+        let plist = try Self.loadPlist(Self.iosPlistURL)
+        let decl = try #require(Self.zudioExportedType(plist))
+        let conforms = Set(decl["UTTypeConformsTo"] as? [String] ?? [])
+
+        #expect(conforms.isDisjoint(with: Self.textConformingTypes),
+                "iOS declares \(conforms.sorted()), which conforms to text.")
     }
 
     // MARK: - Document type claim

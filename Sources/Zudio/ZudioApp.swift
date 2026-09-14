@@ -6,6 +6,9 @@ import SwiftUI
 import AppKit
 import os
 #endif
+#if os(iOS)
+import UIKit   // UIApplication.didBecomeActiveNotification — sweeping the ZudioShare inbox
+#endif
 
 #if os(macOS)
 // DIAGNOSTIC LOGGING — Messages "Open with Zudio" cold-launch window bug (2026).
@@ -338,6 +341,17 @@ struct ZudioApp: App {
         #endif
     }
 
+    #if os(iOS)
+    /// Loads a song the ZudioShare extension left in the App Group container, if any.
+    /// Safe to call repeatedly — it no-ops when the inbox is empty, and clears the file
+    /// once loaded so the same song is not re-opened on every activation.
+    private func loadPendingSharedSong() {
+        guard let pending = SharedSongInbox.pendingSong() else { return }
+        appState.loadFromLogURL(pending)
+        SharedSongInbox.clear(pending)
+    }
+    #endif
+
     var body: some Scene {
         #if os(macOS)
         // Re-captured every time body is evaluated (idempotent) — see zudioOpenWindowAction's
@@ -352,8 +366,24 @@ struct ZudioApp: App {
                 .environmentObject(appState.playback)
                 #if os(iOS)
                 .onOpenURL { url in
-                    _ = url.startAccessingSecurityScopedResource()
-                    appState.loadFromLogURL(url)
+                    // Two kinds of URL arrive here:
+                    //  - a file URL, when a .zudio is opened from Files or Messages
+                    //  - zudio://open, when the ZudioShare extension has dropped a song in
+                    //    the App Group container and asked the system to launch us
+                    if url.scheme == "zudio" {
+                        loadPendingSharedSong()
+                    } else {
+                        _ = url.startAccessingSecurityScopedResource()
+                        appState.loadFromLogURL(url)
+                    }
+                }
+                // The extension cannot reliably launch the app (NSExtensionContext.open is
+                // documented for app extensions but inconsistent for share extensions), so
+                // also sweep the inbox whenever the app becomes active. Worst case the song
+                // loads the next time Zudio is opened rather than immediately.
+                .onReceive(NotificationCenter.default.publisher(
+                    for: UIApplication.didBecomeActiveNotification)) { _ in
+                    loadPendingSharedSong()
                 }
                 #endif
         }

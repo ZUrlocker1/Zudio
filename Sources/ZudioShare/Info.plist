@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- GENERATE_INFOPLIST_FILE is NO for this target, so none of these are injected for
+         us — they must be spelled out. CFBundleIdentifier in particular: without it the
+         .appex builds with an empty bundle ID and the host app fails to embed it with
+         "Embedded binary's bundle identifier is not prefixed with the parent app's".
+         The version keys read from the same build settings as the host app so the two
+         can never drift apart, which the App Store rejects. -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Zudio</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.share-services</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <!-- Show Zudio in the share sheet only for .zudio songs.
+
+                 IF ZUDIO DOES NOT APPEAR AT ALL during testing, swap this predicate for
+                 the permissive rule below to tell "my predicate is wrong" apart from
+                 "share extensions aren't offered here". Do NOT ship the permissive one —
+                 it puts Zudio in the share sheet for every file type:
+
+                     <key>NSExtensionActivationRule</key>
+                     <dict>
+                         <key>NSExtensionActivationSupportsFileWithMaxCount</key>
+                         <integer>1</integer>
+                     </dict>
+            -->
+            <key>NSExtensionActivationRule</key>
+            <string>SUBQUERY (
+                extensionItems,
+                $extensionItem,
+                SUBQUERY (
+                    $extensionItem.attachments,
+                    $attachment,
+                    ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.zudio.song"
+                ).@count == 1
+            ).@count == 1</string>
+        </dict>
+    </dict>
+</dict>
+</plist>
