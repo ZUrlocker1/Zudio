@@ -25,14 +25,6 @@ final class IOSPlatformHost: ZudioPlatformHost {
         } catch {
             print("AVAudioSession setup failed: \(error)")
         }
-        NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            self?.handleInterruption(note)
-        }
-
         // DIAGNOSTIC LOGGING — lock-screen tempo drift investigation (2026).
         // protectedDataWillBecomeUnavailable/DidBecomeAvailable fire precisely on device
         // lock/unlock (data-protection boundary), which is a tighter correlate than
@@ -63,17 +55,6 @@ final class IOSPlatformHost: ZudioPlatformHost {
 
     func dismissKeyboard() {
         // Keyboard dismissal is handled via @FocusState in SwiftUI views on iOS
-    }
-
-    // MARK: - Private
-
-    private func handleInterruption(_ notification: Notification) {
-        guard let info = notification.userInfo,
-              let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
-        // Playback pause/resume on interruption is handled by the audio engine automatically.
-        // Add AppState callbacks here if manual intervention is needed.
-        _ = type
     }
 }
 #endif

@@ -546,11 +546,20 @@ enum OfflineExport {
                 eq.bands[1].bypass     = !snap.hpfEnabled
                 eq.auAudioUnit.shouldBypassEffect = snap.lowShelfBypassed
 
-                let airEQ = AVAudioUnitEQ(numberOfBands: 1)
-                airEQ.bands[0].filterType = .highShelf
-                airEQ.bands[0].frequency  = 12000
-                airEQ.bands[0].gain       = 3.5
+                // Must stay identical to the Phase 2 airEQ and to PlaybackEngine's live
+                // airEQ. Build 128 tuned live + Phase 2 up to this two-band shape but left
+                // this copy on the original single 12 kHz shelf, so Air-enabled stems
+                // exported far duller than the mix.
+                let airEQ = AVAudioUnitEQ(numberOfBands: 2)
+                airEQ.bands[0].filterType = .parametric  // presence peak: upper-mid bite
+                airEQ.bands[0].frequency  = 4000
+                airEQ.bands[0].gain       = 5.0
+                airEQ.bands[0].bandwidth  = 1.5          // broad, natural-sounding peak
                 airEQ.bands[0].bypass     = false
+                airEQ.bands[1].filterType = .highShelf   // air shelf: opens up top end
+                airEQ.bands[1].frequency  = 8000
+                airEQ.bands[1].gain       = 7.5
+                airEQ.bands[1].bypass     = false
                 airEQ.auAudioUnit.shouldBypassEffect = !snap.airEnabled
 
                 trackEngine.attach(player);      trackEngine.attach(vibratoNode)

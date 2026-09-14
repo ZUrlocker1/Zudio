@@ -76,6 +76,10 @@ struct SongLogExporter {
         if let k = song.keyOverride   { lines.append(col("Key Override:",   16) + k) }
         if let t = song.tempoOverride { lines.append(col("Tempo Override:", 16) + "\(t)") }
         if let m = song.moodOverride  { lines.append(col("Mood Override:",  16) + m.rawValue) }
+        // Blues Variation is rolled via a forceBluesVariation || rng.nextDouble() short-circuit —
+        // if not captured here and replayed on load, reloading skips that roll entirely, shifting
+        // every subsequent random draw and silently losing the blues identity (~80% of the time).
+        if song.chillBluesVariation   { lines.append(col("Blues Variation:", 16) + "true") }
         lines += [
             col("Key:",       16) + "\(song.frame.key)  \(song.frame.mode.rawValue)",
             col("Tempo:",     16) + "\(song.frame.tempo) BPM",

@@ -37,7 +37,7 @@ struct ChillMusicalFrameGenerator {
         // Blues uses a dedicated instrument pool (all blues-appropriate horns/reeds).
         let leadInst = bluesVariation
             ? pickLeadInstrumentBlues(rng: &rng)
-            : pickLeadInstrument(mood: mood, rng: &rng)
+            : pickLeadInstrument(rng: &rng)
 
         // Blues excludes stGermain and hipHopJazz beat styles.
         // forceBeatStyle from best-first-song/load path takes priority in all cases.
@@ -123,9 +123,13 @@ struct ChillMusicalFrameGenerator {
         return families[rng.weightedPick(weights)]
     }
 
-    private static func pickLeadInstrument(mood: Mood, rng: inout SeededRNG) -> ChillLeadInstrument {
-        // Lead 1 pool: all five horn/reed instruments equally weighted.
-        // Soprano sax, vibraphone, trombone, flute are Lead 2 only.
+    /// Lead 1 pool: all five horn/reed instruments equally weighted, independent of mood.
+    /// Soprano sax, vibraphone, trombone, flute are Lead 2 only.
+    /// (2026: this used to take an unused `mood` parameter — chill-plan.md's CHILL-RULE-09 once
+    /// specified mood-dependent instrument choice, e.g. muted trumpet/sax for Deep/Dream, but that
+    /// was never wired up; the parameter was dead code. Removed rather than implemented, to match
+    /// the flat, mood-independent selection every other Chill track generator already uses.)
+    private static func pickLeadInstrument(rng: inout SeededRNG) -> ChillLeadInstrument {
         let insts: [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
         return insts[rng.nextInt(upperBound: insts.count)]
     }

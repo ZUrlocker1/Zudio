@@ -351,7 +351,11 @@ struct SongState: Sendable {
     }
 
     /// Returns a copy of this state with one track's events replaced and extra log entries appended.
-    func replacingEvents(_ events: [MIDIEvent], forTrack trackIndex: Int, appendingLog extra: [GenerationLogEntry]) -> SongState {
+    /// `replacingStepAnnotations`, when given, replaces stepAnnotations entirely instead of
+    /// carrying the old ones over verbatim — used when a track regen needs to drop stale
+    /// per-bar annotations (e.g. Chill Blues bass variation bars) tied to the rule it just replaced.
+    func replacingEvents(_ events: [MIDIEvent], forTrack trackIndex: Int, appendingLog extra: [GenerationLogEntry],
+                         replacingStepAnnotations: [Int: [GenerationLogEntry]]? = nil) -> SongState {
         var updated = trackEvents
         if trackIndex < updated.count { updated[trackIndex] = events }
         return SongState(
@@ -359,7 +363,8 @@ struct SongState: Sendable {
             trackEvents: updated, globalSeed: globalSeed,
             trackOverrides: trackOverrides, title: title, form: form, style: style,
             percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
-            generationLog: generationLog + extra, stepAnnotations: stepAnnotations,
+            generationLog: generationLog + extra,
+            stepAnnotations: replacingStepAnnotations ?? stepAnnotations,
             ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
             ambientXFilesBlockRange: ambientXFilesBlockRange,
             ambientUseBrushKit: ambientUseBrushKit,

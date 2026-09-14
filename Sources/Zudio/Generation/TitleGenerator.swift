@@ -34,7 +34,7 @@ struct TitleGenerator {
         "Luftmensh", "Nudnik", "Chutzpah", "Plotz", "Shtick",
         // The Man from Mittelwerk
         "Wunderwaffe", "Wunderwaffen",
-        "Stollen", "Tunnel", "Dehomag", "Zwilling",
+        "Stollen", "Tunnel", "Dehomag ", "Zwilling",
         "V2", "Vergeltung",
         "Zeitmaschine", "Z-Maschine", "Z-Machine", "Gear"
     ]

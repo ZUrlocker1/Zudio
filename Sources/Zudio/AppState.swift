@@ -157,6 +157,7 @@ final class AppState: ObservableObject {
             case .endless:
                 // Sync style axis to the currently playing style so shifts are relative to it
                 songsInCurrentStyle = 1
+                songsInCurrentPair  = 1
                 if let idx = endlessStyleAxis.firstIndex(of: selectedStyle) {
                     endlessStyleIndex = idx
                 }
@@ -210,6 +211,23 @@ final class AppState: ObservableObject {
     private func rearmSleepTimerIfNeeded() {
         guard sleepTimerDuration != .never, sleepTimerExpiresAt == nil else { return }
         setSleepTimer(sleepTimerDuration)
+    }
+
+    /// Cancels any in-progress countdown. Playback has stopped, so a pending sleep-timer
+    /// fire tied to the previous play session is no longer meaningful — without this, the
+    /// timer keeps counting down in the background and fires later against a silent player.
+    private func cancelSleepTimerCountdown() {
+        sleepTimerFire?.invalidate()
+        sleepTimerFire = nil
+        sleepTimerExpiresAt = nil
+    }
+
+    /// Call immediately before every playback.play() site: dismisses any stale "sleep timer
+    /// ended" message and arms a fresh countdown (the timer starts when playback starts, not
+    /// at app launch or at some earlier press of Play).
+    private func prepareSleepTimerForPlayback() {
+        clearSleepTimerMessage()
+        rearmSleepTimerIfNeeded()
     }
 
     private func logSleepTimerStop() {
@@ -371,6 +389,9 @@ final class AppState: ObservableObject {
     private let endlessStyleAxis: [MusicStyle] = [.ambient, .chill, .kosmic, .motorik]
     private var endlessStyleIndex: Int = 1    // start at Chill
     private var songsInCurrentStyle: Int = 0
+    /// Consecutive songs confined to one pair — Ambient+Chill (0) or Kosmic+Motorik (1) — used by
+    /// the hard streak cap in decideNextStyle(). Reset to 1 whenever the pair actually changes.
+    private var songsInCurrentPair: Int = 0
 
     // Pre-generated next song for seamless Endless transitions
     private var nextSongState:            SongState? = nil
@@ -443,6 +464,7 @@ final class AppState: ObservableObject {
         nextSongState        = nil
         isPreGenerating      = false
         songsInCurrentStyle  = 0
+        songsInCurrentPair   = 0
         endlessStyleIndex    = 1
         tearDownEvolve()
 
@@ -788,6 +810,16 @@ final class AppState: ObservableObject {
     let nowPlaying = NowPlayingController()
 
     private var cancellables = Set<AnyCancellable>()
+    /// Throttle for the AUDIO status-log line in onAudioInterrupted — prevents a single
+    /// real-world interruption from logging twice if iOS fires the notification more than once.
+    private var lastInterruptionLogAt: Date?
+    #if os(iOS)
+    /// Pending "playback stopped while backgrounded" check — see the `playback.$isPlaying`
+    /// subscription in `init()`. Cancelled whenever playback resumes before it fires, so a
+    /// normal Endless/Evolve song-to-song gap (as short as instant, up to ~500ms) never
+    /// triggers a session deactivation mid-transition.
+    private var backgroundedStopWorkItem: DispatchWorkItem?
+    #endif
     var platformHost: ZudioPlatformHost?
 
     init() {
@@ -796,15 +828,8 @@ final class AppState: ObservableObject {
         // slate (new install or after reset). A returning user with any saved songs skips them.
         stylesWithGeneratedSongs = Set(persistedHistory.map { $0.style })
         preloadPersistedSongs()
-        // Arm sleep timer from launch using saved preference (default 2 hours).
-        // Set directly to avoid triggering sleepTimerDuration.didSet (no UserDefaults write at init).
-        if let mins = sleepTimerDuration.minutes {
-            let expiresAt = Date().addingTimeInterval(mins * 60)
-            sleepTimerExpiresAt = expiresAt
-            sleepTimerFire = Timer.scheduledTimer(withTimeInterval: mins * 60, repeats: false) { [weak self] _ in
-                self?.executeSleepTimerStop()
-            }
-        }
+        // Sleep timer arms when playback actually starts (see prepareSleepTimerForPlayback()),
+        // not at app launch — a countdown with nothing playing isn't meaningful.
 
         // Forward only isPlaying changes so transport buttons (TopBarView) stay current.
         // Removing the blanket objectWillChange cascade breaks the per-step chain:
@@ -886,17 +911,41 @@ final class AppState: ObservableObject {
 
         // When the app backgrounds while stopped, deactivate AVAudioSession so iOS
         // removes the active-audio inference that causes the lock screen to show ⏸/■.
-        // Both engines must be paused first (setActive(false) fails if any engine is running).
-        // On resume, play() reactivates the session and restarts the engines as needed.
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil, queue: .main
         ) { [weak self] _ in
             guard let self, !self.playback.isPlaying else { return }
-            self.audioTexture.pauseEngine()
-            self.playback.pauseEngine()
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            self.suspendAudioSessionIfBackgroundedAndStopped()
         }
+
+        // Mirror image of the handler above: playback can also stop WHILE the app is
+        // already backgrounded (sleep timer, natural song end with no auto-continue,
+        // interruption) — a transition the didEnterBackground observer can't see, since
+        // it only fires once, at the moment backgrounding itself happens. Left unhandled,
+        // the session stays active and the lock screen keeps showing ⏸/■ indefinitely.
+        //
+        // Debounced ~1.5s (well past Evolve's fixed 500ms inter-song gap, and Endless's
+        // typically-instant pre-generated resume) so an ordinary song-to-song transition
+        // while backgrounded doesn't trigger a mid-transition deactivate/reactivate —
+        // harmless either way since play() unconditionally reactivates, but pointless churn
+        // to invite. Cancelled outright the moment playback resumes.
+        playback.$isPlaying
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isPlaying in
+                guard let self else { return }
+                self.backgroundedStopWorkItem?.cancel()
+                guard !isPlaying else { return }
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self, !self.playback.isPlaying,
+                          UIApplication.shared.applicationState == .background else { return }
+                    self.suspendAudioSessionIfBackgroundedAndStopped()
+                }
+                self.backgroundedStopWorkItem = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+            }
+            .store(in: &cancellables)
         #endif
 
         // Real-time tempo scrubbing: update live playback when BPM changes on a loaded song
@@ -980,9 +1029,16 @@ final class AppState: ObservableObject {
         }
         // iOS audio interruption (another app takes focus) or headphones pulled.
         // PlaybackEngine.stop() has already fired; stop audioTexture (Chill background loop) too.
-        playback.onAudioInterrupted = { [weak self] in
+        // Logged to the status log (throttled) so a repeated real-world problem is visible after
+        // the fact instead of just silently stopping playback with no trace.
+        playback.onAudioInterrupted = { [weak self] reason in
             guard let self else { return }
             self.audioTexture.stop()
+            let now = Date()
+            if self.lastInterruptionLogAt == nil || now.timeIntervalSince(self.lastInterruptionLogAt!) > 3 {
+                self.lastInterruptionLogAt = now
+                self.appendToLog([GenerationLogEntry(tag: "AUDIO", description: reason)])
+            }
         }
 
         playback.onOutroStart = { [weak self] in
@@ -1001,6 +1057,26 @@ final class AppState: ObservableObject {
             }
         }
     }
+
+    #if os(iOS)
+    // MARK: - Background audio session
+
+    /// Pauses both engines and deactivates AVAudioSession — removes the active-audio
+    /// inference that makes iOS show ⏸/■ on the lock screen even though Zudio itself has
+    /// stopped. Both engines must be paused first (setActive(false) fails while either is
+    /// running). Safe to call redundantly (e.g. during an interruption, which has already
+    /// deactivated the session itself) — `try?` swallows the resulting no-op error.
+    /// On resume, `play()` unconditionally reactivates the session and restarts the engines.
+    ///
+    /// Two callers: `didEnterBackgroundNotification` (background while already stopped) and
+    /// the debounced `playback.$isPlaying` sink in `init()` (stopped while already
+    /// backgrounded) — the two directions of the same underlying fix.
+    private func suspendAudioSessionIfBackgroundedAndStopped() {
+        audioTexture.pauseEngine()
+        playback.pauseEngine()
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+    #endif
 
     // MARK: - Log append helper
 
@@ -1297,7 +1373,7 @@ final class AppState: ObservableObject {
                 self.defaultsResetToken += 1
                 self.applyCurrentInstrumentsToPlayback()
                 if thenPlay || wasPlaying {
-                    self.rearmSleepTimerIfNeeded()
+                    self.prepareSleepTimerForPlayback()
                     self.playback.play()
                     // Start ambient audio texture directly (Chill is handled via setProgram/switchTexture).
                     if state.style == .ambient, let texFile = state.ambientAudioTexture {
@@ -1413,8 +1489,7 @@ final class AppState: ObservableObject {
     // MARK: - Transport
 
     func play() {
-        clearSleepTimerMessage()
-        rearmSleepTimerIfNeeded()
+        prepareSleepTimerForPlayback()
         if songState == nil {
             generateNew(thenPlay: true)
         } else {
@@ -1440,6 +1515,7 @@ final class AppState: ObservableObject {
 
     func stop() {
         clearSleepTimerMessage()
+        cancelSleepTimerCountdown()
         endlessTransitionToken += 1
         playback.stop()
         audioTexture.stop()
@@ -1511,6 +1587,7 @@ final class AppState: ObservableObject {
     private func decideNextStyle() -> MusicStyle {
         let atLeft  = endlessStyleIndex == 0
         let atRight = endlessStyleIndex == endlessStyleAxis.count - 1
+        let currentPair = endlessStyleIndex < endlessStyleAxis.count / 2 ? 0 : 1   // 0 = Ambient+Chill, 1 = Kosmic+Motorik
         let shiftNow: Bool
         switch songsInCurrentStyle {
         case 1:  shiftNow = Double.random(in: 0..<1) < 0.30
@@ -1519,23 +1596,44 @@ final class AppState: ObservableObject {
         }
         if !shiftNow {
             songsInCurrentStyle += 1
+            songsInCurrentPair  += 1   // still counts toward the pair-streak cap even without a style shift
             return endlessStyleAxis[endlessStyleIndex]
         }
-        // Normal walls force the adjacent step, but a 25% escape valve jumps two steps
-        // so Ambient can leap to Kosmic and Motorik can leap to Chill — breaks ping-pong traps.
-        let step: Int
+        // Style-mix tuning: asymmetric per-side probabilities, chosen and verified by simulating
+        // the underlying Markov chain, to hit a target steady-state mix of roughly Ambient 21.6% /
+        // Chill 23.4% / Kosmic 30% / Motorik 25%. Ambient/Motorik each have a two-step "escape
+        // valve" (a chance to jump past their neighbor straight to Kosmic/Chill) that bounds how
+        // long the walk can get stuck oscillating within one pair of adjacent styles; the
+        // pair-streak cap below is a hard backstop for the rare case where the valves alone aren't
+        // enough. Full derivation, the structural constraints this target runs into (Ambient can
+        // never exceed Chill's share; Chill can never go below 22.5%), and the tuning history are
+        // all in docs/continuous-play.md — worth reading before changing any number here.
+        let crossStep: Int      // step that crosses into the other pair
+        let sameStep: Int       // step that stays within the current pair
+        let crossProbability: Double
         if atLeft {
-            step = Double.random(in: 0..<1) < 0.25 ? 2 : 1   // Ambient: 75%→Chill, 25%→Kosmic
+            // Ambient: ~68% → Chill (adjacent), ~32% → Kosmic (escape valve, breaks ping-pong traps).
+            crossStep = 2; sameStep = 1; crossProbability = 0.3188
         } else if atRight {
-            step = Double.random(in: 0..<1) < 0.25 ? -2 : -1  // Motorik: 75%→Kosmic, 25%→Chill
+            // Motorik: ~85% → Kosmic (adjacent), ~15% → Chill (escape valve, breaks long
+            // Kosmic/Motorik-only streaks).
+            crossStep = -2; sameStep = -1; crossProbability = 0.15
+        } else if endlessStyleIndex < endlessStyleAxis.count / 2 {
+            // Chill: ~92% → Ambient (adjacent), ~8% → Kosmic (forward valve — occasional direct
+            // advance, restoring some of the original design's two-way movement).
+            crossStep = 1; sameStep = -1; crossProbability = 0.08
         } else {
-            // 65% outward (toward nearest endpoint), 35% inward — raises Ambient/Motorik
-            // steady-state share from ~17% toward ~20% without starving the middle styles.
-            let outward = endlessStyleIndex < endlessStyleAxis.count / 2 ? -1 : 1
-            step = Double.random(in: 0..<1) < 0.65 ? outward : -outward
+            // Kosmic: ~83% outward (toward Motorik, same pair), ~17% inward (toward Chill, crosses pair).
+            crossStep = -1; sameStep = 1; crossProbability = 1.0 - 0.8333
         }
+        let pairStreakCap = currentPair == 0 ? 8 : 12   // smaller cap for Ambient+Chill
+        let step = songsInCurrentPair >= pairStreakCap
+            ? crossStep
+            : (Double.random(in: 0..<1) < crossProbability ? crossStep : sameStep)
         endlessStyleIndex   = max(0, min(endlessStyleAxis.count - 1, endlessStyleIndex + step))
         songsInCurrentStyle = 1
+        let newPair = endlessStyleIndex < endlessStyleAxis.count / 2 ? 0 : 1
+        songsInCurrentPair  = newPair == currentPair ? songsInCurrentPair + 1 : 1
         return endlessStyleAxis[endlessStyleIndex]
     }
 
@@ -2794,6 +2892,7 @@ final class AppState: ObservableObject {
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
         if thenPlay {
+            prepareSleepTimerForPlayback()
             playback.play()
             let texFile2   = state.style == .ambient ? state.ambientAudioTexture : state.chillAudioTexture
             let texOffset2 = state.style == .ambient ? state.ambientAudioTextureOffset : state.chillAudioTextureOffset
@@ -2951,6 +3050,7 @@ final class AppState: ObservableObject {
         var loadedKeyOverride:      String? = nil
         var loadedTempoOverride:    Int?    = nil
         var loadedMoodOverride:     Mood?   = nil
+        var loadedBluesVariation:   Bool    = false
         var loadedInstrumentOverrides: [Int: Int] = [:]
         let instrumentShortNames = ["L1": 0, "L2": 1, "Pd": 2, "Ry": 3, "Tx": 4, "Bs": 5, "Dr": 6, "LS": 7]
 
@@ -2977,6 +3077,8 @@ final class AppState: ObservableObject {
                 // "Bright" — user had a mood override active at generation time
                 let val = trimmed.dropFirst(14).trimmingCharacters(in: .whitespaces)
                 loadedMoodOverride = Mood(rawValue: val)
+            } else if trimmed.hasPrefix("Blues Variation:") {
+                loadedBluesVariation = true
             } else if trimmed.hasPrefix("Track Overrides:") {
                 let val = trimmed.dropFirst(16).trimmingCharacters(in: .whitespaces)
                 for pair in val.components(separatedBy: "  ") {
@@ -3031,6 +3133,7 @@ final class AppState: ObservableObject {
         let loadKey           = loadedKeyOverride
         let loadTempo         = loadedTempoOverride
         let loadMood          = loadedMoodOverride
+        let loadBlues         = loadedBluesVariation
         let loadedInstOverrides = loadedInstrumentOverrides
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
@@ -3045,7 +3148,10 @@ final class AppState: ObservableObject {
                 forceArpRuleID:   loadForced["Rhythm"],
                 forcePadsRuleID:  loadForced["Pads"],
                 forceLeadRuleID:  loadForced["Lead"],
-                forceTexRuleID:   loadForced["Tex"]
+                forceTexRuleID:   loadForced["Tex"],
+                forcePercussionStyle: loadForced["PercStyle"].flatMap { PercussionStyle(rawValue: $0) },
+                forceBridge:      loadForced["Bridge"] == "true",
+                forceBluesVariation: loadBlues
             )
             for trackIdx in overrides.keys.sorted() {
                 state = SongGenerator.regenerateTrack(trackIdx, songState: state, overrideSeed: overrides[trackIdx])
@@ -3102,7 +3208,10 @@ final class AppState: ObservableObject {
                 self.playback.setChillMode(style == .chill, bluesVariation: state.chillBluesVariation)
                 self.defaultsResetToken += 1
                 self.applyCurrentInstrumentsToPlayback()
-                if wasPlaying { self.playback.play() }
+                if wasPlaying {
+                    self.prepareSleepTimerForPlayback()
+                    self.playback.play()
+                }
                 self.platformHost?.dismissKeyboard()
                 // If another file-open arrived while we were loading, load it now.
                 self.consumePendingLoad()
@@ -3483,7 +3592,7 @@ final class AppState: ObservableObject {
         switch selectedStyle {
         case .ambient:
             defaults = switch trackIndex {
-            case kTrackLead1:   songState?.isAmbientPiano == true ? [.space] : [.delay, .space]
+            case kTrackLead1:   [.delay, .space]
             case kTrackLead2:   [.space]
             case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
@@ -3627,7 +3736,10 @@ final class AppState: ObservableObject {
         playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation)
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
-        if wasPlaying || forcePlay { playback.play() }
+        if wasPlaying || forcePlay {
+            prepareSleepTimerForPlayback()
+            playback.play()
+        }
         if playMode == .evolve { tearDownEvolve(); startEvolveMode(from: state) }
     }
 

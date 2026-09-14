@@ -16,11 +16,13 @@ struct ChillBassGenerator {
         breakdownStyle: ChillBreakdownStyle,
         bluesVariation: Bool = false,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        variationAnnotations: inout [(bar: Int, kind: String)]
     ) -> [MIDIEvent] {
         // Blues Chill uses dedicated blues bass pool (overrides beat-style routing)
         if bluesVariation {
-            return bluesBass(frame: frame, structure: structure, rng: &rng, usedRuleIDs: &usedRuleIDs)
+            return bluesBass(frame: frame, structure: structure, rng: &rng, usedRuleIDs: &usedRuleIDs,
+                             variationAnnotations: &variationAnnotations)
         }
 
         // St Germain beat style always uses the 8th-note ostinato (CHL-BASS-007)
@@ -48,15 +50,18 @@ struct ChillBassGenerator {
 
         // CHL-BASS-006 Bass Statement: fires on exactly ONE groove bar mid-song.
         // Pick the bar now so the statement is placed deliberately, not randomly per bar.
+        // Note: the picked bar may land in a section (bridge/intro/outro) that never reaches
+        // the rendering check below, so tagging as "used" happens only once it actually renders.
         let grooveBars = frame.totalBars - 8  // rough groove length excluding intro/outro
         let statementBar: Int? = grooveBars >= 16
             ? 4 + rng.nextInt(upperBound: grooveBars)   // somewhere in the groove
             : nil
-        if statementBar != nil { usedRuleIDs.insert("CHL-BASS-006") }
 
         var events: [MIDIEvent] = []
-        // Build 4-bar ostinato if selected
-        let ostinatoPattern: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(frame: frame) : nil
+        // Build 4-bar ostinato if selected, plus a mildly varied tile swapped in every third
+        // repeat (~every 12 bars) so the figure isn't note-for-note identical the whole song.
+        let ostinatoPattern: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(variant: false) : nil
+        let ostinatoVariant: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(variant: true) : nil
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -66,17 +71,10 @@ struct ChillBassGenerator {
             let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
-            // Cold start: bar 0 is drums-only, bass silent
-            if case .coldStart = structure.introStyle, bar == 0 { continue }
-
-            // Cold stop: final bar silent; crash bar gets a root stab landing with the crash.
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar >= outroEnd - 1 { continue }
-                if bar == outroEnd - 2 {
-                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
-                                            velocity: 80, durationSteps: 3))
-                    continue
-                }
+            switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
+            case .skip: continue
+            case .stabAndSkip(let stab): events.append(stab); continue
+            case .proceed: break
             }
 
             switch label {
@@ -193,9 +191,12 @@ struct ChillBassGenerator {
             default:
                 // Groove sections
                 if let ostinato = ostinatoPattern {
-                    // CHL-BASS-004 Air Ostinato: 4-bar repeating figure
+                    // CHL-BASS-004 Air Ostinato: 4-bar repeating figure, with the variant tile
+                    // swapped in on every third cycle (bars 9-12, 21-24, ...) for relief.
                     let patBar = bar % 4
-                    let patNotes = ostinato.filter { $0.0 / 16 == patBar }
+                    let cycleIndex = bar / 4
+                    let activePattern = (ostinatoVariant != nil && cycleIndex % 3 == 2) ? ostinatoVariant! : ostinato
+                    let patNotes = activePattern.filter { $0.0 / 16 == patBar }
                     for (step, deg) in patNotes {
                         let note = snapToScale(chordRoot + deg, scale: scale)
                         events.append(MIDIEvent(stepIndex: base + (step % 16), note: UInt8(clampBass(note)),
@@ -209,7 +210,7 @@ struct ChillBassGenerator {
                     if useSyncopated {
                         events += syncopatedPattern(base: base, chordRoot: chordRoot, scale: scale,
                                                      nextChordRoot: nextChordRootNote(bar: bar, frame: frame, structure: structure),
-                                                     rng: &rng)
+                                                     bar: bar, rng: &rng)
                     } else {
                         events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
                     }
@@ -217,6 +218,7 @@ struct ChillBassGenerator {
                     // CHL-BASS-006 Bass Statement: fires on exactly one designated bar mid-song
                     if let sb = statementBar, bar == sb {
                         events += bassStatement(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
+                        usedRuleIDs.insert("CHL-BASS-006")
                     }
                 }
             }
@@ -262,26 +264,50 @@ struct ChillBassGenerator {
 
     // MARK: - Syncopated pattern (CHL-BASS-002)
 
+    /// Evolution: the shape cycles every 4 bars (bar % 4) so the same cell doesn't repeat
+    /// unbroken for the whole song — bar 1 shifts the embellishment to a b7 offbeat, bar 3
+    /// thins out to root + approach only for breathing room.
     private static func syncopatedPattern(base: Int, chordRoot: Int, scale: [Int],
-                                           nextChordRoot: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+                                           nextChordRoot: Int, bar: Int,
+                                           rng: inout SeededRNG) -> [MIDIEvent] {
         var result: [MIDIEvent] = []
-        let root = clampBass(chordRoot)
-        // Step 1: root, 2 beats
-        result.append(MIDIEvent(stepIndex: base, note: UInt8(root),
-                                velocity: UInt8(80 + rng.nextInt(upperBound: 11)), durationSteps: 8))
-        // Step 7 (AND beat 2): 5th or approach, 1 beat
-        if rng.nextDouble() < 0.70 {
-            let fifth = snapToScale(chordRoot + 7, scale: scale)
-            result.append(MIDIEvent(stepIndex: base + 6, note: UInt8(clampBass(fifth)),
-                                    velocity: UInt8(70 + rng.nextInt(upperBound: 11)), durationSteps: 2))
-        }
-        // Step 9 (beat 3): root, 1.5 beats
-        result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),
-                                velocity: UInt8(75 + rng.nextInt(upperBound: 11)), durationSteps: 6))
-        // Step 15 (AND beat 4): approach tone snapped to scale (leading-tone feel)
+        let root     = clampBass(chordRoot)
         let approach = clampBass(snapToScale(nextChordRoot - 1, scale: scale))
-        result.append(MIDIEvent(stepIndex: base + 14, note: UInt8(approach),
-                                velocity: UInt8(65 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+
+        switch bar % 4 {
+        case 1:
+            // b7 offbeat variant: AND of beat 3 (step 10) instead of AND of beat 2.
+            let b7 = clampBass(snapToScale(chordRoot + 10, scale: scale))
+            result.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                    velocity: UInt8(80 + rng.nextInt(upperBound: 11)), durationSteps: 8))
+            if rng.nextDouble() < 0.70 {
+                result.append(MIDIEvent(stepIndex: base + 10, note: UInt8(b7),
+                                        velocity: UInt8(70 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+            }
+            result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),
+                                    velocity: UInt8(75 + rng.nextInt(upperBound: 11)), durationSteps: 4))
+            result.append(MIDIEvent(stepIndex: base + 14, note: UInt8(approach),
+                                    velocity: UInt8(65 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+        case 3:
+            // Sparse bar: root long hold + approach only — breathing room every 4th bar.
+            result.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                    velocity: UInt8(78 + rng.nextInt(upperBound: 11)), durationSteps: 12))
+            result.append(MIDIEvent(stepIndex: base + 14, note: UInt8(approach),
+                                    velocity: UInt8(62 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+        default:
+            // Original shape (bars 0 and 2 of the cycle)
+            result.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                    velocity: UInt8(80 + rng.nextInt(upperBound: 11)), durationSteps: 8))
+            if rng.nextDouble() < 0.70 {
+                let fifth = snapToScale(chordRoot + 7, scale: scale)
+                result.append(MIDIEvent(stepIndex: base + 6, note: UInt8(clampBass(fifth)),
+                                        velocity: UInt8(70 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+            }
+            result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),
+                                    velocity: UInt8(75 + rng.nextInt(upperBound: 11)), durationSteps: 6))
+            result.append(MIDIEvent(stepIndex: base + 14, note: UInt8(approach),
+                                    velocity: UInt8(65 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+        }
         return result
     }
 
@@ -305,9 +331,19 @@ struct ChillBassGenerator {
 
     // MARK: - Air Ostinato pattern (CHL-BASS-004)
 
-    private static func buildOstinatoPattern(frame: GlobalMusicalFrame) -> [(Int, Int)] {
+    private static func buildOstinatoPattern(variant: Bool) -> [(Int, Int)] {
         // Returns [(stepInPattern, degreeOffsetFromRoot)]
         // 4-bar pattern: (step 0=bar1, 16=bar2, 32=bar3, 48=bar4)
+        if variant {
+            // Swapped in every third cycle: bar 3 descends through the 5th instead of
+            // climbing to the 3rd, and bar 4 adds a late approach tone instead of just holding.
+            return [
+                (0,  0), (4,  2), (8,  0),            // bar 1: root, 2nd, root
+                (16, 0), (20, 5), (24, 7), (28, 0),   // bar 2: root, 4th, 5th, root
+                (32, 7), (40, 5), (44, 3),             // bar 3: 5th, 4th, 3rd (descending)
+                (48, 0), (60, -2),                     // bar 4: root, then approach tone
+            ]
+        }
         return [
             (0,  0), (4,  2), (8,  0),           // bar 1: root, 2nd, root
             (16, 0), (20, 5), (24, 7), (28, 0),  // bar 2: root, 4th, 5th, root ← bar 2 now starts on root
@@ -358,17 +394,10 @@ struct ChillBassGenerator {
             let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
-            // Cold start: bar 0 is drums-only, bass silent
-            if case .coldStart = structure.introStyle, bar == 0 { continue }
-
-            // Cold stop: final bar silent; crash bar gets a root stab landing with the crash.
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar >= outroEnd - 1 { continue }
-                if bar == outroEnd - 2 {
-                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
-                                            velocity: 80, durationSteps: 3))
-                    continue
-                }
+            switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
+            case .skip: continue
+            case .stabAndSkip(let stab): events.append(stab); continue
+            case .proceed: break
             }
 
             switch label {
@@ -558,6 +587,31 @@ struct ChillBassGenerator {
         return events
     }
 
+    // MARK: - Cold start/stop guard
+
+    /// What to do with a bar at the cold-start/cold-stop edges of the song, shared by every
+    /// bass render function (`generate`, `stGermainOstinato`, `acidJazzGroove`, `bluesBass`).
+    private enum ColdEdgeAction {
+        case proceed
+        case skip
+        case stabAndSkip(MIDIEvent)
+    }
+
+    /// Cold start: bar 0 is drums-only, bass silent. Cold stop: final bar silent; the bar
+    /// before it gets a root stab landing with the crash.
+    private static func coldEdgeAction(bar: Int, base: Int, chordRoot: Int,
+                                        structure: SongStructure) -> ColdEdgeAction {
+        if case .coldStart = structure.introStyle, bar == 0 { return .skip }
+        if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
+            if bar >= outroEnd - 1 { return .skip }
+            if bar == outroEnd - 2 {
+                return .stabAndSkip(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
+                                              velocity: 80, durationSteps: 3))
+            }
+        }
+        return .proceed
+    }
+
     // MARK: - Scale/chord helpers
 
     private static func chordRootNote(frame: GlobalMusicalFrame, chord: ChordWindow?) -> Int {
@@ -616,15 +670,10 @@ struct ChillBassGenerator {
             let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
-            // Cold start/stop guards
-            if case .coldStart = structure.introStyle, bar == 0 { continue }
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar >= outroEnd - 1 { continue }
-                if bar == outroEnd - 2 {
-                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
-                                            velocity: 80, durationSteps: 3))
-                    continue
-                }
+            switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
+            case .skip: continue
+            case .stabAndSkip(let stab): events.append(stab); continue
+            case .proceed: break
             }
 
             let root  = clampBass(chordRoot)
@@ -711,26 +760,37 @@ struct ChillBassGenerator {
         return events
     }
 
-    // MARK: - Blues bass dispatcher (CHL-BASS-009 / CHL-BASS-010 / CHL-BASS-011 / CHL-BASS-012)
+    // MARK: - Blues bass dispatcher (CHL-BASS-001 / 003 / 004 / 009 / 010 / 011 / 012)
 
     /// Selects one blues bass pattern for the whole song, then applies it per bar.
-    /// Pool: CHL-BASS-012 (20%), CHL-BASS-009 (22%), CHL-BASS-011 (22%), CHL-BASS-001 (14%), CHL-BASS-003 (12%), CHL-BASS-010 (10%).
+    /// Pool: CHL-BASS-012/009/011/001/010/003 at 15% each, CHL-BASS-004 (Air Ostinato, trial
+    /// addition) at 10% — deliberately a bit less common than the others.
     private static func bluesBass(frame: GlobalMusicalFrame, structure: SongStructure,
                                    rng: inout SeededRNG,
-                                   usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+                                   usedRuleIDs: inout Set<String>,
+                                   variationAnnotations: inout [(bar: Int, kind: String)]) -> [MIDIEvent] {
         let roll = rng.nextDouble()
-        let useRumba     = roll < 0.20
-        let usePickup    = roll >= 0.20 && roll < 0.42
-        let useAscending = roll >= 0.42 && roll < 0.64
-        let useWalking   = roll >= 0.64 && roll < 0.78
-        let usePulse     = roll >= 0.78 && roll < 0.90   // fixed: was >= 0.90, leaving 0.78–0.90 unmapped
+        let useRumba     = roll < 0.15
+        let usePickup    = roll >= 0.15 && roll < 0.30
+        let useAscending = roll >= 0.30 && roll < 0.45
+        let useWalking   = roll >= 0.45 && roll < 0.60
+        let usePulse     = roll >= 0.60 && roll < 0.75
+        let useOstinato  = roll >= 0.75 && roll < 0.85
+        // else (roll >= 0.85): CHL-BASS-003 walking line
 
         if useRumba          { usedRuleIDs.insert("CHL-BASS-012") }
         else if usePickup    { usedRuleIDs.insert("CHL-BASS-009") }
         else if useAscending { usedRuleIDs.insert("CHL-BASS-011") }
         else if useWalking   { usedRuleIDs.insert("CHL-BASS-001") }
         else if usePulse     { usedRuleIDs.insert("CHL-BASS-010") }
+        else if useOstinato  { usedRuleIDs.insert("CHL-BASS-004") }
         else                 { usedRuleIDs.insert("CHL-BASS-003") }
+
+        // CHL-BASS-004 Air Ostinato (trial addition to the blues pool): same 4-bar tile as
+        // regular Chill, re-rooted to whatever chord is active each bar — including through
+        // the IV/V changes of the 12-bar form, same as every other blues bass rule here.
+        let ostinatoPattern: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(variant: false) : nil
+        let ostinatoVariant: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(variant: true) : nil
 
         // IV/V chord bass style — chosen once, applied to every IV and V bar in the song.
         let ivvRoll = rng.nextDouble()
@@ -756,6 +816,22 @@ struct ChillBassGenerator {
         let rumbaBlues7th    = rng.nextDouble() < 0.50   // enable per-bar 20% b7 sub at step 12
         let rumbaOctaveReset = rng.nextDouble() < 0.30   // step 14 = nextRoot−12 on chord-change bars
 
+        // One subtle bass variation per 16-bar blues-form repeat, landing at random in bars 4-6
+        // of the 8-bar I-chord span (never near a chord change) — applied uniformly regardless
+        // of which bass rule is active, so the long stretch of I chord doesn't feel static.
+        let variationKinds = ["octave shift", "passing tone", "note repeat", "reorder"]
+        var variationBarKinds: [Int: String] = [:]
+        for section in structure.sections where section.label == .A || section.label == .B {
+            var cycleStart = section.startBar
+            while cycleStart < section.endBar {
+                let bar = cycleStart + 3 + rng.nextInt(upperBound: 3)   // bars 4-6 (0-indexed 3-5)
+                if bar < section.endBar {
+                    variationBarKinds[bar] = variationKinds[rng.nextInt(upperBound: variationKinds.count)]
+                }
+                cycleStart += 16
+            }
+        }
+
         var events: [MIDIEvent] = []
         // Turnaround bar: bar 16 of each 16-bar blues cycle — plain root hold (non-rumba rules).
         // A and B sections each have their own form clock so turnarounds fire in both.
@@ -770,17 +846,10 @@ struct ChillBassGenerator {
             let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
-            // Cold start: bar 0 is drums-only, bass silent
-            if case .coldStart = structure.introStyle, bar == 0 { continue }
-
-            // Cold stop guards
-            if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
-                if bar >= outroEnd - 1 { continue }
-                if bar == outroEnd - 2 {
-                    events.append(MIDIEvent(stepIndex: base, note: UInt8(clampBass(chordRoot)),
-                                            velocity: 80, durationSteps: 3))
-                    continue
-                }
+            switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
+            case .skip: continue
+            case .stabAndSkip(let stab): events.append(stab); continue
+            case .proceed: break
             }
 
             switch label {
@@ -824,15 +893,21 @@ struct ChillBassGenerator {
                     break
                 }
 
+                // Capture the range of events this bar is about to append, so a scheduled
+                // variation bar can mutate just this bar's notes regardless of which rule rendered them.
+                let beforeCount = events.count
+
                 // IV and V chords: simplified pattern chosen once per song (ivvIsHold / ivvIsApproach / two-feel).
-                // Pickup and rumba bypass this — both handle all chord contexts in their own riff.
+                // Pickup, rumba, and ostinato bypass this — all three handle every chord context
+                // in their own riff, so add any future rule with the same trait to this list.
+                let usesOwnChordHandling = usePickup || useRumba || useOstinato
                 let isIV = chord?.chordRoot == "4" && chord?.chordType == .min7
                 let isV  = chord?.chordType == .dom7  // dom7 only appears on V in the blues cycle
 
                 // True for the first full 16-bar blues form in B section — enables B-form variants.
                 let isFirstBForm = label == .B && posInForm < 32
 
-                if (isIV || isV) && !usePickup && !useRumba {
+                if (isIV || isV) && !usesOwnChordHandling {
                     let root = clampBass(chordRoot)
                     if ivvIsHold {
                         // Root hold: single sustained note spotlights the chord change.
@@ -853,7 +928,7 @@ struct ChillBassGenerator {
                     }
                 } else if usePickup {
                     events += bluesPickup(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
-                                          firstBForm: isFirstBForm,
+                                          firstBForm: isFirstBForm, formPosition: posInForm,
                                           pickupIsB3: pickupIsB3, step12Interval: step12Interval, echoStyle: echoStyle)
                 } else if useAscending {
                     events += bluesAscendingRiff(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
@@ -879,13 +954,150 @@ struct ChillBassGenerator {
                     events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng,
                                                  firstBForm: isFirstBForm)
                 } else if usePulse {
-                    events += quarterPulse(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
+                    events += quarterPulse(base: base, chordRoot: chordRoot, scale: scale,
+                                           formPosition: posInForm, rng: &rng)
+                } else if useOstinato {
+                    let patBar = bar % 4
+                    let cycleIndex = bar / 4
+                    let activePattern = (cycleIndex % 3 == 2) ? ostinatoVariant! : ostinatoPattern!
+                    let patNotes = activePattern.filter { $0.0 / 16 == patBar }
+                    for (step, deg) in patNotes {
+                        let note = snapToScale(chordRoot + deg, scale: scale)
+                        events.append(MIDIEvent(stepIndex: base + (step % 16), note: UInt8(clampBass(note)),
+                                                velocity: UInt8(80 + rng.nextInt(upperBound: 11)), durationSteps: 2))
+                    }
                 } else {
                     events += walkingLine(bar: bar, chordRoot: chordRoot, scale: scale, rng: &rng)
+                }
+
+                if let kind = variationBarKinds[bar] {
+                    let (mutated, appliedKind) = applyBassVariation(Array(events[beforeCount...]), kind: kind,
+                                                                     chordRoot: chordRoot, scale: scale, rng: &rng)
+                    events.replaceSubrange(beforeCount..., with: mutated)
+                    variationAnnotations.append((bar, appliedKind))
                 }
             }
         }
         return events
+    }
+
+    /// Mutates one bar's worth of already-generated bass events for CHL-BASS variation bars —
+    /// rule-agnostic so it works the same regardless of which of the 7 blues bass rules rendered
+    /// the bar. `scale` anchors the diatonic passing-tone case to the active key (CHL-SYNC-001);
+    /// `chordRoot` anchors the blues blue-note case and the end-of-bar resolution target.
+    /// Returns the events plus the kind actually applied — note repeat and passing tone fall back
+    /// to octave shift whenever they'd otherwise produce no audible change (no room, or a
+    /// "passing" tone that collapses back onto a note already there).
+    private static func applyBassVariation(_ barEvents: [MIDIEvent], kind: String, chordRoot: Int,
+                                            scale: [Int], rng: inout SeededRNG)
+                                            -> (events: [MIDIEvent], appliedKind: String) {
+        guard !barEvents.isEmpty else { return (barEvents, kind) }
+        let result = barEvents.sorted { $0.stepIndex < $1.stepIndex }
+
+        // Reach outside the usual narrow bass register for a short run of 1-3 notes together —
+        // clampBass would clamp right back into range and erase the effect, so widen it here.
+        // Direction is biased, not a coin flip: a note already in the upper half of the normal
+        // register shifts down (never compounding an already-high note even higher).
+        func octaveShift() -> [MIDIEvent] {
+            var r = result
+            let runLen = min(r.count, 1 + rng.nextInt(upperBound: 3))   // 1-3 notes
+            let startIdx = rng.nextInt(upperBound: r.count - runLen + 1)
+            for i in startIdx..<(startIdx + runLen) {
+                let dir = Int(r[i].note) >= 46 ? -12 : 12
+                let shifted = max(28, min(64, Int(r[i].note) + dir))
+                r[i] = MIDIEvent(stepIndex: r[i].stepIndex, note: UInt8(shifted),
+                                 velocity: r[i].velocity, durationSteps: r[i].durationSteps)
+            }
+            return r
+        }
+
+        switch kind {
+        case "octave shift":
+            return (octaveShift(), "octave shift")
+
+        case "note repeat":
+            // Short, quiet echo of a 1-3 note motif from the start of the bar (not just one
+            // note), trimmed to however many actually fit before the bar ends or collide.
+            var mutated = result
+            let motifLen = min(result.count, 1 + rng.nextInt(upperBound: 3))   // 1-3 notes
+            let motif = Array(result[0..<motifLen])
+            let barEnd = (result[0].stepIndex / 16) * 16 + 16
+            var echoEvents: [MIDIEvent] = []
+            var cursor = motif.last!.stepIndex + motif.last!.durationSteps
+            for note in motif {
+                guard cursor + 2 <= barEnd else { break }
+                let collides = result.contains { $0.stepIndex >= cursor && $0.stepIndex < cursor + 2 }
+                guard !collides else { break }
+                let echoVel = UInt8(max(30, Int(note.velocity) - 20))
+                echoEvents.append(MIDIEvent(stepIndex: cursor, note: note.note,
+                                            velocity: echoVel, durationSteps: 2))
+                cursor += 3   // short gap between echoed notes
+            }
+            guard !echoEvents.isEmpty else { return (octaveShift(), "octave shift") }
+            mutated.append(contentsOf: echoEvents)
+            mutated.sort { $0.stepIndex < $1.stepIndex }
+            return (mutated, "note repeat")
+
+        case "reorder":
+            // Reverse the pitch sequence across the bar while keeping the rhythm exactly as-is.
+            guard result.count >= 2 else { return (result, "reorder") }
+            var mutated = result
+            let pitches = Array(result.map { $0.note }.reversed())
+            for i in mutated.indices {
+                mutated[i] = MIDIEvent(stepIndex: mutated[i].stepIndex, note: pitches[i],
+                                       velocity: mutated[i].velocity, durationSteps: mutated[i].durationSteps)
+            }
+            return (mutated, "reorder")
+
+        case "passing tone":
+            // Slip a genuine passing tone into the widest gap between notes (or between the
+            // last note and the bar's resolution toward the next chord root), if there's room.
+            var mutated = result
+            let barStart = (result[0].stepIndex / 16) * 16
+            let barEnd = barStart + 16
+            var bestGapStart = -1, bestGapLen = 0, bestFromIdx = 0
+            for i in 0..<result.count {
+                let gapStart = result[i].stepIndex + result[i].durationSteps
+                let gapEnd = (i + 1 < result.count) ? result[i + 1].stepIndex : barEnd
+                let len = gapEnd - gapStart
+                if len > bestGapLen { bestGapLen = len; bestGapStart = gapStart; bestFromIdx = i }
+            }
+            guard bestGapLen >= 4 else { return (octaveShift(), "octave shift") }
+
+            let fromNote = Int(result[bestFromIdx].note)
+            let toNote = (bestFromIdx + 1 < result.count) ? Int(result[bestFromIdx + 1].note) : clampBass(chordRoot)
+            let interval = toNote - fromNote
+            let sign = interval >= 0 ? 1 : -1
+
+            // Blues signature: a 4th-to-5th gap (either direction) gets the blue note (b5) —
+            // the note the blues scale adds on top of the minor pentatonic specifically to
+            // pass between those two degrees. Deliberately off-scale.
+            let fourthPC = (chordRoot + 5) % 12, fifthPC = (chordRoot + 7) % 12
+            var passingNote: Int? = nil
+            if Set([fromNote % 12, toNote % 12]) == Set([fourthPC, fifthPC]) {
+                passingNote = clampBass(chordRoot + 6)
+            } else if abs(interval) >= 3 {
+                // Diatonic passing tone: genuinely between the two flanking notes (they're a
+                // third or more apart, so this can't just collapse back onto either endpoint).
+                passingNote = snapToScale((fromNote + toNote) / 2, scale: scale)
+            } else if abs(interval) == 2 {
+                // Chromatic passing tone: the only note that fills a whole-step gap is off-scale.
+                passingNote = fromNote + sign
+            }
+            // abs(interval) <= 1: no real gap to pass through — falls through to the guard below.
+
+            guard let pn = passingNote, pn != fromNote, pn != toNote else {
+                return (octaveShift(), "octave shift")
+            }
+            let insertStep = bestGapStart + bestGapLen / 2
+            mutated.append(MIDIEvent(stepIndex: insertStep, note: UInt8(max(28, min(64, pn))),
+                                     velocity: UInt8(55 + rng.nextInt(upperBound: 10)), durationSteps: 2))
+            mutated.sort { $0.stepIndex < $1.stepIndex }
+            return (mutated, "passing tone")
+
+        default:
+            return (result, kind)
+        }
     }
 
     // MARK: - CHL-BASS-009: Blues Pickup
@@ -896,18 +1108,28 @@ struct ChillBassGenerator {
     ///   pickupIsB3     — pickup note at steps 7–8: b3 (30%) or 5th (70%)
     ///   step12Interval — note at step 12: b7/+10 (60%), b3/+3 (25%), 5th/+7 (15%)
     ///   echoStyle      — 0: root echo at step 2 (65%), 1: silence (20%), 2: ghost at step 6 (15%)
+    /// Evolution: `formPosition` (this bar's position within the running 16-bar blues form) flips
+    /// the pickup note and cycles the echo style each time the form repeats, so the pattern
+    /// doesn't stay frozen on the same shape for the whole song. Takes the raw position (not a
+    /// pre-divided form index) for the same reason `quarterPulse` does — keeps the "which form
+    /// repeat is this" math in one place, next to the code that uses it, instead of split between
+    /// the call site and here.
     /// firstBForm: step 14 becomes a chromatic half-step approach (adds tension into next bar).
     private static func bluesPickup(base: Int, chordRoot: Int, scale: [Int],
                                      rng: inout SeededRNG,
                                      firstBForm: Bool = false,
+                                     formPosition: Int = 0,
                                      pickupIsB3: Bool = false,
                                      step12Interval: Int = 10,
                                      echoStyle: Int = 0) -> [MIDIEvent] {
         var result: [MIDIEvent] = []
+        let formIndex = formPosition / 16
+        let effectivePickupIsB3 = formIndex % 2 == 0 ? pickupIsB3 : !pickupIsB3
+        let effectiveEchoStyle  = (echoStyle + formIndex) % 3
         let root       = clampBass(chordRoot)
         let fifth      = clampBass(snapToScale(chordRoot + 7,  scale: scale))
         let b3         = clampBass(snapToScale(chordRoot + 3,  scale: scale))
-        let pickupNote = pickupIsB3 ? b3 : fifth
+        let pickupNote = effectivePickupIsB3 ? b3 : fifth
         let step12Note = clampBass(snapToScale(chordRoot + step12Interval, scale: scale))
         // B-form tail: chromatic half-step below root — pulls forward into next bar's landing.
         let tail14     = firstBForm ? clampBass(chordRoot - 1) : fifth
@@ -916,7 +1138,7 @@ struct ChillBassGenerator {
         result.append(MIDIEvent(stepIndex: base, note: UInt8(root),
                                 velocity: UInt8(82 + rng.nextInt(upperBound: 10)), durationSteps: 5))
         // Echo variant: root echo at step 2, silence, or ghost anticipation at step 6
-        switch echoStyle {
+        switch effectiveEchoStyle {
         case 1:  // silence — open space after root hit
             break
         case 2:  // ghost note at step 6 — soft anticipation one step before the pickup
@@ -945,14 +1167,33 @@ struct ChillBassGenerator {
 
     /// CHL-BASS-010: Quarter-note walking feel on chord tones — root, b3, 5th, b7.
     /// Steady and grounded; works under all blues beat styles.
+    /// Evolution: `formPosition` (this bar's position within the running 16-bar blues form)
+    /// reverses the note order every time the form repeats, and every 4th bar thins out to a
+    /// half-time root+5th "breathing" bar so the pattern doesn't loop identically all song long.
     private static func quarterPulse(base: Int, chordRoot: Int, scale: [Int],
+                                      formPosition: Int = 0,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
         var result: [MIDIEvent] = []
         let root  = clampBass(chordRoot)
         let b3    = clampBass(snapToScale(chordRoot + 3,  scale: scale))
         let fifth = clampBass(snapToScale(chordRoot + 7,  scale: scale))
         let b7    = clampBass(snapToScale(chordRoot + 10, scale: scale))
-        let notes = [root, b3, fifth, b7]
+
+        let formIndex   = formPosition / 16
+        let reversed    = formIndex % 2 == 1
+        let isBreathBar = formPosition % 4 == 3
+
+        if isBreathBar {
+            let (n1, n2) = reversed ? (b7, b3) : (root, fifth)
+            result.append(MIDIEvent(stepIndex: base,     note: UInt8(n1),
+                                    velocity: UInt8(75 + rng.nextInt(upperBound: 12)), durationSteps: 8))
+            result.append(MIDIEvent(stepIndex: base + 8, note: UInt8(n2),
+                                    velocity: UInt8(70 + rng.nextInt(upperBound: 12)), durationSteps: 8))
+            return result
+        }
+
+        let ascending: [Int] = [root, b3, fifth, b7]
+        let notes: [Int] = reversed ? Array(ascending.reversed()) : ascending
         let steps = [0, 4, 8, 12]
         for (note, step) in zip(notes, steps) {
             let vel = UInt8(75 + rng.nextInt(upperBound: 12))

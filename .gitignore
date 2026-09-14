@@ -13,3 +13,9 @@ Zudio.app/
 
 # Working notes — not source
 docs/Zudio future features.rtf
+
+# Build output and local agent config — not source
+build/
+.claude/
+*.ips
+tools/batch-output/

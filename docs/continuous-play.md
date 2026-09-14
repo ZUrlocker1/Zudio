@@ -36,12 +36,31 @@ The four styles sit on a fixed linear axis:
 Ambient  ←→  Chill  ←→  Kosmic  ←→  Motorik
 ```
 
-Movement is normally ±1 step. The endpoints have a **25% escape valve** to prevent ping-pong traps:
+Movement is normally ±1 step, but the exact probabilities are **asymmetric per side** — tuned (2026) to hit a target style mix rather than a flat/symmetric split:
 
-- **Ambient**: 75% → Chill, 25% → Kosmic (two-step jump)
-- **Chill**: 50% → Ambient, 50% → Kosmic
-- **Kosmic**: 50% → Chill, 50% → Motorik
-- **Motorik**: 75% → Kosmic, 25% → Chill (two-step jump)
+- **Ambient**: ~68% → Chill, ~32% → Kosmic (two-step escape valve, breaks ping-pong traps)
+- **Chill**: ~92% → Ambient, ~8% → Kosmic (forward valve — occasional direct advance)
+- **Kosmic**: ~83% → Motorik, ~17% → Chill
+- **Motorik**: ~85% → Kosmic, ~15% → Chill (two-step escape valve, mirrors Ambient's)
+
+**Matched escape valves:** an earlier version of this tuning gave Motorik no escape valve at all — it always stepped back to Kosmic. That hit an exact target percentage, but made Kosmic/Motorik a one-way trap only escapable via Kosmic's 17% roll: simulating the chain showed a median unbroken Kosmic/Motorik streak of 16 songs, with ~30% of streaks running 28+ songs. Restoring Motorik's valve roughly halves streak length (median ~9, ~11% running 28+ songs).
+
+**Chill's forward valve:** the original symmetric design gave Chill a 50/50 split (Ambient or Kosmic). The first version of the 2026 retune removed that entirely — Chill always returned to Ambient — specifically so Ambient's share would land exactly equal to Chill's. That was a bigger change than a probability tweak; it deleted one of Chill's two transitions. Chill's forward valve to Kosmic has been restored, tuned small (8%) so the Ambient/Chill split stays close to the 22.5%/22.5% optimum (see below) while still giving Chill some two-way movement. An earlier version of this fix used 15%, which pushed the split out to ~20.7%/24.3% — noticeably further from optimum than desired, so it was dialed back.
+
+This is a random walk, not a flat weight table, so the actual long-run frequency of each style is the *steady state* of that walk, not the numbers above directly. Simulating the underlying Markov chain (including the shift-timing rule and the pair-streak cap below) gives roughly:
+
+- Ambient: ~19.5%
+- Chill: ~24%
+- Kosmic: ~32%
+- Motorik: ~24.5%
+
+(Slightly off the pure-valve target of 21.6%/23.4%/30%/25% — the pair-streak cap below nudges these a little, since it occasionally forces a crossing the probabilities alone wouldn't have chosen. Tighter caps push the split further from the pure-valve target; this is an expected, deliberate trade-off for tighter worst-case bounds.)
+
+**A structural limit worth knowing:** Ambient can only ever be *reached* from Chill — no other transition leads to it — so Ambient's steady-state share can never exceed Chill's, no matter how the probabilities above are tuned. The reverse also holds while Kosmic=30%/Motorik=25% stay fixed: Chill's share can never go *below* 22.5% either. The two meet at exactly 22.5%/22.5% only when Chill's forward valve is 0%; any nonzero valve necessarily pushes Chill above, and Ambient below, that point — so "occasional forward motion" and "Ambient/Chill as close to equal as possible" are in direct tension, and the valve size is a dial between them.
+
+**Pair-streak hard cap (2026):** the valves above only bound the *average* streak length, not the worst case. A probabilistic walk can occasionally get stuck in one pair of adjacent styles for a long time by chance — this was discovered when a real 34-song Endless session landed on ~50% Chill and under 12% combined Kosmic+Motorik, a ~1-in-25 outcome under the valve-only design. To bound the worst case directly: the engine now tracks how many consecutive songs have been confined to one pair — **Ambient+Chill** or **Kosmic+Motorik** — and once that count hits a cap, the *next* transition is forced across to the other pair regardless of the dice roll. The cap differs by pair: **8 songs for Ambient+Chill, 12 for Kosmic+Motorik** (smaller for the less-favored pair). This only ever intervenes in the rare tail case — simulated worst-case streaks are now bounded at 10 (Ambient+Chill) and 14 (Kosmic+Motorik).
+
+*(Earlier revision of this doc described a simpler, fully symmetric design — 25% escape valve at both ends, 50/50 at both middle nodes — which gave a steady state of roughly Ambient 20% / Chill 30% / Kosmic 30% / Motorik 20%. That was changed because Chill was over-represented.)*
 
 ### When style shifts happen
 

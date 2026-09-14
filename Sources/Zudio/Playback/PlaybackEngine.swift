@@ -184,8 +184,9 @@ final class PlaybackEngine: ObservableObject {
     var onMissingPatch: ((Int, Int) -> Void)? = nil   // (trackIndex, program)
     // onAudioInterrupted: fired on iOS when another app takes audio focus (e.g. Apple Music starts)
     // or when headphones are pulled. PlaybackEngine.stop() has already been called; AppState uses
-    // this to stop audioTexture (Chill background loop) and any other non-engine audio.
-    var onAudioInterrupted: (() -> Void)? = nil
+    // this to stop audioTexture (Chill background loop) and any other non-engine audio, and to log
+    // a short status-log line. The String is a short human-readable reason for that log line.
+    var onAudioInterrupted: ((String) -> Void)? = nil
     // Set to true once the corresponding callback fires; reset on load(), seek(), switchToPass().
     private var approachingEndFired = false
     private var outroStartFired     = false
@@ -339,7 +340,7 @@ final class PlaybackEngine: ObservableObject {
                   type == .began
             else { return }
             self.stopSchedulerOnly()
-            self.onAudioInterrupted?()
+            self.onAudioInterrupted?("Stopped by another app")
         }
 
         // routeChangeNotification fires when headphones connect or disconnect.
@@ -359,7 +360,7 @@ final class PlaybackEngine: ObservableObject {
             case .oldDeviceUnavailable:
                 // Headphones pulled — stop scheduler (don't touch session, restartAudio re-arms it)
                 self.stopSchedulerOnly()
-                self.onAudioInterrupted?()
+                self.onAudioInterrupted?("Stopped, output disconnected")
                 self.restartAudio()
             case .newDeviceAvailable:
                 self.restartAudio()
@@ -1217,8 +1218,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — general fallback
             } else if trackIndex == kTrackBass && kosmicStyle {
                 vol = 0.80   // Kosmic bass slightly quieter overall
+            } else if trackIndex == kTrackBass && chillPadsMode && program == 32 {
+                vol = 0.48   // Acoustic Bass runs hot on Chill bass — 1.6 dB under Elec Bass (0.58)
+            } else if trackIndex == kTrackBass && chillPadsMode && program == 35 {
+                vol = 0.48   // Fretless Bass runs hot on Chill bass — 1.6 dB under Elec Bass (0.58)
             } else if trackIndex == kTrackBass && chillPadsMode {
-                vol = 0.82   // Chill bass slightly quieter overall
+                vol = 0.58   // Chill bass quieter overall (Elec Bass, program 33) — 3 dB under old 0.82
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 8080 {
                 vol = 0.80   // Sine Wave — lower from initial guess
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 76 {
@@ -1419,12 +1424,17 @@ final class PlaybackEngine: ObservableObject {
             delays[i].feedback      = ambientDelayFeedback[i]
             delays[i].lowPassCutoff = ambientDelayLowpass[i]
         }
-        // Ambient Piano: smaller reverb (0.28 send instead of 0.65), no delay.
+        // Ambient Piano: moderate reverb (0.56 send instead of 0.65) and a short, fixed-time
+        // doubling instead of full ambient delay. The general loop above ties delayTime to the
+        // song tempo (0.75 beats — audible as a distinct dotted-quarter/quarter-note repeat at
+        // slow ambient tempos); a solo piano this exposed needs thickening, not an audible echo,
+        // so this uses a fixed short time well under 150ms — short enough to read as room
+        // reflection/doubling rather than a separate rhythmic repeat.
         if songState?.isAmbientPiano == true {
-            connectSend(kTrackLead1, to: .small, level: 0.28)
+            connectSend(kTrackLead1, to: .small, level: 0.56)
+            delays[kTrackLead1].delayTime     = 0.09
             delays[kTrackLead1].feedback      = 0
-            delays[kTrackLead1].lowPassCutoff = 2000
-            setEffect(.delay, enabled: false, forTrack: kTrackLead1)
+            delays[kTrackLead1].lowPassCutoff = 2800
         }
         // Enable HPF (250 Hz) on Lead and Texture to prevent reverb low-end muddiness.
         let hpfTracks: Set<Int> = [kTrackLead1, kTrackLead2, kTrackTexture]
@@ -1589,7 +1599,7 @@ final class PlaybackEngine: ObservableObject {
             delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
                 let wet: Float = (trackIndex == kTrackLead1 && songState?.isAmbientPiano == true)
-                    ? 18   // piano with LH accompaniment needs subtler echo than standard ambient (40)
+                    ? 14   // piano needs a touch of thickening, not an audible repeating echo
                     : ambientDelayWet[trackIndex]
                 delays[trackIndex].wetDryMix = enabled ? wet : 0
             } else if chillPadsMode && trackIndex == kTrackLead1 {

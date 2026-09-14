@@ -784,6 +784,12 @@ struct SongGenerator {
         if let r = forcePadsRuleID  { forced["Pads"]   = r }
         if let r = forceLeadRuleID  { forced["Lead"]   = r }
         if let r = forceTexRuleID   { forced["Tex"]    = r }
+        // forceBridge/forcePercussionStyle (curated first-song path) gate a
+        // forceBridge || rng.nextDouble() short-circuit in CosmicStructureGenerator — if not
+        // captured here and replayed on load, reloading re-rolls the form from scratch and can
+        // silently produce a different song. Recorded via the same "Forced Rules:" round-trip.
+        if forceBridge                  { forced["Bridge"]    = "true" }
+        if let p = forcePercussionStyle { forced["PercStyle"] = p.rawValue }
 
         return SongState(
             frame: frame,
@@ -955,6 +961,7 @@ struct SongGenerator {
             }
             var forced: [String: String] = [:]
             if let r = forceAmbientPianoRule { forced["Piano"] = r }
+            if let p = forcePercussionStyle  { forced["PercStyle"] = p.rawValue }
             return SongState(
                 frame: frame, structure: structure, tonalMap: tonalMap,
                 trackEvents: trackEvents, globalSeed: seed, trackOverrides: [:],
@@ -1393,6 +1400,7 @@ struct SongGenerator {
         if let r = forcePadsRuleID  { forced["Pads"]   = r }
         if let r = forceLeadRuleID  { forced["Lead"]   = r }
         if let r = forceTexRuleID   { forced["Tex"]    = r }
+        if let p = forcePercussionStyle { forced["PercStyle"] = p.rawValue }
 
         return SongState(
             frame: frame, structure: structure, tonalMap: tonalMap,
@@ -1431,6 +1439,13 @@ struct SongGenerator {
         var regenAmbientAudioTexture: String? = songState.ambientAudioTexture
         var regenAmbientAudioOffset:  Int     = songState.ambientAudioTextureOffset
         var ambientAudioTextureChanged = false
+        // Chill Blues bass variation bars — captured here (instead of discarded) so the
+        // regenerated track's own annotations replace the stale ones from whatever bass rule
+        // was previously in place (see stepAnnotations rebuild below).
+        var chillBassVariationRegen: [(bar: Int, kind: String)] = []
+        // Chill Rhythm comping-mode switch point — same staleness concern as bass variation:
+        // captured here so the regenerated track's own switch bar/rule replaces the old one.
+        var chillRhythmSwitchRegen: (bar: Int, ruleID: String)? = nil
         switch trackIndex {
         case kTrackDrums:
             if isAmbPiano {
@@ -1491,7 +1506,8 @@ struct SongGenerator {
                     beatStyle: songState.chillBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules,
+                    variationAnnotations: &chillBassVariationRegen)
             } else {
                 let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
                 var scratch = songState.trackEvents
@@ -1625,11 +1641,11 @@ struct SongGenerator {
             } else if isChill {
                 events = ChillRhythmGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
-                    mood: songState.frame.mood,
                     beatStyle: songState.chillBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules,
+                    switchAnnotation: &chillRhythmSwitchRegen)
             } else {
                 events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
@@ -1689,7 +1705,39 @@ struct SongGenerator {
             }
         }
 
-        var updated = songState.replacingEvents(events, forTrack: trackIndex, appendingLog: regenLog)
+        // Bass regen: drop stale "Bass variation ..." annotations left over from whichever bass
+        // rule was previously in place, and replace them with this regen's own (if any) — a
+        // regenerated bass track's variation bars are almost certainly at different bars/kinds.
+        var newStepAnnotations: [Int: [GenerationLogEntry]]? = nil
+        if trackIndex == kTrackBass && isChill {
+            var cleared = songState.stepAnnotations
+            for key in cleared.keys {
+                cleared[key]?.removeAll { $0.tag == "Bass" && $0.description.hasPrefix("variation") }
+                if cleared[key]?.isEmpty == true { cleared.removeValue(forKey: key) }
+            }
+            for (bar, kind) in chillBassVariationRegen {
+                cleared[bar * 16, default: []].append(GenerationLogEntry(tag: "Bass", description: "variation \(kind)"))
+            }
+            newStepAnnotations = cleared
+        }
+
+        // Rhythm regen: same staleness concern as Bass above — drop the old "Rhythm switch to
+        // ..." line and replace it with this regen's own switch point (if any).
+        if trackIndex == kTrackRhythm && isChill {
+            var cleared = songState.stepAnnotations
+            for key in cleared.keys {
+                cleared[key]?.removeAll { $0.tag == "Rhythm" && $0.description.hasPrefix("switch to") }
+                if cleared[key]?.isEmpty == true { cleared.removeValue(forKey: key) }
+            }
+            if let (bar, ruleID) = chillRhythmSwitchRegen {
+                cleared[bar * 16, default: []].append(
+                    GenerationLogEntry(tag: "Rhythm", description: "switch to \(chillRhythmShortName(ruleID))"))
+            }
+            newStepAnnotations = cleared
+        }
+
+        var updated = songState.replacingEvents(events, forTrack: trackIndex, appendingLog: regenLog,
+                                                 replacingStepAnnotations: newStepAnnotations)
         if ambientAudioTextureChanged {
             updated = updated.withAmbientAudioTexture(regenAmbientAudioTexture, offset: regenAmbientAudioOffset)
         }
@@ -2547,7 +2595,8 @@ struct SongGenerator {
         chillDrumFillBars: [Int] = [],
         bluesVariation: Bool = false,
         bluesIVVDesc: String = "",
-        driftBridgeLabels: [Int: String] = [:]
+        driftBridgeLabels: [Int: String] = [:],
+        chillRhythmSwitch: (bar: Int, ruleID: String)? = nil
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -2985,7 +3034,10 @@ struct SongGenerator {
         //    (KOS-BASS-006/007) masks fingerprint changes. Applied with 4-bar cooldown.
         // B) Fingerprint: 4-bar pitch-class window comparison + density check. Fallback
         //    for patterns not covered by explicit tracking. 8-bar cooldown.
-        if kTrackBass < trackEvents.count {
+        // Skipped for Chill Blues — the bass variation bars are now tracked explicitly (see
+        // chillBassVariationAnnotations at the call site), which would otherwise double up with
+        // this generic fingerprint-based detector at the same bar.
+        if kTrackBass < trackEvents.count && !bluesVariation {
             var lastEvolvedBar: Int = -8
 
             if !bassEvolutionBars.isEmpty {
@@ -3049,8 +3101,12 @@ struct SongGenerator {
 
         // 6. Pads and Rhythm pattern changes — compare step-position fingerprints between body sections.
         // PAD-001 auto-breaks to PAD-007 after 4 bars; Rhythm picks a new rule per section;
-        // fingerprint comparison catches meaningful rhythmic shifts in both tracks.
+        // fingerprint comparison catches meaningful rhythmic shifts in both tracks. Rhythm is
+        // skipped here when chillRhythmSwitch is provided — Chill names its own switch point and
+        // target rule explicitly (see call site), which would otherwise double up with this
+        // generic "pattern changes" line at the same bar.
         for (patternTrack, patternTag) in [(kTrackPads, "Pads"), (kTrackRhythm, "Rhythm")] {
+            if patternTrack == kTrackRhythm && chillRhythmSwitch != nil { continue }
             guard patternTrack < trackEvents.count else { continue }
             let evs = trackEvents[patternTrack]
             var prevStepFP: Set<Int>? = nil
@@ -3246,11 +3302,13 @@ struct SongGenerator {
 
         // Step 4 — Bass
         var bassRules: Set<String> = []
+        var chillBassVariationAnnotations: [(bar: Int, kind: String)] = []
         trackEvents[kTrackBass] = ChillBassGenerator.generate(
             frame: frame, structure: structure, chillProgFamily: chillProgFamily,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
             bluesVariation: bluesVariation,
-            rng: &bassRNG, usedRuleIDs: &bassRules
+            rng: &bassRNG, usedRuleIDs: &bassRules,
+            variationAnnotations: &chillBassVariationAnnotations
         )
 
         // Step 5 — Pads (sustained harmonic layer)
@@ -3391,11 +3449,13 @@ struct SongGenerator {
 
         // Step 7 — Rhythm (Rhodes active comping)
         var rhythmRules: Set<String> = []
+        var chillRhythmSwitchAnnotation: (bar: Int, ruleID: String)? = nil
         trackEvents[kTrackRhythm] = ChillRhythmGenerator.generate(
-            frame: frame, structure: structure, mood: frame.mood,
+            frame: frame, structure: structure,
             beatStyle: chillBeatStyle,
             breakdownStyle: chillBreakdownStyle, bluesVariation: bluesVariation,
-            rng: &rhythmRNG, usedRuleIDs: &rhythmRules
+            rng: &rhythmRNG, usedRuleIDs: &rhythmRules,
+            switchAnnotation: &chillRhythmSwitchAnnotation
         )
 
         // Texture track: audio-only — no MIDI events generated here.
@@ -3531,8 +3591,23 @@ struct SongGenerator {
             chillBreakdownStyle: chillBreakdownStyle,
             chillDrumFillBars: drumFillBars,
             bluesVariation: bluesVariation,
-            bluesIVVDesc: bluesIVVDesc
+            bluesIVVDesc: bluesIVVDesc,
+            chillRhythmSwitch: chillRhythmSwitchAnnotation
         )
+        // Rhythm comping-mode switch (both the natural B-section boundary and the Simple-form
+        // forced mid-body switch) — names the specific rule it switches to, e.g.
+        // "Rhythm switch to Moby backbeat beat", instead of a vague "evolving". Replaces the
+        // generic fingerprint-based Rhythm detector for Chill (suppressed inside
+        // buildStepAnnotations when chillRhythmSwitch is provided, to avoid a duplicate line).
+        if let (bar, ruleID) = chillRhythmSwitchAnnotation {
+            stepAnnotations[bar * 16, default: []].append(
+                GenerationLogEntry(tag: "Rhythm", description: "switch to \(chillRhythmShortName(ruleID))"))
+        }
+        // Chill Blues: subtle bass variation once per 16-bar form repeat (bars 4-6 of the I chord).
+        for (bar, kind) in chillBassVariationAnnotations {
+            stepAnnotations[bar * 16, default: []].append(
+                GenerationLogEntry(tag: "Bass", description: "variation \(kind)"))
+        }
         func harmonyDesc(_ h: (bar: Int, isUnison: Bool, intervalSteps: Int)) -> String {
             if h.isUnison      { return "Lead 2 harmony - unison" }
             if h.intervalSteps == 2 { return "Lead 2 harmony - third" }
@@ -3733,6 +3808,20 @@ struct SongGenerator {
         return log
     }
 
+    /// Short comping-mode names for the "Rhythm switch to X" log line — drops the descriptive
+    /// suffix used elsewhere (e.g. "Bosa Moon" not "Bosa Moon broken chord") so the line stays short.
+    private static func chillRhythmShortName(_ ruleID: String) -> String {
+        switch ruleID {
+        case "CHL-RHY-001": return "St Germain"
+        case "CHL-RHY-002": return "Moby Backbeat"
+        case "CHL-RHY-003": return "Bosa Moon"
+        case "CHL-RHY-004": return "Acid Jazz"
+        case "CHL-RHY-005": return "Chord Hold"
+        case "CHL-RHY-006": return "Downbeat Pulse"
+        default:            return chillRuleDescription(ruleID)
+        }
+    }
+
     private static func chillRuleDescription(_ ruleID: String) -> String {
         if ruleID.hasPrefix("CHL-LD2-HARM-") { return "Lead 2 harmony" }
         if ruleID.hasPrefix("CHL-LD2-UNIS-") { return "Lead 2 unison" }
@@ -3779,6 +3868,8 @@ struct SongGenerator {
         case "CHL-RHY-002":  return "Moby backbeat beat"
         case "CHL-RHY-003":  return "Bosa Moon broken chord"
         case "CHL-RHY-004":  return "Acid jazz off-beat stab"
+        case "CHL-RHY-005":  return "Chord hold"
+        case "CHL-RHY-006":  return "Downbeat pulse"
         default:             return ruleID
         }
     }

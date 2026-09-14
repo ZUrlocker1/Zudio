@@ -52,7 +52,7 @@ struct KosmicTitleGenerator {
         "Arc", "Field", "Drift", "Pulse", "Nebula", "Void", "Ether", "Gear",
         "Flux", "Prism", "Helix", "Vortex", "Horizon", "Signal", "Connection",
         "Current", "Phase", "Lattice", "Aurora", "Apex", "Zenith", "Crescendo",
-        "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra", "Zorvaak"
+        "Parallax", "Apogee", "Solstice", "Perihelion", "Penumbra", "Galaxy"
     ]
 
     /// Invented Greek-style words — Tangerine Dream aesthetic (-on, -eon, -ax endings)

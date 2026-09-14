@@ -39,6 +39,11 @@
                 <string>public.plain-text</string>
                 <string>public.data</string>
             </array>
+            <!-- Do not add public.mime-type here without testing on iOS 18. It was tried
+                 in Sept 2026 to restore the missing "Open in Zudio" chip on iOS 26 and made
+                 no difference: inspection of the Messages database showed .zudio attachments
+                 were already typed correctly as com.zudio.song with no MIME tag at all.
+                 The chip's disappearance is an iOS 26 change, not a typing problem. -->
             <key>UTTypeTagSpecification</key>
             <dict>
                 <key>public.filename-extension</key>

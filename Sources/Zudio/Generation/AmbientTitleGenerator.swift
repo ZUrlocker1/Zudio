@@ -199,7 +199,7 @@ struct AmbientTitleGenerator {
     private static let jmjConcepts = [
         "Oxygene", "Equinoxe", "Magnetique", "Kronologie", "Electrique",
         "Metamorphoses", "Electronique", "Atmosphere", "Crezendo",
-        "Cozmique", "Solstice", "Meridien", "Lumineux", "Zorvaak",
+        "Cozmique", "Solstice", "Anthropique", "Lumineux", "Galactique",
         "Telephonie", "Zenith", "Isotrope", "Maladoxe", "Zut Alors"
     ]
 
@@ -321,9 +321,9 @@ struct AmbientTitleGenerator {
 
     // AI entities — for "The ___ Arrangements" style
     private static let aiEntities = [
-        "Claude", "Akron", "Cleveland", "Gemini", "Model",
-        "Code", "Foundation Model", "Transformer", "AI", "Agentic",
-        "Inference Engine", "Software", "Prompt", "Buddha"
+        "Claude", "Akron", "Anthropic", "Gemini", "Model",
+        "Code", "Frontier", "Transformer", "AI", "Agentic",
+        "Router", "Software", "Instinct", "Agent"
     ]
 
     // Words that follow an AI entity name

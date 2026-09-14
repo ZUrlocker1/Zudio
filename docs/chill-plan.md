@@ -652,16 +652,27 @@ plays root notes on beat 1, with occasional approach tones a semitone below the 
 chord changes. Active walking bass lines appear only in the groove body sections of Bright/Free
 songs. The bass is never flashy or melodically dominant.
 
-**CHILL-RULE-09 — Wind instrument character by mood**
+**CHILL-RULE-09 — Wind instrument character by mood** *(planned; not shipped — see 2026 note)*
 Deep/Dream moods: muted trumpet and saxophone lead (darker, more introspective phrasing).
 Bright/Free moods: flute and vibraphone lead (lighter, more buoyant phrasing). The
 instrument selection is fixed for the song at generation time and logged as a forced rule.
+**As shipped, `pickLeadInstrument` is flat and mood-independent** — equal weight over muted
+trumpet, saxophone, trumpet, tenor sax, clarinet, for every mood. Flute and vibraphone are
+Lead 2 only, never selected here. The mood-based split above was the original design intent
+but was never implemented; the function's dead `mood` parameter was removed in the 2026
+mood-architecture audit rather than the feature being built. Revisit if this is wanted later.
 
-**CHILL-RULE-10 — Swing by mood**
+**CHILL-RULE-10 — Swing by mood** *(planned; not shipped)*
 Deep/Dream moods play straight 4/4 (electronic beats quantized to the grid). Bright/Free
 moods use a light swing feel — 8th notes at approximately 55/45 ratio (not heavy bebop
 swing). Straight feel is produced by normal step quantization; swing is simulated by
 advancing odd 8th-note steps by 1 tick (2 ticks = 1 step).
+**As shipped, `swingFeel` is hardcoded `false`** (`ChillMusicalFrameGenerator.swift`: "swing
+not yet implemented — requires sub-step timing") — true sub-step swing was never built
+anywhere in the engine, for any style. The 2026 Rhythm-track variety work (occasional
+AND-of-beat hits, staccato punctuation, dropped pulses in Chord Hold/Downbeat Pulse)
+deliberately used that as musical-variety language instead of attempting real swing timing,
+since the latter would require touching step-to-time conversion at the engine level.
 
 **CHILL-RULE-11 — Breakdown section is essential**
 Every Chill song has a breakdown section (bass + sparse Rhodes or bass + drums only) that
@@ -711,10 +722,21 @@ Progression families (new ChillProgressionFamily enum):
 
 Chill-specific metadata output:
 - chillProgFamily: ChillProgressionFamily
-- leadInstrument: ChillLeadInstrument (Flute, MutedTrumpet, Vibraphone, Saxophone)
-  assigned here based on mood; logged as a forced rule
-- swingFeel: Bool (true for Bright/Free moods)
-- beatStyle: ChillBeatStyle (electronic / neoSoul / brushKit) based on mood
+- leadInstrument: ChillLeadInstrument — **as shipped, this is flat/mood-independent**: equal weight
+  over muted trumpet, saxophone, trumpet, tenor sax, clarinet (Blues songs use their own separate
+  equally-weighted horn/reed pool). The original plan called for mood-based assignment (Deep/Dream
+  → muted trumpet/sax, Bright/Free → flute/vibraphone, per CHILL-RULE-09 above) but that was never
+  wired up — `pickLeadInstrument` used to take an unused `mood` parameter; the dead parameter was
+  removed in the 2026 mood-audit rather than the feature being implemented. Flute and vibraphone
+  are Lead 2 only, not part of this pool.
+- swingFeel: Bool — **as shipped, always false.** True swing (sub-step timing) was never
+  implemented anywhere in the engine; see CHILL-RULE-10 above, which documents the originally
+  planned mechanism as a still-unbuilt idea, not current behavior.
+- beatStyle: ChillBeatStyle — **as shipped, flat/mood-independent**: equal weight over 5 styles
+  (electronic, neoSoul, brushKit, stGermain, hipHopJazz) for regular songs; Blues songs use a
+  separate flat 4-way pool excluding stGermain. An earlier revision of this generator did weight
+  beat style by mood (see the Quality Fix History below) but that was reverted to the current flat
+  roll.
 
 ---
 
@@ -1970,6 +1992,38 @@ is selected, including CHL-PAD-004 Absent.
 
 ### Rhythm
 
+> **2026 update — the section below is the original planning draft and no longer matches the
+> shipped implementation.** Rule IDs were reused for entirely different rules along the way
+> (e.g. the current CHL-RHY-004/005/006 are not "Deep Sustain" / "Space Rule" / "Breakdown and
+> Intro Silence" as described below — see `ChillRhythmGenerator.swift` for ground truth). As
+> actually shipped:
+> - Six comping modes: CHL-RHY-001 St Germain Syncopated, CHL-RHY-002 Moby Backbeat, CHL-RHY-003
+>   Bosa Moon Arpeggiated, CHL-RHY-004 Acid Jazz Stab Groove (hipHopJazz beat style only, not
+>   part of the general pool below), CHL-RHY-005 Chord Hold, CHL-RHY-006 Downbeat Pulse.
+> - Selection is **flat/mood-independent** (see `pickCompingMode`) — a single weighted roll
+>   (Bosa Moon 30%, Moby 20%, Chord Hold 19%, St Germain 17%, Downbeat Pulse 14%), not the
+>   mood-gated tables this draft describes. This was deliberately flattened in 2026: an earlier
+>   mood-weighted version made every "how often does rule X appear" question require a Monte
+>   Carlo simulation to answer, for a real but marginal audible benefit. See docs/change-log.md.
+> - Every song picks two *different* comping modes (one for the A-ish portion, one for B/mid-body)
+>   — this "modeA != modeB" pairing, not the per-rule "Evolution" schedules described below, is
+>   what actually varies the comping character across a song.
+> - Bosa Moon (the busiest mode — 100% step coverage on its dense bar) has a real 8-bar
+>   micro-form: 4 dense bars, then 4 bars that thin out (half-density arpeggio or genuinely
+>   sparse, mixed) — active from bar 1 of the section, not a footnote exception.
+> - Each A/B section is tiled into 12-16 bar segments, each independently ~35% likely to go
+>   sparse (up to 2 per section) — the busier modes fall back to a sparse shape; Moby gets a
+>   half-time variant.
+> - A rarer "dropout" fragment (Rhythm fully silent for one 12-16 bar stretch) fires in ~20% of
+>   songs generally, and always when Bosa Moon is in play.
+> - Chord Hold and Downbeat Pulse (both added 2026) have their own light internal variation —
+>   occasional syncopated/staccato hits, breathing gaps — see source for specifics.
+>
+> The detailed step positions, voicings, and per-section "Evolution" behavior described in the
+> rules below reflect the original design intent and the real MIDI-analysis research (St Germain
+> "So Flute", Moby "Why Does My Heart Feel So Bad") that motivated the shipped rules' character —
+> useful historical context — but do not describe the current bar-by-bar mechanics.
+
 One primary comping rule selected per song based on mood and beat style. Rhythm is the
 active harmonic voice in Chill — the Rhodes electric piano that defines the style. Unlike
 Pads (which sustains), Rhythm comps rhythmically and drives the groove feel. Absent in
@@ -2442,10 +2496,12 @@ structurally strong beat (beat 1 or beat 3).
 **CHL-SYNC-006 — Override state cleared after generation**
 
 `frame.keyOverride`, `frame.modeOverride`, `frame.tempoOverride` must all be set to `nil`
-immediately after `SongGenerator.generateChill()` completes. Chill's mood-dependent
-parameters (BPM range, beat style, lead instrument) make it especially vulnerable to
-override lock-in if the previous song's state persists. This was confirmed in Motorik as
-a key clustering bug (five consecutive E Dorian songs).
+immediately after `SongGenerator.generateChill()` completes. Chill's mood-dependent BPM
+range makes it especially vulnerable to override lock-in if the previous song's state
+persists. (Beat style and lead instrument are *not* mood-dependent as shipped — see the
+Chill-specific metadata note under ChillMusicalFrameGenerator above — so only tempo carries
+this particular risk today.) This was confirmed in Motorik as a key clustering bug (five
+consecutive E Dorian songs).
 
 ---
 

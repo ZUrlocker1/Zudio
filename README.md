@@ -21,6 +21,14 @@ This repository contains the macOS app source, implementation notes, and support
 
 Current release: `2.4` (build 129). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
+**In progress for v2.5:**
+- **Endless mix rebalanced** — More Kosmic and Motorik, slightly less Chill and Ambient, plus a streak cap so Endless mode stops bouncing between the same two styles for long stretches.
+- **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars.
+- **Chill bass levels reduced** — All three Chill bass instruments turned down; Acoustic Bass and Fretless Bass were running noticeably hot. Chill Blues is affected too, since it uses the same pool.
+- **Zudio file type on Mac** — Fixed `.zudio` files showing as text documents and opening in the iPad app instead of the Mac app.
+- **Known issue on iOS 26** — Sharing a song over iMessage no longer offers an "Open in Zudio" button. This is an iOS 26 change, confirmed by the same build behaving correctly on iOS 18; the file still opens in Zudio via Save to Files.
+- **Air effect in stem export** — Fixed the Air effect using the wrong EQ shape when exporting separate track stems, which made Air-enabled stems duller than the mix. Normal audio export was unaffected.
+
 **What's new in v2.4:**
 - **Motorik Arcade** — New Motorik substyle inspired by the fast, bright, arpeggiated sound of classic arcade and early video game music (Tempest 2000, Contra, Sonic). Features 4-on-the-floor kick, mid-register bass, Lydian/Mixolydian modes, and new arpeggio-driven lead rules including Octave Bounce, Triad Climb, Arcade Arp, and Gate Arp.
 - **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass.

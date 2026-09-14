@@ -1,8 +1,9 @@
 // ChillRhythmGenerator.swift — Chill generation step 7 (Rhythm track)
 // Copyright (c) 2026 Zack Urlocker
 // Rhythm = Rhodes active comping (Electric Piano 1, program 4).
-// Four comping modes: St Germain syncopated (Bright/Free), Moby backbeat (Deep/Dream),
-// Bosa Moon arpeggiated (Bright/Free), Acid jazz stab groove (hipHopJazz).
+// Six comping modes, flat-weighted (2026, mood-independent — see pickCompingMode): St Germain
+// Syncopated, Moby Backbeat, Bosa Moon Arpeggiated, Chord Hold, Downbeat Pulse, plus Acid Jazz
+// Stab Groove (hipHopJazz beat style only).
 // Voicings: upper-structure jazz [3rd, 5th, 7th] — root omitted (CHL-SYNC-004).
 // Silent in breakdown and intro (CHL-RHY rules).
 
@@ -13,38 +14,152 @@ struct ChillRhythmGenerator {
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        mood: Mood,
         beatStyle: ChillBeatStyle = .electronic,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
         bluesVariation: Bool = false,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        switchAnnotation: inout (bar: Int, ruleID: String)?
     ) -> [MIDIEvent] {
-        let compingMode: CompingMode
+        // A and B sections always use two different comping modes — keeps the comping track
+        // from settling into one flavor for the whole song.
+        let modeA: CompingMode
+        let modeB: CompingMode
         if bluesVariation {
-            // Blues: mobyBackbeat 70%, stGermainSyncopated 30% — open to all moods.
-            compingMode = rng.nextDouble() < 0.70 ? .mobyBackbeat : .stGermainSyncopated
+            // Blues: weighted pick among the four non-arpeggiated modes (Bosa Moon and Acid Jazz
+            // don't suit blues phrasing); B section always takes a different one.
+            modeA = pickBluesCompingMode(rng: &rng)
+            modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allBluesCompingModes,
+                                              picker: pickBluesCompingMode, rng: &rng)
         } else if beatStyle == .hipHopJazz {
-            compingMode = .acidJazzStab
+            // Acid jazz stab keeps its signature groove on the A section; B section switches
+            // to a different mode for contrast.
+            modeA = .acidJazzStab
+            modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allCompingModes,
+                                              picker: pickCompingMode, rng: &rng)
         } else {
-            compingMode = pickCompingMode(mood: mood, rng: &rng)
+            modeA = pickCompingMode(rng: &rng)
+            modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allCompingModes,
+                                              picker: pickCompingMode, rng: &rng)
         }
-        usedRuleIDs.insert(compingMode.ruleID)
+        usedRuleIDs.insert(modeA.ruleID)
+        usedRuleIDs.insert(modeB.ruleID)
         // Blues intro: keyboard enters at bar 1 (50%) or bar 3 (50%) — not from bar 0.
         let bluesKeyboardBar: Int = bluesVariation ? (rng.nextDouble() < 0.50 ? 1 : 3) : 0
+        // Simple form (single body section, no B) never gets to hear modeB via the A/B split
+        // above — force a mid-body switch instead, snapped to a chord-plan boundary so it lands
+        // on the song's natural phrase edge (8/12/16-bar cycles etc.) rather than an arbitrary bar.
+        // Purely internal to this function — generateComping needs it to decide when to switch
+        // modes, but nothing outside this file needs to know where it landed (switchAnnotation
+        // below already carries the one thing callers actually use it for: bar + target rule).
+        let forcedSwitchBar = forcedMidBodySwitchBar(structure: structure)
+        // Report exactly where and to which rule the comping mode switches, so the live log can
+        // say "Rhythm switch to <rule>" instead of a vague "evolving" — either the natural B
+        // section boundary, or forcedSwitchBar for a Simple-form (single-body) song.
+        let switchBar = structure.hasBSection
+            ? structure.sections.first(where: { $0.label == .B })?.startBar
+            : forcedSwitchBar
+        switchAnnotation = switchBar.map { (bar: $0, ruleID: modeB.ruleID) }
+        // Sparse fragments (2026): the whole groove/body is tiled into consecutive 12- or 16-bar
+        // segments, aligned to chord-plan boundaries, and each segment independently has a 35%
+        // chance of going sparse — St Germain/Bosa Moon fall back to their existing periodic
+        // "sparse bar" shape for the whole segment, Moby Backbeat goes half-time. Every song has
+        // this tiling; a typical 60-100 bar song ends up with 2-3 sparse segments, not zero or one.
+        let sparseFragments = pickSparseFragments(structure: structure, rng: &rng)
+        // Dropout fragment (2026): a single, more dramatic gesture — Rhythm goes fully silent for
+        // one 12- or 16-bar stretch, giving Bass/Drums/Lead the full spotlight. Fires in 20% of
+        // songs normally, but ALWAYS when Bosa Moon Arpeggiated is in play — it's the busiest mode
+        // by far (100% step coverage even outside its sparse bars) and benefits most from a real
+        // break rather than just the thinner sparse-fragment treatment. Takes priority over sparse
+        // fragments if the two happen to overlap (silence wins over merely thinner).
+        let hasBosaMoon = modeA == .bosaMoonArpeggiated || modeB == .bosaMoonArpeggiated
+        let dropoutFragment = pickRhythmDropoutFragment(structure: structure, forceInclude: hasBosaMoon, rng: &rng)
         return generateComping(frame: frame, structure: structure,
-                                compingMode: compingMode, breakdownStyle: breakdownStyle,
+                                modeA: modeA, modeB: modeB, breakdownStyle: breakdownStyle,
                                 bluesVariation: bluesVariation, bluesKeyboardBar: bluesKeyboardBar,
+                                forcedSwitchBar: forcedSwitchBar, sparseFragments: sparseFragments,
+                                dropoutFragment: dropoutFragment,
                                 rng: &rng)
+    }
+
+    /// Picks a single fragment (12 or 16 bars, chord-plan-boundary aligned) where the whole
+    /// Rhythm track drops out completely. See call site for frequency rationale.
+    private static func pickRhythmDropoutFragment(structure: SongStructure, forceInclude: Bool,
+                                                   rng: inout SeededRNG) -> Range<Int>? {
+        guard forceInclude || rng.nextDouble() < 0.20 else { return nil }
+        let grooveSections = structure.sections.filter { $0.label == .A || $0.label == .B }
+        guard let grooveStart = grooveSections.first?.startBar,
+              let grooveEnd   = grooveSections.last?.endBar else { return nil }
+        let length = rng.nextDouble() < 0.5 ? 12 : 16
+        guard grooveEnd - grooveStart >= length + 8 else { return nil }
+        let candidates = structure.chordPlan
+            .map(\.startBar)
+            .filter { $0 >= grooveStart + 4 && $0 + length <= grooveEnd - 4 }
+        guard !candidates.isEmpty else { return nil }
+        let start = candidates[rng.nextInt(upperBound: candidates.count)]
+        return start..<(start + length)
+    }
+
+    /// Tiles each groove/body section (A and B independently — Chill has at most one of each)
+    /// into consecutive 12- or 16-bar segments, snapped to chord-plan boundaries, and
+    /// independently rolls each segment (35%) for a sparse treatment — up to 2 sparse segments
+    /// per section (further rolls still consume RNG for determinism but are discarded). Capping
+    /// per section rather than per song means A and B — which always use different comping modes
+    /// — each get their own chance to show a sparse moment, rather than one section's fragments
+    /// using up the whole song's budget and leaving the other mode with none.
+    private static func pickSparseFragments(structure: SongStructure, rng: inout SeededRNG) -> [Range<Int>] {
+        var result: [Range<Int>] = []
+        for section in structure.sections where section.label == .A || section.label == .B {
+            result += pickSparseFragments(inSection: section, chordPlan: structure.chordPlan, rng: &rng)
+        }
+        return result
+    }
+
+    private static func pickSparseFragments(inSection section: SongSection, chordPlan: [ChordWindow],
+                                             rng: inout SeededRNG) -> [Range<Int>] {
+        guard section.lengthBars >= 16 else { return [] }
+        let boundaries = chordPlan.map(\.startBar).filter { $0 > section.startBar && $0 < section.endBar }
+        let maxSparseFragments = 2
+
+        var sparseFragments: [Range<Int>] = []
+        var cursor = section.startBar
+        while cursor < section.endBar {
+            let targetLength = rng.nextDouble() < 0.5 ? 12 : 16
+            let target = cursor + targetLength
+            let segmentEnd = boundaries.first(where: { $0 >= target }) ?? section.endBar
+            guard segmentEnd > cursor else { break }
+            if rng.nextDouble() < 0.35, sparseFragments.count < maxSparseFragments {
+                sparseFragments.append(cursor..<min(segmentEnd, section.endBar))
+            }
+            cursor = segmentEnd
+        }
+        return sparseFragments
+    }
+
+    /// For Chill's Simple form (single body section, no B) — snaps a forced rhythm-mode switch
+    /// point to the nearest chord-plan boundary near the body's midpoint. Returns nil when the
+    /// song already has a real B section (the A/B split above handles it) or the body is too
+    /// short to bother splitting.
+    private static func forcedMidBodySwitchBar(structure: SongStructure) -> Int? {
+        guard !structure.hasBSection,
+              let body = structure.bodySections.first,
+              body.lengthBars >= 24 else { return nil }
+        let target = body.startBar + body.lengthBars / 2
+        let candidates = structure.chordPlan
+            .map(\.startBar)
+            .filter { $0 > body.startBar + 8 && $0 < body.endBar - 8 }
+        return candidates.min(by: { abs($0 - target) < abs($1 - target) })
     }
 
     // MARK: - Comping modes
 
-    private enum CompingMode {
+    private enum CompingMode: Equatable {
         case stGermainSyncopated   // CHL-RHY-001
         case mobyBackbeat          // CHL-RHY-002
         case bosaMoonArpeggiated   // CHL-RHY-003
         case acidJazzStab          // CHL-RHY-004
+        case chordHold             // CHL-RHY-005
+        case downbeatPulse         // CHL-RHY-006
 
         var ruleID: String {
             switch self {
@@ -52,47 +167,82 @@ struct ChillRhythmGenerator {
             case .mobyBackbeat:        return "CHL-RHY-002"
             case .bosaMoonArpeggiated: return "CHL-RHY-003"
             case .acidJazzStab:        return "CHL-RHY-004"
+            case .chordHold:           return "CHL-RHY-005"
+            case .downbeatPulse:       return "CHL-RHY-006"
             }
         }
     }
 
-    private static func pickCompingMode(mood: Mood, rng: inout SeededRNG) -> CompingMode {
-        switch mood {
-        case .Deep:
-            // Backbeat 50%, Syncopated 25%, Arpeggiated 25%
-            let roll = rng.nextDouble()
-            if roll < 0.50 { return .mobyBackbeat }
-            if roll < 0.75 { return .stGermainSyncopated }
-            return .bosaMoonArpeggiated
-        case .Dream:
-            // Backbeat 50%, Arpeggiated 30%, Syncopated 20%
-            let roll = rng.nextDouble()
-            if roll < 0.50 { return .mobyBackbeat }
-            if roll < 0.80 { return .bosaMoonArpeggiated }
-            return .stGermainSyncopated
-        case .Free:
-            // Syncopated 50%, Arpeggiated 50%
-            return rng.nextDouble() < 0.50 ? .stGermainSyncopated : .bosaMoonArpeggiated
-        case .Bright:
-            // Arpeggiated 40%, Syncopated 40%, Backbeat 20%
-            let roll = rng.nextDouble()
-            if roll < 0.40 { return .bosaMoonArpeggiated }
-            if roll < 0.80 { return .stGermainSyncopated }
-            return .mobyBackbeat
+    /// Fallback candidate lists for `pickDifferentCompingMode`'s rejection-sampling loop.
+    private static let allCompingModes: [CompingMode] = [.stGermainSyncopated, .mobyBackbeat,
+        .bosaMoonArpeggiated, .acidJazzStab, .chordHold, .downbeatPulse]
+    private static let allBluesCompingModes: [CompingMode] = [.mobyBackbeat, .stGermainSyncopated,
+        .chordHold, .downbeatPulse]
+
+    /// Weights (2026 flattening): this pool used to have separate weight tables for Deep/Dream
+    /// vs Free/Bright moods. That made every "how often does rule X show up" question require a
+    /// Monte Carlo simulation instead of a direct read of the number (mood-averaged population
+    /// share isn't just the table value — it depends on the mood distribution too, and on how the
+    /// "modeA always != modeB" pairing interacts with each mood's table). Flattened to one table,
+    /// tuned to reproduce the same population-level shares the old mood-weighted version had
+    /// (verified by simulation): Moby ~49%, St Germain ~45%, Bosa Moon ~40%, Chord Hold ~28%,
+    /// Downbeat Pulse ~21%. Bosa Moon (100% step coverage, the busiest by far) still sits lowest;
+    /// nothing about the audible mix changed, only how easy it is to reason about. See
+    /// docs/chill-plan.md "Mood-dependent parameters" for the fuller rationale, and
+    /// docs/change-log.md for the numbers this replaced.
+    private static func pickCompingMode(rng: inout SeededRNG) -> CompingMode {
+        let roll = rng.nextDouble()
+        if roll < 0.30 { return .bosaMoonArpeggiated }
+        if roll < 0.50 { return .mobyBackbeat }
+        if roll < 0.69 { return .chordHold }
+        if roll < 0.86 { return .stGermainSyncopated }
+        return .downbeatPulse
+    }
+
+    /// Blues comping pool (2026): Moby Backbeat and St Germain Syncopated remain the dominant,
+    /// "real" blues comping choices; Chord Hold and Downbeat Pulse added as lighter supporting
+    /// textures. Bosa Moon and Acid Jazz stay excluded — neither suits blues phrasing.
+    private static func pickBluesCompingMode(rng: inout SeededRNG) -> CompingMode {
+        let roll = rng.nextDouble()
+        if roll < 0.40 { return .mobyBackbeat }
+        if roll < 0.65 { return .stGermainSyncopated }
+        if roll < 0.85 { return .chordHold }
+        return .downbeatPulse
+    }
+
+    /// Picks a comping mode guaranteed to differ from `excluded`, drawing candidates from
+    /// `picker` (either `pickCompingMode` or `pickBluesCompingMode`) up to 8 times before
+    /// falling back to a plain scan of `allCandidates` — astronomically unlikely to be needed,
+    /// but keeps this a total function rather than risking an infinite loop. Shared by both the
+    /// main pool and the Blues-only pool (2026 — previously two near-identical copies of this
+    /// same rejection-sampling loop, one per pool).
+    private static func pickDifferentCompingMode(from excluded: CompingMode, allCandidates: [CompingMode],
+                                                  picker: (inout SeededRNG) -> CompingMode,
+                                                  rng: inout SeededRNG) -> CompingMode {
+        for _ in 0..<8 {
+            let candidate = picker(&rng)
+            if candidate != excluded { return candidate }
         }
+        return allCandidates.first { $0 != excluded } ?? excluded
     }
 
     // MARK: - Main generator
 
     private static func generateComping(frame: GlobalMusicalFrame, structure: SongStructure,
-                                         compingMode: CompingMode,
+                                         modeA: CompingMode, modeB: CompingMode,
                                          breakdownStyle: ChillBreakdownStyle,
                                          bluesVariation: Bool = false,
                                          bluesKeyboardBar: Int = 0,
+                                         forcedSwitchBar: Int? = nil,
+                                         sparseFragments: [Range<Int>] = [],
+                                         dropoutFragment: Range<Int>? = nil,
                                          rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let scalePCs  = frame.scalePCs
         let snapTable = ChillPadsGenerator.makeSnapTable(scalePCs)
+        // Extends a triggered rest bar to 2 bars occasionally — set to the bar right after a
+        // rest bar that rolled the extension, then consumed and cleared on the next iteration.
+        var extendedRestBar: Int? = nil
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -186,24 +336,61 @@ struct ChillRhythmGenerator {
                 }
             }
 
+            // Consume a rest bar that was extended to 2 bars on the previous iteration.
+            if let extended = extendedRestBar, bar == extended {
+                extendedRestBar = nil
+                continue
+            }
+
+            // Dropout fragment: Rhythm goes fully silent for this stretch — takes priority over
+            // the rest-bar and sparse-fragment mechanics below.
+            if let dropout = dropoutFragment, dropout.contains(bar) { continue }
+
+            // Rest bars: comping periodically lays out completely so the track doesn't feel
+            // relentless. Roughly one rest every ~23 bars on average, never on back-to-back bars.
+            // ~20% of triggered rests extend to a second bar (only if that next bar is still the
+            // same section, so the extension never bleeds into a breakdown/outro boundary).
+            let barInSection = bar - (section?.startBar ?? bar)
+            if barInSection > 0 && barInSection % 8 == 7 && rng.nextDouble() < 0.35 {
+                if rng.nextDouble() < 0.20, structure.section(atBar: bar + 1)?.label == label {
+                    extendedRestBar = bar + 1
+                }
+                continue
+            }
+
             let chord     = structure.chordPlan.first { $0.contains(bar: bar) }
             let voicing   = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
             let base      = bar * 16
+
+            // B section always plays a different comping mode than A (and everything else);
+            // for a single-body (Simple form) song, forcedSwitchBar does the same job mid-body.
+            let useModeB = (label == .B) || (forcedSwitchBar.map { bar >= $0 } ?? false)
+            let compingMode = useModeB ? modeB : modeA
+            let forceSparse = sparseFragments.contains { $0.contains(bar) }
 
             switch compingMode {
             case .stGermainSyncopated:
                 events += stGermainSyncopated(base: base, voicing: voicing, bar: bar,
                                                sectionStart: section?.startBar ?? 0,
+                                               forceSparse: forceSparse,
                                                rng: &rng)
             case .mobyBackbeat:
-                events += mobyBackbeat(base: base, voicing: voicing, bar: bar, rng: &rng)
+                events += mobyBackbeat(base: base, voicing: voicing, bar: bar,
+                                        halfTime: forceSparse, rng: &rng)
             case .bosaMoonArpeggiated:
                 events += bosaMoonArpeggiated(base: base, voicing: voicing, frame: frame,
                                                chord: chord, bar: bar,
                                                sectionStart: section?.startBar ?? 0,
+                                               forceSparse: forceSparse,
                                                rng: &rng)
             case .acidJazzStab:
                 events += acidJazzStab(base: base, voicing: voicing, bar: bar, rng: &rng)
+            case .chordHold:
+                events += chordHold(base: base, voicing: voicing, bar: bar,
+                                     forceSparse: forceSparse, rng: &rng)
+            case .downbeatPulse:
+                events += downbeatPulse(base: base, voicing: voicing, bar: bar,
+                                         forceSparse: forceSparse, rng: &rng)
             }
         }
         return events
@@ -214,8 +401,10 @@ struct ChillRhythmGenerator {
     /// Beat 1 + syncopated second hit per bar. After 16 bars:
     /// second hit slides from AND-of-2 (step 6) to AND-of-3 (step 10) every 16 bars;
     /// every 4th bar becomes a single-hit bar (beat 1 only) for breathing room.
+    /// forceSparse: reuses that same single-hit shape for every bar (sparse-fragment mechanic).
     private static func stGermainSyncopated(base: Int, voicing: [Int],
                                              bar: Int, sectionStart: Int,
+                                             forceSparse: Bool = false,
                                              rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
@@ -229,7 +418,7 @@ struct ChillRhythmGenerator {
 
         // Variation 3: sparse single-hit bar every 4 bars, starting from bar 16 of section.
         // Sparse bars also use shell voicing [3rd, 7th] — drop the 5th for a lighter touch.
-        let isSparseBar   = period16 >= 1 && barInSection % 4 == 3
+        let isSparseBar   = forceSparse || (period16 >= 1 && barInSection % 4 == 3)
         let activeVoicing = isSparseBar && voicing.count >= 3
             ? [voicing[0], voicing[voicing.count - 1]]
             : voicing
@@ -274,10 +463,24 @@ struct ChillRhythmGenerator {
     ///
     /// Additionally, 15% chance either beat fires alone (unchanged), and a 20% chance of
     /// an extra staccato fill on step 6 (AND of beat 2) at very low velocity — subtle syncopation.
+    ///
+    /// halfTime (sparse-fragment mechanic): drops the beat-2/beat-4 pattern entirely for a single
+    /// shell-voicing hit on beat 3 — half the harmonic rhythm, no variant cycling or embellishment.
     private static func mobyBackbeat(base: Int, voicing: [Int], bar: Int,
+                                      halfTime: Bool = false,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         guard !voicing.isEmpty else { return events }
+
+        if halfTime {
+            let shellVoicing = voicing.count >= 2 ? Array(voicing.prefix(2)) : voicing
+            let vel = UInt8(60 + rng.nextInt(upperBound: 11))
+            for note in shellVoicing {
+                events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(note),
+                                        velocity: vel, durationSteps: 6))
+            }
+            return events
+        }
 
         let onlyBeat2 = rng.nextDouble() < 0.15
         let onlyBeat4 = !onlyBeat2 && rng.nextDouble() < 0.15
@@ -358,14 +561,27 @@ struct ChillRhythmGenerator {
 
     // MARK: - CHL-RHY-003: Bosa Moon Arpeggiated
 
-    /// Chord tones played sequentially on 8th-note grid (~10 notes/bar).
-    /// 30–40% chance of block chord on step 0 or step 8.
-    /// After 16 bars: direction flips every 16 bars; sparse quarter-note bar every 4 bars.
+    /// Chord tones played sequentially on 8th-note grid (~10 notes/bar) for the first half of an
+    /// 8-bar micro-form; the second half thins out (see below). 30–40% chance of block chord on
+    /// step 0 or step 8 during the dense half. Direction flips every 16 bars (cosmetic — same
+    /// density, different color).
+    ///
+    /// 8-bar micro-form (2026 simplification): previously this mode was dense on literally every
+    /// bar, with a footnote "sparse every 4th bar" exception that didn't even begin until bar 16
+    /// of the section — meaning the first 16 bars of any section had zero built-in relief.
+    /// Replaced with real structure, active from bar 1: bars 1-4 of every 8-bar cycle play the
+    /// full dense arpeggio; bars 5-8 thin out, each bar independently choosing between a
+    /// half-density arpeggio (same up/down movement, quarter-note grid — 4 notes/bar instead of
+    /// 8) or the genuinely-sparse single-hit shape, for a mix of "still moving, just thinner" and
+    /// real stillness.
+    /// forceSparse: always the genuinely-sparse shape, skipping the half-density option — the
+    /// sparse-fragment mechanic wants a plain, predictable rendering, not extra variety.
     private static func bosaMoonArpeggiated(base: Int, voicing: [Int],
                                              frame: GlobalMusicalFrame,
                                              chord: ChordWindow?,
                                              bar: Int,
                                              sectionStart: Int,
+                                             forceSparse: Bool = false,
                                              rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         guard !voicing.isEmpty else { return events }
@@ -373,30 +589,36 @@ struct ChillRhythmGenerator {
         let barInSection = bar - sectionStart
         let period16     = barInSection / 16   // increments every 16 bars within the section
 
-        // Variation 2: direction flip every 16 bars.
+        // Direction flip every 16 bars (cosmetic).
         // Period 0, 2, 4… → ascending then descending (original feel).
         // Period 1, 3, 5… → descending then ascending (mirror feel).
         let arpPool = period16 % 2 == 0
             ? voicing + voicing.reversed()
             : voicing.reversed() + voicing
 
-        // Variation 3: sparse quarter-note bar every 4 bars, starting from bar 16 of the section.
-        // Shell voicing [3rd, 7th] — drop the 5th for a lighter harmonic touch on the sparse bar.
-        let isSparseBar = period16 >= 1 && barInSection % 4 == 3
-        if isSparseBar {
+        let isSecondHalf = (barInSection % 8) >= 4
+        if forceSparse || isSecondHalf {
+            if !forceSparse && rng.nextDouble() < 0.50 {
+                // Half-density arpeggio: same movement, quarter-note grid (4 notes/bar).
+                for (i, step) in stride(from: 0, to: 16, by: 4).enumerated() {
+                    let note = arpPool[i % arpPool.count]
+                    let vel  = UInt8(65 + rng.nextInt(upperBound: 14))
+                    events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: 5))
+                }
+                return events
+            }
+            // Genuinely sparse: single beat-1 hit, half-bar duration, shell voicing [3rd, 7th].
             let shellVoicing = voicing.count >= 3
                 ? [voicing[0], voicing[voicing.count - 1]]
                 : voicing
-            for step in [0, 4, 8, 12] {
-                let vel = UInt8(63 + rng.nextInt(upperBound: 14))
-                for note in shellVoicing {
-                    events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: 6))
-                }
+            let vel = UInt8(60 + rng.nextInt(upperBound: 12))
+            for note in shellVoicing {
+                events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel, durationSteps: 8))
             }
             return events
         }
 
-        // Dense bar: 8th-note grid, steps 0, 2, 4, 6, 8, 10, 12, 14
+        // Dense bar (first half of the 8-bar cycle): 8th-note grid, steps 0, 2, 4, ..., 14
         for (i, step) in stride(from: 0, to: 16, by: 2).enumerated() {
             let note = arpPool[i % arpPool.count]
             let vel  = UInt8(70 + rng.nextInt(upperBound: 16))
@@ -449,6 +671,93 @@ struct ChillRhythmGenerator {
                 events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
                                         velocity: vel, durationSteps: 2))
             }
+        }
+        return events
+    }
+
+    // MARK: - CHL-RHY-005: Chord Hold
+
+    /// CHL-RHY-005: The sparsest comping mode — one held chord per bar, full voicing, soft
+    /// velocity, with a couple of steps of silence at the tail so it doesn't run straight into
+    /// the next bar's attack.
+    ///
+    /// Variation (2026) — true sub-step swing timing isn't implemented anywhere in the engine
+    /// (`swingFeel` has been a documented no-op since the original Chill design), so "swing" here
+    /// means musical variety, not swung-8th timing:
+    ///   - 20% of bars: syncopated entry on the AND of beat 1 (step 2) instead of beat 1 — a
+    ///     laid-back push, same idiom St Germain's own comping uses (beat 1 / AND of beat 2).
+    ///   - Every 4th bar (phrase-end position): ~35% chance of dropping the hold entirely for a
+    ///     breath, else ~26% chance of a short staccato punctuation instead of the long hold.
+    ///   - Occasional (20%) very soft single-note re-touch at beat 3, unchanged from before.
+    /// forceSparse: alternates hit-bar/rest-bar (bar % 2) for a genuine 2-bar hold, bypassing all
+    /// of the above — the sparse-fragment mechanic wants a plain, predictable 2-bar hold.
+    private static func chordHold(base: Int, voicing: [Int], bar: Int,
+                                   forceSparse: Bool = false,
+                                   rng: inout SeededRNG) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        guard !voicing.isEmpty else { return events }
+
+        if forceSparse {
+            if bar % 2 == 1 { return events }
+            let dur = 12 + rng.nextInt(upperBound: 3)
+            let vel = UInt8(50 + rng.nextInt(upperBound: 12))
+            for note in voicing {
+                events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel, durationSteps: dur))
+            }
+            return events
+        }
+
+        let phraseEnd = bar % 4 == 3
+        if phraseEnd && rng.nextDouble() < 0.35 { return events }   // breathing gap
+
+        let staccato = phraseEnd && rng.nextDouble() < 0.40
+        let syncopated = !staccato && rng.nextDouble() < 0.20
+        let step = syncopated ? 2 : 0
+        let dur: Int = staccato ? (3 + rng.nextInt(upperBound: 2)) : (12 + rng.nextInt(upperBound: 3))
+        let vel = UInt8((staccato ? 58 : 50) + rng.nextInt(upperBound: 12))
+        for note in voicing {
+            events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: dur))
+        }
+        if !staccato && rng.nextDouble() < 0.20 {
+            let touchVel = UInt8(38 + rng.nextInt(upperBound: 10))
+            events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(voicing[0]),
+                                    velocity: touchVel, durationSteps: 4))
+        }
+        return events
+    }
+
+    // MARK: - CHL-RHY-006: Downbeat Pulse
+
+    /// CHL-RHY-006: A notch busier than Chord Hold — plain, unsyncopated chord on beats 1 and 3,
+    /// shell voicing. No variant cycling like Moby Backbeat, but not perfectly static either:
+    ///   - 25% of bars: staccato punch (short durations) instead of the sustained shell chord.
+    ///   - 20% of bars: beat 3 pushes early to the AND of beat 2 (step 6) — a laid-back lean,
+    ///     same idiom as Chord Hold's syncopated entry.
+    ///   - 15% of bars: beat 3 drops entirely for a breath (independent of forceSparse below).
+    /// forceSparse: drops beat 3 unconditionally, leaving only the beat-1 hit (true half-time) —
+    /// the sparse-fragment mechanic wants a plain, predictable half-time, not extra variation.
+    private static func downbeatPulse(base: Int, voicing: [Int], bar: Int,
+                                       forceSparse: Bool = false,
+                                       rng: inout SeededRNG) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        guard !voicing.isEmpty else { return events }
+
+        let shellVoicing = voicing.count >= 2 ? Array(voicing.prefix(2)) : voicing
+        let staccato = !forceSparse && rng.nextDouble() < 0.25
+        let dur = staccato ? (3 + rng.nextInt(upperBound: 2)) : 7
+        let vel1 = UInt8((staccato ? 70 : 65) + rng.nextInt(upperBound: 10))
+        for note in shellVoicing {
+            events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel1, durationSteps: dur))
+        }
+
+        if forceSparse { return events }
+        if rng.nextDouble() < 0.15 { return events }   // occasional dropped beat 3 — a breath
+
+        let pushed = rng.nextDouble() < 0.20   // AND of beat 2 instead of beat 3 — a laid-back lean
+        let beat3Step = pushed ? 6 : 8
+        let vel2 = UInt8((staccato ? 65 : 60) + rng.nextInt(upperBound: 10))
+        for note in shellVoicing {
+            events.append(MIDIEvent(stepIndex: base + beat3Step, note: UInt8(note), velocity: vel2, durationSteps: dur))
         }
         return events
     }
