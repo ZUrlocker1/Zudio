@@ -29,16 +29,6 @@ Current release: `2.5` (build 130). Universal binary — runs natively on both A
 - **Known issue on iOS 26** — Sharing a song over iMessage no longer offers an "Open in Zudio" button. This is an iOS 26 change, confirmed by the same build behaving correctly on iOS 18; the file still opens in Zudio via Save to Files.
 - **Air effect in stem export** — Fixed the Air effect using the wrong EQ shape when exporting separate track stems, which made Air-enabled stems duller than the mix. Normal audio export was unaffected.
 
-**What's new in v2.4:**
-- **Motorik Arcade** — New Motorik substyle inspired by the fast, bright, arpeggiated sound of classic arcade and early video game music (Tempest 2000, Contra, Sonic). Features 4-on-the-floor kick, mid-register bass, Lydian/Mixolydian modes, and new arpeggio-driven lead rules including Octave Bounce, Triad Climb, Arcade Arp, and Gate Arp.
-- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass.
-- **Distortion effect** — New Dist. chip on Motorik Bass and Rhythm. Soft-clip saturation applied automatically on Motorik Noir; toggleable by the user.
-- **Vibrato effect** — New Vibrato chip on Chill and Kosmic leads. Applied probabilistically on instruments where it fits (flute, sax, oboe, etc.).
-- **Air effect** — New Air chip on Motorik leads. A two-band EQ boost (4 kHz presence + 8 kHz shelf) that adds brightness and openness. Applied probabilistically on Lead 1.
-- **Probabilistic effects** — Several effects (Sweep, Tremolo, Pan, Delay) now applied probabilistically on Kosmic and Motorik tracks so songs sound different from each other even within the same style.
-- **Style chip** — The song style or substyle is now displayed on Mac and iPad matching the iPhone display.
-- **Crash fix** — Fixed a rare Mac crash after extended playback (2+ hours).
-
 ---
 
 ## Documentation
