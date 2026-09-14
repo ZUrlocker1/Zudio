@@ -17,11 +17,11 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.0/Zudio-2.0.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.5/Zudio-2.5.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `2.4` (build 129). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `2.5` (build 130). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**In progress for v2.5:**
+**What's new in v2.5:**
 - **Endless mix rebalanced** — More Kosmic and Motorik, slightly less Chill and Ambient, plus a streak cap so Endless mode stops bouncing between the same two styles for long stretches.
 - **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars.
 - **Chill bass levels reduced** — All three Chill bass instruments turned down; Acoustic Bass and Fretless Bass were running noticeably hot. Chill Blues is affected too, since it uses the same pool.
