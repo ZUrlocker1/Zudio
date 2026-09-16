@@ -23,10 +23,12 @@ Current release: `2.5` (build 130). Universal binary — runs natively on both A
 
 **What's new in v2.5:**
 - **Endless mix rebalanced** — More Kosmic and Motorik, slightly less Chill and Ambient, plus a streak cap so Endless mode stops bouncing between the same two styles for long stretches.
-- **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars.
+- **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars. Much more chill!
 - **Chill bass levels reduced** — All three Chill bass instruments turned down; Acoustic Bass and Fretless Bass were running noticeably hot. Chill Blues is affected too, since it uses the same pool.
-- **Song sharing on iOS** — Zudio now appears in the iOS share sheet, so songs open in the app from Files and other apps. iOS 26 removed the "Open in Zudio" button on shared songs and opening one straight from Messages is unreliable as a result — this affects any text-like attachment, not just Zudio. Also fixed `.zudio` files showing as text documents on Mac.
+- **Chill breakdown bass** — The breakdown bridge bass used to repeat one note for four bars. It now moves, and it's funky.
 - **Air effect in stem export** — Fixed the Air effect using the wrong EQ shape when exporting separate track stems, which made Air-enabled stems duller than the mix. Normal audio export was unaffected.
+- **Song sharing fix** — Shared songs open properly again on iPhone and iPad, and Zudio now appears in the iOS share sheet. Also fixed `.zudio` files showing as text documents on Mac.
+
 
 ---
 

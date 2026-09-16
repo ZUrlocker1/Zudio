@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- GENERATE_INFOPLIST_FILE is NO for this target, so nothing is injected — every key
+         has to be spelled out. CFBundleIdentifier especially: without it the .appex builds
+         with an empty bundle ID and the host app refuses to embed it with "Embedded
+         binary's bundle identifier is not prefixed with the parent app's". Version keys
+         read from the same build settings as the host app so they cannot drift, which the
+         App Store rejects. -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Zudio Song Preview</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.quicklook.preview</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>$(PRODUCT_MODULE_NAME).PreviewViewController</string>
+
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <!-- Must match UTTypeIdentifier / LSItemContentTypes in iOS-Info.plist. This is
+                 what tells Quick Look that Zudio can render a .zudio, which is the whole
+                 point of this target — see the note in PreviewViewController.swift. -->
+            <key>QLSupportedContentTypes</key>
+            <array>
+                <string>com.zudio.song</string>
+            </array>
+            <!-- We index nothing for Spotlight; the log has no searchable structure. -->
+            <key>QLSupportsSearchableItems</key>
+            <false/>
+        </dict>
+    </dict>
+</dict>
+</plist>

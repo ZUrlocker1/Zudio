@@ -696,8 +696,64 @@ struct ChillBassGenerator {
                     events.append(MIDIEvent(stepIndex: base + 9, note: UInt8(root),  velocity: 82, durationSteps: 2))
                     events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(snapToScale(chordRoot - 1, scale: scale) == root ? b7 : clampBass(snapToScale(chordRoot - 1, scale: scale))), velocity: 70, durationSteps: 2))
                 case .harmonicDrone:
-                    for step in [0, 4, 8, 12] {
-                        events.append(MIDIEvent(stepIndex: base + step, note: UInt8(root), velocity: 76, durationSteps: 3))
+                    // Alternating pulse / motion arc. This used to be a root quarter-note on
+                    // every beat of every breakdown bar — four identical bars, 16 identical
+                    // notes, which reads as a stuck loop rather than a breakdown.
+                    //
+                    // Shape: even bars pulse (repetition builds tension), odd bars move, and
+                    // the last bar always releases into the groove. Alternating means no more
+                    // than one repetitive bar ever lands in a row, at any breakdown length.
+                    //
+                    //   bar 1  root funk cell, quarters      — establish the drone
+                    //   bar 2  root/b7/5th, mixed durations  — motion
+                    //   bar 3  root funk cell, tighter       — tension tightens
+                    //   bar 4  walk-up + chromatic approach  — release into the return
+                    //
+                    // Every bar opens with the same funk cell — accent on the beat, ghost on
+                    // the "a", push on the "and" — so the pocket carries across all four even
+                    // though bars 1 and 3 never leave the root. Ghosts are near-silent muted
+                    // notes: felt as groove, not heard as pitches.
+                    let sectionLen  = section?.lengthBars ?? 4
+                    let isLastBDBar = (breakdownBar == sectionLen - 1)
+                    let swell       = UInt8(min(72 + breakdownBar * 5, 92))
+                    let ghost       = UInt8(36)
+
+                    if isLastBDBar {
+                        // Release: syncopated chord-tone walk, chromatic approach on beat 4.
+                        // Matches the approach-tone convention used by the other two
+                        // harmonicDrone bass rules so the return lands the same way.
+                        // True chromatic leading tone, deliberately NOT snapped to the scale:
+                        // chordRoot-1 sits one semitone from both the root and the b7, so
+                        // snapToScale's tie-break could collapse it onto the root and leave
+                        // beat 4, beat 1 and the B-section downbeat all on the same note.
+                        let approach = clampBass(chordRoot - 1)
+                        events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),     velocity: 84,    durationSteps: 3))
+                        events.append(MIDIEvent(stepIndex: base + 3,  note: UInt8(root),     velocity: ghost, durationSteps: 1))
+                        events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(b7),       velocity: 84,    durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 10, note: UInt8(fifth),    velocity: 88,    durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(approach), velocity: 92,    durationSteps: 2))
+                    } else if breakdownBar % 2 == 0 {
+                        // Pulse bar — still one note, but a funk cell instead of flat quarters:
+                        // accent on the beat, ghost on the "a", push on the "and". The cell
+                        // repeats across both halves, so the bar stays highly repetitive while
+                        // sitting in a pocket. Later pulses are shorter and louder, so the
+                        // repetition reads as intensifying rather than as bar 1 coming round again.
+                        let gate = breakdownBar == 0 ? 3 : 2
+                        for half in [0, 8] {
+                            events.append(MIDIEvent(stepIndex: base + half,     note: UInt8(root), velocity: swell,     durationSteps: gate))
+                            events.append(MIDIEvent(stepIndex: base + half + 3, note: UInt8(root), velocity: ghost,     durationSteps: 1))
+                            events.append(MIDIEvent(stepIndex: base + half + 6, note: UInt8(root), velocity: swell - 8, durationSteps: 2))
+                        }
+                    } else {
+                        // Motion bar: opens with the same funk cell so the feel carries across
+                        // bars, then leaves the root — b7 on the "and of 3", 5th swung onto the
+                        // "and of 4" so the bar lifts into the next downbeat rather than closing
+                        // square on beat 4.
+                        events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),  velocity: swell,     durationSteps: 3))
+                        events.append(MIDIEvent(stepIndex: base + 3,  note: UInt8(root),  velocity: ghost,     durationSteps: 1))
+                        events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(root),  velocity: swell - 8, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 10, note: UInt8(b7),    velocity: swell + 4, durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(fifth), velocity: swell + 2, durationSteps: 2))
                     }
                 case .groovePocket:
                     let sectionLen = section?.lengthBars ?? 4

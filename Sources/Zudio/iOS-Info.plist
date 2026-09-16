@@ -34,27 +34,36 @@
             <string>com.zudio.song</string>
             <key>UTTypeDescription</key>
             <string>Zudio Song</string>
-            <!-- Deliberately NOT text-conforming, and deliberately different from the
-                 Mac plist. Do not "fix" this to match — see below.
+            <!-- OPAQUE ON PURPOSE, AND PAIRED WITH ZudioQuickLook. Change neither
+                 without the other.
 
-                 On iOS 26 Messages cannot open a text attachment at all. Not a Zudio
-                 problem: a plain .txt behaves identically, and the same build works on
-                 iOS 18 and on Mac. Seven declaration variants were tested on clean
-                 installs (app deleted and reinstalled, since iOS caches UTI registrations
-                 across in-place updates, phone rebooted, freshly sent file, since Messages
-                 stamps an attachment's type when SENT). None produced an Open affordance;
-                 Mail and AirDrop-to-iPhone behave the same way.
+                 iOS 26 removed the "Open in Zudio" affordance on a shared song. Verified
+                 not a Zudio bug: a plain .txt behaves identically, the same build works on
+                 iOS 18 and on Mac, and the official App Store build failed the same way.
+                 Filed as FB24777501; still broken in iOS 27.
 
-                 Given that nothing opens either way, the remaining choice was cosmetic:
-                 text conformance makes Messages resolve up the chain to public.plain-text
-                 and label the file "Text Document" (rendering the log inline), while an
-                 opaque type stops that walk and lets UTTypeDescription through, so it
-                 reads "Zudio Song". We took the correct label. The cost is no inline text
-                 preview of .zudio files on iPhone/iPad.
+                 What finally worked (Sept 2026) — an opaque type PLUS our own Quick Look
+                 preview extension. Messages then offers "Copy to Zudio" again. Neither
+                 half works alone:
+                   public.plain-text + previewer -> iOS uses its own text previewer and
+                                                    never consults ours
+                   opaque, no previewer          -> nothing can render it; the attachment
+                                                    goes completely inert
+                   opaque + ZudioQuickLook       -> Zudio is the only thing that can render
+                                                    a .zudio, and the handoff returns
+                 Note it is the extension's PRESENCE that matters, not what it draws —
+                 Messages shows the Zudio icon rather than the previewer's text view.
 
-                 macOS is unaffected: Info.plist still conforms to public.json ->
-                 public.text, so Finder Quick Look previews as text and Open With still
-                 offers TextEdit, Xcode, Chrome and the rest, with Zudio as default. -->
+                 Also ruled out: MIME type declarations, public.content on its own,
+                 public.data alone, Mail, AirDrop. Seven variants in total.
+
+                 Trade-off: no inline text preview of .zudio on iPhone/iPad. macOS is
+                 deliberately left text-conforming (public.json -> public.text) so Finder
+                 Quick Look previews as text and Open With still offers TextEdit.
+
+                 TESTING: iOS caches UTI and extension registrations across in-place
+                 updates. Delete the app, reinstall, and send a FRESH file — Messages
+                 stamps an attachment's type when SENT, so old bubbles keep old typing. -->
             <key>UTTypeConformsTo</key>
             <array>
                 <string>public.data</string>

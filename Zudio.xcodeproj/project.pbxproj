@@ -188,6 +188,8 @@
 		SH000000000000000000071 /* SharedSongInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = SH000000000000000000003 /* SharedSongInbox.swift */; };
 		SH000000000000000000072 /* SharedSongInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = SH000000000000000000003 /* SharedSongInbox.swift */; };
 		SH000000000000000000073 /* ZudioShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = SH000000000000000000001 /* ZudioShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		QL000000000000000000070 /* PreviewViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = QL000000000000000000002 /* PreviewViewController.swift */; };
+		QL000000000000000000073 /* ZudioQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = QL000000000000000000001 /* ZudioQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -205,6 +207,13 @@
 			remoteGlobalIDString = SH000000000000000000020;
 			remoteInfo = ZudioShare;
 		};
+		QL000000000000000000061 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EE000000000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = QL000000000000000000020;
+			remoteInfo = ZudioQuickLook;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -215,6 +224,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				SH000000000000000000073 /* ZudioShare.appex in Embed Foundation Extensions */,
+				QL000000000000000000073 /* ZudioQuickLook.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -325,6 +335,9 @@
 		SH000000000000000000003 /* SharedSongInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSongInbox.swift; sourceTree = "<group>"; };
 		SH000000000000000000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		SH000000000000000000005 /* ZudioShare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ZudioShare.entitlements; sourceTree = "<group>"; };
+		QL000000000000000000001 /* ZudioQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ZudioQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		QL000000000000000000002 /* PreviewViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViewController.swift; sourceTree = "<group>"; };
+		QL000000000000000000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -360,6 +373,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		QL000000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -382,6 +402,7 @@
 				UU000000000000000000004 /* ZudioTests.xctest */,
 				BB000000000000000000101 /* ZudioiOS.app */,
 				SH000000000000000000001 /* ZudioShare.appex */,
+				QL000000000000000000001 /* ZudioQuickLook.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -500,6 +521,7 @@
 			children = (
 				DD000000000000000000008 /* Zudio */,
 				SH000000000000000000010 /* ZudioShare */,
+				QL000000000000000000010 /* ZudioQuickLook */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -608,6 +630,15 @@
 			path = ZudioShare;
 			sourceTree = "<group>";
 		};
+		QL000000000000000000010 /* ZudioQuickLook */ = {
+			isa = PBXGroup;
+			children = (
+				QL000000000000000000002 /* PreviewViewController.swift */,
+				QL000000000000000000004 /* Info.plist */,
+			);
+			path = ZudioQuickLook;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -660,6 +691,7 @@
 			);
 			dependencies = (
 				SH000000000000000000060 /* PBXTargetDependency */,
+				QL000000000000000000060 /* PBXTargetDependency */,
 			);
 			name = ZudioiOS;
 			productName = ZudioiOS;
@@ -681,6 +713,23 @@
 			name = ZudioShare;
 			productName = ZudioShare;
 			productReference = SH000000000000000000001 /* ZudioShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		QL000000000000000000020 /* ZudioQuickLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = QL000000000000000000050 /* Build configuration list for PBXNativeTarget "ZudioQuickLook" */;
+			buildPhases = (
+				QL000000000000000000030 /* Sources */,
+				QL000000000000000000031 /* Frameworks */,
+				QL000000000000000000032 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ZudioQuickLook;
+			productName = ZudioQuickLook;
+			productReference = QL000000000000000000001 /* ZudioQuickLook.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -722,6 +771,7 @@
 				EE000000000000000000003 /* ZudioTests */,
 				EE000000000000000000004 /* ZudioiOS */,
 				SH000000000000000000020 /* ZudioShare */,
+				QL000000000000000000020 /* ZudioQuickLook */,
 			);
 		};
 /* End PBXProject section */
@@ -756,6 +806,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		SH000000000000000000032 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		QL000000000000000000032 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -994,6 +1051,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		QL000000000000000000030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				QL000000000000000000070 /* PreviewViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1006,6 +1071,11 @@
 			isa = PBXTargetDependency;
 			target = SH000000000000000000020 /* ZudioShare */;
 			targetProxy = SH000000000000000000061 /* PBXContainerItemProxy */;
+		};
+		QL000000000000000000060 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = QL000000000000000000020 /* ZudioQuickLook */;
+			targetProxy = QL000000000000000000061 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1350,6 +1420,66 @@
 			};
 			name = Release;
 		};
+		QL000000000000000000051 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 130;
+				DEVELOPMENT_TEAM = K66MA9TR8Z;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Sources/ZudioQuickLook/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.quicklook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		QL000000000000000000052 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 130;
+				DEVELOPMENT_TEAM = K66MA9TR8Z;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Sources/ZudioQuickLook/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app.quicklook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1394,6 +1524,15 @@
 			buildConfigurations = (
 				SH000000000000000000051 /* Debug */,
 				SH000000000000000000052 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		QL000000000000000000050 /* Build configuration list for PBXNativeTarget "ZudioQuickLook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				QL000000000000000000051 /* Debug */,
+				QL000000000000000000052 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
