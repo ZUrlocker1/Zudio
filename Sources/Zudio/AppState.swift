@@ -731,13 +731,27 @@ final class AppState: ObservableObject {
         var parts: [String] = []
         for i in 0..<kTrackCount {
             let p = playback.loadedProgram(forTrack: i)
-            if i == kTrackTexture && style == .chill { continue }   // audio texture omitted
-            if let s = songState, SongLogExporter.isTrackSilent(i, song: s) { continue }
+            // Chill audio textures are files, not MIDI patches — report by name, matching
+            // the Ambient branch below. Previously skipped entirely, so a Chill song's
+            // texture never appeared in the log at all.
+            if i == kTrackTexture && style == .chill {
+                if let texFile = songState?.chillAudioTexture {
+                    parts.append("Tx:\(Self.chillTextureDisplayName(texFile))")
+                }
+                continue
+            }
+            // MUST come before the isTrackSilent() skip below. An Ambient audio texture has
+            // no MIDI events (the audio file replaces them), so isTrackSilent() reports it
+            // silent and the Tx: entry was never emitted — the log could not show which
+            // texture was playing, which made the Sept 2026 iPhone texture bug much harder
+            // to diagnose than it needed to be.
             if i == kTrackTexture && style == .ambient,
-                      let texFile = songState?.ambientAudioTexture {
-                let displayName = Self.ambientAudioDisplayName(texFile)
-                parts.append("Tx:\(displayName)")
-            } else if p != 255 {   // omit tracks that weren't loaded (e.g. LeadSynth in non-Kosmic)
+               let texFile = songState?.ambientAudioTexture {
+                parts.append("Tx:\(Self.ambientAudioDisplayName(texFile))")
+                continue
+            }
+            if let s = songState, SongLogExporter.isTrackSilent(i, song: s) { continue }
+            if p != 255 {   // omit tracks that weren't loaded (e.g. LeadSynth in non-Kosmic)
                 parts.append("\(shortNames[i]):\(p)")
             }
         }
@@ -1837,10 +1851,24 @@ final class AppState: ObservableObject {
     /// Called after randomizeTwoInstruments so randomisation cannot overwrite it.
     /// User can still change it manually after the song loads.
     private func applyAmbientPianoInstrument(for state: SongState) {
-        guard state.isAmbientPiano else { return }
         // Ambient Lead 1 pool: ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
         // Stereo Piano is at index 0 (encoded program 61001).
-        instrumentOverrides[kTrackLead1] = 0
+        //
+        // The else branch is load-bearing. This used to `guard isAmbientPiano else { return }`,
+        // which pinned Lead 1 to Stereo Piano for an Ambient Piano song and then never cleared
+        // it. Because instrumentOverrides is snapshotted into sessionInstrumentOverrides and
+        // PersistedSong, every later Ambient song inherited — and persisted — Stereo Piano on
+        // Lead 1, showing as "L1:61001" in the Instruments log where the song had generated
+        // something else entirely.
+        guard state.style == .ambient else { return }
+        if state.isAmbientPiano {
+            instrumentOverrides[kTrackLead1] = 0
+        } else if instrumentOverrides[kTrackLead1] == 0 {
+            // Only clear a value that could have come from the piano pin. A genuine manual
+            // pick of Stereo Piano on a non-piano song is indistinguishable, so this
+            // deliberately resets to "unset" and lets the song's own assignment apply.
+            instrumentOverrides[kTrackLead1] = nil
+        }
     }
 
     // When Ambient Lead 1 uses a sparse/melodic rule, mirror Lead 2's program to match
@@ -3388,7 +3416,7 @@ final class AppState: ObservableObject {
             }
             return
         }
-        // Ambient texture track uses pseudo-programs 231–233 that map to audio filenames.
+        // Ambient texture track uses pseudo-programs 231–237 that map to audio filenames.
         if trackIndex == kTrackTexture && selectedStyle == .ambient,
            let filename = Self.ambientAudioFilename(forProgram: program) {
             let offset = songState?.ambientAudioTextureOffset ?? 0
@@ -3437,6 +3465,53 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Recovers a song's per-track instrument assignment from its own generation log.
+    ///
+    /// Instrument picks use SystemRandomNumberGenerator (randomizeTwoInstruments), so they
+    /// cannot be re-derived from the song seed — they have to be remembered. They were only
+    /// ever held in sessionInstrumentOverrides (session-scoped) and PersistedSong, so a
+    /// cache miss silently fell back to pool index 0 for every track: an Ambient song would
+    /// reload as "L1:61001 L2:46 Pd:95 Bs:42" (all index 0) instead of what it generated.
+    ///
+    /// The assignment is already durably recorded: applyCurrentInstrumentsToPlayback() writes
+    /// an "Instruments" entry into songState.generationLog, which SongLogExporter saves into
+    /// the .zudio file. Parsing it back makes the assignment survive reloads AND file loads
+    /// without changing SongState or the save format.
+    ///
+    /// Format: "L1:73 L2:99 Pd:94 Tx:Long Lake Bs:42". Tx: is a texture NAME, not a program,
+    /// and is handled separately by the ambient/chill texture paths — skipped here.
+    static func instrumentOverridesFromLog(_ state: SongState) -> [Int: Int] {
+        guard let entry = state.generationLog.last(where: { $0.tag == "Instruments" }) else { return [:] }
+        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
+        let isDrift = state.isKosmicDrift
+        var result: [Int: Int] = [:]
+        for token in entry.description.split(separator: " ") {
+            let parts = token.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2,
+                  let trackIndex = shortNames.firstIndex(of: String(parts[0])),
+                  trackIndex != kTrackTexture,                 // texture is a name, not a program
+                  let program = Int(parts[1]) else { continue }
+            let pool = instrumentPoolPrograms(trackIndex: trackIndex, style: state.style,
+                                              isKosmicDrift: isDrift)
+            if let idx = pool.firstIndex(of: program) { result[trackIndex] = idx }
+        }
+        return result
+    }
+
+    /// Maps a Chill audio texture filename to a short display name.
+    /// Mirrors ambientAudioDisplayName so both styles log their texture the same way.
+    static func chillTextureDisplayName(_ filename: String) -> String {
+        switch filename {
+        case "another_bar.m4a":    return "Another Bar"
+        case "bar_sounds.m4a":     return "Bar Sounds"
+        case "city_at_night.m4a":  return "City at Night"
+        case "harbor.m4a":         return "Harbor"
+        case "vinyl_crackle.m4a":  return "Vinyl Crackle"
+        case "another-pub.m4a":    return "Another Pub"
+        default:                   return "Audio"
+        }
+    }
+
     /// Maps an Ambient audio texture filename to a short display name.
     static func ambientAudioDisplayName(_ filename: String) -> String {
         switch filename {
@@ -3446,11 +3521,12 @@ final class AppState: ObservableObject {
         case "zen-bells.m4a":     return "Zen Bells"
         case "wind-stoorm.m4a":   return "Wind Storm"
         case "desert-winds.m4a":  return "Desert Winds"
+        case "long_lake_loons.m4a": return "Long Lake"
         default:                  return "Audio"
         }
     }
 
-    /// Maps an Ambient audio texture pseudo-program (231–236) to an M4A filename.
+    /// Maps an Ambient audio texture pseudo-program (231–237) to an M4A filename.
     static func ambientAudioFilename(forProgram program: Int) -> String? {
         switch program {
         case 231: return "light_rain.m4a"
@@ -3459,6 +3535,7 @@ final class AppState: ObservableObject {
         case 234: return "zen-bells.m4a"
         case 235: return "wind-stoorm.m4a"
         case 236: return "desert-winds.m4a"
+        case 237: return "long_lake_loons.m4a"
         default:  return nil
         }
     }
@@ -3472,6 +3549,7 @@ final class AppState: ObservableObject {
         case "zen-bells.m4a":    return 234
         case "wind-stoorm.m4a":  return 235
         case "desert-winds.m4a": return 236
+        case "long_lake_loons.m4a": return 237
         default:                 return 231
         }
     }
@@ -3706,11 +3784,22 @@ final class AppState: ObservableObject {
         songState        = state
         visibleBarOffset = 0
         lastEmittedStep  = -1
+        // Reloading a song reprints its full generation log, exactly as loading a .zudio
+        // file does on Mac. Without this, ⏮/⏭ and Songs-tab taps logged only a one-line
+        // "Rewind" entry, so there was no way to see which rules (AMB-TEXT-0NN in
+        // particular) the reloaded song actually used.
+        appendGenerationLog(state.generationLog)
         // Restore the exact instruments that were playing when this song was first generated.
         if let cached = sessionInstrumentOverrides[state.globalSeed] {
             instrumentOverrides = cached
         } else {
-            instrumentOverrides = [:]
+            // No cached assignment for this seed. Instrument picks use
+            // SystemRandomNumberGenerator (see randomizeTwoInstruments), so they cannot be
+            // re-derived from the song seed — every track without an entry falls back to
+            // pool index 0 in applyCurrentInstrumentsToPlayback(). That silent fallback is
+            // why "L1:61001" (Ambient index 0, Stereo Piano) went unnoticed for so long, so
+            // say it out loud in the log rather than quietly substituting instruments.
+            instrumentOverrides = Self.instrumentOverridesFromLog(state)
             if state.style == .chill {
                 let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                 instrumentOverrides[kTrackTexture] = Int(prog) - 240
@@ -3718,6 +3807,12 @@ final class AppState: ObservableObject {
             if state.style == .ambient, let audioTex = state.ambientAudioTexture {
                 let prog = Self.ambientAudioProgram(forFilename: audioTex)
                 instrumentOverrides[kTrackTexture] = Int(prog) - 231
+            }
+            if instrumentOverrides.filter({ $0.key != kTrackTexture }).isEmpty {
+                appendToLog([GenerationLogEntry(
+                    tag: "Warning",
+                    description: "using default instruments",
+                    isTitle: false)])
             }
         }
         songInstrumentOverrides = instrumentOverrides
@@ -3739,6 +3834,16 @@ final class AppState: ObservableObject {
         if wasPlaying || forcePlay {
             prepareSleepTimerForPlayback()
             playback.play()
+            // Ambient/Chill audio textures are NOT part of the MIDI engine, so
+            // playback.play() does not start them. AppState.play() has its own
+            // audioTexture.start() call, but this path calls playback.play() directly and
+            // bypasses it — so the texture has to be started here, exactly as
+            // finishLoadingSong() does on the regenerate-from-seed path. Without this,
+            // reloading a song that was still in generationHistory played every MIDI track
+            // but left the audio texture silent, while the log correctly reported it.
+            let texFile   = state.style == .ambient ? state.ambientAudioTexture : state.chillAudioTexture
+            let texOffset = state.style == .ambient ? state.ambientAudioTextureOffset : state.chillAudioTextureOffset
+            audioTexture.start(style: state.style, texture: texFile, offsetSeconds: texOffset)
         }
         if playMode == .evolve { tearDownEvolve(); startEvolveMode(from: state) }
     }
@@ -3786,7 +3891,12 @@ final class AppState: ObservableObject {
                 self.keyOverride   = song.keyOverride
                 self.tempoOverride = song.tempoOverride
                 self.moodOverride  = song.moodOverride
-                self.instrumentOverrides = song.decodedInstrumentOverrides
+                // Songs saved before the assignment was reliably captured have no persisted
+                // overrides; recover them from the regenerated song's own Instruments log
+                // rather than letting every track fall back to pool index 0.
+                self.instrumentOverrides = song.decodedInstrumentOverrides.isEmpty
+                    ? Self.instrumentOverridesFromLog(state)
+                    : song.decodedInstrumentOverrides
                 if song.style == .chill && self.instrumentOverrides[kTrackTexture] == nil {
                     let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
@@ -3800,6 +3910,7 @@ final class AppState: ObservableObject {
                 self.applyAmbientPianoInstrument(for: state)
                 self.restoreLead2Mirror()
                 self.applyLead2Mirror(for: state)
+                self.appendGenerationLog(state.generationLog)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
                 if self.playMode == .evolve { self.tearDownEvolve(); self.startEvolveMode(from: state) }
             }

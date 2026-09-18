@@ -10,7 +10,8 @@ struct SongGenerator {
     /// Referenced in both generateAmbient and regenerateTrack — add new files here only.
     static let ambientAudioFilePool: [String] = [
         "light_rain.m4a", "rain-and-thunder.m4a", "ocean_waves.m4a",
-        "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a"
+        "zen-bells.m4a", "wind-stoorm.m4a", "desert-winds.m4a",
+        "long_lake_loons.m4a"
     ]
 
     // MARK: - Public entry points
@@ -1756,6 +1757,7 @@ struct SongGenerator {
         case "zen-bells.m4a":        return "AMB-TEXT-007"
         case "wind-stoorm.m4a":      return "AMB-TEXT-008"
         case "desert-winds.m4a":     return "AMB-TEXT-009"
+        case "long_lake_loons.m4a":  return "AMB-TEXT-010"
         default:                     return "AMB-TEXT-003"
         }
     }
@@ -2561,6 +2563,7 @@ struct SongGenerator {
         case "AMB-TEXT-007": return "Audio: Zen Bells"
         case "AMB-TEXT-008": return "Audio: Wind Storm"
         case "AMB-TEXT-009": return "Audio: Desert Winds"
+        case "AMB-TEXT-010": return "Audio: Long Lake"
         // Drums
         case "AMB-DRUM-004": return "Claude hand percussion"
         case "AMB-DRUM-001": return "Sparse ride, cymbals"

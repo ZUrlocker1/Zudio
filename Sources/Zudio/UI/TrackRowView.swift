@@ -65,7 +65,7 @@ struct TrackRowView: View {
     private struct Instrument { let name: String; let program: Int }
 
     private var instruments: [Instrument] {
-        // Ambient texture with audio active: picker shows audio file names (pseudo-programs 231–236)
+        // Ambient texture with audio active: picker shows audio file names (pseudo-programs 231–237)
         if trackIndex == kTrackTexture, activeStyle == .ambient,
            appState.songState?.ambientAudioTexture != nil {
             return [
@@ -75,6 +75,7 @@ struct TrackRowView: View {
                 Instrument(name: "Zen Bells",    program: 234),
                 Instrument(name: "Wind Storm",   program: 235),
                 Instrument(name: "Desert Winds", program: 236),
+                Instrument(name: "Long Lake",    program: 237),
             ]
         }
         let isDrift  = appState.songState?.isKosmicDrift == true

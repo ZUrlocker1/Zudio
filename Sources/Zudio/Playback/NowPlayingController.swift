@@ -46,7 +46,10 @@ final class NowPlayingController {
         guard let image else { return nil }
         return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         #elseif os(macOS)
-        guard let image = NSApp.applicationIconImage else { return nil }
+        // NSApp is an implicitly-unwrapped optional and is nil outside a running
+        // NSApplication (unit tests, command-line hosts), where the old
+        // NSApp.applicationIconImage crashed rather than returning nil.
+        guard let app = NSApp, let image = app.applicationIconImage else { return nil }
         return MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         #else
         return nil

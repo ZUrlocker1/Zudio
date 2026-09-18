@@ -271,11 +271,26 @@ final class AudioTexturePlayer {
 
     // MARK: - Pan LFO (hidden, always active during playback)
 
+    /// Schedules a repeating timer in `.common` run-loop mode.
+    ///
+    /// `Timer.scheduledTimer` installs in `.default` mode only, which does NOT fire while
+    /// the main run loop is in `.tracking` mode — i.e. while the user is touching a List
+    /// row or scrolling on iOS. In `.default` mode a texture switch triggered from the
+    /// Songs tab could leave the fade-in timer unfired, so playerNode.volume stayed at the
+    /// 0.0 that startFile() sets (silence), and leave stop()'s fade-out unfired, so its
+    /// completion never ran playerNode.stop() and the previous texture kept looping.
+    private func scheduleTimer(interval: Double,
+                               _ tick: @escaping (Timer) -> Void) -> Timer {
+        let t = Timer(timeInterval: interval, repeats: true) { timer in tick(timer) }
+        RunLoop.main.add(t, forMode: .common)
+        return t
+    }
+
     private func startPan() {
         stopPan()
         panPhase = Double.random(in: 0 ..< .pi * 2)
         let period = Double.random(in: 20...40)        // 20–40 s full left-right cycle
-        panTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        panTimer = scheduleTimer(interval: 1.0) { [weak self] _ in
             guard let self else { return }
             self.panPhase += 1.0 * 2 * .pi / period   // 1 s tick — imperceptible at 20–40 s period
             self.playerNode.pan = Float(sin(self.panPhase) * 0.30)  // max ±30% stereo spread
@@ -294,7 +309,7 @@ final class AudioTexturePlayer {
         cancelFade()
         let target = currentTargetVolume
         let step = target / Float(duration / fadeInterval)
-        fadeTimer = Timer.scheduledTimer(withTimeInterval: fadeInterval, repeats: true) { [weak self] timer in
+        fadeTimer = scheduleTimer(interval: fadeInterval) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
             let next = min(self.playerNode.volume + step, target)
             self.playerNode.volume = next
@@ -310,7 +325,7 @@ final class AudioTexturePlayer {
         guard startVol > 0 else { completion(); return }
         let fastDuration = 0.20   // 200 ms out; startFile fade-in adds another ~200 ms
         let step = startVol / Float(fastDuration / fadeInterval)
-        fadeTimer = Timer.scheduledTimer(withTimeInterval: fadeInterval, repeats: true) { [weak self] timer in
+        fadeTimer = scheduleTimer(interval: fadeInterval) { [weak self] timer in
             guard let self else { timer.invalidate(); completion(); return }
             let next = max(self.playerNode.volume - step, 0.0)
             self.playerNode.volume = next
@@ -324,7 +339,7 @@ final class AudioTexturePlayer {
         let startVol = playerNode.volume
         guard startVol > 0 else { completion(); return }
         let step = startVol / Float(duration / fadeInterval)
-        fadeTimer = Timer.scheduledTimer(withTimeInterval: fadeInterval, repeats: true) { [weak self] timer in
+        fadeTimer = scheduleTimer(interval: fadeInterval) { [weak self] timer in
             guard let self else { timer.invalidate(); completion(); return }
             let next = max(self.playerNode.volume - step, 0.0)
             self.playerNode.volume = next

@@ -26,6 +26,8 @@ Current release: `2.5` (build 130). Universal binary — runs natively on both A
 - **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars. Much more chill!
 - **Chill bass levels reduced** — All three Chill bass instruments turned down; Acoustic Bass and Fretless Bass were running noticeably hot. Chill Blues is affected too, since it uses the same pool.
 - **Chill breakdown bass** — The breakdown bridge bass used to repeat one note for four bars. It now moves, and it's funky.
+- **New Ambient texture** — Added "Long Lake" (loon calls over a lake) to the Ambient audio texture pool.
+- **Texture and instrument fixes** — Reloading a saved song now plays its audio texture and restores its original instruments, instead of falling silent or substituting defaults.
 - **Air effect in stem export** — Fixed the Air effect using the wrong EQ shape when exporting separate track stems, which made Air-enabled stems duller than the mix. Normal audio export was unaffected.
 - **Song sharing fix** — Shared songs open properly again on iPhone and iPad, and Zudio now appears in the iOS share sheet. Also fixed `.zudio` files showing as text documents on Mac.
 
