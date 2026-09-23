@@ -550,6 +550,25 @@ Electronic timbres that work in Ambient:
 Example pairing (valid): Pads=Warm Pad (electronic) + Texture=String Ensemble (acoustic) + Lead=Flute (acoustic) + Rhythm=FX Echoes (electronic)
 Example pairing (too uniform): Pads=Warm Pad + Texture=Halo Pad + Lead=Space Voice + Rhythm=Sweep Pad — all four are electronic pads
 
+### 6.1a External Soundfont Source
+
+The Stereo Piano used by Ambient Piano (and by Ambient and Chill) is **SC55 Stereo**, from a
+Roland SC-55 soundfont. It ships as `assets/SC55 Piano_V2.sf2` — a single preset extracted to
+a ~2 MB file rather than a whole bank.
+
+**Source: [musical-artifacts.com](https://musical-artifacts.com/)**, a libre library of
+soundfonts and music-production resources, browsable by tag, format and licence. The banks
+compared before settling on SC55 Stereo — Florestan Basic GM GS, SC-55 variants, Velocity
+Grand, Yamaha PSR, and the GeneralUser GS bank Zudio originally shipped — are all hosted
+there.
+
+Two things to carry forward when adding any future sample:
+
+- **Check the licence on the individual artifact.** Licensing on the site is per upload, and
+  anything bundled with Zudio must permit redistribution in a paid App Store app.
+- **Extract the single preset needed**, rather than bundling a full bank. That is what keeps
+  the piano at 2 MB instead of tens of megabytes.
+
 ### 6.2 Instrument Preset Lists Per Track
 
 Each track lists instruments in two families. At song generation time, AMB-SYNC-007 (see Part 13) requires at least one acoustic and one electronic instrument across the 7-track assignment. Instruments marked (A) are acoustic family; (E) are electronic.

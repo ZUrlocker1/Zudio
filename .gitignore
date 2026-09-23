@@ -19,3 +19,6 @@ build/
 .claude/
 *.ips
 tools/batch-output/
+
+# Python bytecode from tools/
+__pycache__/
