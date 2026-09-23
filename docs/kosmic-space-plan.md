@@ -83,6 +83,21 @@ The measurements that set values in this plan:
   Magnetic Fields Part 2 has five, Équinoxe four, Oxygène Part 2 two. Only the shortest file
   is single-voiced. Registers cluster tightly (p71, p75, p76, p77 in Part 2) — the habit is
   stacking nearby voices rather than separating them widely.
+- **Parts make statements, then leave.** Measured as runs of activity separated by silence,
+  with the phrase boundary set adaptively from each track's own density. Per role — statement
+  length, silence between, and the silence-to-statement ratio:
+  - **Lead**: 4 notes / 13 steps, then 13 steps silence. **Ratio 1.0:1** — a lead is silent
+    about as long as it plays.
+  - **Bass**: 10 notes / 83 steps, then 93 steps silence. Ratio 1.0:1.
+  - **Pads**: 26 notes / 457 steps, then 183 steps silence. Ratio 0.5:1 — long holds, long gaps.
+  - **Sequencer**: 42 notes / 84 steps, then 8 steps silence. Ratio 0.3:1 — near-continuous.
+
+  This matters more than a bare rest ratio: a part can be 90% silent either by scattering
+  single notes or by playing a phrase and stopping. Only the second is a statement, and it is
+  what these tracks do.
+- **Parts also leave entirely.** Dropouts of two bars or more: bass 5 of 5 tracks, sequencer 5
+  of 8, pads 2 of 2, lead 3 of 5. Leaving the arrangement is normal behaviour here, not a
+  drum-specific habit.
 - **Velocity is flat** — one value per track across every file, consistent with sequencer
   programming. No dynamics rules are derived.
 
@@ -132,8 +147,14 @@ Jarre's arrangements run 12–14 tracks; Zudio has seven.
 
 The sequencer is the song; every other track is defined relative to it.
 
-**Rhythm** runs continuously, carrying both pulse and harmony. It never rests, and it is
-excluded from block-silencing — as Motorik Arcade already does for Lead 1.
+**Rhythm** carries both pulse and harmony and is excluded from random block-silencing, as
+Motorik Arcade already does for Lead 1.
+
+**One bounded exception.** The measurement shows sequencer parts dropping out in 5 of 8 source
+tracks, so "never silent" would be a departure from the evidence rather than a reading of it.
+The arrangement arc may remove Rhythm for **one window of 4–8 bars, in the final third only**.
+Everywhere else it runs unbroken. That preserves the spine through the body of the song while
+allowing the one breakdown the sources actually use.
 
 **Bass** moves underneath at roughly half Rhythm's density — ~1.6 notes/beat against ~2.7 —
 in longer note values. It shares the harmony but never competes for the pulse.
@@ -226,7 +247,8 @@ throughout, matching Magnetic Fields Part 2's unbroken 276 bars.
 kick (36) on steps 0 and 8; snare (38) on steps 4 and 12. Twelve events per bar = 3.0
 notes/beat. Velocity 80 on all three voices with **no variation whatsoever** — do not apply
 the humanisation the other Kosmic drum rules use. `durationSteps: 1`. No fills at section
-boundaries, no intro or outro variant. Identical output in every bar of the song.
+boundaries, no intro or outro variant — identical output in **every bar it plays**. When the
+track enters and leaves is set by the arrangement arc (see Song Structure), not by this rule.
 
 Excluded: `KOS-DRUM-002`, `004`, `005`, `006`, `007`, `008`.
 
@@ -239,6 +261,10 @@ fifth**, note duration ~0.5 beat, density 1.5–2.0 notes/beat.
 Pulse and movement are separate axes and this rule requires both: *pulsing* is rhythm — a
 steady unbroken subdivision — while *stepwise* is pitch. **Never rest, never drone.** The
 pulse stays constant while the pitch keeps moving.
+
+This applies *within the bars the bass plays*. Whether the track is playing at all is the
+arrangement arc's decision, not this rule's — the same separation as `KOS-DRUM-009`. Measured
+bass tracks drop out in 5 of 5 sources, so the part leaving is expected; the part idling is not.
 
 *Implementation.* Emit on all eight even steps of every bar — 0,2,4,6,8,10,12,14 — giving 2.0
 notes/beat with no rests. `durationSteps: 2` (legato, each note running into the next),
@@ -269,6 +295,35 @@ Excluded: `KOS-BASS-003`, `004`, `008`, `010`, `011`, `012`, and any single-pitc
 
 ### Lead 1
 
+**Both Lead 1 rules draw from a single song motif rather than generating each phrase
+independently.** This is what separates a memorable line from a plausible one: Jarre's
+melodies are short, strongly shaped and repeated with conviction. A fresh random walk per
+phrase satisfies the interval statistics and is forgettable.
+
+*Motif construction and use.* At song start, build one motif and reuse it all song:
+
+- The motif is an array of `(degreeOffset, stepOffset, durationSteps)`, length 4...8, where
+  `degreeOffset` is a **scale-degree offset from the chord root**, not an absolute pitch. Storing
+  it relatively is what lets it transpose correctly when the harmony moves.
+- Build it using the interval rules of whichever Lead 1 rule was drawn — stepwise for
+  `KOS-LEAD-013`, leap-dominant for `KOS-LEAD-015`. The motif inherits the rule's character.
+- `stepOffset` values are drawn from the rule's placement grid and are strictly increasing.
+
+Each time the lead enters, it **states the motif**, realised against the current chord:
+
+- Statements 1 and 2: exact, transposed to the current chord root.
+- From statement 3 on, apply one variation drawn per statement: **diatonic transposition** by a
+  third or fourth (0.35), **contour inversion** around the first note (0.2), **rhythmic
+  displacement** by 2 or 4 steps (0.25), or **tail extension** — hold the final note twice as
+  long (0.2).
+- Every fourth statement is exact again, whatever the draw. Returning to the plain form is what
+  makes the variations read as variations rather than as drift.
+- Rest 4...12 steps between statements, as before.
+
+Two songs generated under this scheme share a character and no material; within one song, the
+listener hears the same idea developing.
+
+
 **KOS-LEAD-006 "JMJ evolving phrase"** *(shared)* — 35%
 
 **KOS-LEAD-004 "Echo melody"** *(shared)* — 25%
@@ -281,9 +336,13 @@ dominant and leaps above a fifth rare.
 *Implementation.* At song start, draw a band: low edge uniformly from 70...74, width uniformly
 from 7...13. Every note is clamped into that band for the entire song.
 
-Phrases: draw length 4...8 notes. Notes land on even steps (0,2,4,...) within the bar, starting
-at step 0 or step 8 (50/50). `durationSteps: 2`, velocity 80. After each phrase, rest for
-4...12 steps before the next, so the track is active roughly half the time.
+Phrases: draw length **3...6 notes** (measured median 4). Notes land on even steps (0,2,4,...)
+within the bar, starting at step 0 or step 8 (50/50). `durationSteps: 2`, velocity 80.
+
+**Silence between phrases is drawn to roughly match the phrase's own length** — measured
+ratio is 1.0:1, so a phrase spanning 13 steps is followed by about 13 steps of rest. Draw the
+rest as 0.8...1.4 × the phrase span, minimum 8 steps. A fixed short rest would make the lead
+chatter; matching silence to statement is what makes each phrase land.
 
 Pitch: first note of each phrase is a member of `chordWindow.chordTones` inside the band.
 Subsequent notes walk ±1 or ±2 scale degrees (weights 0.65 / 0.35); reject any interval above
@@ -646,18 +705,53 @@ closest available and should be enabled on Pads by default here, slow and shallo
 unmodulated string ensemble is only half the sound — this is the difference between "strings"
 and *that* string sound.
 
-Texture keeps its existing panning.
+**Stereo layout.** Everything else defaults to centre, which sounds narrow against records
+where every element is placed. Kosmic Space specifies positions:
+
+- **Bass and Drums** — hard centre, always. Low frequencies stay centred; this is not a
+  stylistic choice.
+- **Rhythm** — left of centre (~30%) when Lead 2 carries the second sequencer, otherwise
+  auto-panning across a ±40% span.
+- **Lead 2** — right of centre (~30%) under `KOS-LEAD-017`, forming the pair with Rhythm.
+  Under the other rules, offset ~20% opposite whichever side Rhythm occupies.
+- **Lead 1** — centre or ~10% off. The melody stays in the middle so the width around it reads
+  as space rather than as a hole.
+- **Pads** — widest element. When `KOS-PADS-009` draws 3 or 4 voices, spread them across
+  ±50%, lowest voice centred.
+- **Texture** — retains its existing panning, which suits the sweeps.
+
+The intent is a wide bed with a centred spine: bass and drums anchoring, sequencers opposed,
+pads filling the edges, lead in the middle.
 
 ---
 
 ## Song Structure
 
-Pure drone shape, as base Kosmic: no verse/chorus, no fanfare intro or outro. Sections are
-delineated by **sweeps** — `KOS-TEXT-005` at the boundary is what signals a section change.
+No verse/chorus model — but not a flat drone either. Jarre's long tracks **accumulate and
+release**, and a substyle that runs every track from bar 1 to the end will sound static however
+good the individual rules are.
 
-**Section-scoped instrument change applies to Lead 1 and Rhythm only**: their program may swap
-at a section boundary. The plumbing to set a program mid-song already exists. Tempo is fixed
-for the whole song.
+**Entry schedule.** Tracks enter in a fixed order, at bar positions drawn per song:
+
+- **Rhythm** — bar 1, always. The sequencer is the spine and it never rests.
+- **Bass** — bar 8 or 16 (50/50).
+- **Pads** — bar 16 or 24.
+- **Texture** — first boundary sweep, typically bar 16–32.
+- **Lead 1** — bar 24, 32 or 40. Latest entry of the melodic parts, so the sequencer is
+  established before a melody arrives over it.
+- **Lead 2** — at least 16 bars after Lead 1, when present.
+
+Entries land on multiples of 8 so they coincide with chord-window and section boundaries.
+
+**Withdrawal.** In the final third, remove one or two of Pads, Lead 2 or Drums for 8–16 bars,
+then optionally restore. This is the release half of the arc. `KOS-DRUM-010` already does this
+for Drums; when that rule is active, do not also withdraw Drums here.
+
+**Ending.** Tracks drop out in reverse entry order over the last 8–16 bars, leaving the
+sequencer last. No fade, no fanfare — the song thins until only the spine remains, then stops.
+
+**Section boundaries** are marked by `KOS-TEXT-005` sweeps, and **Lead 1 and Rhythm may swap
+program** at one. Tempo is fixed for the whole song.
 
 ---
 
@@ -702,6 +796,10 @@ Missing any one of these produces a half-existing substyle.
    `KOS-DRUM-010`, `KOS-LEAD-016`.
 8. `PersistedSong.displaySubstyleName` — the pre-build-125 inference list.
 9. `ArrangementFilter` — exclude Rhythm from block-silencing when `isKosmicSpace`.
+9a. **Arrangement arc** — per-track entry bars, the final-third withdrawal, and the
+   reverse-order ending. This is new machinery, not a rule: it gates which bars each track
+   emits into, above whatever its rule produces. Nearest existing analogue is
+   `KOS-DRUM-010`'s gap set, which it should not double up with when that rule is active.
 10. Endless-mode weighting — decide whether Space counts as Kosmic for the streak cap.
 
 Generate a batch and listen before treating the 25% share as final.

@@ -88,6 +88,81 @@ def cell_period(notes, tpb, max_steps=32):
     return best
 
 
+def arrangement(notes, tpb):
+    """Entry/exit, dropout gaps and rest ratio for one track.
+
+    Answers the arrangement questions the rule design needs: when does this part
+    come in, does it ever leave, for how long, and how much of its active span is
+    silence. Kraftwerk in particular uses absence structurally — a part that stops
+    for sixteen bars is making a statement, not resting.
+    """
+    bar = tpb * 4
+    first_bar = notes[0][0] // bar
+    last_bar  = (notes[-1][0] + notes[-1][3]) // bar
+    span = max(1, last_bar - first_bar + 1)
+
+    # Which bars inside the active span contain at least one note-on
+    occupied = set(n[0] // bar for n in notes)
+    gaps, run = [], 0
+    for b in range(first_bar, last_bar + 1):
+        if b in occupied:
+            if run >= 2:
+                gaps.append((b - run, run))     # (start bar, length in bars)
+            run = 0
+        else:
+            run += 1
+    if run >= 2:
+        gaps.append((last_bar + 1 - run, run))
+
+    # Rest ratio: sixteenth-steps with no note-on, across the active span
+    steps_total = span * 16
+    step_len = tpb // 4 or 1
+    onsets = set(n[0] // step_len for n in notes)
+    rest_ratio = 1.0 - (len(onsets) / steps_total) if steps_total else 0.0
+    return first_bar, last_bar, span, gaps, rest_ratio
+
+
+def phrases(notes, tpb):
+    """Group notes into statements separated by silence.
+
+    Rest ratio alone is misleading: one note every ten steps and an eight-note
+    phrase followed by forty steps of silence both read as ~90% rest, but only the
+    second is a musical statement. This finds the statements.
+
+    The phrase-boundary threshold adapts to the track's own density — three times
+    its median inter-onset gap, floored at one beat — so a dense sequencer and a
+    sparse lead are each judged on their own terms rather than a fixed grid.
+    """
+    step_len = tpb // 4 or 1
+    onsets = sorted(set(n[0] // step_len for n in notes))
+    if len(onsets) < 4:
+        return None
+    gaps = [onsets[i+1] - onsets[i] for i in range(len(onsets)-1)]
+    med_gap = statistics.median(gaps)
+    threshold = max(4, med_gap * 3)
+
+    runs, cur = [], [onsets[0]]
+    for i in range(1, len(onsets)):
+        if onsets[i] - onsets[i-1] > threshold:
+            runs.append(cur); cur = [onsets[i]]
+        else:
+            cur.append(onsets[i])
+    runs.append(cur)
+
+    lens_notes = [len(r) for r in runs]
+    lens_steps = [r[-1] - r[0] + 1 for r in runs]
+    silences   = [runs[i+1][0] - (runs[i][-1] + 1) for i in range(len(runs)-1)]
+    return {
+        "count":       len(runs),
+        "notes_med":   statistics.median(lens_notes),
+        "steps_med":   statistics.median(lens_steps),
+        "silence_med": statistics.median(silences) if silences else 0,
+        "ratio":       (statistics.median(silences) / statistics.median(lens_steps))
+                       if silences and statistics.median(lens_steps) else 0.0,
+        "uniform":     statistics.pstdev(lens_notes) < 1.0 if len(lens_notes) > 2 else True,
+    }
+
+
 def analyse(path):
     name = os.path.basename(path)
     print(f"\n{'='*74}\n{name}\n{'='*74}")
@@ -96,6 +171,12 @@ def analyse(path):
     except Exception as e:
         print(f"  UNREADABLE: {e}"); return
     print(f"  ticks/beat {tpb}   tracks with notes: {len(tracks)}")
+
+    # Entry order across the song — shows how the arrangement is built up
+    entries = sorted(((notes[0][0] // (tpb*4), tname) for tname, notes in tracks
+                      if len(notes) >= 8), key=lambda x: x[0])
+    if entries:
+        print("  entry order: " + " -> ".join(f"{n[:12]}@{b}" for b, n in entries))
 
     for tname, notes in tracks:
         if len(notes) < 8: continue
@@ -126,6 +207,16 @@ def analyse(path):
               f"({'quantised' if statistics.mean(dev) < 0.04 else 'played/loose'})")
         cp = cell_period(notes, tpb)
         print(f"     repeating cell: {cp if cp else 'none detected'} notes")
+        first, last, span, gaps, rest = arrangement(notes, tpb)
+        gap_txt = ", ".join(f"{L}bar@{b}" for b, L in sorted(gaps, key=lambda g: -g[1])[:4]) or "none"
+        print(f"     arrangement: bars {first}-{last} ({span} bars)  "
+              f"rest {100*rest:.0f}%  dropouts: {gap_txt}")
+        ph = phrases(notes, tpb)
+        if ph:
+            shape = "uniform" if ph["uniform"] else "varied"
+            print(f"     phrasing: {ph['count']} statements, median {ph['notes_med']:.0f} notes "
+                  f"/ {ph['steps_med']:.0f} steps, then {ph['silence_med']:.0f} steps silence "
+                  f"(silence:statement {ph['ratio']:.1f}:1, {shape} lengths)")
 
 
 def main():
