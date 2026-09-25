@@ -236,8 +236,18 @@ struct TextureGenerator {
         if ruleID == "MOT-TEXT-009" {
             // Wide Scatter — SINGLE notes, never phrases: one event, then a gap. The register
             // span is 36-88, which is 52 semitones, comfortably past the measured 40 minimum,
-            // and pitches are drawn across the whole span rather than from a band. A note every
-            // 6-10 steps averages ~0.5 notes/beat, inside the measured 0.4-0.7.
+            // and pitches are drawn across the whole span rather than from a band.
+            //
+            // The plan gives two figures that cannot both hold: 0.4-0.7 notes/beat, and a
+            // silence-to-statement ratio of 7:1 or wider. With notes 1-3 steps long, the density
+            // figure forces a gap of about 8 steps, which lands at 3.8:1 — and reads as a blip
+            // every half-bar for the length of the song. Evenly thin is not the same as sparse;
+            // the ear hears the regularity as constant presence. The ratio is the figure that
+            // governs how sparse this actually sounds, so it is the one honoured here.
+            //
+            // A 14-30 step gap gives roughly 10:1 and about 0.2 notes/beat. On top of that,
+            // one gap in six stretches to a couple of bars, so the part breathes instead of
+            // ticking — isolated events in a wide space, which is what the corpus describes.
             var step = 8
             while step < totalSteps {
                 let pcs = chordPCs(atStep: step)
@@ -248,7 +258,9 @@ struct TextureGenerator {
                 let note   = max(36, min(88, octave * 12 + pc))
                 events.append(MIDIEvent(stepIndex: step, note: UInt8(note),
                                         velocity: 72, durationSteps: 1 + rng.nextInt(upperBound: 3)))
-                step += 6 + rng.nextInt(upperBound: 5)               // 6...10 steps of silence
+                step += rng.nextDouble() < 0.17
+                    ? 32 + rng.nextInt(upperBound: 33)               // 2-4 bars: a real rest
+                    : 14 + rng.nextInt(upperBound: 17)               // 14-30 steps
             }
             return events
         }

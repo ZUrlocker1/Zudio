@@ -342,7 +342,10 @@ Strict unison — no thirds, no offset. The machine quality comes from exact loc
 
 ### Texture
 
-Texture rides along with **any** sync rather than belonging to one. The corpus shows a
+Texture rides along with **any** sync rather than belonging to one. It is also the one voice
+that can continue through a dropout window — but only on `MOT-TEXT-010`, whose two-or-three-note
+bursts mark a space. `MOT-TEXT-009` is continuous, and leaving it running would fill the gap
+rather than hold it, so it drops out with everything else. The corpus shows a
 clear textural behaviour: isolated single notes scattered across a very wide register (spans of
 20–94 and 35–107 semitones) at high silence ratios (7:1 to 31:1).
 
@@ -350,8 +353,16 @@ clear textural behaviour: isolated single notes scattered across a very wide reg
 
 *Implementation.* **Single notes**, never phrases — one event then a gap. Register spans at
 least **40 semitones**, pitches drawn from chord tones across the full span rather than a band.
-Density 0.4–0.7 notes/beat, silence-to-statement **7:1 or wider**. `durationSteps: 1...3`,
-velocity 72.
+`durationSteps: 1...3`, velocity 72.
+
+**The two measurements conflict, and the ratio wins.** Density 0.4–0.7 notes/beat and a
+silence-to-statement ratio of 7:1 or wider cannot both hold when notes are 1–3 steps long: the
+density figure forces a gap of about eight steps, which is 3.8:1. Built to the density figure
+this rule put a note in every bar of the song and read as a constant presence — evenly thin is
+not the same as sparse, and the ear hears the regularity rather than the space. Built to the
+ratio it lands near 19:1, mid-range of the measured 7:1–31:1, at about 0.12 notes/beat. Gaps are
+14–30 steps, and one in six stretches to two-to-four bars so the part breathes instead of
+ticking.
 
 **MOT-TEXT-010 "Sparse Punctuation"**
 

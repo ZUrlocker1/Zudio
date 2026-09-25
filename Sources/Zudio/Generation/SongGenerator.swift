@@ -314,7 +314,9 @@ struct SongGenerator {
         // Step 13.5 — Kraftwerk sync section dropout: the whole sync leaves together for
         // two windows, while everything outside it keeps playing.
         trackEvents = applySyncDropout(trackEvents: trackEvents, sync: motorikSync,
-                                          lead2Partners: syncLead2Partners, windows: syncWindows)
+                                       lead2Partners: syncLead2Partners,
+                                       texturePlaysThrough: texRules.contains("MOT-TEXT-010"),
+                                       windows: syncWindows)
 
         // Step 13.6 — Kraftwerk sync repeat guard. Rhythm was done at step 8b.
         // EVERY track in a sync song, not only the sync's members. A non-member still
@@ -2026,14 +2028,16 @@ struct SongGenerator {
         trackEvents: [[MIDIEvent]],
         sync: MotorikSync,
         lead2Partners: Bool,
+        texturePlaysThrough: Bool,
         windows: [Range<Int>]
     ) -> [[MIDIEvent]] {
         guard sync.isActive, !windows.isEmpty else { return trackEvents }
 
-        // Texture plays THROUGH the drop. It is the one sync voice that continues, so the
-        // window reads as a change of texture rather than a hole: the machine parts step out
-        // and the scattered colour is what is left holding the space.
-        var tracks = sync.tracks.filter { $0 != kTrackTexture }
+        // Texture can play THROUGH the drop, so the window reads as a change of texture rather
+        // than a hole — but only when it is on MOT-TEXT-010, whose two-or-three-note bursts are
+        // built to mark a space. MOT-TEXT-009 is continuous; leaving it running would fill the
+        // gap rather than hold it, and the drop would stop registering as one.
+        var tracks = texturePlaysThrough ? sync.tracks.filter { $0 != kTrackTexture } : sync.tracks
         if lead2Partners { tracks.append(kTrackLead2) }
 
         let silentSteps = windows.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
