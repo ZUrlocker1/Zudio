@@ -146,8 +146,8 @@ import Foundation
             let log = s.generationLog.map(\.description).joined(separator: " | ")
             // The cluster line carries "KW" in its TAG, so check the entry rather than the
             // joined descriptions.
-            #expect(s.generationLog.contains { $0.tag == "Cluster KW" },
-                    "seed \(seed): no Cluster KW line")
+            #expect(s.generationLog.contains { $0.tag == "Sync" },
+                    "seed \(seed): no Sync line")
             for (track, names) in kraftwerk where s.motorikCluster.includes(track) {
                 #expect(names.contains { log.contains($0) },
                         "seed \(seed) \(s.motorikCluster): track \(track) drew no Kraftwerk rule — \(log)")

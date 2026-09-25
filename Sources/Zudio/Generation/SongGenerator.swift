@@ -162,6 +162,11 @@ struct SongGenerator {
         // Step 2 — Song structure + chord plan
         let structure = StructureGenerator.generate(frame: frame, rng: &rng, arcade: isArcade)
 
+        // Derived once here and passed to everyone who needs it: the Texture rules place events
+        // against these bars, the drum pass marks their seams, and the dropout itself applies
+        // them. Deriving it in more than one place invites the copies to drift apart.
+        let clusterWindows = clusterDropoutWindows(cluster: motorikCluster, totalBars: frame.totalBars, seed: seed)
+
         // Step 3 — Tonal governance map
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
 
@@ -264,7 +269,7 @@ struct SongGenerator {
 
         // Step 9 — Texture
         var texRules: Set<String> = []
-        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, cluster: motorikCluster)
+        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, cluster: motorikCluster, clusterWindows: clusterWindows)
 
         // Step 10 — Collision / density simplification pass
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
@@ -302,7 +307,6 @@ struct SongGenerator {
 
         // Step 13 — Drum variation engine: fills at section transitions and instrument entrances,
         //            plus cymbal variations on 16+-bar identical runs
-        let clusterWindows = clusterDropoutWindows(cluster: motorikCluster, totalBars: frame.totalBars, seed: seed)
         // A fill on the bar before the cluster leaves, and on the bar before it returns.
         let clusterSeamBars = clusterWindows.flatMap { [$0.lowerBound - 1, $0.upperBound - 1] }
         trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, noirVariation: isNoir, arcadeVariation: isArcade, kraftwerkCluster: motorikCluster.isActive, clusterBoundaryBars: clusterSeamBars, clusterBassIsLocked: motorikCluster.includes(kTrackBass))
@@ -310,7 +314,7 @@ struct SongGenerator {
         // Step 13.5 — Kraftwerk cluster section dropout: the whole cluster leaves together for
         // two windows, while everything outside it keeps playing.
         trackEvents = applyClusterDropout(trackEvents: trackEvents, cluster: motorikCluster,
-                                          lead2Partners: clusterLead2Partners, totalBars: frame.totalBars, seed: seed)
+                                          lead2Partners: clusterLead2Partners, windows: clusterWindows)
 
         // Step 13.6 — Kraftwerk cluster repeat guard. Rhythm was done at step 8b.
         // EVERY track in a cluster song, not only the cluster's members. A non-member still
@@ -2022,16 +2026,15 @@ struct SongGenerator {
         trackEvents: [[MIDIEvent]],
         cluster: MotorikCluster,
         lead2Partners: Bool,
-        totalBars: Int,
-        seed: UInt64
+        windows: [Range<Int>]
     ) -> [[MIDIEvent]] {
-        guard cluster.isActive else { return trackEvents }
+        guard cluster.isActive, !windows.isEmpty else { return trackEvents }
 
-        var tracks = cluster.tracks
+        // Texture plays THROUGH the drop. It is the one cluster voice that continues, so the
+        // window reads as a change of texture rather than a hole: the machine parts step out
+        // and the scattered colour is what is left holding the space.
+        var tracks = cluster.tracks.filter { $0 != kTrackTexture }
         if lead2Partners { tracks.append(kTrackLead2) }
-
-        let windows = clusterDropoutWindows(cluster: cluster, totalBars: totalBars, seed: seed)
-        guard !windows.isEmpty else { return trackEvents }
 
         let silentSteps = windows.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
         var out = trackEvents
@@ -2069,14 +2072,15 @@ struct SongGenerator {
         let substyleLabel = isNoir ? "Motorik Noir" : isArcade ? "Motorik Arcade" : "Motorik"
         log.append(GenerationLogEntry(tag: "Style", description: "\(substyleLabel) – \(frame.tempo) bpm"))
 
-        // Kraftwerk cluster — lists the tracks that ACTUALLY adopted Kraftwerk rules, not the
-        // cluster's internal name, so a song's character can be read off its log. Texture joins
-        // every cluster and Lead 2 only joins when it partners with Rhythm, so membership is
-        // per-song. Nothing is emitted when no cluster fires: the absence is the signal.
+        // Logged as "Sync" rather than "Cluster": Cluster is a krautrock band and the name of
+        // several existing texture rules, so the word is already taken. Lists the tracks that
+        // ACTUALLY synchronised, not the group's internal name — Texture joins every one and
+        // Lead 2 only when it partners with Rhythm, so membership is per-song. Nothing is
+        // emitted when none fires: the absence is the signal.
         if cluster.isActive {
             var names = cluster.logTrackNames
             if clusterLead2Partners { names.append("Lead 2") }
-            log.append(GenerationLogEntry(tag: "Cluster KW",
+            log.append(GenerationLogEntry(tag: "Sync",
                                           description: names.joined(separator: ", ")))
         }
 

@@ -32,7 +32,8 @@ struct TextureGenerator {
         usedRuleIDs: inout Set<String>,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        cluster: MotorikCluster = .none
+        cluster: MotorikCluster = .none,
+        clusterWindows: [Range<Int>] = []
     ) -> [MIDIEvent] {
         // Texture rides along with EVERY cluster rather than belonging to one: its scattered
         // wide-register behaviour suits all three, and it is a supporting role rather than part
@@ -42,7 +43,7 @@ struct TextureGenerator {
             let ruleID = rng.weightedPick([0.65, 0.35]) == 1 ? "MOT-TEXT-010" : "MOT-TEXT-009"
             usedRuleIDs.insert(ruleID)
             return kraftwerkTexture(ruleID: ruleID, frame: frame, structure: structure,
-                                    tonalMap: tonalMap, rng: &rng)
+                                    tonalMap: tonalMap, windows: clusterWindows, rng: &rng)
         }
 
         var events: [MIDIEvent] = []
@@ -221,6 +222,7 @@ struct TextureGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
+        windows: [Range<Int>],
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
@@ -252,13 +254,27 @@ struct TextureGenerator {
         }
 
         // MOT-TEXT-010 Sparse Punctuation — very rare events at STRUCTURAL positions: 2-3 notes,
-        // then 300-400 steps of silence. Placed at section boundaries rather than randomly,
-        // which is what makes them read as punctuation of the form.
+        // then a long silence. Placed against the form rather than randomly, which is what makes
+        // them read as punctuation of it.
+        //
+        // Section starts alone are not enough anchors. A Motorik song has about three sections,
+        // so the rule managed roughly two bursts and six notes across four minutes — present in
+        // the file, inaudible in the song. The cluster's dropout windows are the other structural
+        // moment, and they are where this rule earns its place: Texture plays through the drop
+        // while the machine parts step out, so these bursts are the only thing in that space.
+        var anchors: [Int] = structure.sections.map { $0.startBar * 16 }
+        for window in windows {
+            anchors.append(window.lowerBound * 16)                    // as the cluster steps out
+            let mid = (window.lowerBound + window.upperBound) / 2
+            if mid > window.lowerBound { anchors.append(mid * 16) }   // once more inside the gap
+        }
+        anchors.sort()
+
+        // Still sparse: a burst needs real distance from the one before it.
         var lastStep = -1_000
-        for section in structure.sections {
-            let step = section.startBar * 16
+        for step in anchors {
             guard step < totalSteps else { break }
-            guard step - lastStep >= 300 + rng.nextInt(upperBound: 101) else { continue }
+            guard step - lastStep >= 180 + rng.nextInt(upperBound: 121) else { continue }
             let pcs   = chordPCs(atStep: step)
             let count = 2 + rng.nextInt(upperBound: 2)               // 2...3 notes
             for i in 0..<count {
@@ -273,7 +289,7 @@ struct TextureGenerator {
             }
             lastStep = step
         }
-        return events
+        return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
 }

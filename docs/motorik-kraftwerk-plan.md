@@ -98,14 +98,17 @@ Texture (+ Lead 2 when partnering).
 
 All remaining tracks draw from normal Motorik rotation as they do now.
 
-**Log the cluster.** When one fires, emit a `GenerationLogEntry` with tag `Cluster` naming the
+**Log it.** The tag is `Sync`, not `Cluster` — Cluster is a krautrock band and the name of
+several existing texture rules, so the word is already taken in this codebase.
+
+**What is logged.** When one fires, emit a `GenerationLogEntry` with tag `Sync` naming the
 tracks that actually adopted Kraftwerk rules, so a song's character can be identified by
 reading its log rather than by guessing:
 
 ```
-Cluster    KW Bass + Drums + Texture
-Cluster    KW Bass + Rhythm + Texture + Lead 2
-Cluster    KW Rhythm + Lead 1 + Texture
+Sync       Bass, Drums, Texture
+Sync       Bass, Rhythm, Texture, Lead 2
+Sync       Rhythm, Lead 1, Texture
 ```
 
 List **actual membership**, not the cluster's name — Texture always joins and Lead 2 joins only
