@@ -26,6 +26,11 @@
 //   RHY-012: Void Stab — root+fifth sustained d8 on beat 1, optional beat-3 re-hit (50%),
 //            optional pickup at s14 (40%). Max 3 notes per bar — creates ambient chord wash.
 //            From PiL Albatross T3 guitar long sustains. Motorik Noir only.
+//   RHY-014: Two-Note Lock — a 2- or 4-step cell over 2-3 pitch classes, repeated with no
+//            variation for the whole song. Transposes with the chord but never changes shape;
+//            the cell length divides into 16 so it locks to the barline. Cluster only.
+//   RHY-015: Paired Sequencer — an 8-step cell with 6 active slots over 6 pitch classes.
+//            Lead 2 takes the same cell offset by 2 steps when it partners. Cluster only.
 //   RHY-013: Levene Drop — single-note staccato hits on "and" positions only (s2,s6,s10,s14),
 //            45% probability per step, 30% of bars completely silent. Root (55%) / flat7 (30%) /
 //            fifth (15%) chosen once per bar — no dyad. From Keith Levene's isolated guitar drops
@@ -43,8 +48,24 @@ struct RhythmGenerator {
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
         noirVariation: Bool = false,
-        arcadeVariation: Bool = false
+        arcadeVariation: Bool = false,
+        cluster: MotorikCluster = .none
     ) -> [MIDIEvent] {
+        // The Kraftwerk rules run for the WHOLE song rather than being re-picked per section,
+        // and they play through intro and outro too. A cell that changed at a section boundary
+        // would not be the measured behaviour — rigidity across the entire song is the point.
+        if let forced = forceRuleID, forced == "MOT-RTHM-014" || forced == "MOT-RTHM-015" {
+            usedRuleIDs.insert(forced)
+            return kraftwerkRhythm(ruleID: forced, frame: frame, tonalMap: tonalMap, rng: &rng)
+        }
+        if forceRuleID == nil, cluster.includes(kTrackRhythm) {
+            // Two-Note Lock 55% / Paired Sequencer 45%. This draw also decides which Lead 2
+            // partner is available, so it has to happen before Lead 2 is resolved.
+            let ruleID = rng.weightedPick([0.55, 0.45]) == 1 ? "MOT-RTHM-015" : "MOT-RTHM-014"
+            usedRuleIDs.insert(ruleID)
+            return kraftwerkRhythm(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng)
+        }
+
         var events: [MIDIEvent] = []
 
         // Arpeggio direction is fixed for the whole song (consistent feel)
@@ -513,4 +534,90 @@ struct RhythmGenerator {
         guard !candidates.isEmpty else { return UInt8(clamping: target) }
         return UInt8(clamping: candidates.min(by: { abs($0 - target) < abs($1 - target) }) ?? low)
     }
+
+    // MARK: - Kraftwerk cluster rhythm
+
+    /// Lowest MIDI note of pitch class `pc` inside [low, high].
+    private static func kwInRegister(_ pc: Int, low: Int, high: Int) -> Int {
+        var m = low + (((pc - low) % 12) + 12) % 12
+        if m > high { m -= 12 }
+        return max(low, min(high, m))
+    }
+
+    /// The two sequencer rules. Both transpose with the chord but never change shape, and both
+    /// use a cell length that divides evenly into 16 so the figure LOCKS to the barline rather
+    /// than phasing across it. That is the opposite of Kosmic Space's sequencer and is
+    /// deliberate: Kraftwerk's rigidity comes from perfect alignment, Jarre's motion from drift.
+    ///
+    /// The plan also lists a 3-step cell, which is excluded here because 3 does not divide 16 —
+    /// it would phase, contradicting the locking requirement stated in the same section.
+    private static func kraftwerkRhythm(
+        ruleID: String,
+        frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        if ruleID == "MOT-RTHM-014" {
+            // The most extreme measurement in the corpus: a short cell over 2-3 pitch classes,
+            // repeated with no variation for the entire song. A note on every step of the cell
+            // gives 16 notes/bar = 4.0 notes/beat; dropping one slot of a 4-cell gives 3.0.
+            let cellLength = rng.nextDouble() < 0.5 ? 2 : 4
+            let pcCount    = rng.nextDouble() < 0.6 ? 2 : 3
+            // Degrees above the chord root, so the shape survives transposition.
+            let degreePool = [0, 7, 12, 3, 5]
+            var degrees: [Int] = []
+            for i in 0..<pcCount { degrees.append(degreePool[i]) }
+            var cell: [Int?] = (0..<cellLength).map { degrees[$0 % degrees.count] }
+            // One rest slot in a 4-cell, drawn once, takes density to the bottom of the band.
+            if cellLength == 4 && rng.nextDouble() < 0.5 {
+                cell[1 + rng.nextInt(upperBound: 3)] = nil
+            }
+
+            for bar in 0..<frame.totalBars {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = kwInRegister(rootPC, low: 44, high: 70)
+                for step in 0..<16 {
+                    guard let degree = cell[step % cellLength] else { continue }
+                    var note = root + degree
+                    if note > 70 { note -= 12 }
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step,
+                                            note: UInt8(max(44, min(70, note))),
+                                            velocity: 80, durationSteps: 1))
+                }
+            }
+            return events
+        }
+
+        // MOT-RTHM-015 Paired Sequencer — the doubling habit, measured twice in the corpus.
+        // An 8-step cell with 6 active slots repeats twice a bar: 12 notes/bar = 3.0 notes/beat,
+        // inside the measured 2.6-3.1 band. Lead 2 takes this same cell offset by 2 steps when
+        // it partners; when it does not, this plays alone.
+        var slots = Array(0..<8)
+        var inactive: [Int] = []
+        for _ in 0..<2 { inactive.append(slots.remove(at: rng.nextInt(upperBound: slots.count))) }
+        let activeSlots = slots.sorted()
+        // Six pitch classes, as degrees above the chord root.
+        let degrees = [0, 2, 3, 5, 7, 10]
+        _ = inactive
+
+        for bar in 0..<frame.totalBars {
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root   = kwInRegister(rootPC, low: 53, high: 77)
+            for rep in 0..<2 {
+                for (i, slot) in activeSlots.enumerated() {
+                    var note = root + degrees[i % degrees.count]
+                    if note > 77 { note -= 12 }
+                    events.append(MIDIEvent(stepIndex: bar * 16 + rep * 8 + slot,
+                                            note: UInt8(max(53, min(77, note))),
+                                            velocity: 80, durationSteps: 1))
+                }
+            }
+        }
+        return events
+    }
+
 }

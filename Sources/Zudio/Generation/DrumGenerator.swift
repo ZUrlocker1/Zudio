@@ -20,6 +20,13 @@
 //            Based on Joy Division "Disorder" (1979). 8th-note hat. At high intensity (odd bars):
 //            extra syncopated kick on "and of 2" (step 6) and "and of 4" (step 14).
 //            Motorik Noir only.
+//   DRM-013: Sequenced Timekeeper — one dense single-pitch timekeeping voice (closed hat or
+//            wood block) on all eight even steps, plus kick 1+3, snare on beat 3 only, and two
+//            fixed accent steps. Flat velocity 80, identical every bar, no fills. Kraftwerk
+//            cluster only (Rhythm Section).
+//   DRM-014: Sparse Accents — no timekeeper at all. Kick 1+3 (or 1 and the "and" of 3), snare
+//            every second bar, one accent every fourth bar. Under 1.5 notes/beat; the space is
+//            the point. Kraftwerk cluster only (Rhythm Section).
 //   DRM-008: Tribal — NO hi-hat. Kick syncopated on steps 2, 4, 12, 14. Snare on beats 1+3.
 //            Based on Joy Division "She's Lost Control" (1980) — purely percussive, tom-driven.
 //            At high intensity every 6th bar: a mechanical descending tom cascade replaces the
@@ -53,11 +60,15 @@ struct DrumGenerator {
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
         noirVariation: Bool = false,
-        arcadeVariation: Bool = false
+        arcadeVariation: Bool = false,
+        cluster: MotorikCluster = .none
     ) -> [MIDIEvent] {
         let ruleID: String
         if let forced = forceRuleID {
             ruleID = forced
+        } else if cluster.includes(kTrackDrums) {
+            // Kraftwerk cluster: Sequenced Timekeeper 60% / Sparse Accents 40%.
+            ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-DRUM-014" : "MOT-DRUM-013"
         } else if noirVariation {
             // Noir: Classic, Open Pocket, Ride, Albatross, Annalisa, Inverted Beat, Tribal.
             let ruleWeights: [Double] = [0.12, 0.06, 0.12, 0.20, 0.20, 0.10, 0.20]
@@ -94,6 +105,14 @@ struct DrumGenerator {
         }
         usedRuleIDs.insert(ruleID)
         if ruleID == "MOT-DRUM-000" { return [] }
+
+        // The two Kraftwerk kit rules bypass the bar loop entirely. That loop adds section
+        // crashes, fills and intro/outro variants, and the measured character depends on none
+        // of that happening — every bar is identical, and the arrangement interest comes from
+        // the cluster's section dropout instead.
+        if ruleID == "MOT-DRUM-013" || ruleID == "MOT-DRUM-014" {
+            return kraftwerkKit(ruleID: ruleID, totalBars: frame.totalBars, rng: &rng)
+        }
 
         var events: [MIDIEvent] = []
 
@@ -976,6 +995,82 @@ struct DrumGenerator {
         events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,  velocity: 82, durationSteps: 1))
         events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 72, durationSteps: 1))
         events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 68, durationSteps: 1))
+        return events
+    }
+
+
+    // MARK: - Kraftwerk cluster kits
+
+    /// The corpus splits percussion into two tiers: one near-continuous timekeeping voice at
+    /// ~3.3 notes/beat with 18-20% rest, and accent voices at 0.27-0.98 with 76-93% rest. Every
+    /// voice is a SINGLE pitch on a fixed every-other-step figure, separately sequenced — machine
+    /// sequencing rather than a kit performance. These two rules are "with a timekeeper" and
+    /// "without one".
+    ///
+    /// Velocities are accented but do not swing: a sequencer's per-step accent, not the
+    /// hi-hat gradient that gives normal Motorik its human groove. Wood block is deliberately
+    /// absent from both rules — a hard transient eight times a bar reads as knocking rather
+    /// than timekeeping, and it does not belong in Motorik at all.
+    private static func kraftwerkKit(ruleID: String, totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        func hit(_ bar: Int, _ step: Int, _ note: GMDrum, _ vel: UInt8 = 80) {
+            events.append(MIDIEvent(stepIndex: bar * 16 + step, note: note.rawValue,
+                                    velocity: vel, durationSteps: 1))
+        }
+
+        if ruleID == "MOT-DRUM-013" {
+            // Four independent single-pitch voices, each on a fixed step set, every bar alike.
+            //
+            // The timekeeper runs eight to the bar for the whole song, so it is the one voice
+            // that decides whether this rule is a groove or a nuisance. Two things keep it from
+            // becoming one:
+            //
+            //   * It is ACCENTED, not flat. The corpus reads as flat velocity, but the Evidence
+            //     Base lists that as a caveat of the fan transcriptions rather than a property
+            //     of the records — and a step sequencer has a per-step accent control. Taking
+            //     the transcription literally reproduced an artefact, and eight identical hits
+            //     a bar with no dynamic shape is fatiguing however authentic the placement is.
+            //   * It can SPLIT ACROSS TWO VOICES. The Robots spreads its percussion over eight
+            //     separately sequenced single-pitch tracks, two of them hats, so beats on the
+            //     closed hat and offbeats on the pedal hat is the more faithful reading as well
+            //     as the more listenable one. Same eight positions, same density, two timbres.
+            let splitVoices = rng.nextDouble() < 0.65
+            let offbeatVoice: GMDrum = splitVoices ? .pedalHat : .closedHat
+            let accent:       GMDrum = rng.nextDouble() < 0.5 ? .lowMidTom : .sidestick
+            // Two accent steps drawn ONCE and held all song — the figure never varies.
+            var offbeats = [2, 6, 10, 14]
+            let a = offbeats.remove(at: rng.nextInt(upperBound: offbeats.count))
+            let b = offbeats.remove(at: rng.nextInt(upperBound: offbeats.count))
+            let accentSteps = [a, b].sorted()
+
+            for bar in 0..<totalBars {
+                for step in stride(from: 0, to: 16, by: 2) {
+                    let onBeat = step % 4 == 0
+                    // Step 0 carries the bar; the other beats sit just under it; the "and"
+                    // steps drop well back so the ear hears quarters with filigree between.
+                    let velocity: UInt8 = step == 0 ? 90 : onBeat ? 84 : 60
+                    hit(bar, step, onBeat ? .closedHat : offbeatVoice, velocity)
+                }
+                hit(bar, 0, .kick, 92)
+                hit(bar, 8, .kick, 92)
+                // Measured snare density is 0.54 notes/beat — far below a backbeat, so beat 3 only.
+                hit(bar, 8, .snare, 84)
+                for step in accentSteps { hit(bar, step, accent, 72) }
+            }
+        } else {
+            // MOT-DRUM-014 Sparse Accents — no timekeeper at all, under 1.5 notes/beat total.
+            // The space is the point; this is the furthest departure from current Motorik drums.
+            let secondKick = rng.nextDouble() < 0.5 ? 8 : 10
+            let accent:    GMDrum = rng.nextDouble() < 0.5 ? .lowMidTom : .sidestick
+            let accentStep = rng.nextDouble() < 0.5 ? 6 : 14
+
+            for bar in 0..<totalBars {
+                hit(bar, 0, .kick, 92)
+                hit(bar, secondKick, .kick, 84)
+                if bar % 2 == 0 { hit(bar, 8, .snare, 84) }
+                if bar % 4 == 0 { hit(bar, accentStep, accent, 72) }
+            }
+        }
         return events
     }
 

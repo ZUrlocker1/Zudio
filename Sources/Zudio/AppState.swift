@@ -576,7 +576,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad"]
-        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1","Clavinet"]
+        case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
@@ -620,7 +620,9 @@ final class AppState: ObservableObject {
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096]  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
-        case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84, 11088, 4, 7]
+        // Clavinet (GM 7) was removed in build 131: the preset is not present in Zudio.sf2, so it
+        // played silent and logged "Missing MIDI patch 7".
+        case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84, 11088, 4]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
@@ -1317,6 +1319,7 @@ final class AppState: ObservableObject {
                 self.sanitiseNoirInstruments(for: state)
                 self.sanitiseDriftInstruments(for: state)
                 self.sanitiseArcadeInstruments(for: state)
+                self.sanitiseClusterInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
                 // Chill: sync Lead 1 and Lead 2 overrides to generation-time instruments so log and
                 // playback agree. chillLeadInstrument/chillLead2Instrument drive musical generation
@@ -1817,6 +1820,24 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Forces every Kraftwerk-cluster track into its restricted instrument subset.
+    ///
+    /// The pick pool alone is not enough. Only two instruments are re-picked per song, so the
+    /// other five carry over from the previous song untouched — a cluster could inherit Fuzz
+    /// Guitar on Rhythm, which is a guitar riff rather than a sequencer and is the exact case
+    /// the subsets exist to prevent. Noir and Arcade each have a sanitiser for the same reason;
+    /// this is the cluster's. It also covers the first song of a style, where every override
+    /// defaults to index 0.
+    private func sanitiseClusterInstruments(for state: SongState) {
+        guard state.style == .motorik, state.motorikCluster.isActive else { return }
+        var rng = SystemRandomNumberGenerator()
+        for track in 0..<kTrackCount {
+            guard let subset = state.motorikCluster.instrumentSubset(forTrack: track),
+                  !subset.contains(instrumentOverrides[track] ?? 0) else { continue }
+            instrumentOverrides[track] = subset[Int.random(in: 0..<subset.count, using: &rng)]
+        }
+    }
+
     private func sanitiseArcadeInstruments(for state: SongState) {
         guard state.style == .motorik, state.motorikArcadeVariation else { return }
         var rng = SystemRandomNumberGenerator()
@@ -1837,7 +1858,7 @@ final class AppState: ObservableObject {
         //              5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1, 10=Clavi]
         // Charang, Doctor Solo, Crunch Guitar, Harpsi Pad are excluded from Arcade.
         let cr = instrumentOverrides[kTrackRhythm] ?? 0
-        if ![0, 6, 9, 10].contains(cr) { instrumentOverrides[kTrackRhythm] = [0, 6, 9, 10][Int.random(in: 0..<4, using: &rng)] }
+        if ![0, 6, 9].contains(cr) { instrumentOverrides[kTrackRhythm] = [0, 6, 9][Int.random(in: 0..<3, using: &rng)] }
         // Pads pool [0=Halo Pad, 1=Sweep Pad, 2=Bowed Glass, 3=Synth Strings] — Arcade excludes Bowed Glass
         let cp = instrumentOverrides[kTrackPads] ?? 0
         if cp == 2 { instrumentOverrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
@@ -2003,11 +2024,19 @@ final class AppState: ObservableObject {
             let cl1 = overrides[kTrackLead1] ?? 0
             if ![0, 1, 5, 6, 7].contains(cl1) { overrides[kTrackLead1] = [0, 1, 5, 6, 7][Int.random(in: 0..<5, using: &rng)] }
             let cr = overrides[kTrackRhythm] ?? 0
-            if ![0, 6, 9, 10].contains(cr) { overrides[kTrackRhythm] = [0, 6, 9, 10][Int.random(in: 0..<4, using: &rng)] }
+            if ![0, 6, 9].contains(cr) { overrides[kTrackRhythm] = [0, 6, 9][Int.random(in: 0..<3, using: &rng)] }
             let cp = overrides[kTrackPads] ?? 0
             if cp == 2 { overrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
             let ct = overrides[kTrackTexture] ?? 0
             if ![0, 3, 5, 6, 8, 9, 10].contains(ct) { overrides[kTrackTexture] = [0, 3, 5, 6, 8, 9, 10][Int.random(in: 0..<7, using: &rng)] }
+        } else if style == .motorik, state.motorikCluster.isActive {
+            // Kraftwerk cluster — same enforcement as sanitiseClusterInstruments, and it takes
+            // precedence over the plain base-Motorik pass below.
+            for track in 0..<kTrackCount {
+                guard let subset = state.motorikCluster.instrumentSubset(forTrack: track),
+                      !subset.contains(overrides[track] ?? 0) else { continue }
+                overrides[track] = subset[Int.random(in: 0..<subset.count, using: &rng)]
+            }
         } else if style == .motorik {
             let cd = overrides[kTrackDrums] ?? 0
             if cd == 3 { overrides[kTrackDrums] = Int.random(in:0..<3, using:&rng) }
@@ -2037,6 +2066,13 @@ final class AppState: ObservableObject {
 
     /// Static backing for instrumentPickPool — takes explicit SongState instead of self.songState.
     nonisolated static func instrumentPickPoolStatic(trackIndex: Int, style: MusicStyle, poolCount: Int, state: SongState?) -> [Int] {
+        // Kraftwerk cluster (base Motorik only) restricts its member tracks to the machine
+        // sounds in each existing pool. Checked before the substyle branches because a cluster
+        // never fires in a Noir or Arcade song, so no substyle case can be reached from here.
+        if style == .motorik,
+           let clusterSubset = state?.motorikCluster.instrumentSubset(forTrack: trackIndex) {
+            return clusterSubset
+        }
         if style == .motorik && trackIndex == kTrackBass {
             if state?.motorikArcadeVariation == true { return [1,3,4,5,6] }
             return state?.motorikNoirVariation == true ? [0,1,4,5] : [0,1,2,3]
@@ -2054,7 +2090,7 @@ final class AppState: ObservableObject {
             return state?.motorikNoirVariation == true ? [0,1,3] : [0,1,2]
         }
         if style == .motorik && trackIndex == kTrackRhythm {
-            if state?.motorikArcadeVariation == true { return [0,1,6,8,9,10] }
+            if state?.motorikArcadeVariation == true { return [0,1,6,8,9] }
             return state?.motorikNoirVariation == true ? [2,3,5,6,7] : [0,1,2,4,5,6]
         }
         if style == .motorik && trackIndex == kTrackPads {
@@ -2095,6 +2131,13 @@ final class AppState: ObservableObject {
     /// Chill kTrackLead2:  blues excludes Flute; regular reduces Trombone and Soprano Sax.
     /// Motorik kTrackBass: Noir restricts to cold/synthetic sounds; regular restricts to organic sounds.
     private func instrumentPickPool(trackIndex: Int, style: MusicStyle, poolCount: Int) -> [Int] {
+        // Kraftwerk cluster (base Motorik only) restricts its member tracks to the machine
+        // sounds in each existing pool. Checked before the substyle branches because a cluster
+        // never fires in a Noir or Arcade song, so no substyle case can be reached from here.
+        if style == .motorik,
+           let clusterSubset = songState?.motorikCluster.instrumentSubset(forTrack: trackIndex) {
+            return clusterSubset
+        }
         if style == .motorik && trackIndex == kTrackBass {
             // Pool: [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
             if songState?.motorikArcadeVariation == true { return [1, 3, 4, 5, 6] }  // Arcade: Lead Bass + Elec Bass + Mean Saw + Techno + Synth Bass 1
@@ -2126,7 +2169,7 @@ final class AppState: ObservableObject {
         if style == .motorik && trackIndex == kTrackRhythm {
             // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1, 10=Clavi]
             // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
-            if songState?.motorikArcadeVariation == true { return [0, 6, 9, 10] }  // Arcade: Guitar Pulse + Synth Bass 3 + EP1 + Clavi
+            if songState?.motorikArcadeVariation == true { return [0, 6, 9] }  // Arcade: Guitar Pulse + Synth Bass 3 + Electric Piano 1
             return songState?.motorikNoirVariation == true
                 ? [2, 3, 5, 6, 7]      // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
                 : [0, 1, 2, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Fuzz Guitar + Acoustic Bass + Pick Bass + Synth Bass 3

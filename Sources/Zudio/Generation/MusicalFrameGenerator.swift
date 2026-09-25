@@ -11,10 +11,21 @@ struct MusicalFrameGenerator {
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         motorikNoir: Bool = false,
-        motorikArcade: Bool = false
+        motorikArcade: Bool = false,
+        kraftwerkCluster: Bool = false
     ) -> GlobalMusicalFrame {
         let key    = keyOverride   ?? pickKey(rng: &rng)
         var tempo  = tempoOverride ?? (motorikNoir ? pickTempoNoir(rng: &rng) : motorikArcade ? pickTempoArcade(rng: &rng) : pickTempo(rng: &rng))
+
+        // Kraftwerk cluster: the corpus measures 120-128 BPM, and base Motorik's 126-154 is
+        // fast enough that a sequencer on top still reads as Neu! rather than Kraftwerk.
+        // Remapped rather than clamped — clamping would pile most songs onto the 132 ceiling,
+        // whereas this compresses the existing triangular spread into the slower band and keeps
+        // its shape. The peak lands at 125, inside the measured range. Applied BEFORE
+        // pickTotalBars so the bar count still targets the intended duration.
+        if kraftwerkCluster && tempoOverride == nil {
+            tempo = 120 + Int((Double(tempo - 126) * 12.0 / 28.0).rounded())
+        }
         let mood   = moodOverride  ?? pickMood(rng: &rng)
         let mode   = motorikNoir   ? pickModeNoir(rng: &rng) : motorikArcade ? pickModeArcade(rng: &rng) : modeForMood(mood, rng: &rng)
         let family = motorikNoir   ? pickProgressionFamilyNoir(rng: &rng) : motorikArcade ? pickProgressionFamilyArcade(mode: mode, rng: &rng) : pickProgressionFamily(rng: &rng)
@@ -22,6 +33,7 @@ struct MusicalFrameGenerator {
 
         if motorikNoir    { tempo = Swift.max(110, Swift.min(tempo, 140)) }
         else if motorikArcade { tempo = Swift.max(130, Swift.min(tempo, 160)) }
+        else if kraftwerkCluster { tempo = Swift.max(120, Swift.min(tempo, 132)) }
         else              { tempo = Swift.max(126, Swift.min(tempo, 154)) }
 
         return GlobalMusicalFrame(

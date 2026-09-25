@@ -1,7 +1,11 @@
 # Kosmic Space — Design & Implementation Plan
 
-Status: **design complete, not implemented.** No code, README or change-log changes until
-after the Oct 1 2026 App Store release of 2.5 (build 130).
+Status: **design complete, ready to implement.** Builds 130 for iOS and Mac were uploaded
+to App Store Connect on 2026-09-24, scheduled for release Oct 1. Those binaries are locked,
+so repository changes no longer affect what ships.
+
+**Work on a branch until the app is actually live.** If review rejects, `main` needs to be
+in the state that produced the uploaded build.
 
 Every decision below is settled. Where a value could have gone more than one way, the choice
 is stated with its reason.

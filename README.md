@@ -17,19 +17,15 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.5/Zudio-2.5.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.6/Zudio-2.6.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-Current release: `2.5` (build 130). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
+Current release: `2.6` (build 131). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v2.5:**
-- **Endless mix rebalanced** — More Kosmic and Motorik, slightly less Chill and Ambient, plus a streak cap so Endless mode stops bouncing between the same two styles for long stretches.
-- **Chill variety** — Chill Bass and Rhythm tracks now evolve within a song instead of looping the same patterns, with two new Rhythm rules and occasional rest bars. Much more chill!
-- **Chill bass levels reduced** — All three Chill bass instruments turned down; Acoustic Bass and Fretless Bass were running noticeably hot. Chill Blues is affected too, since it uses the same pool.
-- **Chill breakdown bass** — The breakdown bridge bass used to repeat one note for four bars. It now moves, and it's funky.
-- **New Ambient texture** — Added "Long Lake" (loon calls over a lake) to the Ambient audio texture pool.
-- **Texture and instrument fixes** — Reloading a saved song now plays its audio texture and restores its original instruments, instead of falling silent or substituting defaults.
-- **Air effect in stem export** — Fixed the Air effect using the wrong EQ shape when exporting separate track stems, which made Air-enabled stems duller than the mix. Normal audio export was unaffected.
-- **Song sharing fix** — Shared songs open properly again on iPhone and iPad, and Zudio now appears in the iOS share sheet. Also fixed `.zudio` files showing as text documents on Mac.
+**What's new in v2.6:**
+- **Kraftwerk flavour in Motorik** — Some Motorik songs now lean machine-like rather than Neu!-like. A coupled group of tracks adopts Kraftwerk rules together — rigid sequencer cells locked to the bar, sparse mechanical drums with no mid-section fills, octave doubling between parts — while the rest of the song plays normally. These songs run slower (120-132 BPM), drop out together twice a song, and take a German-flavoured title, so you can spot one in the Songs list.
+- **Motorik bass concentrated** — Four of the less distinctive bass rules were retired from the base Motorik pool, with the freed weight going to the Neu! and Kraftwerk rules at either end of the style. All four remain in Motorik Noir or Arcade.
+- **Saved songs reload note-for-note** — A saved song stores its seed and is rebuilt from it, and a few places in the generators could return a different pitch each time. The same seed now always produces the same song.
+- **Fixes** — Removed Clavinet from the Motorik instrument pool: the sound was missing from the soundfont, so that track played silent. Corrected the iPhone info sheet, which still showed v2.4.
 
 
 ---

@@ -1328,7 +1328,11 @@ struct KosmicArpeggioGenerator {
         while bar < bodyEnd {
             guard let entry = tonalMap.entry(atBar: bar) else { bar += 4; continue }
             // 5-voice chord: root in 3 registers + 3rd + 5th + optional 7th
-            let root3 = clampToRegister(entry.chordWindow.chordTones.first ?? 60, low: 40, high: 55)
+            // chordTones is a Set, so .first returned an arbitrary tone that differed between
+            // two runs of the same seed. The chord root is what was meant; derive it the way
+            // the rest of the generators do.
+            let rootPC3 = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root3 = clampToRegister(rootPC3, low: 40, high: 55)
             var tones = entry.chordWindow.chordTones
                 .map { clampToRegister($0, low: 52, high: 80) }
             tones = Array(Set(tones + [root3])).sorted().prefix(5).map { $0 }
@@ -1359,7 +1363,9 @@ struct KosmicArpeggioGenerator {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let barStart = bar * 16
             // Root of current chord, clamped to mid register
-            let root  = clampToRegister(entry.chordWindow.chordTones.first ?? 60, low: 56, high: 72)
+            // .first on a Set is arbitrary and varies per run; derive the actual root.
+            let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+            let root  = clampToRegister(rootPC, low: 56, high: 72)
             let upper = Swift.min(127, root + 1)  // semitone above
             let vel = UInt8(44 + rng.nextInt(upperBound: 17))  // 44–60
             // Alternate every 2 steps: root on even half-beats, upper on odd half-beats

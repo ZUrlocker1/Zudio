@@ -12,13 +12,17 @@ struct MIDIFileExporter {
         let dir = AudioFileExporter.exportDirectory()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = AudioFileExporter.incrementingURL(in: dir, base: AudioFileExporter.sanitizedName(song.title), ext: "MID")
-        try buildMIDIFile(song).write(to: url)
+        try buildMIDIFile(song, programs: nil).write(to: url)
         return url
     }
 
     /// Write MIDI data to a caller-specified URL (used by batch test generator).
-    static func export(_ song: SongState, to url: URL) throws {
-        try buildMIDIFile(song).write(to: url)
+    ///
+    /// `programs` overrides the default GM mapping with the song's ACTUAL per-track programs,
+    /// keyed by track index. Instruments are chosen outside generation, so without this an
+    /// exported file plays the default patch rather than the one the song was assigned.
+    static func export(_ song: SongState, to url: URL, programs: [Int: UInt8]? = nil) throws {
+        try buildMIDIFile(song, programs: programs).write(to: url)
     }
 
     // MARK: - MIDI file construction
@@ -26,7 +30,7 @@ struct MIDIFileExporter {
     private static let ticksPerQuarter: UInt16 = 480
     private static let ticksPerStep: Int = 120  // 16th note = 480/4
 
-    private static func buildMIDIFile(_ song: SongState) -> Data {
+    private static func buildMIDIFile(_ song: SongState, programs: [Int: UInt8]? = nil) -> Data {
         var data = Data()
         let numTracks: UInt16 = 8  // 1 tempo + 7 music
 
@@ -44,7 +48,7 @@ struct MIDIFileExporter {
         for i in 0..<kTrackCount {
             let events  = song.events(forTrack: i)
             let channel = kTrackMIDIChannels[i]
-            let program = kDefaultGMPrograms[i] ?? 0
+            let program = programs?[i] ?? kDefaultGMPrograms[i] ?? 0
             data.append(musicTrack(
                 name: kTrackNames[i],
                 events: events,

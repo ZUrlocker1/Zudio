@@ -107,8 +107,17 @@ struct LeadGenerator {
         forceLeadRuleID: String? = nil,
         passBodyBars: Int? = nil,
         noirVariation: Bool = false,
-        arcadeVariation: Bool = false
+        arcadeVariation: Bool = false,
+        cluster: MotorikCluster = .none
     ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
+
+        // Kraftwerk cluster (Machine Voice only). No solo range: these rules are announcements
+        // separated by silence, not a solo, and the Lead 1 solo machinery would fight them.
+        if forceLeadRuleID == nil, cluster.includes(kTrackLead1) {
+            let ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-LD1-022" : "MOT-LD1-021"
+            usedRuleIDs.insert(ruleID)
+            return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), nil)
+        }
 
         // A: Per-section rule — always consume two draws for RNG determinism across songs.
         // forceLeadRuleID is honoured only for known Motorik-lead IDs; cross-style IDs are ignored.
@@ -3013,9 +3022,13 @@ struct LeadGenerator {
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         trackIndex: Int, prevNote: UInt8?, rng: inout SeededRNG
     ) -> UInt8 {
+        // DETERMINISM: sorted(), not Array(). These are Sets, and a Set's iteration order
+        // differs between runs even for identical contents, so indexing the raw Array with a
+        // seeded draw returned a different pitch each time while the rhythm — driven by the
+        // same RNG stream — stayed identical.
         let pool: [Int] = (rng.nextDouble() < 0.80)
-            ? Array(entry.chordWindow.chordTones)
-            : Array(entry.chordWindow.scaleTensions)
+            ? entry.chordWindow.chordTones.sorted()
+            : entry.chordWindow.scaleTensions.sorted()
         guard !pool.isEmpty else {
             return frame.midiNote(degree: "1", oct: 0, trackIndex: trackIndex)
         }
@@ -3039,7 +3052,9 @@ struct LeadGenerator {
         entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
         trackIndex: Int, lead1LastNote: UInt8?, rng: inout SeededRNG
     ) -> UInt8 {
-        let pool = Array(entry.chordWindow.chordTones)
+        // sorted() for the same reason as pickNoteNearest: this pool is indexed by a seeded
+        // draw, so an unordered Set made the harmony note vary between runs of the same seed.
+        let pool = entry.chordWindow.chordTones.sorted()
         guard !pool.isEmpty else { return frame.midiNote(degree: "1", oct: 0, trackIndex: trackIndex) }
         let bounds = kRegisterBounds[trackIndex] ?? RegisterBounds(low: 60, high: 96)
 
@@ -3287,4 +3302,81 @@ struct LeadGenerator {
             return []
         }
     }
+
+    // MARK: - Kraftwerk cluster lead
+
+    /// Two measured shapes: short compact statements with proportionate silence, and long runs
+    /// followed by very long silences. Both are announcements rather than melodies — the rest
+    /// ratio lands 88-95% either way, and the silence is as much the material as the notes.
+    private static func kraftwerkLead1(
+        ruleID: String,
+        frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let totalSteps = frame.totalBars * 16
+
+        /// Pitch classes available at `step`, restricted to the measured vocabulary size.
+        func palette(at step: Int, count: Int) -> [Int] {
+            let bar = step / 16
+            guard let entry = tonalMap.entry(atBar: bar) else { return [0] }
+            let pool = entry.chordWindow.chordTones.sorted() + entry.chordWindow.scaleTensions.sorted()
+            return pool.isEmpty ? [0] : Array(pool.prefix(count))
+        }
+        func inRegister(_ pc: Int, low: Int, high: Int) -> Int {
+            var m = low + (((pc - low) % 12) + 12) % 12
+            if m > high { m -= 12 }
+            return max(low, min(high, m))
+        }
+
+        if ruleID == "MOT-LD1-021" {
+            // Short Statement — 4-6 notes over 6-34 steps, then 1.0-4.0x that span in silence.
+            let (low, high) = (65, 86)
+            var step = 16 * 4                                   // let the song start first
+            while step < totalSteps {
+                let noteCount = 4 + rng.nextInt(upperBound: 3)  // 4...6
+                let span      = 6 + rng.nextInt(upperBound: 29) // 6...34 steps
+                let pcs       = palette(at: step, count: 5 + rng.nextInt(upperBound: 2))
+                for i in 0..<noteCount {
+                    let at = step + (span * i) / max(1, noteCount)
+                    guard at < totalSteps else { break }
+                    let pc = pcs[rng.nextInt(upperBound: pcs.count)]
+                    events.append(MIDIEvent(stepIndex: at, note: UInt8(inRegister(pc, low: low, high: high)),
+                                            velocity: 80, durationSteps: 2))
+                }
+                let silence = Int(Double(span) * (1.0 + rng.nextDouble() * 3.0))   // 1.0...4.0x
+                step += span + max(1, silence)
+            }
+            return events
+        }
+
+        // MOT-LD1-022 Long Run — a continuous run at ~1.0 notes/beat, then 4-6x
+        // that span in silence. Typically two or three statements in a song, which is what makes
+        // the lead feel like an announcement rather than a part.
+        let (low, high) = (77, 106)
+        var step = 16 * 8
+        while step < totalSteps {
+            let noteCount = 40 + rng.nextInt(upperBound: 91)    // 40...130
+            let span      = noteCount * 4                       // ~1.0 notes/beat
+            let pcs       = palette(at: step, count: 5)
+            for i in 0..<noteCount {
+                let at = step + i * 4
+                guard at < totalSteps else { break }
+                let pc = pcs[rng.nextInt(upperBound: pcs.count)]
+                // Spread across the octaves the band allows. inRegister alone returns the
+                // lowest match, which would pin the run to 77-88 and lose the height that
+                // makes this rule read as an announcement.
+                var note = inRegister(pc, low: low, high: high)
+                let lift = rng.nextInt(upperBound: 3) * 12
+                if note + lift <= high { note += lift }
+                events.append(MIDIEvent(stepIndex: at, note: UInt8(min(127, note)),
+                                        velocity: 80, durationSteps: 2))
+            }
+            let silence = span * (4 + rng.nextInt(upperBound: 3))   // 4...6x
+            step += span + silence
+        }
+        return events
+    }
+
 }

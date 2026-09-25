@@ -592,7 +592,9 @@ struct ChillPadsGenerator {
     /// Built once per generator call so per-note snapping is O(1) instead of O(scale_size).
     static func makeSnapTable(_ scalePCs: Set<Int>) -> [Int] {
         (0..<12).map { pc in
-            scalePCs.contains(pc) ? pc : (scalePCs.min(by: { abs($0 - pc) < abs($1 - pc) }) ?? pc)
+            // Was scalePCs.min(by:) over the Set directly, which picked a different tone
+            // between runs whenever two scale tones tied. Use the shared snapping helper.
+            nearestScalePitchClass(pc, in: scalePCs)
         }
     }
 

@@ -41,8 +41,14 @@ struct PatternEvolver {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
-        seed: UInt64
+        seed: UInt64,
+        skipForKraftwerkBass: Bool = false
     ) -> [[MIDIEvent]] {
+        // This pass exists to mutate the bass gradually across the song. MOT-BASS-026 is a cell
+        // drawn once and repeated with no variation, and MOT-BASS-027's statement/rest shape is
+        // deliberate too — evolving either one would remove the measured feature.
+        guard !skipForKraftwerkBass else { return trackEvents }
+
         var rng = SeededRNG(seed: seed &+ 0xCAFE_BABE_7654_3210)
         var events = trackEvents
 
@@ -71,9 +77,15 @@ struct PatternEvolver {
         }
 
         // Reconstruct flat sorted array from bar dictionary.
-        events[kTrackBass] = barDict.values
-            .flatMap { $0 }
-            .sorted { $0.stepIndex < $1.stepIndex }
+        //
+        // DETERMINISM: walk the bars in key order, and sort on every field. Dictionary values
+        // come out in an arbitrary order that differs between runs, and sorting on stepIndex
+        // alone cannot undo that — events sharing a step compare equal, and Swift's sort is not
+        // stable, so they kept landing in a different order each time.
+        events[kTrackBass] = barDict.keys.sorted()
+            .flatMap { barDict[$0] ?? [] }
+            .sorted { ($0.stepIndex, $0.note, $0.velocity, $0.durationSteps)
+                    < ($1.stepIndex, $1.note, $1.velocity, $1.durationSteps) }
         return events
     }
 
@@ -255,11 +267,16 @@ struct PatternEvolver {
         }
         guard !freq.isEmpty else { return [] }
 
-        // Highest frequency first; off-beat positions (steps 2, 6, 10, 14) preferred on ties
+        // Highest frequency first; off-beat positions (steps 2, 6, 10, 14) preferred on ties.
+        // The final step comparison is what makes this a total order: freq.keys arrives in an
+        // arbitrary order, so without it two equally-frequent steps of the same beat class
+        // sorted differently between runs and the thinning hit different notes.
         let sorted = freq.keys.sorted {
             let fa = freq[$0, default: 0], fb = freq[$1, default: 0]
             if fa != fb { return fa > fb }
-            return ($0 % 4 == 2) && ($1 % 4 != 2)  // prefer off-beat
+            let aOffBeat = $0 % 4 == 2, bOffBeat = $1 % 4 == 2
+            if aOffBeat != bOffBeat { return aOffBeat }   // prefer off-beat
+            return $0 < $1
         }
         return Array(sorted.prefix(rng.nextInt(upperBound: 2) + 2))  // 2–3 targets
     }

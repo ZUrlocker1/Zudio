@@ -1,5 +1,17 @@
 # Zudio Change Log
 
+## V 2.6 (Build 131)  In progress
+
+- **Clavinet removed from Motorik** — The Clavinet sound is not present in Zudio's soundfont, so any Motorik song that drew it for the Rhythm track generated notes that never played, and the status log reported "Missing MIDI patch 7". It has been removed from the Motorik instrument pool. Only one saved song out of 444 was affected, and it had been playing as a six-track song all along; on reload it now takes the pool's default Rhythm instrument instead. An audit confirmed this was the only instrument in any style whose sound was missing.
+
+- **More Kraftwerk flavour in Motorik** — About one Motorik song in seven now leans more Krafwerk machine-like rather than Neu!-like. Rather than a new substyle, a coupled *cluster* of tracks adopts Kraftwerk rules together while the rest of the song draws from normal rotation. Twelve new Kraftwerk derived rules across drums, bass, rhythm, both leads and texture: rigid single-pitch percussion with few fills and a step sequencer's accent pattern rather than a drummer's swing, tiny sequencer cells locked to the barline, octave-unison doubling, and leads that make short statements and then stop. Cluster tracks also drop out together twice a song while everything else keeps playing, and draw from a restricted set of the existing electronic instruments. Cluster songs also run slower — 120-132 BPM against Motorik's usual 126-154, matching the tempo Kraftwerk actually worked at — and the drums fill only where the whole cluster drops out and returns. 
+- **Motorik bass pool concentrated** — Four rules were retired from the base Motorik bass pool: McCartney Drive, LA Woman Sustain, Hook Ascent and Quo Arc. All four remain in Motorik Noir or Arcade, The freed weight went to the rules that pull hardest in either direction — both Kraftwerk bass rules rise from 15% combined to 26%, and Neu! Hallogallo doubles — so base Motorik gets more characterful at both ends.
+
+- **Saved songs reload note-for-note** — A saved song stores its seed and is rebuilt from that seed on reload. Previously some patterns in Motorik songs came out slightly differently on reload. All tracks now restore consistently across all styles. 
+- **Regression tests** — Added `DeterminismTests`, which generates 200 seeds per style twice over and requires identical notes, plus a third run to catch drift, and pins title, structure, harmony and the generation log as well.
+
+---
+
 ## V 2.5 (Build 130)  Improvements to Endless, Chill, bug fixes
 - Endless mode style mix modified to increase Kosmik and Motorik, decrease Chill, Ambient slightly: 
     - Ambient ~19.5%

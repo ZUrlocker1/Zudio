@@ -1,14 +1,13 @@
 # Motorik Kraftwerk Flavour — Design Plan
 
-Status: **design only, not implemented.** No code, README or change-log changes until after
-the Oct 1 2026 App Store release of 2.5 (build 130).
+Status: **implemented and shipping in 2.6 build 131.**
 
-Scheduled **before** [kosmic-space-plan.md](kosmic-space-plan.md). This is a surgical change
-to a style that already works, not a new substyle — smaller, lower risk, and it improves
-output that ships today.
+Motorik occasionally leans machine-like rather than Neu!-like. A coupled *cluster* of tracks
+adopts Kraftwerk rules together while the rest of the song draws from normal rotation. This is
+not a substyle: there is no new `displayStyleName`, no UI change and no fourth sanitiser.
 
-Every decision below is settled, and the rule values are measured rather than estimated —
-see the Evidence Base.
+This document describes the design as built. Section numbers, weights and measurements below
+are the shipped values.
 
 ---
 
@@ -74,7 +73,7 @@ songs — at the current 60% base share, a cluster fires in about 12% of Motorik
 **Texture joins whichever cluster is drawn.** It is not a member of any one cluster — the
 scattered wide-register behaviour suits all three equally, and Texture is a supporting role
 rather than part of the rhythmic interlock. So whenever a cluster fires, Texture also draws
-from `MOT-TEX-001/002` instead of normal rotation.
+from `MOT-TEXT-009/002` instead of normal rotation.
 
 **Lead 2 is locked to Rhythm.** Both Lead 2 rules are partners — one mirrors Rhythm's cell at
 a 2-step offset, the other re-emits Rhythm's events at the octave — so neither is meaningful
@@ -99,9 +98,22 @@ Texture (+ Lead 2 when partnering).
 
 All remaining tracks draw from normal Motorik rotation as they do now.
 
-**Log the cluster.** When one fires, emit a log line naming it, so a song's character can be
-identified by reading its log rather than by guessing. Follow the existing convention used for
-substyle and rule reporting.
+**Log the cluster.** When one fires, emit a `GenerationLogEntry` with tag `Cluster` naming the
+tracks that actually adopted Kraftwerk rules, so a song's character can be identified by
+reading its log rather than by guessing:
+
+```
+Cluster    KW Bass + Drums + Texture
+Cluster    KW Bass + Rhythm + Texture + Lead 2
+Cluster    KW Rhythm + Lead 1 + Texture
+```
+
+List **actual membership**, not the cluster's name — Texture always joins and Lead 2 joins only
+when partnering, so the line should reflect what happened in this song rather than which of the
+three clusters was drawn. A song where Lead 2 drew silence omits it.
+
+Emit nothing when no cluster fires; the absence is the signal. The entry is written into
+`generationLog`, so it reaches the `.zudio` file and survives reload like every other rule line.
 
 **Implementation.** One roll at frame-generation time, thresholds in order, exactly as the
 Motorik substyle roll already works. The result is passed to the generators as an enum, and
@@ -215,20 +227,37 @@ Every voice is a **single pitch** with `cell 2` — an every-other-step figure. 
 
 *Implementation.* Four independent single-pitch voices, each on a fixed step set repeated
 identically every bar:
-- **Timekeeper** — closed hat (42) or wood block (76), drawn per song, on **all eight even
-  steps**. This is the ~3.3 notes/beat voice.
+- **Timekeeper** — on **all eight even steps**, the ~3.3 notes/beat voice. Per song it either
+  stays on the closed hat (42) throughout, or splits across two hat voices — closed hat on the
+  beats, pedal hat (44) on the "and" steps — at 65% split / 35% single. Same eight positions
+  and the same density either way. The split is the more faithful reading as well as the more
+  listenable one: The Robots spreads its percussion over eight separately sequenced single-pitch
+  tracks, two of them hats.
 - **Kick (36)** — steps 0 and 8.
 - **Snare (38)** — step 8 only. The measured snare density is 0.54 notes/beat, far below a backbeat.
 - **Accent** — tom (45) or rim (37), two steps drawn once from {2, 6, 10, 14} and held all song.
 
-Velocity 80 flat, `durationSteps: 1`, **no fills anywhere** including section boundaries.
+`durationSteps: 1`, **no fills anywhere** including section boundaries.
+
+**Velocities are accented, not flat** — step 0 at 90, the other beats at 84, the "and" steps at
+60, kick 92, snare 84, accent 72. The corpus reads as flat velocity, but the Evidence Base lists
+that as a caveat of the fan transcriptions rather than a property of the records, and a step
+sequencer has a per-step accent control. Implementing the flat reading literally reproduced a
+measurement artefact: eight identical hits a bar with no dynamic shape is fatiguing however
+authentic the placement is. The accent is a sequencer's, not a drummer's — it never swings, and
+the hi-hat gradient that gives normal Motorik its human groove stays out.
+
+*Implementation note.* Both rules bypass `DrumGenerator`'s bar loop, which would otherwise add
+section crashes and intro/outro variants; `DrumVariationEngine` runs in its restricted cluster
+form. Measured output: Sequenced Timekeeper 13 hits/bar (3.25 notes/beat against a ~3.3 target)
+on 4 pitches; Sparse Accents ~0.6 notes/beat on 3 pitches.
 
 **MOT-DRUM-014 "Sparse Accents"** — no timekeeper at all.
 
 *Implementation.* Three voices, all sparse, total density under 1.5 notes/beat:
 - **Kick (36)** — steps 0 and 8, or 0 and 10 (drawn per song).
 - **Snare (38)** — step 8, every **second** bar only.
-- **Accent** — one tom or block pitch on a single step drawn from {6, 14}, every fourth bar.
+- **Accent** — a tom or rim on a single step drawn from {6, 14}, every fourth bar.
 
 The space is the point. This is the rule that makes a cluster song feel mechanical rather than
 driven, and it is the furthest departure from current Motorik drums.
@@ -285,7 +314,7 @@ steps, ratio 0.9–4.3:1), and long runs followed by very long silences (38–12
 6...34 steps, then silence of **1.0...4.0 ×** the statement span. Rest ratio lands 88–95%.
 `durationSteps: 2`, velocity 80.
 
-**MOT-LD1-022 "Long Run, Long Silence"**
+**MOT-LD1-022 "Long Run"**
 
 *Implementation.* Register 77–106, 5 pitch classes. A continuous run of **40...130 notes** at
 ~1.0 notes/beat, then **4...6 × that span** in silence. Typically two or three statements in a
@@ -314,14 +343,14 @@ Texture rides along with **any** cluster rather than belonging to one. The corpu
 clear textural behaviour: isolated single notes scattered across a very wide register (spans of
 20–94 and 35–107 semitones) at high silence ratios (7:1 to 31:1).
 
-**MOT-TEX-001 "Wide Scatter"**
+**MOT-TEXT-009 "Wide Scatter"**
 
 *Implementation.* **Single notes**, never phrases — one event then a gap. Register spans at
 least **40 semitones**, pitches drawn from chord tones across the full span rather than a band.
 Density 0.4–0.7 notes/beat, silence-to-statement **7:1 or wider**. `durationSteps: 1...3`,
 velocity 72.
 
-**MOT-TEX-002 "Sparse Punctuation"**
+**MOT-TEXT-010 "Sparse Punctuation"**
 
 *Implementation.* Very rare events at structural positions: **2...3 notes**, then **300...400
 steps** of silence — measured ratio 12:1 with twelve dropouts across a song. Place at section
@@ -337,9 +366,9 @@ Every track with more than one option needs a split. These are the weights:
   `MOT-RTHM-015` Paired Sequencer 45%. This draw also determines which Lead 2 partner is
   available.
 - **Lead 1** (Machine Voice only) — `MOT-LD1-021` Short Statement 60%,
-  `MOT-LD1-022` Long Run, Long Silence 40%.
-- **Texture** (all clusters) — `MOT-TEX-001` Wide Scatter 65%,
-  `MOT-TEX-002` Sparse Punctuation 35%.
+  `MOT-LD1-022` Long Run 40%.
+- **Texture** (all clusters) — `MOT-TEXT-009` Wide Scatter 65%,
+  `MOT-TEXT-010` Sparse Punctuation 35%.
 - **Lead 2** — partner 65% / silent 35%, as above.
 
 **Bass draws from four options per cluster**, not one. The three existing Kraftwerk bass rules
@@ -361,6 +390,12 @@ When a cluster fires, Bass draws from the lists here instead.
 
 ### Instrument subsets
 
+Held on `MotorikCluster.instrumentSubset(forTrack:)` so the index lists live in one place,
+read by the pick pools and by `sanitiseClusterInstruments`. Lead 2's subset applies whenever
+Rhythm is clustered: it only partners on a 65/35 draw made during generation, but applying the
+subset to both outcomes is harmless, since a silent Lead 2 has no audible instrument either way.
+
+
 Cluster tracks draw from a restricted subset of the **existing** Motorik pools. No pool is
 reordered, extended or renamed — this uses the same `instrumentPickPool` /
 `instrumentPickPoolStatic` mechanism Arcade already uses to return an index array, so the
@@ -369,9 +404,9 @@ surrounding pool-selection code is untouched.
 The problem being solved: the Rhythm pool contains three guitars and an acoustic bass, and a
 rigid two-pitch-class cell played on Fuzz Guitar is a guitar riff, not a sequencer.
 
-- **Rhythm** `[3, 6, 9, 10]` — Doctor Solo, Synth Bass 3, Electric Piano 1, Clavinet.
-  Excludes Guitar Pulse, Crunch Guitar, Fuzz Guitar, Acoustic Bass, Pick Bass, Charang,
-  Harpsi Pad.
+- **Rhythm** `[3, 6, 9]` — Doctor Solo, Synth Bass 3, Electric Piano 1. Excludes the three
+  guitars, both acoustic basses, Charang and Harpsi Pad. (Clavinet was removed from the Motorik
+  pool entirely in build 131 — its sound is absent from `Zudio.sf2`, so it played silent.)
 - **Bass** `[0, 1, 4, 5, 6]` — Moog, Lead Bass, Mean Saw Bass, Techno Bass, Synth Bass 1.
   Excludes Rock Bass and Elec Bass.
 - **Drums** `[2, 3]` — Dance Drums, Machine Kit. Electronic kits only.
@@ -400,47 +435,197 @@ The most distinctive measured feature, and it spans tracks so it belongs to the 
   makes the drop read as a section change rather than the song stopping.
 - Never drop in the first 16 bars or the last 8.
 
+## Title Signal
+
+When a cluster fires, the song title takes a German-flavoured affix so the character is
+visible in the Songs list, not only audible. Applies **only** when a cluster is active —
+non-cluster Motorik titles are unchanged.
+
+`TitleGenerator` already has the machinery: `motorikCities`, `motorikCityPrefixes` and a
+German-noun-compound pattern. This adds two word banks and one formation step.
+
+**Prefixes** — `Der`, `Die`, `Das`, `Neo`, `Elektro`, `Trans`, `Ultra`, `Hyper`, `Mikro`,
+`Tele`, `Zentral`, `Stahl`, `Nacht`, `Schnell`, `Fern`, `Tekno`
+
+**Nouns and suffixes**, grouped by field:
+
+- *Industry* — `Werk`, `Maschine`, `Motor`, `Apparat`, `Anlage`, `Getriebe`, `Turbine`,
+  `Dynamo`, `Montage`, `Automat`
+- *Energy* — `Strom`, `Energie`, `Funke`, `Blitz`, `Netz`, `Leitung`, `Kontakt`, `Magnet`
+- *Transport* — `Bahn`, `Fahrt`, `Strecke`, `Gleis`, `Tunnel`
+- *Signal* — `Signal`, `Impuls`, `Frequenz`, `Kanal`, `Welle`, `Takt`, `Echo`
+- *Abstract* — `Form`, `System`, `Struktur`, `Muster`, `Licht`, `Zeit`
+
+Words are kept recognisable to an English speaker — either cognates (`Motor`, `Signal`,
+`System`, `Magnet`) or short and concrete (`Werk`, `Netz`, `Blitz`, `Licht`). Anything that
+reads as English rather than German is out, which is why `Sender` was dropped.
+
+**Formation**, drawn per song. **Exactly one affix — a prefix or a suffix, never both.**
+A title is never wrapped on both sides ("Elektro Pulse Werk" is wrong):
+
+- *Prefix + existing title* (45%) — "Elektro Pulse", "Neo Grid", "Stahl Circuit"
+- *Existing title + suffix* (25%) — "Signal Werk", "Drift Bahn", "Pulse Takt"
+
+The remaining two patterns **replace** the generated title rather than affixing to it, so the
+one-affix rule does not apply — they are standalone German titles:
+
+- *German compound* (20%) — prefix joined to a noun, no space: "Stahlwelle", "Impulswerk",
+  "Fernsignal"
+- *Article + noun* (10%) — "Der Apparat", "Die Anlage", "Das Getriebe"
+
+**One guard.** Compound formation can accidentally produce a real Kraftwerk song title —
+`Auto` + `bahn` being the obvious case. Keep a small blocklist of actual titles and re-draw on
+a hit. The same principle as the rules: evoke the idiom, never reproduce the work. For that
+reason `Auto` and `Radio` are deliberately absent from the prefix bank, since both compound
+straight into real titles.
+
+---
+
 ## What Is Not Changing
 
-- **Instruments.** Uses the existing Motorik pools unchanged. No new samples, no pool
-  extensions, no pick-pool restrictions.
-- **Effects, mode, harmony, structure, titles, tempo.** All inherited from base Motorik.
-  Deliberately so: the corpus measures 120–128 BPM, but Motorik's own tempo and progressions
-  are not busy enough to fight the rigidity, and constraining them would make this a substyle
-  in all but name.
+- **Instruments.** No new samples and no pool extensions — a cluster draws a restricted
+  *subset* of each existing Motorik pool, through the same mechanism Arcade already uses.
+- **Effects, mode, harmony, structure.** All inherited from base Motorik. Constraining the
+  progressions would make this a substyle in all but name.
+- **Tempo and titles** are the two exceptions: a cluster song sits in the 120-132 band and takes
+  a German-flavoured affix. Both are cluster-only, and base Motorik is untouched by either.
 - **Noir and Arcade.** Untouched. Clusters apply to base Motorik only.
 - **Neu! identity.** Protected deliberately — the Hallogallo rule's weight doubles rather than
   being diluted.
 
 ---
 
-## Implementation Checklist
+## How It Fits Into Generation
 
-1. Cluster roll at frame-generation time, thresholds in order (none 70 / rhythm-section 12 /
-   sequence-lock 10 / machine-voice 8).
-2. Thread the cluster through `BassGenerator`, `DrumGenerator`, `RhythmGenerator`,
-   `LeadGenerator` and `TextureGenerator`; each checks whether its track is in the drawn
-   cluster. Texture is in scope for **every** cluster, not any single one.
-3. Retire the four bass rules from the base Motorik pool and apply the redistributed weights.
-4. Add all twelve new rule IDs to the rule-ID → description map: `MOT-DRUM-013/014`,
-   `MOT-BASS-026/027`, `MOT-RTHM-014/015`, `MOT-LD1-021/022`, `MOT-LD2-011/012`,
-   `MOT-TEX-001/002`. **Do not reuse the retired numbers** — saved `.zudio` logs
-   record rule IDs, so a recycled number would make an old song's log misreport itself.
-5. Build the section-dropout schedule when a cluster is drawn, and silence the whole cluster
-   together during its windows.
-6. Log the cluster name when one fires.
-7. Batch-generate and listen, checking specifically that non-cluster songs still sound like
-   today's Motorik.
+The cluster is drawn once per song, on a stream derived from the seed so it does not shift any
+other draw. Everything below follows from that one value.
+
+1. **Cluster roll** at frame-generation time — none 80 / Rhythm Section 8 / Sequence Lock 7 /
+   Machine Voice 5, of base Motorik songs.
+2. **Tempo band.** A cluster song is remapped from base Motorik's 126-154 into **120-132**,
+   centred on 125. The corpus measures 120-128, and at Motorik's usual pace a sequencer on top
+   still reads as Neu!. The existing triangular spread is compressed rather than clamped, so the
+   distribution keeps its shape instead of piling onto the ceiling, and it is applied before the
+   bar count is chosen so songs keep their intended duration. Non-cluster songs are untouched.
+3. **Rule pools.** Each generator checks whether its track is in the drawn cluster and, if so,
+   draws from the Kraftwerk pool instead of normal rotation.
+4. **Instrument subsets**, held on `MotorikCluster.instrumentSubset(forTrack:)` so the pick pool
+   and the sanitiser share one definition.
+5. **Lead 2** is resolved after Rhythm, since both its rules derive from Rhythm's actual events.
+6. **Fills only at the dropout edges.** In every cluster song, including those where Drums is
+   not a member, the drum pass runs in a restricted form: no periodic every-eighth-bar fills, no
+   generic instrument-entrance fills, none at ordinary section boundaries. A cluster fills at one
+   kind of moment only — the bar before the whole cluster drops out, and the bar before it
+   returns — held to 1 or 2 beats, never 3, averaging under two fills a song.
+
+   Entrance fills in particular have to go: Texture and Lead 1 are 88-95% rest in a cluster, so
+   a rule that fires whenever a part returns fires almost continuously. The dropout schedule is
+   decided after this pass runs, so the bars come from `clusterDropoutWindows` and are handed in.
+
+   **The log reads the drum track, not the fill logic.** `buildStepAnnotations` mirrors the
+   normal drum pass rather than the engine's output, and `fillBeats` infers a fill's length from
+   where the hi-hat stops — which measures every bar as a 3-beat cascade on kits that have no
+   continuous hat, as neither Kraftwerk kit does. For a cluster the annotation therefore keys on
+   toms the kits never play. Crash is not a marker: it also lands on the first bar of a section
+   as an accent.
+
+7. **Section dropout** drops the whole cluster together, twice a song.
+8. **Repeat guard** caps any cluster track at 12 identical bars.
+9. **Title affix** and the `Cluster` log line make the song identifiable without listening.
+
+### Instrument enforcement needs two halves
+
+The pick pool alone is not sufficient, and this is worth stating plainly because it is not
+obvious: **only two instruments are re-picked per song.** The other five carry over from the
+previous song untouched. A cluster that only consulted the pick pool would routinely inherit
+Fuzz Guitar on Rhythm — a guitar riff rather than a sequencer, the exact case the subsets exist
+to prevent.
+
+So the cluster has a **sanitiser** as well, `sanitiseClusterInstruments`, which forces every
+member track into its subset. Noir and Arcade each have one for the same reason. Both the
+instance path and the static Endless-mode path need it.
+
+### Repeat guard — 12 bars
+
+The corpus behaviour is a figure repeated with **no** variation, and the rules implement that
+literally. Over a 128-bar song that gives stretches of 30-50 identical bars: true to the source,
+and tiring.
+
+A cluster track therefore plays at most **12 identical bars** before the pattern takes a slight
+change — one note displaced by an octave, or one note dropped. The cell is not rewritten and the
+groove does not move. Percussion only ever drops a hit, never shifts an octave, since a drum
+note selects the instrument rather than a pitch. Empty bars reset the count, because a dropout
+window already breaks the repetition. Drums are covered in every cluster song, member or not,
+because the variation engine that would otherwise break up a long run is skipped throughout.
+
+The guard runs on Rhythm *before* Lead 2 derives from it, so the partner rules inherit the
+variation rather than drifting out of unison.
+
+This is a deliberate departure from the measured behaviour, chosen for listenability.
+
+### Which passes a cluster skips, and why
+
+- **`ArrangementFilter`** — spotlights one track and thins the others independently, which is
+  the opposite of a cluster. It also breaks `MOT-LD2-012`'s strict unison by thinning Rhythm but
+  not Lead 2. The section dropout is the cluster's arrangement device instead.
+- **`DrumVariationEngine`** — runs in a restricted form rather than being skipped: fills only
+  at dropout edges, and no cymbal run variations, since the 12-bar repeat guard already covers
+  long identical runs. Bass locking is skipped when Bass is a cluster member, because
+  `MOT-BASS-027` already takes every kick and `MOT-BASS-026` is a cell that must not be
+  perturbed.
+- **`PatternEvolver`** — skipped for `MOT-BASS-026` only. That rule alone is "drawn once and
+  repeated with no variation"; the other three options in the cluster bass pool are pre-existing
+  rules that have always evolved, and they still do.
+
+### Rule ID conventions
+
+New IDs continue each track's existing numbering: `MOT-DRUM-013/014`, `MOT-BASS-026/027`,
+`MOT-RTHM-014/015`, `MOT-LD1-021/022`, `MOT-LD2-011/012`, `MOT-TEXT-009/010`. Note the texture
+prefix is `MOT-TEXT-`, matching `MOT-TEXT-001`...`008`.
+
+**Retired IDs are never recycled.** A saved `.zudio` records rule IDs, so a reused number would
+make an old song's log misreport itself.
+
+### Two places the measurements could not be taken literally
+
+- **`MOT-RTHM-014` uses a 2- or 4-step cell.** Three does not divide into 16, so a 3-step cell
+  would phase across the barline — contradicting the locking requirement, which is the musical
+  point.
+- **`MOT-BASS-027` takes every kick rather than half its onsets.** "At least half its onsets
+  coincide with kick steps" cannot hold at 1.1-1.2 notes/beat: a bar has two kick steps but
+  ~4.5 bass onsets. Covering every kick is the intent — the rhythm section reading as locked.
+
+Cells hold the specified pitch-class counts, but the parts transpose with the chord, so the
+absolute count measured over a whole song is necessarily higher. Song-average densities read
+below target for the same reason statement/rest shapes and dropout windows exist; per active bar
+they sit in band.
+
+---
+
+## Verification
+
+Pinned by `MotorikClusterTests` and `DeterminismTests`:
+
+- the cluster survives every `SongState` copy method, and the roll is deterministic
+- Noir and Arcade never draw a cluster; the distribution matches 80/8/7/5
+- every cluster track draws a Kraftwerk rule, and Lead 2 either partners or rests
+- `MOT-LD2-012` never drifts off Rhythm's grid
+- no cluster track exceeds 12 identical bars
+- cluster tempo stays within 120-132 and the base band stays 126-154
+- cluster fills occur only at dropout edges, at most four a song
+
+`RetiredRuleReloadTests` covers the retired bass rules: still playable when a saved song names
+one, absent from the base pool, and reachable from Noir or Arcade.
 
 ---
 
 ## Open Questions
 
-- **Cluster share.** 30% total is a starting figure. If Kraftwerk-flavoured songs feel too
-  frequent, reduce the three cluster weights proportionally rather than removing a cluster.
+- **Cluster share.** 20% of base Motorik, about 12% of all Motorik. If Kraftwerk-flavoured songs
+  feel too frequent, reduce the three weights proportionally rather than removing a cluster.
+- **Machine Voice is the weakest of the three.** It clusters Rhythm + Lead 1 + Texture and
+  leaves Drums and Bass on normal rotation — the two tracks that most determine whether music
+  reads as Kraftwerk. The tempo band and fill suppression narrow the gap; whether it needs the
+  drum pool constrained as well is a listening question.
 - **Whether Machine Voice needs its own instrument treatment.** Unison doubling between Rhythm
-  and Lead 1 may sound thin without a timbral difference between them — the Kosmic Space
-  doubling rule solves the same problem with vibrato, pan and Air. Decide after listening.
-- **Drum rule risk.** A sparse mechanical kit is the furthest departure from current Motorik
-  drums. It is also the biggest gap. Worth prototyping first, since it is the rule most likely
-  to sound wrong against the rest of the arrangement.
+  and Lead 1 may sound thin without a timbral difference between them.

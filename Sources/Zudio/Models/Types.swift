@@ -21,6 +21,83 @@ let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9, 6]
 
 // MARK: - Track effects
 
+/// Which coupled group of tracks, if any, adopts Kraftwerk-flavoured rules in a base
+/// Motorik song. Not a substyle — Noir and Arcade are unaffected and there is no UI change.
+///
+/// Track selection is deliberately COUPLED rather than per-track: a machine bass underneath a
+/// busy Neu!-style drum pattern reads as a Motorik song with an odd bass, not as Kraftwerk.
+/// See docs/motorik-kraftwerk-plan.md.
+enum MotorikCluster: String, Sendable, CaseIterable {
+    case none
+    case rhythmSection   // Bass + Drums
+    case sequenceLock    // Bass + Rhythm
+    case machineVoice    // Rhythm + Lead 1
+
+    /// Tracks that adopt Kraftwerk rules. Texture joins EVERY cluster — its scattered
+    /// wide-register behaviour suits all three and it is a supporting role rather than part
+    /// of the rhythmic interlock. Lead 2 is not listed here: it is decided in the generator,
+    /// since it only partners when Rhythm draws a rule that expects one.
+    var tracks: [Int] {
+        switch self {
+        case .none:          return []
+        case .rhythmSection: return [kTrackBass, kTrackDrums, kTrackTexture]
+        case .sequenceLock:  return [kTrackBass, kTrackRhythm, kTrackTexture]
+        case .machineVoice:  return [kTrackRhythm, kTrackLead1, kTrackTexture]
+        }
+    }
+
+    func includes(_ trackIndex: Int) -> Bool { tracks.contains(trackIndex) }
+
+    var isActive: Bool { self != .none }
+
+    /// Indices into the EXISTING Motorik instrument pool for a cluster track, or nil to keep
+    /// the full pool. No pool is reordered, extended or renamed — this returns an index array
+    /// through the same mechanism Arcade already uses.
+    ///
+    /// The problem being solved: the Rhythm pool holds three guitars and two acoustic basses,
+    /// and a rigid two-pitch-class cell played on Fuzz Guitar is a guitar riff, not a
+    /// sequencer. Each subset keeps only the sounds that read as machine.
+    ///
+    /// Lead 2 is handled by the first branch rather than by `tracks`. It partners only when
+    /// Rhythm is in the cluster, and the 65/35 partner-or-silent draw happens during
+    /// generation — but applying the subset to both outcomes is harmless, because a silent
+    /// Lead 2 has no audible instrument either way.
+    func instrumentSubset(forTrack trackIndex: Int) -> [Int]? {
+        // [0=Polysynth, 1=Brightness, 2=Moog, 3=Elec Guitar, 4=Square Lead, 5=Synth Lead,
+        //  6=Saw Lead, 7=5th Saw Wave] — drops Elec Guitar and Brightness.
+        if trackIndex == kTrackLead2 { return includes(kTrackRhythm) ? [0, 2, 4, 5, 6, 7] : nil }
+        guard includes(trackIndex) else { return nil }
+        switch trackIndex {
+        // [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass,
+        //  5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1]
+        case kTrackRhythm:  return [3, 6, 9]
+        // [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
+        case kTrackBass:    return [0, 1, 4, 5, 6]
+        // [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit] — electronic kits only
+        case kTrackDrums:   return [2, 3]
+        // [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead,
+        //  5=Square Lead, 6=Synth Lead, 7=Saw Stack]
+        case kTrackLead1:   return [0, 1, 3, 5, 6]
+        // [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind,
+        //  6=Interference, 7=Guitar Fdbk, 8=Metal Pad, 9=Ice Rain, 10=Mystery Pad]
+        // Drops the warm sustaining pads, which suit sustain rather than scatter.
+        case kTrackTexture: return [0, 3, 4, 6, 8, 9]
+        default:            return nil
+        }
+    }
+
+    /// Names used in the Cluster log line. Lead 2 is appended by the caller when it partners,
+    /// so the line reports what actually played rather than which cluster was drawn.
+    var logTrackNames: [String] {
+        switch self {
+        case .none:          return []
+        case .rhythmSection: return ["Bass", "Drums", "Texture"]
+        case .sequenceLock:  return ["Bass", "Rhythm", "Texture"]
+        case .machineVoice:  return ["Rhythm", "Lead 1", "Texture"]
+        }
+    }
+}
+
 enum TrackEffect: String, CaseIterable {
     case boost       = "Boost"
     case delay       = "Delay"
@@ -383,11 +460,19 @@ enum OutroStyle: Equatable, Sendable {
 
 /// Snaps `pc` to the nearest pitch class present in `scalePCs`, using circular semitone distance.
 /// Returns `pc` unchanged if it is already in the scale.
+///
+/// DETERMINISM: iterate `sorted()`, never the Set itself. `min(by:)` returns the first
+/// element it encounters at the minimum distance, and Swift perturbs hashing per storage
+/// instance — so two identically-built Sets iterate in different orders within one process.
+/// A chromatic `pc` sits a semitone from two scale tones, so ties are common, and iterating
+/// the Set directly made the snapped pitch differ between two runs of the same seed. Because
+/// this consumes no RNG, rhythm and dynamics stayed identical and only pitches moved, which
+/// is what made the bug so hard to place. Sorting costs nothing at this size and makes a tie
+/// resolve to the lower pitch class every time.
 func nearestScalePitchClass(_ pc: Int, in scalePCs: Set<Int>) -> Int {
     guard !scalePCs.contains(pc) else { return pc }
-    return scalePCs.min(by: {
-        min(abs($0 - pc), 12 - abs($0 - pc)) < min(abs($1 - pc), 12 - abs($1 - pc))
-    }) ?? pc
+    func distance(_ x: Int) -> Int { min(abs(x - pc), 12 - abs(x - pc)) }
+    return scalePCs.sorted().min(by: { distance($0) < distance($1) }) ?? pc
 }
 
 // MARK: - Key semitone table

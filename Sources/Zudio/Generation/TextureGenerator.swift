@@ -13,6 +13,10 @@
 //   TEXT-006: High Tension Touch — single scale-tension note, off-beat, fires ~once per 20 bars (body only)
 //   TEXT-007: Pedal Drone — tonic held (vel 45–60) in MIDI 80–96, ~once per 16 body bars
 //   TEXT-008: Phase Slip — two adjacent semitone notes at same step (vel 25–35), ~once per 20 body bars
+//   TEXT-009: Wide Scatter — isolated SINGLE notes across a 50+ semitone span (MIDI 36-88),
+//             one event then a 6-10 step gap. ~0.5 notes/beat. Kraftwerk cluster only.
+//   TEXT-010: Sparse Punctuation — 2-3 notes at a section boundary, then 300-400 steps of
+//             silence. MIDI 52-82, long gates. Kraftwerk cluster only.
 //
 // Per song: TEXT-001 always active; 1–2 supplementary rules chosen at generation time.
 // Noir-only:    TEXT-006 (High Tension Touch), TEXT-008 (Phase Slip)
@@ -27,8 +31,20 @@ struct TextureGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         noirVariation: Bool = false,
-        arcadeVariation: Bool = false
+        arcadeVariation: Bool = false,
+        cluster: MotorikCluster = .none
     ) -> [MIDIEvent] {
+        // Texture rides along with EVERY cluster rather than belonging to one: its scattered
+        // wide-register behaviour suits all three, and it is a supporting role rather than part
+        // of the rhythmic interlock. When a cluster fires it draws one of these two rules only,
+        // replacing the usual backbone-plus-supplementary stack.
+        if cluster.includes(kTrackTexture) {
+            let ruleID = rng.weightedPick([0.65, 0.35]) == 1 ? "MOT-TEXT-010" : "MOT-TEXT-009"
+            usedRuleIDs.insert(ruleID)
+            return kraftwerkTexture(ruleID: ruleID, frame: frame, structure: structure,
+                                    tonalMap: tonalMap, rng: &rng)
+        }
+
         var events: [MIDIEvent] = []
 
         // MOT-TEXT-001 is always the backbone
@@ -193,4 +209,71 @@ struct TextureGenerator {
         }
         return UInt8(min(high, low + pc))
     }
+
+    // MARK: - Kraftwerk cluster texture
+
+    /// The corpus shows isolated single notes scattered across a very wide register (spans of
+    /// 20-94 and 35-107 semitones) at high silence ratios (7:1 to 31:1). These are textures of
+    /// punctuation, not of sustain — which is also why the cluster's instrument subset drops the
+    /// warm pads in favour of the FX voices.
+    private static func kraftwerkTexture(
+        ruleID: String,
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let totalSteps = frame.totalBars * 16
+
+        func chordPCs(atStep step: Int) -> [Int] {
+            let pool = tonalMap.entry(atBar: step / 16)?.chordWindow.chordTones.sorted() ?? []
+            return pool.isEmpty ? [0] : pool
+        }
+
+        if ruleID == "MOT-TEXT-009" {
+            // Wide Scatter — SINGLE notes, never phrases: one event, then a gap. The register
+            // span is 36-88, which is 52 semitones, comfortably past the measured 40 minimum,
+            // and pitches are drawn across the whole span rather than from a band. A note every
+            // 6-10 steps averages ~0.5 notes/beat, inside the measured 0.4-0.7.
+            var step = 8
+            while step < totalSteps {
+                let pcs = chordPCs(atStep: step)
+                let pc  = pcs[rng.nextInt(upperBound: pcs.count)]
+                // Draw the octave independently of the pitch class — that is what produces the
+                // wide scatter rather than a melodic line.
+                let octave = 3 + rng.nextInt(upperBound: 5)          // MIDI 36...88
+                let note   = max(36, min(88, octave * 12 + pc))
+                events.append(MIDIEvent(stepIndex: step, note: UInt8(note),
+                                        velocity: 72, durationSteps: 1 + rng.nextInt(upperBound: 3)))
+                step += 6 + rng.nextInt(upperBound: 5)               // 6...10 steps of silence
+            }
+            return events
+        }
+
+        // MOT-TEXT-010 Sparse Punctuation — very rare events at STRUCTURAL positions: 2-3 notes,
+        // then 300-400 steps of silence. Placed at section boundaries rather than randomly,
+        // which is what makes them read as punctuation of the form.
+        var lastStep = -1_000
+        for section in structure.sections {
+            let step = section.startBar * 16
+            guard step < totalSteps else { break }
+            guard step - lastStep >= 300 + rng.nextInt(upperBound: 101) else { continue }
+            let pcs   = chordPCs(atStep: step)
+            let count = 2 + rng.nextInt(upperBound: 2)               // 2...3 notes
+            for i in 0..<count {
+                let pc   = pcs[rng.nextInt(upperBound: pcs.count)]
+                var note = 52 + (((pc - 52) % 12) + 12) % 12
+                while note < 52 { note += 12 }
+                if note > 82 { note -= 12 }
+                let at = step + i * 2
+                guard at < totalSteps else { break }
+                events.append(MIDIEvent(stepIndex: at, note: UInt8(max(52, min(82, note))),
+                                        velocity: 68, durationSteps: 4 + rng.nextInt(upperBound: 5)))
+            }
+            lastStep = step
+        }
+        return events
+    }
+
 }

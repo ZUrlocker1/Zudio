@@ -90,6 +90,98 @@ struct TitleGenerator {
         "Inner", "Outer", "Deep", "Dark",
     ]
 
+    // MARK: - Kraftwerk cluster affix
+
+    /// German-flavoured affix applied only when a Kraftwerk cluster fires, so the character is
+    /// visible in the Songs list and not only audible. Non-cluster Motorik titles are untouched.
+    ///
+    /// Words are kept recognisable to an English speaker — either cognates (Motor, Signal,
+    /// System, Magnet) or short and concrete (Werk, Netz, Blitz, Licht). Anything that reads as
+    /// English rather than German is out, which is why "Sender" was dropped.
+
+    /// `Auto` and `Radio` are deliberately absent: both compound straight into real Kraftwerk
+    /// titles, and the aim is to evoke the idiom, never to reproduce the work.
+    private static let kraftwerkPrefixes = [
+        "Der", "Die", "Das", "Neo", "Elektro", "Trans", "Ultra", "Hyper",
+        "Mikro", "Tele", "Zentral", "Stahl", "Nacht", "Schnell", "Fern", "Tekno",
+    ]
+
+    /// Grouped by field in the plan — industry, energy, transport, signal, abstract — and
+    /// flattened here because the draw is uniform across all of them.
+    ///
+    /// Each noun carries its article so "Article + noun" titles are grammatical. "Die Werk" and
+    /// "Das Welle" are wrong in a way a German speaker reads immediately, and the whole point of
+    /// the affix is that it reads as German.
+    private static let kraftwerkNouns: [(word: String, article: String)] = [
+        // Industry
+        ("Werk", "Das"), ("Maschine", "Die"), ("Motor", "Der"), ("Apparat", "Der"),
+        ("Anlage", "Die"), ("Getriebe", "Das"), ("Turbine", "Die"), ("Dynamo", "Der"),
+        ("Montage", "Die"), ("Automat", "Der"),
+        // Energy
+        ("Strom", "Der"), ("Energie", "Die"), ("Funke", "Der"), ("Blitz", "Der"),
+        ("Netz", "Das"), ("Leitung", "Die"), ("Kontakt", "Der"), ("Magnet", "Der"),
+        // Transport
+        ("Bahn", "Die"), ("Fahrt", "Die"), ("Strecke", "Die"), ("Gleis", "Das"),
+        ("Tunnel", "Der"),
+        // Signal
+        ("Signal", "Das"), ("Impuls", "Der"), ("Frequenz", "Die"), ("Kanal", "Der"),
+        ("Welle", "Die"), ("Takt", "Der"), ("Echo", "Das"),
+        // Abstract
+        ("Form", "Die"), ("System", "Das"), ("Struktur", "Die"), ("Muster", "Das"),
+        ("Licht", "Das"), ("Zeit", "Die"),
+    ]
+
+    /// Actual Kraftwerk song titles. Compounding can land on a real one by accident, so any
+    /// formed title is checked against this and redrawn on a hit. Stored lowercased with
+    /// spaces and hyphens stripped, which is how isRealTitle normalises its candidate.
+    private static let realKraftwerkTitles: Set<String> = [
+        "autobahn", "dieroboter", "dasmodel", "radioaktivitat", "computerwelt",
+        "computerliebe", "transeuropaexpress", "nummern", "taschenrechner",
+        "heimcomputer", "neonlicht", "spacelab", "metropolis", "tanzmusik",
+        "kometenmelodie", "mitternacht", "morgenspaziergang", "schaufensterpuppen",
+        "technopop", "musiquenonstop", "elektrokardiogramm", "tourdefrance",
+        "ruckzuck", "vitamin", "geigercounter", "roboter", "model",
+    ]
+
+    private static func isRealTitle(_ s: String) -> Bool {
+        realKraftwerkTitles.contains(s.lowercased().filter { !$0.isWhitespace && $0 != "-" })
+    }
+
+    /// Exactly one affix — a prefix OR a suffix, never both. A title is never wrapped on both
+    /// sides ("Elektro Pulse Werk" is wrong). The last two patterns REPLACE the generated title
+    /// rather than affixing to it, so the one-affix rule does not apply to them.
+    static func applyKraftwerkAffix(to base: String, rng: inout SeededRNG) -> String {
+        // Der/Die/Das work as standalone prefixes ("Der Apparat") but not glued into a compound
+        // — "Diedynamo" is not a word. Compounds draw from the rest.
+        let compoundPrefixes = kraftwerkPrefixes.filter { !["Der", "Die", "Das"].contains($0) }
+
+        // Motorik titles are often already compounds ("Blinkt Wunderwaffen", "KolschWunderwaffe"),
+        // and hanging another word off one of those reads as a mouthful rather than a signal.
+        // Past 14 characters, use only the two patterns that REPLACE the title, keeping their
+        // 20:10 ratio. Noir and Arcade take the same precaution with their own count < 12 gate.
+        let baseIsUnwieldy = base.count > 14
+
+        for _ in 0..<8 {
+            let roll = baseIsUnwieldy ? 0.70 + rng.nextDouble() * 0.30 : rng.nextDouble()
+            let candidate: String
+            if roll < 0.45 {
+                candidate = "\(kraftwerkPrefixes[rng.nextInt(upperBound: kraftwerkPrefixes.count)]) \(base)"
+            } else if roll < 0.70 {
+                candidate = "\(base) \(kraftwerkNouns[rng.nextInt(upperBound: kraftwerkNouns.count)].word)"
+            } else if roll < 0.90 {
+                // German compound — prefix joined to a noun, no space: "Stahlwelle", "Fernsignal"
+                let p = compoundPrefixes[rng.nextInt(upperBound: compoundPrefixes.count)]
+                let n = kraftwerkNouns[rng.nextInt(upperBound: kraftwerkNouns.count)].word
+                candidate = p + n.lowercased()
+            } else {
+                let n = kraftwerkNouns[rng.nextInt(upperBound: kraftwerkNouns.count)]
+                candidate = "\(n.article) \(n.word)"
+            }
+            if !isRealTitle(candidate) { return candidate }
+        }
+        return base   // every draw collided, which should never happen — keep the plain title
+    }
+
     // MARK: - Generation patterns
 
     typealias PatternFn = @Sendable (GlobalMusicalFrame, inout SeededRNG) -> String

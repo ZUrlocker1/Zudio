@@ -55,6 +55,12 @@
 //            Bar A: root 8th-notes skipping step 2 (steps 0,4,6,8,10,12,14).
 //            Bar B: denser root pulse (steps 0,2,4,6,8,10) + M2 lean on final quarter.
 //            Deep register MIDI 28–40. Motorik Noir only.
+//   BAS-026: Locked Micro-Cell — 3 pitch classes (root, fifth, octave) on a 3- or 4-slot
+//            quarter-note cell drawn once and never varied. MIDI 29-48. Kraftwerk cluster
+//            (Sequence Lock) only.
+//   BAS-027: Restricted Run — 4-5 pitch classes from the chord, MIDI 27-43, emitted in long
+//            statements of 30-120 notes then a rest of 0.2-0.4x the span. Takes every kick
+//            step of DRM-013/014. Kraftwerk cluster (Rhythm Section) only.
 //   BAS-021: No Birds Walk — PiL "No Birds" (1979) 2-bar P4 suspension walk;
 //            Bar A: root pickup (steps 0,2), P4 suspension held through bar.
 //            Bar B: root quarter×2, then P4→TT→P5 chromatic ascent resolution.
@@ -83,7 +89,8 @@ struct BassGenerator {
         forceRuleID: String? = nil,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        arcadeDenseMelody: Bool = false
+        arcadeDenseMelody: Bool = false,
+        cluster: MotorikCluster = .none
     ) -> [MIDIEvent] {
         // Noir bass pool: PIL deep riffs + Joy Division high-register counter-melody + Kraftwerk cold mechanics.
         // Removed: Motorik Drive (too upbeat), Crawling Walk (jazzy), Moroder Chase (too energetic).
@@ -102,18 +109,47 @@ struct BassGenerator {
                 rules   = ["MOT-BASS-022","MOT-BASS-025","MOT-BASS-024","MOT-BASS-023","MOT-BASS-008","MOT-BASS-012","MOT-BASS-005","MOT-BASS-010","MOT-BASS-001","MOT-BASS-004","MOT-BASS-002"]
                 weights = [0.16,           0.12,           0.14,           0.15,           0.03,           0.07,          0.08,          0.06,          0.07,          0.06,          0.06]
             }
+        } else if cluster.includes(kTrackBass) {
+            // Kraftwerk cluster. The three existing Kraftwerk bass rules are reused rather than
+            // duplicated — they are already written and already good, and reusing them is what
+            // gives Bass the variety the other tracks get from having two new rules each.
+            // MOT-BASS-025 Electro Pump is otherwise Arcade-only; drawing it inside a base
+            // Motorik cluster extends its reach without changing its behaviour or its Arcade
+            // weighting. The redistributed base-Motorik weights below apply to NON-cluster
+            // songs only.
+            if cluster == .sequenceLock {
+                rules   = ["MOT-BASS-026", "MOT-BASS-013", "MOT-BASS-015", "MOT-BASS-025"]
+                weights = [0.40,           0.25,           0.20,           0.15]
+            } else {
+                rules   = ["MOT-BASS-027", "MOT-BASS-013", "MOT-BASS-015", "MOT-BASS-025"]
+                weights = [0.35,           0.25,           0.25,           0.15]
+            }
         } else {
+            // Base Motorik: 11 rules. Four were retired from THIS pool in build 131 to
+            // concentrate the style — McCartney Drive (005), LA Woman Sustain (006),
+            // Hook Ascent (007) and Quo Arc (010). All four remain reachable: 005 and 010
+            // via Arcade, 006 and 007 via Noir, so their implementations below are still
+            // live and must not be deleted. See docs/motorik-kraftwerk-plan.md.
+            //
+            // The freed 25% went mostly to the rules that pull toward the machine end —
+            // Kraftwerk robotic (013) 4->10 and driving (015) 11->16 — and to Neu!
+            // Hallogallo (004) 4->8, so base Motorik gets more characterful in both
+            // directions rather than only one.
             rules   = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
-                        "MOT-BASS-005","MOT-BASS-006","MOT-BASS-007","MOT-BASS-008","MOT-BASS-009",
-                        "MOT-BASS-010","MOT-BASS-011",
+                        "MOT-BASS-008","MOT-BASS-009","MOT-BASS-011",
                         "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014","MOT-BASS-015"]
-            weights = [0.07,     0.11,     0.04,     0.04,
-                        0.09,     0.05,     0.08,     0.10,     0.06,
-                        0.03,     0.03,
-                        0.07,     0.04,     0.08,     0.11]
+            weights = [0.08,     0.14,     0.05,     0.08,
+                        0.11,     0.07,     0.04,
+                        0.08,     0.10,     0.09,     0.16]
         }
         let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
+
+        // The two new Kraftwerk rules bypass the bar loop: they want none of its variation
+        // windows, section handling or Noir octave shift. Rigidity is the measured feature.
+        if ruleID == "MOT-BASS-026" || ruleID == "MOT-BASS-027" {
+            return kraftwerkBass(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng)
+        }
 
         // BAS-005: pre-roll per-4-bar-group flags — ~1/3 chance the phrase is all-drive
         // (bass sits on the descent groove for 4 straight bars instead of alternating breathe bars).
@@ -679,7 +715,8 @@ struct BassGenerator {
         events.append(MIDIEvent(stepIndex: barStart, note: rootNote, velocity: 92, durationSteps: 6))
 
         let beat3Note: UInt8
-        if let fifth = entry.chordWindow.chordTones.first(where: { ($0 - (Int(rootNote) % 12) + 12) % 12 == 7 }) {
+        // sorted() so the search order is fixed; .first(where:) over a Set is arbitrary.
+        if let fifth = entry.chordWindow.chordTones.sorted().first(where: { ($0 - (Int(rootNote) % 12) + 12) % 12 == 7 }) {
             beat3Note = noteInBassRegister(pc: fifth, frame: frame)
         } else {
             beat3Note = rootNote
@@ -1578,6 +1615,124 @@ struct BassGenerator {
 
     private static func clamped(_ v: Int, low: Int, high: Int) -> Int {
         max(low, min(high, v))
+    }
+
+
+    // MARK: - Kraftwerk cluster bass
+
+    /// Lowest MIDI note of pitch class `pc` inside [low, high].
+    private static func pcInRegister(_ pc: Int, low: Int, high: Int) -> Int {
+        var m = low + (((pc - low) % 12) + 12) % 12
+        if m > high { m -= 12 }
+        return clamped(m, low: low, high: high)
+    }
+
+    /// Two measured behaviours: a tiny locked cell that never stops (3 pitch classes, no
+    /// dropouts), and longer runs over a restricted vocabulary that do stop (4-5 pitch classes,
+    /// statements of 30-120 notes, silence 0.2-0.4x the statement span).
+    private static func kraftwerkBass(
+        ruleID: String,
+        frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+
+        if ruleID == "MOT-BASS-026" {
+            // MOT-BASS-026 Locked Micro-Cell — Sequence Lock cluster.
+            // Three pitch classes only: root, fifth, octave. The cell is drawn ONCE and never
+            // varies; the repetition is what carries the music, not the material.
+            let cellLength = rng.nextDouble() < 0.5 ? 3 : 4
+            let offsets    = [0, 7, 12]            // root, fifth, octave
+            var cell       = [0]                   // always open on the root so the chord reads
+            for _ in 1..<cellLength {
+                cell.append(offsets[rng.nextInt(upperBound: offsets.count)])
+            }
+            // Quarter-note placement. Four slots gives 1.0 notes/beat, three gives 0.75 —
+            // both inside the measured 0.7-1.0 band, and both LOCK to the barline instead of
+            // phasing, which is the difference between Kraftwerk's rigidity and Jarre's drift.
+            let steps = cellLength == 4 ? [0, 4, 8, 12] : [0, 4, 8]
+
+            for bar in 0..<frame.totalBars {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
+                let root   = pcInRegister(rootPC, low: 29, high: 48)
+                for (i, step) in steps.enumerated() {
+                    var note = root + cell[i]
+                    if note > 48 { note -= 12 }
+                    // Accented, not flat: the cell opens the bar, so step 0 carries it. Same
+                    // reasoning as MOT-DRUM-013 — the corpus reads flat because the fan
+                    // transcriptions are flat, not because the sequencer had no accent control.
+                    let velocity: UInt8 = step == 0 ? 92 : 78
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(clamped(note, low: 29, high: 48)),
+                                            velocity: velocity, durationSteps: 2))
+                }
+            }
+            return events
+        }
+
+        // MOT-BASS-027 Restricted Run — Rhythm Section cluster.
+        // Steps 0 and 8 are the kick positions of MOT-DRUM-013/014, and the bass takes every
+        // one of them, so the rhythm section reads as locked together. Note the plan's "at
+        // least half its onsets coincide with kick steps" cannot hold literally at the measured
+        // 1.1-1.2 notes/beat: a bar has only two kick steps, so half of ~4.5 onsets would need
+        // more kicks than exist. Every kick is covered instead, which is the musical intent.
+        var pcs: [Int] = []
+        var inStatement      = true
+        var statementStart   = 0
+        var notesThisRun     = 0
+        var targetNotes      = 30 + rng.nextInt(upperBound: 91)   // 30...120
+        var restUntilBar     = -1
+
+        for bar in 0..<frame.totalBars {
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            if bar < restUntilBar { continue }
+            if !inStatement { inStatement = true; statementStart = bar; notesThisRun = 0 }
+
+            // 4 or 5 pitch classes drawn from the chord — the vocabulary is severely restricted,
+            // and sorted() because chordTones is a Set and its order is not stable.
+            if pcs.isEmpty {
+                let pool = (entry.chordWindow.chordTones.sorted()
+                            + entry.chordWindow.scaleTensions.sorted())
+                let want = 4 + rng.nextInt(upperBound: 2)
+                var candidates = pool
+                while !candidates.isEmpty && pcs.count < want {
+                    pcs.append(candidates.remove(at: rng.nextInt(upperBound: candidates.count)))
+                }
+                if pcs.isEmpty { pcs = [0] }
+            }
+
+            // Base quarter notes plus an extra offbeat on about half the bars, averaging ~4.5
+            // notes/bar = 1.125 notes/beat, inside the measured 1.1-1.2 band.
+            var steps = [0, 4, 8, 12]
+            if rng.nextDouble() < 0.5 {
+                steps.append([2, 6, 10, 14][rng.nextInt(upperBound: 4)])
+            }
+            steps.sort()
+
+            for (i, step) in steps.enumerated() {
+                let pc   = pcs[(notesThisRun + i) % pcs.count]
+                let note = pcInRegister(pc, low: 27, high: 43)
+                // The kick steps are the ones that lock the rhythm section together, so they
+                // carry the accent; the notes between them sit back.
+                let velocity: UInt8 = (step == 0 || step == 8) ? 92 : 76
+                events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(note),
+                                        velocity: velocity, durationSteps: 2))
+            }
+            notesThisRun += steps.count
+
+            if notesThisRun >= targetNotes {
+                // Then it stops. Bass making short statements and stopping is the measured
+                // behaviour, quite unlike the continuous pulsing bass of the Jarre corpus.
+                let spanBars = max(1, bar - statementStart + 1)
+                let ratio    = 0.2 + rng.nextDouble() * 0.2      // 0.2...0.4
+                restUntilBar = bar + 1 + max(1, Int(Double(spanBars) * ratio))
+                inStatement  = false
+                targetNotes  = 30 + rng.nextInt(upperBound: 91)
+                pcs          = []
+            }
+        }
+        return events
     }
 
 }

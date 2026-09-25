@@ -28,9 +28,17 @@ struct ArrangementFilter {
         structure: SongStructure,
         seed: UInt64,
         lead1SoloRange: Range<Int>? = nil,   // bars containing LD1-007/008 solo — never rested
-        arcadeVariation: Bool = false         // Arcade: Lead 1 is always protected from block silencing
+        arcadeVariation: Bool = false,        // Arcade: Lead 1 is always protected from block silencing
+        exemptTracks: [Int] = []              // Kraftwerk cluster members — see below
     ) -> [[MIDIEvent]] {
         var events = trackEvents
+
+        // Cluster tracks are exempt. This filter spotlights one track and thins the others
+        // INDEPENDENTLY, which is the opposite of what a cluster is: those parts are chosen to
+        // agree with each other, and MOT-LD2-012 in particular is a strict unison with Rhythm
+        // that thinning one side would silently break. The cluster has its own arrangement
+        // device — the section dropout, which drops the whole group together.
+        let subjectTracks = Self.subjectTracks.filter { !exemptTracks.contains($0) }
         // Arrangement-specific sub-seed — differs from all per-track seeds
         var rng = SeededRNG(seed: seed &+ 0xC3D2E1F4A5B60798)
 
