@@ -27,13 +27,13 @@ let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9, 6]
 /// Track selection is deliberately COUPLED rather than per-track: a machine bass underneath a
 /// busy Neu!-style drum pattern reads as a Motorik song with an odd bass, not as Kraftwerk.
 /// See docs/motorik-kraftwerk-plan.md.
-enum MotorikCluster: String, Sendable, CaseIterable {
+enum MotorikSync: String, Sendable, CaseIterable {
     case none
     case rhythmSection   // Bass + Drums
     case sequenceLock    // Bass + Rhythm
     case machineVoice    // Rhythm + Lead 1
 
-    /// Tracks that adopt Kraftwerk rules. Texture joins EVERY cluster — its scattered
+    /// Tracks that adopt Kraftwerk rules. Texture joins EVERY sync — its scattered
     /// wide-register behaviour suits all three and it is a supporting role rather than part
     /// of the rhythmic interlock. Lead 2 is not listed here: it is decided in the generator,
     /// since it only partners when Rhythm draws a rule that expects one.
@@ -50,7 +50,7 @@ enum MotorikCluster: String, Sendable, CaseIterable {
 
     var isActive: Bool { self != .none }
 
-    /// Indices into the EXISTING Motorik instrument pool for a cluster track, or nil to keep
+    /// Indices into the EXISTING Motorik instrument pool for a sync track, or nil to keep
     /// the full pool. No pool is reordered, extended or renamed — this returns an index array
     /// through the same mechanism Arcade already uses.
     ///
@@ -59,7 +59,7 @@ enum MotorikCluster: String, Sendable, CaseIterable {
     /// sequencer. Each subset keeps only the sounds that read as machine.
     ///
     /// Lead 2 is handled by the first branch rather than by `tracks`. It partners only when
-    /// Rhythm is in the cluster, and the 65/35 partner-or-silent draw happens during
+    /// Rhythm is in the sync, and the 65/35 partner-or-silent draw happens during
     /// generation — but applying the subset to both outcomes is harmless, because a silent
     /// Lead 2 has no audible instrument either way.
     func instrumentSubset(forTrack trackIndex: Int) -> [Int]? {
@@ -86,8 +86,8 @@ enum MotorikCluster: String, Sendable, CaseIterable {
         }
     }
 
-    /// Names used in the Cluster log line. Lead 2 is appended by the caller when it partners,
-    /// so the line reports what actually played rather than which cluster was drawn.
+    /// Names used in the Sync log line. Lead 2 is appended by the caller when it partners,
+    /// so the line reports what actually played rather than which sync was drawn.
     var logTrackNames: [String] {
         switch self {
         case .none:          return []
@@ -394,7 +394,7 @@ enum AmbientProgressionFamily: String, Codable, Sendable {
     case droneTwo       // Two-chord pendulum, very slow movement
     case modalDrift     // Gradual mode drift over the song
     case suspendedDrone // Sus2/sus4 chord as drone base
-    case dissonantHaze  // Minor cluster with min7 tension
+    case dissonantHaze  // Minor sync with min7 tension
 }
 
 // MARK: - Ambient tempo style

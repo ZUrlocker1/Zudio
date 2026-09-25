@@ -90,10 +90,10 @@ struct TitleGenerator {
         "Inner", "Outer", "Deep", "Dark",
     ]
 
-    // MARK: - Kraftwerk cluster affix
+    // MARK: - Kraftwerk sync affix
 
-    /// German-flavoured affix applied only when a Kraftwerk cluster fires, so the character is
-    /// visible in the Songs list and not only audible. Non-cluster Motorik titles are untouched.
+    /// German-flavoured affix applied only when a Kraftwerk sync fires, so the character is
+    /// visible in the Songs list and not only audible. Non-sync Motorik titles are untouched.
     ///
     /// Words are kept recognisable to an English speaker — either cognates (Motor, Signal,
     /// System, Magnet) or short and concrete (Werk, Netz, Blitz, Licht). Anything that reads as

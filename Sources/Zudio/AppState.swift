@@ -1319,7 +1319,7 @@ final class AppState: ObservableObject {
                 self.sanitiseNoirInstruments(for: state)
                 self.sanitiseDriftInstruments(for: state)
                 self.sanitiseArcadeInstruments(for: state)
-                self.sanitiseClusterInstruments(for: state)
+                self.sanitiseSyncInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
                 // Chill: sync Lead 1 and Lead 2 overrides to generation-time instruments so log and
                 // playback agree. chillLeadInstrument/chillLead2Instrument drive musical generation
@@ -1820,19 +1820,19 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Forces every Kraftwerk-cluster track into its restricted instrument subset.
+    /// Forces every Kraftwerk-sync track into its restricted instrument subset.
     ///
     /// The pick pool alone is not enough. Only two instruments are re-picked per song, so the
-    /// other five carry over from the previous song untouched — a cluster could inherit Fuzz
+    /// other five carry over from the previous song untouched — a sync could inherit Fuzz
     /// Guitar on Rhythm, which is a guitar riff rather than a sequencer and is the exact case
     /// the subsets exist to prevent. Noir and Arcade each have a sanitiser for the same reason;
-    /// this is the cluster's. It also covers the first song of a style, where every override
+    /// this is the sync's. It also covers the first song of a style, where every override
     /// defaults to index 0.
-    private func sanitiseClusterInstruments(for state: SongState) {
-        guard state.style == .motorik, state.motorikCluster.isActive else { return }
+    private func sanitiseSyncInstruments(for state: SongState) {
+        guard state.style == .motorik, state.motorikSync.isActive else { return }
         var rng = SystemRandomNumberGenerator()
         for track in 0..<kTrackCount {
-            guard let subset = state.motorikCluster.instrumentSubset(forTrack: track),
+            guard let subset = state.motorikSync.instrumentSubset(forTrack: track),
                   !subset.contains(instrumentOverrides[track] ?? 0) else { continue }
             instrumentOverrides[track] = subset[Int.random(in: 0..<subset.count, using: &rng)]
         }
@@ -2029,11 +2029,11 @@ final class AppState: ObservableObject {
             if cp == 2 { overrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
             let ct = overrides[kTrackTexture] ?? 0
             if ![0, 3, 5, 6, 8, 9, 10].contains(ct) { overrides[kTrackTexture] = [0, 3, 5, 6, 8, 9, 10][Int.random(in: 0..<7, using: &rng)] }
-        } else if style == .motorik, state.motorikCluster.isActive {
-            // Kraftwerk cluster — same enforcement as sanitiseClusterInstruments, and it takes
+        } else if style == .motorik, state.motorikSync.isActive {
+            // Kraftwerk sync — same enforcement as sanitiseSyncInstruments, and it takes
             // precedence over the plain base-Motorik pass below.
             for track in 0..<kTrackCount {
-                guard let subset = state.motorikCluster.instrumentSubset(forTrack: track),
+                guard let subset = state.motorikSync.instrumentSubset(forTrack: track),
                       !subset.contains(overrides[track] ?? 0) else { continue }
                 overrides[track] = subset[Int.random(in: 0..<subset.count, using: &rng)]
             }
@@ -2066,12 +2066,12 @@ final class AppState: ObservableObject {
 
     /// Static backing for instrumentPickPool — takes explicit SongState instead of self.songState.
     nonisolated static func instrumentPickPoolStatic(trackIndex: Int, style: MusicStyle, poolCount: Int, state: SongState?) -> [Int] {
-        // Kraftwerk cluster (base Motorik only) restricts its member tracks to the machine
-        // sounds in each existing pool. Checked before the substyle branches because a cluster
+        // Kraftwerk sync (base Motorik only) restricts its member tracks to the machine
+        // sounds in each existing pool. Checked before the substyle branches because a sync
         // never fires in a Noir or Arcade song, so no substyle case can be reached from here.
         if style == .motorik,
-           let clusterSubset = state?.motorikCluster.instrumentSubset(forTrack: trackIndex) {
-            return clusterSubset
+           let syncSubset = state?.motorikSync.instrumentSubset(forTrack: trackIndex) {
+            return syncSubset
         }
         if style == .motorik && trackIndex == kTrackBass {
             if state?.motorikArcadeVariation == true { return [1,3,4,5,6] }
@@ -2131,12 +2131,12 @@ final class AppState: ObservableObject {
     /// Chill kTrackLead2:  blues excludes Flute; regular reduces Trombone and Soprano Sax.
     /// Motorik kTrackBass: Noir restricts to cold/synthetic sounds; regular restricts to organic sounds.
     private func instrumentPickPool(trackIndex: Int, style: MusicStyle, poolCount: Int) -> [Int] {
-        // Kraftwerk cluster (base Motorik only) restricts its member tracks to the machine
-        // sounds in each existing pool. Checked before the substyle branches because a cluster
+        // Kraftwerk sync (base Motorik only) restricts its member tracks to the machine
+        // sounds in each existing pool. Checked before the substyle branches because a sync
         // never fires in a Noir or Arcade song, so no substyle case can be reached from here.
         if style == .motorik,
-           let clusterSubset = songState?.motorikCluster.instrumentSubset(forTrack: trackIndex) {
-            return clusterSubset
+           let syncSubset = songState?.motorikSync.instrumentSubset(forTrack: trackIndex) {
+            return syncSubset
         }
         if style == .motorik && trackIndex == kTrackBass {
             // Pool: [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]

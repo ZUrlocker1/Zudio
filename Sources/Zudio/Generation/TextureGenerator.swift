@@ -14,9 +14,9 @@
 //   TEXT-007: Pedal Drone — tonic held (vel 45–60) in MIDI 80–96, ~once per 16 body bars
 //   TEXT-008: Phase Slip — two adjacent semitone notes at same step (vel 25–35), ~once per 20 body bars
 //   TEXT-009: Wide Scatter — isolated SINGLE notes across a 50+ semitone span (MIDI 36-88),
-//             one event then a 6-10 step gap. ~0.5 notes/beat. Kraftwerk cluster only.
+//             one event then a 6-10 step gap. ~0.5 notes/beat. Kraftwerk sync only.
 //   TEXT-010: Sparse Punctuation — 2-3 notes at a section boundary, then 300-400 steps of
-//             silence. MIDI 52-82, long gates. Kraftwerk cluster only.
+//             silence. MIDI 52-82, long gates. Kraftwerk sync only.
 //
 // Per song: TEXT-001 always active; 1–2 supplementary rules chosen at generation time.
 // Noir-only:    TEXT-006 (High Tension Touch), TEXT-008 (Phase Slip)
@@ -32,18 +32,18 @@ struct TextureGenerator {
         usedRuleIDs: inout Set<String>,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        cluster: MotorikCluster = .none,
-        clusterWindows: [Range<Int>] = []
+        sync: MotorikSync = .none,
+        syncWindows: [Range<Int>] = []
     ) -> [MIDIEvent] {
-        // Texture rides along with EVERY cluster rather than belonging to one: its scattered
+        // Texture rides along with EVERY sync rather than belonging to one: its scattered
         // wide-register behaviour suits all three, and it is a supporting role rather than part
-        // of the rhythmic interlock. When a cluster fires it draws one of these two rules only,
+        // of the rhythmic interlock. When a sync fires it draws one of these two rules only,
         // replacing the usual backbone-plus-supplementary stack.
-        if cluster.includes(kTrackTexture) {
+        if sync.includes(kTrackTexture) {
             let ruleID = rng.weightedPick([0.65, 0.35]) == 1 ? "MOT-TEXT-010" : "MOT-TEXT-009"
             usedRuleIDs.insert(ruleID)
             return kraftwerkTexture(ruleID: ruleID, frame: frame, structure: structure,
-                                    tonalMap: tonalMap, windows: clusterWindows, rng: &rng)
+                                    tonalMap: tonalMap, windows: syncWindows, rng: &rng)
         }
 
         var events: [MIDIEvent] = []
@@ -181,7 +181,7 @@ struct TextureGenerator {
             }
 
             // --- TEXT-008: Phase Slip — two adjacent semitone notes at same step, ~once per 20 body bars ---
-            // Cluster reference: very quiet dissonant crunch, Stockhausen-via-Cluster influence.
+            // Sync reference: very quiet dissonant crunch, Stockhausen-via-Sync influence.
             if activeSupp.contains("MOT-TEXT-008") && isBodySection && rng.nextDouble() < (1.0 / 20.0) {
                 let chordPool = entry.chordWindow.chordTones.sorted()
                 if !chordPool.isEmpty {
@@ -211,11 +211,11 @@ struct TextureGenerator {
         return UInt8(min(high, low + pc))
     }
 
-    // MARK: - Kraftwerk cluster texture
+    // MARK: - Kraftwerk sync texture
 
     /// The corpus shows isolated single notes scattered across a very wide register (spans of
     /// 20-94 and 35-107 semitones) at high silence ratios (7:1 to 31:1). These are textures of
-    /// punctuation, not of sustain — which is also why the cluster's instrument subset drops the
+    /// punctuation, not of sustain — which is also why the sync's instrument subset drops the
     /// warm pads in favour of the FX voices.
     private static func kraftwerkTexture(
         ruleID: String,
@@ -259,12 +259,12 @@ struct TextureGenerator {
         //
         // Section starts alone are not enough anchors. A Motorik song has about three sections,
         // so the rule managed roughly two bursts and six notes across four minutes — present in
-        // the file, inaudible in the song. The cluster's dropout windows are the other structural
+        // the file, inaudible in the song. The sync's dropout windows are the other structural
         // moment, and they are where this rule earns its place: Texture plays through the drop
         // while the machine parts step out, so these bursts are the only thing in that space.
         var anchors: [Int] = structure.sections.map { $0.startBar * 16 }
         for window in windows {
-            anchors.append(window.lowerBound * 16)                    // as the cluster steps out
+            anchors.append(window.lowerBound * 16)                    // as the sync steps out
             let mid = (window.lowerBound + window.upperBound) / 2
             if mid > window.lowerBound { anchors.append(mid * 16) }   // once more inside the gap
         }

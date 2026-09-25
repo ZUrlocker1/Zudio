@@ -1,4 +1,4 @@
-// KraftwerkBatchTests.swift — headless batch generator for Kraftwerk-cluster Motorik songs.
+// KraftwerkBatchTests.swift — headless batch generator for Kraftwerk-sync Motorik songs.
 //
 // Run with:
 //   swift test --filter KraftwerkBatchTests
@@ -7,8 +7,8 @@
 //   *.MID     — with the song's ACTUAL instrument programs, not the GM defaults
 //   *.zudio   — the generation log
 //
-// A cluster fires in only about 20% of base Motorik songs, so this searches seeds until it
-// has a balanced sample of all three cluster types rather than taking the first 20 it finds.
+// A sync fires in only about 20% of base Motorik songs, so this searches seeds until it
+// has a balanced sample of all three sync types rather than taking the first 20 it finds.
 
 import Testing
 import Foundation
@@ -148,10 +148,10 @@ struct KraftwerkBatchTests {
             try? fm.removeItem(at: url)
         }
 
-        // A balanced sample: the three clusters occur at 8/7/5, so taking the first 20 hits
+        // A balanced sample: the three sync groups occur at 8/7/5, so taking the first 20 hits
         // would under-represent Machine Voice, which is the one most worth listening to.
-        let wanted: [MotorikCluster: Int] = [.rhythmSection: 7, .sequenceLock: 7, .machineVoice: 6]
-        var have: [MotorikCluster: Int] = [:]
+        let wanted: [MotorikSync: Int] = [.rhythmSection: 7, .sequenceLock: 7, .machineVoice: 6]
+        var have: [MotorikSync: Int] = [:]
         var picked: [(seed: UInt64, song: SongState)] = []
 
         var rng = SystemRandomNumberGenerator()
@@ -160,14 +160,14 @@ struct KraftwerkBatchTests {
             attempts += 1
             let seed = UInt64.random(in: .min ... .max, using: &rng)
             let song = SongGenerator.generate(seed: seed, style: .motorik)
-            let c = song.motorikCluster
+            let c = song.motorikSync
             guard c.isActive, (have[c] ?? 0) < (wanted[c] ?? 0) else { continue }
             have[c, default: 0] += 1
             picked.append((seed, song))
         }
-        #expect(picked.count == 20, "only found \(picked.count) cluster songs in \(attempts) seeds")
+        #expect(picked.count == 20, "only found \(picked.count) sync songs in \(attempts) seeds")
 
-        print("\n=== 20 Kraftwerk-cluster Motorik songs ===")
+        print("\n=== 20 Kraftwerk-sync Motorik songs ===")
         print("Output: \(dir.path)\n")
 
         // Instruments are assigned outside generation and carry over between songs, exactly as
@@ -211,7 +211,7 @@ struct KraftwerkBatchTests {
             }
 
             print(String(format: "%2d. %-28@ %@ %3d bpm %3d bars  %@",
-                         i + 1, song.title as NSString, song.motorikCluster.rawValue,
+                         i + 1, song.title as NSString, song.motorikSync.rawValue,
                          song.frame.tempo, song.frame.totalBars, names.joined(separator: " ")))
         }
         print("")

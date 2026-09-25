@@ -127,7 +127,7 @@ struct SongGenerator {
         let motorikNoirBassDistortion    = isNoir && rng.nextDouble() < 0.75
         let motorikNoirRhythmDistortion  = isNoir && rng.nextDouble() < 0.75
 
-        // Kraftwerk cluster — base Motorik only, never Noir or Arcade. A coupled group of
+        // Kraftwerk sync — base Motorik only, never Noir or Arcade. A coupled group of
         // tracks adopts machine-like rules while the rest draw normal rotation; this is a
         // flavour within base Motorik, not a fourth substyle.
         //
@@ -138,14 +138,14 @@ struct SongGenerator {
         // Drawing from `rng` here would shift every subsequent draw and change what every
         // previously generated Motorik song produces from the same seed — saved songs would
         // no longer reproduce. A derived stream leaves the main sequence untouched, so this
-        // change is invisible to every song that does not draw a cluster.
-        var clusterRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 64))
-        let clusterRoll = clusterRNG.nextDouble()
-        let motorikCluster: MotorikCluster = {
+        // change is invisible to every song that does not draw a sync.
+        var syncRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 64))
+        let syncRoll = syncRNG.nextDouble()
+        let motorikSync: MotorikSync = {
             guard !isNoir && !isArcade else { return .none }
-            if clusterRoll < 0.80 { return .none }
-            if clusterRoll < 0.88 { return .rhythmSection }
-            if clusterRoll < 0.95 { return .sequenceLock }
+            if syncRoll < 0.80 { return .none }
+            if syncRoll < 0.88 { return .rhythmSection }
+            if syncRoll < 0.95 { return .sequenceLock }
             return .machineVoice
         }()
 
@@ -156,7 +156,7 @@ struct SongGenerator {
             tempoOverride: tempoOverride,
             moodOverride: moodOverride,
             motorikNoir: isNoir,
-            motorikArcade: isArcade, kraftwerkCluster: motorikCluster.isActive
+            motorikArcade: isArcade, kraftwerkSync: motorikSync.isActive
         )
 
         // Step 2 — Song structure + chord plan
@@ -165,7 +165,7 @@ struct SongGenerator {
         // Derived once here and passed to everyone who needs it: the Texture rules place events
         // against these bars, the drum pass marks their seams, and the dropout itself applies
         // them. Deriving it in more than one place invites the copies to drift apart.
-        let clusterWindows = clusterDropoutWindows(cluster: motorikCluster, totalBars: frame.totalBars, seed: seed)
+        let syncWindows = syncDropoutWindows(sync: motorikSync, totalBars: frame.totalBars, seed: seed)
 
         // Step 3 — Tonal governance map
         let tonalMap = TonalGovernanceBuilder.build(frame: frame, structure: structure)
@@ -184,12 +184,12 @@ struct SongGenerator {
 
         // Step 4 — Drums
         var drumRules: Set<String> = []
-        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: forceDrumRuleID, noirVariation: isNoir, arcadeVariation: isArcade, cluster: motorikCluster)
+        trackEvents[kTrackDrums]   = DrumGenerator.generate(frame: frame, structure: structure, rng: &drumRNG, usedRuleIDs: &drumRules, forceRuleID: forceDrumRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
 
         // Step 5 — Lead 1 (generated before Bass so bass can react to melodic density)
         var lead1Rules: Set<String> = []
         var lead2Rules: Set<String> = []
-        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, cluster: motorikCluster)
+        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
         trackEvents[kTrackLead1] = lead1Events
 
         // When Lead 1 picks a dense arp rule, bias Bass and Lead 2 toward sparse/pulse roles.
@@ -198,7 +198,7 @@ struct SongGenerator {
 
         // Step 6 — Bass
         var bassRules: Set<String> = []
-        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID, noirVariation: isNoir, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, cluster: motorikCluster)
+        trackEvents[kTrackBass]    = BassGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &bassRNG, usedRuleIDs: &bassRules, forceRuleID: forceBassRuleID, noirVariation: isNoir, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, sync: motorikSync)
 
         // Step 7 — Pads
         var padRules: Set<String> = []
@@ -212,9 +212,9 @@ struct SongGenerator {
 
         // Step 8 — Rhythm
         var rhythmRules: Set<String> = []
-        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID, noirVariation: isNoir, arcadeVariation: isArcade, cluster: motorikCluster)
+        trackEvents[kTrackRhythm]  = RhythmGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceRhythmRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
 
-        if motorikCluster.includes(kTrackRhythm) {
+        if motorikSync.includes(kTrackRhythm) {
             // Applied before Lead 2 derives from Rhythm, so the partner rules inherit the
             // variation rather than drifting out of unison with it.
             trackEvents[kTrackRhythm] = limitIdenticalBars(
@@ -222,27 +222,27 @@ struct SongGenerator {
                 totalBars: frame.totalBars, seed: seed)
         }
 
-        // Step 8b — Kraftwerk cluster: Lead 2 is locked to Rhythm.
+        // Step 8b — Kraftwerk sync: Lead 2 is locked to Rhythm.
         //
         // Both partner rules are derived from Rhythm's ACTUAL events, so this has to run after
         // Rhythm rather than at step 8 where Lead 2 is normally generated — the earlier pass has
         // no Rhythm track to read yet, and whatever it produced is replaced here.
         //
         // It never draws a normal Motorik rule: a melodic Lead 2 over a rigid two-pitch-class
-        // sequencer is exactly the incoherence the cluster design exists to prevent. Variety
+        // sequencer is exactly the incoherence the sync design exists to prevent. Variety
         // comes from presence versus absence, which is why the split is partner 65 / silent 35 —
         // doubling appears in two of the three corpus files, common but not universal.
-        var clusterLead2Partners = false
-        if motorikCluster.includes(kTrackRhythm) {
-            var lead2ClusterRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 67))
+        var syncLead2Partners = false
+        if motorikSync.includes(kTrackRhythm) {
+            var lead2SyncRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 67))
             lead2Rules.removeAll()
-            if lead2ClusterRNG.nextDouble() < 0.65 {
-                clusterLead2Partners = true
+            if lead2SyncRNG.nextDouble() < 0.65 {
+                syncLead2Partners = true
                 let rhythmEvents = trackEvents[kTrackRhythm]
                 if rhythmRules.contains("MOT-RTHM-014") {
                     // MOT-LD2-012 Octave Unison — generates no rhythm of its own. Strict unison,
                     // no thirds and no offset: the machine quality comes from the exact lock.
-                    let shift = lead2ClusterRNG.nextDouble() < 0.70 ? 12 : 24
+                    let shift = lead2SyncRNG.nextDouble() < 0.70 ? 12 : 24
                     trackEvents[kTrackLead2] = rhythmEvents.map {
                         MIDIEvent(stepIndex: $0.stepIndex,
                                   note: UInt8(min(127, Int($0.note) + shift)),
@@ -269,13 +269,13 @@ struct SongGenerator {
 
         // Step 9 — Texture
         var texRules: Set<String> = []
-        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, cluster: motorikCluster, clusterWindows: clusterWindows)
+        trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, syncWindows: syncWindows)
 
         // Step 10 — Collision / density simplification pass
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
 
         // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
-        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, arcadeVariation: isArcade, exemptTracks: motorikCluster.isActive ? motorikCluster.tracks + [kTrackLead2] : [])
+        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, arcadeVariation: isArcade, exemptTracks: motorikSync.isActive ? motorikSync.tracks + [kTrackLead2] : [])
 
         // Step 10.7 — Pads gate: when Lead 1 is on a solo rule (< 30 notes), thin pads outside
         // the solo window to avoid a dense shimmer wall with nothing cutting through it.
@@ -307,22 +307,22 @@ struct SongGenerator {
 
         // Step 13 — Drum variation engine: fills at section transitions and instrument entrances,
         //            plus cymbal variations on 16+-bar identical runs
-        // A fill on the bar before the cluster leaves, and on the bar before it returns.
-        let clusterSeamBars = clusterWindows.flatMap { [$0.lowerBound - 1, $0.upperBound - 1] }
-        trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, noirVariation: isNoir, arcadeVariation: isArcade, kraftwerkCluster: motorikCluster.isActive, clusterBoundaryBars: clusterSeamBars, clusterBassIsLocked: motorikCluster.includes(kTrackBass))
+        // A fill on the bar before the sync leaves, and on the bar before it returns.
+        let syncSeamBars = syncWindows.flatMap { [$0.lowerBound - 1, $0.upperBound - 1] }
+        trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, noirVariation: isNoir, arcadeVariation: isArcade, kraftwerkSync: motorikSync.isActive, syncBoundaryBars: syncSeamBars, syncBassIsLocked: motorikSync.includes(kTrackBass))
 
-        // Step 13.5 — Kraftwerk cluster section dropout: the whole cluster leaves together for
+        // Step 13.5 — Kraftwerk sync section dropout: the whole sync leaves together for
         // two windows, while everything outside it keeps playing.
-        trackEvents = applyClusterDropout(trackEvents: trackEvents, cluster: motorikCluster,
-                                          lead2Partners: clusterLead2Partners, windows: clusterWindows)
+        trackEvents = applySyncDropout(trackEvents: trackEvents, sync: motorikSync,
+                                          lead2Partners: syncLead2Partners, windows: syncWindows)
 
-        // Step 13.6 — Kraftwerk cluster repeat guard. Rhythm was done at step 8b.
-        // EVERY track in a cluster song, not only the cluster's members. A non-member still
+        // Step 13.6 — Kraftwerk sync repeat guard. Rhythm was done at step 8b.
+        // EVERY track in a sync song, not only the sync's members. A non-member still
         // sits inside a Kraftwerk arrangement, and the parts most likely to run long are exactly
         // the ones left on normal rotation — a Machine Voice song's bass held 20 identical bars
         // because nothing was watching it. Drums matter doubly: the variation engine that would
-        // otherwise break up a long run is skipped for every cluster song.
-        let guardedTracks = motorikCluster.isActive ? Array(0..<kTrackCount) : []
+        // otherwise break up a long run is skipped for every sync song.
+        let guardedTracks = motorikSync.isActive ? Array(0..<kTrackCount) : []
         for track in guardedTracks where track != kTrackRhythm {
             trackEvents[track] = limitIdenticalBars(trackEvents[track], trackIndex: track,
                                                     totalBars: frame.totalBars, seed: seed)
@@ -331,10 +331,10 @@ struct SongGenerator {
         // Title generation — Noir/Arcade titles with short words get a suffix or variant
         let title: String = {
             let raw   = TitleGenerator.generate(frame: frame, rng: &rng)
-            // A Kraftwerk cluster renames the song instead of taking the Noir/Arcade path —
-            // those two never coexist with a cluster anyway. Drawn on its own stream so adding
+            // A Kraftwerk sync renames the song instead of taking the Noir/Arcade path —
+            // those two never coexist with a sync anyway. Drawn on its own stream so adding
             // the affix does not shift the shared RNG and change the rest of the song.
-            if motorikCluster.isActive {
+            if motorikSync.isActive {
                 var titleRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 65))
                 return TitleGenerator.applyKraftwerkAffix(to: raw, rng: &titleRNG)
             }
@@ -388,10 +388,10 @@ struct SongGenerator {
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
             rhythmRules: rhythmRules, texRules: texRules, isNoir: isNoir, isArcade: isArcade,
-            cluster: motorikCluster, clusterLead2Partners: clusterLead2Partners
+            sync: motorikSync, syncLead2Partners: syncLead2Partners
         )
 
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.sorted().first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }), kraftwerkCluster: motorikCluster.isActive)
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.sorted().first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }), kraftwerkSync: motorikSync.isActive)
 
         var forced: [String: String] = [:]
         if let r = forceBassRuleID   { forced["Bass"]   = r }
@@ -415,7 +415,7 @@ struct SongGenerator {
             stepAnnotations: stepAnnotations,
             motorikNoirVariation: isNoir,
             motorikArcadeVariation: isArcade,
-            motorikCluster: motorikCluster,
+            motorikSync: motorikSync,
             motorikBassDistortion: motorikBassDistortion,
             motorikNoirBassDistortion: motorikNoirBassDistortion,
             motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
@@ -1916,12 +1916,12 @@ struct SongGenerator {
 
     // MARK: - Generation log builder
 
-    /// The bars a cluster leaves and returns. Computed separately from the dropout itself
+    /// The bars a sync leaves and returns. Computed separately from the dropout itself
     /// because the drum pass runs earlier and needs the same bars to place its seam fills.
     ///
     /// Drawn on its own stream so the schedule does not shift any other decision in the song.
-    static func clusterDropoutWindows(cluster: MotorikCluster, totalBars: Int, seed: UInt64) -> [Range<Int>] {
-        guard cluster.isActive else { return [] }
+    static func syncDropoutWindows(sync: MotorikSync, totalBars: Int, seed: UInt64) -> [Range<Int>] {
+        guard sync.isActive else { return [] }
         var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 66))
 
         // Never drop in the first 16 bars — the song has to establish itself before absence
@@ -1944,18 +1944,18 @@ struct SongGenerator {
         return windows
     }
 
-    /// Cluster section dropout — the most distinctive measured feature in the corpus, and it
-    /// spans tracks, so it belongs to the cluster rather than to any single rule.
+    /// Sync section dropout — the most distinctive measured feature in the corpus, and it
+    /// spans tracks, so it belongs to the sync rather than to any single rule.
     ///
     /// In *The Robots* the percussion voices leave at the SAME bars — around a quarter and two
     /// thirds of the way through — and come back together. That is a coordinated arrangement
-    /// event, not independent per-track rests, which is why this silences the whole cluster at
-    /// once. Tracks OUTSIDE the cluster keep playing, and that is what makes the drop read as a
+    /// event, not independent per-track rests, which is why this silences the whole sync at
+    /// once. Tracks OUTSIDE the sync keep playing, and that is what makes the drop read as a
     /// section change rather than as the song stopping.
     ///
     /// Runs after the drum variation engine so a fill cannot be re-added inside a silent window.
 
-    /// Caps how many consecutive identical bars a cluster track may play.
+    /// Caps how many consecutive identical bars a sync track may play.
     ///
     /// The measured Kraftwerk behaviour is a figure repeated with no variation at all, and the
     /// rules implement that faithfully — which over a 128-bar song produced stretches of 30 to
@@ -2022,18 +2022,18 @@ struct SongGenerator {
                     < ($1.stepIndex, $1.note, $1.velocity, $1.durationSteps) }
     }
 
-    private static func applyClusterDropout(
+    private static func applySyncDropout(
         trackEvents: [[MIDIEvent]],
-        cluster: MotorikCluster,
+        sync: MotorikSync,
         lead2Partners: Bool,
         windows: [Range<Int>]
     ) -> [[MIDIEvent]] {
-        guard cluster.isActive, !windows.isEmpty else { return trackEvents }
+        guard sync.isActive, !windows.isEmpty else { return trackEvents }
 
-        // Texture plays THROUGH the drop. It is the one cluster voice that continues, so the
+        // Texture plays THROUGH the drop. It is the one sync voice that continues, so the
         // window reads as a change of texture rather than a hole: the machine parts step out
         // and the scattered colour is what is left holding the space.
-        var tracks = cluster.tracks.filter { $0 != kTrackTexture }
+        var tracks = sync.tracks.filter { $0 != kTrackTexture }
         if lead2Partners { tracks.append(kTrackLead2) }
 
         let silentSteps = windows.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
@@ -2060,8 +2060,8 @@ struct SongGenerator {
         texRules: Set<String>,
         isNoir: Bool = false,
         isArcade: Bool = false,
-        cluster: MotorikCluster = .none,
-        clusterLead2Partners: Bool = false
+        sync: MotorikSync = .none,
+        syncLead2Partners: Bool = false
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -2077,9 +2077,9 @@ struct SongGenerator {
         // ACTUALLY synchronised, not the group's internal name — Texture joins every one and
         // Lead 2 only when it partners with Rhythm, so membership is per-song. Nothing is
         // emitted when none fires: the absence is the signal.
-        if cluster.isActive {
-            var names = cluster.logTrackNames
-            if clusterLead2Partners { names.append("Lead 2") }
+        if sync.isActive {
+            var names = sync.logTrackNames
+            if syncLead2Partners { names.append("Lead 2") }
             log.append(GenerationLogEntry(tag: "Sync",
                                           description: names.joined(separator: ", ")))
         }
@@ -2882,7 +2882,7 @@ struct SongGenerator {
         bluesIVVDesc: String = "",
         driftBridgeLabels: [Int: String] = [:],
         chillRhythmSwitch: (bar: Int, ruleID: String)? = nil,
-        kraftwerkCluster: Bool = false
+        kraftwerkSync: Bool = false
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -3004,9 +3004,9 @@ struct SongGenerator {
             // The hi-hat test below reads a fill's length from where the timekeeping stops. That
             // assumes a kit with continuous hats: MOT-DRUM-014 has no hats at all and
             // MOT-DRUM-013 often keeps time on a wood block, so every bar measured as a 3-beat
-            // fill and the log filled with cascades that never played. For a cluster, measure
+            // fill and the log filled with cascades that never played. For a sync, measure
             // the fill directly from where its own notes start.
-            if kraftwerkCluster {
+            if kraftwerkSync {
                 let steps = (drumByBar[bar] ?? [])
                     .filter { Self.kraftwerkFillMarkerNotes.contains($0.note) }
                     .map { $0.stepIndex % 16 }
@@ -3114,11 +3114,11 @@ struct SongGenerator {
             }
         }
 
-        // A Kraftwerk cluster fills only at its dropout edges, so the three sources above — which
+        // A Kraftwerk sync fills only at its dropout edges, so the three sources above — which
         // mirror the normal drum pass — describe fills that were never generated. Read the drum
         // track instead: these notes are ones the two Kraftwerk kits never play, so a bar
         // containing one is a bar a fill actually ran in.
-        if kraftwerkCluster {
+        if kraftwerkSync {
             allFillBars = Set((drumByBar.compactMap { bar, evs in
                 evs.contains { Self.kraftwerkFillMarkerNotes.contains($0.note) } ? bar : nil
             }) as [Int])

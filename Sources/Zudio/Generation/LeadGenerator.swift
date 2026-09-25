@@ -108,12 +108,12 @@ struct LeadGenerator {
         passBodyBars: Int? = nil,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        cluster: MotorikCluster = .none
+        sync: MotorikSync = .none
     ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
 
-        // Kraftwerk cluster (Machine Voice only). No solo range: these rules are announcements
+        // Kraftwerk sync (Machine Voice only). No solo range: these rules are announcements
         // separated by silence, not a solo, and the Lead 1 solo machinery would fight them.
-        if forceLeadRuleID == nil, cluster.includes(kTrackLead1) {
+        if forceLeadRuleID == nil, sync.includes(kTrackLead1) {
             let ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-LD1-022" : "MOT-LD1-021"
             usedRuleIDs.insert(ruleID)
             return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), nil)
@@ -3303,7 +3303,7 @@ struct LeadGenerator {
         }
     }
 
-    // MARK: - Kraftwerk cluster lead
+    // MARK: - Kraftwerk sync lead
 
     /// Two measured shapes: short compact statements with proportionate silence, and long runs
     /// followed by very long silences. Both are announcements rather than melodies — the rest

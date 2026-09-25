@@ -23,10 +23,10 @@
 //   DRM-013: Sequenced Timekeeper — one dense single-pitch timekeeping voice (closed hat or
 //            wood block) on all eight even steps, plus kick 1+3, snare on beat 3 only, and two
 //            fixed accent steps. Flat velocity 80, identical every bar, no fills. Kraftwerk
-//            cluster only (Rhythm Section).
+//            sync only (Rhythm Section).
 //   DRM-014: Sparse Accents — no timekeeper at all. Kick 1+3 (or 1 and the "and" of 3), snare
 //            every second bar, one accent every fourth bar. Under 1.5 notes/beat; the space is
-//            the point. Kraftwerk cluster only (Rhythm Section).
+//            the point. Kraftwerk sync only (Rhythm Section).
 //   DRM-008: Tribal — NO hi-hat. Kick syncopated on steps 2, 4, 12, 14. Snare on beats 1+3.
 //            Based on Joy Division "She's Lost Control" (1980) — purely percussive, tom-driven.
 //            At high intensity every 6th bar: a mechanical descending tom cascade replaces the
@@ -61,13 +61,13 @@ struct DrumGenerator {
         forceRuleID: String? = nil,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        cluster: MotorikCluster = .none
+        sync: MotorikSync = .none
     ) -> [MIDIEvent] {
         let ruleID: String
         if let forced = forceRuleID {
             ruleID = forced
-        } else if cluster.includes(kTrackDrums) {
-            // Kraftwerk cluster: Sequenced Timekeeper 60% / Sparse Accents 40%.
+        } else if sync.includes(kTrackDrums) {
+            // Kraftwerk sync: Sequenced Timekeeper 60% / Sparse Accents 40%.
             ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-DRUM-014" : "MOT-DRUM-013"
         } else if noirVariation {
             // Noir: Classic, Open Pocket, Ride, Albatross, Annalisa, Inverted Beat, Tribal.
@@ -109,7 +109,7 @@ struct DrumGenerator {
         // The two Kraftwerk kit rules bypass the bar loop entirely. That loop adds section
         // crashes, fills and intro/outro variants, and the measured character depends on none
         // of that happening — every bar is identical, and the arrangement interest comes from
-        // the cluster's section dropout instead.
+        // the sync's section dropout instead.
         if ruleID == "MOT-DRUM-013" || ruleID == "MOT-DRUM-014" {
             return kraftwerkKit(ruleID: ruleID, totalBars: frame.totalBars, rng: &rng)
         }
@@ -382,7 +382,7 @@ struct DrumGenerator {
     }
 
     // Ride groove relief: ride cymbal on quarter notes (thinned), snare on 2+4.
-    // Same skeleton as the march but with a controlled ride character — Can/Cluster feel.
+    // Same skeleton as the march but with a controlled ride character — Can/Sync feel.
     private static func annalisaRideGrooveBar(barStart: Int) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
@@ -999,7 +999,7 @@ struct DrumGenerator {
     }
 
 
-    // MARK: - Kraftwerk cluster kits
+    // MARK: - Kraftwerk sync kits
 
     /// The corpus splits percussion into two tiers: one near-continuous timekeeping voice at
     /// ~3.3 notes/beat with 18-20% rest, and accent voices at 0.27-0.98 with 76-93% rest. Every

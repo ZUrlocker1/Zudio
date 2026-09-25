@@ -2,7 +2,7 @@
 
 Status: **implemented and shipping in 2.6 build 131.**
 
-Motorik occasionally leans machine-like rather than Neu!-like. A coupled *cluster* of tracks
+Motorik occasionally leans machine-like rather than Neu!-like. A coupled *sync group* of tracks
 adopts Kraftwerk rules together while the rest of the song draws from normal rotation. This is
 not a substyle: there is no new `displayStyleName`, no UI change and no fourth sanitiser.
 
@@ -251,7 +251,7 @@ authentic the placement is. The accent is a sequencer's, not a drummer's — it 
 the hi-hat gradient that gives normal Motorik its human groove stays out.
 
 *Implementation note.* Both rules bypass `DrumGenerator`'s bar loop, which would otherwise add
-section crashes and intro/outro variants; `DrumVariationEngine` runs in its restricted cluster
+section crashes and intro/outro variants; `DrumVariationEngine` runs in its restricted sync
 form. Measured output: Sequenced Timekeeper 13 hits/bar (3.25 notes/beat against a ~3.3 target)
 on 4 pitches; Sparse Accents ~0.6 notes/beat on 3 pitches.
 
@@ -393,9 +393,9 @@ When a sync fires, Bass draws from the lists here instead.
 
 ### Instrument subsets
 
-Held on `MotorikCluster.instrumentSubset(forTrack:)` so the index lists live in one place,
-read by the pick pools and by `sanitiseClusterInstruments`. Lead 2's subset applies whenever
-Rhythm is clustered: it only partners on a 65/35 draw made during generation, but applying the
+Held on `MotorikSync.instrumentSubset(forTrack:)` so the index lists live in one place,
+read by the pick pools and by `sanitiseSyncInstruments`. Lead 2's subset applies whenever
+Rhythm is synced: it only partners on a 65/35 draw made during generation, but applying the
 subset to both outcomes is harmless, since a silent Lead 2 has no audible instrument either way.
 
 
@@ -512,7 +512,7 @@ other draw. Everything below follows from that one value.
    bar count is chosen so songs keep their intended duration. Non-sync songs are untouched.
 3. **Rule pools.** Each generator checks whether its track is in the drawn sync and, if so,
    draws from the Kraftwerk pool instead of normal rotation.
-4. **Instrument subsets**, held on `MotorikCluster.instrumentSubset(forTrack:)` so the pick pool
+4. **Instrument subsets**, held on `MotorikSync.instrumentSubset(forTrack:)` so the pick pool
    and the sanitiser share one definition.
 5. **Lead 2** is resolved after Rhythm, since both its rules derive from Rhythm's actual events.
 6. **Fills only at the dropout edges.** In every sync song, including those where Drums is
@@ -523,7 +523,7 @@ other draw. Everything below follows from that one value.
 
    Entrance fills in particular have to go: Texture and Lead 1 are 88-95% rest in a sync, so
    a rule that fires whenever a part returns fires almost continuously. The dropout schedule is
-   decided after this pass runs, so the bars come from `clusterDropoutWindows` and are handed in.
+   decided after this pass runs, so the bars come from `syncDropoutWindows` and are handed in.
 
    **The log reads the drum track, not the fill logic.** `buildStepAnnotations` mirrors the
    normal drum pass rather than the engine's output, and `fillBeats` infers a fill's length from
@@ -544,7 +544,7 @@ previous song untouched. A sync that only consulted the pick pool would routinel
 Fuzz Guitar on Rhythm — a guitar riff rather than a sequencer, the exact case the subsets exist
 to prevent.
 
-So the sync has a **sanitiser** as well, `sanitiseClusterInstruments`, which forces every
+So the sync has a **sanitiser** as well, `sanitiseSyncInstruments`, which forces every
 member track into its subset. Noir and Arcade each have one for the same reason. Both the
 instance path and the static Endless-mode path need it.
 
@@ -580,15 +580,6 @@ This is a deliberate departure from the measured behaviour, chosen for listenabi
   repeated with no variation"; the other three options in the sync bass pool are pre-existing
   rules that have always evolved, and they still do.
 
-### A note on naming
-
-The mechanism is called **Sync** in everything a listener or reader sees — the generation log,
-this document, the change log. The source still calls it `MotorikCluster`, and the helpers
-around it keep names like `clusterDropoutWindows` and `sanitiseClusterInstruments`. That is
-deliberate rather than an oversight: the rename was cosmetic, and renaming the type across the
-generators would have produced a large mechanical diff for no behavioural change. Treat
-"cluster" in the source and "sync" in the prose as the same thing.
-
 ### Rule ID conventions
 
 New IDs continue each track's existing numbering: `MOT-DRUM-013/014`, `MOT-BASS-026/027`,
@@ -616,7 +607,7 @@ they sit in band.
 
 ## Verification
 
-Pinned by `MotorikClusterTests` and `DeterminismTests`:
+Pinned by `MotorikSyncTests` and `DeterminismTests`:
 
 - the sync survives every `SongState` copy method, and the roll is deterministic
 - Noir and Arcade never draw a sync; the distribution matches 80/8/7/5

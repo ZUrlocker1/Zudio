@@ -30,7 +30,7 @@ import Foundation
     private static let styles: [MusicStyle] = [.motorik, .ambient, .chill, .kosmic]
 
     /// The core contract: generate twice from one seed, get the same notes.
-    /// Motorik needs the widest sweep — its substyles and cluster rolls mean a given rule
+    /// Motorik needs the widest sweep — its substyles and sync rolls mean a given rule
     /// combination may only appear in a small fraction of seeds.
     @Test func sameSeedProducesSameNotes() throws {
         for style in Self.styles {

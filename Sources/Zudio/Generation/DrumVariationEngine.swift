@@ -96,15 +96,15 @@ struct DrumVariationEngine {
         chillMode: Bool = false,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        kraftwerkCluster: Bool = false,
-        clusterBoundaryBars: [Int] = [],
-        clusterBassIsLocked: Bool = false
+        kraftwerkSync: Bool = false,
+        syncBoundaryBars: [Int] = [],
+        syncBassIsLocked: Bool = false
     ) -> [[MIDIEvent]] {
-        // A Kraftwerk cluster runs this pass in a restricted form rather than skipping it.
+        // A Kraftwerk sync runs this pass in a restricted form rather than skipping it.
         // Removing every fill made the arrangement read as unbroken; keeping the normal ones
-        // made it sound like a drummer. So a cluster fills at exactly one kind of moment — the
-        // bar before the whole cluster drops out, and the bar before it returns — and nowhere
-        // else. Those bars are passed in as `clusterBoundaryBars`. Lengths are held to 1 or 2
+        // made it sound like a drummer. So a sync fills at exactly one kind of moment — the
+        // bar before the whole sync drops out, and the bar before it returns — and nowhere
+        // else. Those bars are passed in as `syncBoundaryBars`. Lengths are held to 1 or 2
         // beats, marking the seam without becoming a gesture.
         var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
         var drumEvents = trackEvents[kTrackDrums]
@@ -114,10 +114,10 @@ struct DrumVariationEngine {
 
         var fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure,
                                        chillMode: chillMode, noirVariation: noirVariation,
-                                       arcadeVariation: arcadeVariation, kraftwerkCluster: kraftwerkCluster)
-        // The cluster's dropout windows are decided after this pass runs, so the bars are handed
+                                       arcadeVariation: arcadeVariation, kraftwerkSync: kraftwerkSync)
+        // The sync's dropout windows are decided after this pass runs, so the bars are handed
         // in rather than derived here.
-        for bar in clusterBoundaryBars where bar > 0 && bar < frame.totalBars { fillBars.insert(bar) }
+        for bar in syncBoundaryBars where bar > 0 && bar < frame.totalBars { fillBars.insert(bar) }
 
         // MARK: Step 2 — Apply fills to drums, collecting fill type info
 
@@ -129,7 +129,7 @@ struct DrumVariationEngine {
             // Arcade: 100% 1-beat — section transitions only, never intrusive under sparse timekeeping.
             // Noir: 95% 1-beat / 5% 2-beat — fills are rare and subtle; 3-beat excluded entirely.
             // Chill: 80% 1-beat / 20% 2-beat; no 3-beat (tom cascades too rock for jazz).
-            let fillLength = kraftwerkCluster
+            let fillLength = kraftwerkSync
                 ? rng.weightedPick([0.80, 0.20, 0.00])   // 1 beat mostly, 2 occasionally, never 3
                 : arcadeVariation
                 ? 0
@@ -146,9 +146,9 @@ struct DrumVariationEngine {
 
         // MARK: Step 3 — Cymbal variations on long identical runs
 
-        // The cluster has its own 12-bar repeat guard, so the cymbal run variations would be a
+        // The sync has its own 12-bar repeat guard, so the cymbal run variations would be a
         // second treatment of the same problem.
-        if !kraftwerkCluster {
+        if !kraftwerkSync {
             drumEvents = applyRunVariations(to: drumEvents, frame: frame,
                                             structure: structure, fillBars: fillBars, rng: &rng)
         }
@@ -159,9 +159,9 @@ struct DrumVariationEngine {
         // Use a separate RNG so bass decisions don't depend on cymbal-variation draw order.
 
         var bassLockRNG = SeededRNG(seed: seed &+ 0xB455_F177_D20B_1337)
-        // A clustered bass already has a deliberate relationship to the kick — MOT-BASS-027
+        // A synced bass already has a deliberate relationship to the kick — MOT-BASS-027
         // takes every one, MOT-BASS-026 is a cell that must not be perturbed.
-        if !clusterBassIsLocked {
+        if !syncBassIsLocked {
             result[kTrackBass] = applyBassLocking(bassEvents: trackEvents[kTrackBass],
                                                   fillInfos: fillInfos,
                                                   rng: &bassLockRNG)
@@ -222,13 +222,13 @@ struct DrumVariationEngine {
         chillMode: Bool = false,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        kraftwerkCluster: Bool = false
+        kraftwerkSync: Bool = false
     ) -> Set<Int> {
-        // A Kraftwerk cluster takes none of the three sources below. Its fills mark one event
-        // only — the cluster leaving and returning together — and the caller passes those bars
-        // in. Ordinary section boundaries are not enough: the cluster's own dropout IS the major
+        // A Kraftwerk sync takes none of the three sources below. Its fills mark one event
+        // only — the sync leaving and returning together — and the caller passes those bars
+        // in. Ordinary section boundaries are not enough: the sync's own dropout IS the major
         // structural event in these songs, and a fill anywhere else is decoration.
-        guard !kraftwerkCluster else { return [] }
+        guard !kraftwerkSync else { return [] }
 
         var fillBars = Set<Int>()
 
@@ -282,7 +282,7 @@ struct DrumVariationEngine {
             }
         }
 
-        // Chill: enforce a 16-bar minimum gap between any two fills to prevent fill clustering.
+        // Chill: enforce a 16-bar minimum gap between any two fills to prevent fill syncing.
         // (Not applied to Noir — section-transition-only fills are already sparse enough.)
         if chillMode && fillBars.count > 1 {
             var spaced = Set<Int>()

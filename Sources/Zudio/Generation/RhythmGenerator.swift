@@ -28,9 +28,9 @@
 //            From PiL Albatross T3 guitar long sustains. Motorik Noir only.
 //   RHY-014: Two-Note Lock — a 2- or 4-step cell over 2-3 pitch classes, repeated with no
 //            variation for the whole song. Transposes with the chord but never changes shape;
-//            the cell length divides into 16 so it locks to the barline. Cluster only.
+//            the cell length divides into 16 so it locks to the barline. Sync only.
 //   RHY-015: Paired Sequencer — an 8-step cell with 6 active slots over 6 pitch classes.
-//            Lead 2 takes the same cell offset by 2 steps when it partners. Cluster only.
+//            Lead 2 takes the same cell offset by 2 steps when it partners. Sync only.
 //   RHY-013: Levene Drop — single-note staccato hits on "and" positions only (s2,s6,s10,s14),
 //            45% probability per step, 30% of bars completely silent. Root (55%) / flat7 (30%) /
 //            fifth (15%) chosen once per bar — no dyad. From Keith Levene's isolated guitar drops
@@ -49,7 +49,7 @@ struct RhythmGenerator {
         forceRuleID: String? = nil,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        cluster: MotorikCluster = .none
+        sync: MotorikSync = .none
     ) -> [MIDIEvent] {
         // The Kraftwerk rules run for the WHOLE song rather than being re-picked per section,
         // and they play through intro and outro too. A cell that changed at a section boundary
@@ -58,7 +58,7 @@ struct RhythmGenerator {
             usedRuleIDs.insert(forced)
             return kraftwerkRhythm(ruleID: forced, frame: frame, tonalMap: tonalMap, rng: &rng)
         }
-        if forceRuleID == nil, cluster.includes(kTrackRhythm) {
+        if forceRuleID == nil, sync.includes(kTrackRhythm) {
             // Two-Note Lock 55% / Paired Sequencer 45%. This draw also decides which Lead 2
             // partner is available, so it has to happen before Lead 2 is resolved.
             let ruleID = rng.weightedPick([0.55, 0.45]) == 1 ? "MOT-RTHM-015" : "MOT-RTHM-014"
@@ -535,7 +535,7 @@ struct RhythmGenerator {
         return UInt8(clamping: candidates.min(by: { abs($0 - target) < abs($1 - target) }) ?? low)
     }
 
-    // MARK: - Kraftwerk cluster rhythm
+    // MARK: - Kraftwerk sync rhythm
 
     /// Lowest MIDI note of pitch class `pc` inside [low, high].
     private static func kwInRegister(_ pc: Int, low: Int, high: Int) -> Int {

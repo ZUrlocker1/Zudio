@@ -56,11 +56,11 @@
 //            Bar B: denser root pulse (steps 0,2,4,6,8,10) + M2 lean on final quarter.
 //            Deep register MIDI 28–40. Motorik Noir only.
 //   BAS-026: Locked Micro-Cell — 3 pitch classes (root, fifth, octave) on a 3- or 4-slot
-//            quarter-note cell drawn once and never varied. MIDI 29-48. Kraftwerk cluster
+//            quarter-note cell drawn once and never varied. MIDI 29-48. Kraftwerk sync
 //            (Sequence Lock) only.
 //   BAS-027: Restricted Run — 4-5 pitch classes from the chord, MIDI 27-43, emitted in long
 //            statements of 30-120 notes then a rest of 0.2-0.4x the span. Takes every kick
-//            step of DRM-013/014. Kraftwerk cluster (Rhythm Section) only.
+//            step of DRM-013/014. Kraftwerk sync (Rhythm Section) only.
 //   BAS-021: No Birds Walk — PiL "No Birds" (1979) 2-bar P4 suspension walk;
 //            Bar A: root pickup (steps 0,2), P4 suspension held through bar.
 //            Bar B: root quarter×2, then P4→TT→P5 chromatic ascent resolution.
@@ -90,7 +90,7 @@ struct BassGenerator {
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
         arcadeDenseMelody: Bool = false,
-        cluster: MotorikCluster = .none
+        sync: MotorikSync = .none
     ) -> [MIDIEvent] {
         // Noir bass pool: PIL deep riffs + Joy Division high-register counter-melody + Kraftwerk cold mechanics.
         // Removed: Motorik Drive (too upbeat), Crawling Walk (jazzy), Moroder Chase (too energetic).
@@ -109,15 +109,15 @@ struct BassGenerator {
                 rules   = ["MOT-BASS-022","MOT-BASS-025","MOT-BASS-024","MOT-BASS-023","MOT-BASS-008","MOT-BASS-012","MOT-BASS-005","MOT-BASS-010","MOT-BASS-001","MOT-BASS-004","MOT-BASS-002"]
                 weights = [0.16,           0.12,           0.14,           0.15,           0.03,           0.07,          0.08,          0.06,          0.07,          0.06,          0.06]
             }
-        } else if cluster.includes(kTrackBass) {
-            // Kraftwerk cluster. The three existing Kraftwerk bass rules are reused rather than
+        } else if sync.includes(kTrackBass) {
+            // Kraftwerk sync. The three existing Kraftwerk bass rules are reused rather than
             // duplicated — they are already written and already good, and reusing them is what
             // gives Bass the variety the other tracks get from having two new rules each.
             // MOT-BASS-025 Electro Pump is otherwise Arcade-only; drawing it inside a base
-            // Motorik cluster extends its reach without changing its behaviour or its Arcade
-            // weighting. The redistributed base-Motorik weights below apply to NON-cluster
+            // Motorik sync extends its reach without changing its behaviour or its Arcade
+            // weighting. The redistributed base-Motorik weights below apply to NON-sync
             // songs only.
-            if cluster == .sequenceLock {
+            if sync == .sequenceLock {
                 rules   = ["MOT-BASS-026", "MOT-BASS-013", "MOT-BASS-015", "MOT-BASS-025"]
                 weights = [0.40,           0.25,           0.20,           0.15]
             } else {
@@ -1618,7 +1618,7 @@ struct BassGenerator {
     }
 
 
-    // MARK: - Kraftwerk cluster bass
+    // MARK: - Kraftwerk sync bass
 
     /// Lowest MIDI note of pitch class `pc` inside [low, high].
     private static func pcInRegister(_ pc: Int, low: Int, high: Int) -> Int {
@@ -1639,7 +1639,7 @@ struct BassGenerator {
         var events: [MIDIEvent] = []
 
         if ruleID == "MOT-BASS-026" {
-            // MOT-BASS-026 Locked Micro-Cell — Sequence Lock cluster.
+            // MOT-BASS-026 Locked Micro-Cell — Sequence Lock sync.
             // Three pitch classes only: root, fifth, octave. The cell is drawn ONCE and never
             // varies; the repetition is what carries the music, not the material.
             let cellLength = rng.nextDouble() < 0.5 ? 3 : 4
@@ -1671,7 +1671,7 @@ struct BassGenerator {
             return events
         }
 
-        // MOT-BASS-027 Restricted Run — Rhythm Section cluster.
+        // MOT-BASS-027 Restricted Run — Rhythm Section sync.
         // Steps 0 and 8 are the kick positions of MOT-DRUM-013/014, and the bass takes every
         // one of them, so the rhythm section reads as locked together. Note the plan's "at
         // least half its onsets coincide with kick steps" cannot hold literally at the measured
