@@ -1,6 +1,6 @@
 # Zudio Change Log
 
-## V 2.6 (Build 131)  In progress
+## V 2.6 (Build 131)  Motorik Europe, reverb restored
 
 - **New Motorik Europe style derived from Kraftwerk** — About one Motorik song in five is shown as **Motorik Europe**: a synchronised group of tracks adopts Kraftwerk rules together while the rest of the song draws from normal rotation. Twelve new rules across drums, bass, rhythm, both leads and texture — rigid single-pitch percussion with a step sequencer's accent pattern, tiny sequencer cells locked to the barline, octave-unison doubling, and leads that make short statements and then stop. The synced tracks drop out together twice a song while Pads and Texture play through, and draw from a restricted set of the existing electronic instruments. Europe songs run 120-132 BPM and take a German-flavoured title. The generation log names the synced tracks on a `Sync` line.
 - **Melodic Motorik leads** — The two Kraftwerk lead rules build their line from short figures measured in Autobahn, The Robots and Computer Love, whose intervals cancel out so the line returns to where it started. They are anchored to the chord and varied the way the originals are, and no leap within a phrase exceeds an octave.
