@@ -543,7 +543,52 @@ struct LeadGenerator {
             }
         }
 
+        // Cap the two rules that combine length with density.
+        //
+        // Most long-running Lead 1 rules are sparse, and there the length IS the gesture: Noir's
+        // Chromatic Descent runs 19 bars at 1.6 notes a bar, which is a slow descent, not a
+        // fault. Arcade is relentless by design. These two are different — Melodic Spiral is
+        // the densest rule in Motorik at 6.8 notes a bar and Octave Bounce is close behind at
+        // 6.2, and both hold that for twenty bars and occasionally forty. A stream of
+        // sixteenths with no air in it stops reading as a line.
+        //
+        // Rests are cut into the stretch rather than the rule being rewritten, so each keeps
+        // its own character and only the tail cases change.
+        let dense: Set<String> = ["MOT-LD1-011", "MOT-LD1-018"]
+        if dense.contains(aRule) || dense.contains(bRule) {
+            events = capUnbrokenStretch(events, maxBars: 20, totalBars: frame.totalBars, rng: &rng)
+        }
         return (events, soloRange)
+    }
+
+    /// Silences a two-to-three bar window inside any stretch of sounding bars longer than
+    /// `maxBars`, repeating until nothing exceeds the cap.
+    private static func capUnbrokenStretch(_ events: [MIDIEvent], maxBars: Int,
+                                           totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        var out = events
+        var guardCount = 0
+        while guardCount < 16 {
+            guardCount += 1
+            let sounding = Set(out.map { $0.stepIndex / 16 })
+            // Find the first stretch that runs past the cap.
+            var runStart = -1, found = -1
+            for bar in 0...totalBars {
+                if bar < totalBars, sounding.contains(bar) {
+                    if runStart < 0 { runStart = bar }
+                    if bar - runStart + 1 > maxBars { found = runStart; break }
+                } else {
+                    runStart = -1
+                }
+            }
+            guard found >= 0 else { break }
+            // Cut near the middle of the cap so the rest lands inside the phrase, not at its edge.
+            let restLen   = 2 + rng.nextInt(upperBound: 2)          // 2 or 3 bars
+            let restStart = found + maxBars - restLen - rng.nextInt(upperBound: 3)
+            guard restStart > found else { break }
+            let lo = restStart * 16, hi = (restStart + restLen) * 16
+            out.removeAll { $0.stepIndex >= lo && $0.stepIndex < hi }
+        }
+        return out
     }
 
     // MARK: - Lead 2
@@ -904,10 +949,12 @@ struct LeadGenerator {
             return lead1MotifFirst(barStart: barStart, entry: entry, frame: frame,
                 intensity: intensity, isIntroOutro: true, prevNote: prevNote, rng: &rng)
         }
-        // C: Mutate phrase every 16 bars
+        // C: Mutate the phrase every 8 or 12 bars — two or three passes of the 4-bar cycle.
+        // At 16 the phrase replayed four times verbatim before anything moved, which is long
+        // enough to stop sounding like a figure and start sounding like a loop.
         if bar >= nextPhraseBar {
             currentPhrase = mutatePhraseOnce(currentPhrase, mode: frame.mode, rng: &rng)
-            nextPhraseBar += 16
+            nextPhraseBar += rng.nextDouble() < 0.5 ? 8 : 12
         }
         // Which 16-step window within the 4-bar phrase cycle?
         let cycleBar      = (bar - entryBar) % 4
@@ -937,6 +984,27 @@ struct LeadGenerator {
             barEvents.append(MIDIEvent(stepIndex: barStart + localStep, note: UInt8(rawMIDI),
                                        velocity: vel, durationSteps: evt.dur))
         }
+        // Vary the replay from the second pass onward.
+        //
+        // Mutating the stored phrase every 8-12 bars still leaves the whole of the second pass
+        // identical to the first, which is what "the same form four times" sounds like. This
+        // moves one note per bar instead, so each return of the figure differs while the figure
+        // stays recognisable. Dropping a note is preferred over displacing one: it varies the
+        // line AND opens space, and space is what this part is short of.
+        if !barEvents.isEmpty, bar >= entryBar + 4, rng.nextDouble() < 0.45 {
+            let i = rng.nextInt(upperBound: barEvents.count)
+            if rng.nextDouble() < 0.6 {
+                barEvents.remove(at: i)                       // leave a hole this time round
+            } else {
+                // Octave displacement keeps the pitch class, so the harmony is untouched.
+                let e = barEvents[i]
+                let up = Int(e.note) + 12, down = Int(e.note) - 12
+                let moved = up <= bounds.high ? up : (down >= bounds.low ? down : Int(e.note))
+                barEvents[i] = MIDIEvent(stepIndex: e.stepIndex, note: UInt8(moved),
+                                         velocity: e.velocity, durationSteps: e.durationSteps)
+            }
+        }
+
         // Legato fill: extend each note toward the next attack so phrases breathe
         // rather than chopping at the raw dur:2 (8th note) stored in the JSON data.
         barEvents.sort { $0.stepIndex < $1.stepIndex }
@@ -2962,14 +3030,22 @@ struct LeadGenerator {
         let bodyEnd   = max(bodyStart, totalBars - 8)
         let bodyLen   = bodyEnd - bodyStart
         guard bodyLen >= 8 else { return restBars }
-        let numWindows = 1 + rng.nextInt(upperBound: 2)  // 1 or 2 rest windows
-        for _ in 0..<numWindows {
-            let restLen   = 4 + rng.nextInt(upperBound: arcade ? 2 : 5)  // Arcade: 4–5 bars, Base: 4–8 bars
-            let maxStart  = max(bodyStart, bodyEnd - restLen)
+        // One window per ~22 bars of body, rather than one or two for a whole song. A fixed
+        // count meant a long song breathed no more often than a short one: a 112-bar song got
+        // a single gap and the lead ran 19 bars without stopping.
+        let numWindows = Swift.max(1, Swift.min(6, bodyLen / 22)) + rng.nextInt(upperBound: 2)
+        // Laid out one per slot so they spread across the song instead of clustering, the same
+        // reason MOT-LD1-022's statements are slotted.
+        let slot = Swift.max(1, bodyLen / numWindows)
+        for w in 0..<numWindows {
+            let restLen  = 4 + rng.nextInt(upperBound: arcade ? 2 : 5)  // Arcade: 4–5 bars, Base: 4–8 bars
+            let slotStart = bodyStart + w * slot
             // Guarantee at least 8 active bars before the first rest window.
-            let restFloor = min(bodyStart + 8, maxStart)
-            let restStart = restFloor + rng.nextInt(upperBound: max(1, maxStart - restFloor))
-            for rb in restStart..<min(restStart + restLen, bodyEnd) {
+            let floorBar = w == 0 ? Swift.min(bodyStart + 8, bodyEnd - restLen) : slotStart
+            let ceilBar  = Swift.min(slotStart + slot - restLen, bodyEnd - restLen)
+            guard ceilBar > floorBar else { continue }
+            let restStart = floorBar + rng.nextInt(upperBound: ceilBar - floorBar)
+            for rb in restStart..<Swift.min(restStart + restLen, bodyEnd) {
                 restBars.insert(rb)
             }
         }
@@ -3308,6 +3384,31 @@ struct LeadGenerator {
     /// Two measured shapes: short compact statements with proportionate silence, and long runs
     /// followed by very long silences. Both are announcements rather than melodies — the rest
     /// ratio lands 88-95% either way, and the silence is as much the material as the notes.
+    /// Closed melodic cells measured from the Kraftwerk corpus by `tools/kraftwerk_lead_phrases.py`.
+    ///
+    /// Each is a list of semitone intervals, and each SUMS TO ZERO — the figure returns to the
+    /// pitch it started on. That single property is what separates these lines from a random
+    /// walk. The corpus leads are not stepwise (4-33% of motion is a step, and the median
+    /// interval is a perfect fourth), so wide intervals are correct here; what makes them sound
+    /// melodic rather than shrill is that every leap is answered.
+    ///
+    /// The first interval is the cell's own starting offset and is always 0; the rest are the
+    /// moves. Counts are how often the figure recurs in its source track.
+    private static let kraftwerkCells: [[Int]] = [
+        [0,  5,  3, -8],    // The Robots "steampad" x204 — 4th up, m3 up, m6 back down
+        [0,  9, -4, -5],    // Autobahn ch2 x20 — 6th up, then walked back down
+        [0, -9,  5,  4],    // Autobahn ch2 x19 — the same figure inverted
+        [0,  5, -2,  4, -7], // Computer Love ch0 x8
+        [0,  9, -2, -2, -5], // Autobahn ch5
+        [0,  6, -1, -5],    // Autobahn ch11
+        [0, 12,  0, -12],   // Autobahn ch10 x77 — octave oscillation
+        [0,  0, -5,  5],    // Autobahn ch6 x27 — repeated note, then a fourth away and back
+        [0, -2,  0,  2],    // The Robots "steeldrm" x40 — neighbour-tone oscillation
+        [0,  7, -2, -5],    // 5th up, step down, 4th home
+        [0, -1, -3,  8, -4], // Autobahn ch8 — a descent, then a 6th back up
+        [0,  4, -7,  3],    // Computer Love ch0 x12 — 3rd up, 5th down, back
+    ]
+
     private static func kraftwerkLead1(
         ruleID: String,
         frame: GlobalMusicalFrame,
@@ -3317,66 +3418,370 @@ struct LeadGenerator {
         var events: [MIDIEvent] = []
         let totalSteps = frame.totalBars * 16
 
-        /// Pitch classes available at `step`, restricted to the measured vocabulary size.
-        func palette(at step: Int, count: Int) -> [Int] {
-            let bar = step / 16
-            guard let entry = tonalMap.entry(atBar: bar) else { return [0] }
-            let pool = entry.chordWindow.chordTones.sorted() + entry.chordWindow.scaleTensions.sorted()
-            return pool.isEmpty ? [0] : Array(pool.prefix(count))
+        /// Pitch classes usable at `step` — chord tones first, then scale tensions. Used to
+        /// snap a realised cell into the harmony without changing its shape more than it must.
+        func harmony(at step: Int) -> (chord: Set<Int>, usable: Set<Int>) {
+            guard let entry = tonalMap.entry(atBar: step / 16) else { return ([], []) }
+            let chord = entry.chordWindow.chordTones
+            return (chord, chord.union(entry.chordWindow.scaleTensions))
         }
-        func inRegister(_ pc: Int, low: Int, high: Int) -> Int {
-            var m = low + (((pc - low) % 12) + 12) % 12
-            if m > high { m -= 12 }
-            return max(low, min(high, m))
+
+        /// Realises a cell as actual MIDI pitches, starting from `startPitch`.
+        ///
+        /// A cell is a list of semitone intervals whose running sum returns to zero, so the
+        /// figure ends where it began and the line cycles in place. Every pitch is snapped to
+        /// the nearest usable pitch class, which bends the shape slightly but never lets it
+        /// drift: the anchor is re-derived from the ORIGINAL offset each time rather than from
+        /// the previous snapped note, so snapping errors cannot accumulate.
+        func realise(_ cell: [Int], from startPitch: Int, at step: Int,
+                     low: Int, high: Int) -> [Int] {
+            let usable = harmony(at: step).usable
+            var offset = 0
+            var out: [Int] = []
+            // The final interval is the cell's return home, and the NEXT statement's first note
+            // already supplies that pitch — emitting it too puts a repeated note at every seam.
+            // `[0 +5 +3 -8]` is the three notes 0, +5, +8, cycling; not four ending where it
+            // started. Bars of `82 81 77 82 | 82 81 77 82` were this, not the figure itself.
+            for (i, interval) in cell.dropLast().enumerated() {
+                if i > 0 { offset += interval }
+                let raw = startPitch + offset
+                var pitch = raw
+                if !usable.isEmpty {
+                    let pc = nearestScalePitchClass(((raw % 12) + 12) % 12, in: usable)
+                    // Move to that pitch class by the shortest route, so the interval the cell
+                    // asked for is close to the interval the ear hears.
+                    let delta = ((pc - (((raw % 12) + 12) % 12)) + 18) % 12 - 6
+                    // Snap only when the nearest usable note is close. Two notes snapping in
+                    // opposite directions each shift their shared interval, so an unbounded
+                    // snap can turn a cell's octave into a minor tenth — the shape matters
+                    // more here than absolute diatonicism, and the harmony pool is wide enough
+                    // that a distant nearest note means the raw pitch is the better answer.
+                    if abs(delta) <= 2 { pitch = raw + delta }
+                }
+                // Fold by octaves rather than clamping. Clamping collapses every out-of-band
+                // note onto the same edge pitch, which flattens the figure and breaks its
+                // closure exactly where it is most exposed — the same failure as clamping a
+                // pitch into a register band. An octave shift keeps the pitch class, so the
+                // cell still reads as itself.
+                while pitch > high { pitch -= 12 }
+                while pitch < low  { pitch += 12 }
+                out.append(Swift.max(low, Swift.min(high, pitch)))
+            }
+            return out
+        }
+
+        /// Varies a cell the way the corpus does, keeping it closed.
+        ///
+        /// The Robots states `[+5 +3 -8]` and then `[+2 -7 +5]`: intervals nudged, and the sum
+        /// still zero. A change that does not compensate turns the figure into a random walk —
+        /// which is exactly what the previous per-note walk produced, with a `+17` leap making
+        /// up a tenth of the part and cells summing to +12, +14 and -15.
+        func varyCell(_ cell: [Int], rng: inout SeededRNG) -> [Int] {
+            guard cell.count >= 2 else { return cell }
+            let roll = rng.nextDouble()
+            if roll < 0.20 { return cell }                       // say it again, unchanged
+            // Four entries minimum: index 0 is the starting offset and the last is the return
+            // home, and the realiser emits neither, so both are off limits — a change there
+            // moves nothing while its compensating partner still moves. That leaves at least
+            // two interior intervals to trade between.
+            guard cell.count >= 4 else { return cell }
+            var c = cell
+            // Nudge one interval and take the same amount back out of another, so the running
+            // sum is unchanged and the figure still returns to its start.
+            //
+            // Only the interior intervals, for the reason above.
+            let interior = c.count - 2                            // indices 1 ..< count-1
+            let a = 1 + rng.nextInt(upperBound: interior)
+            var b = 1 + rng.nextInt(upperBound: interior)
+            if b == a { b = a == c.count - 2 ? 1 : a + 1 }
+            let nudge = (rng.nextDouble() < 0.5 ? 1 : -1) * (rng.nextDouble() < 0.7 ? 1 : 2)
+            c[a] += nudge
+            c[b] -= nudge
+            // A cell that has drifted past an octave in one move is no longer the same figure.
+            guard c.allSatisfy({ abs($0) <= 12 }) else { return cell }
+            return c
+        }
+
+        /// A start pitch for a statement: a chord tone, placed so the whole cell fits in the
+        /// band, and biased low so the top of the band is somewhere the figure reaches rather
+        /// than somewhere it sits.
+        func anchor(for cell: [Int], at step: Int, low: Int, high: Int,
+                    near: Int? = nil, rng: inout SeededRNG) -> Int {
+            var offsets = [0]
+            for interval in cell.dropFirst().dropLast() { offsets.append(offsets.last! + interval) }
+            let lo = offsets.min() ?? 0, hi = offsets.max() ?? 0
+            // Two semitones of headroom at each end: snapping to the nearest usable pitch
+            // class can move a note either way, and a note that leaves the band has to be
+            // folded, which costs the figure an octave jump it did not ask for.
+            let margin = (high - low) > (hi - lo) + 4 ? 2 : 0
+            let floorP = low + margin - lo, ceilP = high - margin - hi
+            guard ceilP >= floorP else { return low - lo }
+            let chord = harmony(at: step).chord
+            var candidates = (floorP...ceilP).filter { chord.isEmpty || chord.contains(((($0 % 12) + 12) % 12)) }
+            // Moving the figure mid-run is a transposition, so it has to travel a musical
+            // distance. Left unbounded it picks any chord tone in the band, which across a
+            // 19-semitone register reads as the line teleporting rather than moving — one run
+            // dropped a fifteenth between two notes four steps apart.
+            if let near {
+                let close = candidates.filter { abs($0 - near) <= 7 }
+                if !close.isEmpty { candidates = close }
+            }
+            guard !candidates.isEmpty else {
+                let r = rng.nextDouble()
+                return floorP + Int(Double(ceilP - floorP) * r * r)
+            }
+            let r = rng.nextDouble()
+            return candidates[Swift.min(candidates.count - 1, Int(Double(candidates.count) * r * r))]
+        }
+
+        /// Shapes the end of every phrase: a note followed by real silence holds, and sometimes
+        /// resolves onto the tonic.
+        ///
+        /// Both ideas are taken from the Chill lead, which ends a phrase by lengthening a short
+        /// final note and by resolving it AGAINST the direction the phrase was travelling. A
+        /// sequencer line does not need Chill's contrary-motion resolution, but it does need the
+        /// other two: a statement that stops on a two-step blip before four bars of nothing
+        /// sounds cut off rather than finished, and a figure that never lands on the tonic never
+        /// sounds like it arrived anywhere.
+        ///
+        /// Applied as a pass over the finished events so both rules get it, and so it sees the
+        /// actual gaps rather than the ones each rule intended.
+        func shapePhraseEndings(_ input: [MIDIEvent], rng: inout SeededRNG,
+                                low: Int, high: Int) -> [MIDIEvent] {
+            var out = input.sorted { $0.stepIndex < $1.stepIndex }
+            let tonicPC = ((frame.keySemitoneValue % 12) + 12) % 12
+
+            // A pitch may be struck twice — several cells repeat their first note, which is
+            // how Autobahn's `[+0 +0 -5]` figure goes — but a third strike in a row is a stuck
+            // sequencer rather than a figure. Drop it and leave the space instead; the gap it
+            // opens then feeds the phrase-ending pass below, so the pair before it holds.
+            var deduped: [MIDIEvent] = []
+            var sameRun = 0
+            for e in out {
+                if let previous = deduped.last, previous.note == e.note,
+                   e.stepIndex - previous.stepIndex <= 8 {
+                    sameRun += 1
+                    if sameRun >= 2 { continue }
+                } else {
+                    sameRun = 0
+                }
+                deduped.append(e)
+            }
+            out = deduped
+            // Clamp every note to end before the next begins. Long Run's legato branch can
+            // draw a duration longer than the gap it sits in, which overlaps the next note —
+            // on a lead meant to read as a single voice that muddies the line. The Chill lead
+            // assigns its durations last for exactly this reason.
+            for i in out.indices where i + 1 < out.count {
+                // At least one step, so two notes landing on adjacent steps still yield a
+                // playable note rather than being skipped and left overlapping.
+                let room = Swift.max(1, out[i + 1].stepIndex - out[i].stepIndex - 1)
+                if Int(out[i].durationSteps) > room {
+                    out[i] = MIDIEvent(stepIndex: out[i].stepIndex, note: out[i].note,
+                                       velocity: out[i].velocity, durationSteps: room)
+                }
+            }
+            for i in out.indices {
+                // The gap to whatever comes next — or to the end of the song for the last note.
+                let nextStart = i + 1 < out.count ? out[i + 1].stepIndex : totalSteps
+                let gap = nextStart - out[i].stepIndex
+                guard gap >= 8 else { continue }          // less than half a bar is not an ending
+
+                var note = Int(out[i].note)
+                // Land on the tonic, but only where the harmony wants it and only if it is a
+                // short move — a phrase ending should settle, not leap to get there.
+                if rng.nextDouble() < 0.45, harmony(at: out[i].stepIndex).usable.contains(tonicPC) {
+                    var candidate = note - ((((note - tonicPC) % 12) + 12) % 12)
+                    if note - candidate > 6 { candidate += 12 }
+                    // The move must not widen the interval arriving at this note. Resolving is
+                    // a settling gesture; reaching the tonic by a bigger leap than the phrase
+                    // was already making defeats it, and turns an ending into a lurch.
+                    let approach = i > 0 && out[i].stepIndex - out[i - 1].stepIndex <= 8
+                        ? Int(out[i - 1].note) : nil
+                    let widens = approach.map { abs(candidate - $0) > Swift.max(12, abs(note - $0)) } ?? false
+                    // Never resolve onto the pitch just played: the repetition guard has
+                    // already run by this point, so a resolution that matches its neighbour
+                    // reintroduces exactly the stuck note it removed.
+                    let repeats = approach.map { $0 == candidate } ?? false
+                    if candidate >= low, candidate <= high, abs(candidate - note) <= 5,
+                       !widens, !repeats {
+                        note = candidate
+                    }
+                }
+                // Hold it — but a half note, not a whole one, and always followed by real rest.
+                //
+                // Filling the gap to within two steps made the ending a long tone rather than a
+                // held note with air after it: durations ran to 20 steps and the median rest
+                // that followed was 2. A half note either side is long enough to read as an
+                // arrival, and reserving a quarter note of silence is what makes it land.
+                let want = 6 + rng.nextInt(upperBound: 5)        // 6...10 steps, around a half note
+                let dur  = Swift.max(2, Swift.min(want, gap - 4))
+                out[i] = MIDIEvent(stepIndex: out[i].stepIndex, note: UInt8(note),
+                                   velocity: out[i].velocity,
+                                   durationSteps: dur)
+            }
+
+            // Final guarantee: nothing inside a phrase leaps more than an octave.
+            //
+            // The cells cap there by construction, but the passes that run afterwards can widen
+            // an interval without meaning to — dropping a repeated note leaves its neighbours
+            // adjacent, and snapping moves two notes apart. Folding by an octave fixes it
+            // without changing the pitch class, so the harmony is untouched.
+            for i in 1..<Swift.max(1, out.count) where out[i].stepIndex - out[i - 1].stepIndex < 8 {
+                let previous = Int(out[i - 1].note)
+                var note = Int(out[i].note)
+                while note - previous > 12, note - 12 >= low { note -= 12 }
+                while previous - note > 12, note + 12 <= high { note += 12 }
+                if note != Int(out[i].note) {
+                    out[i] = MIDIEvent(stepIndex: out[i].stepIndex, note: UInt8(note),
+                                       velocity: out[i].velocity,
+                                       durationSteps: out[i].durationSteps)
+                }
+            }
+            return out
         }
 
         if ruleID == "MOT-LD1-021" {
             // Short Statement — 4-6 notes over 6-34 steps, then 1.0-4.0x that span in silence.
             let (low, high) = (65, 86)
+            var cell: [Int] = []                                // drawn once, then varied
             var step = 16 * 4                                   // let the song start first
             while step < totalSteps {
-                let noteCount = 4 + rng.nextInt(upperBound: 3)  // 4...6
                 let span      = 6 + rng.nextInt(upperBound: 29) // 6...34 steps
-                let pcs       = palette(at: step, count: 5 + rng.nextInt(upperBound: 2))
+                if cell.isEmpty { cell = Self.kraftwerkCells[rng.nextInt(upperBound: Self.kraftwerkCells.count)] }
+                else             { cell = varyCell(cell, rng: &rng) }
+                // Successive statements are separated by silence, but a short gap between two
+                // of them still reads as one line, so the next statement starts within a fifth
+                // of where the last one ended rather than anywhere in the band.
+                let start  = anchor(for: cell, at: step, low: low, high: high,
+                                    near: events.last.map { Int($0.note) }, rng: &rng)
+                let placed = realise(cell, from: start, at: step, low: low, high: high)
+                let noteCount = placed.count
                 for i in 0..<noteCount {
                     let at = step + (span * i) / max(1, noteCount)
                     guard at < totalSteps else { break }
-                    let pc = pcs[rng.nextInt(upperBound: pcs.count)]
-                    events.append(MIDIEvent(stepIndex: at, note: UInt8(inRegister(pc, low: low, high: high)),
-                                            velocity: 80, durationSteps: 2))
+                    // A statement is short, so its notes can hold: each lasts most of the way to
+                    // the next rather than being a uniform two-step blip.
+                    let nextAt = step + (span * (i + 1)) / max(1, noteCount)
+                    let dur    = max(2, min(12, nextAt - at - 1))
+                    events.append(MIDIEvent(stepIndex: at, note: UInt8(placed[i]),
+                                            velocity: 80, durationSteps: dur))
                 }
                 let silence = Int(Double(span) * (1.0 + rng.nextDouble() * 3.0))   // 1.0...4.0x
                 step += span + max(1, silence)
             }
-            return events
+            return shapePhraseEndings(events, rng: &rng, low: low, high: high)
         }
 
-        // MOT-LD1-022 Long Run — a continuous run at ~1.0 notes/beat, then 4-6x
-        // that span in silence. Typically two or three statements in a song, which is what makes
-        // the lead feel like an announcement rather than a part.
-        let (low, high) = (77, 106)
-        var step = 16 * 8
-        while step < totalSteps {
+        // MOT-LD1-022 Long Run — a continuous run at ~1.0 notes/beat, then 4-6x that span in
+        // silence. Typically two or three statements in a song, which is what makes the lead
+        // feel like an announcement rather than a part.
+        //
+        // The plan's 77-106 came from the corpus, but 106 is Bb7 — well over an octave above
+        // Motorik's own Lead 1 band of 52-79, and it put 29% of this rule's notes above C7,
+        // which reads as shrill. 72-91 stays above MOT-LD1-021's centre without reaching
+        // whistle register, and the figure is placed low within it.
+        let (low, high) = (72, 91)
+        var cell: [Int] = []                                // drawn once, then varied
+
+        // Statements are LAID OUT ACROSS THE SONG rather than chained end to end.
+        //
+        // The corpus gives "4-6x the span in silence", and taken literally with runs of up to
+        // 130 notes that is 120-180 bars of rest — so one statement and its silence consumed the
+        // whole song. Measured over 43 songs the rule managed 1.7 appearances, its last note
+        // fell 46% of the way through, and 33 of them had no lead at all after the two-thirds
+        // mark. The plan asks for two or three statements; this guarantees them, and guarantees
+        // the last one lands late.
+        let statements = 3 + rng.nextInt(upperBound: 2)         // 3...4
+        let bodyStart  = 16 * 8
+        let bodyEnd    = max(bodyStart + 1, totalSteps - 16 * 4)
+        let slot       = max(1, (bodyEnd - bodyStart) / statements)
+
+        for s in 0..<statements {
+            let slotStart = bodyStart + s * slot
+            // Jitter the entry so the statements do not arrive on a grid.
+            var step = slotStart + rng.nextInt(upperBound: max(1, slot / 4))
+            // The run fills roughly half its slot, but is capped at 14 bars however long the
+            // slot is. Uncapped, a long song gave 15-25 bar runs — too much unbroken presence
+            // for a rule whose character is a statement followed by silence.
+            // 13 bars of span, not 14: a window that starts mid-bar touches one more bar index
+            // than its length, so 14 would spill to 15.
+            let maxRun    = 13 * 16
+            let minRun    = 7 * 16
+            let runSteps  = max(minRun, min(maxRun, slot / 2 + rng.nextInt(upperBound: max(1, slot / 4))))
             let noteCount = 40 + rng.nextInt(upperBound: 91)    // 40...130
-            let span      = noteCount * 4                       // ~1.0 notes/beat
-            let pcs       = palette(at: step, count: 5)
-            for i in 0..<noteCount {
-                let at = step + i * 4
-                guard at < totalSteps else { break }
-                let pc = pcs[rng.nextInt(upperBound: pcs.count)]
-                // Spread across the octaves the band allows. inRegister alone returns the
-                // lowest match, which would pin the run to 77-88 and lose the height that
-                // makes this rule read as an announcement.
-                var note = inRegister(pc, low: low, high: high)
-                let lift = rng.nextInt(upperBound: 3) * 12
-                if note + lift <= high { note += lift }
-                events.append(MIDIEvent(stepIndex: at, note: UInt8(min(127, note)),
-                                        velocity: 80, durationSteps: 2))
+            // The cell is drawn once for the song and restated through every run, so the same
+            // figure recurs across minutes rather than each run being unrelated to the last.
+            // The first run establishes the figure; later runs take a fresh one 40% of the
+            // time, so a song states two or three related ideas rather than one for its whole
+            // length. Within a run the figure still holds, which is what keeps it recognisable.
+            if cell.isEmpty || rng.nextDouble() < 0.40 {
+                cell = Self.kraftwerkCells[rng.nextInt(upperBound: Self.kraftwerkCells.count)]
             }
-            let silence = span * (4 + rng.nextInt(upperBound: 3))   // 4...6x
-            step += span + silence
+            var statement = realise(cell, from: anchor(for: cell, at: step, low: low, high: high, rng: &rng),
+                                    at: step, low: low, high: high)
+            var posInFigure = 0
+
+            // A rhythmic cell of 3 or 4 gaps, drawn once per run and repeated. An unvarying
+            // 4-step grid for a hundred notes is the single most fatiguing thing this rule did:
+            // same length, same spacing, no phrase anywhere in it.
+            let cellLen = 3 + rng.nextInt(upperBound: 2)
+            var gapCell = (0..<cellLen).map { _ -> Int in
+                let r = rng.nextDouble()
+                return r < 0.45 ? 4 : r < 0.75 ? 2 : r < 0.92 ? 6 : 8
+            }
+            // A cell that draws the same gap throughout is the even grid again by another
+            // route, so force at least one contrasting value into it.
+            if Set(gapCell).count == 1 {
+                gapCell[rng.nextInt(upperBound: gapCell.count)] = gapCell[0] == 4 ? 2 : 4
+            }
+            // Long notes in some runs, short in others — one more axis that never varied.
+            let legato = rng.nextDouble() < 0.4
+
+            var at = step
+            var placed = 0
+            let runEnd = min(totalSteps, step + runSteps)
+            while placed < noteCount && at < runEnd {
+                let gap = gapCell[placed % cellLen]
+                // Duration follows the gap but is not locked to it: a note may hold into the
+                // next or clip short, which is what stops a repeating cell sounding mechanical.
+                let dur = legato ? max(2, gap - 1 + (rng.nextDouble() < 0.3 ? 2 : 0))
+                                 : max(1, min(3, gap - (rng.nextDouble() < 0.4 ? 2 : 1)))
+                events.append(MIDIEvent(stepIndex: at, note: UInt8(statement[posInFigure]),
+                                        velocity: 80, durationSteps: dur))
+                posInFigure += 1
+                if posInFigure >= statement.count {
+                    // The cell has been stated; say it again. Most restatements keep the same
+                    // anchor so the figure sits still — re-anchoring every time is the drift
+                    // this rewrite exists to remove — and a transposition, when it happens, is
+                    // onto a chord tone via anchor().
+                    cell = varyCell(cell, rng: &rng)
+                    let reanchor = rng.nextDouble() < 0.45
+                    let previous = statement[0]
+                    statement = realise(cell,
+                                        from: reanchor ? anchor(for: cell, at: at, low: low, high: high,
+                                                                near: previous, rng: &rng)
+                                                       : previous,
+                                        at: at, low: low, high: high)
+                    posInFigure = 0
+                }
+                at += gap
+                placed += 1
+                // A breath every 6-10 notes: without one the run is a hundred notes with no seam.
+                // One breath in four opens into a full bar or two of silence, so the statement
+                // has space inside it rather than only around it.
+                if placed % (6 + (placed / 7) % 5) == 0 {
+                    // One breath in three opens into two to four bars. At one in four and a
+                    // two-bar ceiling, a thirteen-bar run had no real gap in it and forty bars
+                    // of a long song could pass without the lead ever leaving.
+                    at += rng.nextDouble() < 0.33
+                        ? 32 + rng.nextInt(upperBound: 33)      // 2-4 bars
+                        : 4 + rng.nextInt(upperBound: 9)        // a short breath
+                }
+            }
+            _ = step
         }
-        return events
+        return shapePhraseEndings(events, rng: &rng, low: low, high: high)
     }
 
 }

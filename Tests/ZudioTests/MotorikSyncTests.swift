@@ -67,18 +67,32 @@ import Foundation
 
     // MARK: - Membership
 
-    /// Texture joins every sync; Lead 2 is never listed, since the generator decides it.
-    @Test func textureIsInEverySync() throws {
+    /// Bass is the one track in every group; Lead 2 is never listed, since the generator
+    /// decides it. Pads is never synced — it is what keeps playing through a dropout, which is
+    /// what makes the drop read as a section change rather than the song stopping.
+    @Test func membershipInvariants() throws {
         for c in MotorikSync.allCases where c != .none {
-            #expect(c.includes(kTrackTexture), "\(c) must include Texture")
+            #expect(c.includes(kTrackBass), "\(c) must include Bass")
             #expect(!c.includes(kTrackLead2), "\(c) must not list Lead 2 — the generator decides it")
+            #expect(!c.includes(kTrackPads), "\(c) must not include Pads")
+            #expect(c.tracks.count == Set(c.tracks).count, "\(c) lists a track twice")
+        }
+        // Every rule written for the sync must be reachable from at least one group.
+        for track in [kTrackBass, kTrackDrums, kTrackRhythm, kTrackLead1, kTrackTexture] {
+            #expect(MotorikSync.allCases.contains { $0.includes(track) },
+                    "no sync group includes track \(track) — its Kraftwerk rules can never fire")
         }
     }
 
     @Test func syncMembershipMatchesPlan() throws {
-        #expect(MotorikSync.rhythmSection.tracks.sorted() == [kTrackTexture, kTrackBass, kTrackDrums].sorted())
-        #expect(MotorikSync.sequenceLock.tracks.sorted()  == [kTrackTexture, kTrackBass, kTrackRhythm].sorted())
-        #expect(MotorikSync.machineVoice.tracks.sorted()  == [kTrackTexture, kTrackRhythm, kTrackLead1].sorted())
+        #expect(MotorikSync.rhythmSection.tracks.sorted() == [kTrackBass, kTrackDrums, kTrackLead1].sorted())
+        #expect(MotorikSync.sequenceLock.tracks.sorted()  == [kTrackBass, kTrackRhythm, kTrackTexture].sorted())
+        #expect(MotorikSync.machineVoice.tracks.sorted()  == [kTrackBass, kTrackRhythm, kTrackLead1].sorted())
+        // The log line must name exactly what the group contains.
+        for c in MotorikSync.allCases where c != .none {
+            #expect(c.logTrackNames.count == c.tracks.count,
+                    "\(c): log names \(c.logTrackNames) do not match tracks \(c.tracks)")
+        }
     }
 
     @Test func noneIsInert() throws {
@@ -101,24 +115,37 @@ import Foundation
         }
     }
 
-    /// Distribution within base Motorik: none 80 / rhythmSection 8 / sequenceLock 7 /
-    /// machineVoice 5. Tolerances are wide enough to absorb sampling noise but tight enough
+    /// Distribution within base Motorik: none 67.2 / rhythmSection 13.1 / sequenceLock 11.3 /
+    /// machineVoice 8.4. Tolerances are wide enough to absorb sampling noise but tight enough
     /// to catch a threshold typo.
+    ///
+    /// Also checks the split of ALL Motorik, which is what the numbers are actually tuned
+    /// against: regular 41 / Noir 20 / Arcade 19 / Europe 20. The sync share only means anything
+    /// in combination with the substyle roll, and the two are set in different places.
     @Test func syncDistributionMatchesPlan() throws {
         var counts: [MotorikSync: Int] = [:]
-        var base = 0
-        for seed in UInt64(1)...3000 {
+        var base = 0, noir = 0, arcade = 0, total = 0
+        for seed in UInt64(1)...4000 {
             let s = SongGenerator.generate(seed: seed, style: .motorik)
-            guard !s.motorikNoirVariation && !s.motorikArcadeVariation else { continue }
+            total += 1
+            if s.motorikNoirVariation { noir += 1; continue }
+            if s.motorikArcadeVariation { arcade += 1; continue }
             base += 1
             counts[s.motorikSync, default: 0] += 1
         }
         func pct(_ c: MotorikSync) -> Double { 100.0 * Double(counts[c] ?? 0) / Double(base) }
         #expect(base > 500, "need a reasonable base-Motorik sample, got \(base)")
-        #expect(abs(pct(.none)          - 80) < 5, "none \(pct(.none))%")
-        #expect(abs(pct(.rhythmSection) -  8) < 4, "rhythmSection \(pct(.rhythmSection))%")
-        #expect(abs(pct(.sequenceLock)  -  7) < 4, "sequenceLock \(pct(.sequenceLock))%")
-        #expect(abs(pct(.machineVoice)  -  5) < 4, "machineVoice \(pct(.machineVoice))%")
+        #expect(abs(pct(.none)          - 67.2) < 5, "none \(pct(.none))%")
+        #expect(abs(pct(.rhythmSection) - 13.1) < 4, "rhythmSection \(pct(.rhythmSection))%")
+        #expect(abs(pct(.sequenceLock)  - 11.3) < 4, "sequenceLock \(pct(.sequenceLock))%")
+        #expect(abs(pct(.machineVoice)  -  8.4) < 4, "machineVoice \(pct(.machineVoice))%")
+
+        let syncs = base - (counts[.none] ?? 0)
+        func all(_ n: Int) -> Double { 100.0 * Double(n) / Double(total) }
+        #expect(abs(all(counts[.none] ?? 0) - 41) < 3, "regular Motorik \(all(counts[.none] ?? 0))%")
+        #expect(abs(all(noir)   - 20) < 3, "Noir \(all(noir))%")
+        #expect(abs(all(arcade) - 19) < 3, "Arcade \(all(arcade))%")
+        #expect(abs(all(syncs)  - 20) < 3, "Motorik Europe \(all(syncs))%")
     }
 
     /// The roll must come from a stream derived from the seed, never the shared generator
@@ -146,7 +173,7 @@ import Foundation
             let log = s.generationLog.map(\.description).joined(separator: " | ")
             // The sync line carries "KW" in its TAG, so check the entry rather than the
             // joined descriptions.
-            #expect(s.generationLog.contains { $0.tag == "Sync" },
+            #expect(s.generationLog.contains { $0.tag.hasPrefix("Sync ") },
                     "seed \(seed): no Sync line")
             for (track, names) in kraftwerk where s.motorikSync.includes(track) {
                 #expect(names.contains { log.contains($0) },
@@ -297,6 +324,47 @@ import Foundation
         #expect(checked > 5, "expected a reasonable sample, got \(checked)")
     }
 
+    /// Every synced track plays in key.
+    ///
+    /// MOT-RTHM-014/015 build their cells from fixed semitone offsets above the chord root —
+    /// root, fifth, octave, third, fourth — which is how the corpus describes them, and which
+    /// is not diatonic in every mode: a minor third above the root is G natural in E Lydian,
+    /// where the scale has G#. Three of MOT-RTHM-015's six offsets were wrong in that key.
+    /// Nothing downstream catches it either, since HarmonicFilter's clash pass covers only the
+    /// two leads and never checks Rhythm's pitches at all.
+    @Test func syncedTracksStayInScale() throws {
+        var offScale = 0, checked = 0, songs = 0
+        for seed in UInt64(1)...400 {
+            let s = SongGenerator.generate(seed: seed, style: .motorik)
+            guard s.motorikSync.isActive else { continue }
+            songs += 1
+            let scale = s.frame.scalePCs
+            for track in s.motorikSync.tracks where track != kTrackDrums {
+                for e in s.trackEvents[track] {
+                    checked += 1
+                    if !scale.contains(Int(e.note) % 12) { offScale += 1 }
+                }
+            }
+        }
+        #expect(songs > 20, "expected a reasonable sync sample, got \(songs)")
+        // Rhythm must be exactly clean: its rules build pitches from fixed offsets, so any
+        // non-diatonic note there is a snapping failure rather than a harmonic choice.
+        var rhythmOff = 0
+        for seed in UInt64(1)...400 {
+            let s = SongGenerator.generate(seed: seed, style: .motorik)
+            guard s.motorikSync.includes(kTrackRhythm) else { continue }
+            let scale = s.frame.scalePCs
+            rhythmOff += s.trackEvents[kTrackRhythm].filter { !scale.contains(Int($0.note) % 12) }.count
+        }
+        #expect(rhythmOff == 0, "\(rhythmOff) Rhythm notes are out of scale")
+
+        // Across the other synced tracks a few chromatic notes are legitimate — the reused
+        // pre-existing rules use them deliberately — but a synced song must be no more
+        // chromatic than an ordinary Motorik one.
+        let rate = Double(offScale) / Double(max(1, checked))
+        #expect(rate < 0.004, "synced tracks are \(String(format: "%.2f", rate * 100))% out of scale")
+    }
+
     /// No sync track may play more than 12 identical bars in a row.
     ///
     /// The measured Kraftwerk behaviour is a figure repeated with no variation whatsoever, and
@@ -338,5 +406,190 @@ import Foundation
             let b = SongGenerator.generate(seed: seed, style: .motorik)
             #expect(a.motorikSync == b.motorikSync, "seed \(seed): sync roll varied")
         }
+    }
+
+    // MARK: - Motorik Europe naming
+
+    /// A sync song is presented to the user as "Motorik Europe" — in the song list, the
+    /// style chip, Now Playing, the exported genre tag and the .zudio file — and every one
+    /// of those reads `displayStyleName`. Nothing else may claim the name.
+    @Test func syncSongsAreNamedMotorikEurope() throws {
+        var europeCount = 0
+        for seed in UInt64(1)...600 {
+            let s = SongGenerator.generate(seed: seed, style: .motorik)
+            if s.motorikSync.isActive {
+                europeCount += 1
+                #expect(s.displayStyleName == "Motorik Europe",
+                        "seed \(seed): synced song displayed as \(s.displayStyleName)")
+            } else {
+                #expect(s.displayStyleName != "Motorik Europe",
+                        "seed \(seed): unsynced song displayed as Motorik Europe")
+            }
+        }
+        #expect(europeCount > 0, "no Motorik Europe songs in 600 seeds")
+    }
+
+    /// The generation log's Style tag must agree with the chip the user sees, or the log
+    /// says "Motorik" for a song the UI calls "Motorik Europe".
+    @Test func generationLogStyleTagMatchesDisplayName() throws {
+        for seed in UInt64(1)...300 {
+            let s = SongGenerator.generate(seed: seed, style: .motorik)
+            guard let tag = s.generationLog.first(where: { $0.tag == "Style" })?.description
+            else { Issue.record("seed \(seed): no Style entry in the generation log"); continue }
+            #expect(tag.hasPrefix(s.displayStyleName + " "),
+                    "seed \(seed): log says \(tag), UI says \(s.displayStyleName)")
+        }
+    }
+
+    /// A .zudio file's `Style:` line is parsed back through MusicStyle(rawValue:) on load,
+    /// so it must stay the bare style name — "Motorik Europe" there would fail to match and
+    /// silently reload every Europe song as Kosmic. The display name goes on `Substyle:`,
+    /// which the loader ignores.
+    @Test func zudioFileKeepsStyleLineParseable() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("europe-roundtrip-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        var seenEurope = false
+        for seed in UInt64(1)...120 {
+            let song = SongGenerator.generate(seed: seed, style: .motorik)
+            let midi = tmp.appendingPathComponent("s\(seed).midi")
+            try SongLogExporter.export(song, midiURL: midi)
+            let text = try String(contentsOf: midi.deletingPathExtension()
+                .appendingPathExtension("zudio"), encoding: .utf8)
+            let lines = text.components(separatedBy: "\n").map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+
+            guard let styleLine = lines.first(where: { $0.hasPrefix("Style:") }) else {
+                Issue.record("seed \(seed): no Style: line"); continue
+            }
+            let raw = styleLine.dropFirst(6).trimmingCharacters(in: .whitespaces)
+            #expect(MusicStyle(rawValue: raw) == .motorik,
+                    "seed \(seed): Style: \(raw) does not parse back to Motorik")
+
+            let substyle = lines.first { $0.hasPrefix("Substyle:") }?
+                .dropFirst(9).trimmingCharacters(in: .whitespaces)
+            if song.displayStyleName == "Motorik Europe" {
+                seenEurope = true
+                #expect(substyle == "Motorik Europe",
+                        "seed \(seed): Substyle: line was \(substyle ?? "absent")")
+            }
+        }
+        #expect(seenEurope, "no Motorik Europe songs in 120 seeds")
+    }
+
+    // MARK: - Kraftwerk Lead 1 shape
+
+    /// The Kraftwerk lead rules build their line from closed cells measured in the corpus —
+    /// figures whose intervals sum to zero, so the line cycles in place. Before that, a
+    /// per-note random walk over a sparse chord-tone ladder produced a `+17` leap making up a
+    /// tenth of one part, with its repeated figures summing to +12, +14 and -15. The audible
+    /// result was a line that lurched up a tenth and crawled back down, over and over.
+    ///
+    /// Two properties keep that from returning.
+    ///
+    /// Leaps are measured only between notes close together in time. A pitch jump across
+    /// several bars of silence separates two statements and is not something the ear hears as
+    /// a leap; measuring those too reports 17 semitones for a part whose widest real interval
+    /// is an octave.
+    @Test func kraftwerkLeadStaysMelodic() throws {
+        var songs = 0
+        var worstLeap = 0
+        var worstLeapWhere = ""
+        var worstDrift = 0.0
+        var worstDriftWhere = ""
+        for seed in UInt64(1)...500 {
+            let s = SongGenerator.generate(seed: seed, style: .motorik)
+            guard s.motorikSync.includes(kTrackLead1) else { continue }
+            let events = s.trackEvents[kTrackLead1].sorted { $0.stepIndex < $1.stepIndex }
+            guard events.count >= 12 else { continue }
+            songs += 1
+
+            // Less than half a bar apart: notes the ear groups into one phrase. The generator
+            // uses the same boundary — a gap of 8 steps or more is where it ends a phrase,
+            // lengthening the note and sometimes resolving it — so a jump across one of those
+            // is a new phrase entering, not a leap within a line.
+            for (a, b) in zip(events, events.dropFirst()) where b.stepIndex - a.stepIndex < 8 {
+                let leap = abs(Int(b.note) - Int(a.note))
+                if leap > worstLeap {
+                    worstLeap = leap
+                    worstLeapWhere = "seed \(seed): \(a.note) -> \(b.note)"
+                }
+            }
+            // A closed cell does not migrate. Compare the average pitch of the first and last
+            // quarter: a wandering line shows up here even when no single leap is large.
+            let pitches = events.map { Int($0.note) }
+            let q = Swift.max(1, pitches.count / 4)
+            let first = Double(pitches.prefix(q).reduce(0, +)) / Double(q)
+            let last  = Double(pitches.suffix(q).reduce(0, +)) / Double(q)
+            if abs(last - first) > abs(worstDrift) {
+                worstDrift = last - first
+                worstDriftWhere = "seed \(seed)"
+            }
+        }
+        #expect(songs > 20, "not enough Kraftwerk lead songs sampled: \(songs)")
+        // The cells cap at an octave and a final pass in the generator folds anything wider
+        // back, so this is a guarantee rather than an observation.
+        //
+        // For scale: the corpus itself reaches 29 semitones on The Robots' "steampad" and 40 on
+        // "echopan", so an octave is a conservative ceiling, not a stylistic one. What it
+        // catches is the failure mode that produced it — a figure that climbs instead of
+        // closing, which is what a `+17` leap making up a tenth of a part looked like.
+        #expect(worstLeap <= 12,
+                "a Kraftwerk lead leapt \(worstLeap) semitones within a phrase at \(worstLeapWhere) — its cells cap at an octave")
+        // Measured across 800 seeds: median 1.6, worst 5.8.
+        #expect(abs(worstDrift) <= 10,
+                "a Kraftwerk lead drifted \(worstDrift) semitones end to end at \(worstDriftWhere) — the cells are no longer closing")
+    }
+
+    /// A lead that never stops, and one that repeats a single pitch, are the two ways this
+    /// part stops sounding played. Both were measured in a real song before these guards:
+    /// Schnell-Gleis ran 30 consecutive sounding bars, and eleven identical notes in a row.
+    ///
+    /// The repetition guard allows a pitch struck twice — several corpus cells repeat their
+    /// first note — but drops the third strike and leaves the space. Later passes
+    /// (`limitIdenticalBars`, the sync dropout) can remove notes and bring two of the same
+    /// pitch together again, so a short run can still survive; what must not come back is a
+    /// stuck sequencer.
+    @Test func kraftwerkLeadBreathes() throws {
+        var songs = 0
+        var worstRun = 0, worstRunWhere = ""
+        var worstStretch = 0, worstStretchWhere = ""
+        for seed in UInt64(1)...500 {
+            let s = SongGenerator.generate(seed: seed, style: .motorik)
+            guard s.motorikSync.includes(kTrackLead1) else { continue }
+            let events = s.trackEvents[kTrackLead1].sorted { $0.stepIndex < $1.stepIndex }
+            guard events.count >= 12 else { continue }
+            songs += 1
+
+            var run = 1
+            for (a, b) in zip(events, events.dropFirst()) {
+                if a.note == b.note && b.stepIndex - a.stepIndex <= 8 {
+                    run += 1
+                    if run > worstRun { worstRun = run; worstRunWhere = "seed \(seed) on note \(a.note)" }
+                } else {
+                    run = 1
+                }
+            }
+
+            let sounding = Set(events.map { $0.stepIndex / 16 })
+            var stretch = 0
+            for bar in 0..<s.frame.totalBars {
+                if sounding.contains(bar) {
+                    stretch += 1
+                    if stretch > worstStretch { worstStretch = stretch; worstStretchWhere = "seed \(seed)" }
+                } else {
+                    stretch = 0
+                }
+            }
+        }
+        #expect(songs > 20, "not enough Kraftwerk lead songs sampled: \(songs)")
+        #expect(worstRun <= 4,
+                "a Kraftwerk lead struck the same pitch \(worstRun) times running at \(worstRunWhere)")
+        // A run is capped at 13 bars and a run starting mid-bar touches one more bar index.
+        #expect(worstStretch <= 16,
+                "a Kraftwerk lead played \(worstStretch) bars without a rest at \(worstStretchWhere)")
     }
 }

@@ -76,11 +76,18 @@ final class PlaybackEngine: ObservableObject {
     private let reverbBusSmall      = AVAudioUnitReverb()   // MediumHall / MediumRoom
     private let reverbBusMixerLarge = AVAudioMixerNode()
     private let reverbBusMixerSmall = AVAudioMixerNode()
-    private var reverbSendMixers    = [AVAudioMixerNode]()  // one per track; volume = send level
+    private var reverbSendMixers    = [AVAudioMixerNode]()  // one per track; volume = the wet leg's gain
     private var fanMixers           = [AVAudioMixerNode]()  // V3-native fan-out source between lowEQ and dry/send split
-    private var reverbSendLevels       = Array(repeating: Float(0),  count: kTrackCount)
+    // The amount of reverb per track, as the insert wetDryMix it reproduces. Offline export
+    // builds real insert reverbs, so this is what it needs — no conversion at the boundary.
+    private var perTrackReverbWet      = Array(repeating: Float(0),  count: kTrackCount)
     // Per-track reverb presets for offline export — set by each style method to match original intent.
     // Live playback uses shared buses; export uses these presets for per-track reverb nodes.
+    // Read only by offline export, where it currently has no effect: AVAudioUnitReverb
+    // ignores loadFactoryPreset on an unprepared unit, so exported tracks render in the
+    // default room. Kept because it records the intended per-track rooms and because the
+    // amount of reverb, which does carry across, is snapshotted alongside it.
+    // See the note in OfflineExport.swift before attempting to make this take effect.
     private var perTrackReverbPresets  = Array(repeating: AVAudioUnitReverbPreset.mediumHall, count: kTrackCount)
     private var busLargePreset: AVAudioUnitReverbPreset = .cathedral
     private var busSmallPreset: AVAudioUnitReverbPreset = .mediumHall
@@ -158,7 +165,6 @@ final class PlaybackEngine: ObservableObject {
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
-    private let lfoQueue = DispatchQueue(label: "com.zudio.lfo", qos: .userInteractive)
     // Per-track pending instrument loads — used to coalesce rapid setProgram calls on macOS.
     private var programLoadWork: [Int: DispatchWorkItem] = [:]
     private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
@@ -1334,7 +1340,7 @@ final class PlaybackEngine: ObservableObject {
                 volume:             volume,
                 pan:                trackStaticPan[i],
                 reverbPreset:       perTrackReverbPresets[i],
-                reverbWetDryMix:    reverbSendMixers[i].outputVolume * 100,
+                reverbWetDryMix:    perTrackReverbWet[i],
                 reverbBypassed:     reverbSendMixers[i].outputVolume == 0,
                 delayTime:          delays[i].delayTime,
                 delayFeedback:      delays[i].feedback,
@@ -1364,6 +1370,27 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Reverb bus helpers
 
+    /// The send-leg and dry-leg gains that reproduce an insert reverb of `wetDryMix` W.
+    ///
+    /// Before build 124 every track had its own insert reverb, and each style carried a table
+    /// of wetDryMix values (Ambient pads 72, Kosmic leads 60, and so on). The bus rewrite
+    /// replaced those with send levels set to W/100 — on the assumption that a send of 0.72
+    /// and a wetDryMix of 72 are the same amount of reverb. They are not, and that one
+    /// assumption is the origin of every reverb discrepancy in this file's history.
+    ///
+    /// `AVAudioUnitReverb` blends in the power domain (measured, not documented): an insert at
+    /// W outputs `sqrt(1 - W/100)` of dry plus `sqrt(W/100)` of wet. A send leaves the dry path
+    /// at unity and adds wet on top, so reproducing the insert needs BOTH legs — the send at
+    /// `sqrt(W/100)` and the dry leg attenuated to `sqrt(1 - W/100)`.
+    ///
+    /// Setting only the send and leaving dry at unity gets the wet/dry ratio right but makes
+    /// the track up to 4 dB louder, worst on the wettest tracks. Doing both is level-neutral
+    /// to within about 2 dB across every value the styles use, so the mix balance survives.
+    nonisolated static func reverbGains(forWetDryMix wetDryMix: Float) -> (send: Float, dry: Float) {
+        let w = Swift.max(0, Swift.min(100, wetDryMix)) / 100
+        return (w.squareRoot(), (1 - w).squareRoot())
+    }
+
     private enum ReverbBus { case large, small }
 
     /// Loads a factory preset on one or both bus reverbs and keeps the tracking variables in sync.
@@ -1373,15 +1400,32 @@ final class PlaybackEngine: ObservableObject {
         if let p = small { reverbBusSmall.loadFactoryPreset(p); busSmallPreset = p }
     }
 
-    /// Assigns a track's send mixer to a bus, sets its send level, and persists both for restore.
-    /// Called per-style at load time (engine not yet running) — safe to rewire.
-    private func connectSend(_ trackIndex: Int, to bus: ReverbBus, level: Float) {
+    /// Applies an amount of reverb to one track, driving both legs of its fan-out so the
+    /// result is indistinguishable from the insert reverb this track used before build 124.
+    ///
+    /// The send and the dry path are separate destinations of the same fanMixer, so setting a
+    /// volume on one leaves the other alone — which is exactly the split this needs.
+    private func applyReverbAmount(_ trackIndex: Int, wetDryMix: Float) {
+        guard trackIndex < reverbSendMixers.count else { return }
+        let gains = Self.reverbGains(forWetDryMix: wetDryMix)
+        reverbSendMixers[trackIndex].outputVolume = gains.send
+        if trackIndex < fanMixers.count {
+            fanMixers[trackIndex]
+                .destination(forMixer: mixer, bus: AVAudioNodeBus(trackIndex))?
+                .volume = gains.dry
+        }
+    }
+
+    /// Assigns a track's send mixer to a bus and sets its reverb amount, expressed as the
+    /// insert `wetDryMix` the track used before the bus rewrite — the same numbers the
+    /// per-style tables held then, so the styles read the way they always did.
+    private func connectSend(_ trackIndex: Int, to bus: ReverbBus, wetDryMix: Float) {
         guard trackIndex < reverbSendMixers.count else { return }
         let busMixer = bus == .large ? reverbBusMixerLarge : reverbBusMixerSmall
         engine.disconnectNodeOutput(reverbSendMixers[trackIndex])
         engine.connect(reverbSendMixers[trackIndex], to: busMixer, format: nil)
-        reverbSendMixers[trackIndex].outputVolume = level
-        reverbSendLevels[trackIndex] = level
+        perTrackReverbWet[trackIndex] = wetDryMix
+        applyReverbAmount(trackIndex, wetDryMix: wetDryMix)
     }
 
     // MARK: - Ambient mode configuration
@@ -1397,14 +1441,14 @@ final class PlaybackEngine: ObservableObject {
         }
         // Texture on large bus (.largeRoom); all others on small bus (.mediumHall).
         setBusPresets(large: .largeRoom, small: .mediumHall)
-        connectSend(kTrackLead1,     to: .small, level: 0.65)
-        connectSend(kTrackLead2,     to: .small, level: 0.60)
-        connectSend(kTrackPads,      to: .small, level: 0.72)
-        connectSend(kTrackRhythm,    to: .small, level: 0.50)
-        connectSend(kTrackTexture,   to: .large, level: 0.60)
-        connectSend(kTrackBass,      to: .small, level: 0.45)
-        connectSend(kTrackDrums,     to: .small, level: 0.70)
-        connectSend(kTrackLeadSynth, to: .small, level: 0)
+        connectSend(kTrackLead1,     to: .small, wetDryMix: 65)
+        connectSend(kTrackLead2,     to: .small, wetDryMix: 60)
+        connectSend(kTrackPads,      to: .small, wetDryMix: 72)
+        connectSend(kTrackRhythm,    to: .small, wetDryMix: 50)
+        connectSend(kTrackTexture,   to: .large, wetDryMix: 60)
+        connectSend(kTrackBass,      to: .small, wetDryMix: 45)
+        connectSend(kTrackDrums,     to: .small, wetDryMix: 70)
+        connectSend(kTrackLeadSynth, to: .small, wetDryMix: 0)
         // Per-track presets for offline export — original design intent preserved.
         perTrackReverbPresets[kTrackLead1]     = .mediumHall
         perTrackReverbPresets[kTrackLead2]     = .mediumHall
@@ -1424,14 +1468,14 @@ final class PlaybackEngine: ObservableObject {
             delays[i].feedback      = ambientDelayFeedback[i]
             delays[i].lowPassCutoff = ambientDelayLowpass[i]
         }
-        // Ambient Piano: moderate reverb (0.56 send instead of 0.65) and a short, fixed-time
+        // Ambient Piano: moderate reverb (56 instead of 65) and a short, fixed-time
         // doubling instead of full ambient delay. The general loop above ties delayTime to the
         // song tempo (0.75 beats — audible as a distinct dotted-quarter/quarter-note repeat at
         // slow ambient tempos); a solo piano this exposed needs thickening, not an audible echo,
         // so this uses a fixed short time well under 150ms — short enough to read as room
         // reflection/doubling rather than a separate rhythmic repeat.
         if songState?.isAmbientPiano == true {
-            connectSend(kTrackLead1, to: .small, level: 0.56)
+            connectSend(kTrackLead1, to: .small, wetDryMix: 56)
             delays[kTrackLead1].delayTime     = 0.09
             delays[kTrackLead1].feedback      = 0
             delays[kTrackLead1].lowPassCutoff = 2800
@@ -1461,14 +1505,14 @@ final class PlaybackEngine: ObservableObject {
         // All active tracks on the small bus (.mediumHall).
         // Texture sampler is unused in Chill (AudioTexturePlayer handles it) — zero send.
         setBusPresets(small: .mediumHall)
-        connectSend(kTrackLead1,     to: .small, level: 0.45)
-        connectSend(kTrackLead2,     to: .small, level: 0.40)
-        connectSend(kTrackPads,      to: .small, level: 0.55)
-        connectSend(kTrackRhythm,    to: .small, level: 0.40)
-        connectSend(kTrackTexture,   to: .small, level: 0)
-        connectSend(kTrackBass,      to: .small, level: 0.35)
-        connectSend(kTrackDrums,     to: .small, level: 0.40)
-        connectSend(kTrackLeadSynth, to: .small, level: 0)
+        connectSend(kTrackLead1,     to: .small, wetDryMix: 45)
+        connectSend(kTrackLead2,     to: .small, wetDryMix: 40)
+        connectSend(kTrackPads,      to: .small, wetDryMix: 55)
+        connectSend(kTrackRhythm,    to: .small, wetDryMix: 40)
+        connectSend(kTrackTexture,   to: .small, wetDryMix: 0)
+        connectSend(kTrackBass,      to: .small, wetDryMix: 35)
+        connectSend(kTrackDrums,     to: .small, wetDryMix: 40)
+        connectSend(kTrackLeadSynth, to: .small, wetDryMix: 0)
         perTrackReverbPresets[kTrackLead1]     = .mediumHall
         perTrackReverbPresets[kTrackLead2]     = .mediumHall
         perTrackReverbPresets[kTrackPads]      = .mediumHall
@@ -1502,16 +1546,16 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func applyMotorikAudio() {
-        // All tracks on the small bus (.mediumHall); bass slightly lower send level.
+        // All tracks on the small bus (.mediumHall); bass a little drier than the rest.
         setBusPresets(small: .mediumHall)
-        connectSend(kTrackLead1,     to: .small, level: 0.55)
-        connectSend(kTrackLead2,     to: .small, level: 0.50)
-        connectSend(kTrackPads,      to: .small, level: 0.50)
-        connectSend(kTrackRhythm,    to: .small, level: 0.45)
-        connectSend(kTrackTexture,   to: .small, level: 0.50)
-        connectSend(kTrackBass,      to: .small, level: 0.40)
-        connectSend(kTrackDrums,     to: .small, level: 0.45)
-        connectSend(kTrackLeadSynth, to: .small, level: 0.55)
+        connectSend(kTrackLead1,     to: .small, wetDryMix: 55)
+        connectSend(kTrackLead2,     to: .small, wetDryMix: 50)
+        connectSend(kTrackPads,      to: .small, wetDryMix: 50)
+        connectSend(kTrackRhythm,    to: .small, wetDryMix: 45)
+        connectSend(kTrackTexture,   to: .small, wetDryMix: 50)
+        connectSend(kTrackBass,      to: .small, wetDryMix: 40)
+        connectSend(kTrackDrums,     to: .small, wetDryMix: 45)
+        connectSend(kTrackLeadSynth, to: .small, wetDryMix: 55)
         perTrackReverbPresets[kTrackLead1]     = .mediumHall
         perTrackReverbPresets[kTrackLead2]     = .mediumHall
         perTrackReverbPresets[kTrackPads]      = .mediumHall
@@ -1536,14 +1580,14 @@ final class PlaybackEngine: ObservableObject {
         // Large bus (.cathedral): Pads, Leads, Bass, LeadSynth (mirrors Lead1, currently dry).
         // Small bus (.mediumHall): Texture, Rhythm, Drums.
         setBusPresets(large: .cathedral, small: .mediumHall)
-        connectSend(kTrackLead1,     to: .large, level: 0.60)
-        connectSend(kTrackLead2,     to: .large, level: 0.55)
-        connectSend(kTrackPads,      to: .large, level: 0.62)
-        connectSend(kTrackBass,      to: .large, level: 0.45)
-        connectSend(kTrackLeadSynth, to: .large, level: 0)
-        connectSend(kTrackTexture,   to: .small, level: 0.55)
-        connectSend(kTrackRhythm,    to: .small, level: 0.50)
-        connectSend(kTrackDrums,     to: .small, level: 0.45)
+        connectSend(kTrackLead1,     to: .large, wetDryMix: 60)
+        connectSend(kTrackLead2,     to: .large, wetDryMix: 55)
+        connectSend(kTrackPads,      to: .large, wetDryMix: 62)
+        connectSend(kTrackBass,      to: .large, wetDryMix: 45)
+        connectSend(kTrackLeadSynth, to: .large, wetDryMix: 0)
+        connectSend(kTrackTexture,   to: .small, wetDryMix: 55)
+        connectSend(kTrackRhythm,    to: .small, wetDryMix: 50)
+        connectSend(kTrackDrums,     to: .small, wetDryMix: 45)
         // Per-track presets for offline export — original per-track design intent.
         perTrackReverbPresets[kTrackLead1]     = .largeHall
         perTrackReverbPresets[kTrackLead2]     = .largeHall
@@ -1646,8 +1690,9 @@ final class PlaybackEngine: ObservableObject {
             airEnabled[trackIndex] = enabled
             airEQs[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .reverb, .space:
-            // Bus architecture: bypass = zero send level; restore = persisted send level from style setup.
-            reverbSendMixers[trackIndex].outputVolume = enabled ? reverbSendLevels[trackIndex] : 0
+            // Zero reverb restores the dry leg to unity too, so switching it off makes the
+            // track dry rather than quiet.
+            applyReverbAmount(trackIndex, wetDryMix: enabled ? perTrackReverbWet[trackIndex] : 0)
         }
     }
 
@@ -1656,15 +1701,24 @@ final class PlaybackEngine: ObservableObject {
     // Fast tremolos (phaseInc ≥ 0.1, i.e. ≥2 Hz) update every tick (60fps).
     // Slow tremolos (phaseInc < 0.1, e.g. Chill/Ambient pads at 0.15 Hz) update every 3rd tick (~20fps).
     // Sweep and pan always update every 3rd tick (~20fps).
-    // One DispatchQueue.main.async dispatch per 16ms regardless of how many effects are active.
+    // One timer for all effects, on the main queue, regardless of how many are active.
 
     private func startSharedLFO() {
         guard lfoTimer == nil else { return }
         lfoTickCount = 0
-        let src = DispatchSource.makeTimerSource(queue: lfoQueue)
+        // The timer fires on the main queue because lfoTick() is main-actor isolated and
+        // touches main-actor state — the phase accumulators, and the sampler/boost nodes that
+        // setEffect() and the mute/solo pass also write. Running it on a private queue
+        // compiled without complaint (the event handler is not @Sendable, so the closure is
+        // inferred main-actor and nothing checks it) but executed on a background thread,
+        // racing the main thread 60 times a second.
+        //
+        // assumeIsolated documents and checks that: if this timer is ever moved off the main
+        // queue again it traps here rather than silently corrupting state.
+        let src = DispatchSource.makeTimerSource(queue: .main)
         src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
         src.setEventHandler { [weak self] in
-            self?.lfoTick()
+            MainActor.assumeIsolated { self?.lfoTick() }
         }
         src.resume()
         lfoTimer = src
@@ -1965,9 +2019,10 @@ final class PlaybackEngine: ObservableObject {
             let durationSecs = Double(fadeSteps) * state.frame.secondsPerStep
             let startNanos   = DispatchTime.now().uptimeNanoseconds
 
-            let fadeSrc = DispatchSource.makeTimerSource(queue: lfoQueue)
+            let fadeSrc = DispatchSource.makeTimerSource(queue: .main)
             fadeSrc.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
             fadeSrc.setEventHandler { [weak self] in
+              MainActor.assumeIsolated {
                 guard let self, self.currentSchedulerID == schedulerID else { return }
                 let elapsed  = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
                 let fraction = Float(min(1.0, elapsed / max(0.001, durationSecs)))
@@ -1981,6 +2036,7 @@ final class PlaybackEngine: ObservableObject {
                     self.kosmicIntroFadeTimer?.cancel()
                     self.kosmicIntroFadeTimer = nil
                 }
+              }
             }
             fadeSrc.resume()
             kosmicIntroFadeTimer = fadeSrc
@@ -2023,9 +2079,10 @@ final class PlaybackEngine: ObservableObject {
                 self.boosts[kTrackBass].outputVolume = startProgress
                 self.boosts[kTrackPads].outputVolume = startProgress
 
-                let src = DispatchSource.makeTimerSource(queue: lfoQueue)
+                let src = DispatchSource.makeTimerSource(queue: .main)
                 src.schedule(deadline: .now(), repeating: .milliseconds(100), leeway: .milliseconds(10))
                 src.setEventHandler { [weak self] in
+                  MainActor.assumeIsolated {
                     guard let self, self.currentSchedulerID == schedulerID else { return }
                     let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startNanos) / 1_000_000_000.0
                     let linearFade = Float(max(0.0, 1.0 - elapsed / max(0.001, remainingSecs)))
@@ -2039,6 +2096,7 @@ final class PlaybackEngine: ObservableObject {
                         self.droneFadeTimers[1]?.cancel()
                         self.droneFadeTimers[1] = nil
                     }
+                  }
                 }
                 src.resume()
                 self.droneFadeTimers[1] = src
@@ -2187,9 +2245,11 @@ final class PlaybackEngine: ObservableObject {
 
         // Start shared timer only if not already running
         guard ambientFadeTimer == nil else { return }
-        let src = DispatchSource.makeTimerSource(queue: lfoQueue)
+        let src = DispatchSource.makeTimerSource(queue: .main)
         src.schedule(deadline: .now(), repeating: .milliseconds(50), leeway: .milliseconds(10))
-        src.setEventHandler { [weak self] in self?.tickAmbientFades() }
+        src.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.tickAmbientFades() }
+        }
         src.resume()
         ambientFadeTimer = src
     }
@@ -2384,8 +2444,23 @@ final class PlaybackEngine: ObservableObject {
         engine.attach(reverbBusSmall)
         engine.connect(reverbBusMixerLarge, to: reverbBusLarge, format: nil)
         engine.connect(reverbBusMixerSmall, to: reverbBusSmall, format: nil)
-        engine.connect(reverbBusLarge,      to: mixer,          format: nil)
-        engine.connect(reverbBusSmall,      to: mixer,          format: nil)
+        // Return the two buses on input buses ABOVE the track range, explicitly.
+        //
+        // These used to connect with the default "next available" bus, which handed them
+        // inputs 0 and 1 because nothing else was connected to `mixer` yet. The per-track
+        // loop below then claims buses 0...kTrackCount-1 explicitly, and claiming a bus
+        // replaces whatever was on it — silently displacing both reverb returns. The sends
+        // still fed the buses, the buses still produced reverb, and none of it reached the
+        // mixer. Playback had no bus reverb at all; offline export, which builds its own
+        // per-track reverbs, was unaffected, which is why exports sounded far wetter.
+        //
+        // `ReverbBusRoutingTests` pins the returns against this.
+        engine.connect(reverbBusLarge, to: [
+            AVAudioConnectionPoint(node: mixer, bus: AVAudioNodeBus(kTrackCount))
+        ], fromBus: 0, format: nil)
+        engine.connect(reverbBusSmall, to: [
+            AVAudioConnectionPoint(node: mixer, bus: AVAudioNodeBus(kTrackCount + 1))
+        ], fromBus: 0, format: nil)
 
         for i in 0..<kTrackCount {
             let sampler      = AVAudioUnitSampler()
@@ -2395,7 +2470,7 @@ final class PlaybackEngine: ObservableObject {
             let comp         = AVAudioUnitEffect(audioComponentDescription: Self.compDesc)
             let distortion   = AVAudioUnitEffect(audioComponentDescription: Self.distDesc)
             let lowEQ        = AVAudioUnitEQ(numberOfBands: 2)
-            let sendMixer    = AVAudioMixerNode()   // reverb send tap — volume = send level (0 until style set)
+            let sendMixer    = AVAudioMixerNode()   // reverb send tap — volume = wet gain (0 until style set)
             let fanMixer     = AVAudioMixerNode()   // V3-native pass-through; fan-out source to dry path + send
 
             // Boost: unity gain, centre pan by default
@@ -2561,9 +2636,7 @@ private func loadGMPrograms() {
             let muted = effectiveMute || (anySolo && !effectiveSolo)
             samplers[i].volume = muted ? 0.0 : trackBaseVolume[i]
             // Zero the reverb send when muted so the shared bus tail doesn't continue from a muted track.
-            if i < reverbSendMixers.count {
-                reverbSendMixers[i].outputVolume = muted ? 0.0 : reverbSendLevels[i]
-            }
+            applyReverbAmount(i, wetDryMix: muted ? 0 : perTrackReverbWet[i])
         }
     }
 

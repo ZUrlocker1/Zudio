@@ -13,7 +13,24 @@
 struct TitleGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
         let pattern = patterns[rng.nextInt(upperBound: patterns.count)]
-        return pattern(frame, &rng)
+        return splitCompounds(pattern(frame, &rng))
+    }
+
+    /// Puts a space where a compound ran two capitalised words together — "SchlepTrieb" becomes
+    /// "Schlep Trieb". Joined is the more authentically German form, but it reads as an unbroken
+    /// run of letters in a song list.
+    ///
+    /// Only splits an uppercase letter that follows a LOWERCASE one, so "Z-Maschine" and other
+    /// hyphenated or already-spaced forms are left alone.
+    static func splitCompounds(_ title: String) -> String {
+        var out = ""
+        var previous: Character? = nil
+        for ch in title {
+            if let p = previous, p.isLowercase, ch.isUppercase { out.append(" ") }
+            out.append(ch)
+            previous = ch
+        }
+        return out
     }
 
     // MARK: - Word banks
@@ -169,10 +186,12 @@ struct TitleGenerator {
             } else if roll < 0.70 {
                 candidate = "\(base) \(kraftwerkNouns[rng.nextInt(upperBound: kraftwerkNouns.count)].word)"
             } else if roll < 0.90 {
-                // German compound — prefix joined to a noun, no space: "Stahlwelle", "Fernsignal"
+                // Prefix and noun as two words — "Stahl Welle", "Fern Signal". Joined into one
+                // (Stahlwelle, Fernsignal) is the more authentically German form, but it reads
+                // as an unbroken run of letters in a song list.
                 let p = compoundPrefixes[rng.nextInt(upperBound: compoundPrefixes.count)]
                 let n = kraftwerkNouns[rng.nextInt(upperBound: kraftwerkNouns.count)].word
-                candidate = p + n.lowercased()
+                candidate = "\(p) \(n)"
             } else {
                 let n = kraftwerkNouns[rng.nextInt(upperBound: kraftwerkNouns.count)]
                 candidate = "\(n.article) \(n.word)"

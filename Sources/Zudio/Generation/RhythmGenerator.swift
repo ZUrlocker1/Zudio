@@ -565,14 +565,29 @@ struct RhythmGenerator {
             // gives 16 notes/bar = 4.0 notes/beat; dropping one slot of a 4-cell gives 3.0.
             let cellLength = rng.nextDouble() < 0.5 ? 2 : 4
             let pcCount    = rng.nextDouble() < 0.6 ? 2 : 3
-            // Degrees above the chord root, so the shape survives transposition.
-            let degreePool = [0, 7, 12, 3, 5]
-            var degrees: [Int] = []
-            for i in 0..<pcCount { degrees.append(degreePool[i]) }
+
+            // Degrees above the chord root, so the shape survives transposition — each snapped
+            // onto the scale below, since a fixed offset is not diatonic in every mode.
+            //
+            // DRAWN from the pool, not taken in order. Reading the first two or three entries
+            // meant the cell was always root+fifth or root+fifth+octave: the third and fourth
+            // were dead code, and every Two-Note Lock song was a variation on the same drone.
+            // The root always leads — it is what anchors the cell to the chord — and the rest
+            // are drawn, so a song may get root+third, root+fourth, or root+octave+third.
+            var pool = [7, 12, 3, 5]
+            var degrees = [0]
+            for _ in 1..<pcCount where !pool.isEmpty {
+                degrees.append(pool.remove(at: rng.nextInt(upperBound: pool.count)))
+            }
             var cell: [Int?] = (0..<cellLength).map { degrees[$0 % degrees.count] }
-            // One rest slot in a 4-cell, drawn once, takes density to the bottom of the band.
+
+            // A rest slot takes density to the bottom of the band. A 2-step cell can drop its
+            // offbeat, which a 4-step cell could always do and a 2-step never could — that
+            // asymmetry was why the every-step pattern dominated.
             if cellLength == 4 && rng.nextDouble() < 0.5 {
                 cell[1 + rng.nextInt(upperBound: 3)] = nil
+            } else if cellLength == 2 && rng.nextDouble() < 0.35 {
+                cell[1] = nil
             }
 
             for bar in 0..<frame.totalBars {
@@ -580,7 +595,8 @@ struct RhythmGenerator {
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let root   = kwInRegister(rootPC, low: 44, high: 70)
                 for step in 0..<16 {
-                    guard let degree = cell[step % cellLength] else { continue }
+                    guard let rawDegree = cell[step % cellLength] else { continue }
+                    let degree = snapDegreeToScale(rawDegree, rootPC: rootPC, scale: frame.scalePCs)
                     var note = root + degree
                     if note > 70 { note -= 12 }
                     events.append(MIDIEvent(stepIndex: bar * 16 + step,
@@ -599,14 +615,26 @@ struct RhythmGenerator {
         var inactive: [Int] = []
         for _ in 0..<2 { inactive.append(slots.remove(at: rng.nextInt(upperBound: slots.count))) }
         let activeSlots = slots.sorted()
-        // Six pitch classes, as degrees above the chord root.
-        let degrees = [0, 2, 3, 5, 7, 10]
+        // Six pitch classes, as degrees above the chord root, snapped onto the scale below.
+        let rawDegrees = [0, 2, 3, 5, 7, 10]
         _ = inactive
 
         for bar in 0..<frame.totalBars {
             guard let entry = tonalMap.entry(atBar: bar) else { continue }
             let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
             let root   = kwInRegister(rootPC, low: 53, high: 77)
+            // Snapping can collapse two offsets onto one scale tone; top the cell back up from
+            // the scale so it keeps its six-note vocabulary.
+            var degrees = rawDegrees.map { snapDegreeToScale($0, rootPC: rootPC, scale: frame.scalePCs) }
+            if Set(degrees).count < degrees.count {
+                var seen = Set<Int>()
+                var unique = degrees.filter { seen.insert($0).inserted }
+                for pc in frame.scalePCs.sorted() where unique.count < rawDegrees.count {
+                    let d = (((pc - rootPC) % 12) + 12) % 12
+                    if !unique.contains(d) { unique.append(d) }
+                }
+                degrees = unique
+            }
             for rep in 0..<2 {
                 for (i, slot) in activeSlots.enumerated() {
                     var note = root + degrees[i % degrees.count]

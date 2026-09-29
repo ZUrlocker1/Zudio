@@ -119,8 +119,8 @@ struct SongGenerator {
 
         // Motorik substyle: Noir/Arcade/base. Production split: 21/19/60.
         let substyleRoll = rng.nextDouble()
-        let isNoir    = substyleRoll < 0.21
-        let isArcade  = !isNoir && substyleRoll < 0.40
+        let isNoir    = substyleRoll < 0.20
+        let isArcade  = !isNoir && substyleRoll < 0.39
         // Bass distortion: 20% of regular (non-Noir, non-Arcade) Motorik songs get Dist. on bass by default.
         let motorikBassDistortion = !isNoir && !isArcade && rng.nextDouble() < 0.20
         // Noir distortion: 75% chance independently for Bass and Rhythm.
@@ -143,9 +143,11 @@ struct SongGenerator {
         let syncRoll = syncRNG.nextDouble()
         let motorikSync: MotorikSync = {
             guard !isNoir && !isArcade else { return .none }
-            if syncRoll < 0.80 { return .none }
-            if syncRoll < 0.88 { return .rhythmSection }
-            if syncRoll < 0.95 { return .sequenceLock }
+            // 32.8% of base Motorik, which is 20% of all Motorik once Noir and Arcade are
+            // excluded. The three groups keep their original 8:7:5 proportions to each other.
+            if syncRoll < 0.672 { return .none }
+            if syncRoll < 0.803 { return .rhythmSection }
+            if syncRoll < 0.916 { return .sequenceLock }
             return .machineVoice
         }()
 
@@ -239,25 +241,51 @@ struct SongGenerator {
             if lead2SyncRNG.nextDouble() < 0.65 {
                 syncLead2Partners = true
                 let rhythmEvents = trackEvents[kTrackRhythm]
+
+                // Doubling is SECTIONAL, not all-or-nothing. Applied to the whole song it was
+                // either wholly absent or a rigid copy of Rhythm from end to end, and across
+                // songs that one gesture was all you heard. Alternating 8-16 bar stretches turns
+                // it from "a doubled line" into "a line that gets doubled at certain moments",
+                // which is what the records actually do.
+                var doublingBars = Set<Int>()
+                var bar = 4 + lead2SyncRNG.nextInt(upperBound: 9)      // enter after the opening
+                var on = true
+                while bar < frame.totalBars {
+                    let run = 8 + lead2SyncRNG.nextInt(upperBound: 9)  // 8...16 bars
+                    if on { for b in bar..<min(bar + run, frame.totalBars) { doublingBars.insert(b) } }
+                    bar += run
+                    on.toggle()
+                }
+
+                // Well under Rhythm's 80. The double is a shadow of the sequencer, not a second
+                // voice competing with it — at 72 it blurred the line it doubles, and 54 was
+                // still too present once the two parts were heard together.
+                let doubleVelocity: UInt8 = 44
+
                 if rhythmRules.contains("MOT-RTHM-014") {
                     // MOT-LD2-012 Octave Unison — generates no rhythm of its own. Strict unison,
                     // no thirds and no offset: the machine quality comes from the exact lock.
                     let shift = lead2SyncRNG.nextDouble() < 0.70 ? 12 : 24
-                    trackEvents[kTrackLead2] = rhythmEvents.map {
-                        MIDIEvent(stepIndex: $0.stepIndex,
-                                  note: UInt8(min(127, Int($0.note) + shift)),
-                                  velocity: 72, durationSteps: $0.durationSteps)
-                    }
+                    trackEvents[kTrackLead2] = rhythmEvents
+                        .filter { doublingBars.contains($0.stepIndex / 16) }
+                        .map {
+                            MIDIEvent(stepIndex: $0.stepIndex,
+                                      note: UInt8(min(127, Int($0.note) + shift)),
+                                      velocity: doubleVelocity, durationSteps: $0.durationSteps)
+                        }
                     lead2Rules.insert("MOT-LD2-012")
                 } else {
-                    // MOT-LD2-011 Counter Sequencer — the same cell displaced by 2 steps. Two
-                    // near-identical lines slightly offset is the measured arrangement.
+                    // MOT-LD2-011 Counter Sequencer — the same cell displaced. The offset is
+                    // drawn per song rather than fixed at 2: a half-beat, a beat and a beat and
+                    // a half are three distinctly different feels from the one rule.
+                    let offset = [2, 4, 6][lead2SyncRNG.nextInt(upperBound: 3)]
                     let lastStep = frame.totalBars * 16
                     trackEvents[kTrackLead2] = rhythmEvents.compactMap {
-                        let shifted = $0.stepIndex + 2
+                        guard doublingBars.contains($0.stepIndex / 16) else { return nil }
+                        let shifted = $0.stepIndex + offset
                         guard shifted < lastStep else { return nil }
                         return MIDIEvent(stepIndex: shifted, note: $0.note,
-                                         velocity: 72, durationSteps: $0.durationSteps)
+                                         velocity: doubleVelocity, durationSteps: $0.durationSteps)
                     }
                     lead2Rules.insert("MOT-LD2-011")
                 }
@@ -315,7 +343,6 @@ struct SongGenerator {
         // two windows, while everything outside it keeps playing.
         trackEvents = applySyncDropout(trackEvents: trackEvents, sync: motorikSync,
                                        lead2Partners: syncLead2Partners,
-                                       texturePlaysThrough: texRules.contains("MOT-TEXT-010"),
                                        windows: syncWindows)
 
         // Step 13.6 — Kraftwerk sync repeat guard. Rhythm was done at step 8b.
@@ -2028,16 +2055,17 @@ struct SongGenerator {
         trackEvents: [[MIDIEvent]],
         sync: MotorikSync,
         lead2Partners: Bool,
-        texturePlaysThrough: Bool,
         windows: [Range<Int>]
     ) -> [[MIDIEvent]] {
         guard sync.isActive, !windows.isEmpty else { return trackEvents }
 
-        // Texture can play THROUGH the drop, so the window reads as a change of texture rather
-        // than a hole — but only when it is on MOT-TEXT-010, whose two-or-three-note bursts are
-        // built to mark a space. MOT-TEXT-009 is continuous; leaving it running would fill the
-        // gap rather than hold it, and the drop would stop registering as one.
-        var tracks = texturePlaysThrough ? sync.tracks.filter { $0 != kTrackTexture } : sync.tracks
+        // Texture always plays THROUGH the drop, alongside Pads and Drums. With it silenced too,
+        // a five-track group leaves only two parts in the window and the drop reads as empty
+        // rather than as a change. Texture does not become relentless as a result: both its
+        // rules are sparse by construction — MOT-TEXT-009 leaves gaps of 14-30 steps with one
+        // in six stretching to two-to-four bars, and MOT-TEXT-010 fires two or three notes and
+        // then nothing for hundreds of steps — so it drops out plenty on its own, elsewhere.
+        var tracks = sync.tracks.filter { $0 != kTrackTexture }
         if lead2Partners { tracks.append(kTrackLead2) }
 
         let silentSteps = windows.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
@@ -2073,7 +2101,9 @@ struct SongGenerator {
         log.append(GenerationLogEntry(tag: "SONG", description: title, isTitle: true))
 
         // Style / sub-style tag — always present for consistency with all other styles
-        let substyleLabel = isNoir ? "Motorik Noir" : isArcade ? "Motorik Arcade" : "Motorik"
+        let substyleLabel = isNoir ? "Motorik Noir"
+                          : isArcade ? "Motorik Arcade"
+                          : sync.isActive ? "Motorik Europe" : "Motorik"
         log.append(GenerationLogEntry(tag: "Style", description: "\(substyleLabel) – \(frame.tempo) bpm"))
 
         // Logged as "Sync" rather than "Cluster": Cluster is a krautrock band and the name of
@@ -2083,8 +2113,10 @@ struct SongGenerator {
         // emitted when none fires: the absence is the signal.
         if sync.isActive {
             var names = sync.logTrackNames
-            if syncLead2Partners { names.append("Lead 2") }
-            log.append(GenerationLogEntry(tag: "Sync",
+            if syncLead2Partners { names.append("Ld 2") }
+            // The tag carries the count — "Sync 4" — so the size of the group is visible
+            // without counting the names.
+            log.append(GenerationLogEntry(tag: "Sync \(names.count)",
                                           description: names.joined(separator: ", ")))
         }
 
@@ -3368,6 +3400,11 @@ struct SongGenerator {
                 // Single-pass window: uses bassByBar so the 4-bar accumulation is O(eventsInWindow).
                 func bassWindow(fromBar: Int) -> (fp: Set<UInt8>, count: Int) {
                     let windowEnd = min(fromBar + 4, totalBars)
+                    // A bar at or past the last one clamps windowEnd BELOW fromBar, and the
+                    // loop below then builds an invalid range and traps. The caller strides to
+                    // outroStartBar and only checks that a section covers the bar, which can be
+                    // true past totalBars when a section's declared range overruns the song.
+                    guard fromBar < windowEnd else { return ([], 0) }
                     var pitchClasses = Set<UInt8>()
                     var count = 0
                     for b in fromBar..<windowEnd {

@@ -374,8 +374,11 @@ final class AppState: ObservableObject {
                     if !ovr.isEmpty {
                         self.sessionInstrumentOverrides[finalState.globalSeed] = ovr
                     }
-                    // Backfill substyleName for songs saved before build 125.
-                    if song.substyleName == nil,
+                    // Refresh substyleName from the regenerated state. Backfills songs saved
+                    // before build 125 (when the field was added) and corrects songs whose
+                    // substyle was named later than they were saved — a Motorik Europe song
+                    // saved while the sync group was still unnamed reads back as "Motorik".
+                    if song.substyleName != finalState.displayStyleName,
                        let idx = self.persistedHistory.firstIndex(where: { $0.seed == song.seed }) {
                         self.persistedHistory[idx].substyleName = finalState.displayStyleName
                     }
@@ -535,6 +538,7 @@ final class AppState: ObservableObject {
         (kTrackBass,   .kosmic,  2),  // Lead Bass        patch 87
         (kTrackRhythm, .kosmic,  2),  // Rock Organ       patch 18
         (kTrackLead1,  .motorik, 5),  // Square Lead      patch 80
+        (kTrackLead1,  .motorik, 0),  // Mono Synth       patch 81 — thin on repeat, so never twice running
         (kTrackBass,   .motorik, 1),  // Lead Bass        patch 87
         (kTrackBass,   .motorik, 2),  // Rock Bass        patch 34
         (kTrackLead2,  .motorik, 1),  // Brightness       patch 100
@@ -1310,7 +1314,7 @@ final class AppState: ObservableObject {
                 // current instruments — giving a feeling of gradual change song to song.
                 // kTrackTexture for Chill is handled separately below.
                 if isFirstForStyle {
-                    self.instrumentOverrides = [:]
+                    self.seedInstrumentOverrides(for: state, style: style)
                 } else {
                     self.randomizeTwoInstruments(style: style)
                 }
@@ -1754,13 +1758,14 @@ final class AppState: ObservableObject {
             guard lastUsedInstrumentIndex[entry.track]?[style] == entry.poolIndex else { continue }
             let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift)
             guard pool.count > 1 else { continue }
-            var newIdx = current
-            var attempts = 0
-            repeat {
-                newIdx = Int.random(in: 0..<pool.count, using: &rng)
-                attempts += 1
-            } while newIdx == current && attempts < 8
-            instrumentOverrides[entry.track] = newIdx
+            // Replace from the pool this song actually allows, not the whole instrument list.
+            // Drawing from the full list usually landed outside the substyle's subset, so the
+            // sanitiser re-picked afterwards — and could land back on the very instrument this
+            // rule exists to move away from, letting it play two songs running anyway.
+            let allowed = instrumentPickPool(trackIndex: entry.track, style: style,
+                                             poolCount: pool.count).filter { $0 != current }
+            guard !allowed.isEmpty else { continue }
+            instrumentOverrides[entry.track] = allowed[Int.random(in: 0..<allowed.count, using: &rng)]
         }
     }
 
@@ -1830,42 +1835,36 @@ final class AppState: ObservableObject {
     /// defaults to index 0.
     private func sanitiseSyncInstruments(for state: SongState) {
         guard state.style == .motorik, state.motorikSync.isActive else { return }
+        sanitiseInstrumentsToPool(for: state)
+    }
+
+    /// Forces every track's instrument into the set its substyle allows.
+    ///
+    /// Only two instruments are re-picked per song, so the other five carry over from the
+    /// previous song untouched — an Arcade song could inherit Fuzz Guitar on Rhythm, or a sync
+    /// song a guitar where a sequencer belongs. This also covers the first song of a style,
+    /// where every override defaults to index 0.
+    ///
+    /// Driven by `instrumentPickPool`, so the allowed set is written down once. Arcade and the
+    /// sync groups both express their restriction as "this subset of the pool", which is what
+    /// this enforces. Noir does not — see `sanitiseNoirInstruments`.
+    private func sanitiseInstrumentsToPool(for state: SongState) {
         var rng = SystemRandomNumberGenerator()
         for track in 0..<kTrackCount {
-            guard let subset = state.motorikSync.instrumentSubset(forTrack: track),
-                  !subset.contains(instrumentOverrides[track] ?? 0) else { continue }
-            instrumentOverrides[track] = subset[Int.random(in: 0..<subset.count, using: &rng)]
+            let pool = Self.instrumentPoolNames(trackIndex: track, style: state.style,
+                                                isKosmicDrift: state.isKosmicDrift)
+            guard pool.count > 1 else { continue }
+            let allowed = instrumentPickPool(trackIndex: track, style: state.style,
+                                             poolCount: pool.count)
+            guard !allowed.isEmpty,
+                  !allowed.contains(instrumentOverrides[track] ?? 0) else { continue }
+            instrumentOverrides[track] = allowed[Int.random(in: 0..<allowed.count, using: &rng)]
         }
     }
 
     private func sanitiseArcadeInstruments(for state: SongState) {
         guard state.style == .motorik, state.motorikArcadeVariation else { return }
-        var rng = SystemRandomNumberGenerator()
-        // Drums pool [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit] — Arcade: [2,3] only
-        let cd = instrumentOverrides[kTrackDrums] ?? 0
-        if ![2, 3].contains(cd) { instrumentOverrides[kTrackDrums] = Bool.random(using: &rng) ? 2 : 3 }
-        // Lead 2 pool [0=Polysynth, 1=Brightness, 2=Moog, 3=Elec Guitar, 4=Square Lead, 5=Synth Lead, 6=Saw Lead, 7=5th Saw Wave]
-        // Arcade: Moog + Square Lead + Synth Lead + Saw Lead + 5th Saw Wave
-        let cl2 = instrumentOverrides[kTrackLead2] ?? 0
-        if ![2, 5, 7].contains(cl2) { instrumentOverrides[kTrackLead2] = [2, 5, 7][Int.random(in: 0..<3, using: &rng)] }
-        // Bass pool [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
-        let cb = instrumentOverrides[kTrackBass] ?? 0
-        if ![1, 3, 4, 5, 6].contains(cb) { instrumentOverrides[kTrackBass] = [1, 3, 4, 5, 6][Int.random(in: 0..<5, using: &rng)] }
-        // Lead 1 pool [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
-        let cl1 = instrumentOverrides[kTrackLead1] ?? 0
-        if ![0, 1, 6, 7].contains(cl1) { instrumentOverrides[kTrackLead1] = [0, 1, 6, 7][Int.random(in: 0..<4, using: &rng)] }
-        // Rhythm pool [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass,
-        //              5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1, 10=Clavi]
-        // Charang, Doctor Solo, Crunch Guitar, Harpsi Pad are excluded from Arcade.
-        let cr = instrumentOverrides[kTrackRhythm] ?? 0
-        if ![0, 6, 9].contains(cr) { instrumentOverrides[kTrackRhythm] = [0, 6, 9][Int.random(in: 0..<3, using: &rng)] }
-        // Pads pool [0=Halo Pad, 1=Sweep Pad, 2=Bowed Glass, 3=Synth Strings] — Arcade excludes Bowed Glass
-        let cp = instrumentOverrides[kTrackPads] ?? 0
-        if cp == 2 { instrumentOverrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
-        // Texture pool [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk, 8=Metal Pad, 9=Ice Rain, 10=Mystery Pad]
-        // Arcade: electronic textures only; 8/9/10 are Arcade-exclusive
-        let ct = instrumentOverrides[kTrackTexture] ?? 0
-        if ![0, 3, 5, 6, 8, 9, 10].contains(ct) { instrumentOverrides[kTrackTexture] = [0, 3, 5, 6, 8, 9, 10][Int.random(in: 0..<7, using: &rng)] }
+        sanitiseInstrumentsToPool(for: state)
     }
 
     /// Forces Lead 1 to Stereo Piano (pool index 0) for Ambient Piano songs.
@@ -1913,6 +1912,37 @@ final class AppState: ObservableObject {
     private func restoreLead2Mirror() {
         lead2MirroredProgram = nil
         lead2MirrorName      = nil
+    }
+
+    /// Assigns every track an instrument from its allowed pool, explicitly.
+    ///
+    /// `instrumentOverrides` is sparse: a track with no entry reads as index 0 through the
+    /// `?? 0` fallback at a dozen call sites. Clearing the dictionary for the first song of a
+    /// style therefore put every track on the FIRST instrument in its pool rather than on a
+    /// neutral one — and because only two tracks are re-picked per song, that choice then
+    /// persisted for several songs.
+    ///
+    /// On Motorik Lead 1 the first entry is Mono Synth, which reached 25% of Motorik Europe
+    /// songs against an even share of 16.7%, roughly twice Polysynth's rate. Seeding every
+    /// track removes the privilege of being first in the list; the `?? 0` fallback stays as a
+    /// safety net but no longer decides what anything sounds like.
+    ///
+    /// Chill's Lead 1, Lead 2 and Texture are left out for the same reason
+    /// `randomizeTwoInstruments` skips them: the generator picks those itself, and register and
+    /// phrasing rules depend on the choice.
+    private func seedInstrumentOverrides(for state: SongState, style: MusicStyle) {
+        var rng = SystemRandomNumberGenerator()
+        instrumentOverrides = [:]
+        let generatorOwned: Set<Int> = style == .chill
+            ? [kTrackLead1, kTrackLead2, kTrackTexture] : []
+        for track in 0..<kTrackCount where !generatorOwned.contains(track) {
+            let pool = Self.instrumentPoolNames(trackIndex: track, style: style,
+                                                isKosmicDrift: state.isKosmicDrift)
+            guard pool.count > 1 else { continue }
+            let allowed = instrumentPickPool(trackIndex: track, style: style, poolCount: pool.count)
+            guard !allowed.isEmpty else { continue }
+            instrumentOverrides[track] = allowed[Int.random(in: 0..<allowed.count, using: &rng)]
+        }
     }
 
     private func randomizeTwoInstruments(style: MusicStyle) {
@@ -2090,7 +2120,7 @@ final class AppState: ObservableObject {
             return state?.motorikNoirVariation == true ? [0,1,3] : [0,1,2]
         }
         if style == .motorik && trackIndex == kTrackRhythm {
-            if state?.motorikArcadeVariation == true { return [0,1,6,8,9] }
+            if state?.motorikArcadeVariation == true { return [0,6,9] }  // Arcade: Guitar Pulse + Synth Bass 3 + Electric Piano 1
             return state?.motorikNoirVariation == true ? [2,3,5,6,7] : [0,1,2,4,5,6]
         }
         if style == .motorik && trackIndex == kTrackPads {
@@ -2109,7 +2139,7 @@ final class AppState: ObservableObject {
             case kTrackRhythm:  return isDrift ? [0,4,5,6,7]     : [0,1,2,3]
             case kTrackDrums:   return isDrift ? [2,3,4]         : [0,1,2]
             case kTrackTexture: return isDrift ? Array(0..<poolCount) : [0,1,2,3]
-            case kTrackPads:    return isDrift ? [0,1,2,4,5]     : Array(0..<poolCount)
+            case kTrackPads:    return isDrift ? [0,1,2,4,5,6]   : Array(0..<poolCount)
             case kTrackBass:    return isDrift ? [1,3,4,6,7]     : Array(0..<poolCount)
             default: break
             }
@@ -2130,105 +2160,15 @@ final class AppState: ObservableObject {
     /// Chill kTrackRhythm: blues favours organs, regular favours Rhodes/Wurlitzer.
     /// Chill kTrackLead2:  blues excludes Flute; regular reduces Trombone and Soprano Sax.
     /// Motorik kTrackBass: Noir restricts to cold/synthetic sounds; regular restricts to organic sounds.
+    /// Instance wrapper over `instrumentPickPoolStatic`, supplying the current `songState`.
+    ///
+    /// These two used to be separate implementations of the same tables, and they drifted in
+    /// three places: Arcade Rhythm, Kosmic Drift Pads and Chill Rhythm each had an instrument
+    /// added to one copy and not the other. Because both are live picking paths, the same song
+    /// could get a different instrument depending on which one ran. One implementation now.
     private func instrumentPickPool(trackIndex: Int, style: MusicStyle, poolCount: Int) -> [Int] {
-        // Kraftwerk sync (base Motorik only) restricts its member tracks to the machine
-        // sounds in each existing pool. Checked before the substyle branches because a sync
-        // never fires in a Noir or Arcade song, so no substyle case can be reached from here.
-        if style == .motorik,
-           let syncSubset = songState?.motorikSync.instrumentSubset(forTrack: trackIndex) {
-            return syncSubset
-        }
-        if style == .motorik && trackIndex == kTrackBass {
-            // Pool: [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
-            if songState?.motorikArcadeVariation == true { return [1, 3, 4, 5, 6] }  // Arcade: Lead Bass + Elec Bass + Mean Saw + Techno + Synth Bass 1
-            return songState?.motorikNoirVariation == true
-                ? [0, 1, 4, 5]   // Noir: Moog + Lead Bass (shared) + Mean Saw Bass + Techno Bass
-                : [0, 1, 2, 3]   // Regular: Moog + Lead Bass (shared) + Rock Bass + Elec Bass
-        }
-        if style == .motorik && trackIndex == kTrackLead1 {
-            // Pool: [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
-            // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
-            if songState?.motorikArcadeVariation == true { return [0, 1, 6, 7] }  // Arcade: Mono Synth + Saw Lead 3 + Synth Lead + Saw Stack
-            return songState?.motorikNoirVariation == true
-                ? [1, 4, 5, 6, 7]      // Noir: Saw Lead 3 + Chiff Lead + Square Lead + Synth Lead + Saw Stack
-                : [0, 1, 2, 3, 4, 6]   // Regular: Mono Synth + Saw Lead 3 + Soft Brass + Polysynth + Chiff Lead + Synth Lead
-        }
-        if style == .motorik && trackIndex == kTrackLead2 {
-            // Pool: [0=Polysynth, 1=Brightness, 2=Moog, 3=Elec Guitar, 4=Square Lead, 5=Synth Lead]
-            // Synth Lead (87) excluded from Arcade: it's a dual-voice "fifths" patch, too thick for fast arpeggios.
-            if songState?.motorikArcadeVariation == true { return [2, 5, 7] }  // Arcade: Moog + Synth Lead + 5th Saw Wave
-            return Array(0..<poolCount)
-        }
-        if style == .motorik && trackIndex == kTrackDrums {
-            // Pool: [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit]
-            if songState?.motorikArcadeVariation == true { return [2, 3] }  // Arcade: Dance Drums + Machine Kit only
-            return songState?.motorikNoirVariation == true
-                ? [0, 1, 3]   // Noir: Rock Kit + Brush Kit + Machine Kit — no Dance Drums
-                : [0, 1, 2]   // Regular: Rock Kit + Brush Kit + Dance Drums — no Machine Kit
-        }
-        if style == .motorik && trackIndex == kTrackRhythm {
-            // Pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1, 10=Clavi]
-            // Must match sanitiseNoirInstruments's valid sets exactly to avoid immediate overrides.
-            if songState?.motorikArcadeVariation == true { return [0, 6, 9] }  // Arcade: Guitar Pulse + Synth Bass 3 + Electric Piano 1
-            return songState?.motorikNoirVariation == true
-                ? [2, 3, 5, 6, 7]      // Noir: Fuzz Guitar + Doctor Solo + Pick Bass + Synth Bass 3 + Charang
-                : [0, 1, 2, 4, 5, 6]   // Regular: Guitar Pulse + Crunch Guitar + Fuzz Guitar + Acoustic Bass + Pick Bass + Synth Bass 3
-        }
-        if style == .motorik && trackIndex == kTrackTexture {
-            // Pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk]
-            if songState?.motorikArcadeVariation == true { return [0, 3, 5, 6, 8, 9, 10] }  // Arcade: electronic textures only
-            return songState?.motorikNoirVariation == true ? [0, 2, 3, 5, 6, 7] : Array(0..<poolCount)
-        }
-        if style == .motorik && trackIndex == kTrackPads {
-            // Pool: [0=Halo Pad, 1=Sweep Pad, 2=Bowed Glass, 3=Synth Strings]
-            if songState?.motorikArcadeVariation == true { return [0, 1, 3] }  // Arcade: exclude Bowed Glass
-            return Array(0..<poolCount)
-        }
-        // Kosmic: unified pool (Regular + Drift-exclusive); substyle restricts random picks.
-        if style == .kosmic {
-            let isDrift = songState?.isKosmicDrift == true
-            switch trackIndex {
-            case kTrackLead1:
-                // [0=Flute, 1=Brightness, 2=Oboe, 3=Recorder, 4=Warm Pad, 5=Sine Wave, 6=Bottle Blow, 7=Shenai]
-                return isDrift ? [4, 5, 6, 7] : [0, 1, 2, 3]
-            case kTrackRhythm:
-                // [0=Moog, 1=Wurlitzer, 2=Rock Organ, 3=Harpsi Pad, 4=New Age Pad, 5=Synth Mallet, 6=Synth Chime, 7=Mystery Pad]
-                return isDrift ? [0, 4, 5, 6, 7] : [0, 1, 2, 3]
-            case kTrackDrums:
-                // [0=808 Kit, 1=Machine Kit, 2=Standard Kit, 3=Brush Kit, 4=Jazz Kit]
-                return isDrift ? [2, 3, 4] : [0, 1, 2]  // Drift: Standard/Brush/Jazz; Regular: 808/Machine/Standard
-            case kTrackTexture:
-                // [0=Pad 3 Poly, 1=Fifths Lead, 2=Solar Wind, 3=FX Echoes, 4=Rain]
-                return isDrift ? Array(0..<poolCount) : [0, 1, 2, 3]  // Rain (4) Drift-only
-            case kTrackPads:
-                // [0=Sweep Pad, 1=Synth Strings, 2=Warm Pad, 3=Space Voice, 4=Halo Pad, 5=Bowed Glass, 6=Fantasia 2]
-                return isDrift ? [0, 1, 2, 4, 5, 6] : Array(0..<poolCount)  // Space Voice (3) excluded from Drift random
-            case kTrackBass:
-                // [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel, 7=Warm Pad]
-                return isDrift ? [1, 3, 4, 6, 7] : Array(0..<poolCount)  // Moog+Mono Synth excluded from Drift random
-            default: break
-            }
-        }
-        guard style == .chill else { return Array(0..<poolCount) }
-        let isBlues = songState?.chillBluesVariation == true
-        switch trackIndex {
-        case kTrackRhythm:
-            // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=PercOrg, 4=StereoPiano, 5=RockOrg(blues only)]
-            return isBlues
-                // Blues: B3 20%, PercOrg/RockOrg 30% each, StereoPiano 20%; no Rhodes/Wurlitzer
-                ? [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5]
-                // Regular: Rhodes/Wurlitzer high, B3/StereoPiano medium, organs excluded
-                : [0, 0, 0, 1, 1, 1, 2, 2, 4, 4]
-        case kTrackLead2:
-            // [0=Vibraphone, 1=Flute, 2=SopSax, 3=Trombone, 4=Xylophone]
-            return isBlues
-                // Blues: Flute and Xylophone excluded
-                ? [0, 0, 0, 2, 2, 3, 3, 3]
-                // Regular: Xylophone rare (~11%), Trombone/SopSax rare
-                : [0, 0, 0, 1, 1, 2, 3, 3, 4]
-        default:
-            return Array(0..<poolCount)
-        }
+        Self.instrumentPickPoolStatic(trackIndex: trackIndex, style: style,
+                                      poolCount: poolCount, state: songState)
     }
 
     /// Ensures Kosmic Drift bass is never Moog (index 0) — Moog is Kosmic-regular only.
@@ -3134,8 +3074,12 @@ final class AppState: ObservableObject {
             } else if trimmed.hasPrefix("Seed:") {
                 globalSeed = UInt64(trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces))
             } else if trimmed.hasPrefix("Style:") {
+                // Falls back to the first word so a file that ever carries a substyle name
+                // here ("Motorik Europe") still resolves to its base style rather than Kosmic.
                 let val = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
-                style = MusicStyle(rawValue: val) ?? .kosmic
+                style = MusicStyle(rawValue: val)
+                    ?? MusicStyle(rawValue: val.components(separatedBy: " ").first ?? "")
+                    ?? .kosmic
             } else if trimmed.hasPrefix("Key Override:") {
                 // "C#" — user had a key override active at generation time
                 let val = trimmed.dropFirst(13).trimmingCharacters(in: .whitespaces)

@@ -26,27 +26,44 @@ let kTrackMIDIChannels: [UInt8] = [0, 1, 2, 3, 4, 5, 9, 6]
 ///
 /// Track selection is deliberately COUPLED rather than per-track: a machine bass underneath a
 /// busy Neu!-style drum pattern reads as a Motorik song with an odd bass, not as Kraftwerk.
-/// See docs/motorik-kraftwerk-plan.md.
+/// See docs/motorik-europe-plan.md.
 enum MotorikSync: String, Sendable, CaseIterable {
     case none
-    case rhythmSection   // Bass + Drums
-    case sequenceLock    // Bass + Rhythm
-    case machineVoice    // Rhythm + Lead 1
+    case rhythmSection   // Bass + Drums + Lead 1
+    case sequenceLock    // Bass + Rhythm + Texture
+    case machineVoice    // Bass + Rhythm + Lead 1
 
-    /// Tracks that adopt Kraftwerk rules. Texture joins EVERY sync — its scattered
-    /// wide-register behaviour suits all three and it is a supporting role rather than part
-    /// of the rhythmic interlock. Lead 2 is not listed here: it is decided in the generator,
-    /// since it only partners when Rhythm draws a rule that expects one.
+    /// Tracks that adopt Kraftwerk rules. Only Bass is in all three — it is the foundation of
+    /// the machine sound and has four rules written for it. Rhythm is in two, Lead 1 in two,
+    /// and Drums and Texture in one each, so the groups differ in colour as well as in
+    /// membership and no two sync songs draw on the same set of rules. Lead 2 is not listed
+    /// here: it is decided in the generator, since it only partners when Rhythm draws a rule
+    /// that expects one.
     var tracks: [Int] {
         switch self {
         case .none:          return []
-        case .rhythmSection: return [kTrackBass, kTrackDrums, kTrackTexture]
+        // Machine foundation with Kraftwerk lead statements over it — the Autobahn shape.
+        // The only group with Drums, and the only one without Texture.
+        case .rhythmSection: return [kTrackBass, kTrackDrums, kTrackLead1]
         case .sequenceLock:  return [kTrackBass, kTrackRhythm, kTrackTexture]
-        case .machineVoice:  return [kTrackRhythm, kTrackLead1, kTrackTexture]
+        // Bass joins so the doubled Rhythm/Lead 1 line has a locked foundation rather than a
+        // Neu!-style rhythm section underneath it. No Texture: with it in two of three groups
+        // the Kraftwerk texture rules were most of what a sync song's texture ever did, and
+        // they have only one shape between them. Leaving it out here sends most sync songs
+        // back to the ordinary Motorik texture pool.
+        case .machineVoice:  return [kTrackBass, kTrackRhythm, kTrackLead1]
         }
     }
 
-    func includes(_ trackIndex: Int) -> Bool { tracks.contains(trackIndex) }
+    /// Membership as a set, built once from `tracks` so there is still exactly one place
+    /// where a group's membership is written down. `tracks` stays the ordered array — the
+    /// generation log and the dropout pass both depend on its order.
+    private static let trackSets: [MotorikSync: Set<Int>] = Dictionary(
+        uniqueKeysWithValues: MotorikSync.allCases.map { ($0, Set($0.tracks)) })
+
+    func includes(_ trackIndex: Int) -> Bool {
+        Self.trackSets[self]?.contains(trackIndex) ?? false
+    }
 
     var isActive: Bool { self != .none }
 
@@ -77,7 +94,19 @@ enum MotorikSync: String, Sendable, CaseIterable {
         case kTrackDrums:   return [2, 3]
         // [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead,
         //  5=Square Lead, 6=Synth Lead, 7=Saw Stack]
-        case kTrackLead1:   return [0, 1, 3, 5, 6]
+        // Excludes Soft Brass, which reads as orchestral against a rigid sequencer, and Chiff
+        // Lead, whose breathy attack blurs the note placement the rules depend on.
+        // Weighted by repetition, the same way the Chill pools express preference. Mono Synth
+        // appears twice against three of everything else, which is a 12% share of the draw and
+        // lands at about 10% of songs once the no-repeat rule below has evicted the recurrences
+        // — at a 9% draw share it came out at only 4.8%, since half its appearances were
+        // second-in-a-row and got replaced — it reads thin against a rigid sequencer where Polysynth and
+        // Saw Stack read full, but it is not wrong, only easily overused. It is also listed
+        // last: it was reaching 25% of Europe songs partly because it sits first in the
+        // instrument pool and a missing override reads as index 0.
+        //
+        // `noRepeatInstruments` carries a matching entry, so it never plays two songs running.
+        case kTrackLead1:   return [1, 1, 1, 3, 3, 3, 5, 5, 5, 6, 6, 6, 7, 7, 7, 0, 0]
         // [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind,
         //  6=Interference, 7=Guitar Fdbk, 8=Metal Pad, 9=Ice Rain, 10=Mystery Pad]
         // Drops the warm sustaining pads, which suit sustain rather than scatter.
@@ -86,14 +115,15 @@ enum MotorikSync: String, Sendable, CaseIterable {
         }
     }
 
-    /// Names used in the Sync log line. Lead 2 is appended by the caller when it partners,
-    /// so the line reports what actually played rather than which sync was drawn.
+    /// Names used in the Sync log line. The leads are abbreviated to "Ld 1" / "Ld 2" because
+    /// a four- or five-track line gets long. Lead 2 is appended by the caller when it partners,
+    /// so the line reports what actually played rather than which group was drawn.
     var logTrackNames: [String] {
         switch self {
         case .none:          return []
-        case .rhythmSection: return ["Bass", "Drums", "Texture"]
+        case .rhythmSection: return ["Bass", "Drums", "Ld 1"]
         case .sequenceLock:  return ["Bass", "Rhythm", "Texture"]
-        case .machineVoice:  return ["Rhythm", "Lead 1", "Texture"]
+        case .machineVoice:  return ["Bass", "Rhythm", "Ld 1"]
         }
     }
 }
@@ -473,6 +503,20 @@ func nearestScalePitchClass(_ pc: Int, in scalePCs: Set<Int>) -> Int {
     guard !scalePCs.contains(pc) else { return pc }
     func distance(_ x: Int) -> Int { min(abs(x - pc), 12 - abs(x - pc)) }
     return scalePCs.sorted().min(by: { distance($0) < distance($1) }) ?? pc
+}
+
+/// Snaps a semitone offset above a chord root onto the nearest offset that is diatonic,
+/// keeping its octave.
+///
+/// Rules built from fixed intervals — root, fifth, octave, third — are not scale-aware on their
+/// own: a minor third above the chord root is G natural in E Lydian, where the scale has G#, and
+/// a perfect fifth is diminished above some roots. This keeps the intervallic shape as close as
+/// the scale allows while guaranteeing the note belongs.
+func snapDegreeToScale(_ degree: Int, rootPC: Int, scale: Set<Int>) -> Int {
+    let octave  = (degree / 12) * 12
+    let within  = degree % 12
+    let snapped = nearestScalePitchClass((rootPC + within) % 12, in: scale)
+    return octave + (((snapped - rootPC) % 12) + 12) % 12
 }
 
 // MARK: - Key semitone table

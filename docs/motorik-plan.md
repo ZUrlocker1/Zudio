@@ -485,7 +485,53 @@ final sound. Cold Stop — pads cut on final outro bar.
 - Re-voice less often than Lead 1 motif mutation cadence (target every 8–16 bars)
 - If Lead 1 activity is high, reduce pad re-voicing and keep stable shell voicings
 
-### Lead 1
+#
+### Lead 1 — where a long unbroken run is and is not a fault
+
+Measured across 2,500 Motorik songs, longest unbroken run of sounding bars against note density:
+
+- **Machine Answer** (Arcade) — 22.7 bars mean, 44 worst, 3.1 notes/bar
+- **Octave Bounce** (Arcade) — 22.4 mean, 38 worst, **6.2 notes/bar**
+- **Triad Climb** (Arcade) — 19.8 mean, 42 worst, 3.6 notes/bar
+- **Pendulum arc** (Noir) — 19.4 mean, 32 worst, 5.1 notes/bar
+- **Arcade Riff** (Arcade) — 19.1 mean, 34 worst, 3.6 notes/bar
+- **Chromatic Descent** (Noir) — 18.5 mean, 32 worst, **1.6 notes/bar**
+- **Melodic Spiral** (Noir) — 18.1 mean, 32 worst, **6.8 notes/bar**
+- **Rising phrase** (Noir) — 18.0 mean, 28 worst, 2.4 notes/bar
+
+Length alone is not the problem; length combined with density is. A sparse rule held for
+twenty bars is a sustained gesture — Chromatic Descent at 1.6 notes a bar is a slow descent,
+and Arcade is relentless by design. Those are left as they are.
+
+**Melodic Spiral and Octave Bounce are capped at 20 bars.** They are the two densest rules in
+Motorik and a stream of sixteenths with no air in it stops reading as a line. The cap cuts two-
+to three-bar rests into an over-long stretch rather than rewriting either rule, so both keep
+their density — verified by `MotorikLeadDensityTests`, which also pins that Chromatic Descent
+still runs past 20 bars so the cap is not widened to the sparse rules by mistake.
+
+### Lead 1 breathing and phrase variation
+
+Two limits found by ear in a 112-bar song whose lead ran 19 bars without a rest and repeated
+one four-bar figure verbatim fourteen times.
+
+**Rest windows scale with song length.** `buildRestBars` drew one or two windows of 4–8 bars
+for a whole song, so a long song breathed no more often than a short one. It now places one
+window per ~22 bars of body, laid out one per slot so they spread rather than cluster.
+Measured across 400 Motorik songs: mean 8.7 gaps of two or more bars per song, against 3 in
+the song that prompted this.
+
+**The replayed phrase varies on every return.** `MOT-LD1-001` replays a stored phrase on a
+4-bar cycle and mutated it every 16 bars — four identical passes before anything moved. The
+mutation interval is now 8 or 12 bars, and on top of that each bar from the second pass onward
+has a 45% chance of one note either being dropped or displaced by an octave. Dropping is
+preferred at 60%, because it varies the line and opens space at the same time; octave
+displacement keeps the pitch class, so the harmony is untouched. Bars identical to the bar four
+earlier fell from 54% to 25%.
+
+This applies to all Motorik songs, not only Motorik Europe — `buildRestBars` serves every
+non-solo Lead 1 rule.
+
+## Lead 1
 
 **Writing rules:**
 

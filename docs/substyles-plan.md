@@ -14,7 +14,10 @@ This document identifies 3 more sub-styles, one for each remaining style. Each i
 These are the live values in the codebase as of this writing. Target release probabilities are noted separately where they differ.
 
 - **Chill Blues** — `20%` of Chill songs (`rng.nextDouble() < 0.20` in `ChillMusicalFrameGenerator.swift`)
-- **Motorik Noir** — `23%` of Motorik songs (`rng.nextDouble() < 0.23` in `SongGenerator.swift`)
+- **Motorik Noir** — `20%` of Motorik songs (`substyleRoll < 0.20` in `SongGenerator.swift`)
+- **Motorik Arcade** — `19%` of Motorik songs (`substyleRoll < 0.39` in `SongGenerator.swift`)
+- **Motorik Europe** — `20%` of Motorik songs (the sync roll in `SongGenerator.swift`; base Motorik only,
+  so a song is never both Europe and Noir or Europe and Arcade)
 - **Kosmic Drift** — `30%` of Kosmic songs (`rng.nextDouble() < 0.30` in `CosmicMusicalFrameGenerator.swift`)
 - **Kosmic Drift — Dreamscape variant** — `15%` of Drift songs, i.e. ~4.5% of all Kosmic songs (`rng.nextDouble() < 0.15`, also in `CosmicMusicalFrameGenerator.swift`)
 - **Ambient Piano** — `35%` of Ambient songs (`pianoRoll < 0.35` in `SongGenerator.swift`)

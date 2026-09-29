@@ -238,6 +238,20 @@ enum OfflineExport {
             }
 
             let reverb = AVAudioUnitReverb()
+            // NOTE: this call has no effect, and must not be "fixed" by moving it later.
+            //
+            // AVAudioUnitReverb ignores loadFactoryPreset until the unit has been prepared, so
+            // every exported track actually renders in the default room rather than the one
+            // named here. Moving the call after prepare()/start() does make the preset take,
+            // but it also destroys the reverb tail — the unit then emits one short burst and
+            // nothing after it. Measured across plate/mediumHall/cathedral at every point in
+            // the engine lifecycle: there is no ordering where the preset applies AND the
+            // reverb still works in an offline manual-rendering engine.
+            //
+            // Left in place because the amount of reverb — snap.reverbWetDryMix — is correct
+            // and is what carries the match with playback. `ReverbPresetOfflineTests` pins the
+            // limitation, and will fail if a future OS makes this work, at which point the
+            // per-track rooms can be honoured properly.
             reverb.loadFactoryPreset(snap.reverbPreset)
             reverb.wetDryMix = snap.reverbBypassed ? 0 : snap.reverbWetDryMix
 
@@ -512,6 +526,7 @@ enum OfflineExport {
                 }
 
                 let reverb = AVAudioUnitReverb()
+                // No effect — see the note on the mix path above. Do not move this later.
                 reverb.loadFactoryPreset(snap.reverbPreset)
                 reverb.wetDryMix = snap.reverbBypassed ? 0 : snap.reverbWetDryMix
 

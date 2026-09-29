@@ -5,7 +5,24 @@ Copyright (c) 2026 Zack Urlocker
 
 Strictly CPU optimization for **live playback only**. The goal is to reduce the DSP cost of reverb by replacing 7 independent `AVAudioUnitReverb` instances (one per track) with 2 shared reverb bus instances in `PlaybackEngine`.
 
-**M4A audio export (`OfflineExport.swift`) deliberately uses per-track reverbs** — one `AVAudioUnitReverb` per track with the original per-track presets (e.g. `.largeHall` for Kosmic leads, `.plate` for Ambient drums). This preserves the original wet/dry balance and full per-track spatial character in exported audio. Since offline rendering is not real-time and not CPU-constrained, the performance trade-off is irrelevant for export.
+**M4A audio export (`OfflineExport.swift`) deliberately uses per-track reverbs** — one `AVAudioUnitReverb` per track with the original per-track presets (e.g. `.largeHall` for Kosmic leads, `.plate` for Ambient drums). This preserves full per-track spatial character in exported audio. Since offline rendering is not real-time and not CPU-constrained, the performance trade-off is irrelevant for export.
+
+**The bus returns must use input buses above the track range.** `mixer` takes one input per track at bus `0..<kTrackCount`, claimed explicitly in `setupEngine`. The two reverb returns are connected before that loop runs, so a default "next available bus" connection puts them on buses 0 and 1 — and the track fan-outs then replace them. This produced no error and no log line; playback simply had no reverb from build 124 until it was found, while export was unaffected because it builds its own per-track reverbs. The returns now connect explicitly to `kTrackCount` and `kTrackCount + 1`, and `ReverbBusRoutingTests` pins it.
+
+**Offline export cannot use factory reverb presets.** `AVAudioUnitReverb` ignores `loadFactoryPreset` until the unit has been prepared, so the per-track rooms `OfflineExport` asks for never take effect — every exported track renders in the default room. Moving the call after `prepare()` does apply the preset, but the unit then stops producing a tail entirely: one short burst and silence. Measured across plate / mediumHall / cathedral at every point in the engine lifecycle, there is no ordering that both applies the preset and leaves the reverb working, so the call is left where it is and the limitation is pinned by `ReverbPresetOfflineTests`. What does carry across is the *amount* of reverb, which is what matches export to playback. `perTrackReverbPresets[]` is therefore a record of intent rather than something that reaches the output.
+
+**Reverb amount is expressed as the pre-bus insert `wetDryMix`, not as a send level.** The original per-style tables (Ambient pads 72, Kosmic leads 60, and so on) are still the numbers the style setup methods pass. `PlaybackEngine.reverbGains(forWetDryMix:)` turns each one into the pair of gains that reproduces that insert:
+
+```swift
+send = sqrt(W / 100)        // the wet leg
+dry  = sqrt(1 - W / 100)    // the dry leg of the same fan-out
+```
+
+`AVAudioUnitReverb` blends in the power domain (measured, not documented), so those two gains render identically to an insert at `W`. Both legs matter: setting only the send gets the wet/dry ratio right but leaves the track up to 4 dB louder, worst on the wettest tracks.
+
+Because playback now reproduces the insert exactly, offline export needs no conversion at all — it builds a real insert and reads `W` straight from the snapshot. `ReverbSendConversionTests` renders both graphs and requires them to match.
+
+**Historical note.** Build 124 set send levels to `W/100` directly, treating a send of 0.72 and a wetDryMix of 72 as the same amount of reverb. That halved playback's reverb — observed at the time and attributed to "the bus architecture" — and, because export converted back the same way, left exported files about twice as wet as playback. Both symptoms came from that one assumption.
 
 ---
 
@@ -163,7 +180,7 @@ Bus assignments are per-style, determined by the preset each track currently use
 
 **OfflineExport (M4A export) — unchanged:**
 - Still uses 7 per-track `AVAudioUnitReverb` nodes, one per active track
-- Reads `snap.reverbPreset` (per-track preset from `perTrackReverbPresets[]`) and `snap.reverbWetDryMix` (send level × 100, equivalent to the original wetDryMix)
+- Reads `snap.reverbPreset` (per-track preset from `perTrackReverbPresets[]`) and `snap.reverbWetDryMix` (the insert wetDryMix, carried through unchanged)
 - Chain: `player → sweep → delay → comp → eq → reverb → mainMixerNode`
 
 ---
@@ -194,7 +211,7 @@ If the reverb bus delivers the expected CPU reduction, profile again. Only addre
 
 **Live playback:** tracks on the same bus share one reverb tail rather than having independent decay. In practice this sounds more cohesive — instruments feel like they exist in the same acoustic space. The two-bus approach (large/small) preserves the most important spatial distinction. Ambient drums move from `.plate` to the small bus (`.mediumHall`); since Ambient drums are sparse and sit low in the mix this is inaudible in context.
 
-**M4A export:** uses the original per-track presets and wet/dry balance throughout. Ambient drums retain `.plate`. Kosmic leads/bass retain `.largeHall`. The exported audio matches the original design intent, not the live playback bus approximation.
+**M4A export:** uses the original per-track presets throughout. Ambient drums retain `.plate`. Kosmic leads/bass retain `.largeHall`. The amount of reverb is converted from the live send levels, so the exported audio carries the same wet/dry balance the user heard in playback.
 
 ---
 
@@ -243,7 +260,7 @@ samplers[i] → boosts[i] → sweepFilters[i] → delays[i] → comps[i] → low
 Confirm whether `mainMixerNode` is Apple's implicit engine mixer or an explicit node. This matters because bus outputs must connect to the same mixer.
 
 **0b. Decide OfflineExport strategy before writing a line of code**
-`OfflineExport.swift` builds a separate offline `AVAudioEngine` per M4A render. It reads a `TrackSnapshot` struct (captured in `PlaybackEngine.swift` around line 1231–1282) that includes `reverbPreset: AVAudioUnitReverbPreset` and `reverbWetDryMix: Float` per track, and builds a per-track reverb chain offline. Since offline rendering is not CPU-constrained, **keep OfflineExport per-track** — do not rewire it. Instead update the snapshot capture so it populates `reverbPreset` with the bus preset the track routes to, and `reverbWetDryMix` with a value derived from the send mixer volume. OfflineExport.swift itself does not change.
+`OfflineExport.swift` builds a separate offline `AVAudioEngine` per M4A render. It reads a `TrackSnapshot` struct (captured in `PlaybackEngine.swift` around line 1231–1282) that includes `reverbPreset: AVAudioUnitReverbPreset` and `reverbWetDryMix: Float` per track, and builds a per-track reverb chain offline. Since offline rendering is not CPU-constrained, **keep OfflineExport per-track** — do not rewire it. Instead update the snapshot capture so it populates `reverbPreset` with the bus preset the track routes to, and `reverbWetDryMix` with the track's insert wetDryMix. OfflineExport.swift itself does not change.
 
 **0c. Inventory all reverb-touching call sites**
 Run these greps before writing any code. Every result is a place that needs updating:
@@ -304,7 +321,7 @@ Note: each `reverbSendMixers[i]` connects to ONE of the two bus mixers depending
 
 **1c. Style setup methods — send levels replace wetDryMix**
 
-Per-track send levels (0.0–1.0, roughly equivalent to the previous wetDryMix / 100). Exact values should be tuned by ear against the existing sound, but these are starting points derived from the current wetDryMix values:
+**Superseded — see the Purpose section.** These were the send levels as first planned, set to the previous wetDryMix / 100. That equivalence does not hold, and the style setup methods now pass the wetDryMix values themselves. Kept for the record because the numbers below are the original per-track tables:
 
 **Ambient:**
 ```swift
@@ -403,7 +420,7 @@ Ambient empty-track suppression (lines 1443–1448) returns early for `.reverb`/
 
 ```swift
 reverbPreset:    perTrackReverbPresets[i],   // original per-track preset (largeHall, plate, etc.)
-reverbWetDryMix: reverbSendLevels[i] * 100,  // send level × 100 = equivalent wetDryMix
+reverbWetDryMix: perTrackReverbWet[i],  // the insert wetDryMix — no conversion needed
 reverbBypassed:  reverbSendLevels[i] == 0,
 ```
 
@@ -494,11 +511,13 @@ Send levels are inlined as literals directly in each style method's `connectSend
 
 ### F0d. OfflineExport — Per-Track by Design
 
-OfflineExport.swift uses per-track `AVAudioUnitReverb` nodes intentionally. The bus architecture produces a drier sound than the original wetDryMix model — audible on Ambient and Kosmic where reverb levels are 60–72%. Since export is not CPU-constrained, per-track reverbs are correct.
+OfflineExport.swift uses per-track `AVAudioUnitReverb` nodes intentionally. Since export is not CPU-constrained, per-track reverbs are correct — they keep each track's own preset rather than collapsing onto two shared buses.
+
+What an insert reverb does **not** keep for free is the amount of reverb. The send level has to be converted (see the Purpose section); playback is the reference, and the export must match what the user hears, not the pre-bus per-track values.
 
 Each track's reverb is configured from `TrackEffectSnapshot`:
 - `snap.reverbPreset` — original per-track preset from `perTrackReverbPresets[]` in PlaybackEngine
-- `snap.reverbWetDryMix` — send level × 100, equivalent to the original wetDryMix
+- `snap.reverbWetDryMix` — the insert wetDryMix, carried through unchanged
 - Chain: `player → sweep → delay → comp → eq → reverb → fxEngine.mainMixerNode`
 
 ### F0e. Mute/Solo — Sampler Only; Reverb Bus Needs Explicit Zero

@@ -7,7 +7,7 @@
 //   *.MID     — with the song's ACTUAL instrument programs, not the GM defaults
 //   *.zudio   — the generation log
 //
-// A sync fires in only about 20% of base Motorik songs, so this searches seeds until it
+// A sync fires in only about 26% of base Motorik songs, so this searches seeds until it
 // has a balanced sample of all three sync types rather than taking the first 20 it finds.
 
 import Testing
@@ -148,7 +148,8 @@ struct KraftwerkBatchTests {
             try? fm.removeItem(at: url)
         }
 
-        // A balanced sample: the three sync groups occur at 8/7/5, so taking the first 20 hits
+        // A balanced sample: the three sync groups occur at 10.5/9.2/6.5, so taking the first
+        // 20 hits
         // would under-represent Machine Voice, which is the one most worth listening to.
         let wanted: [MotorikSync: Int] = [.rhythmSection: 7, .sequenceLock: 7, .machineVoice: 6]
         var have: [MotorikSync: Int] = [:]

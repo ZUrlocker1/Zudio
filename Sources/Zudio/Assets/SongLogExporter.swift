@@ -61,6 +61,13 @@ struct SongLogExporter {
             col("Seed:",           16) + "\(song.globalSeed)",
             col("Style:",          16) + song.style.rawValue.capitalized,
         ]
+        // Style: stays the bare MusicStyle rawValue — the loader parses it back through
+        // MusicStyle(rawValue:), so a substyle name there would fail to match and fall
+        // back to Kosmic. The display name goes on its own line, written only when it
+        // differs, and is informational: the substyle is re-derived from the seed on load.
+        if song.displayStyleName != song.style.rawValue.capitalized {
+            lines.append(col("Substyle:", 16) + song.displayStyleName)
+        }
         if !song.trackOverrides.isEmpty {
             let overridesStr = song.trackOverrides.sorted { $0.key < $1.key }
                 .map { "\($0.key)=\($0.value)" }.joined(separator: "  ")

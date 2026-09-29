@@ -106,6 +106,7 @@ struct SongState: Sendable {
         if chillBluesVariation { return "Chill Blues" }
         if motorikNoirVariation { return "Motorik Noir" }
         if motorikArcadeVariation { return "Motorik Arcade" }
+        if motorikSync.isActive { return "Motorik Europe" }
         if isKosmicDrift { return "Kosmic Drift" }
         return style.rawValue.capitalized
     }

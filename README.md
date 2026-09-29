@@ -2,7 +2,7 @@
 
 Zudio is a generative music app for macOS. It generates complete multi-track songs in one click using human-curated musical rules derived from analyzing real artists rather than machine learning.
 
-It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk) each with their own substyle. Songs are built from 7 tracks (Lead, Pads, Bass, Drums, etc.) with deterministic seed-based variation. Sometimes it even sounds like music! 
+It supports four styles: **Ambient** (Brian Eno, Loscil, Craven Faults), **Chill** (Moby, St Germain), **Kosmic** (Tangerine Dream, Jean-Michel Jarre, Electric Buddha Band), and **Motorik** (Neu!, Kraftwerk) each with their own substyles. Songs are built from 7 tracks (Lead, Pads, Bass, Drums, etc.) with deterministic seed-based variation. Sometimes it even sounds like music! 
 
 ![Zudio screenshot](assets/images/Zudio%20099%20screenshot.jpg)
 
@@ -22,10 +22,14 @@ This repository contains the macOS app source, implementation notes, and support
 Current release: `2.6` (build 131). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
 **What's new in v2.6:**
-- **Kraftwerk flavour in Motorik** — Some Motorik songs now lean machine-like rather than Neu!-like. A group of tracks **syncs**: they adopt Kraftwerk rules together — rigid sequencer cells locked to the bar, sparse mechanical drums with no mid-section fills, octave doubling between parts — while the rest of the song plays normally. Synced songs run slower (120-132 BPM) and drop out together twice a song, with the texture track left playing through the gap. Its generation log names the tracks on a `Sync` line.
+- **Motorik Europe** — A new Kraftwerk-flavoured take on Motorik, turning up in about one Motorik song in five. A group of tracks **syncs**, adopting Kraftwerk rules together — rigid sequencer cells locked to the bar, sparse mechanical drums, octave doubling between parts — while the rest of the song plays normally. Europe songs run slower (120-132 BPM) and take a German-flavoured title.
+- **More melodic Motorik leads** — Lead lines are now built from figures measured in the original recordings rather than assembled note by note, so they repeat, vary and resolve like phrases instead of wandering. Leads also rest more often, hold the last note of a phrase, and no longer sit on one note or play for twenty bars without a break.
 - **Motorik bass concentrated** — Four of the less distinctive bass rules were retired from the base Motorik pool with the freed weight going to the Neu! and Kraftwerk rules at either end of the style. All four remain in Motorik Noir or Arcade.
+- **More instrument variety** — New songs no longer favour whichever instrument happens to sit first in each pool.
 - **Saved songs reload note-for-note** — A saved song stores its seed and is rebuilt from it, and a few places in the generators could return a different pitch each time. The same seed now always produces the same song.
-- **Fixes** — Removed Clavinet from the Motorik instrument pool: the sound was missing from the soundfont, so that track played silent. Corrected the iPhone info sheet, which still showed v2.4.
+- **Reverb fixed** — Playback inadvertently did not use the same reverb as Audio Export. Now both Audio Export and Playback reverbs match exactly.
+- **Stability** — Fixed a crash that could stop a song generating, depending on how its sections lined up, and a threading fault behind rare glitches during long playback.
+- **Minor Fixes** — Removed Clavinet from the Motorik instrument pool: the sound was missing from the soundfont, so that track played silent. Corrected the iPhone info sheet, which still showed v2.4.
 
 
 ---

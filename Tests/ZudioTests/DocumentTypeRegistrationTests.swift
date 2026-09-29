@@ -208,7 +208,12 @@ struct DocumentTypeRegistrationTests {
             let value = line
                 .split(separator: "=").last?
                 .trimmingCharacters(in: CharacterSet(charactersIn: " ;\t\""))
-            guard let value, !value.hasSuffix(".tests") else { continue }
+            // Only the two app targets are checked. The test bundle and the QuickLook and
+            // Share extensions are separate targets and must each carry their own ID, which
+            // is required to be a child of the app's — so anything below com.zudio.app is
+            // a non-app target, not a parity violation.
+            guard let value, value == "com.zudio.app" || !value.hasPrefix("com.zudio.app.")
+            else { continue }
             ids.insert(value)
         }
 

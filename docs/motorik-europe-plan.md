@@ -1,27 +1,39 @@
-# Motorik Kraftwerk Flavour — Design Plan
+# Motorik Europe — Design Plan
 
 Status: **implemented and shipping in 2.6 build 131.**
 
-Motorik occasionally leans machine-like rather than Neu!-like. A coupled *sync group* of tracks
-adopts Kraftwerk rules together while the rest of the song draws from normal rotation. This is
-not a substyle: there is no new `displayStyleName`, no UI change and no fourth sanitiser.
+Motorik Europe is the Kraftwerk-derived flavour of Motorik. A coupled *sync group* of tracks
+adopts Kraftwerk rules together while the rest of the song draws from normal rotation, and the
+song is presented to the user as **Motorik Europe**.
 
 This document describes the design as built. Section numbers, weights and measurements below
 are the shipped values.
 
 ---
 
-## What This Is — and Is Not
+## What This Is
 
-**Not a substyle.** Motorik already has Noir and Arcade. A third would fragment the style and
-force a fourth `displayStyleName` case, a fourth set of pool restrictions and a fourth
-sanitiser.
+Motorik has four presentations: regular Motorik, Motorik Noir, Motorik Arcade and Motorik
+Europe. Europe is the machine-like one — where the others differ by mood or energy, Europe
+differs by *coordination*: several tracks lock to the same rigid pattern instead of each
+drawing independently.
 
-Instead: **a sync of tracks within a regular Motorik song occasionally adopts Kraftwerk
-rules, while the rest draw from normal rotation.** No new flag on SongState, no UI change, no
-new substyle name. A Motorik song simply sometimes leans machine-like.
+It is built differently from Noir and Arcade. Those are substyle flags that restrict every
+track's rule pool for the whole song. Europe is a **sync group** — a named set of tracks that
+draw Kraftwerk rules together, while every track outside the group behaves like base Motorik.
+Roughly half the tracks in a Europe song are unsynced, which is deliberate: the machine
+element sits inside a Motorik song rather than replacing it.
 
-The aim is to widen what base Motorik can sound like, not to carve a new territory out of it.
+So Europe shares base Motorik's harmony, structure, effects and instrument pools. What it adds
+is the sync group, a narrower tempo band, and a German-flavoured title affix.
+
+### The name
+
+Kraftwerk were a European act more than a narrowly German one — they recorded in German,
+English and French, drew on European culture and industry, and shaped it back. "Europe" names
+that sensibility without naming any of their records. It is also free of collisions with
+Zudio's own title word banks, which "Maschine" and "Düsseldorf" are not: the title generator
+already produces *Die Maschine* as a song name.
 
 ---
 
@@ -59,21 +71,34 @@ So: **one sync group is drawn per song**, and only those tracks use Kraftwerk ru
 
 **The roll happens inside base Motorik only**, after the existing substyle roll has already
 excluded Noir and Arcade. So these percentages are of base Motorik songs, not of all Motorik
-songs — at the current 60% base share, a sync fires in about 12% of Motorik output overall.
+songs. At the current 61% base share, a sync fires in **20% of Motorik output overall**, which
+makes the four-way split of the style: regular 41 / Noir 20 / Arcade 19 / Europe 20.
 
-- **No sync — 80%.** Normal Motorik, unchanged. This must remain the common case.
-- **Rhythm Section sync — 8%.** Bass + Drums. The machine rhythm section: rigid kick
-  placement with a bass locked to it.
-- **Sequence Lock sync — 7%.** Bass + Rhythm. A repeating cell shared between the two,
-  the sequencer-driven texture.
-- **Machine Voice sync — 5%.** Rhythm + Lead 1, with unison or octave doubling between
-  them. This is the most identifiable Kraftwerk gesture and the least represented in Zudio
-  today.
+- **No sync — 67.2%.** Normal Motorik, unchanged. This must remain the common case.
+- **Rhythm Section sync — 13.1%.** Bass + Drums + Lead 1. The machine rhythm section — rigid
+  kick placement with a bass locked to it — carrying Kraftwerk lead statements over the top.
+  The only group with Drums, and the only one without Texture.
+- **Sequence Lock sync — 11.3%.** Bass + Rhythm + Texture. A repeating cell shared between
+  bass and sequencer.
+- **Machine Voice sync — 8.4%.** Bass + Rhythm + Lead 1, with unison or octave
+  doubling between Rhythm and Lead 1. This is the most identifiable Kraftwerk gesture. Bass is
+  in the group so the doubled line has a locked foundation rather than a Neu!-style rhythm
+  section underneath it.
 
-**Texture joins whichever sync is drawn.** It is not a member of any one sync — the
-scattered wide-register behaviour suits all three equally, and Texture is a supporting role
-rather than part of the rhythmic interlock. So whenever a sync fires, Texture also draws
-from `MOT-TEXT-009/010` instead of normal rotation.
+**Only Bass is in all three groups.** It is the foundation of the machine sound and has four
+rules written for it. Rhythm is in two, Lead 1 in two, and Drums and Texture in one each, so
+every group is three tracks and no two draw on the same set of rules.
+
+Texture is deliberately in **one** group only. With it in all three, the two Kraftwerk texture
+rules were the whole of what a sync song's texture ever did, and between them they have one
+shape — sparse single notes across a wide register. Confining them to Sequence Lock sends 62%
+of sync songs back to the ordinary Motorik texture pool, which is where the variety comes from.
+
+Every track with purpose-built rules is reachable from at least one group; a test enforces that,
+so a membership change cannot silently orphan a rule set.
+
+**Pads is never synced.** It is what keeps playing through a dropout, which is what makes the
+drop read as a section change rather than the song stopping. There are no Kraftwerk pads rules.
 
 **Lead 2 is locked to Rhythm.** Both Lead 2 rules are partners — one mirrors Rhythm's cell at
 a 2-step offset, the other re-emits Rhythm's events at the octave — so neither is meaningful
@@ -81,7 +106,11 @@ without Rhythm in the sync. Its behaviour is therefore fully determined:
 
 - **Rhythm in the sync** (Sequence Lock, Machine Voice): Lead 2 takes the partner rule
   matching Rhythm's draw — `MOT-RTHM-014` pairs with `MOT-LD2-012`, `MOT-RTHM-015` pairs with
-  `MOT-LD2-011` — **or rests entirely**. Split 65% partner / 35% silent. It never draws a
+  `MOT-LD2-011` — **or rests entirely**. Split 65% partner / 35% silent, and when it partners
+  the doubling is **sectional**: alternating stretches of 8-16 bars on and off, entering after a
+  variable opening, so it covers about a quarter of the song's bars rather than all of them.
+  Applied end to end it was either wholly absent or a rigid copy from first bar to last, and
+  across songs that single gesture was all you heard. It never draws a
   normal Motorik rule here: a melodic Lead 2 over a rigid two-pitch-class sequencer is exactly
   the incoherence the sync design exists to prevent. Variety comes from presence versus
   absence, not from mixing vocabularies.
@@ -92,13 +121,14 @@ without Rhythm in the sync. Its behaviour is therefore fully determined:
 The 65/35 split reflects the corpus: doubling appears in two of the three files, so it should
 be common but not universal.
 
-Effective track counts per song: **Rhythm Section** = Bass + Drums + Texture; **Sequence Lock**
-= Bass + Rhythm + Texture (+ Lead 2 when partnering); **Machine Voice** = Rhythm + Lead 1 +
-Texture (+ Lead 2 when partnering).
+Effective track counts per song: **Rhythm Section** = Bass + Drums + Lead 1; **Sequence Lock**
+= Bass + Rhythm + Texture (+ Lead 2 when partnering); **Machine Voice** = Bass + Rhythm +
+Lead 1 (+ Lead 2 when partnering). Five membership shapes reach the log.
 
 All remaining tracks draw from normal Motorik rotation as they do now.
 
-**Log it.** The tag is `Sync`, not `Cluster` — Cluster is a krautrock band and the name of
+**Log it.** The tag is `Sync` plus the track count — `Sync 4` — never `Cluster`, which is a
+krautrock band and the name of
 several existing texture rules, so the word is already taken in this codebase.
 
 **What is logged.** When one fires, emit a `GenerationLogEntry` with tag `Sync` naming the
@@ -106,9 +136,11 @@ tracks that actually adopted Kraftwerk rules, so a song's character can be ident
 reading its log rather than by guessing:
 
 ```
-Sync       Bass, Drums, Texture
-Sync       Bass, Rhythm, Texture, Lead 2
-Sync       Rhythm, Lead 1, Texture
+Sync 3     Bass, Drums, Ld 1
+Sync 3     Bass, Rhythm, Texture
+Sync 4     Bass, Rhythm, Texture, Ld 2
+Sync 4     Bass, Rhythm, Ld 1, Texture
+Sync 5     Bass, Rhythm, Ld 1, Texture, Ld 2
 ```
 
 List **actual membership**, not the sync group's name — Texture always joins and Lead 2 joins only
@@ -153,20 +185,27 @@ naturally alongside Kraftwerk rather than against it), and both existing Kraftwe
 The freed 25% goes mostly to the rules that pull toward this plan's goal. Base Motorik bass
 becomes eleven rules:
 
-- `MOT-BASS-001` Root Anchor — 8%
-- `MOT-BASS-002` Motorik Drive — 14%
-- `MOT-BASS-003` Crawling Walk — 5%
-- `MOT-BASS-004` Neu! Hallogallo lock — 8% *(raised from 4%)*
+- `MOT-BASS-001` Root Anchor — 9%
+- `MOT-BASS-002` Motorik Drive — 11%
+- `MOT-BASS-003` Crawling Walk — 8%
+- `MOT-BASS-004` Neu! Hallogallo lock — 9% *(raised from 4%)*
 - `MOT-BASS-008` Moroder Pulse — 11%
-- `MOT-BASS-009` Vitamin Hook — 7%
+- `MOT-BASS-009` Vitamin Hook — 8%
 - `MOT-BASS-011` Quo Drive — 4%
-- `MOT-BASS-012` Moroder Chase — 8%
+- `MOT-BASS-012` Moroder Chase — 9%
 - `MOT-BASS-013` Kraftwerk robotic bass — 10% *(raised from 4%)*
-- `MOT-BASS-014` McCartney melodic drive — 9%
-- `MOT-BASS-015` Kraftwerk driving bass — 16% *(raised from 11%)*
+- `MOT-BASS-014` McCartney melodic drive — 10%
+- `MOT-BASS-015` Kraftwerk driving bass — 11%
 
-Sums to 100%. Net effect: the two existing Kraftwerk bass rules rise from 15% combined to 26%,
-and Neu! doubles — so base Motorik gets **more** characterful in both directions, not just one.
+Sums to 100%. Net effect: the two existing Kraftwerk bass rules rise from 15% combined to 21%,
+and Neu! more than doubles — so base Motorik gets **more** characterful in both directions, not
+just one.
+
+Two rules were trimmed afterwards on listening, each having grown too dominant.
+`MOT-BASS-015` was first set to 16% and is back to 11%, its 5% spread over Moroder Chase,
+Neu! Hallogallo, McCartney melodic drive and Crawling Walk. `MOT-BASS-002` Motorik Drive went
+14% -> 11%, its 3% spread over Crawling Walk, Root Anchor and Vitamin Hook. The pool is flatter
+than it started — nothing sits above 11% — so no single bass figure defines base Motorik.
 
 ---
 
@@ -290,9 +329,28 @@ must coincide with `MOT-DRUM-013`/`014`'s kick steps.
 **MOT-RTHM-014 "Two-Note Lock"** — the most extreme measurement in the corpus: a 4-step cell
 over **2 pitch classes** carrying 2,321 notes at density 3.84 with only 28% rest.
 
-*Implementation.* A cell of **2, 3 or 4 steps** using **2 or 3 pitch classes only**, repeated
-with **no variation for the entire song**, transposing with the chord but never changing shape.
-Register MIDI 44–70, density 3.0–4.0, `durationSteps: 1`, velocity 80.
+*Implementation.* A cell of **2 or 4 steps** using **2 or 3 pitch classes only**, repeated with
+**no variation for the entire song**, transposing with the chord but never changing shape.
+Register MIDI 44–70, density 3.0–4.0, `durationSteps: 1`, velocity 80. Three is excluded because
+it does not divide into 16 and would phase across the barline, which contradicts the locking
+requirement below.
+
+**The degrees are drawn, not fixed.** The root always leads — it is what anchors the cell to the
+chord — and the remaining one or two are drawn from the fifth, octave, third and fourth. Taking
+them in a fixed order made every song root+fifth or root+fifth+octave, so the rule had two
+pitch vocabularies in total and every Two-Note Lock song was a variation on the same drone.
+Drawing them yields fourteen, including root+third, root+fourth and root+2nd+fifth.
+
+A cell may drop one slot to a rest — one of three positions in a 4-step cell (50%), or its
+offbeat in a 2-step cell (35%), which takes density to the bottom of the band.
+
+**Every offset is snapped onto the scale.** A fixed interval above the chord root is not
+diatonic in every mode — a minor third above the root is G natural in E Lydian, where the scale
+has G# — and three of `MOT-RTHM-015`'s six offsets were non-diatonic in that key. Nothing
+downstream catches it either: `HarmonicFilter`'s clash pass covers only the two leads and never
+examines Rhythm's pitches. Snapping keeps the intervallic shape as close as the scale allows
+while guaranteeing the notes belong; a restricted vocabulary is the point, a wrong one is not.
+`MOT-BASS-026` and `MOT-BASS-027` are snapped for the same reason.
 
 Because cell length divides evenly into 16, it **locks to the barline** rather than phasing.
 That is the opposite of Kosmic Space's sequencer and is intentional: Kraftwerk's rigidity comes
@@ -307,53 +365,144 @@ instrument. When Lead 2 does not, this plays alone.
 
 ### Lead 1
 
-Two measured shapes: short compact statements with proportionate silence (4–6 notes over 6–34
-steps, ratio 0.9–4.3:1), and long runs followed by very long silences (38–127 notes, then
-37–608 steps, ratio 4.8–5.8:1).
+Both Kraftwerk Lead 1 rules build their line from **closed cells** measured in the corpus by
+`tools/kraftwerk_lead_phrases.py`, rather than from a per-note random walk.
 
-**MOT-LD1-021 "Short Statement"**
+**The finding.** Across all three transcriptions, the figures that recur are short and their
+intervals **sum to zero** — the figure returns to the pitch it began on, so the line cycles in
+place instead of wandering:
 
-*Implementation.* Register 65–86, **5 or 6 pitch classes**. Statements of **4...6 notes** over
-6...34 steps, then silence of **1.0...4.0 ×** the statement span. Rest ratio lands 88–95%.
-`durationSteps: 2`, velocity 80.
+- *The Robots* "steampad": `[+5 +3 -8]` ×204 — a fourth up, a minor third up, a minor sixth back down
+- *Autobahn* ch2: `[+9 -4 -5]` ×20 and its inversion `[-9 +5 +4]` ×19
+- *Computer Love* ch0: `[+5 -2 +4 -7]` ×8
+- *Autobahn* ch10: `[-12 +0 +12]` ×77 — octave oscillation
+- *Autobahn* ch6: `[+0 +0 -5 +5]` ×27 — a repeated note, then a fourth away and back
+- *The Robots* "steeldrm": `[+0 -2 +0 +2]` ×40 — neighbour-tone oscillation
 
-**MOT-LD1-022 "Long Run"**
+Two corrections to earlier assumptions come out of this. Kraftwerk leads are **not stepwise**:
+4–33% of motion is a step and the median interval is a perfect fourth, so wide intervals are
+correct here. What makes them melodic rather than shrill is that **every leap is answered**.
+And **repeated notes are structural** — `+0` is among the most common intervals.
 
-*Implementation.* Register 77–106, 5 pitch classes. A continuous run of **40...130 notes** at
-~1.0 notes/beat, then **4...6 × that span** in silence. Typically two or three statements in a
-song. This is the rule that makes the lead feel like an announcement.
+**How it is built.** A cell is drawn once per song from `kraftwerkCells`, anchored to start on a
+chord tone with the whole figure inside the register band, and realised as actual pitches. Each
+pitch snaps to the nearest usable pitch class, but only when that is within two semitones —
+two notes snapping in opposite directions each shift their shared interval, and an unbounded
+snap turns a cell's octave into a minor tenth. Notes outside the band are folded by octaves, not
+clamped; clamping collapses them onto the edge pitch and breaks the closure exactly where it is
+most exposed.
+
+Variation follows the corpus: *The Robots* states `[+5 +3 -8]` then `[+2 -7 +5]`, each interval
+nudged with the sum unchanged. `varyCell` nudges one interval and takes the same amount back out
+of another, never touching index 0 — that entry is the cell's own starting offset, which the
+realiser skips, so changing it moves nothing while its compensating partner still moves, leaving
+the cell open. Restatements keep the same anchor 75% of the time; a transposition, when it
+happens, lands on a chord tone.
+
+**Three places the figure can quietly come open**, each found by ear first and then measured:
+
+- **The closing interval must not be emitted.** `[0 +5 +3 -8]` is the three notes 0, +5, +8
+  cycling — the final interval is the return home, which the *next* statement's first note
+  already supplies. Emitting it too puts a repeated note at every seam, which is what produced
+  bars of `82 81 77 82 | 82 81 77 82` and drove repeated-note moves to 32% of a part.
+- **Variation may only touch the interior intervals.** Index 0 is the starting offset and the
+  last is the return home, and the realiser emits neither, so nudging either moves nothing
+  while its compensating partner still moves — leaving the cell open and letting the figure
+  climb. Both ends caused a 15-semitone leap in a part whose widest cell interval is an octave.
+- **Re-anchoring is a transposition, not a jump.** Left free to pick any chord tone in a
+  19-semitone band, a mid-run move reads as the line teleporting; it is held to a fifth of
+  where the line already was.
+
+**Measured over 800 Europe songs:** 9.0 distinct pitches per lead, 9% repeated-note moves
+(corpus 2–31%), stepwise motion 24% and median interval 5.5 semitones — both inside the corpus
+range — and end-to-end pitch drift with a median of 1.6 semitones and a worst case of 5.8.
+`MotorikSyncTests` pins the leap ceiling and the drift bound.
+
+**Phrase endings are shaped in a final pass**, taking two ideas from the Chill lead
+(`applyLastNoteDuration` and `applyLastNoteFlip`), which solve the same problem for a solo:
+
+- A note followed by half a bar or more of silence **holds** — 10 to 20 steps rather than the
+  2 to 3 the body runs at. A statement that stops on a blip before four bars of nothing sounds
+  cut off rather than finished. Measured: 11.3 steps at endings against 2.6 elsewhere.
+- That note **resolves onto the tonic** 45% of the time, but only where the harmony admits it,
+  only within five semitones, and never by a wider interval than the phrase was already making
+  — resolving is a settling gesture, and reaching the tonic by a bigger leap defeats it.
+  Measured: 50% of endings land on the tonic, counting those that were already there.
+
+The same pass clamps every note to end before the next begins. Long Run's legato branch could
+draw a duration longer than the gap it sat in, overlapping the following note — 412 times
+across 600 songs — which muddies a line meant to read as a single voice. Chill assigns its
+durations last for exactly this reason. Now zero.
+
+**The lead has to stop, and it has to move.** Two failures measured in a finished song:
+30 consecutive sounding bars with no rest, and eleven strikes of one pitch in a row.
+
+- A breath inside a run opens into **two to four bars one time in three**. At one in four with
+  a two-bar ceiling, a thirteen-bar run had no real gap in it.
+- A pitch may be struck **twice** — several cells repeat their first note, which is how
+  Autobahn's `[+0 +0 -5]` goes — but a third strike in a row is dropped and the space left
+  instead. The gap that opens then feeds the phrase-ending pass, so the pair before it holds.
+  A tonic resolution never lands on the pitch just played, which would undo this.
+
+Measured over 600 songs: longest same-pitch run 3, longest unbroken stretch 14 bars, and the
+lead sounds in 32% of bars with multi-bar gaps averaging 5.7 bars.
+
+The 8-step boundary is shared: the generator ends a phrase there, and `MotorikSyncTests`
+measures leaps only below it, so a jump across a rest counts as a new phrase rather than as a
+leap within a line.
+
+Long Run draws a fresh cell for 40% of its runs, so a song states two or three related ideas
+across its length rather than one figure for several minutes.
 
 ### Lead 2
 
 Used as an additional sequencer voice rather than a second melody, which is how the corpus uses
 its extra parts.
 
+Both partner rules double at **velocity 44** against Rhythm's 80 — roughly 45% below it once
+the velocity arc has shaped both. The double is a shadow of the sequencer, not a second voice:
+at the original 72 it blurred the very line it was doubling.
+
 **MOT-LD2-011 "Counter Sequencer"** — fires only when Rhythm draws `MOT-RTHM-015`.
 
-*Implementation.* The same cell as Rhythm, **offset by 2 steps** and on a different instrument,
-panned opposite. Velocity 72. Two near-identical lines slightly displaced is the measured
-arrangement.
+*Implementation.* The same cell as Rhythm, **offset by 2, 4 or 6 steps** — drawn per song, since
+a half-beat, a beat and a beat-and-a-half are three distinctly different feels from the one rule
+— on a different instrument, panned opposite. Two near-identical lines slightly displaced is the
+measured arrangement.
 
 **MOT-LD2-012 "Octave Unison"** — fires only when Rhythm draws `MOT-RTHM-014`.
 
 *Implementation.* Generates no rhythm. Re-emits Rhythm's events at the same `stepIndex` and
-`durationSteps`, transposed **+12 or +24** (70/30 per song). Velocity 72, different instrument.
-Strict unison — no thirds, no offset. The machine quality comes from exact lock.
+`durationSteps`, transposed **+12 or +24** (70/30 per song), on a different instrument. Strict
+unison — no thirds, no offset. The machine quality comes from exact lock.
 
 ### Texture
 
-Texture rides along with **any** sync rather than belonging to one. It is also the one voice
-that can continue through a dropout window — but only on `MOT-TEXT-010`, whose two-or-three-note
-bursts mark a space. `MOT-TEXT-009` is continuous, and leaving it running would fill the gap
-rather than hold it, so it drops out with everything else. The corpus shows a
+Texture is in **one** of the three groups, Sequence Lock. It is also the one member that plays
+**through** a dropout window, alongside the never-synced Pads and whatever else is outside the
+group: with it silenced too, a four-track group leaves only two parts in the window and the drop
+reads as empty rather than as a change. It does not become relentless as a result — the rules
+are sparse by construction and each song carves two 12-16 bar windows where the part is absent
+entirely. The corpus shows a
 clear textural behaviour: isolated single notes scattered across a very wide register (spans of
 20–94 and 35–107 semitones) at high silence ratios (7:1 to 31:1).
 
 **MOT-TEXT-009 "Wide Scatter"**
 
-*Implementation.* **Single notes**, never phrases — one event then a gap. Register spans at
-least **40 semitones**, pitches drawn from chord tones across the full span rather than a band.
-`durationSteps: 1...3`, velocity 72.
+*Implementation.* Isolated events in a wide space, pitches drawn from chord tones. Velocity 72.
+
+**Three things are drawn once per song**, because with a single character available every Wide
+Scatter song sounded like the last — the same full-register scatter of the same tiny blips, and
+the register *shape* is the dimension the ear notices:
+
+- **Register band** — 36-64 (a dark undertow, 30%), 58-88 (glassy and distant, 30%), or the full
+  36-88 (40%). The corpus measured spans of 20-94 *and* 35-107 semitones, so the span varied
+  there too.
+- **Sustain** — blips of `durationSteps: 1...3`, or in 35% of songs long tones of **8...16**. The
+  gap scales with the note, so a sustained song is one long voice every few bars rather than a
+  drone.
+- **Dyads** — in 25% of songs, an occasional octave or fifth struck with the note at velocity 64.
+  It breaks the uniformity of "always exactly one note" without adding density.
 
 **The two measurements conflict, and the ratio wins.** Density 0.4–0.7 notes/beat and a
 silence-to-statement ratio of 7:1 or wider cannot both hold when notes are 1–3 steps long: the
@@ -362,7 +511,12 @@ this rule put a note in every bar of the song and read as a constant presence �
 not the same as sparse, and the ear hears the regularity rather than the space. Built to the
 ratio it lands near 19:1, mid-range of the measured 7:1–31:1, at about 0.12 notes/beat. Gaps are
 14–30 steps, and one in six stretches to two-to-four bars so the part breathes instead of
-ticking.
+ticking. A sustained song stretches the gap to 48–96 steps to hold the same ratio.
+
+**Two rest windows of 12–16 bars** are drawn per song, in both texture rules, where the part is
+simply absent. Sparse note-to-note is not the same as absent: without them Texture was present
+in some form for the whole song and stopped registering as colour. The windows avoid the sync's
+dropout, which is the one place Texture is wanted.
 
 **MOT-TEXT-010 "Sparse Punctuation"**
 
@@ -404,16 +558,15 @@ When a sync fires, Bass draws from the lists here instead.
 
 ### Instrument subsets
 
-Held on `MotorikSync.instrumentSubset(forTrack:)` so the index lists live in one place,
-read by the pick pools and by `sanitiseSyncInstruments`. Lead 2's subset applies whenever
-Rhythm is synced: it only partners on a 65/35 draw made during generation, but applying the
-subset to both outcomes is harmless, since a silent Lead 2 has no audible instrument either way.
-
-
 Sync tracks draw from a restricted subset of the **existing** Motorik pools. No pool is
 reordered, extended or renamed — this uses the same `instrumentPickPool` /
 `instrumentPickPoolStatic` mechanism Arcade already uses to return an index array, so the
 surrounding pool-selection code is untouched.
+
+The lists live in one place, on `MotorikSync.instrumentSubset(forTrack:)`, read by both pick
+pools and by `sanitiseSyncInstruments`. Lead 2's subset applies whenever Rhythm is synced: it
+only partners on a 65/35 draw made during generation, but applying the subset to both outcomes
+is harmless, since a silent Lead 2 has no audible instrument either way.
 
 The problem being solved: the Rhythm pool contains three guitars and an acoustic bass, and a
 rigid two-pitch-class cell played on Fuzz Guitar is a guitar riff, not a sequencer.
@@ -424,8 +577,9 @@ rigid two-pitch-class cell played on Fuzz Guitar is a guitar riff, not a sequenc
 - **Bass** `[0, 1, 4, 5, 6]` — Moog, Lead Bass, Mean Saw Bass, Techno Bass, Synth Bass 1.
   Excludes Rock Bass and Elec Bass.
 - **Drums** `[2, 3]` — Dance Drums, Machine Kit. Electronic kits only.
-- **Lead 1** `[0, 1, 3, 5, 6]` — Mono Synth, Saw Lead 3, Polysynth, Square Lead, Synth Lead.
-  Excludes Soft Brass.
+- **Lead 1** `[0, 1, 3, 5, 6, 7]` — Mono Synth, Saw Lead 3, Polysynth, Square Lead, Synth Lead,
+  Saw Stack. Weights Mono Synth down to roughly one song in twelve, and never two running, since it reads thin where Polysynth and Saw Stack read full; excludes Soft Brass, which reads as orchestral against a rigid sequencer; and Chiff
+  Lead, whose breathy attack blurs the note placement the rules depend on.
 - **Lead 2** `[0, 2, 4, 5, 6, 7]` — Polysynth, Moog, Square Lead, Synth Lead, Saw Lead,
   5th Saw Wave. Excludes Elec Guitar and Brightness.
 - **Texture** `[0, 3, 4, 6, 8, 9]` — Fifths Lead, FX Atmosphere, FX Echoes, Interference,
@@ -500,10 +654,11 @@ straight into real titles.
 - **Instruments.** No new samples and no pool extensions — a sync draws a restricted
   *subset* of each existing Motorik pool, through the same mechanism Arcade already uses.
 - **Effects, mode, harmony, structure.** All inherited from base Motorik. Constraining the
-  progressions would make this a substyle in all but name.
+  progressions would pull Europe away from Motorik rather than colouring it.
 - **Tempo and titles** are the two exceptions: a sync song sits in the 120-132 band and takes
   a German-flavoured affix. Both are sync-only, and base Motorik is untouched by either.
-- **Noir and Arcade.** Untouched. Sync groups apply to base Motorik only.
+- **Noir and Arcade.** Untouched. Sync groups apply to base Motorik only, so a song is
+  never both Europe and Noir, or both Europe and Arcade.
 - **Neu! identity.** Protected deliberately — the Hallogallo rule's weight doubles rather than
   being diluted.
 
@@ -514,8 +669,10 @@ straight into real titles.
 The sync is drawn once per song, on a stream derived from the seed so it does not shift any
 other draw. Everything below follows from that one value.
 
-1. **Sync roll** at frame-generation time — none 80 / Rhythm Section 8 / Sequence Lock 7 /
-   Machine Voice 5, of base Motorik songs.
+1. **Sync roll** at frame-generation time — none 67.2 / Rhythm Section 13.1 / Sequence Lock 11.3 /
+   Machine Voice 8.4, of base Motorik songs. Set together with the substyle roll, since the
+   two only mean anything in combination: the target is the four-way split of the whole style,
+   regular 41 / Noir 20 / Arcade 19 / Europe 20.
 2. **Tempo band.** A sync song is remapped from base Motorik's 126-154 into **120-132**,
    centred on 125. The corpus measures 120-128, and at Motorik's usual pace a sequencer on top
    still reads as Neu!. The existing triangular spread is compressed rather than clamped, so the
@@ -621,12 +778,13 @@ they sit in band.
 Pinned by `MotorikSyncTests` and `DeterminismTests`:
 
 - the sync survives every `SongState` copy method, and the roll is deterministic
-- Noir and Arcade never draw a sync; the distribution matches 80/8/7/5
+- Noir and Arcade never draw a sync; the distribution matches none 67.2 / Rhythm Section 13.1 / Sequence Lock 11.3 / Machine Voice 8.4
 - every synced track draws a Kraftwerk rule, and Lead 2 either partners or rests
 - `MOT-LD2-012` never drifts off Rhythm's grid
 - no synced track exceeds 12 identical bars
 - sync tempo stays within 120-132 and the base band stays 126-154
 - sync fills occur only at dropout edges, at most four a song
+- every synced note is in key: Rhythm exactly, the other tracks within 0.4%
 
 `RetiredRuleReloadTests` covers the retired bass rules: still playable when a saved song names
 one, absent from the base pool, and reachable from Noir or Arcade.
@@ -635,11 +793,11 @@ one, absent from the base pool, and reachable from Noir or Arcade.
 
 ## Open Questions
 
-- **Sync share.** 20% of base Motorik, about 12% of all Motorik. If Kraftwerk-flavoured songs
-  feel too frequent, reduce the three weights proportionally rather than removing a sync.
-- **Machine Voice is the weakest of the three.** It sync groups Rhythm + Lead 1 + Texture and
-  leaves Drums and Bass on normal rotation — the two tracks that most determine whether music
-  reads as Kraftwerk. The tempo band and fill suppression narrow the gap; whether it needs the
-  drum pool constrained as well is a listening question.
+- **Sync share.** 32.8% of base Motorik, 20% of all Motorik. If Kraftwerk-flavoured songs feel
+  too frequent, reduce the three weights proportionally rather than removing a group — but the
+  substyle roll has to move with them, or the four-way split stops adding up.
+- **Whether Lead 1 has enough reach.** It sits in two groups and lands in 10.4% of Motorik
+  songs, which puts its two rules in the same range as an ordinary Lead 1 rule rather than the
+  4-to-6x rarer they were when Machine Voice was their only route.
 - **Whether Machine Voice needs its own instrument treatment.** Unison doubling between Rhythm
   and Lead 1 may sound thin without a timbral difference between them.

@@ -228,41 +228,92 @@ struct TextureGenerator {
         var events: [MIDIEvent] = []
         let totalSteps = frame.totalBars * 16
 
+        // Two stretches of 12-16 bars where Texture is simply absent. Both rules are sparse
+        // note-to-note, but sparse is not the same as absent: without these the part is present
+        // in some form for the whole song, and the ear stops hearing it as colour. The windows
+        // avoid the sync's own dropout, which is the one place Texture is wanted.
+        let restWindows: [Range<Int>] = {
+            guard frame.totalBars >= 48 else { return [] }
+            var out: [Range<Int>] = []
+            // Draw candidate starts in a fixed order and take the first two that fit; SeededRNG
+            // is not a RandomNumberGenerator, so this picks by index rather than shuffling.
+            var candidates = stride(from: 8, to: frame.totalBars - 16, by: 4).map { $0 }
+            while out.count < 2 && !candidates.isEmpty {
+                let start  = candidates.remove(at: rng.nextInt(upperBound: candidates.count))
+                let length = 12 + rng.nextInt(upperBound: 5)           // 12...16 bars
+                let w = start..<min(start + length, frame.totalBars)
+                // Keep clear of the dropout windows and of each other.
+                if windows.contains(where: { $0.overlaps(w.lowerBound - 2 ..< w.upperBound + 2) }) { continue }
+                if out.contains(where: { $0.overlaps(w.lowerBound - 4 ..< w.upperBound + 4) }) { continue }
+                out.append(w)
+            }
+            return out.sorted { $0.lowerBound < $1.lowerBound }
+        }()
+        func inRestWindow(_ step: Int) -> Bool {
+            restWindows.contains { $0.contains(step / 16) }
+        }
+
         func chordPCs(atStep step: Int) -> [Int] {
             let pool = tonalMap.entry(atBar: step / 16)?.chordWindow.chordTones.sorted() ?? []
             return pool.isEmpty ? [0] : pool
         }
 
         if ruleID == "MOT-TEXT-009" {
-            // Wide Scatter — SINGLE notes, never phrases: one event, then a gap. The register
-            // span is 36-88, which is 52 semitones, comfortably past the measured 40 minimum,
-            // and pitches are drawn across the whole span rather than from a band.
+            // Wide Scatter — isolated events in a wide space.
             //
             // The plan gives two figures that cannot both hold: 0.4-0.7 notes/beat, and a
-            // silence-to-statement ratio of 7:1 or wider. With notes 1-3 steps long, the density
-            // figure forces a gap of about 8 steps, which lands at 3.8:1 — and reads as a blip
-            // every half-bar for the length of the song. Evenly thin is not the same as sparse;
-            // the ear hears the regularity as constant presence. The ratio is the figure that
-            // governs how sparse this actually sounds, so it is the one honoured here.
+            // silence-to-statement ratio of 7:1 or wider. With short notes the density figure
+            // forces a gap of about 8 steps, which lands at 3.8:1 and reads as a blip every
+            // half-bar for the length of the song. Evenly thin is not sparse; the ear hears the
+            // regularity as constant presence. The ratio is what governs how sparse this
+            // actually sounds, so it is the figure honoured here.
             //
-            // A 14-30 step gap gives roughly 10:1 and about 0.2 notes/beat. On top of that,
-            // one gap in six stretches to a couple of bars, so the part breathes instead of
-            // ticking — isolated events in a wide space, which is what the corpus describes.
+            // Three things are drawn ONCE PER SONG, because with only one character available
+            // every Wide Scatter song sounded like the last: the same full-register scatter of
+            // the same tiny blips. The corpus measured spans of 20-94 AND 35-107 semitones, so
+            // the span varied there too.
+            let bandRoll = rng.nextDouble()
+            let (bandLo, bandHi) = bandRoll < 0.30 ? (36, 64)     // a dark undertow
+                                 : bandRoll < 0.60 ? (58, 88)     // glassy and distant
+                                 : (36, 88)                        // the full span
+            // Long tones instead of blips. The gap scales with the note so the silence ratio
+            // holds either way — a sustained voice every few bars rather than a constant tick.
+            let sustained = rng.nextDouble() < 0.35
+            let dyads     = rng.nextDouble() < 0.25
+
             var step = 8
             while step < totalSteps {
                 let pcs = chordPCs(atStep: step)
                 let pc  = pcs[rng.nextInt(upperBound: pcs.count)]
-                // Draw the octave independently of the pitch class — that is what produces the
-                // wide scatter rather than a melodic line.
-                let octave = 3 + rng.nextInt(upperBound: 5)          // MIDI 36...88
-                let note   = max(36, min(88, octave * 12 + pc))
-                events.append(MIDIEvent(stepIndex: step, note: UInt8(note),
-                                        velocity: 72, durationSteps: 1 + rng.nextInt(upperBound: 3)))
-                step += rng.nextDouble() < 0.17
-                    ? 32 + rng.nextInt(upperBound: 33)               // 2-4 bars: a real rest
-                    : 14 + rng.nextInt(upperBound: 17)               // 14-30 steps
+                // Pick from the octaves this pitch class actually HAS inside the band. Choosing
+                // an octave first and clamping afterwards silently rewrote the pitch: anything
+                // above the ceiling landed on the ceiling, a different note than the one drawn.
+                let placements = stride(from: bandLo, through: bandHi, by: 1).filter { $0 % 12 == pc % 12 }
+                let note = placements.isEmpty ? 60 : placements[rng.nextInt(upperBound: placements.count)]
+                let dur  = sustained ? 8 + rng.nextInt(upperBound: 9)      // 8...16 steps
+                                     : 1 + rng.nextInt(upperBound: 3)      // 1...3 steps
+                if !inRestWindow(step) {
+                    events.append(MIDIEvent(stepIndex: step, note: UInt8(note),
+                                            velocity: 72, durationSteps: dur))
+                    // An occasional octave or fifth above, struck together — breaks the
+                    // uniformity of "always exactly one note" without adding density.
+                    if dyads, rng.nextDouble() < 0.30 {
+                        let interval = rng.nextDouble() < 0.6 ? 12 : 7
+                        let partner  = note + interval
+                        if partner <= bandHi {
+                            events.append(MIDIEvent(stepIndex: step, note: UInt8(partner),
+                                                    velocity: 64, durationSteps: dur))
+                        }
+                    }
+                }
+                // Long notes need proportionally long gaps, or a sustained texture becomes a drone.
+                step += sustained
+                    ? 48 + rng.nextInt(upperBound: 49)              // 48...96 steps
+                    : (rng.nextDouble() < 0.17
+                        ? 32 + rng.nextInt(upperBound: 33)          // 2-4 bars: a real rest
+                        : 14 + rng.nextInt(upperBound: 17))         // 14...30 steps
             }
-            return events
+            return events.sorted { $0.stepIndex < $1.stepIndex }
         }
 
         // MOT-TEXT-010 Sparse Punctuation — very rare events at STRUCTURAL positions: 2-3 notes,
@@ -287,6 +338,7 @@ struct TextureGenerator {
         for step in anchors {
             guard step < totalSteps else { break }
             guard step - lastStep >= 180 + rng.nextInt(upperBound: 121) else { continue }
+            guard !inRestWindow(step) else { continue }
             let pcs   = chordPCs(atStep: step)
             let count = 2 + rng.nextInt(upperBound: 2)               // 2...3 notes
             for i in 0..<count {

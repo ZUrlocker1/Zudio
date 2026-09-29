@@ -117,30 +117,43 @@ struct BassGenerator {
             // Motorik sync extends its reach without changing its behaviour or its Arcade
             // weighting. The redistributed base-Motorik weights below apply to NON-sync
             // songs only.
-            if sync == .sequenceLock {
-                rules   = ["MOT-BASS-026", "MOT-BASS-013", "MOT-BASS-015", "MOT-BASS-025"]
-                weights = [0.40,           0.25,           0.20,           0.15]
-            } else {
-                rules   = ["MOT-BASS-027", "MOT-BASS-013", "MOT-BASS-015", "MOT-BASS-025"]
-                weights = [0.35,           0.25,           0.25,           0.15]
-            }
+            // Both pools share one shape — 40/25/20/15 — and differ only in which rule leads.
+            // The leader is the one written for that sync: MOT-BASS-026's locked cell IS the
+            // Sequence Lock character, and MOT-BASS-027 takes every kick, which is what makes a
+            // Rhythm Section read as locked together. The other three are reused Kraftwerk
+            // rules providing variety behind it.
+            // MOT-BASS-027 Restricted Run takes every kick, which only reads as a locked
+            // rhythm section when the drums are synced too — so it leads exactly where that is
+            // true. Everywhere else the locked cell of MOT-BASS-026 leads, since it is Rhythm
+            // the bass is interlocking with rather than the kick.
+            let leader = sync == .rhythmSection ? "MOT-BASS-027" : "MOT-BASS-026"
+            rules   = [leader, "MOT-BASS-013", "MOT-BASS-015", "MOT-BASS-025"]
+            weights = [0.40,   0.25,           0.20,           0.15]
         } else {
             // Base Motorik: 11 rules. Four were retired from THIS pool in build 131 to
             // concentrate the style — McCartney Drive (005), LA Woman Sustain (006),
             // Hook Ascent (007) and Quo Arc (010). All four remain reachable: 005 and 010
             // via Arcade, 006 and 007 via Noir, so their implementations below are still
-            // live and must not be deleted. See docs/motorik-kraftwerk-plan.md.
+            // live and must not be deleted. See docs/motorik-europe-plan.md.
             //
             // The freed 25% went mostly to the rules that pull toward the machine end —
-            // Kraftwerk robotic (013) 4->10 and driving (015) 11->16 — and to Neu!
-            // Hallogallo (004) 4->8, so base Motorik gets more characterful in both
-            // directions rather than only one.
+            // Kraftwerk robotic (013) 4->10 — and to Neu! Hallogallo (004), so base Motorik
+            // gets more characterful in both directions rather than only one.
+            //
+            // Weights have been tuned by listening since. The four least interesting figures
+            // were cut back — Root Anchor (001), Motorik Drive (002) and Neu! Hallogallo (004)
+            // to 7%, Vitamin Hook (009) to 6% — and the freed 10% spread over the rest.
+            //
+            // Quo Drive (011) is deliberately held at 4% despite being by far the most melodic
+            // rule in the pool: 73% of its moves are 1-4 semitone steps, where nothing else
+            // clears 29%. It is a walking line, and base Motorik is not a walking-bass style;
+            // it earns its place as the exception rather than as a staple.
             rules   = ["MOT-BASS-001","MOT-BASS-002","MOT-BASS-003","MOT-BASS-004",
                         "MOT-BASS-008","MOT-BASS-009","MOT-BASS-011",
                         "MOT-BASS-012","MOT-BASS-013","MOT-BASS-014","MOT-BASS-015"]
-            weights = [0.08,     0.14,     0.05,     0.08,
-                        0.11,     0.07,     0.04,
-                        0.08,     0.10,     0.09,     0.16]
+            weights = [0.07,     0.07,     0.10,     0.07,
+                        0.12,     0.06,     0.04,
+                        0.11,     0.12,     0.12,     0.12]
         }
         let ruleID = forceRuleID ?? rules[rng.weightedPick(weights)]
         usedRuleIDs.insert(ruleID)
@@ -1658,7 +1671,9 @@ struct BassGenerator {
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let root   = pcInRegister(rootPC, low: 29, high: 48)
                 for (i, step) in steps.enumerated() {
-                    var note = root + cell[i]
+                    // The fifth is diminished above some chord roots, so the offset is snapped
+                    // onto the scale rather than taken literally.
+                    var note = root + snapDegreeToScale(cell[i], rootPC: rootPC, scale: frame.scalePCs)
                     if note > 48 { note -= 12 }
                     // Accented, not flat: the cell opens the bar, so step 0 carries it. Same
                     // reasoning as MOT-DRUM-013 — the corpus reads flat because the fan
@@ -1692,8 +1707,14 @@ struct BassGenerator {
             // 4 or 5 pitch classes drawn from the chord — the vocabulary is severely restricted,
             // and sorted() because chordTones is a Set and its order is not stable.
             if pcs.isEmpty {
+                // Snapped to the scale: a chord tone is not always a scale tone, and this rule
+                // holds each pitch for long stretches, so a chromatic one sits under the whole
+                // statement rather than passing through.
+                var seen = Set<Int>()
                 let pool = (entry.chordWindow.chordTones.sorted()
                             + entry.chordWindow.scaleTensions.sorted())
+                    .map { nearestScalePitchClass($0, in: frame.scalePCs) }
+                    .filter { seen.insert($0).inserted }
                 let want = 4 + rng.nextInt(upperBound: 2)
                 var candidates = pool
                 while !candidates.isEmpty && pcs.count < want {
