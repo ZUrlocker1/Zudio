@@ -309,7 +309,7 @@ struct BassGenerator {
         case "MOT-BASS-022": return chromeWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-023": return acidSweepBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         case "MOT-BASS-024": return arcadeDriveBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
-        case "MOT-BASS-025": return electroPumpBar(barStart: barStart, entry: entry, frame: frame)
+        case "MOT-BASS-025": return electroPumpBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
         default:        return rootAnchorBar(barStart: barStart, entry: entry, frame: frame, rng: &rng)
         }
     }
@@ -1593,19 +1593,68 @@ struct BassGenerator {
     // "And" of 2 and 4 (steps 6, 14): P4 approach note, staccato. Creates subtle syncopation.
     // P4 is diatonic in every mode, so it's harmonically safe across all Arcade progressions.
 
+    /// Electro Pump, shaped into 4-bar cells.
+    ///
+    /// Measured against the corpus, the flat version of this rule played onsets at 0, 6, 8 and
+    /// 14 in 98% of its bars — one rhythm, one two-note alternation, for a whole song. The
+    /// Robots' drum-machine voices really are that rigid, but its bass is not: `elbass1` uses
+    /// 23 distinct rhythms over 90 bars and its most common appears in only 17% of them.
+    ///
+    /// What that part actually does is work in 4-bar cells — an extra attack on the first bar
+    /// of a group, the last note dropped on the fourth, and a genuinely different cell every
+    /// four bars. All three are reproduced here; the pump itself is untouched.
     private static func electroPumpBar(
-        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame
     ) -> [MIDIEvent] {
         let root   = arcadeChordRoot(entry: entry, frame: frame)
         let fourth = nearestScaleNote(to: Int(root) + 5, frame: frame, low: 38, high: 58)
-        var events: [MIDIEvent] = []
-        // Root on beats 1 + 3 — the pump
-        for step in [0, 8] {
-            events.append(MIDIEvent(stepIndex: barStart + step, note: root, velocity: 90, durationSteps: 3))
+        let fifth  = nearestScaleNote(to: Int(root) + 7, frame: frame, low: 38, high: 58)
+
+        // Where in the 4-bar group this bar sits, and which cell the group is playing.
+        let posInGroup = bar % 4
+        // Stable for every bar of a group, different between groups, and different between
+        // songs — keyed off the frame rather than the shared RNG, which advances per bar and
+        // so cannot give the four bars of one group the same answer.
+        let salt = UInt64(bitPattern: Int64(frame.tempo &* 2654435761
+                                            &+ frame.keySemitoneValue &* 40503
+                                            &+ frame.totalBars))
+        var groupRNG = SeededRNG(seed: salt &+ UInt64(bar / 4) &* 0x9E3779B97F4A7C15)
+
+        // Three placements of the syncopated answer. The pump on 0 and 8 is the rule's
+        // identity and stays; what moves is where the offbeat lands.
+        let offbeats: [Int]
+        switch groupRNG.nextInt(upperBound: 3) {
+        case 0:  offbeats = [6, 14]          // the original: "and" of 2 and 4
+        case 1:  offbeats = [6, 11, 14]      // an extra push before beat 4
+        default: offbeats = [3, 6, 14]       // pulled earlier in the bar
         }
-        // P4 approach on "and" of 2 + 4 — the syncopation
-        for step in [6, 14] {
-            events.append(MIDIEvent(stepIndex: barStart + step, note: fourth, velocity: 72, durationSteps: 1))
+        // The answering pitch alternates between cells so successive cells differ in colour,
+        // not only in rhythm.
+        let answer = groupRNG.nextDouble() < 0.5 ? fourth : fifth
+
+        var events: [MIDIEvent] = []
+        // Root on beats 1 + 3 — the pump. The accent moves onto beat 3 for one group in three,
+        // which changes the feel of the bar without moving a single note.
+        let accentOnThree = groupRNG.nextDouble() < 0.33
+        for step in [0, 8] {
+            let accented = accentOnThree ? step == 8 : step == 0
+            events.append(MIDIEvent(stepIndex: barStart + step, note: root,
+                                    velocity: accented ? 90 : 78, durationSteps: 3))
+        }
+        // Opening attack: an extra root on beat 2 marks the top of each 4-bar group. The
+        // corpus adds its extra attack at the START of the group's first bar, so it announces
+        // the cell; put at the end of the bar it would instead read as a pickup into bar 2,
+        // and would collide with the offbeat already sitting on step 14.
+        if posInGroup == 0 {
+            events.append(MIDIEvent(stepIndex: barStart + 4, note: root,
+                                    velocity: 70, durationSteps: 1))
+        }
+        for step in offbeats {
+            // Turnaround: the last offbeat of the fourth bar is left out, so the cell breathes
+            // before it restarts. One note in four bars, and it is what gives the ear a seam.
+            if posInGroup == 3 && step == offbeats.last { continue }
+            events.append(MIDIEvent(stepIndex: barStart + step, note: answer,
+                                    velocity: 72, durationSteps: 1))
         }
         return events
     }
@@ -1655,32 +1704,69 @@ struct BassGenerator {
             // MOT-BASS-026 Locked Micro-Cell — Sequence Lock sync.
             // Three pitch classes only: root, fifth, octave. The cell is drawn ONCE and never
             // varies; the repetition is what carries the music, not the material.
-            let cellLength = rng.nextDouble() < 0.5 ? 3 : 4
-            let offsets    = [0, 7, 12]            // root, fifth, octave
-            var cell       = [0]                   // always open on the root so the chord reads
-            for _ in 1..<cellLength {
-                cell.append(offsets[rng.nextInt(upperBound: offsets.count)])
+            // TWO cells, alternated in 4-bar groups, rather than one for the whole song.
+            //
+            // A single locked cell measured out at one rhythm in 98% of a song's bars — the
+            // most monotonous bass in Motorik Europe. The rigidity is the point of this rule,
+            // but The Robots' bass is rigid in 4-bar cells, not across a whole side: it swaps
+            // to a different cell every four bars and comes back to the first.
+            let offsets = [0, 7, 12]               // root, fifth, octave
+            func drawCell() -> (cell: [Int], steps: [Int]) {
+                let length = rng.nextDouble() < 0.5 ? 3 : 4
+                var c = [0]                        // always open on the root so the chord reads
+                for _ in 1..<length {
+                    c.append(offsets[rng.nextInt(upperBound: offsets.count)])
+                }
+                // Quarter-note placement. Four slots gives 1.0 notes/beat, three gives 0.75 —
+                // both inside the measured 0.7-1.0 band, and both LOCK to the barline instead
+                // of phasing, which is the difference between Kraftwerk's rigidity and Jarre's
+                // drift.
+                return (c, length == 4 ? [0, 4, 8, 12] : [0, 4, 8])
             }
-            // Quarter-note placement. Four slots gives 1.0 notes/beat, three gives 0.75 —
-            // both inside the measured 0.7-1.0 band, and both LOCK to the barline instead of
-            // phasing, which is the difference between Kraftwerk's rigidity and Jarre's drift.
-            let steps = cellLength == 4 ? [0, 4, 8, 12] : [0, 4, 8]
+            let cellA = drawCell()
+            var cellB = drawCell()
+            // Two cells that came out identical give back the single-cell behaviour, so the
+            // second is nudged until it differs.
+            if cellB.cell == cellA.cell && cellB.steps == cellA.steps {
+                cellB = (cellA.cell.count == 3 ? cellA.cell + [7] : Array(cellA.cell.dropLast()),
+                         cellA.steps.count == 3 ? [0, 4, 8, 12] : [0, 4, 8])
+            }
+            // One group in three moves the accent onto beat 3 instead of the downbeat, which
+            // changes the feel of the bar without moving a note.
+            let groupCount = frame.totalBars / 4 + 1
+            let accentLate = (0..<groupCount).map { _ in rng.nextDouble() < 0.33 }
 
             for bar in 0..<frame.totalBars {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let rootPC = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
                 let root   = pcInRegister(rootPC, low: 29, high: 48)
+                let group  = bar / 4
+                let posInGroup = bar % 4
+                let (cell, steps) = group % 2 == 0 ? cellA : cellB
+                let late = accentLate[min(group, accentLate.count - 1)]
+
                 for (i, step) in steps.enumerated() {
+                    // Turnaround: the last note of the fourth bar is left out so the cell
+                    // breathes before it restarts. One note in four bars, and it is what gives
+                    // the ear a seam in an otherwise unbroken line.
+                    if posInGroup == 3 && i == steps.count - 1 { continue }
                     // The fifth is diminished above some chord roots, so the offset is snapped
                     // onto the scale rather than taken literally.
                     var note = root + snapDegreeToScale(cell[i], rootPC: rootPC, scale: frame.scalePCs)
                     if note > 48 { note -= 12 }
-                    // Accented, not flat: the cell opens the bar, so step 0 carries it. Same
-                    // reasoning as MOT-DRUM-013 — the corpus reads flat because the fan
-                    // transcriptions are flat, not because the sequencer had no accent control.
-                    let velocity: UInt8 = step == 0 ? 92 : 78
+                    // Accented, not flat: the corpus reads flat because the fan transcriptions
+                    // are flat, not because the sequencer had no accent control. Same reasoning
+                    // as MOT-DRUM-013.
+                    let accented = late ? step == 8 : step == 0
+                    let velocity: UInt8 = accented ? 92 : 78
                     events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(clamped(note, low: 29, high: 48)),
                                             velocity: velocity, durationSteps: 2))
+                }
+                // Pickup: an extra root an eighth before the downbeat opens each 4-bar group.
+                if posInGroup == 0 && bar > 0 {
+                    let prev = (bar - 1) * 16 + 14
+                    events.append(MIDIEvent(stepIndex: prev, note: UInt8(clamped(root, low: 29, high: 48)),
+                                            velocity: 70, durationSteps: 1))
                 }
             }
             return events

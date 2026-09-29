@@ -38,12 +38,12 @@ struct ChillTitleGenerator {
             // Montreal neighborhoods
             "Montreal", "Verdun", "Outremont", "Westmount", "Hochelaga",
             "Cote-des-Neiges", "Lachine", "Longueuil", "NDG",
-            "Saint-Laurent", "Pointe-Saint-Charles", "Loyola",
+            "L'Avenir", "Bizou", "Loyola",
             // West Island / South Shore
-            "Baie d'Urfe", "Dorval", "Pointe-Claire", "Sainte-Anne",
+            "Baie d'Urfe", "Dorval", "Pointe-Claire", "Ste-Anne",
             "Beaconsfield", "Kirkland", "Dollard", "Vaudreuil",
             // Quebec cities
-            "Sherbrooke", "Trois-Rivieres", "Gatineau", "Saguenay",
+            "Saint-Louis-du-Ha!Ha!", "Trois-Rivieres", "Gatineau", "Saguenay",
             "Rimouski", "Chicoutimi", "Jonquiere", "Riviere-du-Loup",
             "Magog", "Granby", "Drummondville", "Chibougamau", "Petawawa",
             "Shawinigan", "Val d'Or", "Hudson", "Sorel", "Sutton",
@@ -56,7 +56,7 @@ struct ChillTitleGenerator {
             "Glen Arbor","Maple City", "Walled Lake", "Waterloo", "Plymouth",
             "Mississauga","Port Credit", "Toronto", "Etobicoke",
             "TVC", "YYZ", "SFO", "ORD", "LHR", "SJC", "DTW", "LGA","Forest",
-            "Berlin", "Mexico", "London", "Mittelwerk", "Nordhausen", "Dora"
+            "Berlin", "Mexico", "London", "Mittelwerk", "Avoine", "Farine"
         ]
         let city = cities[rng.nextInt(upperBound: cities.count)]
         let sub  = rng.nextDouble()

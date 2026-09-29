@@ -2906,8 +2906,12 @@ struct LeadGenerator {
             let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02]
             return rules[rng.weightedPick(weights)]
         }
+        // 005 Call and answer down from 0.14 to 0.11, its 3% going to 003, 006 and 007.
+        // It is the most recognisable shape in the pool, and because bRule reuses aRule 70% of
+        // the time a rule that wins usually carries the whole song — so it registered as more
+        // frequent than its share.
         let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008"]
-        let weights: [Double] = [0.15,          0.14,          0.10,          0.15,          0.14,          0.11,          0.11,          0.10]
+        let weights: [Double] = [0.15,          0.14,          0.11,          0.15,          0.11,          0.12,          0.12,          0.10]
         return rules[rng.weightedPick(weights)]
     }
 

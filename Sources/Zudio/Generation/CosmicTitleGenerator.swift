@@ -57,10 +57,10 @@ struct KosmicTitleGenerator {
 
     /// Invented Greek-style words — Tangerine Dream aesthetic (-on, -eon, -ax endings)
     private static let greekStyleWords = [
-        "Empyrion", "Orpheon", "Elyseon", "Zephyron", "Kroneon",
-        "Aureon",   "Hezperon", "Logion",  "Pneumex",  "Aionex",
-        "Zatarax",  "Pyreon",   "Zodeon",  "Hypereon", "Chthonon",
-        "Eideon",   "Zopheon",  "Zaerion", "Thyreon",  "Aztraeon", "Gyro"
+        "Empyrion", "Orpheon", "Axolotl", "Zephyron", "Kroneon",
+        "Aureon",   "Hezperon", "Flummoxx",  "Pneumex",  "Aionex",
+        "Zatarax",  "Pyreon",   "FedExx",  "Orthodoxx", "Spandexx",
+        "Eideon",   "Zopheon",  "ExLaxx", "Thyreon",  "Aztraeon", "Gyro"
     ]
 
     /// Poetic space adjectives — atmospheric, distinct from Motorik's German register

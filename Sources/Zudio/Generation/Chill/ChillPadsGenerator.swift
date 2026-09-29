@@ -97,6 +97,19 @@ struct ChillPadsGenerator {
         // Overlay breakdown pad behavior based on breakdown style
         events += breakdownPad(frame: frame, structure: structure, breakdownStyle: breakdownStyle, rng: &rng)
 
+        // Rest windows — the pads stop for a while instead of renewing forever.
+        //
+        // Measured on a 112-bar song: a chord was restruck every other bar for the whole song,
+        // 62 sounding bars with 47 single-bar gaps and exactly one gap longer than that. Notes
+        // hold a median of 20 steps, so the ringing chord covers those single bars and the part
+        // reads as unbroken. A gap has to run at least two bars to be heard at all.
+        //
+        // Blues is excluded: its silence is already composed, with the Im7 half of each later
+        // 16-bar cycle left empty so the pads re-enter on the chord change.
+        if !bluesVariation {
+            events = applyRestWindows(events, frame: frame, structure: structure, rng: &rng)
+        }
+
         // Cold start: bar 0 is drums-only, pads silent
         if case .coldStart = structure.introStyle {
             events = events.filter { $0.stepIndex >= 16 }
@@ -109,6 +122,41 @@ struct ChillPadsGenerator {
         }
 
         return events
+    }
+
+    /// Silences the pads for a few bars at a time, alternating short gaps with long ones.
+    ///
+    /// Notes that began before a window are left alone: a chord already sounding should decay
+    /// into the gap rather than being cut off mid-hold, which is what makes the rest read as
+    /// the pads stopping rather than as an edit.
+    ///
+    /// Bridge bars are never silenced — `breakdownPad()` writes those deliberately, and they
+    /// are the one place the pads are already doing something specific.
+    private static func applyRestWindows(_ events: [MIDIEvent], frame: GlobalMusicalFrame,
+                                         structure: SongStructure,
+                                         rng: inout SeededRNG) -> [MIDIEvent] {
+        let bodyStart = 8                                   // let the song establish itself
+        let bodyEnd   = Swift.max(bodyStart + 1, frame.totalBars - 4)
+        guard bodyEnd - bodyStart >= 16 else { return events }
+
+        // One window per ~18 bars, alternating short and long so a song gets both kinds.
+        let count = Swift.max(2, (bodyEnd - bodyStart) / 18)
+        let slot  = Swift.max(1, (bodyEnd - bodyStart) / count)
+        var rest  = Set<Int>()
+        for w in 0..<count {
+            let isLong = w % 2 == 1
+            let length = isLong ? 5 + rng.nextInt(upperBound: 4)     // 5...8 bars
+                                : 2 + rng.nextInt(upperBound: 2)     // 2...3 bars
+            let lo = bodyStart + w * slot
+            let hi = Swift.min(lo + slot - length, bodyEnd - length)
+            guard hi > lo else { continue }
+            let start = lo + rng.nextInt(upperBound: hi - lo)
+            for bar in start..<(start + length)
+            where structure.section(atBar: bar)?.label != .bridge {
+                rest.insert(bar)
+            }
+        }
+        return events.filter { !rest.contains($0.stepIndex / 16) }
     }
 
     // MARK: - CHL-PAD-001: Chord sustain (Long Lake Winter Strings model)

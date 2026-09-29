@@ -393,8 +393,18 @@ struct TrackRowView: View {
     }
 
     private func applyDefaultEffects() {
-        // Clear all active effects first (handles style switches cleanly)
-        for fx in TrackEffect.allCases where activeEffects.contains(fx.rawValue) {
+        // Clear EVERY effect first, not only the ones this view believes are lit.
+        //
+        // The engine can be holding an effect this view has no record of — the style setup
+        // routes every track to a reverb bus, and this view's `activeEffects` starts empty on
+        // a fresh song or when SwiftUI rebuilds it. Clearing conditionally therefore left
+        // reverb sounding with no chip lit, and made a track wet or dry depending on what had
+        // been switched on in an earlier song.
+        //
+        // AppState.restoreDefaultEffects, which does the same job on iPhone, has always
+        // cleared unconditionally; this brings the two platforms into line so the chip is the
+        // single authority on both.
+        for fx in TrackEffect.allCases {
             activeEffects.remove(fx.rawValue)
             appState.setEffect(fx, enabled: false, forTrack: trackIndex)
         }

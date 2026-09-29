@@ -1,6 +1,31 @@
 # Chill Style Generator — Research & Design Plan
 Copyright (c) 2026 Zack Urlocker
 
+
+## Pads — rest windows
+
+Measured on a 112-bar song: the pads were **audible in every one of its 112 bars**, with no
+silence anywhere. Onsets looked sparse — a chord restruck every other bar, 62 bars with an
+onset — but notes hold a median of 20 steps, so the ringing chord covers the bars between and
+the part reads as unbroken. Counting onsets hides this completely; coverage has to be measured
+as onset plus hold.
+
+`applyRestWindows` now silences the pads for a few bars at a time, one window per ~18 bars of
+body, alternating short (2-3 bars) with long (5-8). Two details matter:
+
+- **Notes that began before a window are left alone.** A chord already sounding decays into the
+  gap instead of being cut off mid-hold, so the rest reads as the pads stopping rather than as
+  an edit.
+- **Bridge bars are never silenced.** `breakdownPad()` writes those deliberately and they are
+  the one place the pads are already doing something specific.
+
+Chill Blues is excluded: its silence is already composed, with the Im7 half of each later
+16-bar cycle left empty so the pads re-enter on the chord change.
+
+Measured over 443 songs: pads audible in **70%** of bars, with 2.4 short and 1.8 long silences
+per song. One song in 443 has no silence of two bars or more.
+
+
 ## Context
 
 Zudio has Motorik (krautrock), Kosmic (Berlin School), and Ambient (Eno/drone). This is the

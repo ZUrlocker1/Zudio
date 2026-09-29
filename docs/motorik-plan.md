@@ -486,6 +486,32 @@ final sound. Cold Stop — pads cut on final outro bar.
 - If Lead 1 activity is high, reduce pad re-voicing and keep stable shell voicings
 
 #
+### Lead 1 rule weights
+
+Per draw, from `pickLd1Rule`. The picker runs twice per song — once for the A section, once
+for B — and `bRule` reuses `aRule` 70% of the time, so a rule's chance of appearing *somewhere*
+in a song is higher than its weight, and a rule that wins usually carries the whole track.
+
+Base Motorik:
+
+- 15% `MOT-LD1-001` Neu! motif first
+- 15% `MOT-LD1-004` Stepwise sequence
+- 14% `MOT-LD1-002` Pentatonic cell
+- 12% `MOT-LD1-006` Long arc solo
+- 12% `MOT-LD1-007` Vanishing solo
+- 11% `MOT-LD1-003` Punch solo
+- 11% `MOT-LD1-005` Call and answer
+- 10% `MOT-LD1-008` Visiting solo
+
+`MOT-LD1-005` was 14% and is the most recognisable shape in the pool, so with the 70% A/B reuse
+it read as more frequent than its share; its 3% went to 003, 006 and 007. `MOT-LD1-003` never
+runs in a B section — if it wins the A draw, B is forced to 001 (60%) or 004 (40%), which gives
+those two a small boost beyond the weights above.
+
+Noir: 010 and 011 at 17%, 014 15%, 013 14%, 009 11%, 012 10%, with 001/005/006/008 at 4% each.
+Arcade: 019 18%, 018 and 015 17%, 017 14%, 016 and 020 13%, with 005/001 at 3% and 002 at 2%.
+Motorik Europe, when Lead 1 is in the sync group: 021 Short Statement 60%, 022 Long Run 40%.
+
 ### Lead 1 — where a long unbroken run is and is not a fault
 
 Measured across 2,500 Motorik songs, longest unbroken run of sounding bars against note density:

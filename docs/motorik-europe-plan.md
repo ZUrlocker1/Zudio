@@ -324,6 +324,41 @@ Density 1.1–1.2 notes/beat. Emits in **long statements of 30...120 notes**, th
 **0.2...0.4 × the statement span**. In the Rhythm Section sync, at least half its onsets
 must coincide with `MOT-DRUM-013`/`014`'s kick steps.
 
+### Bass — 4-bar cells, not one cell per song
+
+**The corpus distinguishes its drum machine from its bass, and we had not.** In The Robots the
+percussion voices are as rigid as the design assumed — `bassdrm2` holds one rhythm for 97% of
+bars, `ophihat1` for 99%, each on a single pitch. But `elbass1`, the electric bass, uses **23
+distinct rhythms over 90 bars**, 39 bar patterns and 10 pitch classes, and its most common
+rhythm appears in only **17%** of bars. Its mean run of truly identical consecutive bars is 1.1.
+
+Read bar by bar, that variation is not random. It is **4-bar cells**:
+
+- an extra attack at the top of the group's first bar
+- the last note dropped on the fourth bar, so the cell breathes before it restarts
+- a genuinely different cell every four bars, returning to an earlier one later
+- density swinging between cells, from 8-note eighths to 13-14 note near-continuous sixteenths
+
+`MOT-BASS-025` and `MOT-BASS-026` had taken the percussion character instead, measuring at 96%
+and 98% one rhythm — the two most monotonous bass lines in the style. Both now carry the four
+behaviours above: an opening attack on beat 2 of each group, the turnaround on the fourth bar,
+a moving accent (one group in three accents beat 3 instead of the downbeat), and two or three
+cells alternated at 4-bar boundaries.
+
+Measured over 2,500 songs, most common rhythm as a share of bars:
+
+- `MOT-BASS-025` Electro Pump — 96% to **30%**, and 8.5 to **39.5** distinct bar patterns,
+  which is `elbass1`'s figure exactly
+- `MOT-BASS-026` Locked Micro-Cell — 98% to **53%**. Still the most rigid of the five, which
+  is the rule's character; it is no longer the same bar for a whole song.
+
+`MOT-BASS-013`, `015` and `027` already varied (34-50%) and are untouched. `MOT-BASS-015` at
+34% is the closest of the originals to the corpus.
+
+Caveat: these are fan transcriptions with hard quantisation, and `elbass1` contains doubled
+onsets that are probably octave doubling or transcription noise, so treat 23 rhythms as
+indicative. The 4-bar cell structure is visible directly and does not depend on it.
+
 ### Rhythm
 
 **MOT-RTHM-014 "Two-Note Lock"** — the most extreme measurement in the corpus: a 4-step cell

@@ -661,6 +661,15 @@ final class AppState: ObservableObject {
             case (kTrackRhythm,  .motorik, "Charang"):       return 70
             case (kTrackTexture, .motorik, "Interference"):  return 127
             case (kTrackBass,    .kosmic,  "Pulse Bass"):    return 115
+            // Moog, Mono Synth and Synth Bass 3 are the loudest patches in the Kosmic bass
+            // pool — thick synth basses that sit well forward against Kosmic's sustained pads,
+            // where the remaining patches read as background.
+            case (kTrackBass,    .kosmic,  "Moog"):          return 80
+            case (kTrackBass,    .kosmic,  "Mono Synth"):    return 80
+            case (kTrackBass,    .kosmic,  "Synth Bass 3"):  return 80
+            // Synth Chime cuts through Kosmic's sustained texture more than the other rhythm
+            // patches, which are pads and organs sitting further back.
+            case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
             default: return 100
             }
@@ -3658,10 +3667,15 @@ final class AppState: ObservableObject {
         case .ambient:
             defaults = switch trackIndex {
             case kTrackLead1:   [.delay, .space]
-            case kTrackLead2:   [.space]
+            // Matches TrackRowView: a mirrored Lead 2 doubles Lead 1, so it takes
+            // Lead 1's delay as well. `lead2MirrorName != nil` is what the Mac path
+            // calls isInstrumentLocked.
+            case kTrackLead2:   lead2MirrorName != nil ? [.delay, .space] : [.space]
             case kTrackPads:    [.space, .sweep]
             case kTrackRhythm:  [.reverb]
-            case kTrackTexture: [.space, .pan, .sweep]
+            // Matches TrackRowView: with an audio texture file playing, the texture
+            // track is driven by AudioTexturePlayer, where pan and sweep do nothing.
+            case kTrackTexture: songState?.ambientAudioTexture != nil ? [.space] : [.space, .pan, .sweep]
             case kTrackBass:    [.reverb, .sweep]
             case kTrackDrums:   [.delay]
             default:            []

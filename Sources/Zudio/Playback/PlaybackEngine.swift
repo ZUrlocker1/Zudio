@@ -81,6 +81,11 @@ final class PlaybackEngine: ObservableObject {
     // The amount of reverb per track, as the insert wetDryMix it reproduces. Offline export
     // builds real insert reverbs, so this is what it needs — no conversion at the boundary.
     private var perTrackReverbWet      = Array(repeating: Float(0),  count: kTrackCount)
+    // Whether each track's reverb chip is currently on. The chip is the authority: the level
+    // above says how much reverb to use WHEN it is on, and this says whether it is. Without
+    // this, applyMuteState() would restore the level on every song load and the chip would
+    // decide nothing.
+    private var reverbEnabled          = Array(repeating: false,      count: kTrackCount)
     // Per-track reverb presets for offline export — set by each style method to match original intent.
     // Live playback uses shared buses; export uses these presets for per-track reverb nodes.
     // Read only by offline export, where it currently has no effect: AVAudioUnitReverb
@@ -1425,7 +1430,17 @@ final class PlaybackEngine: ObservableObject {
         engine.disconnectNodeOutput(reverbSendMixers[trackIndex])
         engine.connect(reverbSendMixers[trackIndex], to: busMixer, format: nil)
         perTrackReverbWet[trackIndex] = wetDryMix
-        applyReverbAmount(trackIndex, wetDryMix: wetDryMix)
+        reverbEnabled[trackIndex] = false
+        // Recorded, not applied. `wetDryMix` is how much reverb this track uses WHEN ITS CHIP
+        // IS ON, which is what the per-style tables have always meant: before the bus rewrite
+        // every track's reverb was created at wetDryMix 0 and bypassed, and only
+        // setEffect(.reverb/.space, enabled: true) raised it to the table value.
+        //
+        // Applying it here instead made the send live whether or not the chip was lit, so a
+        // track could be audibly wet with nothing showing in the UI — Kosmic drums sat at 45
+        // against Chill's 40, while only Chill lit a chip. Reverb is CPU-intensive and was
+        // deliberately used sparingly, so silence is the right default and the chip decides.
+        applyReverbAmount(trackIndex, wetDryMix: 0)
     }
 
     // MARK: - Ambient mode configuration
@@ -1692,6 +1707,7 @@ final class PlaybackEngine: ObservableObject {
         case .reverb, .space:
             // Zero reverb restores the dry leg to unity too, so switching it off makes the
             // track dry rather than quiet.
+            reverbEnabled[trackIndex] = enabled
             applyReverbAmount(trackIndex, wetDryMix: enabled ? perTrackReverbWet[trackIndex] : 0)
         }
     }
@@ -2636,7 +2652,7 @@ private func loadGMPrograms() {
             let muted = effectiveMute || (anySolo && !effectiveSolo)
             samplers[i].volume = muted ? 0.0 : trackBaseVolume[i]
             // Zero the reverb send when muted so the shared bus tail doesn't continue from a muted track.
-            applyReverbAmount(i, wetDryMix: muted ? 0 : perTrackReverbWet[i])
+            applyReverbAmount(i, wetDryMix: (muted || !reverbEnabled[i]) ? 0 : perTrackReverbWet[i])
         }
     }
 
