@@ -31,6 +31,15 @@ struct ChillRhythmGenerator {
             modeA = pickBluesCompingMode(rng: &rng)
             modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allBluesCompingModes,
                                               picker: pickBluesCompingMode, rng: &rng)
+        } else if beatStyle.isSoho {
+            // Chill Soho: pools follow the groove (see "Implementation contract" in
+            // docs/chill-soho-plan.md). Latin has two modes, so A and B always play both.
+            let latin  = beatStyle == .sohoLatin
+            let picker = latin ? pickSohoLatinCompingMode : pickSohoSoulCompingMode
+            modeA = picker(&rng)
+            modeB = pickDifferentCompingMode(from: modeA,
+                                             allCandidates: latin ? Self.allSohoLatinModes : Self.allSohoSoulModes,
+                                             picker: picker, rng: &rng)
         } else if beatStyle == .hipHopJazz {
             // Acid jazz stab keeps its signature groove on the A section; B section switches
             // to a different mode for contrast.
@@ -73,20 +82,29 @@ struct ChillRhythmGenerator {
         // break rather than just the thinner sparse-fragment treatment. Takes priority over sparse
         // fragments if the two happen to overlap (silence wins over merely thinner).
         let hasBosaMoon = modeA == .bosaMoonArpeggiated || modeB == .bosaMoonArpeggiated
-        let dropoutFragment = pickRhythmDropoutFragment(structure: structure, forceInclude: hasBosaMoon, rng: &rng)
+        // Chill Soho: in this music the strongest variation Rhythm has is to stop. Every Soho
+        // song gets long dropouts — one per ~32 groove bars, 8–16 bars each — where base Chill
+        // gets at most one, in 20% of songs. Base Chill's draw is unchanged.
+        let dropoutFragments: [Range<Int>] = beatStyle.isSoho
+            ? pickSohoDropoutFragments(structure: structure, rng: &rng)
+            : [pickRhythmDropoutFragment(structure: structure, forceInclude: hasBosaMoon,
+                                         rng: &rng)].compactMap { $0 }
+        // CHL-RHY-009 rotates its variants on its own 8–12 bar period; drawn for Soho only.
+        let eighthsPeriod = beatStyle.isSoho ? 8 + rng.nextInt(upperBound: 5) : 8
         return generateComping(frame: frame, structure: structure,
                                 modeA: modeA, modeB: modeB, breakdownStyle: breakdownStyle,
                                 bluesVariation: bluesVariation, bluesKeyboardBar: bluesKeyboardBar,
                                 forcedSwitchBar: forcedSwitchBar, sparseFragments: sparseFragments,
-                                dropoutFragment: dropoutFragment,
-                                rng: &rng)
+                                dropoutFragments: dropoutFragments, clave: beatStyle == .sohoLatin,
+                                soho: beatStyle.isSoho, eighthsPeriod: eighthsPeriod, rng: &rng)
     }
 
     /// Picks a single fragment (12 or 16 bars, chord-plan-boundary aligned) where the whole
     /// Rhythm track drops out completely. See call site for frequency rationale.
     private static func pickRhythmDropoutFragment(structure: SongStructure, forceInclude: Bool,
+                                                   probability: Double = 0.20,
                                                    rng: inout SeededRNG) -> Range<Int>? {
-        guard forceInclude || rng.nextDouble() < 0.20 else { return nil }
+        guard forceInclude || rng.nextDouble() < probability else { return nil }
         let grooveSections = structure.sections.filter { $0.label == .A || $0.label == .B }
         guard let grooveStart = grooveSections.first?.startBar,
               let grooveEnd   = grooveSections.last?.endBar else { return nil }
@@ -98,6 +116,44 @@ struct ChillRhythmGenerator {
         guard !candidates.isEmpty else { return nil }
         let start = candidates[rng.nextInt(upperBound: candidates.count)]
         return start..<(start + length)
+    }
+
+    /// Chill Soho's long rhythm dropouts: one per ~32 bars of groove (at least one, at most
+    /// three), each 8, 12 or 16 bars, slotted across the song so they spread rather than
+    /// cluster. Each sits wholly inside one A or B section — a dropout running into a breakdown
+    /// would be cut in two and heard as two short gaps — starts on a 4-bar boundary of that
+    /// section, and leaves at least 4 bars of playing before the next. The first never starts
+    /// within 8 bars of the groove's opening, nor does any reach the last 4 bars of the groove.
+    static func pickSohoDropoutFragments(structure: SongStructure, rng: inout SeededRNG) -> [Range<Int>] {
+        let groove = structure.sections.filter { $0.label == .A || $0.label == .B }
+        guard let start = groove.first?.startBar, let end = groove.last?.endBar else { return [] }
+        let grooveBars = groove.reduce(0) { $0 + $1.lengthBars }
+        let count = Swift.max(1, Swift.min(3, grooveBars / 32))
+        let slot  = (end - start) / count
+        var result: [Range<Int>] = []
+        var earliest = start + 8
+        for w in 0..<count {
+            var length = 8 + 4 * rng.nextInt(upperBound: 3)            // 8, 12 or 16 bars
+            let lo = Swift.max(earliest, start + w * slot)
+            let hi = start + (w + 1) * slot
+            func starts(_ len: Int) -> [Int] {
+                guard lo < hi else { return [] }
+                return (lo..<hi).filter { b in
+                    guard let sec = groove.first(where: { $0.startBar <= b && b < $0.endBar }) else { return false }
+                    // Never the section's own last bar: that bar leads into whatever follows, and
+                    // where a Remix Break follows it carries the band's unison hits.
+                    let limit = sec.endBar == end ? end - 4 : sec.endBar - 1
+                    return (b - sec.startBar) % 4 == 0 && b + len <= limit
+                }
+            }
+            var options = starts(length)
+            if options.isEmpty && length > 8 { length = 8; options = starts(8) }
+            guard !options.isEmpty else { continue }
+            let at = options[rng.nextInt(upperBound: options.count)]
+            result.append(at..<(at + length))
+            earliest = at + length + 4
+        }
+        return result
     }
 
     /// Tiles each groove/body section (A and B independently — Chill has at most one of each)
@@ -160,6 +216,9 @@ struct ChillRhythmGenerator {
         case acidJazzStab          // CHL-RHY-004
         case chordHold             // CHL-RHY-005
         case downbeatPulse         // CHL-RHY-006
+        case chordalComp           // CHL-RHY-007 — Chill Soho
+        case singleNoteLine        // CHL-RHY-008 — Chill Soho
+        case rootAndChordEighths   // CHL-RHY-009 — Chill Soho
 
         var ruleID: String {
             switch self {
@@ -169,6 +228,9 @@ struct ChillRhythmGenerator {
             case .acidJazzStab:        return "CHL-RHY-004"
             case .chordHold:           return "CHL-RHY-005"
             case .downbeatPulse:       return "CHL-RHY-006"
+            case .chordalComp:         return "CHL-RHY-007"
+            case .singleNoteLine:      return "CHL-RHY-008"
+            case .rootAndChordEighths: return "CHL-RHY-009"
             }
         }
     }
@@ -178,6 +240,29 @@ struct ChillRhythmGenerator {
         .bosaMoonArpeggiated, .acidJazzStab, .chordHold, .downbeatPulse]
     private static let allBluesCompingModes: [CompingMode] = [.mobyBackbeat, .stGermainSyncopated,
         .chordHold, .downbeatPulse]
+    private static let allSohoLatinModes: [CompingMode] = [.chordalComp, .rootAndChordEighths, .singleNoteLine]
+    private static let allSohoSoulModes:  [CompingMode] = [.chordalComp, .singleNoteLine,
+        .chordHold, .downbeatPulse, .rootAndChordEighths]
+
+    /// Chill Soho, Latin pool: CHL-RHY-007 45%, CHL-RHY-009 30%, CHL-RHY-008 25%.
+    private static func pickSohoLatinCompingMode(rng: inout SeededRNG) -> CompingMode {
+        let roll = rng.nextDouble()
+        if roll < 0.45 { return .chordalComp }
+        if roll < 0.75 { return .rootAndChordEighths }
+        return .singleNoteLine
+    }
+
+    /// Chill Soho, Soul pool: CHL-RHY-007 30%, CHL-RHY-008 30%, the reused Chord Hold and
+    /// Downbeat Pulse at 15% each, and CHL-RHY-009 at 10% (both EBTG sources are non-Latin).
+    /// Bosa Moon (not a bossa) and the Moby backbeat stay excluded.
+    private static func pickSohoSoulCompingMode(rng: inout SeededRNG) -> CompingMode {
+        let roll = rng.nextDouble()
+        if roll < 0.30 { return .chordalComp }
+        if roll < 0.60 { return .singleNoteLine }
+        if roll < 0.75 { return .chordHold }
+        if roll < 0.90 { return .downbeatPulse }
+        return .rootAndChordEighths
+    }
 
     /// Weights (2026 flattening): this pool used to have separate weight tables for Deep/Dream
     /// vs Free/Bright moods. That made every "how often does rule X show up" question require a
@@ -235,7 +320,10 @@ struct ChillRhythmGenerator {
                                          bluesKeyboardBar: Int = 0,
                                          forcedSwitchBar: Int? = nil,
                                          sparseFragments: [Range<Int>] = [],
-                                         dropoutFragment: Range<Int>? = nil,
+                                         dropoutFragments: [Range<Int>] = [],
+                                         clave: Bool = false,
+                                         soho: Bool = false,
+                                         eighthsPeriod: Int = 8,
                                          rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let scalePCs  = frame.scalePCs
@@ -243,6 +331,8 @@ struct ChillRhythmGenerator {
         // Extends a triggered rest bar to 2 bars occasionally — set to the bar right after a
         // rest bar that rolled the extension, then consumed and cleared on the next iteration.
         var extendedRestBar: Int? = nil
+        let remixEntry = ChillStructureGenerator.remixEntryBars(structure: structure,
+                                                                breakdownStyle: breakdownStyle)
 
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -267,12 +357,28 @@ struct ChillRhythmGenerator {
 
             // Outro: always silent
             if label == .outro { continue }
-            // Intro: silent unless blues (keyboard enters at bluesKeyboardBar)
+            // Intro: silent unless blues (keyboard enters at bluesKeyboardBar). Chill Soho's
+            // comping enters two bars before the groove does — it was silent through every intro,
+            // which is most of why they sounded like bass and drums alone (Zack, 2026-10-12).
             if label == .intro {
-                if !bluesVariation { continue }
                 let introStart = structure.introSection?.startBar ?? 0
-                if bar - introStart < bluesKeyboardBar { continue }
-                // Fall through to normal comping for remaining intro bars
+                if soho {
+                    // The comping enters for the intro's LAST TWO bars, so the build adds one
+                    // thing a bar: percussion, then comping, then the bass figure on the final
+                    // bar. Tied to the end of the intro rather than to a layer number — a cold
+                    // start spends the first bar on a drums-only pickup, which pushed the entry
+                    // to the same bar as the bass and made the build lopsided (Zack, 2026-10-12).
+                    // Whichever of the comping and the bass leads enters on the second-to-last
+                    // bar; the other joins on the last.
+                    let leads = !ChillStructureGenerator.sohoBassLeadsIntro(frame: frame, structure: structure)
+                    guard let intro = structure.introSection,
+                          bar >= intro.endBar - (leads ? 2 : 1) else { continue }
+                } else if !bluesVariation {
+                    continue
+                } else if bar - introStart < bluesKeyboardBar {
+                    continue
+                }
+                // Fall through to normal comping for the remaining intro bars
             }
 
             // Breakdown handling
@@ -282,7 +388,21 @@ struct ChillRhythmGenerator {
                 let base    = bar * 16
                 let sectionLen = section?.lengthBars ?? 4
 
-                if breakdownStyle == .groovePocket {
+                if breakdownStyle == .sohoRemix {
+                    // Remix Break (Chill Soho): Rhythm reduced to short offbeat stabs — the house
+                    // offbeat chord on 2, 6, 10 and 14 — and on the last bar it joins the band's
+                    // unison hits on 0 and 8.
+                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                    let isLast  = breakdownBar == sectionLen - 1
+                    for step in (isLast ? [0, 8] : [2, 6, 10, 14]) {
+                        let vel = UInt8((isLast ? 70 : 48) + rng.nextInt(upperBound: 12))
+                        for note in voicing {
+                            events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
+                                                    velocity: vel, durationSteps: isLast ? 2 : 1))
+                        }
+                    }
+                    continue
+                } else if breakdownStyle == .groovePocket {
                     // Rhythm plays straight through — fall through to normal comping below.
                     // For 8-bar pockets, overlay escalating tension stabs in bars 6–8.
                     if sectionLen >= 8 && breakdownBar >= 5 {
@@ -336,6 +456,23 @@ struct ChillRhythmGenerator {
                 }
             }
 
+            // The bar leading into the Remix Break: stop after beat 2, then hit beats 3 and 4
+            // with the rest of the band. Overrides the rest-bar and dropout logic below — this
+            // bar is the way in, and the band does not sit it out.
+            if remixEntry.contains(bar) {
+                let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                let base    = bar * 16
+                for step in [8, 12] {
+                    let vel = UInt8(76 + rng.nextInt(upperBound: 12))
+                    for note in voicing {
+                        events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
+                                                velocity: vel, durationSteps: 2))
+                    }
+                }
+                continue
+            }
+
             // Consume a rest bar that was extended to 2 bars on the previous iteration.
             if let extended = extendedRestBar, bar == extended {
                 extendedRestBar = nil
@@ -344,7 +481,7 @@ struct ChillRhythmGenerator {
 
             // Dropout fragment: Rhythm goes fully silent for this stretch — takes priority over
             // the rest-bar and sparse-fragment mechanics below.
-            if let dropout = dropoutFragment, dropout.contains(bar) { continue }
+            if dropoutFragments.contains(where: { $0.contains(bar) }) { continue }
 
             // Rest bars: comping periodically lays out completely so the track doesn't feel
             // relentless. Roughly one rest every ~23 bars on average, never on back-to-back bars.
@@ -366,7 +503,10 @@ struct ChillRhythmGenerator {
             // for a single-body (Simple form) song, forcedSwitchBar does the same job mid-body.
             let useModeB = (label == .B) || (forcedSwitchBar.map { bar >= $0 } ?? false)
             let compingMode = useModeB ? modeB : modeA
-            let forceSparse = sparseFragments.contains { $0.contains(bar) }
+            // Chill Soho's intro takes the sparse shape of whichever mode is running: it is a way
+            // in, not the groove proper. Scoped to Soho — Chill Blues also comps in its intro, and
+            // thinning it there changed songs that are already released.
+            let forceSparse = sparseFragments.contains { $0.contains(bar) } || (soho && label == .intro)
 
             switch compingMode {
             case .stGermainSyncopated:
@@ -391,7 +531,167 @@ struct ChillRhythmGenerator {
             case .downbeatPulse:
                 events += downbeatPulse(base: base, voicing: voicing, bar: bar,
                                          forceSparse: forceSparse, rng: &rng)
+            case .chordalComp:
+                events += chordalComp(base: base, voicing: voicing, bar: bar, clave: clave,
+                                      forceSparse: forceSparse, rng: &rng)
+            case .singleNoteLine:
+                events += singleNoteLine(base: base, chord: chord, bar: bar,
+                                         forceSparse: forceSparse, rng: &rng)
+            case .rootAndChordEighths:
+                events += rootAndChordEighths(base: base, frame: frame, chord: chord, voicing: voicing,
+                                              bar: bar, variant: (bar / eighthsPeriod) % 3,
+                                              forceSparse: forceSparse, rng: &rng)
             }
+        }
+        return events
+    }
+
+    // MARK: - CHL-RHY-007: Chordal Comp (Chill Soho)
+
+    /// CHL-RHY-007 Chordal Comp. Measured from the electric-piano comps of Black Cow, Your Love Is
+    /// King, Smooth Operator and Holding Back the Years: 2–3 note rootless voicings, 7–13 notes a
+    /// bar, short 2–3 step stabs, with steps 0, 6 and 12 carrying the weight and 4, 9, 10 and 14 as
+    /// secondary placements. Velocity 48–62 — restraint here comes from touch, not from sparseness.
+    ///
+    /// `clave` (Latin groove): the bar pair plays a 3-2 clave — 0, 6, 12 then 4, 10, 14 — the
+    /// "two-bar answer" the plan specifies. Soul: the measured 0, 6, 12 every bar, plus a
+    /// secondary hit. forceSparse keeps only the downbeat and the "and of two".
+    static func chordalComp(base: Int, voicing: [Int], bar: Int, clave: Bool,
+                                    forceSparse: Bool, rng: inout SeededRNG) -> [MIDIEvent] {
+        guard !voicing.isEmpty else { return [] }
+        var steps: [Int]
+        if forceSparse {
+            steps = [0, 6]
+        } else if clave {
+            steps = bar % 2 == 0 ? [0, 6, 12] : [4, 10, 14]
+        } else {
+            steps = [0, 6, 12]
+            let secondary = [4, 9, 10, 14]
+            steps.append(secondary[rng.nextInt(upperBound: secondary.count)])
+            steps = Array(Set(steps)).sorted()
+        }
+        // 2–3 notes per stab, measured at 2.1–2.5. Two-note stabs keep the top of the voicing,
+        // which is where the 7th and 9th sit once buildVoicing has voiced it rootless.
+        let sorted = voicing.sorted()
+        var events: [MIDIEvent] = []
+        for (i, step) in steps.enumerated() {
+            let notes = (sorted.count > 2 && rng.nextDouble() < 0.5) ? Array(sorted.suffix(2)) : sorted
+            let next  = i + 1 < steps.count ? steps[i + 1] : 16
+            let dur   = Swift.max(1, Swift.min(2 + rng.nextInt(upperBound: 2), next - step))
+            let vel   = UInt8((step == 0 ? 56 : 48) + rng.nextInt(upperBound: 7))
+            for n in notes {
+                events.append(MIDIEvent(stepIndex: base + step, note: UInt8(n), velocity: vel,
+                                        durationSteps: dur))
+            }
+        }
+        return events
+    }
+
+    // MARK: - CHL-RHY-008: Single-Note Line (Chill Soho)
+
+    /// CHL-RHY-008 Single-Note Line. Measured from Avalon (8.6 notes a bar, every step), More Than
+    /// This (4.6–5.4, weighted to 0, 6, 10, 12) and Do It Again: a CONTINUOUS line, strictly
+    /// monophonic, 4.5–9 notes a bar, very short notes, low velocity. Being monophonic is what
+    /// separates it from the comp — not where it lands. The first draft confined it to offbeats;
+    /// the measurement corrected that.
+    ///
+    /// Moves along a ladder of chord tones inside one octave, so each step is a third or a
+    /// fourth — "narrow range, mostly thirds and fourths apart". forceSparse plays quarter notes.
+    static func singleNoteLine(base: Int, chord: ChordWindow?, bar: Int,
+                                       forceSparse: Bool, rng: inout SeededRNG) -> [MIDIEvent] {
+        guard let chord else { return [] }
+        // Ordered range, so Set iteration order never reaches a pitch choice.
+        let ladder = (60...72).filter { chord.chordTones.contains($0 % 12) }
+        guard !ladder.isEmpty else { return [] }
+
+        var steps: [Int]
+        if forceSparse {
+            steps = [0, 4, 8, 12]
+        } else {
+            // Steady eighths with one to three left out, and now and then a sixteenth pickup —
+            // 5 to 8 notes, inside the measured 4.5–9.
+            steps = Array(stride(from: 0, to: 16, by: 2))
+            for _ in 0..<(1 + rng.nextInt(upperBound: 3)) where steps.count > 5 {
+                steps.remove(at: 1 + rng.nextInt(upperBound: steps.count - 1))   // never the downbeat
+            }
+            if rng.nextDouble() < 0.30 { steps.append(15) }
+            steps.sort()
+        }
+
+        var idx = ladder.count / 2
+        var events: [MIDIEvent] = []
+        for (i, step) in steps.enumerated() {
+            if i > 0 {
+                let move = rng.nextDouble() < 0.5 ? 1 : -1
+                var nextIdx = idx + move
+                if nextIdx < 0 || nextIdx >= ladder.count { nextIdx = idx - move }   // reflect
+                idx = Swift.max(0, Swift.min(ladder.count - 1, nextIdx))
+            }
+            let next = i + 1 < steps.count ? steps[i + 1] : 16
+            let dur  = Swift.max(1, Swift.min(1 + rng.nextInt(upperBound: 2), next - step))
+            events.append(MIDIEvent(stepIndex: base + step, note: UInt8(ladder[idx]),
+                                    velocity: UInt8(42 + rng.nextInt(upperBound: 12)),
+                                    durationSteps: dur))
+        }
+        return events
+    }
+
+    // MARK: - CHL-RHY-009: Root-and-Chord Eighths (Chill Soho)
+
+    /// CHL-RHY-009 Root-and-Chord Eighths. Measured from the Do It Again piano and the guitars of
+    /// Each and Every One and Missing: one hand holds a low root while the other answers with
+    /// small chords, between them filling every eighth except the "and" of 1, so the downbeat
+    /// rings. The root sounds on beat 1 and its octave on the "and" of 2 and on beat 4; 2–3 note
+    /// chord fragments fall on beat 2, the "and" of 3, the "and" of 4 and sometimes beat 3.
+    ///
+    /// Variation, so the figure is never identical for a whole song:
+    /// - three variants rotate every 8–12 bars, as measured in Do It Again (36% / 22% / 17%):
+    ///   all of it; without beat 3; without beat 3 and the "and" of 4
+    /// - the chord fragment changes shape on every hit — Do It Again never repeats one twice in
+    ///   a row — and alternate bars start on the other shape
+    /// - forceSparse (the sparse stretches) keeps only the root and two fragments
+    ///
+    /// The low root sits at MIDI 48–59, above the bass track's register, so the two don't collide.
+    static func rootAndChordEighths(base: Int, frame: GlobalMusicalFrame, chord: ChordWindow?,
+                                    voicing: [Int], bar: Int, variant: Int,
+                                    forceSparse: Bool, rng: inout SeededRNG) -> [MIDIEvent] {
+        guard let chord, voicing.count >= 2 else { return [] }
+        let rootPC = (frame.keySemitoneValue + degreeSemitone(chord.chordRoot)) % 12
+        guard let low = (48...59).first(where: { $0 % 12 == rootPC }) else { return [] }
+
+        // Two fragment shapes from the rootless voicing: its top two notes, and its lower two
+        // (or lower three when there are four or more), lifted clear of the root's octave.
+        let sorted = voicing.sorted().map { $0 <= low + 12 ? $0 + 12 : $0 }.sorted()
+        let shapes = [Array(sorted.suffix(2)), Array(sorted.prefix(sorted.count >= 4 ? 3 : 2))]
+
+        let rootSteps: [Int]
+        let chordSteps: [Int]
+        if forceSparse {
+            rootSteps = [0]; chordSteps = [4, 10]
+        } else {
+            rootSteps = [0, 6, 12]
+            switch variant {
+            case 1:  chordSteps = [4, 10, 14]
+            case 2:  chordSteps = [4, 10]
+            default: chordSteps = [4, 8, 10, 14]
+            }
+        }
+
+        var events: [MIDIEvent] = []
+        for step in rootSteps {
+            let note = step == 0 ? low : low + 12
+            let dur  = step == 0 ? (forceSparse ? 8 : 6) : 4
+            let vel  = UInt8((step == 0 ? 56 : 50) + rng.nextInt(upperBound: 8))
+            events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: dur))
+        }
+        var shape = bar % 2
+        for step in chordSteps {
+            let vel = UInt8((step == 4 ? 50 : 46) + rng.nextInt(upperBound: 8))
+            for n in shapes[shape] {
+                events.append(MIDIEvent(stepIndex: base + step, note: UInt8(n), velocity: vel,
+                                        durationSteps: 2))
+            }
+            shape = 1 - shape
         }
         return events
     }
@@ -779,6 +1079,17 @@ struct ChillRhythmGenerator {
         case .major:  intervals = [4, 7, 11]
         case .dom7:   intervals = [4, 7, 10]
         case .sus4:   intervals = [5, 7, 10]
+        // Extended types (Chill Soho). Without these the `default` below voiced every one of
+        // them as a MINOR seventh — so add9, maj7 and maj9 chords played minor. Rootless where
+        // there is a ninth: the bass has the root, and CHL-RHY-007 specifies rootless voicings.
+        case .add9:   intervals = [4, 7, 14]    // 3 5 9
+        case .maj7:   intervals = [4, 7, 11]    // 3 5 7
+        case .maj9:   intervals = [4, 11, 14]   // 3 7 9
+        case .min9:   intervals = [3, 10, 14]   // b3 b7 9
+        case .maj6:   intervals = [4, 7, 9]     // 3 5 6
+        case .min6:   intervals = [3, 7, 9]     // b3 5 6
+        case .dom9:   intervals = [4, 10, 14]   // 3 b7 9
+        case .min7b5: intervals = [3, 6, 10]    // b3 b5 b7
         default:      intervals = [3, 7, 10]
         }
 

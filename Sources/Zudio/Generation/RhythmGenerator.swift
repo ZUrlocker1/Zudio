@@ -451,6 +451,8 @@ struct RhythmGenerator {
         case .add9:    chordIntervals = [0, 4, 7, 14]
         case .quartal: chordIntervals = [0, 5, 10]
         case .power:   chordIntervals = [0, 7, 12]
+        case .maj7, .maj9, .min9, .maj6, .min6, .dom9, .min7b5:
+            chordIntervals = entry.chordWindow.chordType.intervals   // extended: use the formula
         }
 
         var ascending: [UInt8] = []

@@ -559,7 +559,19 @@ final class AppState: ObservableObject {
         kTrackRhythm: "Rhythm", kTrackTexture: "Texture", kTrackBass: "Bass", kTrackDrums: "Drums"
     ]
 
-    nonisolated static func instrumentPoolNames(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [String] {
+    nonisolated static func instrumentPoolNames(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
+                                                isChillSoho: Bool = false) -> [String] {
+        // Chill Soho texture is MIDI, never audio: horns for the stabs, bells and vibes for colour.
+        // Every program was checked against Zudio.sf2 (tools/sf2_drum_keys.py's sibling check) —
+        // Brass Section (61), the obvious section voice, is NOT in the soundfont and would play
+        // silent. Synth Brass 1/2 stood in for it until Zack heard them (2026-10-11): both are
+        // synthetic where this music wants real horns. Trumpet and French Horns replace them —
+        // French Horns is the one true section patch in the bank, and the only other brass are
+        // Trombone (too low for stabs over the pads) and the saxes (Lead 2's voices).
+        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return ["Trumpet","French Horns","Muted Trumpet","Vibraphone","Celesta","Glockenspiel","Solo Vox","Halo Pad"] }
+        // Chill Soho Lead 2: what answers the singer in the corpus. Baritone Sax (67) was measured
+        // too but is not in Zudio.sf2.
+        if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return ["Alto Sax","Tenor Sax","Synth Brass 1","Trombone","Vibraphone"] }
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
@@ -604,7 +616,11 @@ final class AppState: ObservableObject {
 
     /// MIDI program numbers for each slot in instrumentPoolNames — same order, same count.
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
-    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [Int] {
+    nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
+                                                   isChillSoho: Bool = false) -> [Int] {
+        // Chill Soho MIDI texture — names and the reasons are in instrumentPoolNames.
+        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 60, 59, 11, 8, 9, 85, 94] }
+        if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
@@ -649,8 +665,10 @@ final class AppState: ObservableObject {
 
     /// CC7 channel-volume override per pool slot (0 = use default 100).
     /// Entries that differ from 100 are listed explicitly; all others return 100.
-    nonisolated static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false) -> [Int] {
-        let names = instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isKosmicDrift)
+    nonisolated static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
+                                                    isChillSoho: Bool = false) -> [Int] {
+        let names = instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isKosmicDrift,
+                                        isChillSoho: isChillSoho)
         return names.map { name in
             switch (trackIndex, style, name) {
             // Square Lead (program 80) at default CC7 100 — PlaybackEngine vol 0.78 handles calibration
@@ -671,6 +689,9 @@ final class AppState: ObservableObject {
             // patches, which are pads and organs sitting further back.
             case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
+            // Chill Soho Lead 2 only — base Chill's Lead 2 pool has no Synth Brass. It is the
+            // loudest and brightest patch in that pool and sat over the top of Lead 1.
+            case (kTrackLead2,   .chill,   "Synth Brass 1"): return 70
             default: return 100
             }
         }
@@ -693,13 +714,14 @@ final class AppState: ObservableObject {
 
         let style = selectedStyle
         let isDrift = songState?.isKosmicDrift == true
+        let isSoho = songState?.chillSohoVariation == true
         let trackNames = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"]
         var warnings: [GenerationLogEntry] = []
         for trackIndex in 0..<kTrackCount {
-            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
+            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             guard !programs.isEmpty else { continue }
             // Chill/Ambient audio texture tracks are handled by audioTexture.start() — skip MIDI load
-            if trackIndex == kTrackTexture && style == .chill { continue }
+            if trackIndex == kTrackTexture && style == .chill && songState?.chillSohoVariation != true { continue }
             if trackIndex == kTrackTexture && style == .ambient && songState?.ambientAudioTexture != nil { continue }
             // Drums always use percussion bank — no meaningful "default MIDI" concept
             if trackIndex == kTrackDrums { continue }
@@ -707,7 +729,7 @@ final class AppState: ObservableObject {
             let poolProgram = programs[min(idx, programs.count - 1)]
             let program = (trackIndex == kTrackLead2 ? lead2MirroredProgram : nil) ?? poolProgram
             playback.setProgram(program, forTrack: trackIndex, immediate: true)
-            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
+            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             let cc7 = idx < cc7Values.count ? cc7Values[idx] : 100
             playback.setChannelVolume(cc7, forTrack: trackIndex)
             // Check that the load was confirmed (currentProgram updated only on success)
@@ -749,7 +771,7 @@ final class AppState: ObservableObject {
             // Chill audio textures are files, not MIDI patches — report by name, matching
             // the Ambient branch below. Previously skipped entirely, so a Chill song's
             // texture never appeared in the log at all.
-            if i == kTrackTexture && style == .chill {
+            if i == kTrackTexture && style == .chill && songState?.chillSohoVariation != true {
                 if let texFile = songState?.chillAudioTexture {
                     parts.append("Tx:\(Self.chillTextureDisplayName(texFile))")
                 }
@@ -1050,8 +1072,9 @@ final class AppState: ObservableObject {
         playback.onMissingPatch = { [weak self] trackIndex, program in
             guard let self else { return }
             let style    = self.songState?.style ?? .chill
-            let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
-            let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: style)
+            let soho     = self.songState?.chillSohoVariation == true
+            let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isChillSoho: soho)
+            let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: style, isChillSoho: soho)
             let name     = zip(programs, names).first { $0.0 == program }.map(\.1) ?? "p\(program)"
             self.appendToLog([GenerationLogEntry(tag: "Error",
                 description: "Missing MIDI patch \(program) \(name)", isTitle: false)])
@@ -1329,6 +1352,7 @@ final class AppState: ObservableObject {
                 }
                 self.replaceOnceOnlyInstruments(style: style)
                 self.sanitiseBluesInstruments(for: state)
+                self.sanitiseSohoInstruments(for: state)
                 self.sanitiseNoirInstruments(for: state)
                 self.sanitiseDriftInstruments(for: state)
                 self.sanitiseArcadeInstruments(for: state)
@@ -1342,12 +1366,16 @@ final class AppState: ObservableObject {
                     if let idx = l1Pool.firstIndex(of: Int(state.chillLeadInstrument.gmProgram)) {
                         self.instrumentOverrides[kTrackLead1] = idx
                     }
-                    let l2Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill)
+                    let l2Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill,
+                                                             isChillSoho: state.chillSohoVariation)
                     if let idx = l2Pool.firstIndex(of: Int(state.chillLead2Instrument.gmProgram)) {
                         self.instrumentOverrides[kTrackLead2] = idx
                     }
-                    let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
-                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                    // Chill Soho's texture is MIDI: its override is a real pool index, already set
+                    // by randomise/seed and kept in range by sanitiseSohoInstruments.
+                    if !state.chillSohoVariation {
+                        self.instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
+                    }
                 }
                 // Ambient audio texture: set picker index to match the chosen file.
                 if style == .ambient, let audioTex = state.ambientAudioTexture {
@@ -1395,7 +1423,7 @@ final class AppState: ObservableObject {
                 // Configure ambient mode before defaultsResetToken fires so setEffect
                 // uses the correct Ambient reverb/delay values from the start.
                 self.playback.setAmbientMode(self.selectedStyle == .ambient)
-                self.playback.setChillMode(self.selectedStyle == .chill, bluesVariation: state.chillBluesVariation)
+                self.playback.setChillMode(self.selectedStyle == .chill, bluesVariation: state.chillBluesVariation, sohoVariation: state.chillSohoVariation)
                 // Reset instruments + effects and apply them synchronously before play.
                 // defaultsResetToken fires TrackRowView.onChange on the next render cycle
                 // (deferred), so applyCurrentInstrumentsToPlayback() ensures the correct
@@ -1759,13 +1787,14 @@ final class AppState: ObservableObject {
     /// the same distinctive instrument.
     private func replaceOnceOnlyInstruments(style: MusicStyle) {
         let isDrift = songState?.isKosmicDrift == true
+        let isSoho = songState?.chillSohoVariation == true
         var rng = SystemRandomNumberGenerator()
         for entry in Self.noRepeatInstruments where entry.style == style {
             let current = instrumentOverrides[entry.track] ?? 0
             guard current == entry.poolIndex else { continue }
             // Only swap if the previous song also used this instrument.
             guard lastUsedInstrumentIndex[entry.track]?[style] == entry.poolIndex else { continue }
-            let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift)
+            let pool = Self.instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             guard pool.count > 1 else { continue }
             // Replace from the pool this song actually allows, not the whole instrument list.
             // Drawing from the full list usually landed outside the substyle's subset, so the
@@ -1861,7 +1890,8 @@ final class AppState: ObservableObject {
         var rng = SystemRandomNumberGenerator()
         for track in 0..<kTrackCount {
             let pool = Self.instrumentPoolNames(trackIndex: track, style: state.style,
-                                                isKosmicDrift: state.isKosmicDrift)
+                                                isKosmicDrift: state.isKosmicDrift,
+                                                isChillSoho: state.chillSohoVariation)
             guard pool.count > 1 else { continue }
             let allowed = instrumentPickPool(trackIndex: track, style: state.style,
                                              poolCount: pool.count)
@@ -1873,6 +1903,15 @@ final class AppState: ObservableObject {
 
     private func sanitiseArcadeInstruments(for state: SongState) {
         guard state.style == .motorik, state.motorikArcadeVariation else { return }
+        sanitiseInstrumentsToPool(for: state)
+    }
+
+    /// Chill Soho: keeps every track inside the pools `instrumentPickPoolStatic` allows for Soho.
+    /// Needed for the same reason as the others — only two instruments are re-picked per song,
+    /// so a Soho song would otherwise inherit the previous song's 808 Kit. Called on all three
+    /// generation paths; Arcade and Sync are currently only called on one of them.
+    private func sanitiseSohoInstruments(for state: SongState) {
+        guard state.style == .chill, state.chillSohoVariation else { return }
         sanitiseInstrumentsToPool(for: state)
     }
 
@@ -1946,7 +1985,8 @@ final class AppState: ObservableObject {
             ? [kTrackLead1, kTrackLead2, kTrackTexture] : []
         for track in 0..<kTrackCount where !generatorOwned.contains(track) {
             let pool = Self.instrumentPoolNames(trackIndex: track, style: style,
-                                                isKosmicDrift: state.isKosmicDrift)
+                                                isKosmicDrift: state.isKosmicDrift,
+                                                isChillSoho: state.chillSohoVariation)
             guard pool.count > 1 else { continue }
             let allowed = instrumentPickPool(trackIndex: track, style: style, poolCount: pool.count)
             guard !allowed.isEmpty else { continue }
@@ -1956,20 +1996,22 @@ final class AppState: ObservableObject {
 
     private func randomizeTwoInstruments(style: MusicStyle) {
         let isDrift = songState?.isKosmicDrift == true
+        let isSoho = songState?.chillSohoVariation == true
         var rng = SystemRandomNumberGenerator()
         // Chill: Lead 1 and Lead 2 are always driven by the song's generated chillLeadInstrument /
         // chillLead2Instrument (register, phrasing rules, and register separation all depend on them).
         // Exclude them from random variation — only Pads, Rhythm, Bass, Drums vary between songs.
         // Texture is excluded because the generator already picks the audio file.
         var eligible = Self.randomizableTrackIndices.filter {
-            if style == .chill { return $0 != kTrackTexture && $0 != kTrackLead1 && $0 != kTrackLead2 }
+            // Chill Soho's texture is MIDI with a real pool, so it varies like any other track.
+            if style == .chill { return ($0 != kTrackTexture || isSoho) && $0 != kTrackLead1 && $0 != kTrackLead2 }
             return true
         }
         var pickedCount = 0
         while pickedCount < 2, !eligible.isEmpty {
             let pos = eligible.indices.randomElement(using: &rng)!
             let trackIdx = eligible.remove(at: pos)
-            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style, isKosmicDrift: isDrift)
+            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             guard pool.count > 1 else { continue }
             let currentIdx = instrumentOverrides[trackIdx] ?? 0
             let weightedPool = instrumentPickPool(trackIndex: trackIdx, style: style, poolCount: pool.count)
@@ -2000,6 +2042,7 @@ final class AppState: ObservableObject {
     ) {
         let style  = state.style
         let isDrift = state.isKosmicDrift
+        let isSoho = state.chillSohoVariation
         var rng = SystemRandomNumberGenerator()
 
         if isFirstForStyle {
@@ -2007,14 +2050,14 @@ final class AppState: ObservableObject {
         } else {
             // Randomise two instruments (same logic as randomizeTwoInstruments)
             var eligible = randomizableTrackIndices.filter {
-                if style == .chill { return $0 != kTrackTexture && $0 != kTrackLead1 && $0 != kTrackLead2 }
+                if style == .chill { return ($0 != kTrackTexture || isSoho) && $0 != kTrackLead1 && $0 != kTrackLead2 }
                 return true
             }
             var pickedCount = 0
             while pickedCount < 2, !eligible.isEmpty {
                 let pos      = eligible.indices.randomElement(using: &rng)!
                 let trackIdx = eligible.remove(at: pos)
-                let pool     = instrumentPoolNames(trackIndex: trackIdx, style: style, isKosmicDrift: isDrift)
+                let pool     = instrumentPoolNames(trackIndex: trackIdx, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
                 guard pool.count > 1 else { continue }
                 let currentIdx   = overrides[trackIdx] ?? 0
                 let weightedPool = instrumentPickPoolStatic(trackIndex: trackIdx, style: style, poolCount: pool.count, state: state)
@@ -2032,7 +2075,7 @@ final class AppState: ObservableObject {
             let current = overrides[entry.track] ?? 0
             guard current == entry.poolIndex else { continue }
             guard lastUsed[entry.track]?[style] == entry.poolIndex else { continue }
-            let pool = instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift)
+            let pool = instrumentPoolNames(trackIndex: entry.track, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             guard pool.count > 1 else { continue }
             var newIdx = current; var attempts = 0
             repeat { newIdx = Int.random(in: 0..<pool.count, using: &rng); attempts += 1 }
@@ -2155,7 +2198,19 @@ final class AppState: ObservableObject {
         }
         guard style == .chill else { return Array(0..<poolCount) }
         let isBlues = state?.chillBluesVariation == true
+        let isSoho  = state?.chillSohoVariation == true
         switch trackIndex {
+        case kTrackTexture where isSoho:
+            // [0=Trumpet, 1=French Horns, 2=Muted Trumpet, 3=Vibraphone, 4=Celesta,
+            //  5=Glockenspiel, 6=Solo Vox, 7=Halo Pad] — brass leads, as a horn section is the
+            // idiomatic voice for both the stabs and the halo.
+            // Filtered by poolCount: a caller that sized the pool without isChillSoho would get the
+            // 7-entry audio list, and index 7 would then be out of range.
+            return [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7].filter { $0 < poolCount }
+        case kTrackDrums where isSoho:
+            // Chill Soho drums are rim click, brushes and a soft backbeat — never the 808.
+            // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
+            return [0, 2].filter { $0 < poolCount }
         case kTrackRhythm:
             return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4,6,6]
         case kTrackLead2:
@@ -2273,6 +2328,7 @@ final class AppState: ObservableObject {
             self.randomizeTwoInstruments(style: state.style)
             self.replaceOnceOnlyInstruments(style: state.style)
             self.sanitiseBluesInstruments(for: state)
+            self.sanitiseSohoInstruments(for: state)
             self.sanitiseNoirInstruments(for: state)
             self.applyBluesPadsInstrument(for: state)
             self.applyAmbientPianoInstrument(for: state)
@@ -2348,10 +2404,11 @@ final class AppState: ObservableObject {
         guard let anchor = evolveAnchorState else { return }
         let style = anchor.style
         let isDrift = songState?.isKosmicDrift == true
+        let isSoho = songState?.chillSohoVariation == true
         var rng = SystemRandomNumberGenerator()
         var entries: [GenerationLogEntry] = []
         for trackIndex in freshTracks {
-            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
+            let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             guard programs.count > 1 else { continue }
             let currentIdx = instrumentOverrides[trackIndex] ?? 0
             var newIdx = currentIdx
@@ -2364,7 +2421,7 @@ final class AppState: ObservableObject {
             instrumentOverrides[trackIndex] = newIdx
             setProgram(programs[newIdx], forTrack: trackIndex)
             let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-            let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
+            let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
             entries.append(GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false))
         }
@@ -2859,6 +2916,7 @@ final class AppState: ObservableObject {
         if !alreadyEvolved { randomizeTwoInstruments(style: state.style) }
         replaceOnceOnlyInstruments(style: state.style)
         sanitiseBluesInstruments(for: state)
+        sanitiseSohoInstruments(for: state)
         sanitiseNoirInstruments(for: state)
         sanitiseDriftInstruments(for: state)
         applyBluesPadsInstrument(for: state)
@@ -2908,7 +2966,7 @@ final class AppState: ObservableObject {
         playback.load(state)
         playback.seek(toStep: 0)
         playback.setAmbientMode(state.style == .ambient)
-        playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation)
+        playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation, sohoVariation: state.chillSohoVariation)
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
         if thenPlay {
@@ -3071,6 +3129,7 @@ final class AppState: ObservableObject {
         var loadedTempoOverride:    Int?    = nil
         var loadedMoodOverride:     Mood?   = nil
         var loadedBluesVariation:   Bool    = false
+        var loadedSohoVariation:    Bool    = false
         var loadedInstrumentOverrides: [Int: Int] = [:]
         let instrumentShortNames = ["L1": 0, "L2": 1, "Pd": 2, "Ry": 3, "Tx": 4, "Bs": 5, "Dr": 6, "LS": 7]
 
@@ -3103,6 +3162,8 @@ final class AppState: ObservableObject {
                 loadedMoodOverride = Mood(rawValue: val)
             } else if trimmed.hasPrefix("Blues Variation:") {
                 loadedBluesVariation = true
+            } else if trimmed.hasPrefix("Soho Variation:") {
+                loadedSohoVariation = true
             } else if trimmed.hasPrefix("Track Overrides:") {
                 let val = trimmed.dropFirst(16).trimmingCharacters(in: .whitespaces)
                 for pair in val.components(separatedBy: "  ") {
@@ -3131,7 +3192,9 @@ final class AppState: ObservableObject {
                     guard parts.count == 2,
                           let trackIdx = instrumentShortNames[parts[0]],
                           let prog = Int(parts[1]) else { continue }
-                    let pool = Self.instrumentPoolPrograms(trackIndex: trackIdx, style: style)
+                    // Soho Variation: sits in the header above this line, so it is already known.
+                    let pool = Self.instrumentPoolPrograms(trackIndex: trackIdx, style: style,
+                                                           isChillSoho: loadedSohoVariation)
                     if let poolIdx = pool.firstIndex(of: prog) {
                         loadedInstrumentOverrides[trackIdx] = poolIdx
                     }
@@ -3158,6 +3221,7 @@ final class AppState: ObservableObject {
         let loadTempo         = loadedTempoOverride
         let loadMood          = loadedMoodOverride
         let loadBlues         = loadedBluesVariation
+        let loadSoho          = loadedSohoVariation
         let loadedInstOverrides = loadedInstrumentOverrides
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
@@ -3175,7 +3239,8 @@ final class AppState: ObservableObject {
                 forceTexRuleID:   loadForced["Tex"],
                 forcePercussionStyle: loadForced["PercStyle"].flatMap { PercussionStyle(rawValue: $0) },
                 forceBridge:      loadForced["Bridge"] == "true",
-                forceBluesVariation: loadBlues
+                forceBluesVariation: loadBlues,
+                forceSohoVariation: loadSoho
             )
             for trackIdx in overrides.keys.sorted() {
                 state = SongGenerator.regenerateTrack(trackIdx, songState: state, overrideSeed: overrides[trackIdx])
@@ -3196,9 +3261,8 @@ final class AppState: ObservableObject {
                 self.lastEmittedStep  = -1
                 self.instrumentOverrides = loadedInstOverrides
                 // Chill/Ambient audio texture — restore picker index from song state.
-                if style == .chill {
-                    let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
-                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                if style == .chill && !state.chillSohoVariation {   // Soho texture is MIDI
+                    self.instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
                 }
                 if style == .ambient, let audioTex = state.ambientAudioTexture {
                     let prog = Self.ambientAudioProgram(forFilename: audioTex)
@@ -3229,7 +3293,7 @@ final class AppState: ObservableObject {
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 self.playback.setAmbientMode(style == .ambient)
-                self.playback.setChillMode(style == .chill, bluesVariation: state.chillBluesVariation)
+                self.playback.setChillMode(style == .chill, bluesVariation: state.chillBluesVariation, sohoVariation: state.chillSohoVariation)
                 self.defaultsResetToken += 1
                 self.applyCurrentInstrumentsToPlayback()
                 if wasPlaying {
@@ -3404,7 +3468,8 @@ final class AppState: ObservableObject {
             return
         }
         // Chill texture track uses pseudo-programs 240–247 that map to M4A filenames.
-        if trackIndex == kTrackTexture && selectedStyle == .chill {
+        // Chill Soho's texture is MIDI, so its programs fall through to the normal sampler path.
+        if trackIndex == kTrackTexture && selectedStyle == .chill && songState?.chillSohoVariation != true {
             let filename = Self.chillTextureFilename(forProgram: program)
             songState = songState?.withChillAudioTexture(filename)
             if playback.isPlaying {
@@ -3425,16 +3490,17 @@ final class AppState: ObservableObject {
         playback.setProgram(program, forTrack: trackIndex)
         let style = selectedStyle
         let isDrift = songState?.isKosmicDrift == true
-        let poolPrograms = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
+        let isSoho = songState?.chillSohoVariation == true
+        let poolPrograms = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
         if let poolIdx = poolPrograms.firstIndex(of: program) {
-            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift)
+            let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift, isChillSoho: isSoho)
             let cc7 = poolIdx < cc7Values.count ? cc7Values[poolIdx] : 100
             playback.setChannelVolume(cc7, forTrack: trackIndex)
         }
     }
 
     /// Maps a Chill texture pseudo-program (240–250) to an M4A filename.
-    static func chillTextureFilename(forProgram program: Int) -> String? {
+    nonisolated static func chillTextureFilename(forProgram program: Int) -> String? {
         switch program {
         case 240: return nil
         case 241: return "another_bar.m4a"
@@ -3448,7 +3514,7 @@ final class AppState: ObservableObject {
     }
 
     /// Maps a Chill audio texture filename to its pseudo-program number for the instrument picker.
-    static func chillTextureProgram(forFilename filename: String?) -> UInt8 {
+    nonisolated static func chillTextureProgram(forFilename filename: String?) -> UInt8 {
         switch filename {
         case nil:                   return 240
         case "another_bar.m4a":    return 241
@@ -3480,6 +3546,7 @@ final class AppState: ObservableObject {
         guard let entry = state.generationLog.last(where: { $0.tag == "Instruments" }) else { return [:] }
         let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
         let isDrift = state.isKosmicDrift
+        let isSoho = state.chillSohoVariation
         var result: [Int: Int] = [:]
         for token in entry.description.split(separator: " ") {
             let parts = token.split(separator: ":", maxSplits: 1)
@@ -3488,7 +3555,7 @@ final class AppState: ObservableObject {
                   trackIndex != kTrackTexture,                 // texture is a name, not a program
                   let program = Int(parts[1]) else { continue }
             let pool = instrumentPoolPrograms(trackIndex: trackIndex, style: state.style,
-                                              isKosmicDrift: isDrift)
+                                              isKosmicDrift: isDrift, isChillSoho: isSoho)
             if let idx = pool.firstIndex(of: program) { result[trackIndex] = idx }
         }
         return result
@@ -3496,16 +3563,23 @@ final class AppState: ObservableObject {
 
     /// Maps a Chill audio texture filename to a short display name.
     /// Mirrors ambientAudioDisplayName so both styles log their texture the same way.
-    static func chillTextureDisplayName(_ filename: String) -> String {
-        switch filename {
-        case "another_bar.m4a":    return "Another Bar"
-        case "bar_sounds.m4a":     return "Bar Sounds"
-        case "city_at_night.m4a":  return "City at Night"
-        case "harbor.m4a":         return "Harbor"
-        case "vinyl_crackle.m4a":  return "Vinyl Crackle"
-        case "another-pub.m4a":    return "Another Pub"
-        default:                   return "Audio"
-        }
+    /// Display name for a Chill audio texture: the picker's own pool name, so the picker, the
+    /// Instruments line and the generation log all spell it the same way. They used to give three
+    /// spellings of one texture — "Another pub", "Another Pub" and "another-pub".
+    nonisolated static func chillTextureDisplayName(_ filename: String) -> String {
+        let names = instrumentPoolNames(trackIndex: kTrackTexture, style: .chill)
+        let idx   = chillTexturePoolIndex(forFilename: filename)
+        return idx > 0 && idx < names.count ? names[idx] : "Audio"
+    }
+
+    /// Picker position for a Chill audio texture. The picker reads `instrumentOverrides` as a
+    /// POSITION in the pool, but the pool's pseudo-programs are not contiguous — "Another pub" is
+    /// 251 at position 2 — so the old `prog - 240` was right for only four of the seven textures:
+    /// Another pub showed as Vinyl crackle, Bar sounds as Another pub, City at night as Bar sounds,
+    /// and because the picker re-applies its selection on generate, the wrong one could play.
+    nonisolated static func chillTexturePoolIndex(forFilename filename: String?) -> Int {
+        let prog = Int(chillTextureProgram(forFilename: filename))
+        return instrumentPoolPrograms(trackIndex: kTrackTexture, style: .chill).firstIndex(of: prog) ?? 0
     }
 
     /// Maps an Ambient audio texture filename to a short display name.
@@ -3552,7 +3626,8 @@ final class AppState: ObservableObject {
 
     func setEffect(_ effect: TrackEffect, enabled: Bool, forTrack trackIndex: Int) {
         // Chill texture track effects are routed to AudioTexturePlayer's own effect chain.
-        if trackIndex == kTrackTexture && selectedStyle == .chill {
+        // Chill Soho's texture is a MIDI sampler, so its effects go to the engine like any track.
+        if trackIndex == kTrackTexture && selectedStyle == .chill && songState?.chillSohoVariation != true {
             audioTexture.setEffect(effect, enabled: enabled)
             return
         }
@@ -3587,7 +3662,8 @@ final class AppState: ObservableObject {
 
     /// Returns the current MIDI program number for a track, using instrumentOverrides if set.
     func currentInstrument(forTrack trackIndex: Int) -> Int {
-        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle)
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle,
+                                                   isChillSoho: songState?.chillSohoVariation == true)
         guard !programs.isEmpty else { return 0 }
         let idx = instrumentOverrides[trackIndex] ?? 0
         return programs[min(idx, programs.count - 1)]
@@ -3599,7 +3675,8 @@ final class AppState: ObservableObject {
         // from the song currently playing (e.g. a Motorik song loaded while the picker
         // still shows Chill would otherwise draw instruments from the Chill pool).
         let style = songState?.style ?? selectedStyle
-        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style)
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style,
+                                                   isChillSoho: songState?.chillSohoVariation == true)
         guard programs.count > 1 else { return }
         let currentIdx = instrumentOverrides[trackIndex] ?? 0
         var newIdx = currentIdx
@@ -3618,8 +3695,9 @@ final class AppState: ObservableObject {
         instrumentChangeToken += 1
         triggerVisualizerFlash(trackIndex: trackIndex)
         let isDrift2 = songState?.isKosmicDrift == true
+        let isSoho2 = songState?.chillSohoVariation == true
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift2)
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isDrift2, isChillSoho: isSoho2)
         let iName = newIdx < names.count ? names[newIdx] : "prog \(programs[newIdx])"
         appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(iName)", isTitle: false)])
     }
@@ -3627,14 +3705,15 @@ final class AppState: ObservableObject {
     /// Sets a specific program on a track and records the override index.
     func setInstrument(_ program: Int, forTrack trackIndex: Int) {
         let isDrift = songState?.isKosmicDrift == true
-        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle, isKosmicDrift: isDrift)
+        let isSoho = songState?.chillSohoVariation == true
+        let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: selectedStyle, isKosmicDrift: isDrift, isChillSoho: isSoho)
         if let idx = programs.firstIndex(of: program) {
             instrumentOverrides[trackIndex] = idx
         }
         setProgram(program, forTrack: trackIndex)
         instrumentChangeToken += 1
         let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
-        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle, isKosmicDrift: isDrift)
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: selectedStyle, isKosmicDrift: isDrift, isChillSoho: isSoho)
         if let idx = programs.firstIndex(of: program), idx < names.count {
             appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(names[idx])", isTitle: false)])
         }
@@ -3683,6 +3762,8 @@ final class AppState: ObservableObject {
         case .chill:
             let isBlues    = songState?.chillBluesVariation == true
             let baseLeadFX: [TrackEffect] = isBlues ? [.space] : [.space, .delay]
+            // Chill Soho: no delay on Lead 1 (a St Germain signature). Mirrors TrackRowView.
+            let lead1FX: [TrackEffect] = songState?.chillSohoVariation == true ? [.space] : baseLeadFX
 
             // Rhythm organ tremolo: Blues 50% for B3(2)/Perc(3)/Rock(5); regular 20% for B3(2)/Tonewheel(6)
             let rhythmIdx  = trackIndex == kTrackRhythm ? (instrumentOverrides[kTrackRhythm] ?? 0) : -1
@@ -3697,11 +3778,12 @@ final class AppState: ObservableObject {
             let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
 
             defaults = switch trackIndex {
-            case kTrackLead1:   l1Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
+            case kTrackLead1:   l1Vib      ? lead1FX + [.vibrato]    : lead1FX
             case kTrackLead2:   l2Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
             case kTrackRhythm:  rhythmTrem ? [.space, .tremolo]       : [.space]
             case kTrackPads:    [.sweep, .tremolo]
-            case kTrackTexture: [.lowShelf, .reverb]
+            // Chill Soho's texture is MIDI horns/bells — mirrors TrackRowView.
+            case kTrackTexture: songState?.chillSohoVariation == true ? [.space, .reverb] : [.lowShelf, .reverb]
             case kTrackBass:    [.reverb]
             case kTrackDrums:   [.space]
             default:            []
@@ -3801,9 +3883,8 @@ final class AppState: ObservableObject {
             // why "L1:61001" (Ambient index 0, Stereo Piano) went unnoticed for so long, so
             // say it out loud in the log rather than quietly substituting instruments.
             instrumentOverrides = Self.instrumentOverridesFromLog(state)
-            if state.style == .chill {
-                let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
-                instrumentOverrides[kTrackTexture] = Int(prog) - 240
+            if state.style == .chill && !state.chillSohoVariation {   // Soho texture is MIDI
+                instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
             }
             if state.style == .ambient, let audioTex = state.ambientAudioTexture {
                 let prog = Self.ambientAudioProgram(forFilename: audioTex)
@@ -3829,7 +3910,7 @@ final class AppState: ObservableObject {
         playback.load(state)
         playback.seek(toStep: 0)
         playback.setAmbientMode(state.style == .ambient)
-        playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation)
+        playback.setChillMode(state.style == .chill, bluesVariation: state.chillBluesVariation, sohoVariation: state.chillSohoVariation)
         defaultsResetToken += 1
         applyCurrentInstrumentsToPlayback()
         if wasPlaying || forcePlay {
@@ -3898,9 +3979,14 @@ final class AppState: ObservableObject {
                 self.instrumentOverrides = song.decodedInstrumentOverrides.isEmpty
                     ? Self.instrumentOverridesFromLog(state)
                     : song.decodedInstrumentOverrides
-                if song.style == .chill && self.instrumentOverrides[kTrackTexture] == nil {
-                    let prog = Self.chillTextureProgram(forFilename: state.chillAudioTexture)
-                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 240
+                // Re-derive the Chill texture position when it is missing, or when it was saved under
+                // the old `prog - 240` numbering: Another pub (11) and Vinyl crackle (10) fall outside
+                // the 7-entry pool, so they can only be old values. Soho's texture is MIDI.
+                let chillTexPool = Self.instrumentPoolPrograms(trackIndex: kTrackTexture, style: .chill).count
+                let savedTex     = self.instrumentOverrides[kTrackTexture]
+                if song.style == .chill && !state.chillSohoVariation
+                    && (savedTex == nil || savedTex! >= chillTexPool) {
+                    self.instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
                 }
                 if song.style == .ambient, let audioTex = state.ambientAudioTexture,
                    self.instrumentOverrides[kTrackTexture] == nil {

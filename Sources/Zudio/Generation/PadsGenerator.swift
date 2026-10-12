@@ -252,6 +252,14 @@ struct PadsGenerator {
         case .add9:    offsets = [0, 7, 14, 16]
         case .quartal: offsets = [0, 5, 10, 15]
         case .power:   offsets = [0, 7, 12, 19]
+        // Extended: keep the colour tone and drop the fifth where four notes cannot hold both.
+        case .maj7:    offsets = [0, 7, 11, 16]
+        case .maj9:    offsets = [0, 11, 14, 16]
+        case .min9:    offsets = [0, 10, 14, 15]
+        case .maj6:    offsets = [0, 7, 9, 16]
+        case .min6:    offsets = [0, 7, 9, 15]
+        case .dom9:    offsets = [0, 10, 14, 16]
+        case .min7b5:  offsets = [0, 6, 10, 15]
         }
 
         // Snap each chord tone to the nearest in-scale pitch class.

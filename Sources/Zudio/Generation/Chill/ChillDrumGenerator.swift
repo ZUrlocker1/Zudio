@@ -16,6 +16,7 @@ struct ChillDrumGenerator {
         beatStyle: ChillBeatStyle,
         breakdownStyle: ChillBreakdownStyle,
         bluesVariation: Bool = false,
+        sohoPlan: SohoDrumPlan? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         fillBars: inout [Int]
@@ -27,6 +28,33 @@ struct ChillDrumGenerator {
             return bluesDrums(frame: frame, structure: structure, breakdownStyle: breakdownStyle, rng: &rng)
         }
         switch beatStyle {
+        case .sohoLatin, .sohoSoul:
+            let plan = sohoPlan ?? sohoDrumPlan(beatStyle: beatStyle, rng: &rng)
+            usedRuleIDs.insert(plan.ruleID)
+            // The percussion overlay is logged as its own numbered rule so the log shows it.
+            if plan.overlay { usedRuleIDs.insert("CHL-DRUM-014") }
+            if plan.ruleID == "CHL-DRUM-003" {
+                // The reused base-Chill Brush Kit renders the whole song itself; the percussion
+                // overlay goes on top of its groove bars.
+                var events = brushKit(frame: frame, structure: structure,
+                                      breakdownStyle: breakdownStyle, rng: &rng)
+                if plan.overlay {
+                    events += overlayForGrooveBars(frame: frame, structure: structure,
+                                                   ruleID: plan.ruleID, rng: &rng)
+                }
+                // A crash onto the groove, as the Soho rules take on their last intro bar. The
+                // brush kit ramps its velocity through the intro, so it was never as flat as the
+                // Latin rules, but nothing marked the arrival either.
+                if let intro = structure.sections.first(where: { $0.label == .intro }),
+                   let a = structure.sections.first(where: { $0.label == .A }), intro.lengthBars > 0 {
+                    events.append(MIDIEvent(stepIndex: a.startBar * 16, note: GMDrum.crash1.rawValue,
+                                            velocity: UInt8(78 + rng.nextInt(upperBound: 12)),
+                                            durationSteps: 1))
+                }
+                return events
+            }
+            return sohoDrums(frame: frame, structure: structure, plan: plan,
+                             breakdownStyle: breakdownStyle, rng: &rng)
         case .electronic:
             usedRuleIDs.insert("CHL-DRUM-001")
             return electronic(frame: frame, structure: structure, breakdownStyle: breakdownStyle, rng: &rng)
@@ -44,6 +72,545 @@ struct ChillDrumGenerator {
             usedRuleIDs.insert("CHL-DRUM-005")
             return hipHopJazz(frame: frame, structure: structure, breakdownStyle: breakdownStyle, rng: &rng)
         }
+    }
+
+    // MARK: - Chill Soho drums
+
+    /// Chill Soho drum decisions for one song: which rule, and whether the Latin percussion
+    /// overlay plays. Decided on a DERIVED stream from the seed, so SongGenerator can read them
+    /// before the drums exist — the Remix Break, a breakdown style picked early, is eligible only
+    /// when the overlay is on and the rule is not Ballad Half-Time — and a reload reproduces them.
+    struct SohoDrumPlan: Equatable, Sendable {
+        let ruleID: String
+        let overlay: Bool
+    }
+
+    /// Pools from the plan's implementation contract. Latin: 009 40%, 010 30%, 011 30%.
+    /// Soul: 012 55%, 013 25%, reused 003 Brush Kit 20%. Overlay: 85% Latin, 40% Soul — measured
+    /// Latin percussion share runs 25–55% even in Soul-pool records (Avalon 46%, Your Love Is King 25%).
+    static func sohoDrumPlan(beatStyle: ChillBeatStyle, rng: inout SeededRNG) -> SohoDrumPlan {
+        let latin = beatStyle == .sohoLatin
+        let pool: [(String, Double)] = latin
+            ? [("CHL-DRUM-009", 0.40), ("CHL-DRUM-010", 0.30), ("CHL-DRUM-011", 0.30)]
+            : [("CHL-DRUM-012", 0.55), ("CHL-DRUM-013", 0.25), ("CHL-DRUM-003", 0.20)]
+        let rule = pool[rng.weightedPick(pool.map { $0.1 })].0
+        let overlay = rng.nextDouble() < (latin ? 0.85 : 0.40)
+        return SohoDrumPlan(ruleID: rule, overlay: overlay)
+    }
+
+    /// The song's plan from its seed (derived stream 94). A forced drum rule from the load path is
+    /// honoured when it belongs to the groove's pool.
+    static func sohoDrumPlan(beatStyle: ChillBeatStyle, seed: UInt64, forceRuleID: String? = nil) -> SohoDrumPlan {
+        var r = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 94))
+        let plan = sohoDrumPlan(beatStyle: beatStyle, rng: &r)
+        let latinRules: Set<String> = ["CHL-DRUM-009", "CHL-DRUM-010", "CHL-DRUM-011"]
+        let soulRules:  Set<String> = ["CHL-DRUM-012", "CHL-DRUM-013", "CHL-DRUM-003"]
+        if let f = forceRuleID, (beatStyle == .sohoLatin ? latinRules : soulRules).contains(f) {
+            return SohoDrumPlan(ruleID: f, overlay: plan.overlay)
+        }
+        return plan
+    }
+
+    /// Plan for regenerating the drum track: a fresh rule from the groove's pool, but the song's
+    /// ORIGINAL percussion overlay decision. The breakdown style was picked against that decision —
+    /// the Remix Break needs the overlay — so a regen must not silently switch it off.
+    static func sohoRegenPlan(beatStyle: ChillBeatStyle, seed: UInt64, rng: inout SeededRNG) -> SohoDrumPlan {
+        let original = sohoDrumPlan(beatStyle: beatStyle, seed: seed)
+        let fresh    = sohoDrumPlan(beatStyle: beatStyle, rng: &rng)
+        return SohoDrumPlan(ruleID: fresh.ruleID, overlay: original.overlay)
+    }
+
+    // GM percussion notes. Not in GMDrum, as in Ambient's AMB-DRUM-004; verified present in the
+    // Brush (40) and Jazz (32) kits by tools/sf2_drum_keys.py.
+    private static let hiBongo: UInt8 = 60, loBongo: UInt8 = 61
+    private static let muteConga: UInt8 = 62, openConga: UInt8 = 63, lowConga: UInt8 = 64
+    private static let cabasa: UInt8 = 69, maracas: UInt8 = 70, shaker: UInt8 = 82
+    private static let surdoMute: UInt8 = 86, surdoOpen: UInt8 = 87
+
+
+    /// Bars where the shaker rests, and the bars where it returns.
+    ///
+    /// Measured before this existed, the shaker ran in 86–96% of bars with unbroken runs of 115 —
+    /// an entire song (Zack, 2026-10-12). It now stops in three places:
+    ///
+    /// - **every four-bar turnaround**, so the harmony's own punctuation is heard
+    /// - **one or two long windows** of 8, 12 or 16 bars, each opening on the bar after a
+    ///   turnaround resolves, so the gap is bounded by a harmonic event rather than arbitrary
+    /// - **the four or eight bars leading into a breakdown**, so that section arrives from
+    ///   somewhere already thinner
+    ///
+    /// Never inside a breakdown: the Remix Break's continuous shaker is its pivot.
+    ///
+    /// A window's return bar takes a crash. `CHL-TEXT-002` reads its accents from the crashes in
+    /// this track, so the shaker comes back with a cymbal and a horn stab behind it rather than
+    /// simply resuming.
+    private static func sohoShakerRests(frame: GlobalMusicalFrame, structure: SongStructure,
+                                        rng: inout SeededRNG) -> (rests: Set<Int>, returns: Set<Int>) {
+        let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
+        var rests = turns
+        var returns = Set<Int>()
+
+        if let bridge = structure.sections.first(where: { $0.label == .bridge }) {
+            let lead = rng.nextDouble() < 0.5 ? 4 : 8
+            for b in Swift.max(0, bridge.startBar - lead)..<bridge.startBar { rests.insert(b) }
+        }
+
+        // Placed per section rather than across the song: a long B section could otherwise fall
+        // between two globally-spaced windows and run 60 bars unbroken.
+        for section in structure.sections where section.label == .A || section.label == .B {
+            guard section.lengthBars >= 20 else { continue }
+            // One window per ~40 bars. The shaker should be lightened, not removed: Zack wants it
+            // playing at least half the song and is happy around 70% (2026-10-12). The turnarounds
+            // alone already account for about 17% of bars, so the windows are the smaller part.
+            let windows = Swift.max(1, Swift.min(2, section.lengthBars / 40))
+            var earliest = section.startBar + 8
+            for w in 0..<windows {
+                let length = 8 + 4 * rng.nextInt(upperBound: 3)      // 8, 12 or 16 bars
+                let lo = Swift.max(earliest, section.startBar + w * section.lengthBars / windows)
+                let hi = Swift.min(section.endBar - length, section.startBar + (w + 1) * section.lengthBars / windows)
+                guard hi >= lo else { continue }
+                // A window opens on the bar after a turnaround resolves, so the gap is bounded by
+                // a harmonic event. Songs that turn around only at section ends offer none
+                // mid-section, and without the fallback they got no window at all.
+                var opens = (lo...hi).filter { turns.contains($0 - 1) && !turns.contains($0) }
+                if opens.isEmpty {
+                    opens = (lo...hi).filter { ($0 - section.startBar) % 4 == 0 }
+                }
+                guard !opens.isEmpty else { continue }
+                let at = opens[rng.nextInt(upperBound: opens.count)]
+                // Hard floor on how much the shaker gives up. It should be lightened, not
+                // removed: Zack wants it playing at least half the song (2026-10-12). The
+                // turnarounds are never trimmed — dropping it there is the point — so a window
+                // is simply skipped once the rests reach the cap.
+                let wouldRest = rests.union(at..<(at + length)).count
+                guard wouldRest <= frame.totalBars * 33 / 100 else { continue }
+                rests.formUnion(at..<(at + length))
+                returns.insert(at + length)
+                earliest = at + length + 4
+            }
+        }
+        return (rests, returns)
+    }
+
+    /// Chill Soho drums for every rule except the reused 003. Cold start, cold stop, intro and
+    /// breakdown are shared; the groove bar is per rule. Absolute velocities are anchored to
+    /// brushKit's tuned mix — corpus velocities are transcriber choices ("You're the Best Thing"
+    /// has every hit at 89) — and only the RATIOS come from the corpus.
+    private static func sohoDrums(frame: GlobalMusicalFrame, structure: SongStructure,
+                                  plan: SohoDrumPlan, breakdownStyle: ChillBreakdownStyle,
+                                  rng: inout SeededRNG) -> [MIDIEvent] {
+        let rule  = plan.ruleID
+        let latin = ["CHL-DRUM-009", "CHL-DRUM-010", "CHL-DRUM-011"].contains(rule)
+        let kick  = GMDrum.kick.rawValue
+        let rim   = GMDrum.sidestick.rawValue   // the backbeat voice; a struck snare is too hard
+        let snare = GMDrum.snare.rawValue       // fills only
+        let hat   = GMDrum.closedHat.rawValue
+        let crash = GMDrum.crash1.rawValue
+
+        // Per-song decisions, drawn once so the groove is a groove rather than a dice roll per bar.
+        let fillOpt = rng.nextInt(upperBound: 3)
+        let hatEighthsBase = rng.nextDouble() < 0.5   // 012: quarters (More Than This) or eighths
+        let kickPush       = rng.nextDouble() < 0.5   // 012: second kick on 8, or a push on 7
+        // Step-14 kick pickup, measured: ~60% of bars Latin, ~30% Soul.
+        let pickupProb = latin ? 0.60 : 0.30
+        // Remix Break exit: unison stabs or a fill, 50/50 so both can be heard (Zack, 2026-10-10).
+        // Drawn only for a remix song, so other Soho songs' drums are unaffected.
+        let remixExitStabs = breakdownStyle == .sohoRemix ? rng.nextDouble() < 0.5 : false
+        let (shakerRests, shakerReturns) = sohoShakerRests(frame: frame, structure: structure, rng: &rng)
+        // The last bar of each turnaround takes a fill back to the top — the shaker is already
+        // resting there, so there is room for one.
+        let turnarounds = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
+        let turnaroundExit = turnarounds.filter { !turnarounds.contains($0 + 1) }
+        // The way into the break answers the way out of it: the band stops after beat 2 and hits
+        // beats 3 and 4 together, then a crash lands on the break's downbeat (Zack, 2026-10-11).
+        // Bass and rhythm hit the same two steps, and CHL-TEXT-002's horns double them for free,
+        // because they read their accents from the crashes in this track.
+        let remixEntry = ChillStructureGenerator.remixEntryBars(structure: structure,
+                                                                breakdownStyle: breakdownStyle)
+        let clap    = GMDrum.clap.rawValue
+        let openHat = GMDrum.openHat.rawValue
+
+        let coldStopOutroEnd: Int? = {
+            if case .coldStop = structure.outroStyle { return structure.outroSection?.endBar }
+            return nil
+        }()
+
+        var events: [MIDIEvent] = []
+        var crashNextBar = false
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        func hit(_ step: Int, _ note: UInt8, _ vel: UInt8, _ base: Int) {
+            events.append(MIDIEvent(stepIndex: base + step, note: note, velocity: vel, durationSteps: 1))
+        }
+
+        for bar in 0..<frame.totalBars {
+            let section = structure.section(atBar: bar)
+            let label   = section?.label
+            let base    = bar * 16
+
+            if case .coldStart = structure.introStyle, bar == 0 {
+                events += chillColdStartPickup(barStart: base, rng: &rng)
+                continue
+            }
+            if let outroEnd = coldStopOutroEnd {
+                if bar == outroEnd - 1 { continue }
+                if bar == outroEnd - 2 {
+                    hit(0, crash, 100, base); hit(0, kick, 92, base)
+                    continue
+                }
+            }
+
+            // Remix Break: the shaker never stops — it is the pivot, the same continuous shaker that
+            // drives Soft Samba and EBTG's "Missing" remix — while the kit swaps to four-on-the-floor
+            // (0 and 8 accented), clap on 4 and 12, open hats on the offbeats. Entry is additive: two
+            // bars of shaker and kick before the clap and hats join. Exit on the last bar, over the
+            // still-running shaker: unison stabs on 0 and 8 with silence between (steps 9–15 are left
+            // for the Lead 1 pickup), or a fill. Either way a crash marks the return.
+            if label == .bridge && breakdownStyle == .sohoRemix {
+                let bdBar  = bar - (section?.startBar ?? bar)
+                let isLast = bdBar == (section?.lengthBars ?? 12) - 1
+                for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? v(42, 8) : v(32, 7), base) }
+                if isLast {
+                    if remixExitStabs {
+                        for step in [0, 8] {
+                            hit(step, kick, v(88, 10), base); hit(step, snare, v(80, 10), base)
+                            hit(step, crash, v(84, 10), base)
+                        }
+                    } else {
+                        hit(0, kick, v(70, 10), base)
+                        events += stopTimeFill(barStart: base, option: fillOpt,
+                                               kick: kick, snare: snare, hat: hat, rng: &rng)
+                    }
+                    crashNextBar = true
+                    continue
+                }
+                for step in [0, 4, 8, 12] { hit(step, kick, step % 8 == 0 ? v(80, 8) : v(66, 8), base) }
+                if bdBar >= 2 {
+                    for step in [4, 12] { hit(step, clap, v(64, 10), base) }
+                    for step in [2, 6, 10, 14] { hit(step, openHat, v(46, 10), base) }
+                }
+                continue
+            }
+
+            // Groove pocket is the one breakdown where the kit does NOT thin out: bass and leads
+            // drop and the drums push instead. Soho sent every non-remix breakdown through the
+            // thin pulse below, so its pockets had no push at all — the rule's own groove and the
+            // Latin percussion both carry on through this one.
+            let pocketBridge = label == .bridge && breakdownStyle == .groovePocket
+
+            // A Soho groove pocket is a percussion feature, not base Chill's "push the kit
+            // harder" — that was the part that still sounded like regular Chill (Zack,
+            // 2026-10-11). Under a Latin groove the kit steps back to the kick and the hand
+            // percussion comes forward, with a flourish every other bar. A Soul groove keeps its
+            // own rule below and takes handclaps on the backbeat instead.
+            if pocketBridge && latin {
+                let bdBar  = bar - (section?.startBar ?? bar)
+                let isLast = bdBar == (section?.lengthBars ?? 4) - 1
+                let pcut   = isLast ? 12 : 16
+                hit(0, kick, v(70, 10), base)
+                if rng.nextDouble() < 0.60 { hit(8, kick, v(60, 10), base) }
+                let feature: [(Int, UInt8)] = [(0, lowConga), (2, muteConga), (3, openConga),
+                                               (6, muteConga), (8, lowConga), (10, muteConga),
+                                               (11, openConga), (14, openConga)]
+                for (step, note) in feature where step < pcut { hit(step, note, v(60, 16), base) }
+                for step in stride(from: 1, to: 16, by: 2) where step < pcut { hit(step, shaker, v(34, 8), base) }
+                if bdBar % 2 == 1 && !isLast {
+                    for (step, note) in [(12, muteConga), (13, openConga), (14, hiBongo), (15, loBongo)] as [(Int, UInt8)] {
+                        hit(step, note, v(64, 14), base)
+                    }
+                }
+                if isLast {
+                    for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)] as [(Int, UInt8)] {
+                        hit(step, note, v(66, 14), base)
+                    }
+                    hit(14, cabasa, v(50, 8), base)
+                    crashNextBar = true
+                }
+                continue
+            }
+
+            // Breakdown: thin pulse, then a fill on the last bar into the return.
+            if label == .bridge && !pocketBridge {
+                let bdBar  = bar - (section?.startBar ?? bar)
+                let isLast = bdBar == (section?.lengthBars ?? 4) - 1
+                if isLast {
+                    hit(0, kick, v(60, 10), base)
+                    events += stopTimeFill(barStart: base, option: fillOpt,
+                                           kick: kick, snare: snare, hat: hat, rng: &rng)
+                    crashNextBar = true
+                } else {
+                    hit(0, hat, v(38, 12), base); hit(8, hat, v(38, 12), base)
+                    if bdBar % 2 == 0 { hit(0, kick, v(52, 10), base) }
+                }
+                continue
+            }
+
+            if crashNextBar { hit(0, crash, v(78, 12), base); crashNextBar = false }
+            // The shaker returning is an event, not a resumption.
+            else if shakerReturns.contains(bar) && !shakerRests.contains(bar) {
+                hit(0, crash, v(72, 12), base)
+            }
+
+            let isIntro = label == .intro
+            // Fills are rare and structural: the last bar of an A or B section only — measured at
+            // 1–5% of bars, on the last bar of a 4- or 8-bar group, never a sixteenth roll.
+            let isSectionEnd = (label == .A || label == .B || pocketBridge)
+                && section.map { bar == $0.endBar - 1 } == true
+                && bar < frame.totalBars - 1
+            let isRemixEntry = remixEntry.contains(bar)
+            // An entry bar stops after beat 2 so the two stabs stand alone.
+            let cut = isRemixEntry ? 8 : (isSectionEnd ? 12 : 16)   // leave the last beat to the fill
+            func keep(_ step: Int) -> Bool { step < cut }
+
+            if isIntro {
+                // A four-bar intro that holds one texture is the least musical thing the substyle
+                // does (Zack, 2026-10-12). It builds instead: the rule's own voice alone, then the
+                // Latin percussion, then the low end, then a fill and a crash into the groove.
+                let introBar = ChillStructureGenerator.sohoIntroLayer(bar: bar, structure: structure) ?? 0
+                let isLastIntro = bar == (section?.endBar ?? bar + 1) - 1
+                let mark = events.count
+                switch rule {
+                case "CHL-DRUM-009":
+                    for step in stride(from: 0, to: 16, by: 2) {
+                        hit(step, hat, step % 4 == 0 ? v(38, 8) : v(30, 7), base)
+                    }
+                    if introBar >= 1 { hit(0, kick, v(54, 8), base) }
+                    if introBar >= 2 {
+                        for step in (bar % 2 == 0 ? [0, 6, 12] : [4, 10]) { hit(step, rim, v(44, 8), base) }
+                        hit(6, kick, v(50, 8), base)
+                    }
+                case "CHL-DRUM-010":
+                    for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? v(32, 7) : v(24, 6), base) }
+                    if introBar >= 1 { hit(0, surdoMute, v(46, 8), base); hit(8, surdoOpen, v(56, 8), base) }
+                    if introBar >= 2 { for step in [4, 12] { hit(step, rim, v(50, 9), base) } }
+                case "CHL-DRUM-011":
+                    // Latin Sway is the sparsest rule in the style, and left Thunder in the Side
+                    // Street with almost nothing at all. Its intro is fuller than the others by
+                    // design: the full tumbao from bar one, with a shaker under it.
+                    for (step, note) in [(0, lowConga), (3, muteConga), (6, openConga),
+                                         (10, muteConga), (13, openConga)] as [(Int, UInt8)] {
+                        hit(step, note, v(44, 14), base)
+                    }
+                    for step in stride(from: 1, to: 16, by: 2) { hit(step, shaker, v(26, 8), base) }
+                    if introBar >= 1 { hit(0, kick, v(56, 8), base) }
+                    if introBar >= 2 { hit(8, rim, v(50, 8), base); hit(11, kick, v(48, 8), base) }
+                default:
+                    for step in [0, 8] { hit(step, hat, v(38, 10), base) }
+                    if introBar >= 1 { hit(0, kick, v(56, 10), base) }
+                    if introBar >= 2 { for step in [4, 12] { hit(step, rim, v(52, 9), base) } }
+                }
+                // The Latin percussion joins from the second bar, so the intro gains momentum
+                // rather than repeating itself.
+                if plan.overlay && introBar >= 1 {
+                    events += percussionOverlay(base: base, bar: bar, ruleID: rule,
+                                                cut: isLastIntro ? 12 : 16,
+                                                shakerRest: shakerRests.contains(bar), rng: &rng)
+                }
+                if isLastIntro {
+                    // Leave the last beat to the fill, then crash onto the groove. No Soho song
+                    // marked that arrival at all, so the density simply trebled without warning.
+                    let kept = Array(events[mark...]).filter { $0.stepIndex - base < 12 }
+                    events.removeSubrange(mark...)
+                    events.append(contentsOf: kept)
+                    events += stopTimeFill(barStart: base, option: fillOpt,
+                                           kick: kick, snare: snare, hat: hat, rng: &rng)
+                    crashNextBar = true
+                }
+                continue
+            }
+
+            let mark = events.count
+            switch rule {
+            case "CHL-DRUM-009":
+                // Bossa Clave. Rim carries a 3-2 clave across the bar pair; no snare backbeat —
+                // the rim replaces it. Kick is the MEASURED Latin figure 0, 6, 8 (+14).
+                for step in stride(from: 0, to: 16, by: 2) where keep(step) {
+                    hit(step, hat, step % 4 == 0 ? v(50, 9) : v(40, 8), base)
+                }
+                for step in (bar % 2 == 0 ? [0, 6, 12] : [4, 10]) where keep(step) { hit(step, rim, v(58, 10), base) }
+                for step in [0, 6, 8] { hit(step, kick, step == 0 ? v(68, 8) : v(60, 8), base) }
+
+            case "CHL-DRUM-010":
+                // Soft Samba (Matt Bianco / Basia). Shaker sixteenths are the engine; a real surdo
+                // carries the low end — light on 0, weighted on 8, the samba's second-half weight.
+                // Rim on 4 and 12; hats on the offbeat eighths only.
+                if !shakerRests.contains(bar) {
+                    for step in 0..<16 where keep(step) { hit(step, shaker, step % 2 == 0 ? v(40, 8) : v(30, 7), base) }
+                }
+                hit(0, surdoMute, v(56, 8), base)
+                hit(8, surdoOpen, v(70, 8), base)
+                for step in [4, 12] where keep(step) { hit(step, rim, v(56, 9), base) }
+                for step in [2, 6, 10, 14] where keep(step) { hit(step, hat, v(38, 8), base) }
+
+            case "CHL-DRUM-011":
+                // Latin Sway (Sade) — half-time, sparse, conga-forward; the quietest rule in Chill.
+                // Conga on a loose tumbao 0, 3, 6, 10, 13; rim on 8 only; hats barely there; kick on
+                // 0, and 11 on alternate bars. Leaves the bass exposed.
+                let congas: [(Int, UInt8)] = [(0, lowConga), (3, muteConga), (6, openConga),
+                                              (10, muteConga), (13, openConga)]
+                for (step, note) in congas where keep(step) { hit(step, note, v(50, 21), base) }
+                hit(8, rim, v(52, 8), base)
+                for step in [0, 8] { hit(step, hat, v(32, 8), base) }
+                hit(0, kick, v(62, 8), base)
+                if bar % 2 == 1 { hit(11, kick, v(52, 8), base) }
+
+            case "CHL-DRUM-012":
+                // Soft Soul Backbeat (You're the Best Thing / More Than This). Rim on 4 and 12, no
+                // ghost notes. Hats are a per-song 50/50 of quarters or eighths, flipped in B — the
+                // lift on return.
+                let eighths = (label == .B) ? !hatEighthsBase : hatEighthsBase
+                for step in (eighths ? Array(stride(from: 0, to: 16, by: 2)) : [0, 4, 8, 12]) where keep(step) {
+                    hit(step, hat, v(45, 14), base)
+                }
+                for step in [4, 12] where keep(step) { hit(step, rim, v(60, 9), base) }
+                hit(0, kick, v(68, 8), base)
+                hit(kickPush ? 7 : 8, kick, v(58, 8), base)
+
+            case "CHL-DRUM-013":
+                // Ballad Half-Time (No Ordinary Love) — the sparsest rule, leaving the bass most
+                // exposed. Rim on beat 3 only; kick on 0, and 6 on alternate bars; hats on 0 and 8
+                // under velocity 45 and absent on a third of bars; a 25% sixteenth pickup into 8.
+                hit(8, rim, v(54, 8), base)
+                hit(0, kick, v(62, 8), base)
+                if bar % 2 == 1 { hit(6, kick, v(50, 8), base) }
+                if rng.nextDouble() >= 1.0 / 3.0 { for step in [0, 8] { hit(step, hat, v(30, 14), base) } }
+                if rng.nextDouble() < 0.25 && !shakerRests.contains(bar) { hit(7, shaker, v(34, 8), base) }
+
+            default:
+                break
+            }
+
+            if !isSectionEnd && ["CHL-DRUM-009", "CHL-DRUM-012"].contains(rule) && rng.nextDouble() < pickupProb {
+                hit(14, kick, v(52, 8), base)
+            }
+
+            // Soul groove pocket: handclaps on the backbeat, the soul-record way of lifting a
+            // section without adding a single drum.
+            if pocketBridge {
+                for step in [4, 12] where step < cut { hit(step, clap, v(70, 10), base) }
+            }
+
+            // The outro keeps the percussion too. The kit's own rule already played there, but the
+            // overlay stopped at the end of the last groove section, so a Latin song lost its
+            // congas and shakers exactly where it should be fading out in its own feel
+            // (Zack, 2026-10-11).
+            if plan.overlay && (label == .A || label == .B || label == .outro || pocketBridge) {
+                events += percussionOverlay(base: base, bar: bar, ruleID: rule, cut: cut,
+                                            shakerRest: shakerRests.contains(bar), rng: &rng)
+            }
+
+            if isRemixEntry {
+                // Everything from beat 3 on goes, so the stop is a real stop: `cut` alone does not
+                // do it, because a few rules place hits without consulting it (011's step-11 kick,
+                // the rim on 8).
+                let kept = Array(events[mark...]).filter { $0.stepIndex - base < 8 }
+                events.removeSubrange(mark...)
+                events.append(contentsOf: kept)
+                for step in [8, 12] {
+                    hit(step, kick, v(88, 10), base); hit(step, snare, v(80, 10), base)
+                    hit(step, crash, v(84, 10), base)
+                }
+                // The crash on the break's own downbeat. `crashNextBar` cannot do it: the bridge
+                // branches run before it is read, so it would survive to the wrong bar.
+                events.append(MIDIEvent(stepIndex: base + 16, note: crash,
+                                        velocity: v(84, 10), durationSteps: 1))
+                continue
+            }
+
+            // A turnaround fill, unless this bar is already a section end with its own fill.
+            // Not every time: at every turnaround it becomes part of the furniture.
+            if turnaroundExit.contains(bar) && !isSectionEnd && rng.nextDouble() < 0.60 {
+                events.removeAll { $0.stepIndex >= base + 12 && $0.stepIndex < base + 16 }
+                if latin {
+                    for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, hiBongo)] as [(Int, UInt8)] {
+                        hit(step, note, v(58, 14), base)
+                    }
+                } else {
+                    for (i, step) in [12, 13, 14, 15].enumerated() {
+                        hit(step, snare, v(48 + i * 8, 8), base)
+                    }
+                }
+                crashNextBar = true
+            }
+
+            if isSectionEnd {
+                // Latin rules take the measured percussion flourish half the time — the congas
+                // and cabasa flare while the kit holds (Smooth Operator: kick DOWN 6pp in its fill
+                // bars). Otherwise the snare pickup. Either way a crash lands on the next downbeat,
+                // which is where CHL-TEXT-002's horn stabs read their accents from.
+                if latin && rng.nextDouble() < 0.5 {
+                    let flourish: [(Int, UInt8)] = [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)]
+                    for (step, note) in flourish { hit(step, note, v(60, 14), base) }
+                    hit(14, cabasa, v(48, 8), base)
+                } else {
+                    hit(13, snare, v(54, 8), base); hit(14, snare, v(62, 8), base); hit(15, snare, v(70, 8), base)
+                }
+                crashNextBar = true
+            }
+        }
+        return events
+    }
+
+    /// The Latin percussion overlay: conga, bongo, shaker and cabasa layered over the kit. It
+    /// COMPLEMENTS the rule rather than doubling it — Soft Samba already runs a shaker and Latin
+    /// Sway already leads with congas — and it is soft, a texture under the groove.
+    /// Patterns measured from Smooth Operator (congas on every eighth, open tones late in the bar)
+    /// and Your Love Is King (congas weighted to 0, 4, 6, lighter at 12–14).
+    private static func percussionOverlay(base: Int, bar: Int, ruleID: String, cut: Int,
+                                          shakerRest: Bool = false,
+                                          rng: inout SeededRNG) -> [MIDIEvent] {
+        var out: [MIDIEvent] = []
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        func add(_ step: Int, _ note: UInt8, _ vel: UInt8) {
+            if step < cut { out.append(MIDIEvent(stepIndex: base + step, note: note, velocity: vel, durationSteps: 1)) }
+        }
+        let tumbao: [(Int, UInt8)] = [(0, muteConga), (2, muteConga), (4, muteConga), (6, lowConga),
+                                      (8, muteConga), (10, muteConga), (12, openConga), (14, openConga)]
+        switch ruleID {
+        case "CHL-DRUM-009":                       // bossa: congas + soft shaker eighths
+            for (s, n) in tumbao { add(s, n, s >= 12 ? v(56, 10) : v(42, 10)) }
+            if !shakerRest { for s in stride(from: 1, to: 16, by: 2) { add(s, shaker, v(30, 8)) } }
+        case "CHL-DRUM-010":                       // samba (kit has the shaker): congas + bongos
+            for (s, n) in tumbao { add(s, n, s >= 12 ? v(54, 10) : v(40, 10)) }
+            for s in stride(from: 1, to: 16, by: 2) { add(s, s % 4 == 1 ? hiBongo : loBongo, v(34, 8)) }
+        case "CHL-DRUM-011":                       // sway (kit has the congas): cabasa + shaker
+            for s in [2, 6, 10, 14] { add(s, cabasa, v(34, 8)) }
+            if !shakerRest { for s in [0, 4, 8, 12] { add(s, shaker, v(30, 8)) } }
+        case "CHL-DRUM-012", "CHL-DRUM-003":       // soul: lighter congas + cabasa
+            for (s, n) in [(0, muteConga), (4, muteConga), (6, openConga), (12, muteConga), (14, openConga)] as [(Int, UInt8)] {
+                add(s, n, v(40, 12))
+            }
+            for s in [2, 10] { add(s, cabasa, v(30, 8)) }
+        case "CHL-DRUM-013":                       // ballad: a whisper of conga only
+            add(0, lowConga, v(36, 8))
+            if bar % 2 == 1 { add(6, muteConga, v(32, 8)) }
+        default:
+            break
+        }
+        return out
+    }
+
+    /// Overlay for the reused Brush Kit, which renders the whole song itself. The groove sections
+    /// take it in full, each section's last beat left to the kit's own fill; the intro and outro
+    /// take it too, so the song opens and closes in the feel it keeps (Zack, 2026-10-11). The
+    /// breakdown is left alone — that section's job is to drop the percussion — as are the silent
+    /// bars of a cold stop and the opening bar of a cold start.
+    private static func overlayForGrooveBars(frame: GlobalMusicalFrame, structure: SongStructure,
+                                             ruleID: String, rng: inout SeededRNG) -> [MIDIEvent] {
+        var out: [MIDIEvent] = []
+        let coldStopFrom: Int? = {
+            if case .coldStop = structure.outroStyle, let end = structure.outroSection?.endBar { return end - 2 }
+            return nil
+        }()
+        for bar in 0..<frame.totalBars {
+            guard let section = structure.section(atBar: bar),
+                  section.label == .A || section.label == .B || section.label == .intro || section.label == .outro
+            else { continue }
+            if case .coldStart = structure.introStyle, bar == 0 { continue }
+            if let from = coldStopFrom, bar >= from { continue }
+            let cut = bar == section.endBar - 1 ? 12 : 16
+            out += percussionOverlay(base: bar * 16, bar: bar, ruleID: ruleID, cut: cut, rng: &rng)
+        }
+        return out
     }
 
     // MARK: - Cold start / cold stop helpers
@@ -192,7 +759,7 @@ struct ChillDrumGenerator {
                         let vel = UInt8(30 + rng.nextInt(upperBound: 15))
                         events.append(MIDIEvent(stepIndex: base + 2, note: hat, velocity: vel, durationSteps: 1))
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Full groove continues throughout; fills on every odd bar + always on last bar.
                     // Kick: beat 1 always; beat 3 at 60% (slightly higher than normal to push the pocket)
                     events.append(MIDIEvent(stepIndex: base, note: kick,
@@ -344,7 +911,7 @@ struct ChillDrumGenerator {
                         let vel = UInt8(40 + rng.nextInt(upperBound: 20))
                         events.append(MIDIEvent(stepIndex: base + 2, note: hat16, velocity: vel, durationSteps: 1))
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Full groove + fills every odd bar and last bar
                     events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
                     if rng.nextDouble() < 0.60 {
@@ -551,7 +1118,7 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base + 8, note: snare, velocity: UInt8(42 + rng.nextInt(upperBound: 14)), durationSteps: 1))
                         }
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Full four-on-the-floor groove + fills every odd bar and last bar
                     for step in [0, 4, 8, 12] {
                         events.append(MIDIEvent(stepIndex: base + step, note: kick, velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
@@ -737,7 +1304,7 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base, note: ride, velocity: vel, durationSteps: 1))
                         }
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Quarter-note ride groove + snare brush 2+4 + kick on 1 (and 3 at 40%) + fills
                     for step in [0, 4, 8, 12] {
                         let vel = UInt8(45 + rng.nextInt(upperBound: 16))
@@ -900,7 +1467,7 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
                         }
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Full hip-hop groove: kick 1+3, snare 2+4, 8th-note hat, 16th tambourine + fills
                     events.append(MIDIEvent(stepIndex: base,      note: kick,  velocity: UInt8(72 + rng.nextInt(upperBound: 16)), durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base + 8,  note: kick,  velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))

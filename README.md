@@ -21,15 +21,15 @@ This repository contains the macOS app source, implementation notes, and support
 
 Current release: `2.6` (build 131). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**What's new in v2.6:**
-- **Motorik Europe** — A new Kraftwerk-flavoured take on Motorik, turning up in about one Motorik song in five. A group of tracks **syncs**, adopting Kraftwerk rules together — rigid sequencer cells locked to the bar, sparse mechanical drums, octave doubling between parts — while the rest of the song plays normally. Europe songs run slower (120-132 BPM) and take a German-flavoured title.
-- **More melodic Motorik leads** — Lead lines are now built from figures measured in the original recordings rather than assembled note by note, so they repeat, vary and resolve like phrases instead of wandering. Leads also rest more often, hold the last note of a phrase, and no longer sit on one note or play for twenty bars without a break.
-- **Motorik bass concentrated** — Four of the less distinctive bass rules were retired from the base Motorik pool with the freed weight going to the Neu! and Kraftwerk rules at either end of the style. All four remain in Motorik Noir or Arcade.
-- **More instrument variety** — New songs no longer favour whichever instrument happens to sit first in each pool.
-- **Saved songs reload note-for-note** — A saved song stores its seed and is rebuilt from it, and a few places in the generators could return a different pitch each time. The same seed now always produces the same song.
-- **Reverb fixed** — Playback inadvertently did not use the same reverb as Audio Export. Now both Audio Export and Playback reverbs match exactly.
-- **Stability** — Fixed a crash that could stop a song generating, depending on how its sections lined up, and a threading fault behind rare glitches during long playback.
-- **Minor Fixes** — Removed Clavinet from the Motorik instrument pool: the sound was missing from the soundfont, so that track played silent. Corrected the iPhone info sheet, which still showed v2.4.
+**In development — v2.7 Chill Soho:** A new Chill substyle modelled on the sophisti-pop records of Sade, Everything But The Girl, The Style Council, Simply Red and Roxy Music. Its rules were measured from MIDI transcriptions of those songs rather than described in prose, and almost nothing is shared with base Chill:
+
+- **Latin and soul grooves** — bossa, samba and half-time ballad patterns, with congas, bongos, shakers and surdo layered over the kit, and an intro that builds a layer at a time
+- **Jazz harmony** — 6th, 7th and 9th chords instead of triads, and a separate chord cycle for the B section. Each phrase ends on a four-bar turnaround that the whole band plays: the bass leads back to the top, the drums take a fill, the horns mark it and the shaker drops out
+- **Horns on the Texture track** — trumpet and French horn figures that land with the drum accents, struck once, twice or three times with their own rhythm, or long sustained halo notes above the pads
+- **Leads that sound sung** — phrases built from figures measured in the vocal lines of the original records, with a saxophone answering in the gaps
+- **A Remix Break** — a short house-flavoured section mid-song, the band dropping into four-on-the-floor and hitting its way back out
+
+Earlier releases are covered in the [change log](docs/change-log.md).
 
 
 ---

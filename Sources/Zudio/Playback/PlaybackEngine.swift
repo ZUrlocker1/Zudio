@@ -103,6 +103,9 @@ final class PlaybackEngine: ObservableObject {
 
     // Chill pads mode — per-note audio fade-in/fade-out on kTrackPads boost node (same mechanism as Ambient)
     nonisolated(unsafe) var chillPadsMode: Bool = false
+    /// Chill Soho: true when the Texture sampler plays MIDI (horns, bells) instead of base Chill's
+    /// silent sampler beside an audio file. Only meaningful while chillPadsMode is on.
+    nonisolated(unsafe) var chillSohoMode: Bool = false
 
     // Tracks with zero MIDI events in the current song — effects suppressed to avoid processing silence.
     private var emptyTrackSet: Set<Int> = []
@@ -419,21 +422,34 @@ final class PlaybackEngine: ObservableObject {
         applyMuteState()
     }
 
-    private func applyStaticPans() {
-        // Track order: Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6
-        if kosmicStyle {
-            trackStaticPan = [-0.15, 0.15, 0, 0.22, -0.22, 0, 0, 0]   // LeadSynth: centre
-        } else if motorikStyle {
+    /// The per-track stereo positions for a style. Pure, so the table can be read in a test
+    /// without starting an audio engine.
+    /// Track order: Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6, LeadSynth=7.
+    nonisolated static func staticPans(kosmic: Bool, motorik: Bool, ambient: Bool,
+                                       chillPads: Bool, chillSoho: Bool) -> [Float] {
+        if kosmic {
+            return [-0.15, 0.15, 0, 0.22, -0.22, 0, 0, 0]             // LeadSynth: centre
+        } else if motorik {
             // Pads and Rhythm panned for separation; Texture rarely used so stays centre
-            trackStaticPan = [-0.07, 0.07, -0.20, 0.20, 0, 0, 0, 0]
-        } else if ambientMode {
+            return [-0.07, 0.07, -0.20, 0.20, 0, 0, 0, 0]
+        } else if ambient {
             // Texture stays 0 — auto-pan LFO controls it dynamically
-            trackStaticPan = [-0.20, 0.20, 0.10, -0.15, 0, 0, 0, 0]
-        } else if chillPadsMode {
-            trackStaticPan = [-0.18, 0.20, -0.10, 0.15, 0, 0, 0, 0]
+            return [-0.20, 0.20, 0.10, -0.15, 0, 0, 0, 0]
+        } else if chillPads && chillSoho {
+            // As base Chill, but the horn stabs sit right of centre — a horn section off to one
+            // side of the stage, out of the way of Lead 2 and the rhythm part.
+            return [-0.18, 0.20, -0.10, 0.15, 0.30, 0, 0, 0]
+        } else if chillPads {
+            return [-0.18, 0.20, -0.10, 0.15, 0, 0, 0, 0]
         } else {
-            trackStaticPan = [0, 0, 0, 0, 0, 0, 0, 0]
+            return [0, 0, 0, 0, 0, 0, 0, 0]
         }
+    }
+
+    private func applyStaticPans() {
+        trackStaticPan = Self.staticPans(kosmic: kosmicStyle, motorik: motorikStyle,
+                                         ambient: ambientMode, chillPads: chillPadsMode,
+                                         chillSoho: chillSohoMode)
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
         }
@@ -1510,8 +1526,9 @@ final class PlaybackEngine: ObservableObject {
 
     /// Set Chill pads mode — enables per-note audio fade-in/fade-out on the Pads boost node.
     /// Call before defaultsResetToken fires, same as setAmbientMode.
-    func setChillMode(_ enabled: Bool, bluesVariation: Bool = false) {
+    func setChillMode(_ enabled: Bool, bluesVariation: Bool = false, sohoVariation: Bool = false) {
         chillPadsMode = enabled
+        chillSohoMode = enabled && sohoVariation
         if !enabled {
             stopAmbientNoteFades()  // reuse the same stop/cleanup as Ambient
             applyStaticPans()
@@ -1524,7 +1541,10 @@ final class PlaybackEngine: ObservableObject {
         connectSend(kTrackLead2,     to: .small, wetDryMix: 40)
         connectSend(kTrackPads,      to: .small, wetDryMix: 55)
         connectSend(kTrackRhythm,    to: .small, wetDryMix: 40)
-        connectSend(kTrackTexture,   to: .small, wetDryMix: 0)
+        // Base Chill: the texture sampler is unused (AudioTexturePlayer handles texture) — zero send.
+        // Chill Soho: the texture sampler carries the horn stabs and halo notes and needs a real
+        // send level; the reverb chip still decides whether it is heard.
+        connectSend(kTrackTexture,   to: .small, wetDryMix: chillSohoMode ? 45 : 0)
         connectSend(kTrackBass,      to: .small, wetDryMix: 35)
         connectSend(kTrackDrums,     to: .small, wetDryMix: 40)
         connectSend(kTrackLeadSynth, to: .small, wetDryMix: 0)
@@ -1635,8 +1655,9 @@ final class PlaybackEngine: ObservableObject {
     func setEffect(_ effect: TrackEffect, enabled: Bool, forTrack trackIndex: Int) {
         guard trackIndex < samplers.count else { return }
         // Chill: kTrackTexture sampler never receives MIDI events (AudioTexturePlayer handles texture).
-        // Suppress its entire effect chain — no signal flows through it.
-        if chillPadsMode && trackIndex == kTrackTexture { return }
+        // Suppress its entire effect chain — no signal flows through it. Chill Soho is the exception:
+        // its texture IS MIDI, so its effects must reach the sampler.
+        if chillPadsMode && !chillSohoMode && trackIndex == kTrackTexture { return }
         // Ambient: suppress reverb and delay on tracks with no events — eliminates DSP on silence.
         if ambientMode && emptyTrackSet.contains(trackIndex) {
             switch effect {

@@ -79,8 +79,11 @@ struct TrackRowView: View {
             ]
         }
         let isDrift  = appState.songState?.isKosmicDrift == true
-        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle, isKosmicDrift: isDrift)
-        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle, isKosmicDrift: isDrift)
+        let isSoho   = appState.songState?.chillSohoVariation == true
+        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle,
+                                                    isKosmicDrift: isDrift, isChillSoho: isSoho)
+        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle,
+                                                       isKosmicDrift: isDrift, isChillSoho: isSoho)
         return zip(names, programs).map { Instrument(name: $0, program: $1) }
     }
 
@@ -185,7 +188,11 @@ struct TrackRowView: View {
 
                 // MIDI lane (or audio waveform for Chill/Ambient Texture track when audio texture active)
                 let ambientTextureFile = appState.songState?.ambientAudioTexture
-                if trackIndex == kTrackTexture && activeStyle == .chill {
+                // Chill Soho's texture is MIDI, so it gets the MIDI lane below rather than a waveform.
+                // Drawing a waveform here for every Chill song is what showed one under a Soho song
+                // whose picker read "None".
+                if trackIndex == kTrackTexture && activeStyle == .chill
+                    && appState.songState?.chillSohoVariation != true {
                     AudioWaveformView(
                         filename: appState.songState?.chillAudioTexture,
                         totalBars: max(totalBars, 1),
@@ -424,6 +431,11 @@ struct TrackRowView: View {
         } else if activeStyle == .chill {
             let isBlues    = appState.songState?.chillBluesVariation == true
             let baseLeadFX: [TrackEffect] = isBlues ? [.space] : [.space, .delay]
+            // Chill Soho: no delay on Lead 1 by default. A delayed lead is a St Germain signature
+            // and makes Soho sound like regular Chill. Lead 2 keeps base Chill's default.
+            // Mirrored in AppState.restoreDefaultEffects — keep the two in step.
+            let isSoho     = appState.songState?.chillSohoVariation == true
+            let lead1FX: [TrackEffect] = isSoho ? [.space] : baseLeadFX
 
             // Rhythm organ tremolo: Blues 50% for B3(2)/Perc(3)/Rock(5); regular 20% for B3(2)/Tonewheel(6)
             let rhythmIdx  = trackIndex == kTrackRhythm ? (appState.instrumentOverrides[kTrackRhythm] ?? 0) : -1
@@ -438,11 +450,13 @@ struct TrackRowView: View {
             let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
 
             defaults = switch trackIndex {
-            case kTrackLead1:   l1Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
+            case kTrackLead1:   l1Vib      ? lead1FX + [.vibrato]    : lead1FX
             case kTrackLead2:   l2Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
             case kTrackRhythm:  rhythmTrem ? [.space, .tremolo]       : [.space]
             case kTrackPads:    [.sweep, .tremolo]
-            case kTrackTexture: [.lowShelf, .reverb]
+            // Base Chill's texture is an audio loop; Chill Soho's is MIDI horns and bells, which
+            // want the same space as the leads rather than the loop's low shelf.
+            case kTrackTexture: isSoho ? [.space, .reverb] : [.lowShelf, .reverb]
             case kTrackBass:    [.reverb]
             case kTrackDrums:   [.space]
             default:            []

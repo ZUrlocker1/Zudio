@@ -1,9 +1,10 @@
 // ChillPadsGenerator.swift — Chill generation step 5 (Pads track)
 // Copyright (c) 2026 Zack Urlocker
 // Pads = sustained harmonic layer (Warm Pad default) — NOT Rhodes comping.
-// Pad rules (equally weighted for testing): CHL-PAD-001 chord sustain, CHL-PAD-002 staggered entry,
+// Pad rules: CHL-PAD-001 chord sustain, CHL-PAD-002 staggered entry,
 //   CHL-PAD-003 Moby anchor, CHL-PAD-004 open fifth hold, CHL-PAD-005 slow chord build,
 //   CHL-PAD-006 Portishead string hold, CHL-PAD-000 absent.
+// Chill Soho only: CHL-PAD-007 Soho chord hold, CHL-PAD-008 half-bar pad (no 003; 000 is truly absent).
 // All voicings snapped to scale (CHL-SYNC-004).
 // Per-note audio fade-in/fade-out is handled by PlaybackEngine.chillPadsMode (boost node ramp),
 // not via MIDI velocity — identical mechanism to Ambient bass/pads.
@@ -17,12 +18,41 @@ struct ChillPadsGenerator {
         structure: SongStructure,
         breakdownStyle: ChillBreakdownStyle,
         bluesVariation: Bool = false,
+        sohoVariation: Bool = false,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> [MIDIEvent] {
         let roll = rng.nextDouble()
         var events: [MIDIEvent]
-        if bluesVariation {
+        if sohoVariation {
+            // Soho pool, on the same roll. 003 Moby anchor is excluded — it is coded to its
+            // reference. 000 Absent returns at once: no breakdown pad, no rest windows, nothing.
+            if roll < 0.20 {
+                usedRuleIDs.insert("CHL-PAD-000")
+                return []
+            } else if roll < 0.50 {
+                usedRuleIDs.insert("CHL-PAD-007")
+                events = sohoChordHold(frame: frame, structure: structure, rng: &rng)
+            } else if roll < 0.65 {
+                usedRuleIDs.insert("CHL-PAD-008")
+                events = halfBarPad(frame: frame, structure: structure, rng: &rng)
+            } else if roll < 0.77 {
+                usedRuleIDs.insert("CHL-PAD-001")
+                events = chordSustain(frame: frame, structure: structure, rng: &rng)
+            } else if roll < 0.87 {
+                usedRuleIDs.insert("CHL-PAD-005")
+                events = slowChordBuild(frame: frame, structure: structure, rng: &rng)
+            } else if roll < 0.93 {
+                usedRuleIDs.insert("CHL-PAD-006")
+                events = portisheadStrings(frame: frame, structure: structure, rng: &rng)
+            } else if roll < 0.97 {
+                usedRuleIDs.insert("CHL-PAD-002")
+                events = staggeredEntry(frame: frame, structure: structure, rng: &rng)
+            } else {
+                usedRuleIDs.insert("CHL-PAD-004")
+                events = openFifthHold(frame: frame, structure: structure, rng: &rng)
+            }
+        } else if bluesVariation {
             // Blues: CHL-PAD-004 (open fifth hold) — full B section.
             // First 16-bar cycle: pads throughout. Subsequent cycles: Im7 section (first 8 bars
             // of each cycle) is silent — pads re-enter at the chord changes (IVm7 onwards).
@@ -157,6 +187,117 @@ struct ChillPadsGenerator {
             }
         }
         return events.filter { !rest.contains($0.stepIndex / 16) }
+    }
+
+    // MARK: - Soho pad timing
+
+    // Every pad note fades out over a quarter of its length and is only then stopped
+    // (PlaybackEngine.chillPadsMode). A chord restruck on the same pitches must therefore leave a
+    // gap longer than that fade, or the deferred stopNote cuts off the new attack. A 12-step hold
+    // fades over 3 steps, so it clears a restrike 4 steps later; a 6-step hold fades over 1.5.
+    private static let sohoBarHold  = 12   // restruck every bar
+    private static let sohoHalfHold = 6    // restruck every half bar
+
+    // MARK: - CHL-PAD-007: Soho Chord Hold
+
+    /// One chord per bar on step 0, held for most of the bar, voiced with 3–5 notes. The
+    /// signature Soho pad: measured from Cherish the Day, a single onset per bar carrying a
+    /// near five-note voicing.
+    ///
+    /// - About a quarter of bars restate the chord on step 8 as well
+    /// - About 15% of chord changes are anticipated on step 15 of the bar before (Your Love Is
+    ///   King), pushing into the change rather than landing square on it
+    ///
+    /// The bridge is left to `breakdownPad()`, and the rest windows thin the whole part afterwards.
+    private static func sohoChordHold(frame: GlobalMusicalFrame, structure: SongStructure,
+                                      rng: inout SeededRNG) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let snapTable = makeSnapTable(frame.scalePCs)
+        let voiceCount = [3, 4, 4, 5][rng.nextInt(upperBound: 4)]   // one size for the whole song
+        var anticipated = Set<Int>()                                  // bars already struck on step 15
+
+        for bar in 0..<frame.totalBars {
+            if structure.section(atBar: bar)?.label == .bridge { continue }
+            guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { continue }
+            let notes = sohoVoicing(chord, frame: frame, snapTable: snapTable, count: voiceCount)
+            let vel   = 42 + rng.nextInt(upperBound: 14)              // 42–55
+
+            // Anticipate the next bar's chord change on step 15 of this bar.
+            let next = bar + 1
+            var anticipateNext = false
+            // Never from a bar that was itself anticipated: its hold runs to step 12 and would
+            // not clear a second step-15 attack.
+            if next < frame.totalBars, !anticipated.contains(bar),
+               structure.section(atBar: next)?.label != .bridge,
+               let nextChord = structure.chordPlan.first(where: { $0.contains(bar: next) }),
+               nextChord.startBar == next, rng.nextDouble() < 0.15 {
+                anticipateNext = true
+                let nextNotes = sohoVoicing(nextChord, frame: frame, snapTable: snapTable, count: voiceCount)
+                emit(nextNotes, at: bar * 16 + 15, hold: sohoBarHold + 1, vel: vel, into: &events, rng: &rng)
+                anticipated.insert(next)
+            }
+
+            if anticipated.contains(bar) { continue }                // already sounding from step 15
+            if rng.nextDouble() < 0.25 && !anticipateNext {
+                emit(notes, at: bar * 16,     hold: sohoHalfHold, vel: vel, into: &events, rng: &rng)
+                emit(notes, at: bar * 16 + 8, hold: sohoHalfHold, vel: vel - 4, into: &events, rng: &rng)
+            } else {
+                // Shorter before an anticipation so its fade clears step 15.
+                emit(notes, at: bar * 16, hold: anticipateNext ? 10 : sohoBarHold, vel: vel,
+                     into: &events, rng: &rng)
+            }
+        }
+        return events
+    }
+
+    // MARK: - CHL-PAD-008: Half-Bar Pad
+
+    /// The chord restated on steps 0 and 8 of every bar, 2–3 notes, each held about half a bar.
+    /// Measured from Smooth Operator: a slow vamp that keeps moving without getting denser. Suits
+    /// the Latin grooves, where a full-bar hold can feel static against the clave.
+    private static func halfBarPad(frame: GlobalMusicalFrame, structure: SongStructure,
+                                   rng: inout SeededRNG) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        let snapTable  = makeSnapTable(frame.scalePCs)
+        let voiceCount = 2 + rng.nextInt(upperBound: 2)               // 2 or 3, for the whole song
+
+        for bar in 0..<frame.totalBars {
+            if structure.section(atBar: bar)?.label == .bridge { continue }
+            guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { continue }
+            let notes = sohoVoicing(chord, frame: frame, snapTable: snapTable, count: voiceCount)
+            let vel   = 44 + rng.nextInt(upperBound: 12)              // 44–55
+            emit(notes, at: bar * 16,     hold: sohoHalfHold, vel: vel,     into: &events, rng: &rng)
+            emit(notes, at: bar * 16 + 8, hold: sohoHalfHold, vel: vel - 5, into: &events, rng: &rng)
+        }
+        return events
+    }
+
+    /// Soho voicings, built from the four-note upper structure (3rd, 5th, 7th, 9th):
+    /// - 2 notes: the guide tones, 3rd and 7th
+    /// - 3 notes: 3rd, 7th, 9th — the 5th is the first tone a real voicing drops
+    /// - 4 notes: the full upper structure
+    /// - 5 notes: the upper structure with the 3rd doubled an octave up, kept within the register
+    private static func sohoVoicing(_ chord: ChordWindow, frame: GlobalMusicalFrame,
+                                    snapTable: [Int], count: Int) -> [Int] {
+        let rootPC = (frame.keySemitoneValue + degreeSemitone(chord.chordRoot)) % 12
+        let upper  = buildUpperStructure(chordRootPC: rootPC, chordType: chord.chordType,
+                                         snapTable: snapTable, register: 60)
+        var notes: [Int]
+        switch count {
+        case 2:  notes = [upper[0], upper[2]]
+        case 3:  notes = [upper[0], upper[2], upper[3]]
+        case 5:  notes = upper + (upper[0] + 12 <= 84 ? [upper[0] + 12] : [])
+        default: notes = upper
+        }
+        return Array(Set(notes)).sorted()
+    }
+
+    private static func emit(_ notes: [Int], at step: Int, hold: Int, vel: Int,
+                             into events: inout [MIDIEvent], rng: inout SeededRNG) {
+        for note in notes {
+            let v = UInt8(Swift.max(20, Swift.min(90, vel + rng.nextInt(upperBound: 6) - 3)))
+            events.append(MIDIEvent(stepIndex: step, note: UInt8(note), velocity: v, durationSteps: hold))
+        }
     }
 
     // MARK: - CHL-PAD-001: Chord sustain (Long Lake Winter Strings model)
@@ -443,6 +584,7 @@ struct ChillPadsGenerator {
                 let thirdInt: Int
                 switch ct {
                 case .major, .dom7, .add9: thirdInt = 4
+                case .maj7, .maj9, .maj6, .dom9: thirdInt = 4   // Soho extended types — major third
                 case .sus4:                thirdInt = 5
                 default:                   thirdInt = 3
                 }
@@ -455,7 +597,14 @@ struct ChillPadsGenerator {
 
             if isPhase2 {
                 // Seventh — adds jazz complexity
-                let seventhInt = (ct == .major) ? 11 : 10
+                // Major seventh for the maj types, the sixth for sixth chords, flat seventh
+                // otherwise. Existing types unchanged: only .major took 11 before.
+                let seventhInt: Int
+                switch ct {
+                case .major, .maj7, .maj9: seventhInt = 11
+                case .maj6, .min6:         seventhInt = 9
+                default:                   seventhInt = 10
+                }
                 let seventhPC   = snapTable[(rootPC + seventhInt) % 12]
                 let noteSeventh = noteNear(seventhPC, ref: 60, lo: 55, hi: 72)
                 let vel = UInt8(43 + rng.nextInt(upperBound: 12))  // 43–54
@@ -513,10 +662,18 @@ struct ChillPadsGenerator {
             let thirdInt: Int
             switch ct {
             case .major, .dom7, .add9: thirdInt = 4
+            case .maj7, .maj9, .maj6, .dom9: thirdInt = 4   // Soho extended types — major third
             case .sus4:                thirdInt = 5
             default:                   thirdInt = 3
             }
-            let seventhInt = (ct == .major) ? 11 : 10
+            // Major seventh for the maj types, the sixth for sixth chords (they have no seventh),
+            // flat seventh otherwise. Existing types are unchanged: only .major took 11 before.
+            let seventhInt: Int
+            switch ct {
+            case .major, .maj7, .maj9: seventhInt = 11
+            case .maj6, .min6:         seventhInt = 9
+            default:                   seventhInt = 10
+            }
 
             let thirdPC   = snapTable[(rootPC + thirdInt) % 12]
             let fifthPC   = snapTable[(rootPC + 7) % 12]
@@ -553,6 +710,7 @@ struct ChillPadsGenerator {
     /// - bassOstinato: completely silent — bass carries the groove alone
     /// - harmonicDrone: whisper sustain vel 25–40, renewed every 4 bars (barely there warmth)
     /// - groovePocket: full-strength sustain vel 55–70 — pads are prominent since bass/leads are absent
+    /// - sohoRemix (Chill Soho): the same full-strength sustain, as the anchor under the kit swap
     private static func breakdownPad(frame: GlobalMusicalFrame, structure: SongStructure,
                                       breakdownStyle: ChillBreakdownStyle,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
@@ -619,8 +777,10 @@ struct ChillPadsGenerator {
                     events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel,
                                             durationSteps: holdSteps))
                 }
-            case .groovePocket:
-                // Full-strength sustain, renewed every 2 bars — pads are prominent since bass and leads are out
+            case .groovePocket, .sohoRemix:
+                // Full-strength sustain, renewed every 2 bars — pads are prominent since bass and leads are out.
+                // The Remix Break wants exactly this: pads hold as the harmonic anchor while the kit
+                // swaps to four-on-the-floor, and its chords move every 2 bars to match.
                 guard breakdownBar % 2 == 0 else { continue }
                 let holdBars  = Swift.min(2, frame.totalBars - bar)
                 let holdSteps = holdBars * 16 - 12  // 12-step gap keeps deferred stopNote from cutting re-attack
@@ -662,6 +822,14 @@ struct ChillPadsGenerator {
         case .dom7:   rawIntervals = [4, 7, 10, 14]   // 3, 5, b7, 9
         case .sus4:   rawIntervals = [5, 7, 10, 14]   // 4, 5, b7, 9
         case .add9:   rawIntervals = [4, 7, 10, 14]   // 3, 5, b7, 9
+        // Extended types (Chill Soho). Same 3rd/5th/7th/9th upper-structure shape as above;
+        // without these the `default` voiced them all as minor ninths.
+        case .maj7, .maj9: rawIntervals = [4, 7, 11, 14]   // 3, 5, maj7, 9
+        case .min9:   rawIntervals = [3, 7, 10, 14]        // b3, 5, b7, 9
+        case .maj6:   rawIntervals = [4, 7, 9, 14]         // 3, 5, 6, 9 — the six-nine
+        case .min6:   rawIntervals = [3, 7, 9, 14]         // b3, 5, 6, 9
+        case .dom9:   rawIntervals = [4, 7, 10, 14]        // 3, 5, b7, 9
+        case .min7b5: rawIntervals = [3, 6, 10, 15]        // b3, b5, b7, b3 up
         default:      rawIntervals = [3, 7, 10, 14]
         }
 

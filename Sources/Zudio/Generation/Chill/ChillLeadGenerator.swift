@@ -19,10 +19,18 @@ struct ChillLeadGenerator {
         beatStyle: ChillBeatStyle = .electronic,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
         bluesVariation: Bool = false,
+        sohoVariation: Bool = false,
         forceRuleID: String? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
+        // Chill Soho has its own three rules (ChillSohoLeadGenerator.swift) and never reaches the
+        // St Germain staccato roll below.
+        if sohoVariation {
+            return sohoLead1(frame: frame, structure: structure, leadInstrument: leadInstrument,
+                             breakdownStyle: breakdownStyle, forceRuleID: forceRuleID,
+                             rng: &rng, usedRuleIDs: &usedRuleIDs)
+        }
         // CHL-LD1-005: St Germain staccato style — suppressed in blues (blues needs sustained phrases).
         let forceNonStaccato = bluesVariation || (forceRuleID != nil && forceRuleID != "CHL-LD1-005")
         let staccatoProb: Double = forceNonStaccato ? 0.0 : (beatStyle == .stGermain ? 0.85 : 0.15)
@@ -156,7 +164,7 @@ struct ChillLeadGenerator {
             // Breakdown behavior depends on style
             if label == .bridge {
                 switch breakdownStyle {
-                case .bassOstinato:
+                case .bassOstinato, .sohoRemix:   // remix: Lead 1 rests
                     // Silent — bass carries the groove alone
                     bar += 1
                     continue
@@ -280,6 +288,7 @@ struct ChillLeadGenerator {
             case .trumpet:       phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             case .clarinet:      phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars (smoky, patient)
             case .trombone:      phraseLen = 2 + rng.nextInt(upperBound: 3)   // 2–4 bars (smooth, longer lines)
+            case .synthBrass:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             }
 
             // Clamp phrase to section boundary; intro/outro phrases max 2 bars to keep density low
@@ -417,11 +426,15 @@ struct ChillLeadGenerator {
         lead1Onsets: [(startBar: Int, endBar: Int)],
         handoffBars: Set<Int> = [],
         bluesVariation: Bool = false,
+        sohoVariation: Bool = false,
+        keepInstrument: ChillLeadInstrument? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
         // Blues forces CHL-LD2-001 (call-and-response) — shadow hold is too ambient for blues energy.
-        let useShadowHold = bluesVariation ? false : rng.nextDouble() < 0.50
+        // Soho: 75/25 call-and-response. The second voice sounds under the main line a median 17%
+        // of the time across the corpus; a pad-like voice under the melody is the exception.
+        let useShadowHold = bluesVariation ? false : rng.nextDouble() < (sohoVariation ? 0.25 : 0.50)
         usedRuleIDs.insert(useShadowHold ? "CHL-LD2-002" : "CHL-LD2-001")
 
         var events: [MIDIEvent] = []
@@ -430,8 +443,15 @@ struct ChillLeadGenerator {
 
         // Lead 2 instrument: uniform random from the four L2-appropriate instruments.
         // Register separation (below) ensures L2 stays out of L1's range regardless of choice.
-        let l2Pool: [ChillLeadInstrument] = [.vibraphone, .flute, .sopranoSax, .trombone]
-        let inst2 = l2Pool[rng.nextInt(upperBound: l2Pool.count)]
+        // Soho: what answers the singer in the corpus — a saxophone nearly every time, then synth
+        // brass, trombone and vibraphone — never the same instrument as Lead 1.
+        let l2Pool: [ChillLeadInstrument] = sohoVariation
+            ? [.saxophone, .tenorSax, .synthBrass, .trombone, .vibraphone].filter { $0 != lead1Instrument }
+            : [.vibraphone, .flute, .sopranoSax, .trombone]
+        let picked = l2Pool[rng.nextInt(upperBound: l2Pool.count)]
+        // Regeneration keeps the song's instrument: playback still has that patch loaded, so a
+        // line written for a freshly drawn instrument's register would play on the wrong one.
+        let inst2 = keepInstrument ?? picked
         let (regLow1, regHigh1) = register(for: lead1Instrument)
         let (rawLow2, rawHigh2) = register(for: inst2)
         // Lead 2 sits below the midpoint of Lead 1's register (CHL-RULE-12).
@@ -446,7 +466,16 @@ struct ChillLeadGenerator {
             let events = shadowHold(frame: frame, structure: structure,
                                     lead1Onsets: lead1Onsets, scale: scale,
                                     regLow: regLow2, regHigh: regHigh2, rng: &rng)
-            return (events, inst2)
+            return (sohoVariation ? capNotesPerBar(events, 2) : events, inst2)
+        }
+
+        // Soho: Lead 2 sits out whole groove sections about a third of the time — a sax that
+        // replies to everything stops sounding like a reply.
+        var sittingOut = Set<Int>()
+        if sohoVariation {
+            for sec in structure.sections where sec.label == .A || sec.label == .B {
+                if rng.nextDouble() < 0.35 { sittingOut.formUnion(sec.startBar..<sec.endBar) }
+            }
         }
 
         // CHL-LD2-001: Call-and-response — responds in gaps between Lead 1 phrases
@@ -473,16 +502,20 @@ struct ChillLeadGenerator {
             }
 
             // Skip bars where Lead 1 is playing
-            guard !lead1BarSet.contains(bar) else { bar += 1; continue }
+            guard !lead1BarSet.contains(bar), !sittingOut.contains(bar) else { bar += 1; continue }
             // Handoff window: LD2 strongly encouraged to fill bars LD1 was forced to skip.
-            // Normal: 40% in A (sparse), 80% in B (dense).
+            // Normal: 40% in A (sparse), 80% in B (dense). Soho: 35% / 55%.
             let responseProb: Double = handoffBars.contains(bar) ? 0.90
+                : sohoVariation ? (label == .A ? 0.35 : 0.55)
                 : (label == .A ? 0.40 : 0.80)
             guard rng.nextDouble() < responseProb else { bar += 1; continue }
 
             let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars
             // 2-bar phrases for Lead 2; blues: clamp to chord seam so phrases don't span chord changes
             var phraseLen = Swift.min(2, sectionEnd - bar)
+            // Soho: Lead 1 rests about a bar and a half between phrases, so a one-bar answer is
+            // what fits the gap.
+            if sohoVariation && phraseLen == 2 && lead1BarSet.contains(bar + 1) { phraseLen = 1 }
             if bluesVariation {
                 let ld2FormPos = bluesFormPosition(bar: bar, label: label, bStart: ld2_bSectionStart, aStart: ld2_aSectionStart)
                 if ld2FormPos >= 0 {
@@ -511,7 +544,19 @@ struct ChillLeadGenerator {
             events += phraseNotes
             bar += phraseLen + 1  // mandatory 1-bar rest after each phrase (CHL-RULE-06 breathing room)
         }
-        return (events, inst2)
+        return (sohoVariation ? capNotesPerBar(events, 2) : events, inst2)
+    }
+
+    /// Keeps the first `cap` notes of each bar. Chill Soho's Lead 2 measures 1.3–2.0 notes/bar,
+    /// always below the main line.
+    private static func capNotesPerBar(_ events: [MIDIEvent], _ cap: Int) -> [MIDIEvent] {
+        var kept: [Int: Int] = [:]
+        return events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }.filter { ev in
+            let bar = ev.stepIndex / 16
+            guard kept[bar, default: 0] < cap else { return false }
+            kept[bar, default: 0] += 1
+            return true
+        }
     }
 
     // MARK: - CHL-LD2-002: Shadow Hold
@@ -617,6 +662,7 @@ struct ChillLeadGenerator {
             case .tenorSax:     notesPerBar = 3 + rng.nextInt(upperBound: 3)   // 3–5 (rich, bluesy lines)
             case .sopranoSax:   notesPerBar = 2 + rng.nextInt(upperBound: 3)   // 2–4
             case .trombone:     notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3 (smooth legato, fewer notes)
+            case .synthBrass:   notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3 (a section answering)
             case .clarinet:     notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4 (breathy, slightly sparse)
             }
         }
@@ -636,6 +682,7 @@ struct ChillLeadGenerator {
         case .tenorSax:     noteDurSteps = 5 + rng.nextInt(upperBound: 5)   // 5–9 steps (slightly longer, warmer tone)
         case .sopranoSax:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
         case .trombone:     noteDurSteps = 6 + rng.nextInt(upperBound: 7)   // 6–12 steps (long legato slides)
+        case .synthBrass:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
         case .clarinet:     noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps (chalumeau breath)
         }
 
@@ -1048,7 +1095,7 @@ struct ChillLeadGenerator {
 
     // MARK: - Helpers
 
-    private static func register(for instrument: ChillLeadInstrument) -> (low: Int, high: Int) {
+    static func register(for instrument: ChillLeadInstrument) -> (low: Int, high: Int) {
         switch instrument {
         case .flute:        return (65, 85)
         case .mutedTrumpet: return (58, 80)
@@ -1058,11 +1105,12 @@ struct ChillLeadGenerator {
         case .tenorSax:     return (57, 72)   // tenor sax lead: A3–C5
         case .sopranoSax:   return (58, 80)   // soprano sits higher than alto/tenor
         case .trombone:     return (45, 65)   // warm low brass — Lead 2 counter-melody register
+        case .synthBrass:   return (55, 77)   // Synth Brass 1 — Chill Soho Lead 2
         case .clarinet:     return (58, 72)   // clarinet lead: Bb3–C5 (D3 floor was too muddy)
         }
     }
 
-    private static func scaleNotes(frame: GlobalMusicalFrame) -> [Int] {
+    static func scaleNotes(frame: GlobalMusicalFrame) -> [Int] {
         let root = 60 + frame.keySemitoneValue
         return frame.mode.intervals.flatMap { interval -> [Int] in
             [root + interval - 24, root + interval - 12, root + interval, root + interval + 12, root + interval + 24]
@@ -1244,7 +1292,7 @@ struct ChillLeadGenerator {
             // Breakdown: behavior depends on style
             if label == .bridge {
                 switch breakdownStyle {
-                case .bassOstinato:
+                case .bassOstinato, .sohoRemix:   // remix: Lead 1 rests
                     // Silent — bass carries the groove alone
                     bar += 1; continue
                 case .stopTime:

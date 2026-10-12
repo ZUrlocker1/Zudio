@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Zack Urlocker
 // Produces a GlobalMusicalFrame tuned for nu-jazz / acid jazz / chill-out style.
 // Tempo: Deep/Dream 72–92 BPM (peak 83), Bright/Free 88–110 BPM (peak 96). Blues: always 85–92 BPM (peak 88).
+// Soho: 84–128 BPM (peak ~100), independent of groove.
 // Four moods: Deep 35%, Dream 30%, Free 20%, Bright 15%.
 // Four modes: Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%.
 
@@ -9,25 +10,43 @@ import Foundation
 
 struct ChillMusicalFrameGenerator {
 
+    /// Share of NON-Blues Chill songs that become Chill Soho. Blues keeps its 20% on the main
+    /// stream untouched, so Soho's overall share is 0.8 x this.
+    ///
+    /// TESTING: 1.0 makes every non-Blues Chill song Soho — 80% Soho, 20% Blues, no base Chill.
+    /// RELEASE: set back to 0.25 (20% Soho, 20% Blues, 60% base). See docs/chill-soho-plan.md.
+    /// Changing it changes which existing Chill seeds are Soho, but never their main-stream draws.
+    static let sohoShareOfNonBlues: Double = 1.0
+
     static func generate(
         rng: inout SeededRNG,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil,
         forceBeatStyle: ChillBeatStyle? = nil,
-        forceBluesVariation: Bool = false
+        forceBluesVariation: Bool = false,
+        sohoRoll: Double = 1.0,
+        forceSohoVariation: Bool = false
     ) -> (frame: GlobalMusicalFrame,
           chillProgFamily: ChillProgressionFamily,
           chillLeadInstrument: ChillLeadInstrument,
           chillBeatStyle: ChillBeatStyle,
           chillSwingFeel: Bool,
-          chillBluesVariation: Bool) {
+          chillBluesVariation: Bool,
+          chillSohoVariation: Bool) {
 
         let mood = moodOverride ?? pickMood(rng: &rng)
         let key  = keyOverride  ?? pickKey(rng: &rng)
 
         // Blues Chill activation: 20% of Chill songs.
         let bluesVariation = forceBluesVariation || rng.nextDouble() < 0.20
+
+        // Chill Soho activation. `sohoRoll` comes from a DERIVED stream in the caller and is
+        // never drawn from `rng`, so base Chill and Blues make exactly the same main-stream draws
+        // as they did before Soho existed and every existing Chill seed still reproduces. Blues
+        // keeps precedence: 20% Blues as before, then 25% of the remaining 80% = 20% Soho overall.
+        // The default of 1.0 means a caller that does not pass a roll never gets Soho.
+        let sohoVariation = !bluesVariation && (forceSohoVariation || sohoRoll < sohoShareOfNonBlues)
 
         // Blues forces Dorian (Im7 / IVm7 / V7 are diatonic to Dorian only).
         let mode = bluesVariation ? Mode.Dorian : pickMode(rng: &rng)
@@ -43,15 +62,24 @@ struct ChillMusicalFrameGenerator {
         // forceBeatStyle from best-first-song/load path takes priority in all cases.
         let beatStyle = forceBeatStyle ?? (bluesVariation
             ? pickBeatStyleBlues(rng: &rng)
-            : pickBeatStyle(rng: &rng))
+            : sohoVariation
+                ? pickBeatStyleSoho(rng: &rng)
+                : pickBeatStyle(rng: &rng))
 
         let swingFeel = false  // swing not yet implemented (requires sub-step timing)
 
         // Tempo picked after beat style so stGermain can bias toward its faster range.
         // Blues range: 85–92 BPM. Re-roll once if the initial pick lands outside that window.
-        var tempo = tempoOverride ?? pickTempo(mood: mood, rng: &rng, beatStyle: beatStyle)
+        // Soho: one band for the whole substyle, independent of the groove — 84–128, peak ~100.
+        // Measured bimodal in the corpus (80–106 and 121–134); restraint comes from density and
+        // touch, not BPM, so the slow band alone would exclude three of the strongest references.
+        var tempo = tempoOverride ?? (sohoVariation
+            ? triangularInt(min: 84, peak: 100, max: 128, rng: &rng)
+            : pickTempo(mood: mood, rng: &rng, beatStyle: beatStyle))
         if bluesVariation {
             tempo = Swift.max(85, Swift.min(tempo, 92))
+        } else if sohoVariation {
+            tempo = Swift.max(84, Swift.min(tempo, 128))
         } else {
             tempo = Swift.max(72, Swift.min(tempo, 124))
         }
@@ -65,7 +93,7 @@ struct ChillMusicalFrameGenerator {
             key: key, mode: mode, tempo: tempo, mood: mood,
             progressionFamily: .static_tonic, totalBars: total
         )
-        return (frame, progFamily, leadInst, beatStyle, swingFeel, bluesVariation)
+        return (frame, progFamily, leadInst, beatStyle, swingFeel, bluesVariation, sohoVariation)
     }
 
     // MARK: - Private helpers
@@ -132,6 +160,12 @@ struct ChillMusicalFrameGenerator {
     private static func pickLeadInstrument(rng: inout SeededRNG) -> ChillLeadInstrument {
         let insts: [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
         return insts[rng.nextInt(upperBound: insts.count)]
+    }
+
+    /// Chill Soho: Latin 55% / Soul 45%, matching the reference set. The drum, bass and rhythm
+    /// generators each pick their pool from this one value.
+    private static func pickBeatStyleSoho(rng: inout SeededRNG) -> ChillBeatStyle {
+        rng.nextDouble() < 0.55 ? .sohoLatin : .sohoSoul
     }
 
     private static func pickBeatStyleBlues(rng: inout SeededRNG) -> ChillBeatStyle {

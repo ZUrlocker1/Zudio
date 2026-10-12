@@ -563,7 +563,7 @@ struct LeadGenerator {
 
     /// Silences a two-to-three bar window inside any stretch of sounding bars longer than
     /// `maxBars`, repeating until nothing exceeds the cap.
-    private static func capUnbrokenStretch(_ events: [MIDIEvent], maxBars: Int,
+    static func capUnbrokenStretch(_ events: [MIDIEvent], maxBars: Int,
                                            totalBars: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         var out = events
         var guardCount = 0
@@ -3028,7 +3028,7 @@ struct LeadGenerator {
     // I: Pre-computed rest windows for LD1-002 and LD1-006 — 1 or 2 deliberate 4–8 bar
     // silent stretches per rule in body sections. Decided from seed so silences are
     // structural and repeatable, not per-bar noise.
-    private static func buildRestBars(entryBar: Int, totalBars: Int, rng: inout SeededRNG, arcade: Bool = false) -> Set<Int> {
+    static func buildRestBars(entryBar: Int, totalBars: Int, rng: inout SeededRNG, arcade: Bool = false) -> Set<Int> {
         var restBars = Set<Int>()
         let bodyStart = entryBar
         let bodyEnd   = max(bodyStart, totalBars - 8)

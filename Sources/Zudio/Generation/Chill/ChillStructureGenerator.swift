@@ -21,6 +21,7 @@ struct ChillStructureGenerator {
         mood: Mood,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
         noBreakdown: Bool = false,
+        sohoVariation: Bool = false,
         rng: inout SeededRNG
     ) -> SongStructure {
         let (sections, introStyle, outroStyle): ([SongSection], IntroStyle, OutroStyle)
@@ -29,8 +30,9 @@ struct ChillStructureGenerator {
         } else {
             let useSimpleForm = (mood == .Deep || mood == .Dream) && rng.nextDouble() < 0.30
             (sections, introStyle, outroStyle) = useSimpleForm
-                ? buildSimpleSections(frame: frame, rng: &rng)
-                : buildFullSections(frame: frame, breakdownStyle: breakdownStyle, rng: &rng)
+                ? buildSimpleSections(frame: frame, soho: sohoVariation, rng: &rng)
+                : buildFullSections(frame: frame, breakdownStyle: breakdownStyle,
+                                    soho: sohoVariation, rng: &rng)
         }
         let chordPlan = buildChordPlan(frame: frame, sections: sections,
                                        family: chillProgFamily, rng: &rng)
@@ -43,12 +45,13 @@ struct ChillStructureGenerator {
     /// INTRO / GROOVE-A / BREAKDOWN / GROOVE-B / OUTRO
     private static func buildFullSections(frame: GlobalMusicalFrame,
                                            breakdownStyle: ChillBreakdownStyle = .bassOstinato,
+                                           soho: Bool = false,
                                            rng: inout SeededRNG) -> ([SongSection], IntroStyle, OutroStyle) {
         let total = frame.totalBars
         // Section lengths drawn from plan ranges, all multiple of 4.
         // Breakdown length is style-dependent: bass ostinato is the most minimal breakdown
         // and should be short (4 bars); other styles allow 4–8 bars.
-        let introBars     = roundTo4(ChillMusicalFrameGenerator.triangularInt(min: 4,  peak: 6,  max: 8,  rng: &rng))
+        let introBars     = sohoIntroBars(soho: soho, rng: &rng)
         let outroBars     = roundTo4(ChillMusicalFrameGenerator.triangularInt(min: 4,  peak: 6,  max: 8,  rng: &rng))
         let breakdownBars: Int
         switch breakdownStyle {
@@ -64,6 +67,10 @@ struct ChillStructureGenerator {
         case .groovePocket:
             // 4 or 8 bars — 8 gives more room for fill escalation
             breakdownBars = rng.nextDouble() < 0.50 ? 4 : 8
+        case .sohoRemix:
+            // Chill Soho Remix Break. 12 or 16 bars read as one fixed length by ear, so the break
+            // is now 6, 8 or 12 (Zack, 2026-10-11) — a short one is a lift, a long one a section.
+            breakdownBars = [6, 8, 12][rng.weightedPick([0.30, 0.40, 0.30])]
         }
         let grooveTotal   = Swift.max(20, total - introBars - outroBars - breakdownBars)
         // Split groove total across A and B; B slightly longer (more active)
@@ -73,9 +80,11 @@ struct ChillStructureGenerator {
         var sections: [SongSection] = []
         var cursor = 0
 
-        sections.append(SongSection(startBar: cursor, lengthBars: introBars,
-                                    label: .intro, intensity: .low, mode: frame.mode))
-        cursor += introBars
+        if introBars > 0 {
+            sections.append(SongSection(startBar: cursor, lengthBars: introBars,
+                                        label: .intro, intensity: .low, mode: frame.mode))
+            cursor += introBars
+        }
 
         sections.append(SongSection(startBar: cursor, lengthBars: grooveA,
                                     label: .A, intensity: .medium, mode: frame.mode))
@@ -143,21 +152,38 @@ struct ChillStructureGenerator {
     }
 
     /// Simple form: INTRO / BODY / OUTRO (no breakdown)
-    private static func buildSimpleSections(frame: GlobalMusicalFrame,
+    private static func buildSimpleSections(frame: GlobalMusicalFrame, soho: Bool = false,
                                              rng: inout SeededRNG) -> ([SongSection], IntroStyle, OutroStyle) {
         let total = frame.totalBars
-        let introBars = roundTo4(ChillMusicalFrameGenerator.triangularInt(min: 4, peak: 6, max: 8, rng: &rng))
+        let introBars = sohoIntroBars(soho: soho, rng: &rng)
         let outroBars = roundTo4(ChillMusicalFrameGenerator.triangularInt(min: 4, peak: 6, max: 8, rng: &rng))
         let bodyBars  = Swift.max(16, total - introBars - outroBars)
 
         let useColdStyle = rng.nextDouble() < 0.50
         let introStyle: IntroStyle = useColdStyle ? .coldStart(drumsOnly: true) : .alreadyPlaying
         let outroStyle: OutroStyle = useColdStyle ? .coldStop : .fade
-        return ([
-            SongSection(startBar: 0,                        lengthBars: introBars, label: .intro,  intensity: .low,    mode: frame.mode),
-            SongSection(startBar: introBars,                lengthBars: bodyBars,  label: .A,      intensity: .medium, mode: frame.mode),
-            SongSection(startBar: introBars + bodyBars,     lengthBars: outroBars, label: .outro,  intensity: .low,    mode: frame.mode),
-        ], introStyle, outroStyle)
+        var sections: [SongSection] = []
+        if introBars > 0 {
+            sections.append(SongSection(startBar: 0, lengthBars: introBars, label: .intro,
+                                        intensity: .low, mode: frame.mode))
+        }
+        sections.append(SongSection(startBar: introBars, lengthBars: bodyBars, label: .A,
+                                    intensity: .medium, mode: frame.mode))
+        sections.append(SongSection(startBar: introBars + bodyBars, lengthBars: outroBars,
+                                    label: .outro, intensity: .low, mode: frame.mode))
+        return (sections, introStyle, outroStyle)
+    }
+
+    /// Intro length. Base Chill draws 4 or 8 bars; **Chill Soho is 4, or occasionally none at
+    /// all**. An eight-bar intro of percussion and one bass note a bar is the least musical thing
+    /// the substyle does — Zack heard one on *Thunder in the Side Street* (2026-10-12) — and a
+    /// fair number of these records simply start on the groove. The draw count is the same either
+    /// way, so base Chill is untouched.
+    private static func sohoIntroBars(soho: Bool, rng: inout SeededRNG) -> Int {
+        guard soho else {
+            return roundTo4(ChillMusicalFrameGenerator.triangularInt(min: 4, peak: 6, max: 8, rng: &rng))
+        }
+        return rng.nextDouble() < 0.15 ? 0 : 4
     }
 
     // MARK: - Chord plan
@@ -522,5 +548,67 @@ struct ChillStructureGenerator {
             }
         }
         return result
+    }
+
+    /// The bar immediately before a Remix Break, where the band hits that lead into it land.
+    /// The exit from the break is a unison figure, and the way in should answer it.
+    static func remixEntryBars(structure: SongStructure, breakdownStyle: ChillBreakdownStyle) -> Set<Int> {
+        guard breakdownStyle == .sohoRemix else { return [] }
+        return Set(structure.sections.filter { $0.label == .bridge }
+                       .map { $0.startBar - 1 }.filter { $0 >= 0 })
+    }
+
+    /// How far into the intro's build a bar sits, or nil outside the intro.
+    ///
+    /// A cold start spends the intro's first bar on a drums-only pickup, so the layers that follow
+    /// start a bar later — otherwise the staircase loses its first step and everything arrives at
+    /// once, which is what Zack heard on *Thunder in the Side Street* (2026-10-12). The pickup bar
+    /// returns -1, which fails every `>= n` test on its own.
+    static func sohoIntroLayer(bar: Int, structure: SongStructure) -> Int? {
+        guard let intro = structure.sections.first(where: { $0.label == .intro }),
+              bar >= intro.startBar, bar < intro.endBar else { return nil }
+        var offset = 0
+        if case .coldStart = structure.introStyle, intro.startBar == 0 { offset = 1 }
+        return bar - intro.startBar - offset
+    }
+
+    /// Which of the bass and the comping enters first in a Chill Soho intro's build.
+    ///
+    /// The two are generated independently on different RNG streams and cannot share a draw, so
+    /// this is a pure function of the song's own frame and structure: both generators see the same
+    /// inputs and reach the same answer with no coupling between them. Whichever leads enters on
+    /// the intro's second-to-last bar and the other on its last, so the build still adds one thing
+    /// a bar either way — it just alternates which (Zack, 2026-10-12).
+    static func sohoBassLeadsIntro(frame: GlobalMusicalFrame, structure: SongStructure) -> Bool {
+        (frame.tempo + frame.keySemitoneValue + structure.chordPlan.count) % 2 == 0
+    }
+
+    /// The bars occupied by a four-bar Soho turnaround, read back from the finished chord plan.
+    ///
+    /// `buildSohoChordPlan` decides per song whether every 16-bar phrase turns around or only the
+    /// section ends, on its own RNG stream, so a generator cannot recompute that choice. It can
+    /// recognise the result: a turnaround is four consecutive one-bar windows whose roots are
+    /// exactly the turnaround's, and no cycle in the pool produces that sequence by accident.
+    static func sohoTurnaroundBars(frame: GlobalMusicalFrame, structure: SongStructure) -> Set<Int> {
+        let tonicType = structure.chordPlan.first?.chordType ?? .min7
+        // Major modes have two turnarounds — the measured one and a brighter cadence — and which
+        // a song took is decided on the chord plan's own stream. Both are recognised here.
+        let shapes = [false, true].map {
+            SongGenerator.sohoTurnaround(mode: frame.mode, tonicType: tonicType, bright: $0).map(\.0)
+        }
+        func root(_ bar: Int) -> String {
+            structure.chordPlan.first { $0.contains(bar: bar) }?.chordRoot ?? ""
+        }
+        var out = Set<Int>()
+        for section in structure.sections where section.label == .A || section.label == .B {
+            var bar = section.startBar + 3
+            while bar < section.endBar {
+                if shapes.contains(where: { shape in (0..<4).allSatisfy { root(bar - 3 + $0) == shape[$0] } }) {
+                    out.formUnion((bar - 3)...bar)
+                }
+                bar += 1
+            }
+        }
+        return out
     }
 }

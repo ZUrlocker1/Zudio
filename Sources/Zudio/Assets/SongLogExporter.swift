@@ -87,6 +87,10 @@ struct SongLogExporter {
         // if not captured here and replayed on load, reloading skips that roll entirely, shifting
         // every subsequent random draw and silently losing the blues identity (~80% of the time).
         if song.chillBluesVariation   { lines.append(col("Blues Variation:", 16) + "true") }
+        // Soho is rolled on a derived stream, so it reproduces from the seed alone and forcing it
+        // on load cannot shift any other draw. It is written anyway so that a saved Soho song
+        // survives a later change to the activation threshold during tuning.
+        if song.chillSohoVariation    { lines.append(col("Soho Variation:", 16) + "true") }
         lines += [
             col("Key:",       16) + "\(song.frame.key)  \(song.frame.mode.rawValue)",
             col("Tempo:",     16) + "\(song.frame.tempo) BPM",
@@ -157,7 +161,10 @@ struct SongLogExporter {
                 let bar = step / 16 + 1
                 let barLabel = String(format: "Bar %03d", bar)
                 for entry in entries {
-                    lines.append("  \(col(barLabel, 10)) \(col(entry.tag, 12)) \(entry.description)")
+                    let line = "  \(col(barLabel, 10)) \(col(entry.tag, 12)) \(entry.description)"
+                    lines.append(entry.description.isEmpty
+                                 ? String(line.reversed().drop { $0 == " " }.reversed())
+                                 : line)
                 }
             }
             lines.append("")
@@ -224,7 +231,8 @@ struct SongLogExporter {
             if i == kTrackLead2 { return Int(song.chillLead2Instrument.gmProgram) }
         }
         if i == kTrackLeadSynth { return Int(kDefaultGMPrograms[kTrackLeadSynth] ?? 90) }
-        let pool = AppState.instrumentPoolPrograms(trackIndex: i, style: song.style)
+        let pool = AppState.instrumentPoolPrograms(trackIndex: i, style: song.style,
+                                                   isChillSoho: song.chillSohoVariation)
         return pool.first ?? 255
     }
 

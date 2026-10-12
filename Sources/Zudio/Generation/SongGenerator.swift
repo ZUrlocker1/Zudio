@@ -32,6 +32,7 @@ struct SongGenerator {
         forceBridge:          Bool    = false,
         useBrushKit:          Bool    = false,
         forceBluesVariation:  Bool    = false,
+        forceSohoVariation:   Bool    = false,
         forceAmbientPianoRule: String? = nil
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
@@ -44,6 +45,7 @@ struct SongGenerator {
                         forceBridge: forceBridge,
                         useBrushKit: useBrushKit,
                         forceBluesVariation: forceBluesVariation,
+                        forceSohoVariation: forceSohoVariation,
                         forceAmbientPianoRule: forceAmbientPianoRule)
     }
 
@@ -64,6 +66,7 @@ struct SongGenerator {
         forceBridge:          Bool    = false,
         useBrushKit:          Bool    = false,
         forceBluesVariation:  Bool    = false,
+        forceSohoVariation:   Bool    = false,
         forceAmbientPianoRule: String? = nil
     ) -> SongState {
         switch style {
@@ -99,7 +102,8 @@ struct SongGenerator {
                                  forceLeadRuleID: forceLeadRuleID,
                                  forceRhythmRuleID: forceArpRuleID,
                                  forceTexRuleID: forceTexRuleID,
-                                 forceBluesVariation: forceBluesVariation)
+                                 forceBluesVariation: forceBluesVariation,
+                                 forceSohoVariation: forceSohoVariation)
         }
     }
 
@@ -1609,11 +1613,16 @@ struct SongGenerator {
                     driftVelocityBase: 89)
             } else if isChill {
                 var ignoredFills: [Int] = []
+                let regenSohoPlan: ChillDrumGenerator.SohoDrumPlan? = songState.chillSohoVariation
+                    ? ChillDrumGenerator.sohoRegenPlan(beatStyle: songState.chillBeatStyle,
+                                                       seed: songState.globalSeed, rng: &rng)
+                    : nil
                 events = ChillDrumGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
                     beatStyle: songState.chillBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
+                    sohoPlan: regenSohoPlan,
                     rng: &rng, usedRuleIDs: &usedRules, fillBars: &ignoredFills)
             } else {
                 let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
@@ -1678,6 +1687,7 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
+                    sohoVariation: songState.chillSohoVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
@@ -1718,6 +1728,7 @@ struct SongGenerator {
                     beatStyle: songState.chillBeatStyle,
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
+                    sohoVariation: songState.chillSohoVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
                 (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
@@ -1759,6 +1770,8 @@ struct SongGenerator {
                     lead1Instrument: songState.chillLeadInstrument,
                     lead1Onsets: lead1Onsets,
                     bluesVariation: songState.chillBluesVariation,
+                    sohoVariation: songState.chillSohoVariation,
+                    keepInstrument: songState.chillLead2Instrument,
                     rng: &rng, usedRuleIDs: &usedRules).events
             } else {
                 events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, arcadeVariation: songState.motorikArcadeVariation)
@@ -1819,8 +1832,16 @@ struct SongGenerator {
                     kosmicProgFamily: songState.kosmicProgFamily,
                     rng: &rng, usedRuleIDs: &usedRules,
                     isKosmicDrift: songState.isKosmicDrift)
+            } else if isChill && songState.chillSohoVariation {
+                // Chill Soho texture is MIDI and never absent — regenerate it, re-reading the
+                // song's existing drum track so the stabs still land on its crashes.
+                events = ChillSohoTextureGenerator.generate(
+                    frame: songState.frame, structure: songState.structure,
+                    drumEvents: songState.trackEvents[kTrackDrums],
+                    breakdownStyle: songState.chillBreakdownStyle,
+                    rng: &rng, usedRuleIDs: &usedRules)
             } else if isChill {
-                // Chill texture is audio-only; regen is a no-op for the MIDI track.
+                // Base Chill and Blues texture is audio-only; regen is a no-op for the MIDI track.
                 events = []
             } else {
                 events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
@@ -2299,6 +2320,13 @@ struct SongGenerator {
         case .add9:    return "add9"
         case .quartal: return "4th"
         case .power:   return "5"
+        case .maj7:    return "maj7"
+        case .maj9:    return "maj9"
+        case .min9:    return "m9"
+        case .maj6:    return "6"
+        case .min6:    return "m6"
+        case .dom9:    return "9"
+        case .min7b5:  return "m7b5"
         }
     }
 
@@ -2915,6 +2943,7 @@ struct SongGenerator {
         chillBreakdownStyle: ChillBreakdownStyle? = nil,
         chillDrumFillBars: [Int] = [],
         bluesVariation: Bool = false,
+        sohoVariation: Bool = false,
         bluesIVVDesc: String = "",
         driftBridgeLabels: [Int: String] = [:],
         chillRhythmSwitch: (bar: Int, ruleID: String)? = nil,
@@ -2993,6 +3022,13 @@ struct SongGenerator {
             case .min7:    return root + "m7"
             case .quartal: return root
             case .power:   return root + "5"
+            case .maj7:    return root + "maj7"
+            case .maj9:    return root + "maj9"
+            case .min9:    return root + "m9"
+            case .maj6:    return root + "6"
+            case .min6:    return root + "m6"
+            case .dom9:    return root + "9"
+            case .min7b5:  return root + "m7b5"
             }
         }
 
@@ -3160,6 +3196,25 @@ struct SongGenerator {
             }) as [Int])
         }
 
+        // Turnarounds — the four-bar chord detour inside the groove. It is not a section, so
+        // nothing in the structure marks it; the performance log is where it belongs (Zack,
+        // 2026-10-12). Fires on the bar the detour begins.
+        if sohoVariation {
+            let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
+            for bar in turns.sorted() where !turns.contains(bar - 1) {
+                fireBar(bar, tag: "Turnaround", desc: "")
+            }
+        } else if bluesVariation {
+            // The 16-bar blues cycle turns around on its V7, at cycle bar 12.
+            for section in structure.sections where section.label == .A || section.label == .B {
+                var cycleStart = section.startBar
+                while cycleStart + 12 < section.endBar {
+                    fireBar(cycleStart + 12, tag: "Turnaround", desc: "")
+                    cycleStart += 16
+                }
+            }
+        }
+
         // 1. Section entries — fire at bar start (the change is heard immediately)
         var seenLabels = Set<SectionLabel>()
         for section in structure.sections {
@@ -3204,6 +3259,7 @@ struct SongGenerator {
                     case .bassOstinato:  styleLabel = "bass ostinato"
                     case .harmonicDrone: styleLabel = "harmonic drone"
                     case .groovePocket:  styleLabel = "groove pocket"
+                    case .sohoRemix:     styleLabel = "remix break"
                     }
                     fireBar(bar, tag: "Breakdown", desc: "\(section.lengthBars) bars — \(styleLabel)")
                 } else {
@@ -3582,9 +3638,18 @@ struct SongGenerator {
         forceLeadRuleID:    String? = nil,
         forceRhythmRuleID:  String? = nil,
         forceTexRuleID:     String? = nil,
-        forceBluesVariation: Bool = false
+        forceBluesVariation: Bool = false,
+        forceSohoVariation:  Bool = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
+
+        // Chill Soho is rolled on its own derived stream (index 90 — 64–74, 97 and 98 are taken),
+        // never on `rng`. Rolling it on the main stream would shift every later draw — mode, lead
+        // instrument, beat style, tempo, length — for every existing Chill song. The Blues roll
+        // below is the cautionary example: `force || rng.nextDouble()` short-circuits, so a forced
+        // reload consumes zero main-stream draws where the original consumed one.
+        var sohoRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 90))
+        let sohoRoll = sohoRNG.nextDouble()
 
         // Derive forced beat style and lead instrument from rule IDs (best-first-song / load path).
         // CHL-DRUM-004 = stGermain four-on-the-floor; forcing the beat style also biases
@@ -3592,36 +3657,62 @@ struct SongGenerator {
         // CHL-BASS-007 (stGermainOstinato) automatically.
         let forceBeatStyle: ChillBeatStyle? = forceDrumRuleID == "CHL-DRUM-004" ? .stGermain : nil
         // Step 1 — Chill musical frame
-        let (frame, chillProgFamily, pickedLeadInstrument, chillBeatStyle, chillSwingFeel, bluesVariation) =
+        let (frame, chillProgFamily, pickedLeadInstrument, chillBeatStyle, chillSwingFeel, bluesVariation,
+             sohoVariation) =
             ChillMusicalFrameGenerator.generate(
                 rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
                 moodOverride: moodOverride, forceBeatStyle: forceBeatStyle,
-                forceBluesVariation: forceBluesVariation
+                forceBluesVariation: forceBluesVariation,
+                sohoRoll: sohoRoll, forceSohoVariation: forceSohoVariation
             )
         let chillLeadInstrument = pickedLeadInstrument
+
+        // Chill Soho drum plan — rule and percussion overlay — from its own derived stream (94),
+        // decided here because the breakdown style picked just below depends on it.
+        let sohoDrumPlan: ChillDrumGenerator.SohoDrumPlan? = sohoVariation
+            ? ChillDrumGenerator.sohoDrumPlan(beatStyle: chillBeatStyle, seed: seed, forceRuleID: forceDrumRuleID)
+            : nil
 
         // Pick breakdown style first — needed to set breakdown length in the structure.
         // hasBreakdown is optimistically true; if the structure uses simple form (no bridge),
         // the style value is unused.
-        let chillBreakdownStyle: ChillBreakdownStyle = pickChillBreakdownStyle(
+        let baseBreakdownStyle: ChillBreakdownStyle = pickChillBreakdownStyle(
             beatStyle: chillBeatStyle, hasBreakdown: true, rng: &rng
         )
+        // Chill Soho picks its own breakdown on a derived stream (95). The base draw above is still
+        // made and discarded so every later main-stream draw is unchanged.
+        let chillBreakdownStyle: ChillBreakdownStyle = sohoDrumPlan.map {
+            pickSohoBreakdownStyle(drumPlan: $0, tempo: frame.tempo, seed: seed)
+        } ?? baseBreakdownStyle
 
         // Step 2 — Structure (INTRO / GROOVE-A / BREAKDOWN / GROOVE-B / OUTRO)
         // Blues skips the breakdown entirely — the 16-bar cycle is self-contained form.
         let baseStructure = ChillStructureGenerator.generate(
             frame: frame, chillProgFamily: chillProgFamily,
             mood: frame.mood, breakdownStyle: chillBreakdownStyle,
-            noBreakdown: bluesVariation, rng: &rng
+            noBreakdown: bluesVariation, sohoVariation: sohoVariation, rng: &rng
         )
 
         // Step 2.5 — Blues chord plan: replace the structure's default chord plan with the
         // 16-bar blues cycle (Im7×8, IVm7×2, Im7×2, V7×1, IVm7×1, Im7×2) when blues is active.
         let structure: SongStructure
+        var sohoCycleLabel: String? = nil
+        var sohoHasTurnaround = false
         if bluesVariation {
             let bluesChordPlan = buildBluesChordPlan(frame: frame, structure: baseStructure)
             structure = SongStructure(sections: baseStructure.sections,
                                        chordPlan: bluesChordPlan,
+                                       introStyle: baseStructure.introStyle,
+                                       outroStyle: baseStructure.outroStyle)
+        } else if sohoVariation {
+            // Chill Soho: a short non-modulating cycle, one bar per chord. See buildSohoChordPlan.
+            var cycleRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 91))
+            let soho = buildSohoChordPlan(frame: frame, structure: baseStructure,
+                                          remix: chillBreakdownStyle == .sohoRemix, rng: &cycleRNG)
+            sohoCycleLabel = soho.label
+            sohoHasTurnaround = soho.turnaround
+            structure = SongStructure(sections: baseStructure.sections,
+                                       chordPlan: soho.windows,
                                        introStyle: baseStructure.introStyle,
                                        outroStyle: baseStructure.outroStyle)
         } else {
@@ -3646,6 +3737,7 @@ struct SongGenerator {
         trackEvents[kTrackDrums] = ChillDrumGenerator.generate(
             frame: frame, structure: structure, beatStyle: chillBeatStyle,
             breakdownStyle: chillBreakdownStyle, bluesVariation: bluesVariation,
+            sohoPlan: sohoDrumPlan,
             rng: &drumRNG, usedRuleIDs: &drumRules, fillBars: &drumFillBars
         )
 
@@ -3664,7 +3756,7 @@ struct SongGenerator {
         var padRules: Set<String> = []
         trackEvents[kTrackPads] = ChillPadsGenerator.generate(
             frame: frame, structure: structure, breakdownStyle: chillBreakdownStyle,
-            bluesVariation: bluesVariation,
+            bluesVariation: bluesVariation, sohoVariation: sohoVariation,
             rng: &padsRNG, usedRuleIDs: &padRules
         )
 
@@ -3673,7 +3765,7 @@ struct SongGenerator {
         let (lead1Events, lead1Onsets, lead1HandoffBars) = ChillLeadGenerator.generateLead1(
             frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
-            bluesVariation: bluesVariation, forceRuleID: forceLeadRuleID,
+            bluesVariation: bluesVariation, sohoVariation: sohoVariation, forceRuleID: forceLeadRuleID,
             rng: &lead1RNG, usedRuleIDs: &lead1Rules
         )
         trackEvents[kTrackLead1] = lead1Events
@@ -3682,7 +3774,7 @@ struct SongGenerator {
         let (lead2Events, chillLead2Instrument) = ChillLeadGenerator.generateLead2(
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
             lead1Onsets: lead1Onsets, handoffBars: lead1HandoffBars,
-            bluesVariation: bluesVariation,
+            bluesVariation: bluesVariation, sohoVariation: sohoVariation,
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
         var lead2EventsFinal = lead2Events
@@ -3807,8 +3899,20 @@ struct SongGenerator {
             switchAnnotation: &chillRhythmSwitchAnnotation
         )
 
-        // Texture track: audio-only — no MIDI events generated here.
-        trackEvents[kTrackTexture] = []
+        // Texture track: audio-only for base Chill and Blues — no MIDI events generated here.
+        // Chill Soho is the exception: its texture is always MIDI and never absent. It runs on its
+        // own derived stream (92) and reads the finished drum track so its stabs land on the
+        // drum crashes without coordinating two random streams.
+        var sohoTexRules: Set<String> = []
+        if sohoVariation {
+            var sohoTexRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 92))
+            trackEvents[kTrackTexture] = ChillSohoTextureGenerator.generate(
+                frame: frame, structure: structure, drumEvents: trackEvents[kTrackDrums],
+                breakdownStyle: chillBreakdownStyle,
+                rng: &sohoTexRNG, usedRuleIDs: &sohoTexRules)
+        } else {
+            trackEvents[kTrackTexture] = []
+        }
 
         // Blues: conditional drum fills (post-processing — runs after all tracks are final).
         if bluesVariation {
@@ -3904,16 +4008,27 @@ struct SongGenerator {
             chillTextureFiles.removeAll { $0 == "city_at_night.m4a" }
         }
         // forceTexRuleID "forced" guarantees a texture is selected (used by best-first-song).
-        let chillAudioTexture: String? = (forceTexRuleID == "forced" || rng.nextDouble() < 0.55)
+        let pickedAudioTexture: String? = (forceTexRuleID == "forced" || rng.nextDouble() < 0.55)
             ? chillTextureFiles[rng.weightedPick(Array(repeating: 1.0 / Double(chillTextureFiles.count),
                                                        count: chillTextureFiles.count))]
             : nil
         // Random start offset: 0, 15, 30, or 45 seconds into the audio file.
-        let chillAudioTextureOffset = chillAudioTexture != nil ? [0, 15, 30, 45][rng.nextInt(upperBound: 4)] : 0
+        let pickedTextureOffset = pickedAudioTexture != nil ? [0, 15, 30, 45][rng.nextInt(upperBound: 4)] : 0
+        // Chill Soho never uses an audio texture — its Texture track is always MIDI (horns, bells),
+        // generated below. The draws above are still made and then discarded, so every later
+        // main-stream draw (title included) is unchanged and a saved Soho song reloads the same.
+        let chillAudioTexture: String? = sohoVariation ? nil : pickedAudioTexture
+        let chillAudioTextureOffset     = sohoVariation ? 0   : pickedTextureOffset
 
         // Title — append "Blues" suffix for blues variation songs
         let baseTitle = ChillTitleGenerator.generate(frame: frame, rng: &rng)
-        let title = bluesVariation ? baseTitle + " Blues" : baseTitle
+        // Chill Soho takes its own London / Soho / Hull / cafe / 80s titles, drawn on a derived
+        // stream (93). The base title above is still drawn and then discarded, so every later
+        // main-stream draw is unchanged and a saved Soho song differs only in its title.
+        var sohoTitleRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 93))
+        let title = bluesVariation ? baseTitle + " Blues"
+                  : sohoVariation  ? ChillTitleGenerator.generateSoho(rng: &sohoTitleRNG)
+                  : baseTitle
 
         // Log
         let log = buildChillLog(
@@ -3921,6 +4036,9 @@ struct SongGenerator {
             chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
             chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle,
             chillSwingFeel: chillSwingFeel, bluesVariation: bluesVariation,
+            sohoVariation: sohoVariation, sohoCycleLabel: sohoCycleLabel,
+            sohoHasTurnaround: sohoHasTurnaround,
+            sohoTexRules: sohoTexRules,
             chillAudioTexture: chillAudioTexture,
             drumRules: drumRules, bassRules: bassRules, padRules: padRules,
             lead1Rules: lead1Rules, lead2Rules: lead2Rules, rhythmRules: rhythmRules,
@@ -3940,6 +4058,7 @@ struct SongGenerator {
             chillBreakdownStyle: chillBreakdownStyle,
             chillDrumFillBars: drumFillBars,
             bluesVariation: bluesVariation,
+            sohoVariation: sohoVariation,
             bluesIVVDesc: bluesIVVDesc,
             chillRhythmSwitch: chillRhythmSwitchAnnotation
         )
@@ -3990,6 +4109,7 @@ struct SongGenerator {
             chillBreakdownStyle: chillBreakdownStyle,
             chillSwingFeel: chillSwingFeel,
             chillBluesVariation: bluesVariation,
+            chillSohoVariation: sohoVariation,
             chillAudioTexture: chillAudioTexture,
             chillAudioTextureOffset: chillAudioTextureOffset,
             forcedRules: forced,
@@ -4012,7 +4132,206 @@ struct SongGenerator {
         return .groovePocket
     }
 
+    /// Share of ELIGIBLE Chill Soho songs that take the Remix Break (plan: 20–25%). Eligibility
+    /// needs the Latin percussion overlay, tempo above 105 and a drum rule other than Ballad
+    /// Half-Time or the reused Brush Kit, which works out to roughly one Soho song in twenty.
+    static let sohoRemixShareOfEligible: Double = 0.22
+
+    /// Chill Soho breakdown style, on a derived stream (95) so it is reproducible from the seed.
+    /// The Remix Break is only eligible when its pivot exists — the shaker comes with the Latin
+    /// percussion overlay — when the tempo can carry four-on-the-floor (at 84 it is sluggish), and
+    /// when the kit is one Soho renders itself: Ballad Half-Time is too sparse and the reused Brush
+    /// Kit renders base Chill breakdowns. Otherwise the existing styles, weighted as the plan says:
+    /// bass ostinato is the best fit, since the bass as a melodic voice is central here.
+    private static func pickSohoBreakdownStyle(drumPlan: ChillDrumGenerator.SohoDrumPlan,
+                                               tempo: Int, seed: UInt64) -> ChillBreakdownStyle {
+        var r = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 95))
+        let eligible = drumPlan.overlay && tempo > 105
+            && !["CHL-DRUM-013", "CHL-DRUM-003"].contains(drumPlan.ruleID)
+        let remixRoll = r.nextDouble()            // drawn either way, so the pick below is stable
+        if eligible && remixRoll < sohoRemixShareOfEligible { return .sohoRemix }
+        // Stop-time is out: it is base Chill's own gesture and made a Soho break sound like one
+        // (Zack, 2026-10-11). Bass ostinato leads because Soho's bass rules carry a break on
+        // their own; harmonic drone stays because the Soho texture now answers it with horns;
+        // groove pocket stays at Zack's call, with the kit keeping its groove through it.
+        let x = r.nextDouble()
+        if x < 0.45 { return .bassOstinato }
+        if x < 0.75 { return .groovePocket }
+        return .harmonicDrone
+    }
+
     // MARK: - Blues chord plan builder
+
+    /// Chill Soho chord plan: one measured cycle tiled across the groove sections, one bar per
+    /// chord. Cycles come from tools/soho_harmony.py — see "Harmony" in docs/chill-soho-plan.md.
+    /// Returns the plan and a log label naming the cycle and the record it was measured from.
+    ///
+    /// The corpus is almost never triads, so these use the extended ChordTypes. Qualities are
+    /// MODE-AWARE so each chord is diatonic where the measured cycle allows it: Mixolydian's I
+    /// carries a b7 (so I9, not Imaj9), and Aeolian's bVII has a b7 above it (so bVII9, not
+    /// bVIImaj9). Two cycles keep one deliberate borrowed chord, because that IS their sound —
+    /// I-V-I-bVII mixes Ionian's V with Mixolydian's bVII. Chill's voicing code snaps any
+    /// out-of-scale tone to the nearest scale tone.
+    ///
+    /// Your Love Is King measured as "Vmaj9 | Imaj9", but the analyser takes the tonic to be
+    /// the most frequent bass root, which in a two-chord vamp can be the wrong chord. A maj7 on
+    /// V is not diatonic in a major key; read in its true key it is Imaj9 | IVmaj9.
+    private static func buildSohoChordPlan(frame: GlobalMusicalFrame, structure: SongStructure,
+                                           remix: Bool = false,
+                                           rng: inout SeededRNG)
+    -> (windows: [ChordWindow], label: String, turnaround: Bool) {
+        let key = frame.key, mode = frame.mode
+        let minorModes: Set<Mode> = [.Dorian, .Aeolian, .Phrygian, .HarmonicMinor, .MinorPentatonic]
+        let tonicMaj: ChordType  = mode == .Mixolydian ? .dom9 : .maj9   // Mixolydian I has a b7
+        let flatSeven: ChordType = mode == .Aeolian    ? .dom9 : .maj9   // Aeolian bVII has a b7 above
+
+        typealias Cycle = (name: String, chords: [(String, ChordType)], weight: Double)
+        let minorCycles: [Cycle] = [
+            ("Smooth Operator", [("1", .min9), ("b7", flatSeven)],                         0.40),
+            ("Cherish the Day", [("1", .min7), ("5", .min7)],                              0.35),
+            ("Do It Again",     [("1", .min9), ("1", .min9), ("1", .min9), ("5", .min7)],  0.25),
+        ]
+        let majorCycles: [Cycle] = [
+            ("Avalon",                 [("1", tonicMaj), ("4", .maj6)],                         0.30),
+            ("Your Love Is King",      [("1", tonicMaj), ("4", .maj9)],                         0.25),
+            ("You're the Best Thing",  [("1", .major), ("5", .major), ("1", .major), ("b7", .major)], 0.30),
+            ("More Than This",         [("1", .maj6), ("3", .min7), ("2", .min7), ("5", .power)], 0.15),
+        ]
+        let pool = minorModes.contains(mode) ? minorCycles : majorCycles
+        let pick = pool[rng.weightedPick(pool.map { $0.weight })]
+        let cycle = pick.chords
+        // The B section gets its own cycle from the same pool, so the two halves of the song
+        // move differently — one vamp for 60–100 bars was the substyle's weakest point.
+        let others = pool.filter { $0.name != pick.name }
+        let bCycle = others[rng.weightedPick(others.map { $0.weight })].chords
+        let hasB = structure.sections.contains { $0.label == .B }
+
+        // Turnaround: four bars of chord detour inside the groove — two chords stepping up and
+        // back, then the resolution — while the band plays on. Measured in Your Love Is King
+        // (IIm9 – IIIm7 – IIm9 – IVmaj9 back to Imaj9 in the reading used here) at phrase ends
+        // roughly 10–16 bars apart. Per song: at the end of every 16-bar phrase (60%) or only
+        // at the end of each section (40%), so not every song turns around on the same clock.
+        let turnaroundEveryPhrase = rng.nextDouble() < 0.60
+        let turnaround = sohoTurnaround(mode: mode, tonicType: cycle[0].1,
+                                        bright: rng.nextDouble() < 0.50)
+
+        let roman: [String: String] = ["1": "I", "b2": "bII", "2": "II", "b3": "bIII", "3": "III",
+                                       "4": "IV", "#4": "#IV", "5": "V", "b6": "bVI", "6": "VI",
+                                       "b7": "bVII", "7": "VII"]
+        // The chords alone, without the record they were measured from. A chord held for more
+        // than one bar is marked "×n" — the modal cycle (Im9 for three bars, then Vm7) would
+        // otherwise read exactly like the one-bar Im7 – Vm7 alternation. `pick.name` is kept in
+        // the table above as provenance for tuning, not for display.
+        func describe(_ chords: [(String, ChordType)]) -> String {
+            var runs: [(chord: String, bars: Int)] = []
+            for (deg, type) in chords {
+                let c = (roman[deg] ?? deg) + chordTypeSuffix(type)
+                if runs.last?.chord == c { runs[runs.count - 1].bars += 1 } else { runs.append((c, 1)) }
+            }
+            return runs.map { $0.bars > 1 ? "\($0.chord) ×\($0.bars)" : $0.chord }.joined(separator: " – ")
+        }
+        // The Chords line gives the A cycle and nothing else — key, mode, chords. Everything
+        // structural (a B section, its cycle, the turnaround, the breakdown) belongs on the Form
+        // line, and both stay short (Zack, 2026-10-11).
+        let label = describe(cycle)
+        _ = hasB
+
+        func window(_ start: Int, _ len: Int, _ root: String, _ type: ChordType) -> ChordWindow {
+            let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: root, chordType: type, key: key, mode: mode)
+            return ChordWindow(startBar: start, lengthBars: len, chordRoot: root, chordType: type,
+                               chordTones: ct, scaleTensions: st, avoidTones: at)
+        }
+
+        var windows: [ChordWindow] = []
+        let tonicType = cycle[0].1
+        for section in structure.sections {
+            let s = section.startBar, e = s + section.lengthBars
+            switch section.label {
+            case .bridge where remix:
+                // Remix Break: the song's own cycle carries on at two bars per chord. Twelve to
+                // sixteen bars on one unresolved sus4 would stall; EBTG's "Missing" remix keeps its
+                // chord cycle through the house section.
+                var i = 0
+                var bar = s
+                while bar < e {
+                    let (root, type) = cycle[i % cycle.count]
+                    let len = Swift.min(2, e - bar)
+                    windows.append(window(bar, len, root, type))
+                    bar += len; i += 1
+                }
+            case .bridge:
+                windows.append(window(s, section.lengthBars, "1", .sus4))
+            case .intro, .outro:
+                windows.append(window(s, section.lengthBars, "1", tonicType))
+            default:
+                // Tile the section's cycle in 16-bar phrases, each opening on the tonic. A phrase
+                // of 8 bars or more ends on the turnaround when this song turns around every
+                // phrase; otherwise only the section's last phrase does. A remainder under 8 bars
+                // joins the phrase before it, so the section's last phrase is never too short to
+                // turn around.
+                let sectionCycle = section.label == .B ? bCycle : cycle
+                var phraseStart = s
+                while phraseStart < e {
+                    let phraseEnd = e - phraseStart < 24 ? e : phraseStart + 16
+                    let turns = phraseEnd - phraseStart >= 8 && (turnaroundEveryPhrase || phraseEnd == e)
+                    var i = 0
+                    for bar in phraseStart..<phraseEnd {
+                        if turns && bar >= phraseEnd - 4 {
+                            let (root, type) = turnaround[bar - (phraseEnd - 4)]
+                            windows.append(window(bar, 1, root, type))
+                        } else {
+                            let (root, type) = sectionCycle[i % sectionCycle.count]
+                            windows.append(window(bar, 1, root, type))
+                            i += 1
+                        }
+                    }
+                    phraseStart = phraseEnd
+                }
+            }
+        }
+        // Whether any section was long enough to end on the turnaround — the Form line says so.
+        let turnaroundRoots = Set(turnaround.map(\.0))
+        let placed = windows.contains { w in
+            guard let sec = structure.section(atBar: w.startBar) else { return false }
+            return (sec.label == .A || sec.label == .B) && w.startBar >= sec.endBar - 4
+                && turnaroundRoots.contains(w.chordRoot) && !cycle.contains { $0.0 == w.chordRoot }
+        }
+        _ = turnaroundEveryPhrase   // affects placement above, not the label
+        return (windows, label, placed)
+    }
+
+    /// The four-bar Chill Soho turnaround, one chord a bar, with every chord diatonic to the mode
+    /// so nothing in it needs snapping. Major keys use the measured shape from Your Love Is King;
+    /// minor keys mirror it — up a step and back, then home — which is extrapolated, not measured.
+    ///
+    /// - Ionian:     IIm9 – IIIm7 – IIm9 – IVmaj9   (measured)
+    /// - Mixolydian: IIm9 – Vm7 – IIm9 – IVmaj9     (III is half-diminished in Mixolydian)
+    /// - Dorian:     IV9 – Vm7 – IV9 – Im           (IV is a dominant chord in Dorian)
+    /// - Aeolian:    IVm9 – Vm7 – IVm9 – Im
+    ///
+    /// The middle chord is a seventh, not a ninth, as measured: in Ionian the 9th of III is a
+    /// flat ninth, outside the scale.
+    static func sohoTurnaround(mode: Mode, tonicType: ChordType,
+                               bright: Bool = false) -> [(String, ChordType)] {
+        switch mode {
+        // The measured major turnaround is three minor chords out of four. The bright alternative
+        // is a plain cadence with no minor chord in it: IV – V – I – V in Ionian, and in
+        // Mixolydian the same shape with the flat seventh standing in for the minor v. Each song
+        // takes one or the other, 50/50. (Kept when the mode weights were reverted.)
+        case .Ionian:
+            return bright
+                ? [("4", .maj9), ("5", .dom9), ("1", .maj9), ("5", .dom9)]
+                : [("2", .min9), ("3", .min7), ("2", .min9), ("4", .maj9)]
+        case .Mixolydian:
+            return bright
+                ? [("4", .maj9), ("b7", .maj9), ("1", .dom9), ("b7", .maj9)]
+                : [("2", .min9), ("5", .min7), ("2", .min9), ("4", .maj9)]
+        case .Dorian:
+            return [("4", .dom9), ("5", .min7), ("4", .dom9), ("1", tonicType)]
+        default:
+            return [("4", .min9), ("5", .min7), ("4", .min9), ("1", tonicType)]
+        }
+    }
 
     /// Tiles the 16-bar blues cycle across all song sections.
     /// Groove sections get the full cycle (Im7×8, IVm7×2, Im7×2, V7×1, IVm7×1, Im7×2).
@@ -4087,6 +4406,10 @@ struct SongGenerator {
         chillBreakdownStyle: ChillBreakdownStyle,
         chillSwingFeel: Bool,
         bluesVariation: Bool,
+        sohoVariation: Bool = false,
+        sohoCycleLabel: String? = nil,
+        sohoHasTurnaround: Bool = false,
+        sohoTexRules: Set<String> = [],
         chillAudioTexture: String?,
         drumRules: Set<String>,
         bassRules: Set<String>,
@@ -4098,7 +4421,8 @@ struct SongGenerator {
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
         log.append(GenerationLogEntry(tag: "SONG",  description: title, isTitle: true))
-        log.append(GenerationLogEntry(tag: "Style", description: "\(bluesVariation ? "Chill Blues" : "Chill") – \(frame.tempo) bpm"))
+        let styleName = bluesVariation ? "Chill Blues" : (sohoVariation ? "Chill Soho" : "Chill")
+        log.append(GenerationLogEntry(tag: "Style", description: "\(styleName) – \(frame.tempo) bpm"))
 
         // Form — simple label matching the style of other generators
         let hasBreakdown = structure.sections.contains { $0.label == .bridge }
@@ -4108,12 +4432,24 @@ struct SongGenerator {
         case .bassOstinato:  breakdownLabel = "bass ostinato"
         case .harmonicDrone: breakdownLabel = "harmonic drone"
         case .groovePocket:  breakdownLabel = "groove pocket"
+        case .sohoRemix:     breakdownLabel = "remix break"
         }
         let hasHarmony = lead2Rules.contains { $0.hasPrefix("CHL-LD2-HARM-") || $0.hasPrefix("CHL-LD2-UNIS-") }
         let harmonyTag = hasHarmony ? " - harmony" : ""
         let formDesc: String
         if bluesVariation {
             formDesc = "16-bar blues I-IV-V\(harmonyTag)"
+        } else if sohoVariation {
+            // Short, but specific about what the song actually contains: the groove, which
+            // sections are present, the kind of break, and whether it turns around.
+            let groove = chillBeatStyle == .sohoLatin ? "Latin" : "Soul"
+            var parts = ["\(groove) groove"]
+            parts.append(structure.sections.contains { $0.label == .B } ? "A/B" : "A")
+            if hasBreakdown {
+                let bars = structure.sections.first { $0.label == .bridge }?.lengthBars ?? 0
+                parts.append("\(breakdownLabel) \(bars)")
+            }
+            formDesc = parts.joined(separator: " - ") + harmonyTag
         } else {
             formDesc = hasBreakdown ? "Groove - breakdown\(harmonyTag)" : "Groove\(harmonyTag)"
         }
@@ -4127,11 +4463,26 @@ struct SongGenerator {
         case .minor_blues:        familyLabel = "Minor blues"
         case .modal_drift:        familyLabel = "Modal drift"
         }
-        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: familyLabel)))
+        // Soho bypasses chordsDescription's truncation: that shortens base-Chill family names by
+        // cutting at tokens like " bVII", which cut "Im9 – bVII9 (Smooth Operator)" to "Im9 –".
+        let chordsLine: String
+        if let soho = sohoCycleLabel {
+            let keyMode = chordsDescription(key: frame.key, mode: frame.mode, familyLabel: "")
+                .trimmingCharacters(in: .whitespaces)
+            chordsLine = "\(keyMode) \(soho)"
+        } else {
+            chordsLine = chordsDescription(key: frame.key, mode: frame.mode, familyLabel: familyLabel)
+        }
+        log.append(GenerationLogEntry(tag: "Chords", description: chordsLine))
 
-        // Audio texture
-        if let texName = chillAudioTexture {
-            let textureDesc = texName.replacingOccurrences(of: ".m4a", with: "").replacingOccurrences(of: "_", with: " ")
+        // Texture: Chill Soho is MIDI (one CHL-TEXT rule); base Chill and Blues are audio.
+        if sohoVariation {
+            for ruleID in sohoTexRules.sorted() {
+                log.append(GenerationLogEntry(tag: ruleID, description: chillRuleDescription(ruleID)))
+            }
+        } else if let texName = chillAudioTexture {
+            // The picker's own name, so the log matches it ("another-pub" used to print raw).
+            let textureDesc = AppState.chillTextureDisplayName(texName)
             log.append(GenerationLogEntry(tag: "Texture", description: textureDesc))
         } else {
             log.append(GenerationLogEntry(tag: "CHL-TEXT-000", description: "No texture"))
@@ -4195,6 +4546,29 @@ struct SongGenerator {
         case "CHL-BASS-010": return "Blues quarter pulse"
         case "CHL-BASS-011": return "Blues ascending riff"
         case "CHL-BASS-012": return "Rumba bass"
+        // Chill Soho — see docs/chill-soho-plan.md. Rules from later slices are listed now so
+        // they never reach the log as a bare ID.
+        case "CHL-DRUM-009": return "Bossa clave"
+        case "CHL-DRUM-010": return "Soft samba"
+        case "CHL-DRUM-011": return "Latin sway"
+        case "CHL-DRUM-012": return "Soft soul backbeat"
+        case "CHL-DRUM-013": return "Ballad half-time"
+        case "CHL-DRUM-014": return "Latin percussion"
+        case "CHL-BASS-013": return "Bossa root-fifth"
+        case "CHL-BASS-014": return "Melodic bass"
+        case "CHL-BASS-015": return "Syncopated pocket"
+        case "CHL-BASS-016": return "Samba pickup"
+        case "CHL-BASS-017": return "Root pedal walk"
+        case "CHL-RHY-007":  return "Chordal comp"
+        case "CHL-RHY-008":  return "Single-note line"
+        case "CHL-RHY-009":  return "Root-and-chord eighths"
+        case "CHL-LD1-010":  return "Soho counter-line"
+        case "CHL-LD1-011":  return "Sustained tone"
+        case "CHL-LD1-012":  return "Tight hook"
+        case "CHL-PAD-007":  return "Soho chord hold"
+        case "CHL-PAD-008":  return "Half-bar pad"
+        case "CHL-TEXT-001": return "Sustained halo"
+        case "CHL-TEXT-002": return "Punctuation stabs"
         case "CHL-PAD-001":  return "Chord sustain"
         case "CHL-PAD-002":  return "Staggered entry"
         case "CHL-PAD-003":  return "Moby anchor"

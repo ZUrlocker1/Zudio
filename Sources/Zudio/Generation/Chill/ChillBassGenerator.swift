@@ -25,6 +25,12 @@ struct ChillBassGenerator {
                              variationAnnotations: &variationAnnotations)
         }
 
+        // Chill Soho routes on its beat style: the groove value is the coupling, so no extra flag.
+        if beatStyle.isSoho {
+            return sohoBass(frame: frame, structure: structure, beatStyle: beatStyle,
+                            breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs)
+        }
+
         // St Germain beat style always uses the 8th-note ostinato (CHL-BASS-007)
         if beatStyle == .stGermain {
             usedRuleIDs.insert("CHL-BASS-007")
@@ -150,7 +156,7 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 45, durationSteps: 12))
                     }
                     // Bars 1-2 (breakdownBar 0-1): bass silent — pad holds the void alone
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Last bar of 8-bar pocket: ascending pickup into groove return
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
@@ -451,7 +457,7 @@ struct ChillBassGenerator {
                     if bar < frame.totalBars - 1 {
                         events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(approach), velocity: 72, durationSteps: 2))
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
                     let third  = clampBass(snapToScale(chordRoot + 3, scale: scale))
@@ -612,6 +618,518 @@ struct ChillBassGenerator {
         return .proceed
     }
 
+    // MARK: - Chill Soho (CHL-BASS-013 Bossa Root-Fifth, CHL-BASS-014 Melodic Bass,
+    //         CHL-BASS-015 Syncopated Pocket, CHL-BASS-016 Samba Pickup,
+    //         CHL-BASS-017 Root Pedal Walk)
+
+    /// Chill Soho bass. See docs/chill-soho-plan.md, "Bass" and "Variation and space".
+    ///
+    /// CHL-BASS-013 (Latin) and CHL-BASS-014 (Soul) share the scaffolding and differ in the bar.
+    /// Both EVOLVE every 12–18 bars rather than repeating one figure for the whole song: the
+    /// records repeat more than this, but they have a vocal carrying the listener and these
+    /// generations do not.
+    ///
+    /// Pitch assignment is not in the plan's measurements — they fixed rhythm, density and
+    /// duration but not which step plays which note — so it is chosen here from the measured
+    /// interval histograms: repeated pitches dominate every bass, 013's references are root,
+    /// fifth and octave, and 014's are stepwise within an octave.
+    private static func sohoBass(frame: GlobalMusicalFrame, structure: SongStructure,
+                                 beatStyle: ChillBeatStyle,
+                                 breakdownStyle: ChillBreakdownStyle,
+                                 rng: inout SeededRNG,
+                                 usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
+        let latin = beatStyle == .sohoLatin
+        let minorModes: Set<Mode> = [.Dorian, .Aeolian, .Phrygian, .HarmonicMinor, .MinorPentatonic]
+        // Pools from the plan's implementation contract. The reused CHL-BASS-012 Rumba hardcodes a
+        // MINOR third — its measured shape is root, m3, 5th, 6th — so it joins the Latin pool only
+        // in minor modes; over a major chord that third is a clash. Its weight moves to 013 and 015.
+        // CHL-BASS-016 Samba Pickup joins both Latin pools; the major pool, with no Rumba, was
+        // the thinnest in the substyle.
+        let pool: [(String, Double)] = latin
+            ? (minorModes.contains(frame.mode)
+                ? [("CHL-BASS-013", 0.35), ("CHL-BASS-012", 0.25), ("CHL-BASS-015", 0.20), ("CHL-BASS-016", 0.20)]
+                // Major took Rumba's 25% almost entirely onto 013, leaving it at 45%. Levelled to
+                // 35% at Zack's call (2026-10-12), matching the minor pool, with the balance split
+                // between the other two.
+                : [("CHL-BASS-013", 0.35), ("CHL-BASS-015", 0.35), ("CHL-BASS-016", 0.30)])
+            // Soul pool, levelled at Zack's call (2026-10-12): the three measured rules take an
+            // even share rather than 014 leading. The three borrowed from base Chill are held to
+            // 30% between them — levelling had let them back up to 33% — keeping their own
+            // proportions, so a Soul song plays a measured Soho bass seven times in ten.
+            : [("CHL-BASS-014", 0.235), ("CHL-BASS-017", 0.235), ("CHL-BASS-015", 0.23),
+               ("CHL-BASS-002", 0.15), ("CHL-BASS-004", 0.10), ("CHL-BASS-001", 0.05)]
+        let rule = pool[rng.weightedPick(pool.map { $0.1 })].0
+        usedRuleIDs.insert(rule)
+        if structure.sections.contains(where: { $0.label == .bridge })
+            && breakdownStyle != .bassOstinato && breakdownStyle != .sohoRemix {
+            usedRuleIDs.insert("CHL-BASS-005")      // breakdown root drone
+        }
+
+        // Every rule evolves every 12–18 bars rather than repeating one figure for the whole
+        // song — the records repeat more than this, but they have a vocal carrying the listener.
+        let evolvePeriod = 12 + rng.nextInt(upperBound: 7)
+        // Per-song settings for the reused rules, as Chill Blues sets them — except blues7th, which
+        // is forced OFF: the major 6th is the Latin colour and the b7 is what makes it read as blues.
+        let rumbaIsTight     = rng.nextDouble() < 0.20
+        let rumbaOctaveReset = rng.nextDouble() < 0.30
+        let ostinato         = buildOstinatoPattern(variant: false)
+        let ostinatoVariant  = buildOstinatoPattern(variant: true)
+
+        let remixEntry = ChillStructureGenerator.remixEntryBars(structure: structure,
+                                                                breakdownStyle: breakdownStyle)
+        // The last bar of each four-bar turnaround — the bar that leads back to the top. Until
+        // now no track acknowledged a turnaround at all; the chords changed and the band played
+        // on regardless (Zack, 2026-10-12).
+        let turnarounds = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
+        let turnaroundExit = turnarounds.filter { !turnarounds.contains($0 + 1) }
+        // One approach per song, so a listener learns this song's way back:
+        //   0 — the figure as written, its last note bent into a lead-in
+        //   1 — the last few notes walk up into the tonic
+        //   2 — the last few notes walk down into it
+        let turnaroundStyle = rng.nextInt(upperBound: 3)
+        let scalePCs = Set(scaleNotes(frame: frame, chord: nil))
+        // Scale notes inside clampBass's 40–52 window. 014 and 015 walk this ladder and reflect at
+        // the ends; folding by octave would turn a step into a ninth-wide jump.
+        let ladder = (40...52).filter { scalePCs.contains($0 % 12) }
+
+        var events: [MIDIEvent] = []
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+
+        for bar in 0..<frame.totalBars {
+            let section   = structure.section(atBar: bar)
+            let label     = section?.label ?? .A
+            let chord     = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chordRoot = chordRootNote(frame: frame, chord: chord)
+            let scale     = scaleNotes(frame: frame, chord: chord)
+            let base      = bar * 16
+
+            switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
+            case .skip: continue
+            case .stabAndSkip(let stab): events.append(stab); continue
+            case .proceed: break
+            }
+
+            let root        = clampBass(chordRoot)
+            let nextRootRaw = nextChordRootNote(bar: bar, frame: frame, structure: structure)
+            let nextRoot    = clampBass(nextRootRaw)
+            let changesNext = isBeforeChordChange(bar: bar, structure: structure)
+            let startsChord = chord.map { $0.startBar == bar } ?? false
+            let variant     = (bar / evolvePeriod) % 3
+
+            // The bar leading into the Remix Break: the band stops after beat 2 and hits beats 3
+            // and 4 in unison, answering the figure that leads out of the break.
+            if remixEntry.contains(bar) {
+                for step in [8, 12] {
+                    events.append(MIDIEvent(stepIndex: base + step, note: UInt8(root),
+                                            velocity: v(86, 8), durationSteps: 2))
+                }
+                continue
+            }
+
+            // Remix Break: bass out for two bars, then a repeated root-octave figure in eighths —
+            // the house bassline under the kit swap. On the last bar it joins the unison hits on
+            // 0 and 8 and leaves the rest of the bar to the exit.
+            if label == .bridge && breakdownStyle == .sohoRemix {
+                let bdBar = bar - (section?.startBar ?? bar)
+                if bdBar < 2 { continue }
+                let low  = root - 12 >= 28 ? root - 12 : root
+                let high = low + 12
+                if bdBar == (section?.lengthBars ?? 12) - 1 {
+                    for step in [0, 8] {
+                        events.append(MIDIEvent(stepIndex: base + step, note: UInt8(low), velocity: v(86, 8), durationSteps: 2))
+                    }
+                    continue
+                }
+                for step in stride(from: 0, to: 16, by: 2) {
+                    let note = (step / 2) % 2 == 0 ? low : high
+                    events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
+                                            velocity: step % 8 == 0 ? v(80, 8) : v(66, 10),
+                                            durationSteps: 1 + rng.nextInt(upperBound: 2)))
+                }
+                continue
+            }
+
+            // Breakdown: under bassOstinato the bass IS the breakdown, so it keeps its groove;
+            // otherwise CHL-BASS-005, a held root every other bar, leaves the space the section is for.
+            if label == .bridge && breakdownStyle != .bassOstinato {
+                if (bar - (section?.startBar ?? bar)) % 2 == 0 {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: v(70, 10), durationSteps: 8))
+                }
+                continue
+            }
+            // Intro: the root alone for two bars, then the line itself, so the groove is already
+            // moving when A arrives rather than starting from nothing (Zack, 2026-10-12).
+            if label == .intro {
+                let introBar = ChillStructureGenerator.sohoIntroLayer(bar: bar, structure: structure) ?? 0
+                // The bass is the last thing in, so the figure arriving is the lift into the
+                // groove rather than one more layer among several (Zack, 2026-10-12). Until then
+                // it holds the root: once a bar, then twice, then with a pickup into the change.
+                //
+                // Tied to the intro's LAST bar rather than to a layer number. A cold start spends
+                // the first bar on a drums-only pickup, leaving three, so a layer test deferred
+                // the figure past the end of the intro altogether and it arrived with section A.
+                let leads = ChillStructureGenerator.sohoBassLeadsIntro(frame: frame, structure: structure)
+                let figureFrom = (section?.endBar ?? bar + 1) - (leads ? 2 : 1)
+                if bar < figureFrom {
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(root),
+                                            velocity: v(72, 8), durationSteps: 4))
+                    if introBar >= 1 {
+                        events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),
+                                                velocity: v(64, 8), durationSteps: 4))
+                    }
+                    if introBar >= 2 {
+                        events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(root),
+                                                velocity: v(60, 8), durationSteps: 2))
+                    }
+                    continue
+                }
+                // From the fourth layer, fall through to the song's own rule.
+            }
+
+            let mark = events.count
+            switch rule {
+            case "CHL-BASS-013":
+                events += bossaRootFifthBar(base: base, root: root, nextRoot: nextRoot,
+                                            changesNext: changesNext, startsChord: startsChord,
+                                            variant: variant, sparse: false, ladder: ladder, rng: &rng)
+            case "CHL-BASS-014":
+                events += melodicBassBar(base: base, root: root, variant: variant,
+                                         sparse: false, ladder: ladder, rng: &rng)
+            case "CHL-BASS-015":
+                events += syncopatedPocketBar(base: base, root: root, nextRoot: nextRoot,
+                                              changesNext: changesNext, variant: variant,
+                                              ladder: ladder, rng: &rng)
+            case "CHL-BASS-017":
+                events += rootPedalWalkBar(base: base, root: root, nextRoot: nextRoot,
+                                           changesNext: changesNext, variant: variant,
+                                           ladder: ladder, rng: &rng)
+            case "CHL-BASS-016":
+                events += sambaPickupBar(base: base, root: root, nextRoot: nextRoot,
+                                         changesNext: changesNext, variant: variant,
+                                         ladder: ladder, rng: &rng)
+            case "CHL-BASS-012":
+                let isB = label == .B
+                let cell = rumbaBassCell(base: base, chordRoot: chordRoot, rng: &rng,
+                                         isTight: rumbaIsTight, blues7th: false,
+                                         isBeforeChange: isB && changesNext,
+                                         doOctaveReset: rumbaOctaveReset && changesNext && !isB,
+                                         nextChordRoot: nextRootRaw)
+                // The cell's third and sixth are fixed intervals (m3, M6) above the chord root,
+                // right for Blues' minor chords but outside the scale over Soho's major bVII and
+                // the turnaround chords. Snap those two to the scale; the root, fifth and the
+                // deliberate chromatic approach on step 14 are left alone.
+                let scalePCSet = Set(scale)
+                events += cell.map { ev in
+                    let pos = ev.stepIndex - base
+                    guard pos == 6 || pos == 12, !scalePCSet.contains(Int(ev.note) % 12) else { return ev }
+                    return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(snapToScale(Int(ev.note), scale: scale)),
+                                     velocity: ev.velocity, durationSteps: ev.durationSteps)
+                }
+            case "CHL-BASS-002":
+                events += syncopatedPattern(base: base, chordRoot: chordRoot, scale: scale,
+                                            nextChordRoot: nextRootRaw, bar: bar, rng: &rng)
+            case "CHL-BASS-004":
+                // Air ostinato: the 4-bar figure, with the variant tile every third cycle.
+                let active = (bar / 4) % 3 == 2 ? ostinatoVariant : ostinato
+                for (step, deg) in active where step / 16 == bar % 4 {
+                    let note = snapToScale(chordRoot + deg, scale: scale)
+                    events.append(MIDIEvent(stepIndex: base + (step % 16), note: UInt8(clampBass(note)),
+                                            velocity: v(76, 11), durationSteps: 2))
+                }
+            case "CHL-BASS-001":
+                events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
+            default:
+                break
+            }
+
+            if turnaroundExit.contains(bar) {
+                let written = Array(events[mark...])
+                events.removeSubrange(mark...)
+                events += turnaroundApproach(written, base: base, target: nextRoot,
+                                             style: turnaroundStyle, ladder: ladder)
+            }
+        }
+        return events
+    }
+
+    /// Leads the bass back to the top out of a turnaround, by **re-pitching the bar the rule
+    /// already wrote** rather than replacing it with a stock lick. The rhythm, the velocities and
+    /// the note lengths are the song's own, so the turnaround still sounds like this bass part.
+    ///
+    /// - style 0: the figure as written, its last note bent to a leading tone a semitone away
+    /// - style 1: the last few notes walk **up** the scale into the target
+    /// - style 2: the last few notes walk **down** into it
+    ///
+    /// Only the closing notes move. A busy bar — Samba Pickup writes seven — would otherwise walk
+    /// more than an octave and stop being a bass line.
+    private static func turnaroundApproach(_ written: [MIDIEvent], base: Int, target: Int,
+                                           style: Int, ladder: [Int]) -> [MIDIEvent] {
+        guard !written.isEmpty, !ladder.isEmpty else { return written }
+        let sorted = written.sorted { $0.stepIndex < $1.stepIndex }
+        let last = sorted.count - 1
+        func repitch(_ ev: MIDIEvent, _ note: Int) -> MIDIEvent {
+            MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(clampBass(note)),
+                      velocity: ev.velocity, durationSteps: ev.durationSteps)
+        }
+        // A leading tone from below, or from above where the scale has no semitone under the root.
+        let leadingTone = target - 1 >= 33 ? target - 1 : target + 1
+        guard style != 0 else {
+            return sorted.enumerated().map { $0.offset == last ? repitch($0.element, leadingTone) : $0.element }
+        }
+        let up = style == 1
+        let anchor = ladder.firstIndex { $0 >= target } ?? ladder.count - 1
+        let walk = Swift.min(4, sorted.count)          // only the closing notes move
+        return sorted.enumerated().map { i, ev in
+            guard i >= sorted.count - walk else { return ev }
+            if i == last { return repitch(ev, leadingTone) }
+            let away = last - i                         // 1 is nearest the target
+            let idx = up ? anchor - away : anchor + away
+            return repitch(ev, ladder[Swift.max(0, Swift.min(ladder.count - 1, idx))])
+        }
+    }
+
+    /// CHL-BASS-017 Root Pedal Walk — My Ever Changing Moods, the one Style Council bass not
+    /// already in the pool. The bar is in two halves: the first pedals the root in eighths, the
+    /// second walks away from it.
+    ///
+    /// Measured at 5.8 notes a bar, short notes (2 steps the commonest by a distance) and **36%
+    /// repeated pitches**, against the fretless line of You're the Best Thing — CHL-BASS-014, the
+    /// other Style Council bass — at 2.9 notes a bar and 2% repeats. The repeats are the engine
+    /// of this figure, not noise, the same way they are in the vocal-derived lead cells.
+    ///
+    /// - Steps 0–7 are the root: measured 94–100% of bars at steps 0, 1, 3, 4 and 7, 72% at step 2
+    /// - Step 8 leaves it (7th, 5th, 6th), step 10 is a stepwise middle (4th, m3, 2nd), step 12
+    ///   heads for the fifth, and step 14 lands on the fifth (41%) or the flat seventh (35%)
+    ///
+    /// Three variants rotate every 12–18 bars: the measured figure; a busier one doubling the
+    /// root into sixteenths; a lighter one whose first half is only beats 1 and 2.
+    private static func rootPedalWalkBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
+                                         variant: Int, ladder: [Int],
+                                         rng: inout SeededRNG) -> [MIDIEvent] {
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        guard !ladder.isEmpty else {
+            return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 78, durationSteps: 2)]
+        }
+        var out: [MIDIEvent] = []
+        func note(_ step: Int, _ n: Int, _ vel: UInt8, _ dur: Int) {
+            out.append(MIDIEvent(stepIndex: base + step, note: UInt8(n), velocity: vel, durationSteps: dur))
+        }
+        /// The scale note an interval above the root. clampBass keeps the bass inside a single
+        /// octave, so the interval is folded back into the ladder rather than played above it —
+        /// a literal root+10 would leave the register entirely.
+        func degree(_ semis: Int) -> Int {
+            var t = root + semis
+            while t > ladder[ladder.count - 1] { t -= 12 }
+            while t < ladder[0] { t += 12 }
+            return ladder.min { abs($0 - t) < abs($1 - t) } ?? root
+        }
+
+        // First half: the root, pedalled in eighths. One eighth in six drops out, which is what
+        // takes the bar from eight notes to the measured 5–6.
+        for step in (variant == 2 ? [0, 4] : [0, 2, 4, 6]) {
+            if step != 0 && rng.nextDouble() < 0.18 { continue }
+            note(step, root, step == 0 ? v(84, 8) : v(70, 10), 2)
+        }
+        // The busier variant doubles the root into sixteenths, where the measurement found them.
+        if variant == 1 {
+            note([1, 3, 7][rng.nextInt(upperBound: 3)], root, v(62, 8), 1)
+        }
+
+        // Second half: away from the root, then back toward the fifth.
+        if rng.nextDouble() < 0.80 { note(8,  degree(10), v(72, 10), 2) }
+        if rng.nextDouble() < 0.75 { note(10, degree(5),  v(68, 10), 2) }
+        if rng.nextDouble() < 0.70 { note(12, degree(7),  v(70, 10), 2) }
+
+        // The last eighth lands on the fifth or the flat seventh — or, where the chord is about
+        // to change, a scale step short of the next root.
+        var landing = rng.nextDouble() < 0.55 ? degree(7) : degree(10)
+        if changesNext, rng.nextDouble() < 0.30, let i = ladder.firstIndex(where: { $0 >= nextRoot }) {
+            landing = ladder[i > 0 ? i - 1 : Swift.min(i + 1, ladder.count - 1)]
+        }
+        note(14, landing, v(74, 10), 2)
+        return out
+    }
+
+    /// CHL-BASS-016 Samba Pickup — Half a Minute, whose bass plays this figure in 96% of its bars.
+    /// The root on beat 1 is repeated on the sixteenth before beat 2 and lands on the fifth (below,
+    /// where playable) on beat 2; the same pickup leads into beat 4. Between them, the root or its
+    /// octave below on the "a" of 2, and a passing note on the "and" of 4 heading for the next
+    /// chord. Short, punchy notes, about seven a bar, with root–fifth leaps the main motion.
+    ///
+    /// Three variants rotate every 12–18 bars so the figure never runs unchanged for a song:
+    /// - 0, the measured figure: 0, 3, 4, 7, 11, 12, 14
+    /// - 1, busier: adds step 9, as 40% of the measured bars do
+    /// - 2, lighter: the second pickup and the step-7 note drop out — 0, 3, 4, 12, 14
+    /// Within each, the fifth falls below or above bar by bar, as measured (45% / 35%).
+    private static func sambaPickupBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
+                                       variant: Int, ladder: [Int],
+                                       rng: inout SeededRNG) -> [MIDIEvent] {
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        func note(_ step: Int, _ n: Int, _ vel: UInt8, _ dur: Int) -> MIDIEvent {
+            MIDIEvent(stepIndex: base + step, note: UInt8(n), velocity: vel, durationSteps: dur)
+        }
+        // The fifth below needs room under the root; fall back to the fifth above.
+        let fifthBelow = root - 5 >= 33 ? root - 5 : root + 7
+        let fifth = rng.nextDouble() < 0.56 ? fifthBelow : clampBass(root + 7)
+        let lowRoot = root - 12 >= 28 ? root - 12 : root
+
+        var out: [MIDIEvent] = []
+        out.append(note(0, root, v(84, 10), 2))
+        out.append(note(3, root, v(70, 10), 1))
+        out.append(note(4, fifth, v(80, 10), 3))
+        if variant != 2 {
+            out.append(note(7, rng.nextDouble() < 0.45 ? lowRoot : root, v(68, 10), 1))
+        }
+        if variant == 1 {
+            // A step above or below the root, as the measured step-9 notes are.
+            let i = ladder.firstIndex(of: root) ?? ladder.firstIndex(where: { $0 >= root }) ?? 0
+            let j = rng.nextDouble() < 0.5 ? Swift.min(ladder.count - 1, i + 1) : Swift.max(0, i - 1)
+            out.append(note(9, ladder.isEmpty ? root : ladder[j], v(66, 10), 2))
+        }
+        if variant != 2 {
+            out.append(note(11, root, v(70, 10), 1))
+        }
+        out.append(note(12, fifth, v(78, 10), 2))
+
+        // Step 14 leads somewhere: into the next chord's root by a scale step when it changes,
+        // otherwise the second above the root or the octave below.
+        var passing: Int
+        if changesNext, let i = ladder.firstIndex(where: { $0 >= nextRoot }) {
+            passing = ladder[i > 0 ? i - 1 : Swift.min(i + 1, ladder.count - 1)]
+        } else if rng.nextDouble() < 0.5, let i = ladder.firstIndex(where: { $0 > root }) {
+            passing = ladder[i]
+        } else {
+            passing = lowRoot
+        }
+        if passing == root { passing = lowRoot }
+        out.append(note(14, passing, v(72, 10), 2))
+        return out
+    }
+
+    /// CHL-BASS-015 Syncopated Pocket — Black Cow, Chuck Rainey's line and the only bass in the
+    /// corpus working off the sixteenth grid. Measured attacks: 0, 3 and 6 strongest, then 12
+    /// (a count of 82 the plan's prose missed), with 10, 11, 14 and 15 secondary — about five
+    /// notes a bar against a measured 5.3. Short notes; repeated pitches are common, as in every
+    /// bass measured. Three variants rotate every 12–18 bars.
+    private static func syncopatedPocketBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
+                                            variant: Int, ladder: [Int],
+                                            rng: inout SeededRNG) -> [MIDIEvent] {
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        let fifth = clampBass(root + 7)
+        let sixth = clampBass(root + 9)
+        // The approach into the next chord: the scale step just below its root.
+        var approach = fifth
+        if changesNext, let i = ladder.firstIndex(where: { $0 >= nextRoot }) {
+            approach = ladder[i > 0 ? i - 1 : Swift.min(i + 1, ladder.count - 1)]
+        }
+        let figure: [(Int, Int)]
+        switch variant {
+        case 0:  figure = [(0, root), (3, root), (6, fifth), (12, root), (15, approach)]
+        case 1:  figure = [(0, root), (3, fifth), (6, root), (11, sixth), (14, approach)]
+        default: figure = [(0, root), (3, root), (6, fifth), (10, sixth), (12, fifth)]
+        }
+        var out: [MIDIEvent] = []
+        for (i, (step, note)) in figure.enumerated() {
+            let next = i + 1 < figure.count ? figure[i + 1].0 : 16
+            out.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
+                                 velocity: step == 0 ? v(80, 10) : v(66, 12),
+                                 durationSteps: Swift.max(1, Swift.min(2, next - step))))
+        }
+        return out
+    }
+
+    /// CHL-BASS-013 Bossa Root-Fifth — measured from Smooth Operator, confirmed independently by
+    /// Each and Every One: attacks on 0, 6, 8, 14 with 10 and 12 secondary; 4–6 notes a bar;
+    /// SHORT 2–3 step durations, detached rather than ringing.
+    ///
+    /// Three variants rotate every 12–18 bars so the figure stays recognisable without being
+    /// identical: (0) 0 6 8 14, (1) 0 6 10 14 — step 8 moves to 10, (2) 0 6 8 13 with the
+    /// step-8 note an octave up and the pickup a sixteenth earlier.
+    private static func bossaRootFifthBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
+                                          startsChord: Bool, variant: Int, sparse: Bool,
+                                          ladder: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        // clampBass may fold the fifth below the root — the low fifth is idiomatic bossa.
+        let fifth = clampBass(root + 7)
+        var out: [MIDIEvent] = []
+
+        // Octave drop on a chord-change downbeat, 30% (plan). Only where it stays playable.
+        let downbeat = (startsChord && root - 12 >= 33 && rng.nextDouble() < 0.30) ? root - 12 : root
+        out.append(MIDIEvent(stepIndex: base, note: UInt8(downbeat), velocity: v(82, 10), durationSteps: 3))
+        if sparse { return out }   // intro: downbeat only
+
+        out.append(MIDIEvent(stepIndex: base + 6, note: UInt8(fifth), velocity: v(70, 10), durationSteps: 2))
+        let thirdStep = variant == 1 ? 10 : 8
+        let thirdNote = (variant == 2 && root + 12 <= 52) ? root + 12 : root
+        out.append(MIDIEvent(stepIndex: base + thirdStep, note: UInt8(thirdNote), velocity: v(74, 10), durationSteps: 2))
+
+        // Secondary placement reaches the measured 4–6 notes a bar.
+        if variant != 1 && rng.nextDouble() < 0.30 {
+            out.append(MIDIEvent(stepIndex: base + 12, note: UInt8(root), velocity: v(62, 8), durationSteps: 2))
+        }
+
+        // Pickup: approach the next chord's root by a scale step when the chord changes —
+        // that is what step 14 is FOR in the measurements — otherwise sit on the fifth.
+        let pickupStep = variant == 2 ? 13 : 14
+        var pickup = fifth
+        if changesNext, let i = ladder.firstIndex(where: { $0 >= nextRoot }) {
+            pickup = ladder[i > 0 ? i - 1 : Swift.min(i + 1, ladder.count - 1)]
+        }
+        out.append(MIDIEvent(stepIndex: base + pickupStep, note: UInt8(pickup), velocity: v(66, 10), durationSteps: 2))
+        return out
+    }
+
+    /// CHL-BASS-014 Melodic Bass — measured from the Fretless Bass track of You're the Best
+    /// Thing: ~2.8 notes a bar, SUSTAINED 4-step notes, step 0 dominant then a cluster at 12, 14
+    /// and 15 with light weight on 4 and 8. Space and sustain, the opposite of 013.
+    ///
+    /// Step probabilities are the measured per-bar frequencies. Motion follows More Than This:
+    /// a 12-semitone compass and ~18% leaps, with repeated pitches common. The variant sets the
+    /// contour — rising, falling, or turning about the root — and rotates every 12–18 bars.
+    private static func melodicBassBar(base: Int, root: Int, variant: Int, sparse: Bool,
+                                       ladder: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        guard !ladder.isEmpty else {
+            return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 74, durationSteps: 4)]
+        }
+        let stepProb: [(Int, Double)] = [(4, 0.24), (8, 0.16), (12, 0.50), (14, 0.55), (15, 0.13)]
+        var steps = [0]
+        if !sparse {
+            for (st, p) in stepProb where rng.nextDouble() < p { steps.append(st) }
+        }
+
+        var idx = ladder.firstIndex(where: { $0 >= root }) ?? 0
+        let bias = variant == 0 ? 1 : (variant == 1 ? -1 : 0)   // contour for this stretch
+        var notes: [Int] = []
+        for (n, _) in steps.enumerated() {
+            if n > 0 {
+                let r = rng.nextDouble()
+                var move: Int
+                if r < 0.25 {
+                    move = 0                                       // repeat
+                } else if r < 0.82 {
+                    move = bias != 0 ? bias : (rng.nextDouble() < 0.5 ? 1 : -1)   // step
+                } else {
+                    move = (rng.nextDouble() < 0.5 ? 1 : -1) * (2 + rng.nextInt(upperBound: 2)) // leap
+                }
+                var next = idx + move
+                if next < 0 || next >= ladder.count { next = idx - move }      // reflect, never fold
+                idx = Swift.max(0, Swift.min(ladder.count - 1, next))
+            }
+            notes.append(ladder[idx])
+        }
+
+        var out: [MIDIEvent] = []
+        for (n, st) in steps.enumerated() {
+            // Sustain 4 steps, but never into the next attack — the line stays monophonic.
+            let nextOnset = n + 1 < steps.count ? steps[n + 1] : 16
+            let dur = Swift.max(1, Swift.min(4, nextOnset - st))
+            out.append(MIDIEvent(stepIndex: base + st, note: UInt8(notes[n]),
+                                 velocity: st == 0 ? v(74, 8) : v(64, 10), durationSteps: dur))
+        }
+        return out
+    }
+
     // MARK: - Scale/chord helpers
 
     private static func chordRootNote(frame: GlobalMusicalFrame, chord: ChordWindow?) -> Int {
@@ -755,7 +1273,7 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base + 10, note: UInt8(b7),    velocity: swell + 4, durationSteps: 2))
                         events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(fifth), velocity: swell + 2, durationSteps: 2))
                     }
-                case .groovePocket:
+                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
                     let oct = clampBass(chordRoot + 12)

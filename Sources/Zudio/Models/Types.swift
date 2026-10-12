@@ -249,6 +249,15 @@ enum SectionIntensity: String, Codable, Sendable, Comparable {
 
 enum ChordType: String, Codable, Sendable {
     case major, minor, sus2, sus4, add9, dom7, min7, quartal, power
+    // Extended chords, added for Chill Soho: its corpus is almost never triads (Imaj9, Im9, IV6,
+    // Vmaj9 dominate). Standard formulas; the 9th is written as 14 to match add9.
+    case maj7    // 1 3 5 7
+    case maj9    // 1 3 5 7 9
+    case min9    // 1 b3 5 b7 9
+    case maj6    // 1 3 5 6
+    case min6    // 1 b3 5 6
+    case dom9    // 1 3 5 b7 9
+    case min7b5  // 1 b3 b5 b7 (half-diminished)
 
     // Semitone intervals from chord root
     var intervals: [Int] {
@@ -262,6 +271,13 @@ enum ChordType: String, Codable, Sendable {
         case .min7:    return [0, 3, 7, 10]
         case .quartal: return [0, 5, 10]
         case .power:   return [0, 7, 12]
+        case .maj7:    return [0, 4, 7, 11]
+        case .maj9:    return [0, 4, 7, 11, 14]
+        case .min9:    return [0, 3, 7, 10, 14]
+        case .maj6:    return [0, 4, 7, 9]
+        case .min6:    return [0, 3, 7, 9]
+        case .dom9:    return [0, 4, 7, 10, 14]
+        case .min7b5:  return [0, 3, 6, 10]
         }
     }
 
@@ -272,7 +288,7 @@ enum ChordType: String, Codable, Sendable {
     /// Used to decide whether b7 / flatSeven slots use the mode's b7 or a neutral replacement.
     var isMajorContext: Bool {
         switch self {
-        case .major, .sus2, .sus4, .add9: return true
+        case .major, .sus2, .sus4, .add9, .maj7, .maj9, .maj6: return true
         default:                           return false
         }
     }
@@ -343,6 +359,7 @@ enum ChillLeadInstrument: String, Codable, Sendable {
     case trumpet       // GM 56 — open horn; Lead 1
     case trombone      // GM 57 — warm low brass; Lead 2
     case clarinet      // GM 71 — chalumeau register; Lead 1 (blues/jazz)
+    case synthBrass    // GM 62 — Synth Brass 1; Chill Soho Lead 2 only
 
     var gmProgram: UInt8 {
         switch self {
@@ -355,6 +372,7 @@ enum ChillLeadInstrument: String, Codable, Sendable {
         case .trumpet:      return 56
         case .trombone:     return 57
         case .clarinet:     return 71
+        case .synthBrass:   return 62
         }
     }
 }
@@ -367,6 +385,12 @@ enum ChillBeatStyle: String, Codable, Sendable {
     case brushKit     // acoustic brushed jazz kit (Bright/Free)
     case stGermain    // four-on-the-floor kick + 8th-note ride, St Germain style (Bright/Free)
     case hipHopJazz   // CHL-DRUM-005: kick 1+3, snare 2+4, steady 8th hat, tambourine texture
+    // Chill Soho only. One value per song, read by drums, bass and rhythm to pick their pools,
+    // so a soul bass line can never land under a bossa clave. See docs/chill-soho-plan.md.
+    case sohoLatin    // bossa / sway / samba pool (CHL-DRUM-009..011, CHL-BASS-012/013/015)
+    case sohoSoul     // soft backbeat / ballad pool (CHL-DRUM-012/013/003, CHL-BASS-014/015/...)
+
+    var isSoho: Bool { self == .sohoLatin || self == .sohoSoul }
 }
 
 // MARK: - Chill breakdown style
@@ -376,6 +400,13 @@ enum ChillBreakdownStyle: String, Codable, Sendable {
     case bassOstinato   // Syncopated bass riff only; drums and harmonic instruments silent
     case harmonicDrone  // Beat continues at full density; bass simplifies to root pulse; lead plays over drone
     case groovePocket   // Bass and leads drop; pads/rhythm/texture hold; drums play full groove with fills every 2 bars
+    /// Chill Soho only — the Remix Break. 12–16 bars mid-song: the shaker carries straight through
+    /// while the kit switches to four-on-the-floor, bass drops to a root-octave figure, Rhythm to
+    /// offbeat stabs, Lead 1 rests. Measured from EBTG's "Missing" remix, whose continuous shaker is
+    /// the same device as Soft Samba's — so the break is a kit swap over a constant percussion bed,
+    /// not a genre switch. Eligible only when the Latin percussion overlay is on, tempo > 105, and
+    /// the drum rule is not Ballad Half-Time or the reused Brush Kit. See docs/chill-soho-plan.md.
+    case sohoRemix
 }
 
 // MARK: - Percussion style (Kosmic + future Ambient)
