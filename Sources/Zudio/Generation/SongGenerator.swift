@@ -3201,8 +3201,10 @@ struct SongGenerator {
         // 2026-10-12). Fires on the bar the detour begins.
         if sohoVariation {
             let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
+            let style = ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure)
+            let name = ChillStructureGenerator.sohoTurnaroundStyleNames[style]
             for bar in turns.sorted() where !turns.contains(bar - 1) {
-                fireBar(bar, tag: "Turnaround", desc: "")
+                fireBar(bar, tag: "Turnaround", desc: name)
             }
         } else if bluesVariation {
             // The 16-bar blues cycle turns around on its V7, at cycle bar 12.

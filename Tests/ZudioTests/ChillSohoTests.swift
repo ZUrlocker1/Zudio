@@ -50,6 +50,13 @@ import Foundation
         return t.filter { !t.contains($0 + 1) }
     }
 
+    /// The turnaround's last two bars, where the bass stops playing the groove and plays a
+    /// turnaround. No groove measurement should read these.
+    private static func turnaroundTreated(_ s: SongState) -> Set<Int> {
+        let t = turnaroundBars(s)
+        return Set(turnaroundExit(s).flatMap { [$0 - 1, $0] }).intersection(t)
+    }
+
     private static func grooveBars(_ s: SongState) -> [Int] {
         var coldStartBar = -1
         if case .coldStart = s.structure.introStyle { coldStartBar = 0 }
@@ -379,7 +386,7 @@ import Foundation
         var bars = 0, withBackbeat = 0, snareOnBackbeat = 0
         for s in Self.sohoSongs() where Self.uses(s, "CHL-DRUM-012") {
             let drums = s.trackEvents[kTrackDrums]
-            let skip = Self.remixEntry(s).union(Self.turnaroundExit(s))
+            let skip = Self.remixEntry(s).union(Self.turnaroundTreated(s))
             for bar in Self.grooveBars(s) where !skip.contains(bar) {
                 let hits = drums.filter { $0.stepIndex / 16 == bar }
                 let rimSteps = Set(hits.filter { Int($0.note) == rim }.map { $0.stepIndex % 16 })
@@ -504,7 +511,8 @@ import Foundation
     /// CHL-BASS-015 Syncopated Pocket: Black Cow's attacks on 0, 3 and 6 every groove bar.
     @Test func syncopatedPocketHitsZeroThreeSix() {
         for s in Self.sohoSongs() where Self.uses(s, "CHL-BASS-015") {
-            let groove = Self.grooveBars(s)
+            let treated = Self.turnaroundTreated(s)
+            let groove = Self.grooveBars(s).filter { !treated.contains($0) }
             let bass = s.trackEvents[kTrackBass]
             for bar in groove.prefix(16) {
                 let steps = Set(bass.filter { $0.stepIndex / 16 == bar }.map { $0.stepIndex % 16 })
@@ -948,7 +956,7 @@ import Foundation
         var found = 0
         for s in Self.sohoSongs() where Self.uses(s, "CHL-BASS-016") {
             found += 1
-            let groove = Set(Self.grooveBars(s))
+            let groove = Set(Self.grooveBars(s)).subtracting(Self.turnaroundTreated(s))
             let byBar = Dictionary(grouping: s.trackEvents[kTrackBass].filter { groove.contains($0.stepIndex / 16) },
                                    by: { $0.stepIndex / 16 })
             var patterns = Set<[Int]>()
@@ -967,7 +975,7 @@ import Foundation
     @Test func sohoRumbaStaysInTheScale() {
         for s in Self.sohoSongs() where Self.uses(s, "CHL-BASS-012") {
             let pcs = Self.scalePCs(s.frame.mode).map { ($0 + s.frame.keySemitoneValue) % 12 }
-            let skip = Self.turnaroundExit(s)
+            let skip = Self.turnaroundTreated(s)
             for ev in s.trackEvents[kTrackBass]
             where [6, 12].contains(ev.stepIndex % 16) && !skip.contains(ev.stepIndex / 16) {
                 #expect(pcs.contains(Int(ev.note) % 12), "Rumba note \(ev.note) outside the scale")
@@ -1258,7 +1266,7 @@ import Foundation
         for s in Self.sohoSongs() where Self.uses(s, "CHL-BASS-017") {
             found += 1
             let groove = Set(Self.grooveBars(s)).subtracting(Self.remixEntry(s))
-                .subtracting(Self.turnaroundExit(s))
+                .subtracting(Self.turnaroundTreated(s))
             let evs = s.trackEvents[kTrackBass].filter { groove.contains($0.stepIndex / 16) }
             var patterns = Set<[Int]>()
             for (_, inBar) in Dictionary(grouping: evs, by: { $0.stepIndex / 16 }) {
@@ -1454,29 +1462,50 @@ import Foundation
 
     // MARK: - The turnaround is performed, not just written
 
-    /// Until this existed the chords changed and no track acknowledged it. The bass now leads
-    /// back to the top out of every turnaround, by re-pitching its own figure rather than playing
-    /// a stock lick — so the bar keeps the rhythm and velocities the rule wrote.
-    @Test func bassLeadsBackOutOfTheTurnaround() {
-        var checked = 0, led = 0, keptRhythm = 0
+    /// The bass plays the turnaround's last two bars as a turnaround, not as the groove over
+    /// different chords. Three treatments, one per song.
+    @Test func bassPlaysTheTurnaroundAsATurnaround() {
+        var seen = Set<Int>(), checked = 0
         for s in Self.sohoSongs() {
-            for exit in Self.turnaroundExit(s).sorted() {
+            let style = ChillStructureGenerator.sohoTurnaroundStyle(frame: s.frame, structure: s.structure)
+            seen.insert(style)
+            let turns = Self.turnaroundBars(s)
+            let exits = Self.turnaroundExit(s)
+            // The way into a Remix Break is a bigger gesture and takes precedence, so a bar that
+            // is both is not a turnaround bar for this purpose.
+            let entry = Self.remixEntry(s)
+            for exit in exits.sorted() where turns.contains(exit - 1) {
                 func bass(_ bar: Int) -> [MIDIEvent] {
                     s.trackEvents[kTrackBass].filter { $0.stepIndex / 16 == bar }
                         .sorted { $0.stepIndex < $1.stepIndex }
                 }
-                let here = bass(exit), before = bass(exit - 1)
-                guard !here.isEmpty, !before.isEmpty else { continue }
+                guard !entry.contains(exit), !entry.contains(exit - 1) else { continue }
+                let pair = [exit - 1, exit].map(bass)
+                guard pair.allSatisfy({ !$0.isEmpty }) else { continue }
                 checked += 1
-                if here.map(\.note) != before.map(\.note) { led += 1 }
-                // The figure's own rhythm survives: same onsets as the bar before, where the
-                // rule itself would have repeated them.
-                if here.map({ $0.stepIndex % 16 }) == before.map({ $0.stepIndex % 16 }) { keptRhythm += 1 }
+                for inBar in pair {
+                    let steps = inBar.map { $0.stepIndex % 16 }
+                    switch style {
+                    case 0:  // walking quarters — four of them, and a real line, not a repeat
+                        #expect(steps == [0, 4, 8, 12], "walking bar steps \(steps)")
+                        #expect(Set(inBar.map(\.note)).count >= 3, "walk repeats itself")
+                    case 1:  // root and approach — a held root, then a pickup
+                        #expect(steps.first == 0, "root & approach does not start on the root")
+                        #expect(inBar[0].durationSteps >= 8, "the root is not held")
+                        #expect(steps.contains(14), "no pickup into the next chord")
+                    default: // descending — two notes a bar
+                        #expect(steps == [0, 8], "descending bar steps \(steps)")
+                    }
+                }
+                // The descending treatment falls across both bars without rising.
+                if style == 2 {
+                    let line = (pair[0] + pair[1]).map { Int($0.note) }
+                    #expect(zip(line, line.dropFirst()).allSatisfy { $0 >= $1 }, "descending line rises: \(line)")
+                }
             }
         }
         #expect(checked > 0)
-        #expect(Double(led) / Double(checked) > 0.85, "bass unchanged on \(checked - led)/\(checked) exits")
-        #expect(keptRhythm > 0, "the approach never kept the figure's own rhythm")
+        #expect(seen == [0, 1, 2], "only styles \(seen.sorted()) appeared")
     }
 
     /// The last note of a turnaround is a step away from the chord the song returns to.
@@ -1539,6 +1568,12 @@ import Foundation
         for seed in Self.seeds {
             let s = SongGenerator.generate(seed: seed, style: .chill)
             let marked = s.stepAnnotations.values.contains { $0.contains { $0.tag == "Turnaround" } }
+            // Soho names which treatment the bass is using; Blues has none, so no description.
+            if s.chillSohoVariation {
+                let names = ChillStructureGenerator.sohoTurnaroundStyleNames
+                let desc = s.stepAnnotations.values.flatMap { $0 }.first { $0.tag == "Turnaround" }?.description
+                #expect(desc.map(names.contains) == true, "turnaround logged as '\(desc ?? "nil")'")
+            }
             #expect(s.generationLog.first { $0.tag == "Form" }?.description.contains("turnaround") != true,
                     "Form line still names the turnaround")
             if s.chillSohoVariation { sohoN += 1; if marked { soho += 1 } }

@@ -611,4 +611,18 @@ struct ChillStructureGenerator {
         }
         return out
     }
+
+    /// Which of the three turnaround bass treatments a song uses: 0 walking quarters,
+    /// 1 root and approach, 2 descending line.
+    ///
+    /// A pure function of the frame and structure, like `sohoBassLeadsIntro`, because the bass
+    /// generator and the performance log both need it and run on different streams. Roughly
+    /// 40 / 35 / 25.
+    static func sohoTurnaroundStyle(frame: GlobalMusicalFrame, structure: SongStructure) -> Int {
+        let h = (frame.tempo * 7 + frame.keySemitoneValue * 13 + structure.chordPlan.count * 3) % 100
+        return h < 40 ? 0 : h < 75 ? 1 : 2
+    }
+
+    /// The names used in the performance log and in `ChillSohoTests`.
+    static let sohoTurnaroundStyleNames = ["walking quarters", "root & approach", "descending"]
 }

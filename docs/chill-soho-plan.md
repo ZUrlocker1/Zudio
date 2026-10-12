@@ -1525,12 +1525,20 @@ Breakdowns — `005` root drone, both pools.
 
 Every rule evolves on a **12–18 bar** micro-variant cycle.
 
-**Turnaround approach**, one style per song, applied by re-pitching the bar the rule already
-wrote so the rhythm and velocities stay the song's own:
+**Turnaround treatment.** The bass stops playing the groove for the turnaround's **last two
+bars** and plays a turnaround. One of three per song, named in the performance log:
 
-- the figure as written, its last note bent to a leading tone
-- the closing notes walk **up** the scale into the tonic
-- the closing notes walk **down** into it
+- **walking quarters** — four quarters a bar: the root, two scale steps toward the next chord,
+  then a chromatic leading tone into it. Where the next chord is only a step away, the middle
+  notes arc away and back rather than repeating the root
+- **root & approach** — the root held through the bar with a two-note pickup into the next chord;
+  sparser than the groove, so the turnaround reads as a clearing
+- **descending** — one scalar descent across both bars, two notes a bar, arriving a step above
+  the chord the phrase restarts on
+
+Two bars rather than four: a turnaround fires every 16 bars in most songs, and four would put the
+bass out of its own part for a quarter of the song. The way into a Remix Break takes precedence
+where a bar is both.
 
 ### Rhythm
 
@@ -1626,8 +1634,9 @@ is not a title.
 
 - **Chords** line: key, mode and the A cycle only — `Ab Aeolian Im7 – Vm7`
 - **Form** line: groove, sections, break and its length — `Soul groove - A/B - bass ostinato 4`
-- **Turnarounds** are marked in the performance log as `Bar nnn  Turnaround`, with no description,
-  in **both Chill Soho and Chill Blues** (Blues marks the V7 at cycle bar 12)
+- **Turnarounds** are marked in the performance log as `Bar nnn  Turnaround`, in **both Chill
+  Soho and Chill Blues**. Soho names the bass treatment — `Turnaround  walking quarters` — while
+  Blues, which has none, carries no description and marks the V7 at cycle bar 12
 
 ### Verification
 

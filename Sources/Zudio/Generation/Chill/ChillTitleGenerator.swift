@@ -206,13 +206,9 @@ struct ChillTitleGenerator {
     /// Real Soho streets. The substyle is named for the place, so this is the one bank that
     /// should never be invented.
     static let sohoStreets = ["Wardour", "Berwick", "Dean", "Frith", "Greek", "Carnaby", "Brewer",
-                              "Old Compton", "Bateman", "Lexington", "Rupert", "Archer",
-                              "Broadwick", "Beak", "Kingly", "Marshall", "Noel", "Ganton",
-                              "Romilly", "Hollen",
-                              // Denmark Street — Tin Pan Alley, the music shops and studios.
-                              // Kept out of sohoStreetsKnown so it always keeps its "Street":
-                              // "Denmark" on its own reads as the country.
-                              "Denmark"]
+                              "Old Compton",  "Rupert", "Archer",
+                              "Broadwick", "Kingly", "Marshall", "Noel", "Ganton",
+                              "Romilly", "Hollen", "Denmark"]
 
     /// The streets that read as a name on their own, without "Street" after them — the ones a
     /// listener has heard of. "Dean Lights" works; "Broadwick Doorway" is nothing.
@@ -224,11 +220,7 @@ struct ChillTitleGenerator {
                               "Chelsea", "Shoreditch", "Clerkenwell", "Bloomsbury", "Pimlico",
                               "Barbican", "Bermondsey", "Hoxton", "Dalston", "Maida Vale",
                               "Covent Garden", "Holborn",
-                              // The commuter towns beyond. Woking is Paul Weller's, so it is a
-                              // Style Council reference rather than a generic one (Zack, 2026-10-12).
-                              "Woking", "Dorking",
-                              // New-wave towns rather than Soho proper, but the same orbit:
-                              // Bromley, Guildford, Dagenham.
+                              "West End", "East End", "Woking", "Dorking",
                               "Bromley", "Guildford", "Dagenham"]
 
     /// The squares, which take no "Street" after them. Berkeley Square carries a standard of its
@@ -240,10 +232,10 @@ struct ChillTitleGenerator {
 
     /// Streets that carry their own thoroughfare word, so nothing is appended to them —
     /// "King's Road Rain", "Rain on King's Road".
-    static let sohoNamedStreets = ["King's Road", "Portobello Road"]
+    static let sohoNamedStreets = ["King's Road", "Portobello Road", "Shaftesbury Avenue"]
 
     /// London rooms where this music was actually played, late 70s to late 80s. Sade's own circuit
-    /// is most of the Soho half — Ronnie Scott's, etcx. `article` is whether the name
+    /// is most of the Soho half — Ronnie Scott's, etc. `article` is whether the name
     /// takes a "the": "at the Wag", but "at Ronnie Scott's".
     /// `article` is whether the name takes a "the" — "at the Marquee", but "at Ronnie Scott's".
     /// `alone` is whether it can stand as a whole title: "The 101 Club" works, "The BBC" does not.
@@ -258,13 +250,13 @@ struct ChillTitleGenerator {
         ("Hammersmith Palais", false, true), ("Electric Ballroom", true, true),
         ("Bass Clef", false, true), ("Embassy Club", true, true),
         ("Jazz Cafe", true, true), ("Astoria", true, true), ("Legends", false, true),
-        ("Bar Italia", false, true),
         ("Hope & Anchor", true, true), ("Roundhouse", true, true),
         ("Nashville Rooms", true, true), ("Greyhound", true, true), ("BBC", true, false),
-        // The big rooms. Added after Zack cut the smaller clubs, which placed nothing for a
-        // listener outside London (2026-10-12).
         ("Rainbow", true, true), ("Hammersmith Odeon", true, true), ("Brixton Academy", false, true),
         ("Borderline", true, true),
+        // The Tube — Channel 4, 1982-87, Jools Holland co-hosting and bands playing live. Reads
+        // as the programme and as the Underground at the same time.
+        ("Tube", true, true),
     ]
 
     /// Hull, where Everything But The Girl formed. Not extended past the names a listener outside
@@ -272,17 +264,13 @@ struct ChillTitleGenerator {
     /// East Riding names read as nowhere at all.
     static let sohoHull    = ["Hull", "Humber", "Hessle", "Beverley", "Spurn", "Holderness",
                               "Cottingham", "Hedon", "Withernsea"]
-
-    /// Gaggia — the lever espresso machine that put coffee bars on every Soho street — was in
-    /// here until Zack called it too obscure to read as anything but a typo (2026-10-12).
     static let sohoCafeNouns = ["Cafe", "Espresso", "Cappuccino", "Latte", "Macchiato", "Croissant",
                                 "Demitasse", "Brasserie", "Bistro", "Patisserie", "Pavement",
                                 "Terrace", "Booth", "Banquette", "Formica", "Saucer", "Crema",
                                 "Ristretto", "Cortado", "Americano", "Percolator", "Cafetiere",
-                                "Ashtray", "Counter", "Window Seat", "Caff", "Teaspoon",
-                                "Sugar Bowl", "Tablecloth", "Sandwich Bar"]
+                                "Ashtray", "Counter", "Window Seat", "Caff", "Tablecloth", "Sandwich Bar"]
 
-    static let sohoPeriodAdjectives = ["Pastel", "Linen", "Chrome", "Neon", "Suede", "Satin",
+    static let sohoPeriodAdjectives = ["Pastel", "Linen", "Chrome", "Neon", "Suede", "Satin", "Broken", "Torn",
                                        "Velvet", "Monochrome", "Sepia", "Oyster", "Slate",
                                        "Charcoal", "Powder Blue", "Ivory", "Brass", "Glass",
                                        "Pearl", "Taupe"]
@@ -290,20 +278,17 @@ struct ChillTitleGenerator {
     /// The mid-80s by its objects. Some are trade names — Filofax, Walkman, Betamax — which is
     /// how the period is remembered; the bank already worked that way.
     static let sohoPeriodNouns = ["Filofax", "Walkman", "Cassette", "Discotheque", "Wine Bar",
-                                  "Suit", "Shoulders", "Betamax", "Lambretta", "Vespa", "Polaroid",
+                                  "Suit", "Betamax", "Lambretta", "Vespa", "Polaroid",
                                   "Telex", "Pager", "Minicab", "Payphone", "Espadrilles", "Loafers",
                                   "Trench Coat", "Ticket Stub", "Deck Shoes", "Answerphone",
-                                  "Overcoat", "Brogues", "Raincoat", "Routemaster",
-                                  // Brothel creepers: the crepe-soled Teddy Boy shoe, still worn
-                                  // on the King's Road through the period.
-                                  "Brothel Creepers",
+                                  "Overcoat", "Brogues", "Raincoat", "Bangers & Mash", "Pie & Mash", "Brothel Creepers",
                                   "Mixtape", "12-Inch", "B-Side", "Sleeve Notes", "Travelcard",
                                   "Phone Box", "Tube Map", "Hi-Fi",
-                                  // The weekly music press, read on a Wednesday.
                                   "Melody Maker", "NME",
-                                  // British home computing, which is as much the period as the
-                                  // clothes are (Zack, 2026-10-12).
-                                  "Sinclair", "Spectrum", "Psion"]
+                                  "Sinclair", "Spectrum", "Psion",
+                                  // Mod tailoring. Burton is Montague Burton, where most British
+                                  // men bought a suit — the origin of "the full Monty".
+                                  "Sta-Prest Suit", "Desert Boots", "Burton Suits"]
 
     /// What is in the air on the street outside.
     static let sohoAtmosphere = ["Rain", "Smoke", "Lights", "Frost", "Neon", "Dust", "Shadows",
@@ -311,12 +296,12 @@ struct ChillTitleGenerator {
                                  "Steam", "Traffic", "Thunder"]
 
     /// Somewhere just out of the weather.
-    static let sohoInteriors = ["Doorway", "Stairwell", "Basement", "Back Room", "Side Street",
+    static let sohoInteriors = ["Doorway", "Stairwell", "Basement", "Back Room", "Side Street", "Tube Station",
                                 "Window", "Alley", "Courtyard", "Lobby", "Booth", "Last Carriage",
-                                "Cloakroom", "Forecourt", "Long Bar", "Corridor"]
+                                "Cloakroom", "Forecourt", "Long Bar", "Corridor", "Underground"]
 
     static let sohoPairNouns = sohoAtmosphere + ["Coffee", "Cigarettes", "Sunday", "Silence",
-                                                 "Vinyl", "Static", "Velvet", "Gold", "Matches"]
+                        "Vinyl", "Static", "Velvet", "Gold", "Matches"]
 
     static let sohoGerunds = ["Waiting", "Walking", "Driving", "Dancing", "Leaving", "Falling",
                               "Drifting", "Counting", "Watching", "Holding On", "Coming Down",

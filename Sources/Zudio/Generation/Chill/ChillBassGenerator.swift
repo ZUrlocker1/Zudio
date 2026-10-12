@@ -680,13 +680,13 @@ struct ChillBassGenerator {
         // The last bar of each four-bar turnaround — the bar that leads back to the top. Until
         // now no track acknowledged a turnaround at all; the chords changed and the band played
         // on regardless (Zack, 2026-10-12).
+        // The last TWO bars of each turnaround, which the bass plays as a turnaround rather than
+        // as the groove over different chords. Two rather than four: a turnaround fires every 16
+        // bars in most songs, and four bars of broken groove would be a quarter of the song.
         let turnarounds = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
         let turnaroundExit = turnarounds.filter { !turnarounds.contains($0 + 1) }
-        // One approach per song, so a listener learns this song's way back:
-        //   0 — the figure as written, its last note bent into a lead-in
-        //   1 — the last few notes walk up into the tonic
-        //   2 — the last few notes walk down into it
-        let turnaroundStyle = rng.nextInt(upperBound: 3)
+        let turnaroundTreated = Set(turnaroundExit.flatMap { [$0 - 1, $0] }).intersection(turnarounds)
+        let turnaroundStyle = ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure)
         let scalePCs = Set(scaleNotes(frame: frame, chord: nil))
         // Scale notes inside clampBass's 40–52 window. 014 and 015 walk this ladder and reflect at
         // the ends; folding by octave would turn a step into a ninth-wide jump.
@@ -842,49 +842,95 @@ struct ChillBassGenerator {
                 break
             }
 
-            if turnaroundExit.contains(bar) {
-                let written = Array(events[mark...])
+            if turnaroundTreated.contains(bar) {
+                let isExit = turnaroundExit.contains(bar)
+                // Where the phrase restarts, two or one bars ahead depending which of the pair
+                // this is. The descending line aims at it across both bars.
+                let landingBar = isExit ? bar + 1 : bar + 2
+                let landing = clampBass(chordRootNote(
+                    frame: frame, chord: structure.chordPlan.first { $0.contains(bar: landingBar) }))
                 events.removeSubrange(mark...)
-                events += turnaroundApproach(written, base: base, target: nextRoot,
-                                             style: turnaroundStyle, ladder: ladder)
+                events += turnaroundBassBar(base: base, root: root, nextRoot: nextRoot,
+                                            landing: landing, style: turnaroundStyle,
+                                            isExit: isExit, ladder: ladder, rng: &rng)
             }
         }
         return events
     }
 
-    /// Leads the bass back to the top out of a turnaround, by **re-pitching the bar the rule
-    /// already wrote** rather than replacing it with a stock lick. The rhythm, the velocities and
-    /// the note lengths are the song's own, so the turnaround still sounds like this bass part.
+    /// How the bass plays a turnaround. Three treatments, one per song, each covering the
+    /// turnaround's last two bars.
     ///
-    /// - style 0: the figure as written, its last note bent to a leading tone a semitone away
-    /// - style 1: the last few notes walk **up** the scale into the target
-    /// - style 2: the last few notes walk **down** into it
+    /// The first version of this re-pitched the bar the rule had already written, keeping its
+    /// rhythm and velocities. It was faithful to the groove and that was the problem: three
+    /// quarters of the turnaround stayed the normal figure and the fourth bar only decorated it,
+    /// so nothing announced itself (Zack, 2026-10-12). A turnaround **breaks** the groove.
     ///
-    /// Only the closing notes move. A busy bar — Samba Pickup writes seven — would otherwise walk
-    /// more than an octave and stop being a bass line.
-    private static func turnaroundApproach(_ written: [MIDIEvent], base: Int, target: Int,
-                                           style: Int, ladder: [Int]) -> [MIDIEvent] {
-        guard !written.isEmpty, !ladder.isEmpty else { return written }
-        let sorted = written.sorted { $0.stepIndex < $1.stepIndex }
-        let last = sorted.count - 1
-        func repitch(_ ev: MIDIEvent, _ note: Int) -> MIDIEvent {
-            MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(clampBass(note)),
-                      velocity: ev.velocity, durationSteps: ev.durationSteps)
+    /// - **0 walking quarters** — four quarter notes a bar: the root, two scale steps toward the
+    ///   next chord, then a chromatic leading tone into it. Drops the groove's syncopation
+    ///   entirely, and is the treatment that most sounds like a turnaround
+    /// - **1 root and approach** — the root held through the bar with a two-note pickup into the
+    ///   next chord. *Sparser* than the groove, so the turnaround reads as a clearing
+    /// - **2 descending line** — one scalar descent across both bars, two notes a bar, arriving a
+    ///   step above the chord the phrase restarts on
+    private static func turnaroundBassBar(base: Int, root: Int, nextRoot: Int, landing: Int,
+                                          style: Int, isExit: Bool, ladder: [Int],
+                                          rng: inout SeededRNG) -> [MIDIEvent] {
+        guard !ladder.isEmpty else {
+            return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 80, durationSteps: 4)]
         }
-        // A leading tone from below, or from above where the scale has no semitone under the root.
-        let leadingTone = target - 1 >= 33 ? target - 1 : target + 1
-        guard style != 0 else {
-            return sorted.enumerated().map { $0.offset == last ? repitch($0.element, leadingTone) : $0.element }
+        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
+        func note(_ step: Int, _ n: Int, _ vel: UInt8, _ dur: Int) -> MIDIEvent {
+            MIDIEvent(stepIndex: base + step, note: UInt8(clampBass(n)), velocity: vel, durationSteps: dur)
         }
-        let up = style == 1
-        let anchor = ladder.firstIndex { $0 >= target } ?? ladder.count - 1
-        let walk = Swift.min(4, sorted.count)          // only the closing notes move
-        return sorted.enumerated().map { i, ev in
-            guard i >= sorted.count - walk else { return ev }
-            if i == last { return repitch(ev, leadingTone) }
-            let away = last - i                         // 1 is nearest the target
-            let idx = up ? anchor - away : anchor + away
-            return repitch(ev, ladder[Swift.max(0, Swift.min(ladder.count - 1, idx))])
+        func index(_ n: Int) -> Int {
+            ladder.firstIndex { $0 >= n } ?? ladder.count - 1
+        }
+        /// A semitone into the target, from below where the register allows.
+        func leadingTone(into target: Int) -> Int { target - 1 >= 33 ? target - 1 : target + 1 }
+
+        switch style {
+        case 1:
+            // Root and approach.
+            var out = [note(0, root, v(84, 8), 12)]
+            let approach = isExit ? leadingTone(into: nextRoot)
+                                  : ladder[Swift.max(0, Swift.min(ladder.count - 1, index(nextRoot) - 1))]
+            out.append(note(13, root, v(62, 8), 1))
+            out.append(note(14, approach, v(74, 10), 2))
+            return out
+
+        case 2:
+            // Descending line, aimed at the landing across both bars: the four notes sit at
+            // landing+4, +3 (first bar) and +2, +1 (second), by scale step.
+            let base0 = index(landing)
+            let offsets = isExit ? [2, 1] : [4, 3]
+            return zip([0, 8], offsets).map { step, up in
+                note(step, ladder[Swift.max(0, Swift.min(ladder.count - 1, base0 + up))],
+                     v(step == 0 ? 80 : 72, 9), 4)
+            }
+
+        default:
+            // Walking quarters: root, two steps toward the next chord, chromatic leading tone.
+            let lead = leadingTone(into: nextRoot)
+            let a = index(root), b = index(lead)
+            func at(_ i: Int) -> Int { ladder[Swift.max(0, Swift.min(ladder.count - 1, i))] }
+            let mid1: Int, mid2: Int
+            if abs(b - a) >= 3 {
+                // Far enough to walk straight there.
+                mid1 = a + (b - a) / 3
+                mid2 = a + 2 * (b - a) / 3
+            } else {
+                // The next chord is a step or two away, and interpolating between them just
+                // repeats the root three times. Walk an arc instead — away and back — which is
+                // what a bass player does to fill the bar.
+                let away = a + 2 < ladder.count ? 1 : -1
+                mid1 = a + away
+                mid2 = a + 2 * away
+            }
+            return [note(0, root, v(84, 8), 3),
+                    note(4, at(mid1), v(72, 9), 3),
+                    note(8, at(mid2), v(76, 9), 3),
+                    note(12, lead, v(78, 9), 3)]
         }
     }
 
