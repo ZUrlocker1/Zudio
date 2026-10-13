@@ -1875,8 +1875,11 @@ final class PlaybackEngine: ObservableObject {
             // fast heavy wobble on a plucked string; an early Fender amp's tremolo sat around
             // 3 Hz and much shallower (Zack, 2026-10-13). Keyed on the GM program family, so any
             // guitar patch added to any pool gets it without another edit here.
-            tremPhaseInc[i]   = 0.3142     // 2π × 3 Hz / 60 fps
-            tremDepth[i]      = 0.20
+            // Volume swings from full down to (1 - 2 × depth): 0.32 dips to 36%, clearly audible
+            // but well short of the organ's 0.40, which drops to 20% and nearly disappears.
+            // 3 Hz at 0.20 only dipped to 60% and was too subtle (Zack, 2026-10-13).
+            tremPhaseInc[i]   = 0.4189     // 2π × 4 Hz / 60 fps
+            tremDepth[i]      = 0.32
             tremBaseVolume[i] = 1.0
         } else if kosmicStyle && i == kTrackBass {
             // Drift bass: 5 Hz (slower than 8 Hz lead vibrato), 25% depth.

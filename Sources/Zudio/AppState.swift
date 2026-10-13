@@ -628,10 +628,11 @@ final class AppState: ObservableObject {
         //           comping voice, and Blues already draws one on Rhythm in 80% of songs, so a
         //           sixth of them ended up with two organs at once (Zack, 2026-10-13)
         //   Soho  — Bowed Glass and Halo Pad, the longest-sustaining pad voice in the corpus at
-        //           3.4 beats a note
+        //           3.4 beats a note. Concert Choir was tried and removed: the pads are too busy
+        //           a part for a choir
         // Stereo Strings (p49) is the only pad shared at all, by Blues and Soho; nothing is
         // common to all three.
-        case (kTrackPads,    .chill) where isChillSoho:  return ["Strings Slow","Halo Pad","Bowed Glass","Concert Choir"]
+        case (kTrackPads,    .chill) where isChillSoho:  return ["Strings Slow","Halo Pad","Bowed Glass"]
         case (kTrackPads,    .chill) where isChillBlues: return ["Strings Slow","Strings Fast","Cello","Synth Strings 1","Synth Strings 3","Synth Strings 4","Synth Strings 5"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Strings Fast","Sweep Pad","Soundtrack"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
@@ -690,7 +691,7 @@ final class AppState: ObservableObject {
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
-        case (kTrackPads, .chill) where isChillSoho:  return [49, 94, 92, 52]
+        case (kTrackPads, .chill) where isChillSoho:  return [49, 94, 92]
         case (kTrackPads, .chill) where isChillBlues: return [49, 48, 42, 50, 8050, 11050, 11051]
         case (kTrackPads, .chill):     return [89, 48, 95, 97]
         case (kTrackPads, _):          return [94, 95, 92, 50]
@@ -2313,12 +2314,10 @@ final class AppState: ObservableObject {
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
         case kTrackPads where isSoho:
-            // [0=Stereo Strings, 1=Halo Pad, 2=Bowed Glass, 3=Concert Choir] — 34/26/22/18.
-            // Concert Choir is the corpus's "aah" pad, in 3 of its 14 files, and is kept to a
-            // colouring share rather than a staple (Zack, 2026-10-13).
-            return [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                    1,1,1,1,1,1,1,1,1,1,1,1,1,
-                    2,2,2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3,3].filter { $0 < poolCount }
+            // [0=Strings Slow, 1=Halo Pad, 2=Bowed Glass] — 42/33/25. Concert Choir was tried
+            // here and removed: the pads are too busy a part to carry a choir, and the Texture
+            // track that might have suited it occasionally is doing horn hits (Zack, 2026-10-13).
+            return [0,0,0,0,0, 1,1,1,1, 2,2,2].filter { $0 < poolCount }
         case kTrackPads where isBlues:
             // Every string patch in Chill lives here now, so they can be compared side by side
             // (Zack, 2026-10-13): [0=Strings Slow, 1=Strings Fast, 2=Cello, 3=Synth Strings 1,
