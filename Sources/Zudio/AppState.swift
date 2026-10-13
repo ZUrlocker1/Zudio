@@ -3919,10 +3919,19 @@ final class AppState: ObservableObject {
         let names = instrumentPoolNames(trackIndex: kTrackRhythm, style: .chill,
                                         isChillSoho: state?.chillSohoVariation == true,
                                         isChillBlues: blues)
+        let progs = instrumentPoolPrograms(trackIndex: kTrackRhythm, style: .chill,
+                                           isChillSoho: state?.chillSohoVariation == true,
+                                           isChillBlues: blues)
+        let idx = overrides[kTrackRhythm] ?? 0
+        guard idx >= 0, idx < names.count, idx < progs.count else { return false }
+        // A guitar always takes it. The slow shallow amp tremolo is part of that sound rather
+        // than an occasional colour (Zack, 2026-10-13), and PlaybackEngine gives a guitar its own
+        // 4 Hz / 0.32 setting instead of the organ's 8 Hz / 0.40. Keyed on the GM guitar family,
+        // so any guitar added to any Chill rhythm pool gets it without another edit.
+        if PlaybackEngine.isGuitarProgram(progs[idx]) { return true }
         let eligible: Set<String> = blues ? ["B3 Organ", "Perc Organ", "Rock Organ"]
                                           : ["B3 Organ", "Tonewheel"]
-        let idx = overrides[kTrackRhythm] ?? 0
-        guard idx >= 0, idx < names.count, eligible.contains(names[idx]) else { return false }
+        guard eligible.contains(names[idx]) else { return false }
         return Float.random(in: 0..<1) < (blues ? 0.50 : 0.20)
     }
 
