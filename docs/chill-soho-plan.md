@@ -841,7 +841,7 @@ Both continue the existing `CHL-PAD-000`–`006` numbering.
 
 ## Texture
 
-**Chill Soho skips the audio textures entirely, as Chill Blues does, and runs a MIDI Texture
+**Chill Soho skips the audio textures entirely and runs a MIDI Texture
 track instead.**
 
 Base Chill routes Texture to an audio file: `SongGenerator.swift:3810` carries
@@ -1682,9 +1682,9 @@ Soho has its own pools where base Chill's are wrong:
   the saxes, open trumpet and trombone take it; flute, recorder, muted trumpet, the mallets
   and synth brass do not. An index-based rule silently re-aimed itself the moment the Lead 1
   pools were split per form
-- **Pads**: Stereo Strings 30%, Halo Pad 22%, Bowed Glass 18% (at CC7 115 — it is a soft patch),
-  **Concert Choir 16%**, Synth Strings 5 14%. Four of the five are Soho's alone; only Stereo
-  Strings (p49) is shared, with Blues. Halo Pad is the longest-sustaining pad voice in the corpus
+- **Pads**: Strings Slow 34%, Halo Pad 26%, Bowed Glass 22% (at CC7 115 — it is a soft patch),
+  **Concert Choir 18%**. Three of the four are Soho's alone; only Strings Slow (p49) is shared,
+  with Blues, which now holds every other string patch in Chill so they can be compared. Halo Pad is the longest-sustaining pad voice in the corpus
   at 3.4 beats a note, and **Concert Choir is the corpus's "aah" pad**, in 3 of its 14 files — the
   one vocal voice worth having, kept to a colouring share rather than a staple (Zack,
   2026-10-13). Each Chill form also carries one of the three Synth Strings variants that no other
