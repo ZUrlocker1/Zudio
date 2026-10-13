@@ -633,7 +633,7 @@ final class AppState: ObservableObject {
         // Stereo Strings (p49) is the only pad shared at all, by Blues and Soho; nothing is
         // common to all three.
         case (kTrackPads,    .chill) where isChillSoho:  return ["Strings Slow","Halo Pad","Bowed Glass"]
-        case (kTrackPads,    .chill) where isChillBlues: return ["Strings Slow","Strings Fast","Cello","Synth Strings 1","Synth Strings 3","Synth Strings 4","Synth Strings 5"]
+        case (kTrackPads,    .chill) where isChillBlues: return ["Strings Slow","Strings Fast","Cello","Synth Strings 4","Synth Strings 5"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Strings Fast","Sweep Pad","Soundtrack"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
@@ -692,7 +692,7 @@ final class AppState: ObservableObject {
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
         case (kTrackPads, .chill) where isChillSoho:  return [49, 94, 92]
-        case (kTrackPads, .chill) where isChillBlues: return [49, 48, 42, 50, 8050, 11050, 11051]
+        case (kTrackPads, .chill) where isChillBlues: return [49, 48, 42, 11050, 11051]
         case (kTrackPads, .chill):     return [89, 48, 95, 97]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
@@ -2319,17 +2319,14 @@ final class AppState: ObservableObject {
             // track that might have suited it occasionally is doing horn hits (Zack, 2026-10-13).
             return [0,0,0,0,0, 1,1,1,1, 2,2,2].filter { $0 < poolCount }
         case kTrackPads where isBlues:
-            // Every string patch in Chill lives here now, so they can be compared side by side
-            // (Zack, 2026-10-13): [0=Strings Slow, 1=Strings Fast, 2=Cello, 3=Synth Strings 1,
-            // 4=Synth Strings 3, 5=Synth Strings 4, 6=Synth Strings 5]. The six strings take 14%
-            // each; Cello, the one voice that is neither a synth pad nor a string section, 16%.
+            // [0=Strings Slow, 1=Strings Fast, 2=Cello, 3=Synth Strings 4, 4=Synth Strings 5],
+            // evenly. Synth Strings 1 and 3 were auditioned here and dropped (Zack, 2026-10-13).
             //
             // Zudio.sf2 has NO Violin, Viola, Contrabass, Tremolo Strings or Pizzicato — those GM
-            // slots are empty. p48 and p49 are the fast and slow stereo string sections and were
-            // named "String Pad" and "Stereo Strings", which hid from the picker that Blues
-            // already had both.
-            return [0,0,0,0,0,0,0, 1,1,1,1,1,1,1, 2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,
-                    4,4,4,4,4,4,4, 5,5,5,5,5,5,5, 6,6,6,6,6,6,6].filter { $0 < poolCount }
+            // slots were stripped from GeneralUser GS in build 119. p48 and p49 are the fast and
+            // slow stereo string sections and were named "String Pad" and "Stereo Strings", which
+            // hid from the picker that Blues already had both.
+            return [0, 1, 2, 3, 4].filter { $0 < poolCount }
         case kTrackPads where style == .chill:
             // [0=Warm Pad, 1=String Pad, 2=Sweep Pad, 3=Soundtrack] — 28/24/24/24. Base Chill is
             // the one Chill form where a frankly synthetic pad belongs: its beat styles include
