@@ -446,9 +446,14 @@ struct ChillLeadGenerator {
         // Register separation (below) ensures L2 stays out of L1's range regardless of choice.
         // Soho: what answers the singer in the corpus — a saxophone nearly every time, then synth
         // brass, trombone and vibraphone — never the same instrument as Lead 1.
+        // Blues has no flute: AppState already excluded it from Blues Lead 2, but this pool did
+        // not, so 299 Blues songs in 8,000 were written for flute register and then had the patch
+        // overridden to something else — a flute part nobody ever heard on a flute (Zack,
+        // 2026-10-13). Mirrored by the `isChillBlues` branch of `instrumentPoolNames`.
         let l2Pool: [ChillLeadInstrument] = sohoVariation
             ? [.saxophone, .tenorSax, .synthBrass, .trombone, .vibraphone].filter { $0 != lead1Instrument }
-            : [.vibraphone, .flute, .sopranoSax, .trombone]
+            : bluesVariation ? [.vibraphone, .sopranoSax, .trombone]
+                             : [.vibraphone, .flute, .sopranoSax, .trombone]
         let picked = l2Pool[rng.nextInt(upperBound: l2Pool.count)]
         // Regeneration keeps the song's instrument: playback still has that patch loaded, so a
         // line written for a freshly drawn instrument's register would play on the wrong one.

@@ -597,7 +597,7 @@ final class AppState: ObservableObject {
         // them more notes than anything else — and neither is in Zudio.sf2. These three are what
         // it has: Muted Guitar is the damped offbeat chord this music comps on, Nylon is warmer
         // and suits the Latin side, Hawaiian sits in the SC-55 bank at GM 26, Jazz Guitar's slot.
-        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Muted Guitar","Nylon Guitar"] }
+        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar"] }
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
@@ -606,7 +606,9 @@ final class AppState: ObservableObject {
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
-        case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Xylophone"]
+        // Blues drops Flute; the generator never chose Xylophone for any form, so it is gone.
+        case (kTrackLead2,   .chill) where isChillBlues: return ["Vibraphone","Soprano Sax","Trombone"]
+        case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone"]
         case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
         case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal"]
         case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar","Square Lead","Synth Lead","Saw Lead","5th Saw Wave"]
@@ -652,7 +654,7 @@ final class AppState: ObservableObject {
         if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return [66, 65, 73, 64, 74] }
         if style == .chill && trackIndex == kTrackLead1 && isChillBlues { return [66, 65, 56, 71] }
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
-        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 17, 16, 61001, 18, 8016, 28, 24] }
+        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 17, 16, 61001, 18, 8016, 24] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56]
@@ -660,7 +662,8 @@ final class AppState: ObservableObject {
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111]  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
-        case (kTrackLead2, .chill):    return [11, 73, 64, 57, 13]
+        case (kTrackLead2, .chill) where isChillBlues: return [11, 64, 57]
+        case (kTrackLead2, .chill):    return [11, 73, 64, 57]
         case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
         case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98]
         case (kTrackLead2, .motorik):  return [90, 100, 39, 30, 80, 87, 81, 86]
@@ -1419,7 +1422,8 @@ final class AppState: ObservableObject {
                         self.instrumentOverrides[kTrackLead1] = idx
                     }
                     let l2Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill,
-                                                             isChillSoho: state.chillSohoVariation)
+                                                             isChillSoho: state.chillSohoVariation,
+                                                             isChillBlues: state.chillBluesVariation)
                     if let idx = l2Pool.firstIndex(of: Int(state.chillLead2Instrument.gmProgram)) {
                         self.instrumentOverrides[kTrackLead2] = idx
                     }
@@ -2182,7 +2186,7 @@ final class AppState: ObservableObject {
             let cd = overrides[kTrackDrums] ?? 0;  if cd == 0 || cd == 1{ overrides[kTrackDrums]   = [2,3,4][Int.random(in:0..<3,using:&rng)] }
         }
         if style == .chill, state.chillBluesVariation {
-            let pool2 = instrumentPoolNames(trackIndex: kTrackLead2, style: .chill)
+            let pool2 = instrumentPoolNames(trackIndex: kTrackLead2, style: .chill, isChillBlues: true)
             let vp2   = instrumentPickPoolStatic(trackIndex: kTrackLead2, style: .chill, poolCount: pool2.count, state: state)
             if let cur = overrides[kTrackLead2], !Set(vp2).contains(cur) {
                 overrides[kTrackLead2] = vp2[Int.random(in:0..<vp2.count, using:&rng)]
@@ -2280,14 +2284,26 @@ final class AppState: ObservableObject {
             return [0, 1, 2, 3].filter { $0 < poolCount }
         case kTrackRhythm where isSoho:
             // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=Perc Organ, 4=Stereo Piano, 5=Rock Organ,
-            //  6=Tonewheel, 7=Muted Guitar, 8=Nylon Guitar] — roughly half keys, half guitar.
+            //  6=Tonewheel, 7=Nylon Guitar]. Nylon 20%, Stereo Piano and Rhodes 23% each,
+            // Wurlitzer 17%, B3 10%, Tonewheel 7% (Zack, 2026-10-13). Muted Guitar is out,
+            // leaving Nylon as the only guitar the soundfont can do for this music.
             // Filtered by poolCount so a caller sizing without isChillSoho cannot overrun the
             // 7-entry base Chill list.
-            return [0,0,0, 1,1, 2, 4,4, 6, 7,7,7,7, 8,8,8,8].filter { $0 < poolCount }
+            return [0,0,0,0,0,0,0, 1,1,1,1,1, 2,2,2, 4,4,4,4,4,4,4, 6,6, 7,7,7,7,7,7]
+                .filter { $0 < poolCount }
         case kTrackRhythm:
             return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4,6,6]
+        case kTrackLead2 where isSoho:
+            // Soho's Lead 2 pool is its own: [0=Alto Sax, 1=Tenor Sax, 2=Synth Brass 1,
+            // 3=Trombone, 4=Vibraphone], drawn evenly as the generator does — which then drops
+            // whichever instrument Lead 1 already has. This case exists because index 4 means
+            // Vibraphone here and meant Xylophone in base Chill's list, so the two cannot share
+            // one pick pool (Zack, 2026-10-13).
+            return [0, 1, 2, 3, 4].filter { $0 < poolCount }
         case kTrackLead2:
-            return isBlues ? [0,0,0,2,2,3,3,3] : [0,0,0,1,1,2,3,3,4]
+            // Blues pool is [0=Vibraphone, 1=Soprano Sax, 2=Trombone], drawn evenly as the
+            // generator does. Base is [0=Vibraphone, 1=Flute, 2=Soprano Sax, 3=Trombone].
+            return isBlues ? [0, 1, 2] : [0,0,0,1,1,2,3,3]
         default:
             return Array(0..<poolCount)
         }
@@ -2355,7 +2371,7 @@ final class AppState: ObservableObject {
         var rng = SystemRandomNumberGenerator()
         for trackIdx in [kTrackLead2, kTrackRhythm] {
             guard let current = instrumentOverrides[trackIdx] else { continue }
-            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: .chill)
+            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: .chill, isChillBlues: true)
             let validPool = instrumentPickPool(trackIndex: trackIdx, style: .chill, poolCount: pool.count)
             guard !Set(validPool).contains(current) else { continue }
             instrumentOverrides[trackIdx] = validPool[Int.random(in: 0..<validPool.count, using: &rng)]
