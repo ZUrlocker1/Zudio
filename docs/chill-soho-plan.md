@@ -1684,7 +1684,7 @@ Soho has its own pools where base Chill's are wrong:
   pools were split per form
 - **Pads**: Stereo Strings 32%, Synth Strings 28%, Halo Pad 24%, Bowed Glass 16%. Each Chill form
   keeps **two pads the other two do not have** — base Chill has String Pad (p48) and Sweep Pad,
-  Blues has Warm Pad and the tonewheel organ, Soho has Bowed Glass and Halo Pad — and only Synth
+  Blues has Warm Pad, Soho has Bowed Glass and Halo Pad — and only Synth
   Strings is common to all three (Zack, 2026-10-13). Sweep Pad is a filter sweep that suits base
   Chill's electronic and St Germain beat styles and neither other form; Halo Pad is the
   longest-sustaining pad voice in the corpus at 3.4 beats a note.
