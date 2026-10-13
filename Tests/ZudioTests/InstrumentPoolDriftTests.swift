@@ -52,8 +52,7 @@ import Testing
                 Issue.record(Comment(rawValue: "no \(which) song in 4,000 seeds")); continue
             }
             let style: MusicStyle = which == "drift" ? .kosmic : .motorik
-            let names = AppState.instrumentPoolNames(trackIndex: track, style: style,
-                                                     isKosmicDrift: state.isKosmicDrift)
+            let names = AppState.instrumentPoolNames(trackIndex: track, style: style)
             let pick = Set(AppState.instrumentPickPoolStatic(trackIndex: track, style: style,
                                                              poolCount: names.count, state: state))
             func nameList(_ s: Set<Int>) -> [String] {
@@ -73,8 +72,7 @@ import Testing
             if cache[which] == nil { cache[which] = Self.sample(which) }
             guard let state = cache[which] else { continue }
             let style: MusicStyle = which == "drift" ? .kosmic : .motorik
-            let names = AppState.instrumentPoolNames(trackIndex: track, style: style,
-                                                     isKosmicDrift: state.isKosmicDrift)
+            let names = AppState.instrumentPoolNames(trackIndex: track, style: style)
             for i in allowed {
                 #expect(i < names.count,
                         Comment(rawValue: "\(label): index \(i) past a \(names.count)-entry pool"))

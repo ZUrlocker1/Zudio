@@ -81,12 +81,8 @@ struct TrackRowView: View {
         let isDrift  = appState.songState?.isKosmicDrift == true
         let isSoho   = appState.songState?.chillSohoVariation == true
         let isBluesPool = appState.songState?.chillBluesVariation == true
-        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle,
-                                                    isKosmicDrift: isDrift, isChillSoho: isSoho,
-                                                    isChillBlues: isBluesPool)
-        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle,
-                                                       isKosmicDrift: isDrift, isChillSoho: isSoho,
-                                                       isChillBlues: isBluesPool)
+        let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: activeStyle, isChillSoho: isSoho)
+        let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: activeStyle, isChillSoho: isSoho)
         return zip(names, programs).map { Instrument(name: $0, program: $1) }
     }
 

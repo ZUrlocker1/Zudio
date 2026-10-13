@@ -1646,6 +1646,18 @@ songs with a single hit.
 
 ### Instruments
 
+**How pools and pick lists divide the work.** `AppState.instrumentPoolNames` is **one superset
+per style**, not per substyle: the user's picker shows the whole list, so any song can be
+auditioned on any instrument the style owns, including ones its own substyle would never
+generate. `instrumentPickPool` is what narrows generation to the substyle's subset, and it is the
+only place a substyle restriction belongs. Motorik and Kosmic have always worked this way.
+
+The one exception is the **Texture** track: base Chill and Blues play audio loop files there and
+Soho plays MIDI horns. Those are not interchangeable patches and the engine loads them by
+different paths, so that pool alone branches on `isChillSoho`.
+
+Soho's differences therefore live in the pick lists, not in separate pools:
+
 Soho has its own pools where base Chill's are wrong:
 
 - **Texture**: Trumpet 30%, Trombone 20%, Muted Trumpet 20%, Vibraphone 20%, Xylophone 10% —

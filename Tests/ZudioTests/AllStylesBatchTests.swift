@@ -68,8 +68,7 @@ struct AllStylesBatchTests {
             for t in 0..<kTrackCount {
                 if t == kTrackTexture && style == .chill { instParts.append("Tx:audio"); continue }
                 if t == kTrackLeadSynth && style != .kosmic { continue }
-                let pool = AppState.instrumentPoolPrograms(trackIndex: t, style: style,
-                                                          isKosmicDrift: song.isKosmicDrift)
+                let pool = AppState.instrumentPoolPrograms(trackIndex: t, style: style)
                 guard !pool.isEmpty else { continue }
                 let idx  = instrumentOverrides[t] ?? 0
                 let prog = pool[min(idx, pool.count - 1)]
