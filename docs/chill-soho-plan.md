@@ -18,7 +18,7 @@ the Wag Club on Wardour Street, the café culture the Style Council worked in. I
 without naming a record, the same reasoning that settled Motorik Europe.
 
 Checked against the Chill title bank: **Soho is free.** `London`, `Midnight`, `Nocturne`,
-`Quiet` and `Soiree` all collide and were rejected for that reason.
+`Quiet` and `Soiree` all collide with it and are therefore unusable.
 
 The genre's critical label is "sophisti-pop", which is a retrospective coinage the bands
 themselves disliked. It is not used anywhere in this plan or in the UI.
@@ -125,8 +125,8 @@ Motorik bass tables were. The numbers below are hypotheses.
 - **Form.** Base Chill uses chord plans with movement; Chill Blues uses a 16-bar blues form.
   Chill Soho uses a **short cycle of 4–7 chords that does not modulate** — measured, see
   Corpus findings
-- **Tempo.** Base Chill spans 72–124 depending on mood and beat style. Chill Soho is a narrow
-  **84–128** — wider than first drafted, because the corpus is bimodal
+- **Tempo.** Base Chill spans 72–124 depending on mood and beat style. Chill Soho is
+  **84–128** — a wide band, because the corpus is bimodal
 - **Bass role.** Base Chill bass anchors a groove. Chill Soho bass is a **melodic voice** with
   its own line
 - **Density.** Lower than base Chill across every track
@@ -223,8 +223,7 @@ steady eighths; kick plays the dotted figure underneath.
 
 - Rim click, 2-bar clave: steps **0, 6, 12** in bar 1 and **20, 26** across the pair
 - Kick: steps **0, 6, 8**, plus **14** in ~60% of bars — the **measured** Latin kick from
-  *Smooth Operator*. An earlier draft specified 0, 6, 12 (a 3-3-2 tresillo), which contradicted
-  the measurement
+  *Smooth Operator*, not the 3-3-2 tresillo the pattern is often described as
 - Closed hat: steady eighths, steps 0–14 even, velocity alternating strong/weak
 - No snare backbeat at any point. The rim click replaces it entirely
 - Kit: Brush Kit or Jazz Drums
@@ -336,14 +335,14 @@ rule indistinguishable in the log while sounding busier than the references.
 
 The signature bossa bass and the rule that should fire most often.
 
-**Measured from *Smooth Operator*, which overturned the first draft of this rule.** It was
-written as two long ringing notes per bar; the record plays four to six short ones.
+**Measured from *Smooth Operator*.** The record plays four to six short notes a bar, not the two
+long ringing ones this bass is usually described as.
 
 - Attacks on steps **0, 6, 8, 14** as the core figure, with **10** and **12** as secondary
   placements. Step 6 is the "and of two" and step 14 the pickup into the next bar
 - **4–6 notes per bar**, not two
 - **Short durations, 2–3 steps.** Median measured duration is 0.46 beats — detached, not
-  ringing. The draft's "5–6 steps, letting notes ring" is wrong and would sound sluggish
+  ringing. Anything near 5–6 steps sounds sluggish here
 - Octave drop on chord-change bars, 30% of the time
 - Fretless Bass for preference
 
@@ -374,9 +373,8 @@ whole songs as single 150–480 note "phrases". Use it for intervals, not for ph
 
 - **Step 0 is always the strongest attack**, in every file
 - **Step 6** ("and of two") and **step 14** (end-of-bar pickup) are consistently next
-- **Note durations are short in the groove rules**: median 0.8–2.5 steps. The draft's "5–6
-  steps, letting notes ring" was wrong for `CHL-BASS-013` and `015`. **`CHL-BASS-014` is the
-  exception** — see below
+- **Note durations are short in the groove rules**: median 0.8–2.5 steps for `CHL-BASS-013` and
+  `015` — these do not ring. **`CHL-BASS-014` is the exception** — see below
 - **Repeated pitches dominate.** Interval 0 is the most common "interval" in every file
   (153–408 occurrences). These basses drive by rhythm and repetition, not by melody
 
@@ -470,7 +468,7 @@ which makes it more important rather than less.
 **In both pools.** It was drafted as "Bossa Comp" and assigned to Latin, but the measurements
 come mostly from *Soul* songs — *Black Cow*, *Your Love Is King*, *Holding Back the Years* —
 with *Smooth Operator* the only Latin source. The figure is general, so the rule is general and
-the name no longer claims otherwise.
+its name does not claim otherwise.
 
 - Chord stabs on the clave positions: steps **0, 6, 12** with the two-bar answer at 20, 26
 - Voicings: rootless, 7th and 9th in the right hand, no doubled root
@@ -550,9 +548,9 @@ all-Latin draft excluded it for being plain; plain is the point here.
 
 The signature lead. Mid-register, answering an implied vocal rather than soloing.
 
-**Measured from the reed channels of the corpus — and the first draft of this rule was wrong
-by roughly a factor of five.** Prose like "long note values, 6–12 steps" produced a rule that
-does not resemble any sax line in the references. The numbers below replace it.
+**Measured from the reed channels of the corpus.** Prose descriptions of this line ("long note
+values, 6–12 steps") are off by roughly a factor of five and produce a rule that resembles no sax
+line in the references. The numbers below are the measurement.
 
 - **Phrase length: median 8 notes**, range 2–24. The draft said 3–5
 - **Note duration: median 1.3 steps.** The draft said 6–12. This is the single largest error —
@@ -661,8 +659,8 @@ than a line — it recurs and varies instead of developing. Weight ~30%.
 
 ### Closure is per-rule, not corpus-wide
 
-An earlier draft said not to port Motorik Europe's closure machinery, on the grounds that only
-16% of Soho phrases close. That aggregate is misleading.
+Only 16% of Soho phrases close, which argues against porting Motorik Europe's closure machinery
+wholesale. That aggregate is misleading.
 
 Closure clusters in the **hook** behaviour — 10/33 in *Avalon* ch3, 6/38 in *Cherish the Day* —
 and is absent from the counter-line (0/22 in *Smooth Operator*, 0/22 across *Half a Minute*
@@ -751,9 +749,6 @@ a gap of roughly 2–15 semitones. `ChillLeadGenerator` already enforces registe
 this confirms the existing behaviour rather than asking for new code.
 
 Pool recommendation: **Alto Sax, Tenor Sax, Synth Brass 1, Trombone, Vibraphone.** (Baritone Sax, p67, is measured in *Half a Minute* but is **not in `Zudio.sf2`** and would play silent.)
-This corrects an earlier line in this plan suggesting Soprano Sax and dropping Trombone —
-neither matches the corpus.
-
 ---
 
 ## Pads
@@ -1074,10 +1069,11 @@ So the model is **kit + optional percussion layer**, not two kits:
 This keeps the two-case groove while matching what the records actually do, and it keeps the
 overlay on the channel that already owns those voices.
 
-### Harmonic rhythm — the "2–4 chord vamp" claim was wrong
+### Harmonic rhythm
 
 Measured from the bass root per bar: chords change about every **1.0–1.5 bars**, with only
-**5–7 distinct roots** across a whole song.
+**5–7 distinct roots** across a whole song — not the "2–4 chord vamp" this music is usually
+described as.
 
 So the vamp is **harmonically narrow but rhythmically active** — a short cycle going round
 quickly, not two chords held for four bars each. *Cherish the Day* is the extreme at **2 roots
@@ -1095,8 +1091,7 @@ across every arrangement map cleanly:
 - **Drums** — kit
 - **Bass** — always one channel, always distinct, 3.8–8.1 notes/bar (median 5.3)
 - **Rhythm** — the main comp: Rhodes/piano or chorused guitar, 5–13 notes/bar
-- **Lead 1** — sax or reed counter-line, **1.1–3.0 notes/bar**. The draft's sparse
-  counter-melody is confirmed
+- **Lead 1** — sax or reed counter-line, **1.1–3.0 notes/bar**: a sparse counter-melody
 - **Lead 2** — the second melodic line, present in most records
 - **Pads** — strings/synth, 1.2–6.2 notes/bar, long durations (1.7–4.0 beats)
 - **Texture** — MIDI horns or bells: `CHL-TEXT-001` halo or `CHL-TEXT-002` stabs
@@ -1145,10 +1140,7 @@ are 4, 8 and 16, and a 16-bar section would strand phrases mid-cycle. That means
 understood. Its non-positional data is used meanwhile: 98 bpm sits inside the band, and it
 corroborates the eighth-note hat and single-backbeat profile of the Soul pool.
 
-### Guitar Pro exports — corrected
-
-**An earlier draft said these exports merged every pitched part onto one channel. That was
-wrong**, and the error was in the analyser, not the files.
+### Guitar Pro exports
 
 They are **Type 1 files with properly named tracks** — "Fretless Bass", "Rhythm Guitar",
 "Vocals", "Drums". Nothing is merged. But all the pitched tracks share **MIDI channel 0**, and
@@ -1181,8 +1173,8 @@ tempo. Not sparseness.
 
 The plan leans heavily on low density as its restraint mechanism. That is still right for
 Lead 1 and Bass, but for Rhythm it is the wrong lever: a busy comp at low velocity with a soft
-backbeat is both authentic and characteristic. `CHL-RHY-008` should allow a denser syncopated
-figure than first drafted, controlled by velocity rather than by note count.
+backbeat is both authentic and characteristic. `CHL-RHY-008` allows a dense syncopated figure,
+controlled by velocity rather than by note count.
 
 ---
 
@@ -1323,9 +1315,9 @@ harmony was already excluded by the reference list and the measurement confirms 
 
 ### The Guitar Pro files needed a track-aware reader
 
-A first pass reported `?` for every quality in those files, and this plan claimed their roots
-were still valid. **That claim was wrong.** Checked against the real Fretless Bass track of
-*You're the Best Thing*, the channel-based reading got the root wrong in **60% of bars** — the
+Reading these files by channel reports `?` for every quality, and its roots are not usable
+either. Checked against the real Fretless Bass track of *You're the Best Thing*, the
+channel-based reading got the root wrong in **60% of bars** — the
 Rhythm Guitar has roughly 15 times more notes than the bass, so the most common pitch class in
 a merged channel is usually a chord tone, not the root.
 
@@ -1439,8 +1431,8 @@ what was built.
 - Groove: **`.sohoLatin` 55% / `.sohoSoul` 45%**, drawn once per song
 - Tempo: one band, **84–128, peak ~100**, independent of groove
 - Modes: base Chill's weights — **Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%**, giving
-  65% minor keys and 59% minor chord-bars. A Soho-specific brighter set was tried and reverted:
-  it reached 47% minor and lost the character the substyle is built on
+  65% minor keys and 59% minor chord-bars. The substyle's character depends on that balance;
+  brightening it toward 47% minor loses it
 
 ### Song structure
 
@@ -1466,8 +1458,7 @@ in 60% of songs, at section ends only in the other 40%:
 - Aeolian — `IVm9 – Vm7 – IVm9 – Im`
 
 The major shapes carry three minor chords out of four, which is most of why a major-key song
-still reads 21% minor by the bar. A brighter all-major alternative was tried and reverted with
-the mode weights.
+still reads 21% minor by the bar.
 
 Every chord is diatonic, so nothing needs snapping. `ChillStructureGenerator.sohoTurnaroundBars`
 reads them back from the finished chord plan by matching roots; the shaker
@@ -1546,18 +1537,16 @@ bars** and plays a turnaround. One of three figures, named in the performance lo
 - **pedal descent** — the same, but each bar pedals its *own* chord root, so the pedal re-roots
   mid-figure
 
-Two earlier versions of the pedal were wrong by ear, both because they let it move: one re-rooted
-per bar *and* reached an octave below the window, to 33, so the root always cleared the line —
-which landed the two bars in different octaves and lurched by a seventh or a ninth mid-figure.
-A pedal that holds matters more than one that always sits under the line.
+The pedal must not move: a root that changes octave mid-figure lurches by a seventh or a ninth,
+and that is the first thing a listener hears. Holding one note matters more than always sitting
+under the line.
 
 Two notes in a row at the same pitch read as one repeated note rather than as an alternation, and
-are eliminated entirely (Zack, 2026-10-12). A pair whose pedal would equal the line note on
-either side of it **drops its pedal** and plays the line note alone; 78% of pedal slots are
-filled, and no figure loses all four. The **line is never moved** to dodge the pedal: positioning
-it clear of the pedal was tried and broke the descent's resolution, because the last note has to
-land a step from the chord the phrase restarts on and lifting the line pushed it away. Nor is the
-root lifted out of the bass register — it stays within 40–52.
+are eliminated entirely. A pair whose pedal would equal the line note on either side of it
+**drops its pedal** and plays the line note alone; 78% of pedal slots are filled, and no figure
+loses all four. The **line is never moved** to dodge the pedal — its last note has to land a step
+from the chord the phrase restarts on, and lifting it breaks that resolution. Nor is the root
+lifted out of the bass register: it stays within 40–52.
 
 **Which treatments a song uses.** `sohoTurnaroundPalette(frame:structure:)` draws two treatments
 (56% of songs) or three (44%) from the six, and `sohoTurnaroundStyle(frame:structure:index:)`
@@ -1569,8 +1558,8 @@ Two bars rather than four: a turnaround fires every 16 bars in most songs, and f
 bass out of its own part for a quarter of the song. The way into a Remix Break takes precedence
 where a bar is both.
 
-**The treatment varies within the song.** A long song carries four or five turnarounds, and
-playing the same figure at every one of them sounded mechanical. Only the **first** turnaround
+**The treatment varies within the song.** A long song carries four or five turnarounds, and the
+same figure at every one of them reads as mechanical. Only the **first** turnaround
 uses the song's primary treatment; each later one steps to a figure the previous turnaround did
 not play, and about a quarter of them use the **original form** — no figure at all, the groove
 rides straight through the chord detour. Over 300 songs the mix is roughly 23% descending, 22%
@@ -1651,14 +1640,13 @@ Soho has its own pools where base Chill's are wrong:
 - **Texture**: Trumpet 30%, Trombone 20%, Muted Trumpet 20%, Vibraphone 20%, Xylophone 10% —
   brass leads at 70% of picks, the two mallets are colour. Brass Section
   (61), Clean Guitar (27) and Baritone Sax (67) are **not in `Zudio.sf2`** and would play silent.
-  **Trumpet is at CC7 80, and Vibraphone and Xylophone at 75** — a mallet attack cuts through the horn punctuation
-  harder than the brass patches it shares the pool with, and open trumpet is the loudest thing in the pool — brighter than the muted trumpet and higher than the trombone. The trumpet's cut is the lighter one: it is the pool's main voice at 30% of picks. French Horns (60) was the section voice
-  until it proved wrong for the punctuation; **Trombone (57)** took its slot. **No synth brass**:
-  the bank-0 Synth Brass 1 and 2 and the bank-8 variation samples 3 and 4 were all tried on this
-  track and all rejected — this music wants real horns. Celesta, Glockenspiel, Solo Vox, Halo Pad
-  and Crystal all came out on 2026-10-12. Nothing left sustains except the brass, so a Sustained
-  Halo song drawing one of the two mallets gets a note that rings and decays inside its written
-  length instead of holding — the brass covers 70% of picks
+  **Trumpet is at CC7 80, Vibraphone and Xylophone at 75.** A mallet attack cuts through the horn
+  punctuation harder than the brass it shares the pool with, and open trumpet is the loudest patch
+  there — brighter than the muted trumpet, higher than the trombone. The trumpet takes the lighter
+  cut because it is the pool's main voice. **No synth brass and no French horn**: this music wants
+  real horns. Nothing in the pool sustains except the brass, so a Sustained Halo song drawing one
+  of the mallets gets a note that rings and decays inside its written length rather than holding —
+  the brass covers 70% of picks
 - **Lead 2**: as above
 - **Bass**: Fretless 37%, Acoustic 37%, **Elec Bass 25%** — base Chill draws all three evenly,
   Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low and Comp**
@@ -1733,31 +1721,30 @@ soundfont work — every patch this substyle needs is already in the Chill pools
 
 ### Harmonic Drone
 
-Four bars, and until 2026-10-12 it was four bars of one unresolved Isus4 with Lead 1 barred from
-it, which made it the dullest section in the substyle: 21% of its bars had nothing pitched
-playing at all, pads reached only 21% of them, and Lead 1 10%.
+Four bars, opening on an unresolved Isus4.
 
 - **The harmony moves once, halfway.** The suspension either resolves onto the tonic (40%), lifts
   to IV (35%), or steps to bVII and returns unresolved into the re-entry (25%). Two bars each, so
-  the section is no busier than before. `buildSohoChordPlan` only, so no other breakdown style and
-  no other substyle is touched
-- **Lead 1 plays through it** — the one breakdown where it does. It is a held chord with nothing
-  else carrying a melody. Drone bars are also removed from the lead's rest mask, because a single
-  rest landing on a four-bar section silenced the lead for all of it
-- Result: bars with nothing pitched fall from 21% to 11%, Lead 1 reaches 49% of drone bars
+  the section is no busier for it. Set in `buildSohoChordPlan` only, so no other breakdown style
+  and no other substyle is touched
+- **Lead 1 plays through it** — the one breakdown where it does, since the drone is a held chord
+  with nothing else carrying a melody. Drone bars are removed from the lead's rest mask as well: a
+  single rest landing on a four-bar section would otherwise silence the lead for all of it
+- 11% of drone bars have nothing pitched playing; Lead 1 reaches 49% of them
 
-Not done, and worth revisiting if it still feels thin: giving the drone a genuinely sustained bed.
-Pads are absent from 15% of these songs entirely (`CHL-PAD-000`), and the ABSENT ruling says a
-track that is absent does not appear at all, so the bed would have to come from the rhythm
-instrument instead.
+**Open:** the drone has no genuinely sustained bed. Pads are absent from 15% of these songs
+entirely (`CHL-PAD-000`), and the ABSENT ruling says an absent track does not appear at all, so a
+bed would have to come from the rhythm instrument.
 
 ### CHL-LD1-011 Sustained Tone — the phrase around the held note
 
-A held tone on its own sounded wrong wherever it appeared (Zack, 2026-10-12), so **every phrase
-carries an answering figure** — two to four notes, exactly one of them long.
+**Every phrase carries an answering figure** — two to four notes, exactly one of them long. A
+held tone on its own does not work here: the lead is often the only thing moving, so it reads as
+a stall rather than as space.
 
-The **held note is 1.5, 2, 2.5 or 3 bars** (24, 32, 40 or 48 steps), weighted 30/30/25/15. It was
-a continuous 32–48 steps before, which read as "always three bars".
+The **held note is 1, 1.5, 2 or 2.5 bars** (16, 24, 32 or 40 steps), weighted 22/32/28/18. A
+figure's length belongs to the figure, not to each statement of it, so a restatement is the same
+phrase again rather than the same ornament with a new tail.
 
 The figure beside it is **measured, not invented** — `tools/soho_sustained.py` finds every phrase
 in the corpus containing a note of three beats or more (42 of them across the 14 files) and
@@ -1774,20 +1761,18 @@ The cells are lifted from Holding Back the Years, Black Cow and Your Love Is Kin
 intervals are semitones from the held tone, snapped to the scale at use, so the contour is the
 measurement and the pitches stay diatonic.
 
-### CHL-LD1-012 Tight Hook — two hooks, not one
+### CHL-LD1-012 Tight Hook — three hooks in conversation
 
-Measured from **Avalon**, whose lead channel plays **16 phrases in 9 distinct shapes**: its main
-figure recurs five times, a second three times, a third twice, then one-offs. The rule used to
-draw **one** hook and nudge it every ten bars, so a song was that one figure with minor
-variations throughout — monotonous (Zack, 2026-10-13).
+Measured from **Avalon**, whose lead channel plays **13 phrases across three recurring contours**
+— `[+2,-2]` seven times, `[0,+2]` three, `[+3,0]` twice — each appearing in one or two rhythms.
+A dominant figure and two foils, not one figure and not thirty.
 
 - **Three hooks per song**, weighted 55 / 25 / 20 as Avalon weights its own (7 / 3 / 2 across its three recurring contours). Each must differ in note count *and* rhythm, and must move rather
   than repeat pitches. Each mutates independently as the song goes
-- **Episodes alternate.** Drawing independently at 65% stacked up runs of eight identical
-  statements, so a hook that just played gets one chance to be passed over
+- **A hook that just played gets one chance to be passed over**, which keeps episodes from
+  stacking into long runs of the same statement
 - **Alternation is the norm, repetition the exception.** Three statements of one hook read as a
-  carbon copy; `A B A` reads as a call and its answer, and that is what makes a section sound
-  musical rather than mechanical (Zack, 2026-10-13). An episode's plan is drawn by its length:
+  carbon copy; `A B A` reads as a call and its answer. An episode's plan is drawn by its length:
   a pair is `A B` 65% of the time, a three is `A B A` 46% / `A A B` 24% / `A B B` 20% / `A A A`
   10%, and a four alternates in four shapes with `A A A A` at 7%. B is a *different hook*, so it
   differs in notes, not only in phrasing
@@ -1795,30 +1780,28 @@ variations throughout — monotonous (Zack, 2026-10-13).
   natural move is `B A B`, so 60% of the time the previous episode's second hook leads the next
 - Straight copies now run 19% of two-statement episodes, 2% of threes, 0% of fours — **6%
   overall**, rare enough to build a little tension when one does land
-- **Hooks are drawn from `counterLineCells`**, the bank that gives the reed and flute cells full
-  weight, not the vocal-weighted `cellBank` whose heaviest entry is literally `[0, 0, -2]`.
-  Avalon's hook is a flute line. On the vocal bank a statement came out as `0, 0, -2, 0, 0` —
-  one note stuttering, not a figure
-- **A measured fallback.** Hooks are built by concatenating cells, so a drawn hook can be nearly
-  all repeated pitches no matter how often it is redrawn. If twenty-four draws all fail the
-  movement test, Avalon's own figures are used: `[+2, -2]` over durs `[2, 1, 3]` (its x5 hook) and
-  `[0, +5, -5, 0]` over `[2, 1, 2, 3, 1]`
+- **Hooks are drawn from `counterLineCells`**, the bank that gives the reed and flute cells their
+  full weight — Avalon's hook is a flute line. The vocal-weighted `cellBank` has `[0, 0, -2]` as
+  its heaviest entry, and since hooks are built by concatenating cells it yields figures that
+  stutter one pitch rather than play a shape
+- **A measured fallback.** A drawn hook can still come out mostly repeated pitches, so if
+  twenty-four draws all fail the movement test, Avalon's own figures stand in: `[+2, -2]` over
+  durs `[2, 1, 3]` and `[0, +5, -5, 0]` over `[2, 1, 2, 3, 1]`
 
-Result across 96 Tight Hook songs: statements that are mostly repeated pitch fell from 30% to 3%,
-and the commonest statement takes a median 17% of a song (worst 52%), so no song is one figure
-throughout. Distinct shapes per statement: 39% against Avalon's 56%.
+Across 96 Tight Hook songs: 3% of statements are mostly repeated pitch, the commonest statement
+takes a median 17% of a song, and distinct shapes run 39% of statements against Avalon's 56%.
 
 ### CHL-LD2-002 Shadow Hold — a companion for the held note
 
-**Every Chill form**, base and Soho alike (Zack, 2026-10-13). A lone held note sounded wrong on
-Lead 1's Sustained Tone and sounds wrong here for the same reason, so **70% of holds get a
-companion** — about 76% end up with one once placement constraints are applied.
+**Every Chill form**, base and Soho alike. A lone held note does not work here any more than it
+does on Lead 1's Sustained Tone, so **70% of holds get a companion** — about 76% end up with one
+once placement constraints are applied.
 
-This is the one change in the substyle's history that deliberately alters released base Chill
-songs. Base Chill draws Shadow Hold on 53% of its songs (the gate is 50%; Soho's is 25%, drawing
-17%), and **92 of the ~178 base Chill songs in the fingerprint sample changed — 52%, matching the
-share that use the rule**. Verified that nothing else leaked: re-gating this one change to Soho
-returns 229 of 229 base Chill songs identical.
+This is the one Soho change that deliberately alters released base Chill songs. Base Chill draws
+Shadow Hold on 53% of its songs (the gate is 50%; Soho's is 25%, drawing 17%), so **92 of the
+~178 base Chill songs in the fingerprint sample differ from the pre-Soho baseline — 52%, matching
+the share that use the rule**. Nothing else in the substyle touches base Chill: re-gating this one
+change to Soho returns 229 of 229 base Chill songs identical.
 
 Shape and intervals come from the same corpus measurement as Sustained Tone
 (`tools/soho_sustained.py`): a short note of two steps, on the unison or within a tone or two of
@@ -1831,8 +1814,8 @@ the bar after the hold lets go; neither can make a third note in one bar.
 
 ### Lead 2 sitting out
 
-Lead 2 sits out the opening **8–16 bars** of a groove section about a third of the time. It used
-to sit out the *whole* section: in a two-section song with a 56-bar B that meant vanishing from
-bar 45 to the end while the log still listed a rule and a note count for it, and **29% of Soho
-songs had Lead 2 silent for over 40% of their length** (Zack, 2026-10-12). Now 2% do, and the
-longest silence seen across 400 songs fell from 105 bars to 62.
+Lead 2 sits out the opening **8–16 bars** of a groove section about a third of the time — the
+section opens without the reply and the sax arrives later. It is bounded deliberately: sitting
+out a whole section would mean vanishing for more than half of a two-section song while the log
+still listed a rule and a note count for the track. 2% of Soho songs have Lead 2 silent for more
+than 40% of their length, and the longest silence across 400 songs is 62 bars.
