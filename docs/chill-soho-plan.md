@@ -1683,7 +1683,7 @@ Soho has its own pools where base Chill's are wrong:
   and synth brass do not. An index-based rule silently re-aimed itself the moment the Lead 1
   pools were split per form
 - **Pads**: Strings Slow 42%, Halo Pad 33%, Bowed Glass 25% (at CC7 127, the ceiling — it is a soft patch).
-  Halo Pad and Bowed Glass are Soho's alone; Strings Slow (p49) is shared with Blues, which holds
+  All three are Soho's alone — Strings Slow (p49) was in Blues too until it was dropped there. Blues holds
   every other string patch in Chill so they can be compared. Concert Choir was tried here and
   removed — the pads are too busy a part to carry a choir, and the Texture track that might have
   suited it occasionally is doing horn hits (Zack, 2026-10-13). Halo Pad is the longest-sustaining pad voice in the corpus
