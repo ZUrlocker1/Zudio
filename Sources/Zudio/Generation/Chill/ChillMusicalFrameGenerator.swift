@@ -159,19 +159,23 @@ struct ChillMusicalFrameGenerator {
     /// specified mood-dependent instrument choice, e.g. muted trumpet/sax for Deep/Dream, but that
     /// was never wired up; the parameter was dead code. Removed rather than implemented, to match
     /// the flat, mood-independent selection every other Chill track generator already uses.)
+    /// Base Chill's lead, drawn evenly. **Muted Trumpet is base Chill's alone** — Soho and Blues
+    /// both dropped it. Clarinet moved out to Blues (Zack, 2026-10-13).
+    /// Mirrored by `instrumentPoolNames(kTrackLead1, .chill)`; keep the two in step.
     private static func pickLeadInstrument(rng: inout SeededRNG) -> ChillLeadInstrument {
-        let insts: [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
+        let insts: [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax]
         return insts[rng.nextInt(upperBound: insts.count)]
     }
 
     /// Chill Soho's lead, weighted to the corpus rather than drawn evenly. Across the 14 files
     /// Tenor Sax appears in 6, Alto Sax in 4 and **Flute in 4** — the flute standing in for the
-    /// singer is a voice base Chill's pool does not have at all. Muted trumpet, trumpet and
-    /// clarinet stay in but take the smaller share; the clarinet is barely in the corpus.
+    /// singer, and a voice neither other Chill form has. Muted Trumpet and Clarinet were dropped
+    /// to keep the substyle distinct (Zack, 2026-10-13); the clarinet is barely in the corpus
+    /// anyway. Mirrored by the `isChillSoho` branch of `instrumentPoolNames` and by
+    /// `instrumentPickPoolStatic`; all three must stay in step.
     private static func pickLeadInstrumentSoho(rng: inout SeededRNG) -> ChillLeadInstrument {
-        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .flute,
-                                            .mutedTrumpet, .trumpet, .clarinet]
-        return insts[rng.weightedPick([0.25, 0.20, 0.20, 0.15, 0.12, 0.08])]
+        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .trumpet, .flute]
+        return insts[rng.weightedPick([0.32, 0.26, 0.16, 0.26])]
     }
 
     /// Chill Soho: Latin 55% / Soul 45%, matching the reference set. The drum, bass and rhythm
@@ -187,9 +191,11 @@ struct ChillMusicalFrameGenerator {
         return styles[rng.nextInt(upperBound: styles.count)]
     }
 
+    /// Blues's lead, drawn evenly. **Clarinet is Blues's alone** — its reediest voice, and the
+    /// one base Chill and Soho both gave up. Muted Trumpet dropped out here (Zack, 2026-10-13).
+    /// Mirrored by the `isChillBlues` branch of `instrumentPoolNames`; keep the two in step.
     private static func pickLeadInstrumentBlues(rng: inout SeededRNG) -> ChillLeadInstrument {
-        // Blues pool: same five horn/reed instruments, equally weighted.
-        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .clarinet, .mutedTrumpet, .trumpet]
+        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .trumpet, .clarinet]
         return insts[rng.nextInt(upperBound: insts.count)]
     }
 

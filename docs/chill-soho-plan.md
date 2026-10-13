@@ -1664,10 +1664,12 @@ Soho has its own pools where base Chill's are wrong:
   any other instrument, and neither is in `Zudio.sf2`. Muted Guitar is the damped offbeat chord
   this music comps on; Nylon is warmer and suits the Latin side. Hawaiian Guitar (`8026`, which
   sits in Jazz Guitar's slot in the SC-55 bank) was tried here and is out
-- **Lead 1**: Tenor Sax 25%, **Flute 20%**, Alto Sax 17%, Muted Trumpet 15%, Trumpet 12%,
-  Clarinet 8%. Weighted to the corpus — Tenor Sax appears in 6 of the 14 files, Alto Sax in 4 and
-  Flute in 4, the flute standing in for the singer. Base Chill has no flute in its lead pool and
-  draws all five of its instruments evenly. Set in
+- **Lead 1**: Tenor Sax 32%, **Flute 26%**, Alto Sax 26%, Trumpet 16%. Weighted to the corpus —
+  Tenor Sax appears in 6 of the 14 files, Alto Sax in 4 and Flute in 4, the flute standing in for
+  the singer. Muted Trumpet and Clarinet are out (Zack, 2026-10-13), which leaves each Chill form
+  one lead the other two do not have: **Flute** is Soho's, **Clarinet** is Blues's, **Muted
+  Trumpet** is base Chill's. Soho is also the only form whose lead is weighted; base Chill and
+  Blues draw their four evenly. Set in
   `ChillMusicalFrameGenerator.pickLeadInstrumentSoho`, **not** in the AppState pool: Lead 1's
   instrument is chosen in the frame generator, unlike every other track. The pool still has to
   *contain* everything that picker can choose — `AppState` maps the generated instrument back to a

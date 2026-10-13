@@ -560,7 +560,8 @@ final class AppState: ObservableObject {
     ]
 
     nonisolated static func instrumentPoolNames(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
-                                                isChillSoho: Bool = false) -> [String] {
+                                                isChillSoho: Bool = false,
+                                                isChillBlues: Bool = false) -> [String] {
         // Chill Soho texture is MIDI, never audio: horns for the stabs, bells and vibes for colour.
         // Every program was checked against Zudio.sf2 (tools/sf2_drum_keys.py's sibling check) —
         // Brass Section (61), the obvious section voice, is NOT in the soundfont and would play
@@ -581,7 +582,13 @@ final class AppState: ObservableObject {
         // index carried over from another Chill song still means the same instrument.
         // The WEIGHTS live in ChillMusicalFrameGenerator.pickLeadInstrumentSoho, which is what
         // actually chooses Lead 1 for a song — keep the two in step.
-        if isChillSoho && style == .chill && trackIndex == kTrackLead1 { return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet","Flute"] }
+        // Chill Lead 1, one pool per form, each with a voice the other two do not have: Flute is
+        // Soho's, Clarinet is Blues's, Muted Trumpet is base Chill's. The WEIGHTS live in
+        // ChillMusicalFrameGenerator's three pickers, which is what actually chooses Lead 1 for a
+        // song — a pool must contain everything its picker can choose or the instrument never
+        // reaches the sampler. (Zack, 2026-10-13)
+        if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return ["Tenor Sax","Alto Sax","Trumpet","Flute"] }
+        if style == .chill && trackIndex == kTrackLead1 && isChillBlues { return ["Tenor Sax","Alto Sax","Trumpet","Clarinet"] }
         // Chill Soho Lead 2: what answers the singer in the corpus. Baritone Sax (67) was measured
         // too but is not in Zudio.sf2.
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return ["Alto Sax","Tenor Sax","Synth Brass 1","Trombone","Vibraphone"] }
@@ -594,7 +601,7 @@ final class AppState: ObservableObject {
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
-        case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet"]
+        case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet"]
         case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
@@ -636,17 +643,19 @@ final class AppState: ObservableObject {
     /// MIDI program numbers for each slot in instrumentPoolNames — same order, same count.
     /// Only covers the tracks that can be "fresh" in Evolve passes (Lead1, Lead2, Pads, Rhythm).
     nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
-                                                   isChillSoho: Bool = false) -> [Int] {
+                                                   isChillSoho: Bool = false,
+                                                   isChillBlues: Bool = false) -> [Int] {
         // Chill Soho MIDI texture — names and the reasons are in instrumentPoolNames.
         // Trombone replaced French Horns, which did not work for the punctuation (Zack,
         // 2026-10-12). Brass Section (61) is not in Zudio.sf2 and would play silent.
         if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 57, 59, 11, 13] }
-        if isChillSoho && style == .chill && trackIndex == kTrackLead1 { return [59, 66, 65, 56, 71, 73] }
+        if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return [66, 65, 56, 73] }
+        if style == .chill && trackIndex == kTrackLead1 && isChillBlues { return [66, 65, 56, 71] }
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
         if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 17, 16, 61001, 18, 8016, 28, 24] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
-        case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
+        case (kTrackLead1, .chill):    return [59, 66, 65, 56]
         case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111]  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
@@ -689,9 +698,10 @@ final class AppState: ObservableObject {
     /// CC7 channel-volume override per pool slot (0 = use default 100).
     /// Entries that differ from 100 are listed explicitly; all others return 100.
     nonisolated static func instrumentPoolVolumeCC7(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
-                                                    isChillSoho: Bool = false) -> [Int] {
+                                                    isChillSoho: Bool = false,
+                                                    isChillBlues: Bool = false) -> [Int] {
         let names = instrumentPoolNames(trackIndex: trackIndex, style: style, isKosmicDrift: isKosmicDrift,
-                                        isChillSoho: isChillSoho)
+                                        isChillSoho: isChillSoho, isChillBlues: isChillBlues)
         return names.map { name in
             switch (trackIndex, style, name) {
             // Square Lead (program 80) at default CC7 100 — PlaybackEngine vol 0.78 handles calibration
@@ -1403,7 +1413,8 @@ final class AppState: ObservableObject {
                 // (phrasing, register); instrumentOverrides drives the sampler patch — they must match.
                 if style == .chill {
                     let l1Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill,
-                                                             isChillSoho: state.chillSohoVariation)
+                                                             isChillSoho: state.chillSohoVariation,
+                                                             isChillBlues: state.chillBluesVariation)
                     if let idx = l1Pool.firstIndex(of: Int(state.chillLeadInstrument.gmProgram)) {
                         self.instrumentOverrides[kTrackLead1] = idx
                     }
@@ -2258,11 +2269,15 @@ final class AppState: ObservableObject {
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
         case kTrackLead1 where isSoho:
-            // [0=Muted Trumpet, 1=Tenor Sax, 2=Alto Sax, 3=Trumpet, 4=Clarinet, 5=Flute].
-            // Mirrors ChillMusicalFrameGenerator.pickLeadInstrumentSoho (25/20/20/15/12/8) — that
-            // is what picks Lead 1 for a generated song, this is what a manual randomise may pick,
-            // and they must not drift apart.
-            return [0,0,0,0, 1,1,1,1,1,1, 2,2,2,2,2, 3,3,3, 4,4, 5,5,5,5,5].filter { $0 < poolCount }
+            // [0=Tenor Sax, 1=Alto Sax, 2=Trumpet, 3=Flute]. Mirrors
+            // ChillMusicalFrameGenerator.pickLeadInstrumentSoho (32/26/16/26) — that is what picks
+            // Lead 1 for a generated song, this is what a manual randomise may pick, and the two
+            // must not drift apart.
+            return [0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1, 2,2,2,2, 3,3,3,3,3,3,3].filter { $0 < poolCount }
+        case kTrackLead1 where isBlues:
+            // [0=Tenor Sax, 1=Alto Sax, 2=Trumpet, 3=Clarinet], drawn evenly as
+            // pickLeadInstrumentBlues does.
+            return [0, 1, 2, 3].filter { $0 < poolCount }
         case kTrackRhythm where isSoho:
             // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=Perc Organ, 4=Stereo Piano, 5=Rock Organ,
             //  6=Tonewheel, 7=Muted Guitar, 8=Nylon Guitar] — roughly half keys, half guitar.
