@@ -14,6 +14,9 @@
 # Re-pinned 2026-10-13: Chill moved deliberately — the Shadow Hold companion note across all Chill
 # forms, and Blues 20% -> 15% to make room for a 70/15/15 Soho/Blues/base split. Motorik, Kosmic
 # and Ambient were byte-identical through that change and remain pinned where they always were.
+#
+# NOTE: 70/15/15 is a TESTING mix for tuning Chill Soho and will be reverted before release.
+# Reverting it reclassifies seeds and will show a large Chill diff — expected, re-pin again then.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SP="${ROOT}/tools/fingerprints"
 cd "$ROOT" || exit 1

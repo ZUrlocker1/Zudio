@@ -144,8 +144,8 @@ Blues rather than duplicated; the two use it differently, and the reasoning is u
 A new `chillSohoVariation: Bool` on `SongState`, mirroring `chillBluesVariation`.
 
 Roll in `ChillMusicalFrameGenerator` on a derived stream so existing songs still reproduce.
-Chill splits **70% Soho, 15% Blues, 15% base**. Blues and Soho are mutually exclusive — a song is
-never both.
+Chill is at **70% Soho, 15% Blues, 15% base** while Soho is being tuned; see *Activation* below
+for the revert. Blues and Soho are mutually exclusive — a song is never both.
 
 `displayStyleName` returns `"Chill Soho"` when the flag is set, and the `.zudio` file carries it
 on the `Substyle:` line. `Style:` stays `Chill` so the loader still parses it.
@@ -1425,13 +1425,20 @@ what was built.
 
 ### Activation, tempo and mode
 
-- Chill splits **70% Soho / 15% Blues / 15% base** (Zack, 2026-10-13). Blues and Soho are
-  mutually exclusive. Blues takes its 15% first, on the main stream;
-  `ChillMusicalFrameGenerator.sohoShareOfNonBlues` is `70/85`, the Soho share of what is left.
-  Measured over 4,000 songs: 70.0% / 15.2% / 14.8%
-- Blues moved from 20% to 15% to make room. That draw is on the main stream, so it is the one
+- Chill is at **70% Soho / 15% Blues / 15% base** (Zack, 2026-10-13), measured over 4,000 songs
+  as 70.0% / 15.2% / 14.8%. Blues and Soho are mutually exclusive. Blues takes its 15% first, on
+  the main stream; `ChillMusicalFrameGenerator.sohoShareOfNonBlues` is `70/85`, the Soho share of
+  what is left
+- **This is a testing mix and must be reverted before a release build.** It exists so that
+  tuning Soho means hearing Soho. The final split is Zack's call and has not been named; the
+  values before it were `rng.nextDouble() < 0.20` for Blues and `sohoShareOfNonBlues = 0.25`,
+  giving the originally planned 60% base / 20% Blues / 20% Soho
+- Blues moved from 20% to 15% to make room. That draw is on the **main** stream, so it is the one
   Soho-era change that reclassifies existing Blues songs: **11 of 300 baseline seeds stop being
-  Blues** (none become Blues), 8 of them becoming Soho and 3 base Chill
+  Blues** (none become Blues), 8 becoming Soho and 3 base Chill. Restoring `0.20` puts them back
+  and they reproduce their original songs
+- Reverting the mix means **re-pinning `tools/fingerprints/baseline.txt`**, which was re-pinned
+  with this mix in it — see *Verification*
 - Groove: **`.sohoLatin` 55% / `.sohoSoul` 45%**, drawn once per song
 - Tempo: one band, **84–128, peak ~100**, independent of groove
 - Modes: base Chill's weights — **Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%**, giving
