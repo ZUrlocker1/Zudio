@@ -748,9 +748,11 @@ final class AppState: ObservableObject {
             // patches, which are pads and organs sitting further back.
             case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
-            // Bowed Glass is a soft patch and sat under the rest of the Chill pad pool. Lifted
-            // for any Chill form that carries it, not just Soho (Zack, 2026-10-13).
-            case (kTrackPads,    .chill,   "Bowed Glass"):  return 115
+            // Bowed Glass is a soft patch and sat under the rest of the Chill pad pool. 115 was
+            // still too quiet, so it now takes the CC7 ceiling (Zack, 2026-10-13). Nothing more
+            // is available through channel volume; a further lift would need
+            // PlaybackEngine's boostBaseMultiplier, which drives the gain node past unity.
+            case (kTrackPads,    .chill,   "Bowed Glass"):  return 127
             // Chill Soho Lead 2 only — base Chill's Lead 2 pool has no Synth Brass. It is the
             // loudest and brightest patch in that pool and sat over the top of Lead 1.
             case (kTrackLead2,   .chill,   "Synth Brass 1"): return 70
