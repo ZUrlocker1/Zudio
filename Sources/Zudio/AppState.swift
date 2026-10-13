@@ -597,7 +597,7 @@ final class AppState: ObservableObject {
         // them more notes than anything else — and neither is in Zudio.sf2. These three are what
         // it has: Muted Guitar is the damped offbeat chord this music comps on, Nylon is warmer
         // and suits the Latin side, Hawaiian sits in the SC-55 bank at GM 26, Jazz Guitar's slot.
-        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar"] }
+        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return ["Rhodes","Wurlitzer","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar"] }
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
@@ -675,7 +675,7 @@ final class AppState: ObservableObject {
         if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return [66, 65, 73, 64, 74] }
         if style == .chill && trackIndex == kTrackLead1 && isChillBlues { return [66, 65, 56, 71] }
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
-        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 17, 16, 61001, 18, 8016, 24] }
+        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 16, 61001, 18, 8016, 24] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56]
@@ -2344,13 +2344,15 @@ final class AppState: ObservableObject {
             // pickLeadInstrumentBlues does.
             return [0, 1, 2, 3].filter { $0 < poolCount }
         case kTrackRhythm where isSoho:
-            // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=Perc Organ, 4=Stereo Piano, 5=Rock Organ,
-            //  6=Tonewheel, 7=Nylon Guitar]. Nylon 20%, Stereo Piano and Rhodes 23% each,
-            // Wurlitzer 17%, B3 10%, Tonewheel 7% (Zack, 2026-10-13). Muted Guitar is out,
-            // leaving Nylon as the only guitar the soundfont can do for this music.
+            // [0=Rhodes, 1=Wurlitzer, 2=Perc Organ, 3=Stereo Piano, 4=Rock Organ, 5=Tonewheel,
+            //  6=Nylon Guitar] — Rhodes 28%, Stereo Piano 24%, Nylon Guitar 24%, Wurlitzer 16%,
+            // Tonewheel 8%. B3 Organ was dropped from Soho because base Chill and Blues both
+            // draw it (Zack, 2026-10-13); Perc Organ and Rock Organ stay in the pool, as in base
+            // Chill, but are never drawn outside Blues. Muted Guitar is out, leaving Nylon as the
+            // only guitar the soundfont can do for this music.
             // Filtered by poolCount so a caller sizing without isChillSoho cannot overrun the
             // 7-entry base Chill list.
-            return [0,0,0,0,0,0,0, 1,1,1,1,1, 2,2,2, 4,4,4,4,4,4,4, 6,6, 7,7,7,7,7,7]
+            return [0,0,0,0,0,0,0, 1,1,1,1, 3,3,3,3,3,3, 5,5, 6,6,6,6,6,6]
                 .filter { $0 < poolCount }
         case kTrackRhythm:
             return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4,6,6]

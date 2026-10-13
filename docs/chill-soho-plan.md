@@ -1658,8 +1658,9 @@ Soho has its own pools where base Chill's are wrong:
   real horns. Nothing in the pool sustains except the brass, so a Sustained Halo song drawing one
   of the mallets gets a note that rings and decays inside its written length rather than holding —
   the brass covers 70% of picks
-- **Rhythm**: Muted Guitar 23%, Nylon Guitar 23%, Rhodes 17%, Wurlitzer 11%, Stereo Piano 11%,
-  B3 5%, Tonewheel 5% — roughly half keys, half guitar. Guitar is the corpus's dominant comping
+- **Rhythm**: Rhodes 28%, Stereo Piano 24%, **Nylon Guitar 24%**, Wurlitzer 16%, Tonewheel 8%.
+  B3 Organ was dropped from Soho because base Chill and Blues both draw it. Nylon Guitar always
+  takes tremolo, at 4 Hz and 0.32 depth rather than the organs' 8 Hz and 0.40. Guitar is the corpus's dominant comping
   voice: Jazz Guitar is in 8 of the 14 records and Clean Guitar in 7, between them more notes than
   any other instrument, and neither is in `Zudio.sf2`. Muted Guitar is the damped offbeat chord
   this music comps on; Nylon is warmer and suits the Latin side. Hawaiian Guitar (`8026`, which
