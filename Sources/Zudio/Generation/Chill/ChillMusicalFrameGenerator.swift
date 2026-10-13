@@ -169,13 +169,16 @@ struct ChillMusicalFrameGenerator {
 
     /// Chill Soho's lead, weighted to the corpus rather than drawn evenly. Across the 14 files
     /// Tenor Sax appears in 6, Alto Sax in 4 and **Flute in 4** — the flute standing in for the
-    /// singer, and a voice neither other Chill form has. Muted Trumpet and Clarinet were dropped
-    /// to keep the substyle distinct (Zack, 2026-10-13); the clarinet is barely in the corpus
-    /// anyway. Mirrored by the `isChillSoho` branch of `instrumentPoolNames` and by
+    /// singer, and a voice neither other Chill form has. Muted Trumpet, Clarinet and then Trumpet
+    /// were dropped to keep the substyle distinct (Zack, 2026-10-13) — trumpet is in only 1 of
+    /// the 14 files, and for 154 notes. **Soprano Sax and Recorder are on trial** in its place:
+    /// Recorder is in 1 file for 313 notes, Soprano Sax in none, so this is the first Soho pool
+    /// chosen partly against the measurement rather than from it.
+    /// Mirrored by the `isChillSoho` branch of `instrumentPoolNames` and by
     /// `instrumentPickPoolStatic`; all three must stay in step.
     private static func pickLeadInstrumentSoho(rng: inout SeededRNG) -> ChillLeadInstrument {
-        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .trumpet, .flute]
-        return insts[rng.weightedPick([0.32, 0.26, 0.16, 0.26])]
+        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .flute, .sopranoSax, .recorder]
+        return insts[rng.weightedPick([0.30, 0.22, 0.22, 0.13, 0.13])]
     }
 
     /// Chill Soho: Latin 55% / Soul 45%, matching the reference set. The drum, bass and rhythm

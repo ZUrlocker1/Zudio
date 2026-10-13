@@ -1664,17 +1664,24 @@ Soho has its own pools where base Chill's are wrong:
   any other instrument, and neither is in `Zudio.sf2`. Muted Guitar is the damped offbeat chord
   this music comps on; Nylon is warmer and suits the Latin side. Hawaiian Guitar (`8026`, which
   sits in Jazz Guitar's slot in the SC-55 bank) was tried here and is out
-- **Lead 1**: Tenor Sax 32%, **Flute 26%**, Alto Sax 26%, Trumpet 16%. Weighted to the corpus —
-  Tenor Sax appears in 6 of the 14 files, Alto Sax in 4 and Flute in 4, the flute standing in for
-  the singer. Muted Trumpet and Clarinet are out (Zack, 2026-10-13), which leaves each Chill form
-  one lead the other two do not have: **Flute** is Soho's, **Clarinet** is Blues's, **Muted
-  Trumpet** is base Chill's. Soho is also the only form whose lead is weighted; base Chill and
-  Blues draw their four evenly. Set in
+- **Lead 1**: Tenor Sax 30%, **Flute 22%**, Alto Sax 22%, **Soprano Sax 13%**, **Recorder 13%**.
+  No brass at all — Muted Trumpet, Clarinet and Trumpet are all out (Zack, 2026-10-13), the last
+  because it is in only 1 of the 14 files and for 154 notes. The first three follow the corpus:
+  Tenor Sax is in 6 files, Alto Sax in 4, Flute in 4, the flute standing in for the singer.
+  **Soprano Sax and Recorder are on trial** — Recorder is in 1 file for 313 notes and Soprano Sax
+  in none, making this the first Soho pool chosen partly against the measurement rather than from
+  it. Each Chill form keeps leads the others do not: Soho has flute, soprano sax and recorder,
+  **Clarinet** is Blues's, **Muted Trumpet** is base Chill's. Soho is also the only form whose
+  lead is weighted; base Chill and Blues draw their four evenly. Set in
   `ChillMusicalFrameGenerator.pickLeadInstrumentSoho`, **not** in the AppState pool: Lead 1's
   instrument is chosen in the frame generator, unlike every other track. The pool still has to
   *contain* everything that picker can choose — `AppState` maps the generated instrument back to a
   pool index, and a lookup that fails leaves the override unset, so the song plays on whatever
   patch was already loaded
+- **Lead vibrato** fires on 20% of songs and is matched by instrument *name*, not pool index:
+  the saxes, open trumpet and trombone take it; flute, recorder, muted trumpet, the mallets
+  and synth brass do not. An index-based rule silently re-aimed itself the moment the Lead 1
+  pools were split per form
 - **Lead 2**: as above
 - **Bass**: Fretless 37%, Acoustic 37%, **Elec Bass 25%** — base Chill draws all three evenly,
   Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low and Comp**

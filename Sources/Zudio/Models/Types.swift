@@ -360,10 +360,12 @@ enum ChillLeadInstrument: String, Codable, Sendable {
     case trombone      // GM 57 — warm low brass; Lead 2
     case clarinet      // GM 71 — chalumeau register; Lead 1 (blues/jazz)
     case synthBrass    // GM 62 — Synth Brass 1; Chill Soho Lead 2 only
+    case recorder      // GM 74 — wooden and soft; Chill Soho Lead 1 only
 
     var gmProgram: UInt8 {
         switch self {
         case .flute:        return 73
+        case .recorder:     return 74
         case .mutedTrumpet: return 59
         case .vibraphone:   return 11
         case .saxophone:    return 65

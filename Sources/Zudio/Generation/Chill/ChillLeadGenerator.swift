@@ -280,6 +280,7 @@ struct ChillLeadGenerator {
             let phraseLen: Int
             switch leadInstrument {
             case .flute:         phraseLen = 3 + rng.nextInt(upperBound: 2)   // 3–4 bars
+            case .recorder:      phraseLen = 3 + rng.nextInt(upperBound: 2)   // 3–4 bars, as the flute
             case .mutedTrumpet:  phraseLen = 2                                 // 2 bars (punchy)
             case .vibraphone:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             case .saxophone:     phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
@@ -688,6 +689,7 @@ struct ChillLeadGenerator {
         } else {
             switch leadInstrument {
             case .flute:        notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3
+            case .recorder:     notesPerBar = 2 + rng.nextInt(upperBound: 2)   // 2–3
             case .mutedTrumpet: notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4
             case .trumpet:      notesPerBar = 3 + rng.nextInt(upperBound: 2)   // 3–4
             case .vibraphone:   notesPerBar = 3 + rng.nextInt(upperBound: 3)   // 3–5
@@ -708,6 +710,7 @@ struct ChillLeadGenerator {
         let noteDurSteps: Int
         switch leadInstrument {
         case .flute:        noteDurSteps = 8 + rng.nextInt(upperBound: 5)   // 8–12 steps (legato)
+        case .recorder:     noteDurSteps = 8 + rng.nextInt(upperBound: 5)   // 8–12 steps (legato)
         case .mutedTrumpet: noteDurSteps = 2 + rng.nextInt(upperBound: 3)   // 2–4 steps (staccato)
         case .trumpet:      noteDurSteps = 3 + rng.nextInt(upperBound: 3)   // 3–5 steps
         case .vibraphone:   noteDurSteps = 4 + rng.nextInt(upperBound: 5)   // 4–8 steps
@@ -1131,6 +1134,7 @@ struct ChillLeadGenerator {
     static func register(for instrument: ChillLeadInstrument) -> (low: Int, high: Int) {
         switch instrument {
         case .flute:        return (65, 85)
+        case .recorder:     return (65, 81)   // narrower than the flute; thin above this
         case .mutedTrumpet: return (58, 80)
         case .trumpet:      return (58, 79)
         case .vibraphone:   return (60, 80)

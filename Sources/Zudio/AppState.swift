@@ -587,7 +587,7 @@ final class AppState: ObservableObject {
         // ChillMusicalFrameGenerator's three pickers, which is what actually chooses Lead 1 for a
         // song — a pool must contain everything its picker can choose or the instrument never
         // reaches the sampler. (Zack, 2026-10-13)
-        if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return ["Tenor Sax","Alto Sax","Trumpet","Flute"] }
+        if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return ["Tenor Sax","Alto Sax","Flute","Soprano Sax","Recorder"] }
         if style == .chill && trackIndex == kTrackLead1 && isChillBlues { return ["Tenor Sax","Alto Sax","Trumpet","Clarinet"] }
         // Chill Soho Lead 2: what answers the singer in the corpus. Baritone Sax (67) was measured
         // too but is not in Zudio.sf2.
@@ -649,7 +649,7 @@ final class AppState: ObservableObject {
         // Trombone replaced French Horns, which did not work for the punctuation (Zack,
         // 2026-10-12). Brass Section (61) is not in Zudio.sf2 and would play silent.
         if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 57, 59, 11, 13] }
-        if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return [66, 65, 56, 73] }
+        if style == .chill && trackIndex == kTrackLead1 && isChillSoho  { return [66, 65, 73, 64, 74] }
         if style == .chill && trackIndex == kTrackLead1 && isChillBlues { return [66, 65, 56, 71] }
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
         if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 17, 16, 61001, 18, 8016, 28, 24] }
@@ -2269,11 +2269,11 @@ final class AppState: ObservableObject {
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
         case kTrackLead1 where isSoho:
-            // [0=Tenor Sax, 1=Alto Sax, 2=Trumpet, 3=Flute]. Mirrors
-            // ChillMusicalFrameGenerator.pickLeadInstrumentSoho (32/26/16/26) — that is what picks
-            // Lead 1 for a generated song, this is what a manual randomise may pick, and the two
-            // must not drift apart.
-            return [0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1, 2,2,2,2, 3,3,3,3,3,3,3].filter { $0 < poolCount }
+            // [0=Tenor Sax, 1=Alto Sax, 2=Flute, 3=Soprano Sax, 4=Recorder]. Mirrors
+            // ChillMusicalFrameGenerator.pickLeadInstrumentSoho (30/22/22/13/13) — that is what
+            // picks Lead 1 for a generated song, this is what a manual randomise may pick, and
+            // the two must not drift apart.
+            return [0,0,0,0,0,0, 1,1,1,1, 2,2,2,2, 3,3, 4,4].filter { $0 < poolCount }
         case kTrackLead1 where isBlues:
             // [0=Tenor Sax, 1=Alto Sax, 2=Trumpet, 3=Clarinet], drawn evenly as
             // pickLeadInstrumentBlues does.
@@ -3801,8 +3801,9 @@ final class AppState: ObservableObject {
 
     /// Instruments whose Chill lead parts take vibrato. Named rather than indexed so that
     /// reordering or re-scoping a pool cannot silently change which instrument is eligible.
+    /// Flute is deliberately absent: it reads as breath, not as a bowed wobble (Zack, 2026-10-13).
     nonisolated static let chillVibratoLeads: Set<String> = [
-        "Tenor Sax", "Alto Sax", "Soprano Sax", "Trumpet", "Flute", "Trombone"
+        "Tenor Sax", "Alto Sax", "Soprano Sax", "Trumpet", "Trombone"
     ]
 
     /// True 20% of the time when `lead`'s current instrument is one that uses vibrato, and the
