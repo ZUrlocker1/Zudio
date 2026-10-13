@@ -144,8 +144,8 @@ Blues rather than duplicated; the two use it differently, and the reasoning is u
 A new `chillSohoVariation: Bool` on `SongState`, mirroring `chillBluesVariation`.
 
 Roll in `ChillMusicalFrameGenerator` on a derived stream so existing songs still reproduce.
-Proposed split of Chill: **60% base, 20% Blues, 20% Soho**. Blues and Soho are mutually
-exclusive — a song is never both.
+Chill splits **70% Soho, 15% Blues, 15% base**. Blues and Soho are mutually exclusive — a song is
+never both.
 
 `displayStyleName` returns `"Chill Soho"` when the flag is set, and the `.zudio` file carries it
 on the `Substyle:` line. `Style:` stays `Chill` so the loader still parses it.
@@ -1425,9 +1425,13 @@ what was built.
 
 ### Activation, tempo and mode
 
-- Chill splits **60% base / 20% Blues / 20% Soho**. Blues and Soho are mutually exclusive
-- **`ChillMusicalFrameGenerator.sohoShareOfNonBlues` is `1.0` while tuning**, which makes every
-  non-Blues Chill song Soho. **It must go back to `0.25` before any release build**
+- Chill splits **70% Soho / 15% Blues / 15% base** (Zack, 2026-10-13). Blues and Soho are
+  mutually exclusive. Blues takes its 15% first, on the main stream;
+  `ChillMusicalFrameGenerator.sohoShareOfNonBlues` is `70/85`, the Soho share of what is left.
+  Measured over 4,000 songs: 70.0% / 15.2% / 14.8%
+- Blues moved from 20% to 15% to make room. That draw is on the main stream, so it is the one
+  Soho-era change that reclassifies existing Blues songs: **11 of 300 baseline seeds stop being
+  Blues** (none become Blues), 8 of them becoming Soho and 3 base Chill
 - Groove: **`.sohoLatin` 55% / `.sohoSoul` 45%**, drawn once per song
 - Tempo: one band, **84–128, peak ~100**, independent of groove
 - Modes: base Chill's weights — **Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%**, giving
@@ -1683,10 +1687,21 @@ is not a title.
 
 ### Verification
 
-`tools/fpcheck.sh` fingerprints 300 seeds × 4 styles against `tools/fingerprints/baseline-pre-soho.txt`,
-hashed from commit `75fbf47`. **Run it after every step that touches shared Chill code.** Zudio's
-regressions are silent — a changed song does not error, it just sounds different — and this has
-already caught a change that altered 27 released Chill Blues songs.
+`tools/fpcheck.sh` fingerprints 300 seeds × 4 styles against `tools/fingerprints/baseline.txt`.
+**Run it after every step that touches shared Chill code.** Zudio's regressions are silent — a
+changed song does not error, it just sounds different — and this has already caught a change that
+altered 27 released Chill Blues songs.
+
+The baseline holds the **intended** output, not a historical snapshot, so a deliberate change to
+Chill means re-pinning it:
+
+```
+bash tools/fpcheck.sh && cp tools/fingerprints/all_now.txt tools/fingerprints/baseline.txt
+```
+
+Re-pin only once every reported difference is accounted for as deliberate. Doing it to silence a
+difference you cannot explain is how a real regression gets baked in. A baseline left stale is no
+better: the expected differences accumulate until they drown the one that matters.
 
 `ChillSohoTests` is the behavioural suite: `swift test --filter ChillSohoTests`.
 
@@ -1799,7 +1814,7 @@ once placement constraints are applied.
 
 This is the one Soho change that deliberately alters released base Chill songs. Base Chill draws
 Shadow Hold on 53% of its songs (the gate is 50%; Soho's is 25%, drawing 17%), so **92 of the
-~178 base Chill songs in the fingerprint sample differ from the pre-Soho baseline — 52%, matching
+~178 base Chill songs in the fingerprint sample changed when it went in — 52%, matching
 the share that use the rule**. Nothing else in the substyle touches base Chill: re-gating this one
 change to Soho returns 229 of 229 base Chill songs identical.
 

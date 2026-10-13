@@ -1,13 +1,19 @@
 #!/bin/bash
-# Fingerprint every style on the current code and diff against the pre-Soho baseline.
+# Fingerprint every style on the current code and diff against tools/fingerprints/baseline.txt.
 #
 # Chill Soho's rules share code with base Chill, and a mis-scoped change there alters songs that
 # are already released. Those regressions are SILENT — a changed song does not error, it just
 # sounds different — so this runs after every step that touches shared Chill code. It has already
 # caught a change that altered 27 released Chill Blues songs.
 #
-# The baseline is tools/fingerprints/baseline-pre-soho.txt, hashed from commit 75fbf47. Regenerate
-# it only from a clean checkout of that commit, never from current code.
+# The baseline holds the INTENDED output, not a historical snapshot. Re-pin it with
+#     bash tools/fpcheck.sh && cp tools/fingerprints/all_now.txt tools/fingerprints/baseline.txt
+# ONLY after every reported difference has been accounted for as a deliberate change. Re-pinning
+# to silence a difference you cannot explain is how a real regression gets baked in.
+#
+# Re-pinned 2026-10-13: Chill moved deliberately — the Shadow Hold companion note across all Chill
+# forms, and Blues 20% -> 15% to make room for a 70/15/15 Soho/Blues/base split. Motorik, Kosmic
+# and Ambient were byte-identical through that change and remain pinned where they always were.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SP="${ROOT}/tools/fingerprints"
 cd "$ROOT" || exit 1
@@ -41,17 +47,16 @@ rm -f Tests/ZudioTests/AllStylesFingerprintDump.swift
 python3 - "$SP" <<'PY'
 import sys
 SP=sys.argv[1]
-old=[l.split() for l in open(f"{SP}/baseline-pre-soho.txt").read().splitlines()]
+old=[l.split() for l in open(f"{SP}/baseline.txt").read().splitlines()]
 new=[l.split() for l in open(f"{SP}/all_now.txt").read().splitlines()]
 from collections import defaultdict
 r=defaultdict(lambda:[0,0,0]); bad=[]
 for o,n in zip(old,new):
-    if n[2]=="Chill_Soho":
-        r[o[0]][1]+=1
-        if o[2]!="Chill": bad.append(("Soho from non-base",o,n))
-    elif o==n: r[o[0]][0]+=1
+    if o==n:
+        r[o[0]][0]+=1
+        if n[2]=="Chill_Soho": r[o[0]][1]+=1
     else: r[o[0]][2]+=1; bad.append(("CHANGED",o,n))
-for st,(a,b,c) in r.items(): print(f"  {st:<8} identical {a:>3}   Soho {b:>3}   CHANGED {c}")
+for st,(a,b,c) in r.items(): print(f"  {st:<8} identical {a:>3}   (of which Soho {b:>3})   CHANGED {c}")
 print("  PROBLEMS:",len(bad))
 for x in bad[:4]: print("   ",x)
 PY
