@@ -84,9 +84,18 @@ final class AudioTexturePlayer {
 
     /// Called when solo state changes. Instantly silences (or restores) the texture without
     /// a full fade — preserves position in the file so unsoloing resumes cleanly.
+    /// Whether a solo elsewhere is currently silencing this texture. Held here because the mute
+    /// can be asked for before the player is running — `startFile` reads it rather than fading up
+    /// into a solo it should be silent for.
+    private(set) var soloMuted = false
+
     func setSoloMuted(_ muted: Bool) {
+        soloMuted = muted
         guard playerNode.isPlaying else { return }
         if muted {
+            // Cancel the fade first: a running fade timer steps the volume back up within a
+            // frame or two and the texture stays audible through the solo (Zack, 2026-10-13).
+            cancelFade()
             playerNode.volume = 0.0
         } else {
             // Restore to the target volume the texture was playing at
@@ -221,7 +230,11 @@ final class AudioTexturePlayer {
             playerNode.scheduleBuffer(tailBuffer, at: nil, completionHandler: nil)
             playerNode.scheduleBuffer(loopBuffer, at: nil, options: .loops, completionHandler: nil)
             playerNode.play()
-            fadeIn(duration: fastFadeIn ? 0.20 : fadeDuration)
+            // A texture that starts while another track is soloed stays silent until the solo
+            // clears, rather than fading up underneath it.
+            if soloMuted { playerNode.volume = 0.0 } else {
+                fadeIn(duration: fastFadeIn ? 0.20 : fadeDuration)
+            }
             startPan()
         } catch { }   // Unreadable file — silent fallback, no crash.
     }
