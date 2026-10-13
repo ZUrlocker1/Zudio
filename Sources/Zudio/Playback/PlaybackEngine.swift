@@ -1857,10 +1857,26 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Tremolo LFO
 
+    /// True for any guitar patch. GM reserves programs 24–31 for the guitar family, and Zudio
+    /// encodes a non-zero soundfont bank as `bank * 1000 + program`, so the modulo recovers the
+    /// GM number for a bank variant such as 8026 (Hawaiian Guitar) too.
+    nonisolated static func isGuitarProgram(_ program: Int) -> Bool {
+        (24...31).contains(program % 1000)
+    }
+
+
     private func startTremolo(forTrack i: Int) {
         if (ambientMode || chillPadsMode) && i == kTrackPads {
             tremPhaseInc[i]   = 0.047124   // 2π × 0.15 Hz / 20 fps — one swell per ~6.5 seconds (runs at 20fps via lfoTick guard)
             tremDepth[i]      = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
+            tremBaseVolume[i] = 1.0
+        } else if Self.isGuitarProgram(loadedProgram(forTrack: i)) {
+            // A guitar is not a Leslie cabinet. 8 Hz at 40% is the organ setting and reads as a
+            // fast heavy wobble on a plucked string; an early Fender amp's tremolo sat around
+            // 3 Hz and much shallower (Zack, 2026-10-13). Keyed on the GM program family, so any
+            // guitar patch added to any pool gets it without another edit here.
+            tremPhaseInc[i]   = 0.3142     // 2π × 3 Hz / 60 fps
+            tremDepth[i]      = 0.20
             tremBaseVolume[i] = 1.0
         } else if kosmicStyle && i == kTrackBass {
             // Drift bass: 5 Hz (slower than 8 Hz lead vibrato), 25% depth.

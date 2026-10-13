@@ -2184,8 +2184,12 @@ final class AppState: ObservableObject {
             if ![2, 5, 7].contains(cl2) { overrides[kTrackLead2] = [2, 5, 7][Int.random(in: 0..<3, using: &rng)] }
             let cb = overrides[kTrackBass] ?? 0
             if ![1, 3, 4, 5, 6].contains(cb) { overrides[kTrackBass] = [1, 3, 4, 5, 6][Int.random(in: 0..<5, using: &rng)] }
+            // [0, 1, 6, 7], matching instrumentPickPoolStatic. This read [0, 1, 5, 6, 7], which
+            // additionally permitted Square Lead (5) — a lead the pick pool never selects for
+            // Arcade, so it could only ever appear by carrying over from a previous song
+            // (Zack, 2026-10-13).
             let cl1 = overrides[kTrackLead1] ?? 0
-            if ![0, 1, 5, 6, 7].contains(cl1) { overrides[kTrackLead1] = [0, 1, 5, 6, 7][Int.random(in: 0..<5, using: &rng)] }
+            if ![0, 1, 6, 7].contains(cl1) { overrides[kTrackLead1] = [0, 1, 6, 7][Int.random(in: 0..<4, using: &rng)] }
             let cr = overrides[kTrackRhythm] ?? 0
             if ![0, 6, 9].contains(cr) { overrides[kTrackRhythm] = [0, 6, 9][Int.random(in: 0..<3, using: &rng)] }
             let cp = overrides[kTrackPads] ?? 0
@@ -2205,7 +2209,9 @@ final class AppState: ObservableObject {
             if cd == 3 { overrides[kTrackDrums] = Int.random(in:0..<3, using:&rng) }
         }
         if style == .kosmic, state.isKosmicDrift {
-            let cb = overrides[kTrackBass] ?? 0;   if cb == 0           { overrides[kTrackBass]    = [1,2,3,4][Int.random(in:0..<4,using:&rng)] }
+            // Replacement menu matches instrumentPickPoolStatic. It read [1,2,3,4], which offered
+            // Mono Synth (2) — excluded from Drift bass by the pick pool (Zack, 2026-10-13).
+            let cb = overrides[kTrackBass] ?? 0;   if cb == 0           { overrides[kTrackBass]    = [1,3,4,6,7][Int.random(in:0..<5,using:&rng)] }
             let cl = overrides[kTrackLead1] ?? 0;  if cl <= 3           { overrides[kTrackLead1]   = [4,5,6,7][Int.random(in:0..<4,using:&rng)] }
             let cr = overrides[kTrackRhythm] ?? 0; if (1...3).contains(cr) { overrides[kTrackRhythm] = [0,4,5,6,7][Int.random(in:0..<5,using:&rng)] }
             let cd = overrides[kTrackDrums] ?? 0;  if cd == 0 || cd == 1{ overrides[kTrackDrums]   = [2,3,4][Int.random(in:0..<3,using:&rng)] }
