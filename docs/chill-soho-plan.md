@@ -1682,11 +1682,13 @@ Soho has its own pools where base Chill's are wrong:
   the saxes, open trumpet and trombone take it; flute, recorder, muted trumpet, the mallets
   and synth brass do not. An index-based rule silently re-aimed itself the moment the Lead 1
   pools were split per form
-- **Pads**: Stereo Strings 42%, Halo Pad 33%, Bowed Glass 25% (at CC7 115 — it is a soft patch).
-  **No pad is common to all three Chill forms** (Zack, 2026-10-13). Base Chill's three — Warm Pad,
-  String Pad (p48) and Sweep Pad — are all its own; Synth Strings is Blues's alone; Bowed Glass
-  and Halo Pad are Soho's. Stereo Strings (p49) is the only pad shared at all, by Blues and Soho.
-  Halo Pad is the longest-sustaining pad voice in the corpus at 3.4 beats a note.
+- **Pads**: Stereo Strings 30%, Halo Pad 22%, Bowed Glass 18% (at CC7 115 — it is a soft patch),
+  **Concert Choir 16%**, Synth Strings 5 14%. Four of the five are Soho's alone; only Stereo
+  Strings (p49) is shared, with Blues. Halo Pad is the longest-sustaining pad voice in the corpus
+  at 3.4 beats a note, and **Concert Choir is the corpus's "aah" pad**, in 3 of its 14 files — the
+  one vocal voice worth having, kept to a colouring share rather than a staple (Zack,
+  2026-10-13). Each Chill form also carries one of the three Synth Strings variants that no other
+  Zudio style uses.
   The corpus's sustained voices are **Stereo Strings Slow (p49)** — 850 notes across 4 files at
   3.2 beats a note — and Synth Strings 1 (p50) at 848 across 4, so those two lead. Base Chill's
   "String Pad" is p48, Stereo Strings *Fast*, which no corpus file uses and which is the wrong

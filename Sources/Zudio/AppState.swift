@@ -631,9 +631,9 @@ final class AppState: ObservableObject {
         //           3.4 beats a note
         // Stereo Strings (p49) is the only pad shared at all, by Blues and Soho; nothing is
         // common to all three.
-        case (kTrackPads,    .chill) where isChillSoho:  return ["Stereo Strings","Bowed Glass","Halo Pad"]
-        case (kTrackPads,    .chill) where isChillBlues: return ["Synth Strings","Stereo Strings"]
-        case (kTrackPads,    .chill):   return ["Warm Pad","String Pad","Sweep Pad"]
+        case (kTrackPads,    .chill) where isChillSoho:  return ["Stereo Strings","Halo Pad","Bowed Glass","Concert Choir","Synth Strings 5"]
+        case (kTrackPads,    .chill) where isChillBlues: return ["Stereo Strings","Synth Strings","Cello","String Pad","Synth Strings 4"]
+        case (kTrackPads,    .chill):   return ["Warm Pad","String Pad","Sweep Pad","Soundtrack","Synth Strings 3"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
@@ -690,9 +690,9 @@ final class AppState: ObservableObject {
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
-        case (kTrackPads, .chill) where isChillSoho:  return [49, 92, 94]
-        case (kTrackPads, .chill) where isChillBlues: return [50, 49]
-        case (kTrackPads, .chill):     return [89, 48, 95]
+        case (kTrackPads, .chill) where isChillSoho:  return [49, 94, 92, 52, 11051]
+        case (kTrackPads, .chill) where isChillBlues: return [49, 50, 42, 48, 11050]
+        case (kTrackPads, .chill):     return [89, 48, 95, 97, 8050]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016]
@@ -2298,11 +2298,21 @@ final class AppState: ObservableObject {
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
         case kTrackPads where isSoho:
-            // [0=Stereo Strings, 1=Bowed Glass, 2=Halo Pad] — 42/25/33.
-            return [0,0,0,0,0, 1,1,1, 2,2,2,2].filter { $0 < poolCount }
+            // [0=Stereo Strings, 1=Halo Pad, 2=Bowed Glass, 3=Concert Choir, 4=Synth Strings 5]
+            // — 30/22/18/16/14. Concert Choir is the corpus's "aah" pad, in 3 of its 14 files,
+            // and is kept to a colouring share rather than a staple (Zack, 2026-10-13).
+            return [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1,1,1,1,1,
+                    2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3, 4,4,4,4,4,4,4].filter { $0 < poolCount }
         case kTrackPads where isBlues:
-            // [0=Synth Strings, 1=Stereo Strings] — evenly.
-            return [0, 1].filter { $0 < poolCount }
+            // [0=Stereo Strings, 1=Synth Strings, 2=Cello, 3=String Pad, 4=Synth Strings 4]
+            // — 24/24/20/16/16. Cello is the one voice here that is neither a synth pad nor a
+            // string section.
+            return [0,0,0,0,0,0, 1,1,1,1,1,1, 2,2,2,2,2, 3,3,3,3, 4,4,4,4].filter { $0 < poolCount }
+        case kTrackPads where style == .chill:
+            // [0=Warm Pad, 1=String Pad, 2=Sweep Pad, 3=Soundtrack, 4=Synth Strings 3]
+            // — 24/20/20/20/16. Base Chill is the one Chill form where a frankly synthetic pad
+            // belongs: its beat styles include electronic and St Germain.
+            return [0,0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3, 4,4,4,4].filter { $0 < poolCount }
         case kTrackLead1 where isSoho:
             // [0=Tenor Sax, 1=Alto Sax, 2=Flute, 3=Soprano Sax, 4=Recorder]. Mirrors
             // ChillMusicalFrameGenerator.pickLeadInstrumentSoho (30/22/22/13/13) — that is what
