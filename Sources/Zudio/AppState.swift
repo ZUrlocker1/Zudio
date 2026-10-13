@@ -3799,6 +3799,26 @@ final class AppState: ObservableObject {
         appendToLog([GenerationLogEntry(tag: "Instrument", description: "\(tName) \(name)", isTitle: false)])
     }
 
+    /// Instruments whose Chill lead parts take vibrato. Named rather than indexed so that
+    /// reordering or re-scoping a pool cannot silently change which instrument is eligible.
+    nonisolated static let chillVibratoLeads: Set<String> = [
+        "Tenor Sax", "Alto Sax", "Soprano Sax", "Trumpet", "Flute", "Trombone"
+    ]
+
+    /// True 20% of the time when `lead`'s current instrument is one that uses vibrato, and the
+    /// track being configured IS that lead. Shared by `restoreDefaultEffects` and
+    /// `TrackRowView.applyDefaultEffects`, which must agree.
+    nonisolated static func leadUsesVibrato(trackIndex: Int, lead: Int, state: SongState?,
+                                            overrides: [Int: Int]) -> Bool {
+        guard trackIndex == lead, state?.style == .chill else { return false }
+        let names = instrumentPoolNames(trackIndex: lead, style: .chill,
+                                        isChillSoho: state?.chillSohoVariation == true,
+                                        isChillBlues: state?.chillBluesVariation == true)
+        let idx = overrides[lead] ?? 0
+        guard idx >= 0, idx < names.count, chillVibratoLeads.contains(names[idx]) else { return false }
+        return Float.random(in: 0..<1) < 0.20
+    }
+
     /// Removes all active effects from a track.
     func clearAllEffects(forTrack trackIndex: Int) {
         for fx in TrackEffect.allCases {
@@ -3844,11 +3864,18 @@ final class AppState: ObservableObject {
                 ? [2, 3, 5].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.50
                 : [2, 6].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.20
 
-            // Lead vibrato 20%: Lead1 Tenor Sax(1)/Alto Sax(2)/Trumpet(3); Lead2 Flute(1)/Soprano Sax(2)/Trombone(3)
-            let l1Idx = trackIndex == kTrackLead1 ? (instrumentOverrides[kTrackLead1] ?? 0) : -1
-            let l1Vib = [1, 2, 3].contains(l1Idx) && Float.random(in: 0..<1) < 0.20
-            let l2Idx = trackIndex == kTrackLead2 ? (instrumentOverrides[kTrackLead2] ?? 0) : -1
-            let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
+            // Lead vibrato, 20% of songs, on the instruments that actually use it: the saxes,
+            // the open trumpet, the flute and the trombone. Muted trumpet is out (a harmon mute
+            // does not vibrato), as are the mallets and the synth brass.
+            //
+            // This was a list of POOL INDICES, [1, 2, 3], which silently meant something different
+            // in each Chill form and broke the moment the Lead 1 pools were split per form —
+            // Tenor Sax, the commonest lead in Blues and Soho, lost its vibrato (Zack,
+            // 2026-10-13). Matching on the name cannot drift when a pool is reordered.
+            let l1Vib = Self.leadUsesVibrato(trackIndex: trackIndex, lead: kTrackLead1, state: songState,
+                                             overrides: instrumentOverrides)
+            let l2Vib = Self.leadUsesVibrato(trackIndex: trackIndex, lead: kTrackLead2, state: songState,
+                                             overrides: instrumentOverrides)
 
             // Chill Soho's Elec Bass (pool index 2) wants Low and Comp under it — the chips and
             // the audio chain are the same switch, so they cannot drift (Zack, 2026-10-12).

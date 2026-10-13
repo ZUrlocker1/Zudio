@@ -446,11 +446,14 @@ struct TrackRowView: View {
                 ? [2, 3, 5].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.50
                 : [2, 6].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.20
 
-            // Lead vibrato 20%: Lead1 Tenor Sax(1)/Alto Sax(2)/Trumpet(3); Lead2 Flute(1)/Soprano Sax(2)/Trombone(3)
-            let l1Idx = trackIndex == kTrackLead1 ? (appState.instrumentOverrides[kTrackLead1] ?? 0) : -1
-            let l1Vib = [1, 2, 3].contains(l1Idx) && Float.random(in: 0..<1) < 0.20
-            let l2Idx = trackIndex == kTrackLead2 ? (appState.instrumentOverrides[kTrackLead2] ?? 0) : -1
-            let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
+            // Lead vibrato, 20% of songs, matched by instrument NAME — see the note in
+            // AppState.restoreDefaultEffects. Keep the two in step.
+            let l1Vib = AppState.leadUsesVibrato(trackIndex: trackIndex, lead: kTrackLead1,
+                                                 state: appState.songState,
+                                                 overrides: appState.instrumentOverrides)
+            let l2Vib = AppState.leadUsesVibrato(trackIndex: trackIndex, lead: kTrackLead2,
+                                                 state: appState.songState,
+                                                 overrides: appState.instrumentOverrides)
 
             // Chill Soho's Elec Bass (pool index 2) wants Low and Comp under it.
             // Mirrored in AppState.restoreDefaultEffects — keep the two in step.
