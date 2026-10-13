@@ -619,9 +619,17 @@ final class AppState: ObservableObject {
         // which is the wrong articulation for a pad — Soho and Blues take the slow one instead.
         // Soho adds Bowed Glass (p92, 2 files); Blues adds a detuned tonewheel organ, the bed
         // under a blues ballad, and the one organ its Rhythm track never uses (Zack, 2026-10-13).
-        case (kTrackPads,    .chill) where isChillSoho:  return ["Warm Pad","Synth Strings","Stereo Strings","Sweep Pad","Bowed Glass"]
-        case (kTrackPads,    .chill) where isChillBlues: return ["Warm Pad","Synth Strings","Stereo Strings","Sweep Pad","Tonewheel Organ"]
-        case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
+        // Each form keeps two pads the other two do not have, and only Synth Strings is common to
+        // all three (Zack, 2026-10-13):
+        //   base  — String Pad (p48, the fast strings) and Sweep Pad, the filter sweep that suits
+        //           its electronic and St Germain beat styles and suits neither other form
+        //   Blues — Warm Pad, the plainest bed and the one a blues ballad sits on, and the
+        //           detuned tonewheel organ
+        //   Soho  — Bowed Glass and Halo Pad, the longest-sustaining pad voice in the corpus at
+        //           3.4 beats a note
+        case (kTrackPads,    .chill) where isChillSoho:  return ["Synth Strings","Stereo Strings","Bowed Glass","Halo Pad"]
+        case (kTrackPads,    .chill) where isChillBlues: return ["Warm Pad","Synth Strings","Stereo Strings","Tonewheel Organ"]
+        case (kTrackPads,    .chill):   return ["Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
@@ -678,9 +686,9 @@ final class AppState: ObservableObject {
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
-        case (kTrackPads, .chill) where isChillSoho:  return [89, 50, 49, 95, 92]
-        case (kTrackPads, .chill) where isChillBlues: return [89, 50, 49, 95, 8016]
-        case (kTrackPads, .chill):     return [89, 50, 48, 95]
+        case (kTrackPads, .chill) where isChillSoho:  return [50, 49, 92, 94]
+        case (kTrackPads, .chill) where isChillBlues: return [89, 50, 49, 8016]
+        case (kTrackPads, .chill):     return [50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016]
@@ -2286,12 +2294,11 @@ final class AppState: ObservableObject {
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
         case kTrackPads where isSoho:
-            // [0=Warm Pad, 1=Synth Strings, 2=Stereo Strings, 3=Sweep Pad, 4=Bowed Glass].
-            // The two the corpus leans on take 28% each; Bowed Glass is colour at 12%.
-            return [0,0,0,0,0, 1,1,1,1,1,1,1, 2,2,2,2,2,2,2, 3,3,3, 4,4,4].filter { $0 < poolCount }
+            // [0=Synth Strings, 1=Stereo Strings, 2=Bowed Glass, 3=Halo Pad] — 28/32/16/24.
+            return [0,0,0,0,0,0,0, 1,1,1,1,1,1,1,1, 2,2,2,2, 3,3,3,3,3,3].filter { $0 < poolCount }
         case kTrackPads where isBlues:
-            // [0=Warm Pad, 1=Synth Strings, 2=Stereo Strings, 3=Sweep Pad, 4=Tonewheel Organ].
-            return [0,0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2,2,2, 3,3,3, 4,4,4,4].filter { $0 < poolCount }
+            // [0=Warm Pad, 1=Synth Strings, 2=Stereo Strings, 3=Tonewheel Organ] — 28/24/28/20.
+            return [0,0,0,0,0,0,0, 1,1,1,1,1,1, 2,2,2,2,2,2,2, 3,3,3,3,3].filter { $0 < poolCount }
         case kTrackLead1 where isSoho:
             // [0=Tenor Sax, 1=Alto Sax, 2=Flute, 3=Soprano Sax, 4=Recorder]. Mirrors
             // ChillMusicalFrameGenerator.pickLeadInstrumentSoho (30/22/22/13/13) — that is what
