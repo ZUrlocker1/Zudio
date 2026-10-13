@@ -469,12 +469,21 @@ struct ChillLeadGenerator {
             return (sohoVariation ? capNotesPerBar(events, 2) : events, inst2)
         }
 
-        // Soho: Lead 2 sits out whole groove sections about a third of the time — a sax that
-        // replies to everything stops sounding like a reply.
+        // Soho: Lead 2 sits out the opening of a groove section about a third of the time — a sax
+        // that replies to everything stops sounding like a reply.
+        //
+        // It used to sit out the *whole* section, which in a two-section song meant vanishing for
+        // more than half of it: a 56-bar B section sat out entirely left Lead 2 silent from bar 45
+        // to the end while the log still listed a rule and a note count for it, and 29% of Soho
+        // songs were silent for over 40% of their length (Zack, 2026-10-12). Sitting out the
+        // first 8–16 bars gives the same effect — the section opens without the reply and the sax
+        // arrives later — without the track disappearing.
         var sittingOut = Set<Int>()
         if sohoVariation {
             for sec in structure.sections where sec.label == .A || sec.label == .B {
-                if rng.nextDouble() < 0.35 { sittingOut.formUnion(sec.startBar..<sec.endBar) }
+                guard rng.nextDouble() < 0.35 else { continue }
+                let len = Swift.min(sec.lengthBars, 8 + rng.nextInt(upperBound: 9))   // 8–16 bars
+                sittingOut.formUnion(sec.startBar..<(sec.startBar + len))
             }
         }
 
@@ -608,7 +617,31 @@ struct ChillLeadGenerator {
             let dur    = Swift.min(16 + rng.nextInt(upperBound: 13), maxDur)  // 16–28 steps
             let vel    = UInt8(38 + rng.nextInt(upperBound: 18))              // 38–55
 
-            events.append(MIDIEvent(stepIndex: bar * 16, note: note,
+            // Every Chill form, Soho and base alike (Zack, 2026-10-13). A lone held note sounded
+            // wrong on Lead 1's Sustained Tone and sounds wrong here for the same reason, so most
+            // holds get a companion. Shape and intervals are the ones tools/soho_sustained.py
+            // measured off the corpus: short notes of one to two steps, sitting on the unison or
+            // within a tone or two of the held pitch, leading in about twice as often as answering.
+            //
+            // Soho caps Lead 2 at two notes a bar, so a lead-in shares the hold's bar and an
+            // answer falls in the bar after the hold ends — never three in one bar.
+            let holdStart = bar * 16
+            if rng.nextDouble() < 0.70 {
+                let step = [0, 2, -2, 3][rng.weightedPick([0.34, 0.32, 0.21, 0.13])]
+                let near = pool.min { abs($0 - (Int(note) + step)) < abs($1 - (Int(note) + step)) }
+                let companion = UInt8(near ?? Int(note))
+                let softer = UInt8(Swift.min(70, Int(vel) + 6))
+                if rng.nextDouble() < 0.65 {
+                    // The companion leads in, two steps ahead of the hold.
+                    events.append(MIDIEvent(stepIndex: Swift.max(0, holdStart - 2), note: companion,
+                                            velocity: softer, durationSteps: 2))
+                } else if holdStart + dur + 2 < frame.totalBars * 16 {
+                    // Or answers once the hold has let go.
+                    events.append(MIDIEvent(stepIndex: holdStart + dur + 2, note: companion,
+                                            velocity: softer, durationSteps: 2))
+                }
+            }
+            events.append(MIDIEvent(stepIndex: holdStart, note: note,
                                     velocity: vel, durationSteps: Swift.max(1, dur)))
             lastPlaced = bar
         }

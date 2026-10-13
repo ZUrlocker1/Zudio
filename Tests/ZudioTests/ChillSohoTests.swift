@@ -739,9 +739,12 @@ import Foundation
         for s in Self.sohoSongs()
         where !ChillLeadGenerator.sohoReusedLead1Rules.contains(Self.lead1Rule(s) ?? "") {
             let pickups = Self.pickupBars(s)
+            // Lead 1 plays through the Harmonic Drone and no other breakdown (Zack, 2026-10-12).
+            let droneOK = s.chillBreakdownStyle == .harmonicDrone
             for ev in s.trackEvents[kTrackLead1] where !pickups.contains(ev.stepIndex / 16) {
                 let label = s.structure.section(atBar: ev.stepIndex / 16)?.label
-                #expect(label == .A || label == .B || label == .outro, "Lead 1 note in \(String(describing: label))")
+                #expect(label == .A || label == .B || label == .outro || (droneOK && label == .bridge),
+                        "Lead 1 note in \(String(describing: label))")
             }
         }
     }
@@ -771,21 +774,43 @@ import Foundation
         #expect(leapShare > 0.12 && leapShare < 0.32, "leaps \(leaps)/\(intervals)")
     }
 
-    /// Sustained Tone: a handful of long notes with long rests between them.
+    /// Sustained Tone: phrases built on one long note, with long rests between the phrases.
+    /// A phrase may add one to three short punches around its long tone (Zack, 2026-10-12), so
+    /// the sparseness rule is about the gaps *between* phrases, not between notes.
     @Test func sustainedToneIsLongAndSparse() {
-        var found = 0
+        var found = 0, multiNote = 0, phrases = 0
         for s in Self.sohoSongs() where Self.lead1Rule(s) == "CHL-LD1-011" {
             found += 1
             let pickups = Self.pickupBars(s)
             let notes = s.trackEvents[kTrackLead1].filter { !pickups.contains($0.stepIndex / 16) }
                 .sorted { $0.stepIndex < $1.stepIndex }
-            #expect(notes.count <= 24, "\(notes.count) sustained tones")
-            #expect(notes.allSatisfy { $0.durationSteps >= 24 }, "short note in a Sustained Tone song")
-            for (a, b) in zip(notes, notes.dropFirst()) {
-                #expect(b.stepIndex - (a.stepIndex + a.durationSteps) >= 48, "rest under three bars")
+            // Group into phrases: anything more than a bar apart starts a new one.
+            var groups: [[MIDIEvent]] = []
+            for n in notes {
+                if let last = groups.last?.last, n.stepIndex - (last.stepIndex + last.durationSteps) <= 16 {
+                    groups[groups.count - 1].append(n)
+                } else {
+                    groups.append([n])
+                }
+            }
+            phrases += groups.count
+            for g in groups {
+                #expect((1...4).contains(g.count), "phrase of \(g.count) notes")
+                if g.count > 1 { multiNote += 1 }
+                // Exactly one long tone per phrase; the rest are short punches.
+                #expect(g.filter { $0.durationSteps >= 16 }.count == 1,
+                        "phrase durations \(g.map(\.durationSteps))")
+            }
+            #expect(groups.count <= 24, "\(groups.count) sustained-tone phrases")
+            for (a, b) in zip(groups, groups.dropFirst()) {
+                let gap = b[0].stepIndex - (a.last!.stepIndex + a.last!.durationSteps)
+                #expect(gap >= 48, "rest under three bars between phrases")
             }
         }
         #expect(found > 0)
+        // Most phrases carry more than one note — a lone held tone was too static.
+        #expect(Double(multiNote) / Double(phrases) > 0.5,
+                "only \(multiNote)/\(phrases) phrases have more than one note")
     }
 
     /// Tight Hook: each bar's figure fits inside about a tenth.
@@ -1011,8 +1036,10 @@ import Foundation
         let names    = AppState.instrumentPoolNames(trackIndex: kTrackTexture, style: .chill, isChillSoho: true)
         let programs = AppState.instrumentPoolPrograms(trackIndex: kTrackTexture, style: .chill, isChillSoho: true)
         #expect(names.count == programs.count)
+        // No synth brass of any bank: Zack rejected the bank-0 pair and then the bank-8
+        // variation samples too (2026-10-12). This music wants real horns.
         #expect(!names.contains { $0.contains("Synth Brass") }, "\(names)")
-        #expect(programs.prefix(3) == [56, 60, 59], "horns are \(programs.prefix(3))")
+        #expect(programs.prefix(3) == [56, 57, 59], "horns are \(programs.prefix(3))")
         // Every pick the randomiser can make is inside the pool.
         let picks = AppState.instrumentPickPoolStatic(trackIndex: kTrackTexture, style: .chill,
                                                       poolCount: names.count, state: nil)
@@ -1028,9 +1055,8 @@ import Foundation
                 #expect((1...3).contains(notes.count), "stab of \(notes.count) notes")
                 sizes.insert(notes.count)
                 #expect(notes.allSatisfy { step % 16 + $0.durationSteps <= 16 }, "stab runs past the bar")
-                // Every note of one hit sounds together: the figure is in the hits, not in
-                // staggering the chord, which just sounds like one "bap".
-                #expect(Set(notes.map(\.durationSteps)).count == 1, "a hit's notes have different lengths")
+                // Note lengths inside one hit may differ — that is a voicing detail and sounds
+                // fine as a chord. What matters is the rhythm *between* hits (Zack, 2026-10-12).
             }
         }
         #expect(checked > 0)
@@ -1463,23 +1489,28 @@ import Foundation
     // MARK: - The turnaround is performed, not just written
 
     /// The bass plays the turnaround's last two bars as a turnaround, not as the groove over
-    /// different chords. Three treatments, one per song.
+    /// different chords. Three treatments plus the original form, varying within a song.
     @Test func bassPlaysTheTurnaroundAsATurnaround() {
         var seen = Set<Int>(), checked = 0
         for s in Self.sohoSongs() {
-            let style = ChillStructureGenerator.sohoTurnaroundStyle(frame: s.frame, structure: s.structure)
-            seen.insert(style)
             let turns = Self.turnaroundBars(s)
             let exits = Self.turnaroundExit(s)
             // The way into a Remix Break is a bigger gesture and takes precedence, so a bar that
             // is both is not a turnaround bar for this purpose.
             let entry = Self.remixEntry(s)
-            for exit in exits.sorted() where turns.contains(exit - 1) {
+            for (i, exit) in exits.sorted().enumerated() where turns.contains(exit - 1) {
+                let style = ChillStructureGenerator.sohoTurnaroundStyle(
+                    frame: s.frame, structure: s.structure, index: i)
+                let pedal = style == 3 || style == 4
+                seen.insert(style)
                 func bass(_ bar: Int) -> [MIDIEvent] {
                     s.trackEvents[kTrackBass].filter { $0.stepIndex / 16 == bar }
                         .sorted { $0.stepIndex < $1.stepIndex }
                 }
                 guard !entry.contains(exit), !entry.contains(exit - 1) else { continue }
+                // The original form has no figure to check — the groove rides through, and what
+                // it plays is whatever the bar's own rule wrote.
+                guard style != ChillStructureGenerator.sohoTurnaroundOriginal else { continue }
                 let pair = [exit - 1, exit].map(bass)
                 guard pair.allSatisfy({ !$0.isEmpty }) else { continue }
                 checked += 1
@@ -1493,19 +1524,50 @@ import Foundation
                         #expect(steps.first == 0, "root & approach does not start on the root")
                         #expect(inBar[0].durationSteps >= 8, "the root is not held")
                         #expect(steps.contains(14), "no pickup into the next chord")
-                    default: // descending — two notes a bar
-                        #expect(steps == [0, 8], "descending bar steps \(steps)")
+                    case 2, 3, 4:
+                        // Descending: two notes a bar, or four when the root pedals under them
+                        // — "ba-baa", the root short on the beat, the line on the eighth. A pair
+                        // whose pedal would clash with the line drops it, so a pedalled bar can
+                        // carry three steps rather than four.
+                        #expect(Set(steps).isSubset(of: [0, 2, 8, 10]) && steps.contains(0)
+                                && steps.contains(8), "descending bar steps \(steps)")
+                        if !pedal { #expect(steps == [0, 8], "plain descending has a pedal") }
+                        let roots = inBar.filter { $0.durationSteps <= 2 }
+                        #expect(roots.allSatisfy { [0, 8].contains($0.stepIndex % 16) },
+                                "a pedal is off the beat")
+                        #expect(roots.allSatisfy { $0.note >= 40 && $0.note <= 52 },
+                                "a pedal leaves the bass window")
+                    default:
+                        Issue.record("unknown turnaround treatment \(style)")
                     }
                 }
-                // The descending treatment falls across both bars without rising.
-                if style == 2 {
-                    let line = (pair[0] + pair[1]).map { Int($0.note) }
-                    #expect(zip(line, line.dropFirst()).allSatisfy { $0 >= $1 }, "descending line rises: \(line)")
+                // The descending treatment falls across both bars — every step strictly down.
+                // This asserted only `>=` until 2026-10-12, which four identical notes satisfy;
+                // 55% of these turnarounds were clamping against the top of the bass ladder and
+                // not descending at all, and the test passed throughout.
+                if [2, 3, 4].contains(style) {
+                    // When the root pedals, the line is the notes on the eighths; the pedal
+                    // itself holds, so only the line is expected to fall.
+                    let all = pair[0] + pair[1]
+                    // Style 3 is a pedal point: one note under all four pairs, held through the
+                    // chord change. Style 4 re-roots per bar, by design (Zack, 2026-10-12).
+                    let roots = all.filter { $0.durationSteps <= 2 }.map { Int($0.note) }
+                    if style == 3 { #expect(Set(roots).count <= 1, "the pedal moves: \(roots)") }
+                    // Nowhere in the figure may two notes in a row sound the same pitch — that
+                    // reads as one repeated note rather than as an alternation.
+                    let seq = all.sorted { $0.stepIndex < $1.stepIndex }.map { Int($0.note) }
+                    #expect(!zip(seq, seq.dropFirst()).contains { $0 == $1 },
+                            "two notes in a row at the same pitch: \(seq)")
+                    let line = (pedal ? all.filter { [2, 10].contains($0.stepIndex % 16) } : all)
+                        .map { Int($0.note) }
+                    #expect(zip(line, line.dropFirst()).allSatisfy { $0 > $1 },
+                            "descending line does not descend: \(line)")
                 }
             }
         }
         #expect(checked > 0)
-        #expect(seen == [0, 1, 2], "only styles \(seen.sorted()) appeared")
+        #expect(seen == Set(ChillStructureGenerator.sohoTurnaroundTreatments),
+                "only styles \(seen.sorted()) appeared")
     }
 
     /// The last note of a turnaround is a step away from the chord the song returns to.
@@ -1570,7 +1632,7 @@ import Foundation
             let marked = s.stepAnnotations.values.contains { $0.contains { $0.tag == "Turnaround" } }
             // Soho names which treatment the bass is using; Blues has none, so no description.
             if s.chillSohoVariation {
-                let names = ChillStructureGenerator.sohoTurnaroundStyleNames
+                let names = ChillStructureGenerator.sohoTurnaroundStyleNames + ["original form"]
                 let desc = s.stepAnnotations.values.flatMap { $0 }.first { $0.tag == "Turnaround" }?.description
                 #expect(desc.map(names.contains) == true, "turnaround logged as '\(desc ?? "nil")'")
             }
@@ -1620,5 +1682,29 @@ import Foundation
             }
         }
         #expect(meard == 0 && portobello > 0, "Meard \(meard), Portobello Road \(portobello)")
+    }
+
+    /// The Remix Break's backbeat is not always handclaps. Every break sounding identical is what
+    /// gives the device away.
+    @Test func remixBackbeatVariesItsVoice() {
+        let voices: Set<Int> = [Int(GMDrum.clap.rawValue), Int(GMDrum.tambourine.rawValue),
+                                Int(GMDrum.sidestick.rawValue)]
+        var seen = Set<Int>(), checked = 0
+        for s in Self.remixSongs() {
+            guard let b = s.structure.sections.first(where: { $0.label == .bridge }),
+                  b.lengthBars > 2 else { continue }
+            let bars = (b.startBar + 2)..<(b.endBar - 1)
+            let backbeat = Set(s.trackEvents[kTrackDrums]
+                .filter { bars.contains($0.stepIndex / 16) && [4, 12].contains($0.stepIndex % 16) }
+                .map { Int($0.note) })
+                .intersection(voices)
+            guard !backbeat.isEmpty else { continue }
+            checked += 1
+            // One voice for the whole break, not a mixture.
+            #expect(backbeat.count == 1, "remix backbeat uses \(backbeat.sorted())")
+            seen.formUnion(backbeat)
+        }
+        #expect(checked > 0)
+        #expect(seen == voices, "only \(seen.sorted()) of the three backbeat voices appeared")
     }
 }

@@ -108,6 +108,10 @@ extension ChillLeadGenerator {
             guard bar >= 1, bar <= lastPlayable else { return false }
             switch structure.section(atBar: bar)?.label {
             case .A?, .B?, .outro?: return true
+            // The Harmonic Drone is the one breakdown Lead 1 plays through. It is a held chord
+            // with nothing carrying a melody over it, and it sat still as a result (Zack,
+            // 2026-10-12). Every other breakdown still silences the lead.
+            case .bridge?:          return breakdownStyle == .harmonicDrone
             default:                return false
             }
         }
@@ -123,6 +127,14 @@ extension ChillLeadGenerator {
         if ruleID != "CHL-LD1-011" {   // Sustained Tone already rests five bars at a time
             rest = LeadGenerator.buildRestBars(entryBar: firstPlayable, totalBars: frame.totalBars, rng: &rng)
             for bar in remixReturns { rest.remove(bar); rest.remove(bar - 1) }
+            // The Harmonic Drone is four bars long, so a rest landing on it silences the lead for
+            // the whole section — which is how it ended up with nothing over it (Zack,
+            // 2026-10-12). The drone is never a rest.
+            if breakdownStyle == .harmonicDrone {
+                for section in structure.sections where section.label == .bridge {
+                    for bar in section.startBar..<section.endBar { rest.remove(bar) }
+                }
+            }
         }
         func open(_ bar: Int) -> Bool { playable(bar) && !rest.contains(bar) }
 
@@ -346,8 +358,69 @@ extension ChillLeadGenerator {
                                   events: inout [MIDIEvent], onsets: inout [(startBar: Int, endBar: Int)],
                                   rng: inout SeededRNG) {
         let closed = rng.nextDouble() < 0.30
+        // Avalon's hooks move: [+2,-2], [0,+2], [+3,0]. A figure that is mostly repeated pitches
+        // reads as one note stuttering, so both hooks need at least one real step and no more
+        // than half their moves standing still. (Repeated pitch is Counter-Line's signature,
+        // CHL-LD1-010, not this rule's.)
+        func moves(_ c: SohoPhrase) -> Bool {
+            c.intervals.contains { abs($0) >= 2 }
+                && c.intervals.filter { $0 != 0 }.count * 2 >= c.intervals.count
+        }
+        // Avalon's own figures, used when a drawn hook will not move. The cell bank's heaviest
+        // entry is [0, 0, -2] and hooks are built by concatenating cells, so a drawn hook can be
+        // nearly all repeated pitches however many times it is redrawn; a measured fallback makes
+        // the outcome certain rather than likely.
+        let avalonHookA = SohoPhrase(intervals: [2, -2], durs: [2, 1, 3])       // x5 in Avalon
+        let avalonHookB = SohoPhrase(intervals: [0, 5, -5, 0], durs: [2, 1, 2, 3, 1])
         var hook = hookPhrase(closed: closed, rng: &rng)
-        var nextMutation = firstPlayable + 8 + rng.nextInt(upperBound: 5)
+        var tries = 0
+        while !moves(hook), tries < 24 {
+            hook = hookPhrase(closed: closed, rng: &rng)
+            tries += 1
+        }
+        if !moves(hook) { hook = avalonHookA }
+        // A second hook, genuinely different in both notes and rhythm. One hook nudged every ten
+        // bars made every phrase of a song sound the same (Zack, 2026-10-13). Avalon, which this
+        // rule is measured from, plays 16 lead phrases in 9 distinct shapes: its main figure
+        // recurs five times, a second three times, a third twice, then one-offs. So: two hooks,
+        // the first dominant, each still mutating as it goes.
+        var hookC: SohoPhrase = {
+            // A second hook that merely transposes the first is not a second hook. It has to be
+            // a different length, carry real movement rather than repeated pitches, and have its
+            // own rhythm. Up to twelve tries; the last one stands if none qualifies.
+            func contrasts(_ c: SohoPhrase) -> Bool {
+                c.intervals.count != hook.intervals.count && c.durs != hook.durs && moves(c)
+            }
+            // (the third hook's own contrast check is below; this one only has `hook` to clear)
+            var best = hookPhrase(closed: closed, rng: &rng)
+            var n = 0
+            while !contrasts(best), n < 24 {
+                best = hookPhrase(closed: closed, rng: &rng)
+                n += 1
+            }
+            if !contrasts(best) {
+                best = hook.intervals.count == avalonHookB.intervals.count ? avalonHookA : avalonHookB
+            }
+            return best
+        }()
+        // A third. Avalon's lead plays 13 phrases across three recurring contours — [+2,-2] seven
+        // times, [0,+2] three, [+3,0] twice — so three is what the record does, not two (Zack,
+        // 2026-10-13). It only has to differ in contour from both of the others.
+        var hookB: SohoPhrase = {
+            func contrasts(_ c: SohoPhrase) -> Bool {
+                c.intervals != hook.intervals && c.intervals != hookC.intervals && moves(c)
+            }
+            var best = hookPhrase(closed: closed, rng: &rng)
+            var n = 0
+            while !contrasts(best), n < 24 {
+                best = hookPhrase(closed: closed, rng: &rng)
+                n += 1
+            }
+            if !contrasts(best) { best = SohoPhrase(intervals: [0, 2], durs: [2, 4, 1]) }  // Avalon's x3
+            return best
+        }()
+        var nextMutation = firstPlayable + 24 + rng.nextInt(upperBound: 9)
+        var lastHook = -1, lastOther = -1
         let home = pool[pool.count / 3]
         let length = hook.durs.reduce(0, +)
         let preferred = length <= 12 ? [0, 2, 4][rng.nextInt(upperBound: 3)] : 0
@@ -357,17 +430,66 @@ extension ChillLeadGenerator {
             guard open(bar) else { bar += 1; continue }
             if structure.section(atBar: bar)?.label == .outro && rng.nextDouble() < 0.5 { bar += 2; continue }
 
+            // Mutation rewrites a hook's contour, so doing it to all three every ten bars
+            // manufactured a new figure every few phrases: 16 contours in a song where Avalon
+            // has three or four, and no figure recurring enough to be the song's (Zack,
+            // 2026-10-13). Avalon holds its contours all the way through and varies the rhythm.
+            // So: one hook at a time, and rarely — a long song gets three or four in total.
             if bar >= nextMutation {
-                hook = closed ? tradeIntervals(hook, rng: &rng) : nudgeWithinCompass(hook, rng: &rng)
-                nextMutation = bar + 8 + rng.nextInt(upperBound: 5)
+                switch rng.nextInt(upperBound: 3) {
+                case 0:  hook  = closed ? tradeIntervals(hook,  rng: &rng) : nudgeWithinCompass(hook,  rng: &rng)
+                case 1:  hookB = closed ? tradeIntervals(hookB, rng: &rng) : nudgeWithinCompass(hookB, rng: &rng)
+                default: hookC = closed ? tradeIntervals(hookC, rng: &rng) : nudgeWithinCompass(hookC, rng: &rng)
+                }
+                nextMutation = bar + 24 + rng.nextInt(upperBound: 9)
             }
 
-            let statements = 2 + rng.nextInt(upperBound: 3)          // 2–4 in a row
+            // Three hooks, weighted as Avalon weights its own: 7 / 3 / 2. Drawing freely stacked
+            // up runs of eight identical statements, so a hook that just played is given one
+            // chance to be passed over — which thins the runs without banning repetition, since
+            // repetition is most of what this rule is (Zack, 2026-10-13).
+            // Which hook leads this episode. After an A B A the natural next move is B A B, so the
+            // hook that answered last time usually leads this time (Zack, 2026-10-13).
+            var pick: Int
+            if lastOther >= 0, rng.nextDouble() < 0.60 {
+                pick = lastOther
+            } else {
+                pick = rng.weightedPick([0.55, 0.25, 0.20])
+                if pick == lastHook, rng.nextDouble() < 0.45 { pick = rng.weightedPick([0.55, 0.25, 0.20]) }
+            }
+            lastHook = pick
+            let hooks = [hook, hookB, hookC]
+            let other = (pick + 1 + rng.nextInt(upperBound: 2)) % 3   // either of the other two
+            lastOther = other
+
+            // Three statements of one hook read as a carbon copy; A B A reads as a call and its
+            // answer, which is what makes a section sound musical rather than mechanical (Zack,
+            // 2026-10-13). So alternation is the norm from three statements up, and straight
+            // repetition is the exception that builds a little tension when it does happen —
+            // roughly one episode in ten is a straight copy, and the longer the episode the
+            // rarer it is.
+            let plan: [Int]
+            switch 2 + rng.nextInt(upperBound: 3) {
+            case 2:
+                plan = rng.nextDouble() < 0.65 ? [0, 1] : [0, 0]
+            case 3:
+                plan = [[0, 1, 0], [0, 0, 1], [0, 1, 1], [0, 0, 0]][
+                    rng.weightedPick([0.46, 0.24, 0.20, 0.10])]
+            default:
+                plan = [[0, 1, 0, 1], [0, 1, 1, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 0]][
+                    rng.weightedPick([0.34, 0.20, 0.22, 0.17, 0.07])]
+            }
             let everyOther = rng.nextDouble() < 0.30
             let episodeStart = bar
             var stated = 0
-            while stated < statements, bar < frame.totalBars, open(bar) {
-                var figure = hook
+            while stated < plan.count, bar < frame.totalBars, open(bar) {
+                var figure = hooks[plan[stated] == 0 ? pick : other]
+                // Avalon varies a hook by its rhythm, holding the contour: (1,1,3) and (2,1,3)
+                // are the same figure, and so are (1,1,5) and (2,1,5) — the difference is the
+                // first note's length. Both of its repeated hooks appear in exactly two rhythms.
+                if rng.nextDouble() < 0.35, !figure.durs.isEmpty {
+                    figure.durs[0] = figure.durs[0] == 2 ? 1 : 2
+                }
                 // One statement in five is an answer: the last step goes somewhere else.
                 if stated > 0, rng.nextDouble() < 0.20, let lastIv = figure.intervals.last {
                     figure.intervals[figure.intervals.count - 1] = lastIv + (lastIv >= 0 ? -2 : 2)
@@ -384,12 +506,18 @@ extension ChillLeadGenerator {
         }
     }
 
+    /// Hooks are drawn from `counterLineCells`, the bank that gives the reed and flute cells their
+    /// full weight, not the vocal-weighted `cellBank`. Avalon's hook — the figure this rule is
+    /// measured from — is a flute line, and on the vocal-weighted bank the hook came out as
+    /// repeated pitches: a statement like `0, 0, -2` stutters one note rather than playing a
+    /// figure (Zack, 2026-10-13). The same comment on `counterLineCells` records that bank
+    /// drawing 63% repeated pitches.
     private static func hookPhrase(closed: Bool, rng: inout SeededRNG) -> SohoPhrase {
         let n = 3 + rng.nextInt(upperBound: 4)                       // 3–6 notes
         var intervals: [Int] = [0, 2, -2]
         for _ in 0..<12 {
             var c: [Int] = []
-            while c.count < n - 1 { c += pickCell(rng: &rng) }
+            while c.count < n - 1 { c += pickCell(from: counterLineCells, rng: &rng) }
             c = Array(c.prefix(n - 1))
             if closed && c.count >= 2 { c[c.count - 1] = -c.dropLast().reduce(0, +) }
             if compass(c) <= 10 && c.allSatisfy({ abs($0) <= 7 }) { intervals = c; break }
@@ -430,6 +558,35 @@ extension ChillLeadGenerator {
 
     // MARK: - CHL-LD1-011 Sustained Tone
 
+    /// The notes that sit beside a held tone, measured rather than invented — see
+    /// `tools/soho_sustained.py`, which found the 42 phrases in the corpus containing a note of
+    /// three beats or more and reported their shape:
+    ///
+    /// - the held tone lands **last** in 55% of them, first in 29%, mid-phrase in 17%
+    /// - the notes around it are **short**: 1–2 steps in 80% of cases, 4 in most of the rest
+    /// - they sit **very close** to it — unison (43), a tone above (41), a tone below (26) and a
+    ///   minor third above (16) are the whole top of the interval histogram
+    /// - they are **2 steps apart**, not 4: the dominant onset gap by a wide margin
+    ///
+    /// Each cell is `(step offset, semitones from the held tone, duration)`. `span` is how many
+    /// steps the short notes occupy, before the held tone or after it. Intervals are snapped to
+    /// the scale at use, so the contour is the measurement and the pitches stay diatonic.
+    private static let sustainedCells: [(shorts: [(step: Int, interval: Int, dur: Int)],
+                                         longFirst: Bool, span: Int, weight: Double)] = [
+        // Holding Back the Years — two sixteenths, unison then a tone above, into the held note
+        (shorts: [(0, 0, 1), (3, 2, 1)],            longFirst: false, span: 6,  weight: 0.22),
+        // Black Cow — three notes climbing a fourth, dropping onto the held note
+        (shorts: [(0, 2, 2), (2, 4, 3), (5, 5, 3)], longFirst: false, span: 8,  weight: 0.20),
+        // Black Cow — a tone above and a minor third below, into the held note
+        (shorts: [(0, 2, 6), (6, -3, 4)],           longFirst: false, span: 10, weight: 0.14),
+        // Your Love Is King — a single note a tone under, answering straight into it
+        (shorts: [(0, -2, 2)],                      longFirst: false, span: 4,  weight: 0.09),
+        // Black Cow — the held note first, two eighths answering after it
+        (shorts: [(4, 0, 2), (6, 4, 2)],            longFirst: true,  span: 8,  weight: 0.20),
+        // Black Cow — held note first, a single answer a tone above
+        (shorts: [(4, 2, 2)],                       longFirst: true,  span: 6,  weight: 0.15),
+    ]
+
     /// A sax holding long tones, closer to a pad than a melody: one note per phrase, held two
     /// to three bars, then four to seven bars of rest. Measured from More Than This — thirteen
     /// notes in the whole song, median 47.6 steps, inside a 12-semitone compass.
@@ -439,6 +596,24 @@ extension ChillLeadGenerator {
                                       rng: inout SeededRNG) {
         let centre = pool[pool.count / 2]
         let band = pool.filter { abs($0 - centre) <= 6 }
+
+        // The song's theme, and one foil to set against it. 45% of the corpus's lead phrases are
+        // exact repeats of an earlier one and 55% repeat their contour — a phrase recurs eight
+        // times in both Smooth Operator and Black Cow. Drawing a fresh cell every phrase gave a
+        // song a bag of unrelated figures instead of a solo (Zack, 2026-10-12); see
+        // tools/soho_sustained.py.
+        // A held length belongs to a figure, not to each statement of it: one to two and a half
+        // bars, weighted short. Three bars was too long to sit on (Zack, 2026-10-12), and the
+        // corpus agrees — its held notes cluster at 12–28 steps and reach 48 only five times.
+        func heldLength() -> Int { [16, 24, 32, 40][rng.weightedPick([0.22, 0.32, 0.28, 0.18])] }
+        let themeIdx = rng.weightedPick(sustainedCells.map(\.weight))
+        let themeLen = heldLength()
+        let foilIdx: Int = {
+            let rest = sustainedCells.indices.filter { $0 != themeIdx }
+            let total = rest.reduce(0.0) { $0 + sustainedCells[$1].weight }
+            return rest[rng.weightedPick(rest.map { sustainedCells[$0].weight / total })]
+        }()
+        let foilLen = heldLength()
         var previous = -1
         var bar = firstPlayable + rng.nextInt(upperBound: 4)
 
@@ -449,7 +624,7 @@ extension ChillLeadGenerator {
             guard span >= 2 else { bar += span + 1; continue }
 
             let offset = rng.nextDouble() < 0.70 ? 0 : 2
-            let hold = Swift.min(32 + rng.nextInt(upperBound: 17), span * 16 - offset - 2)   // 32–48 steps
+            let available = span * 16 - offset - 2
             guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { bar += 1; continue }
             // A colour tone where there is one (the 9th, the 6th), else a chord tone; never the
             // pitch just held, so successive tones move.
@@ -460,9 +635,64 @@ extension ChillLeadGenerator {
             let note = choices[rng.nextInt(upperBound: choices.count)]
             previous = note
             let vel = Swift.max(40, velocity(at: bar, structure: structure) - 6 + rng.nextInt(upperBound: 6))
-            events.append(MIDIEvent(stepIndex: bar * 16 + offset, note: UInt8(note),
-                                    velocity: UInt8(vel), durationSteps: hold))
-            let endBar = (bar * 16 + offset + hold + 15) / 16
+
+            // One note held for three bars was too static to work as a solo, and a held note with
+            // nothing beside it sounded odd wherever it survived (Zack, 2026-10-12). Every phrase
+            // now carries its answering figure, and the figure is not invented: `sustainedCells`
+            // is measured from the corpus.
+            let start = bar * 16 + offset
+            let phraseEnd: Int
+
+            // The theme carries most phrases; the foil breaks them up. A restatement is always
+            // re-pitched to the current chord, and half the time that is the only thing that
+            // changes — which is what makes it read as the same phrase again rather than a new
+            // one. The rest vary exactly one thing: where the ornament falls, how many notes it
+            // has, how long they are, or how long the tone is held.
+            let useTheme = rng.nextDouble() < 0.60
+            let base = sustainedCells[useTheme ? themeIdx : foilIdx]
+            var wanted = useTheme ? themeLen : foilLen
+            var shorts = base.shorts
+            switch rng.weightedPick([0.50, 0.15, 0.15, 0.10, 0.10]) {
+            case 1:  shorts = shorts.map { ($0.step + 1, $0.interval, $0.dur) }      // a step later
+            case 2:  if shorts.count > 1 {                                            // one note fewer
+                        let drop = shorts.removeFirst().step
+                        shorts = shorts.map { ($0.step - drop, $0.interval, $0.dur) }
+                     }
+            case 3:  shorts = shorts.map { ($0.step, $0.interval, $0.dur + 1) }      // held a touch
+            case 4:  wanted = Swift.max(16, Swift.min(40, wanted + (rng.nextDouble() < 0.5 ? 8 : -8)))
+            default: break
+            }
+            let cellSpan = (shorts.map { $0.step + $0.dur }.max() ?? 0) + (base.longFirst ? 0 : 2)
+            let cell = (shorts: shorts, longFirst: base.longFirst, span: cellSpan)
+            let longHold = Swift.max(16, Swift.min(wanted, available - cell.span))
+
+            // The cell's intervals are semitones from the held tone; snap each to the nearest
+            // note of the band so the answer stays in the scale.
+            func snapped(_ semitones: Int) -> Int {
+                let target = note + semitones
+                return band.min { abs($0 - target) < abs($1 - target) } ?? note
+            }
+            let punchVel = UInt8(Swift.min(120, vel + 8))
+            if cell.longFirst {
+                events.append(MIDIEvent(stepIndex: start, note: UInt8(note),
+                                        velocity: UInt8(vel), durationSteps: longHold))
+                for sh in cell.shorts {
+                    events.append(MIDIEvent(stepIndex: start + longHold + sh.step,
+                                            note: UInt8(snapped(sh.interval)),
+                                            velocity: punchVel, durationSteps: sh.dur))
+                }
+                phraseEnd = start + longHold + cell.span
+            } else {
+                for sh in cell.shorts {
+                    events.append(MIDIEvent(stepIndex: start + sh.step,
+                                            note: UInt8(snapped(sh.interval)),
+                                            velocity: punchVel, durationSteps: sh.dur))
+                }
+                events.append(MIDIEvent(stepIndex: start + cell.span, note: UInt8(note),
+                                        velocity: UInt8(vel), durationSteps: longHold))
+                phraseEnd = start + cell.span + longHold
+            }
+            let endBar = (phraseEnd + 15) / 16
             onsets.append((startBar: bar, endBar: endBar))
             bar = endBar + 4 + rng.nextInt(upperBound: 4)            // 4–7 bars of rest
         }

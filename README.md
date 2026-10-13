@@ -24,9 +24,9 @@ The download is `2.7` (build 132), a **work-in-progress build** with Chill Soho 
 **What's in it — v2.7 Chill Soho:** A new Chill substyle modelled on the sophisti-pop records of Sade, Everything But The Girl, The Style Council, Simply Red and Roxy Music. Its rules were measured from MIDI transcriptions of those songs rather than described in prose, and almost nothing is shared with base Chill:
 
 - **Latin and soul grooves** — bossa, samba and half-time ballad patterns, with congas, bongos, shakers and surdo layered over the kit, and an intro that builds a layer at a time
-- **Jazz harmony** — 6th, 7th and 9th chords instead of triads, and a separate chord cycle for the B section. Each phrase ends on a four-bar turnaround that the whole band plays: the bass leads back to the top, the drums take a fill, the horns mark it and the shaker drops out
-- **Horns on the Texture track** — trumpet and French horn figures that land with the drum accents, struck once, twice or three times with their own rhythm, or long sustained halo notes above the pads
-- **Leads that sound sung** — phrases built from figures measured in the vocal lines of the original records, with a saxophone answering in the gaps
+- **Jazz harmony** — 6th, 7th and 9th chords instead of triads, and a separate chord cycle for the B section. Each phrase ends on a four-bar turnaround that the whole band plays: the bass leads back to the top, the drums take a fill, the horns mark it and the shaker drops out. The bass has six ways of playing it, from a walking line to a root pedalled under a descending one, and a song draws two or three of them so its turnarounds are neither all alike nor all different
+- **Horns on the Texture track** — trumpet, trombone and muted trumpet figures that land with the drum accents, struck once, twice or three times with their own rhythm, or long sustained halo notes above the pads, with vibraphone and xylophone for colour
+- **Leads that sound sung** — phrases built from figures measured in the vocal lines and horn parts of the original records, with a saxophone answering in the gaps. A solo states a figure, answers it with a different one and returns to the first, the way the records do, rather than repeating itself
 - **A Remix Break** — a short house-flavoured section mid-song, the band dropping into four-on-the-floor and hitting its way back out
 
 Earlier releases are covered in the [change log](docs/change-log.md).

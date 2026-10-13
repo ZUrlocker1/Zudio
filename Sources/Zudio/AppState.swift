@@ -565,10 +565,17 @@ final class AppState: ObservableObject {
         // Every program was checked against Zudio.sf2 (tools/sf2_drum_keys.py's sibling check) —
         // Brass Section (61), the obvious section voice, is NOT in the soundfont and would play
         // silent. Synth Brass 1/2 stood in for it until Zack heard them (2026-10-11): both are
-        // synthetic where this music wants real horns. Trumpet and French Horns replace them —
-        // French Horns is the one true section patch in the bank, and the only other brass are
-        // Trombone (too low for stabs over the pads) and the saxes (Lead 2's voices).
-        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return ["Trumpet","French Horns","Muted Trumpet","Vibraphone","Celesta","Glockenspiel","Solo Vox","Halo Pad"] }
+        // synthetic where this music wants real horns. French Horns replaced them and in turn did
+        // not work for the punctuation either (Zack, 2026-10-12); Trombone took its slot, the
+        // third voice of an early-80s horn section, sitting under Lead 1 rather than over it.
+        // The bank-8 Synth Brass 3/4 were tried there too and rejected like the bank-0 pair, so
+        // no synth brass belongs here. The saxes stay out: they are Lead 2's voices.
+        // Celesta, Glockenspiel, Solo Vox, Halo Pad and then Crystal all came out on
+        // 2026-10-12. Vibraphone keeps its place and Xylophone joins it as the bell colour.
+        // Nothing in the pool sustains now except the brass, so a Sustained Halo song that draws
+        // a mallet gets a note that rings and decays inside its written length rather than
+        // holding — brass is 70% of picks, so that is the minority case.
+        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return ["Trumpet","Trombone","Muted Trumpet","Vibraphone","Xylophone"] }
         // Chill Soho Lead 2: what answers the singer in the corpus. Baritone Sax (67) was measured
         // too but is not in Zudio.sf2.
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return ["Alto Sax","Tenor Sax","Synth Brass 1","Trombone","Vibraphone"] }
@@ -619,7 +626,9 @@ final class AppState: ObservableObject {
     nonisolated static func instrumentPoolPrograms(trackIndex: Int, style: MusicStyle, isKosmicDrift: Bool = false,
                                                    isChillSoho: Bool = false) -> [Int] {
         // Chill Soho MIDI texture — names and the reasons are in instrumentPoolNames.
-        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 60, 59, 11, 8, 9, 85, 94] }
+        // Trombone replaced French Horns, which did not work for the punctuation (Zack,
+        // 2026-10-12). Brass Section (61) is not in Zudio.sf2 and would play silent.
+        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 57, 59, 11, 13] }
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
@@ -692,6 +701,23 @@ final class AppState: ObservableObject {
             // Chill Soho Lead 2 only — base Chill's Lead 2 pool has no Synth Brass. It is the
             // loudest and brightest patch in that pool and sat over the top of Lead 1.
             case (kTrackLead2,   .chill,   "Synth Brass 1"): return 70
+            // Vibraphone on Lead 2, in every Chill form — base, Blues and Soho all carry it in
+            // that pool. Matched to the texture track's vibraphone: the mallet attack sits
+            // forward of the reeds and brass it shares the pool with (Zack, 2026-10-12).
+            case (kTrackLead2,   .chill,   "Vibraphone"):    return 75
+            // Chill Soho texture only — base Chill's texture "pool" is audio textures, so no
+            // released song can match this. Vibraphone's mallet attack cuts through the horn
+            // punctuation far harder than the brass patches it shares the pool with (Zack,
+            // 2026-10-12).
+            case (kTrackTexture, .chill,   "Vibraphone"):    return 75
+            // Xylophone is drier and brighter still than the vibraphone, so it gets the same cut.
+            case (kTrackTexture, .chill,   "Xylophone"):     return 75
+            // Open trumpet is the loudest thing in the Soho texture pool — brighter than the
+            // muted trumpet and higher than the trombone it shares the brass slots with (Zack,
+            // 2026-10-13). A lighter cut than the mallets take: it is the pool's main voice at
+            // 30% of picks and should not be buried. Base Chill's texture is audio files, not
+            // instruments, so this can only match Soho.
+            case (kTrackTexture, .chill,   "Trumpet"):       return 80
             default: return 100
             }
         }
@@ -2201,12 +2227,17 @@ final class AppState: ObservableObject {
         let isSoho  = state?.chillSohoVariation == true
         switch trackIndex {
         case kTrackTexture where isSoho:
-            // [0=Trumpet, 1=French Horns, 2=Muted Trumpet, 3=Vibraphone, 4=Celesta,
-            //  5=Glockenspiel, 6=Solo Vox, 7=Halo Pad] — brass leads, as a horn section is the
-            // idiomatic voice for both the stabs and the halo.
-            // Filtered by poolCount: a caller that sized the pool without isChillSoho would get the
-            // 7-entry audio list, and index 7 would then be out of range.
-            return [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7].filter { $0 < poolCount }
+            // [0=Trumpet, 1=Trombone, 2=Muted Trumpet, 3=Vibraphone, 4=Xylophone] — brass leads
+            // at 70% of picks, as a horn section is the idiomatic voice for both the stabs and
+            // the halo; the two mallets are colour.
+            // Filtered by poolCount: a caller that sized the pool without isChillSoho would get
+            // the 7-entry audio list, so an index past its end must not be returned.
+            return [0, 0, 0, 1, 1, 2, 2, 3, 3, 4].filter { $0 < poolCount }
+        case kTrackBass where isSoho:
+            // Chill Soho bass: [0=Fretless, 1=Acoustic, 2=Elec Bass]. Elec Bass is in the mix but
+            // less often than the other two — 25% against base Chill's even 33% (Zack,
+            // 2026-10-12). When it is drawn it takes Low and Comp, in both effect-default paths.
+            return [0, 0, 0, 1, 1, 1, 2, 2].filter { $0 < poolCount }
         case kTrackDrums where isSoho:
             // Chill Soho drums are rim click, brushes and a soft backbeat — never the 808.
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
@@ -3777,6 +3808,12 @@ final class AppState: ObservableObject {
             let l2Idx = trackIndex == kTrackLead2 ? (instrumentOverrides[kTrackLead2] ?? 0) : -1
             let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
 
+            // Chill Soho's Elec Bass (pool index 2) wants Low and Comp under it — the chips and
+            // the audio chain are the same switch, so they cannot drift (Zack, 2026-10-12).
+            // Mirrored in TrackRowView.applyDefaultEffects.
+            let sohoElecBass = songState?.chillSohoVariation == true
+                && trackIndex == kTrackBass && (instrumentOverrides[kTrackBass] ?? 0) == 2
+
             defaults = switch trackIndex {
             case kTrackLead1:   l1Vib      ? lead1FX + [.vibrato]    : lead1FX
             case kTrackLead2:   l2Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
@@ -3784,7 +3821,7 @@ final class AppState: ObservableObject {
             case kTrackPads:    [.sweep, .tremolo]
             // Chill Soho's texture is MIDI horns/bells — mirrors TrackRowView.
             case kTrackTexture: songState?.chillSohoVariation == true ? [.space, .reverb] : [.lowShelf, .reverb]
-            case kTrackBass:    [.reverb]
+            case kTrackBass:    sohoElecBass ? [.reverb, .lowShelf, .compression] : [.reverb]
             case kTrackDrums:   [.space]
             default:            []
             }

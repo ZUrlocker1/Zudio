@@ -3198,12 +3198,24 @@ struct SongGenerator {
 
         // Turnarounds — the four-bar chord detour inside the groove. It is not a section, so
         // nothing in the structure marks it; the performance log is where it belongs (Zack,
-        // 2026-10-12). Fires on the bar the detour begins.
+        // 2026-10-12). Fires on the bar the turnaround is *played*, not the bar its chords
+        // begin: the first two bars of the detour are still the ordinary groove, and the bass
+        // only breaks from it over the last two. Marking the chord change read two bars early
+        // against the ear (Zack, 2026-10-12). This mirrors ChillBassGenerator's turnaroundTreated.
         if sohoVariation {
             let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
-            let style = ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure)
-            let name = ChillStructureGenerator.sohoTurnaroundStyleNames[style]
-            for bar in turns.sorted() where !turns.contains(bar - 1) {
+            let exits = turns.filter { !turns.contains($0 + 1) }.sorted()
+            for (i, exit) in exits.enumerated() {
+                let style = ChillStructureGenerator.sohoTurnaroundStyle(frame: frame,
+                                                                        structure: structure,
+                                                                        index: i)
+                let name = ChillStructureGenerator.sohoTurnaroundStyleName(style)
+                // A treated turnaround is heard where the bass breaks its groove, over the last
+                // two bars. An original-form one has no bass figure to hear, so it is marked
+                // where its chords turn — the only cue there is.
+                let detour = turns.filter { $0 <= exit && !turns.contains($0 - 1) }.max() ?? exit
+                let bar = style == ChillStructureGenerator.sohoTurnaroundOriginal
+                    ? detour : max(detour, exit - 1)
                 fireBar(bar, tag: "Turnaround", desc: name)
             }
         } else if bluesVariation {
@@ -3710,7 +3722,9 @@ struct SongGenerator {
             // Chill Soho: a short non-modulating cycle, one bar per chord. See buildSohoChordPlan.
             var cycleRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 91))
             let soho = buildSohoChordPlan(frame: frame, structure: baseStructure,
-                                          remix: chillBreakdownStyle == .sohoRemix, rng: &cycleRNG)
+                                          remix: chillBreakdownStyle == .sohoRemix,
+                                          drone: chillBreakdownStyle == .harmonicDrone,
+                                          rng: &cycleRNG)
             sohoCycleLabel = soho.label
             sohoHasTurnaround = soho.turnaround
             structure = SongStructure(sections: baseStructure.sections,
@@ -4137,7 +4151,7 @@ struct SongGenerator {
     /// Share of ELIGIBLE Chill Soho songs that take the Remix Break (plan: 20–25%). Eligibility
     /// needs the Latin percussion overlay, tempo above 105 and a drum rule other than Ballad
     /// Half-Time or the reused Brush Kit, which works out to roughly one Soho song in twenty.
-    static let sohoRemixShareOfEligible: Double = 0.22
+    static let sohoRemixShareOfEligible: Double = 0.33
 
     /// Chill Soho breakdown style, on a derived stream (95) so it is reproducible from the seed.
     /// The Remix Break is only eligible when its pivot exists — the shaker comes with the Latin
@@ -4179,7 +4193,7 @@ struct SongGenerator {
     /// the most frequent bass root, which in a two-chord vamp can be the wrong chord. A maj7 on
     /// V is not diatonic in a major key; read in its true key it is Imaj9 | IVmaj9.
     private static func buildSohoChordPlan(frame: GlobalMusicalFrame, structure: SongStructure,
-                                           remix: Bool = false,
+                                           remix: Bool = false, drone: Bool = false,
                                            rng: inout SeededRNG)
     -> (windows: [ChordWindow], label: String, turnaround: Bool) {
         let key = frame.key, mode = frame.mode
@@ -4260,6 +4274,25 @@ struct SongGenerator {
                     let len = Swift.min(2, e - bar)
                     windows.append(window(bar, len, root, type))
                     bar += len; i += 1
+                }
+            case .bridge where drone && section.lengthBars >= 4:
+                // The Harmonic Drone used to be four bars of one unresolved Isus4, which is why
+                // it sat still (Zack, 2026-10-12). It now moves once, halfway: the suspension
+                // either resolves onto the tonic, lifts to IV, or steps to bVII and comes back
+                // unresolved into the re-entry. Two bars each, so the section is no busier.
+                let half = section.lengthBars / 2
+                windows.append(window(s, half, "1", .sus4))
+                switch rng.weightedPick([0.40, 0.35, 0.25]) {
+                case 0:
+                    windows.append(window(s + half, section.lengthBars - half, "1", tonicType))
+                case 1:
+                    windows.append(window(s + half, section.lengthBars - half, "4",
+                                          minorModes.contains(mode) ? .min9 : .maj9))
+                default:
+                    let step = Swift.max(1, (section.lengthBars - half) / 2)
+                    windows.append(window(s + half, step, "b7", flatSeven))
+                    windows.append(window(s + half + step, section.lengthBars - half - step,
+                                          "1", .sus4))
                 }
             case .bridge:
                 windows.append(window(s, section.lengthBars, "1", .sus4))

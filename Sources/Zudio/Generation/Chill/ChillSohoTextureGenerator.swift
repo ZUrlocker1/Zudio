@@ -16,8 +16,9 @@
 // these two roles. See "Texture" in docs/chill-soho-plan.md.
 //
 // Instruments are drawn independently of the rule, so both rules must suit every patch in the
-// pool (trumpet, French horns, muted trumpet, vibraphone, bells, Solo Vox, Halo Pad) — fast
-// attack, sustaining or ringing body.
+// pool (trumpet, trombone, muted trumpet, vibraphone, xylophone) — fast attack, sustaining or
+// ringing body. The two mallets ring rather than sustain, so a Sustained Halo note decays inside
+// its written length on those; only the brass holds it, and brass is 70% of picks.
 
 import Foundation
 
@@ -38,13 +39,15 @@ struct ChillSohoTextureGenerator {
         // the one Soho break with no voice at all — bass and pads hold, drums tick, and the rhythm
         // part and both leads are out — which is why it sounded like base Chill (Zack, 2026-10-11).
         if breakdownStyle == .harmonicDrone || breakdownStyle == .groovePocket {
-            events += breakdownAnswer(structure: structure, style: breakdownStyle, rng: &rng)
+            events += breakdownAnswer(structure: structure, style: breakdownStyle,
+                                      taken: Set(events.map(\.stepIndex)), rng: &rng)
         }
         // Rather over half of songs mark their turnarounds with a horn, announcing the chord
         // detour the way a section would announce itself. Not all of them: at every turnaround of
         // every song it stops being a gesture (Zack, 2026-10-12).
         if rng.nextDouble() < 0.55 {
-            events += turnaroundStabs(frame: frame, structure: structure, rng: &rng)
+            events += turnaroundStabs(frame: frame, structure: structure,
+                                      taken: Set(events.map(\.stepIndex)), rng: &rng)
         }
         // Three separate figures write to this track — the stabs, the turnaround marker and the
         // breakdown answer — so a pitch can be struck twice at one step. Keep the longer.
@@ -63,10 +66,13 @@ struct ChillSohoTextureGenerator {
     /// cycle. Voiced in the stab register and soft enough to mark the change rather than take it
     /// over; the bass is already leading back to the top underneath.
     private static func turnaroundStabs(frame: GlobalMusicalFrame, structure: SongStructure,
-                                        rng: inout SeededRNG) -> [MIDIEvent] {
+                                        taken: Set<Int>, rng: inout SeededRNG) -> [MIDIEvent] {
         let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
         var events: [MIDIEvent] = []
         for bar in turns.sorted() where !turns.contains(bar - 1) {
+            // Never struck on a step the stabs or the halo already sound on: two figures at one
+            // instant with different lengths is the staggered chord this track avoids.
+            guard !taken.contains(bar * 16) else { continue }
             guard let c = chord(atBar: bar, in: structure) else { continue }
             let pool = notes(c.chordTones, 58, 71)
             guard pool.count >= 2 else { continue }
@@ -99,13 +105,15 @@ struct ChillSohoTextureGenerator {
     ///
     /// Designed rather than measured: no reference song has a section of either kind to measure.
     private static func breakdownAnswer(structure: SongStructure, style: ChillBreakdownStyle,
-                                        rng: inout SeededRNG) -> [MIDIEvent] {
+                                        taken: Set<Int>, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         func hits(_ bar: Int, _ steps: [Int], _ lo: Int, _ hi: Int, _ vel: UInt8, _ dur: Int) {
             guard let c = chord(atBar: bar, in: structure) else { return }
             let pool = notes(c.chordTones, lo, hi)
             guard pool.count >= 2 else { return }
-            for step in steps {
+            // Never on a step the stabs or the halo already sound on — two figures at one instant
+            // with different lengths is the staggered chord this track avoids.
+            for step in steps where !taken.contains(bar * 16 + step) {
                 for n in [pool[0], pool[pool.count / 2]] {
                     events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(n),
                                             velocity: vel, durationSteps: dur))
@@ -207,7 +215,7 @@ struct ChillSohoTextureGenerator {
         /// notes are in the chord: two or three notes sounding together is still one "bap"
         /// (Zack, 2026-10-12). A real section plays figures, so most stabs are now two or three
         /// hits of the same chord with their own rhythm — short-short, short-long, short-short-long.
-        func stab(_ bar: Int, step: Int, weights: [Double], vel: UInt8, maxHits: Int) {
+        func stab(_ bar: Int, step: Int, weights: [Double], vel: UInt8, maxHits: Int, room: Int) {
             guard let c = chord(atBar: bar, in: structure) else { return }
             let pool = notes(c.chordTones, 58, 71)
             guard !pool.isEmpty else { return }
@@ -220,7 +228,7 @@ struct ChillSohoTextureGenerator {
             default: picks = [pool[0], pool[pool.count / 2], pool[pool.count - 1]]
             }
             let voiced = Array(Set(picks)).sorted()
-            for (offset, length, accent) in stabFigure(maxHits: maxHits, room: 16 - step, rng: &rng) {
+            for (offset, length, accent) in stabFigure(maxHits: maxHits, room: room, rng: &rng) {
                 let v = UInt8(Swift.max(40, Swift.min(110, Int(vel) + accent)))
                 for n in voiced {
                     events.append(MIDIEvent(stepIndex: bar * 16 + step + offset, note: UInt8(n),
@@ -230,9 +238,16 @@ struct ChillSohoTextureGenerator {
         }
 
         // Accents: 3 notes half the time, 2 a third, 1 occasionally, and up to three hits.
-        for at in crashSteps(drumEvents) where at / 16 < frame.totalBars {
+        //
+        // A figure has to finish before the next accent in the same bar. The Remix Break's exit
+        // crashes on steps 0 AND 8, and a bar can crash on 8 and 12, so a figure left to run the
+        // rest of the bar would strike the same instant as the next one with a different length.
+        let accents = crashSteps(drumEvents)
+        for (i, at) in accents.enumerated() where at / 16 < frame.totalBars {
+            let nextInBar = i + 1 < accents.count && accents[i + 1] / 16 == at / 16
+                ? accents[i + 1] % 16 : 16
             stab(at / 16, step: at % 16, weights: [0.16, 0.34, 0.50],
-                 vel: v(78, 12, &rng), maxHits: 3)
+                 vel: v(78, 12, &rng), maxHits: 3, room: nextInBar - at % 16)
         }
 
         // Pickups are lighter: mostly 1 or 2 notes.
@@ -243,7 +258,7 @@ struct ChillSohoTextureGenerator {
                 if !crashes.contains(bar) && !crashes.contains(bar + 1) {
                     // A pickup sits on beat 4 with only a beat of room, so at most two hits.
                     stab(bar, step: 12, weights: [0.40, 0.45, 0.15],
-                         vel: v(64, 12, &rng), maxHits: 2)
+                         vel: v(64, 12, &rng), maxHits: 2, room: 4)
                 }
                 bar += phrase
             }

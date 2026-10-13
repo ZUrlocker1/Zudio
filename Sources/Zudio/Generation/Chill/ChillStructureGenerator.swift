@@ -612,17 +612,53 @@ struct ChillStructureGenerator {
         return out
     }
 
-    /// Which of the three turnaround bass treatments a song uses: 0 walking quarters,
-    /// 1 root and approach, 2 descending line.
+    /// The bass rides its own groove through the turnaround rather than playing a figure.
+    static let sohoTurnaroundOriginal = -1
+
+    /// The six turnaround bass treatments. −1 leaves the groove alone; 0–4 are figures that
+    /// break it. Three of them are descents, differing only in what the root does underneath:
+    /// nothing, one held note, or a new note each bar.
+    static let sohoTurnaroundTreatments = [sohoTurnaroundOriginal, 0, 1, 2, 3, 4]
+
+    /// The two or three treatments a single song draws on. Four turnarounds all playing the same
+    /// figure sounded mechanical, but four different ones had no shape either — two or three,
+    /// with repeats, is the ask (Zack, 2026-10-12).
     ///
-    /// A pure function of the frame and structure, like `sohoBassLeadsIntro`, because the bass
-    /// generator and the performance log both need it and run on different streams. Roughly
-    /// 40 / 35 / 25.
-    static func sohoTurnaroundStyle(frame: GlobalMusicalFrame, structure: SongStructure) -> Int {
-        let h = (frame.tempo * 7 + frame.keySemitoneValue * 13 + structure.chordPlan.count * 3) % 100
-        return h < 40 ? 0 : h < 75 ? 1 : 2
+    /// Pure, like the rest of the turnaround helpers, because the bass generator and the
+    /// performance log both need it and run on different streams.
+    static func sohoTurnaroundPalette(frame: GlobalMusicalFrame,
+                                      structure: SongStructure) -> [Int] {
+        let seed = frame.tempo * 31 + frame.keySemitoneValue * 17 + structure.chordPlan.count * 13
+        var pool = sohoTurnaroundTreatments
+        var out: [Int] = []
+        var h = seed
+        for _ in 0..<((seed / 7) % 100 < 55 ? 2 : 3) {
+            h = (h &* 1103515245 &+ 12345) & 0x7fffffff
+            out.append(pool.remove(at: h % pool.count))
+        }
+        return out
+    }
+
+    /// The treatment the `index`-th turnaround of the song uses, counting from 0 in bar order.
+    ///
+    /// The first turnarounds take the palette's entries in order, so every treatment the song
+    /// drew is actually heard; any beyond that repeat from the same palette. A song therefore
+    /// never plays one figure throughout, and never plays four different ones.
+    static func sohoTurnaroundStyle(frame: GlobalMusicalFrame, structure: SongStructure,
+                                    index: Int) -> Int {
+        let palette = sohoTurnaroundPalette(frame: frame, structure: structure)
+        guard index >= palette.count else { return palette[index] }
+        let h = (frame.tempo * 11 + frame.keySemitoneValue * 29
+                 + structure.chordPlan.count * 7 + index * 37) % 100
+        return palette[h % palette.count]
     }
 
     /// The names used in the performance log and in `ChillSohoTests`.
-    static let sohoTurnaroundStyleNames = ["walking quarters", "root & approach", "descending"]
+    static let sohoTurnaroundStyleNames = ["walking quarters", "root & approach", "descending",
+                                           "root pedal descent", "pedal descent"]
+
+    /// The performance-log name for a treatment, including the original form.
+    static func sohoTurnaroundStyleName(_ style: Int) -> String {
+        style == sohoTurnaroundOriginal ? "original form" : sohoTurnaroundStyleNames[style]
+    }
 }

@@ -686,7 +686,12 @@ struct ChillBassGenerator {
         let turnarounds = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
         let turnaroundExit = turnarounds.filter { !turnarounds.contains($0 + 1) }
         let turnaroundTreated = Set(turnaroundExit.flatMap { [$0 - 1, $0] }).intersection(turnarounds)
-        let turnaroundStyle = ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure)
+        // Each turnaround gets its own treatment, keyed by its position in the song.
+        let turnaroundStyles = Dictionary(uniqueKeysWithValues:
+            turnaroundExit.sorted().enumerated().map { i, exit in
+                (exit, ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure,
+                                                                  index: i))
+            })
         let scalePCs = Set(scaleNotes(frame: frame, chord: nil))
         // Scale notes inside clampBass's 40–52 window. 014 and 015 walk this ladder and reflect at
         // the ends; folding by octave would turn a step into a ninth-wide jump.
@@ -844,15 +849,38 @@ struct ChillBassGenerator {
 
             if turnaroundTreated.contains(bar) {
                 let isExit = turnaroundExit.contains(bar)
-                // Where the phrase restarts, two or one bars ahead depending which of the pair
-                // this is. The descending line aims at it across both bars.
-                let landingBar = isExit ? bar + 1 : bar + 2
-                let landing = clampBass(chordRootNote(
-                    frame: frame, chord: structure.chordPlan.first { $0.contains(bar: landingBar) }))
-                events.removeSubrange(mark...)
-                events += turnaroundBassBar(base: base, root: root, nextRoot: nextRoot,
-                                            landing: landing, style: turnaroundStyle,
-                                            isExit: isExit, ladder: ladder, rng: &rng)
+                let turnaroundStyle = turnaroundStyles[isExit ? bar : bar + 1]
+                    ?? ChillStructureGenerator.sohoTurnaroundOriginal
+                // The original form leaves the bar as the rules wrote it: the groove rides
+                // straight through the chord detour.
+                if turnaroundStyle != ChillStructureGenerator.sohoTurnaroundOriginal {
+                    // Where the phrase restarts, two or one bars ahead depending which of the pair
+                    // this is. The descending line aims at it across both bars.
+                    let landingBar = isExit ? bar + 1 : bar + 2
+                    let landing = clampBass(chordRootNote(
+                        frame: frame,
+                        chord: structure.chordPlan.first { $0.contains(bar: landingBar) }))
+                    events.removeSubrange(mark...)
+                    // The figure's pedal roots, in bar order. Style 3 holds one note under all
+                    // four pairs, so it passes only the turnaround's first bar's root and does
+                    // not re-root when the chord changes; style 4 passes both bars' roots and
+                    // does. Both are listed so the line can be positioned clear of either.
+                    let firstBar = isExit ? bar - 1 : bar
+                    func rootOf(_ b: Int) -> Int {
+                        chordRootNote(frame: frame,
+                                      chord: structure.chordPlan.first { $0.contains(bar: b) })
+                    }
+                    let pedalRoots: [Int]
+                    switch turnaroundStyle {
+                    case 3:  pedalRoots = [rootOf(firstBar)]
+                    case 4:  pedalRoots = [rootOf(firstBar), rootOf(firstBar + 1)]
+                    default: pedalRoots = []
+                    }
+                    events += turnaroundBassBar(base: base, root: root, nextRoot: nextRoot,
+                                                landing: landing, style: turnaroundStyle,
+                                                isExit: isExit, ladder: ladder,
+                                                pedalRoots: pedalRoots, rng: &rng)
+                }
             }
         }
         return events
@@ -875,7 +903,7 @@ struct ChillBassGenerator {
     ///   step above the chord the phrase restarts on
     private static func turnaroundBassBar(base: Int, root: Int, nextRoot: Int, landing: Int,
                                           style: Int, isExit: Bool, ladder: [Int],
-                                          rng: inout SeededRNG) -> [MIDIEvent] {
+                                          pedalRoots: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
         guard !ladder.isEmpty else {
             return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 80, durationSteps: 4)]
         }
@@ -899,14 +927,58 @@ struct ChillBassGenerator {
             out.append(note(14, approach, v(74, 10), 2))
             return out
 
-        case 2:
+        case 2, 3, 4:
             // Descending line, aimed at the landing across both bars: the four notes sit at
             // landing+4, +3 (first bar) and +2, +1 (second), by scale step.
-            let base0 = index(landing)
-            let offsets = isExit ? [2, 1] : [4, 3]
-            return zip([0, 8], offsets).map { step, up in
-                note(step, ladder[Swift.max(0, Swift.min(ladder.count - 1, base0 + up))],
-                     v(step == 0 ? 80 : 72, 9), 4)
+            //   2 descending          — the line alone
+            //   3 root pedal descent  — one root under all four pairs, held through the chord change
+            //   4 pedal descent       — the bar's own root, so the pedal re-roots mid-figure
+            var base0 = index(landing)
+            // Where the landing sits near the top of the 40–52 window there is no room for four
+            // steps above it, and clamping each step to the top of the ladder repeated one note
+            // instead of descending — 55% of these turnarounds did not descend at all, some as
+            // four identical notes (Zack, 2026-10-12). Aim an octave lower, which always has
+            // room, then hold the whole figure clear of the ceiling so no two steps collide.
+            if base0 + 4 > ladder.count - 1 { base0 = index(landing - 12) }
+            base0 = Swift.max(0, Swift.min(base0, ladder.count - 5))
+
+            // Each pedal root at its lowest instance in the ordinary 40–52 bass window.
+            let pedalNotes = pedalRoots.map { r -> Int in
+                var n = clampBass(r)
+                while n - 12 >= 40 { n -= 12 }
+                return n
+            }
+            // The line is NOT moved to dodge the pedal. Positioning it clear of the pedal was
+            // tried and it broke the descent's resolution: the last note has to land a step from
+            // the chord the phrase restarts on, and lifting the line pushed it away. Clashes are
+            // handled in the figure below, by dropping the offending pedal instead.
+
+            // Style 3 passes one root and uses it in both bars; style 4 passes both.
+            let pedalNote = pedalNotes.isEmpty ? 0 : pedalNotes[isExit ? pedalNotes.count - 1 : 0]
+            // All four of the figure's line notes, highest first, so each bar can see the note
+            // the previous bar left on. The exit bar plays the last two.
+            let lineAll = (1...4).reversed().map {
+                ladder[Swift.max(0, Swift.min(ladder.count - 1, base0 + $0))]
+            }
+            return zip([0, 8], isExit ? [2, 3] : [0, 1]).flatMap { step, k -> [MIDIEvent] in
+                let line = lineAll[k]
+                let vel = v(step == 0 ? 80 : 72, 9)
+                // The figure sounds pedal, line, pedal, line…, so a pedal equal to the line note
+                // on *either* side of it gives two notes of the same pitch in a row, which reads
+                // as one repeated note rather than as an alternation (Zack, 2026-10-12). That
+                // pair plays its line note alone instead — the root stays in the bass register
+                // rather than being lifted out of it to dodge the clash.
+                let clashes = pedalNote == line || (k > 0 && pedalNote == lineAll[k - 1])
+                guard !pedalNotes.isEmpty, !clashes else {
+                    return [note(step, line, vel, 4)]
+                }
+                // "ba-baa": the root short on the beat, the descending note answering on the
+                // eighth and ringing through to the next cell. One velocity draw either way, so
+                // pedalling a turnaround does not shift the stream for anything after it.
+                // Built directly, because note()'s clampBass would fold a lifted pedal back down.
+                return [MIDIEvent(stepIndex: base + step, note: UInt8(pedalNote),
+                                  velocity: UInt8(Swift.max(40, Int(vel) - 12)), durationSteps: 2),
+                        note(step + 2, line, vel, 6)]
             }
 
         default:

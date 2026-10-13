@@ -216,6 +216,14 @@ struct ChillDrumGenerator {
         // Remix Break exit: unison stabs or a fill, 50/50 so both can be heard (Zack, 2026-10-10).
         // Drawn only for a remix song, so other Soho songs' drums are unaffected.
         let remixExitStabs = breakdownStyle == .sohoRemix ? rng.nextDouble() < 0.5 : false
+        // The Remix Break's backbeat voice. Handclaps are the house default and stay the most
+        // common, but every break sounding identical is what gives the device away — tambourine
+        // is the other classic twelve-inch sound, and the side stick is the nearest thing General
+        // MIDI has to a finger snap. Drawn only for a remix song, so no other song shifts.
+        let remixBackbeat: UInt8 = breakdownStyle == .sohoRemix
+            ? [GMDrum.clap.rawValue, GMDrum.tambourine.rawValue, GMDrum.sidestick.rawValue][
+                rng.weightedPick([0.45, 0.30, 0.25])]
+            : GMDrum.clap.rawValue
         let (shakerRests, shakerReturns) = sohoShakerRests(frame: frame, structure: structure, rng: &rng)
         // The last bar of each turnaround takes a fill back to the top — the shaker is already
         // resting there, so there is room for one.
@@ -285,7 +293,10 @@ struct ChillDrumGenerator {
                 }
                 for step in [0, 4, 8, 12] { hit(step, kick, step % 8 == 0 ? v(80, 8) : v(66, 8), base) }
                 if bdBar >= 2 {
-                    for step in [4, 12] { hit(step, clap, v(64, 10), base) }
+                    // Tambourine rings and the side stick is dry, so they sit differently.
+                    let backbeatVel = remixBackbeat == GMDrum.tambourine.rawValue ? 56
+                                    : remixBackbeat == GMDrum.sidestick.rawValue  ? 68 : 64
+                    for step in [4, 12] { hit(step, remixBackbeat, v(backbeatVel, 10), base) }
                     for step in [2, 6, 10, 14] { hit(step, openHat, v(46, 10), base) }
                 }
                 continue

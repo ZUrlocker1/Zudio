@@ -206,9 +206,8 @@ struct ChillTitleGenerator {
     /// Real Soho streets. The substyle is named for the place, so this is the one bank that
     /// should never be invented.
     static let sohoStreets = ["Wardour", "Berwick", "Dean", "Frith", "Greek", "Carnaby", "Brewer",
-                              "Old Compton",  "Rupert", "Archer",
-                              "Broadwick", "Kingly", "Marshall", "Noel", "Ganton",
-                              "Romilly", "Hollen", "Denmark"]
+                              "Old Compton", "Curzon", "Oxford", "Bond", "Archer",
+                              "Broadwick", "Regent", "Camden", "Marshall", "Noel", "Ganton", "Denmark"]
 
     /// The streets that read as a name on their own, without "Street" after them — the ones a
     /// listener has heard of. "Dean Lights" works; "Broadwick Doorway" is nothing.
@@ -216,9 +215,9 @@ struct ChillTitleGenerator {
                                    "Brewer", "Old Compton"]
 
     static let sohoLondon  = ["Fitzrovia", "Marylebone", "Mayfair", "Camden", "Islington",
-                              "Hackney", "Brixton", "Portobello", "Ladbroke", "Kensington",
+                              "Hackney", "Brixton", "Portobello", "Ladbroke Grove", "Kensington",
                               "Chelsea", "Shoreditch", "Clerkenwell", "Bloomsbury", "Pimlico",
-                              "Barbican", "Bermondsey", "Hoxton", "Dalston", "Maida Vale",
+                              "Barbican", "Bermondsey", "Shepherd's Bush", "Maida Vale",
                               "Covent Garden", "Holborn",
                               "West End", "East End", "Woking", "Dorking",
                               "Bromley", "Guildford", "Dagenham"]

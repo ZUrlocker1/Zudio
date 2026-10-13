@@ -449,6 +449,11 @@ struct TrackRowView: View {
             let l2Idx = trackIndex == kTrackLead2 ? (appState.instrumentOverrides[kTrackLead2] ?? 0) : -1
             let l2Vib = [1, 2, 3].contains(l2Idx) && Float.random(in: 0..<1) < 0.20
 
+            // Chill Soho's Elec Bass (pool index 2) wants Low and Comp under it.
+            // Mirrored in AppState.restoreDefaultEffects — keep the two in step.
+            let sohoElecBass = isSoho && trackIndex == kTrackBass
+                && (appState.instrumentOverrides[kTrackBass] ?? 0) == 2
+
             defaults = switch trackIndex {
             case kTrackLead1:   l1Vib      ? lead1FX + [.vibrato]    : lead1FX
             case kTrackLead2:   l2Vib      ? baseLeadFX + [.vibrato] : baseLeadFX
@@ -457,7 +462,7 @@ struct TrackRowView: View {
             // Base Chill's texture is an audio loop; Chill Soho's is MIDI horns and bells, which
             // want the same space as the leads rather than the loop's low shelf.
             case kTrackTexture: isSoho ? [.space, .reverb] : [.lowShelf, .reverb]
-            case kTrackBass:    [.reverb]
+            case kTrackBass:    sohoElecBass ? [.reverb, .lowShelf, .compression] : [.reverb]
             case kTrackDrums:   [.space]
             default:            []
             }

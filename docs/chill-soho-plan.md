@@ -1481,8 +1481,11 @@ The band performs it: **bass approach** on the exit bar, **drum fill** on 60% of
 `ChillBreakdownStyle` gains `.sohoRemix`. Stop-time is excluded — it is base Chill's own gesture.
 
 - **Remix Break** — eligible only when the Latin percussion overlay is active **and** tempo > 105
-  **and** the drum rule is not `013` or `003`. Fires in **22%** of eligible songs, **6, 8 or 12
-  bars**
+  **and** the drum rule is not `013` or `003`. Fires in **33%** of eligible songs — about one
+  Soho song in fourteen — and runs **6, 8 or 12 bars**
+- Its backbeat voice is drawn per song: **handclap 45%, tambourine 30%, side stick 25%**. The
+  pattern stays on beats 2 and 4; only the voice changes, because every break sounding identical
+  is what gives the device away
 - Otherwise **bass ostinato 45%, groove pocket 30%, harmonic drone 25%**
 - **Into the remix**: the band stops after beat 2 of the bar before and hits beats 3 and 4 in
   unison — drums, bass and rhythm on the same two steps — with a crash on the break's downbeat
@@ -1526,7 +1529,7 @@ Breakdowns — `005` root drone, both pools.
 Every rule evolves on a **12–18 bar** micro-variant cycle.
 
 **Turnaround treatment.** The bass stops playing the groove for the turnaround's **last two
-bars** and plays a turnaround. One of three per song, named in the performance log:
+bars** and plays a turnaround. One of three figures, named in the performance log:
 
 - **walking quarters** — four quarters a bar: the root, two scale steps toward the next chord,
   then a chromatic leading tone into it. Where the next chord is only a step away, the middle
@@ -1535,10 +1538,45 @@ bars** and plays a turnaround. One of three per song, named in the performance l
   sparser than the groove, so the turnaround reads as a clearing
 - **descending** — one scalar descent across both bars, two notes a bar, arriving a step above
   the chord the phrase restarts on
+- **root pedal descent** — the same descent with the chord root pedalled under it: the root short
+  on the beat, the descending note answering on the eighth and ringing through to the next cell,
+  "ba-baa, ba-baa" (Zack, 2026-10-12). A true **pedal point** — one note under all four pairs,
+  the turnaround's first bar's root at its lowest instance in the 40–52 bass window, held through
+  the chord change between the two bars
+- **pedal descent** — the same, but each bar pedals its *own* chord root, so the pedal re-roots
+  mid-figure
+
+Two earlier versions of the pedal were wrong by ear, both because they let it move: one re-rooted
+per bar *and* reached an octave below the window, to 33, so the root always cleared the line —
+which landed the two bars in different octaves and lurched by a seventh or a ninth mid-figure.
+A pedal that holds matters more than one that always sits under the line.
+
+Two notes in a row at the same pitch read as one repeated note rather than as an alternation, and
+are eliminated entirely (Zack, 2026-10-12). A pair whose pedal would equal the line note on
+either side of it **drops its pedal** and plays the line note alone; 78% of pedal slots are
+filled, and no figure loses all four. The **line is never moved** to dodge the pedal: positioning
+it clear of the pedal was tried and broke the descent's resolution, because the last note has to
+land a step from the chord the phrase restarts on and lifting the line pushed it away. Nor is the
+root lifted out of the bass register — it stays within 40–52.
+
+**Which treatments a song uses.** `sohoTurnaroundPalette(frame:structure:)` draws two treatments
+(56% of songs) or three (44%) from the six, and `sohoTurnaroundStyle(frame:structure:index:)`
+gives the first turnarounds the palette's entries in order so each one is actually heard, then
+repeats from the same palette. Across 251 songs carrying four turnarounds, none plays the same
+figure throughout and none plays four different ones. Usage runs 13–20% per treatment.
 
 Two bars rather than four: a turnaround fires every 16 bars in most songs, and four would put the
 bass out of its own part for a quarter of the song. The way into a Remix Break takes precedence
 where a bar is both.
+
+**The treatment varies within the song.** A long song carries four or five turnarounds, and
+playing the same figure at every one of them sounded mechanical. Only the **first** turnaround
+uses the song's primary treatment; each later one steps to a figure the previous turnaround did
+not play, and about a quarter of them use the **original form** — no figure at all, the groove
+rides straight through the chord detour. Over 300 songs the mix is roughly 23% descending, 22%
+root & approach, 21% walking quarters and 14% original form. `sohoTurnaroundStyle(frame:
+structure:index:)` is pure, like the song-level picker, because the bass generator and the
+performance log need it on different streams.
 
 ### Rhythm
 
@@ -1573,7 +1611,7 @@ measured line leaps on 17–20% of intervals.
 median overlap across the corpus. No new Lead 2 rules; punctuation belongs on Texture.
 
 Pool: Alto Sax, Tenor Sax, Synth Brass 1, Trombone, Vibraphone, never the same as Lead 1.
-**Synth Brass 1 is at CC7 70** — it is the loudest patch in that pool. Baritone Sax is measured in
+**Synth Brass 1 is at CC7 70** — it is the loudest patch in that pool. **Vibraphone is at CC7 75**, set on the name so it applies to Lead 2 in *every* Chill form, base and Blues included, which share a pool carrying it (Zack, 2026-10-12); it matches the cut the texture track's vibraphone takes, for the same reason. Baritone Sax is measured in
 the corpus but is not in `Zudio.sf2`.
 
 **Density cap 2 notes/bar**, and a 35% chance of sitting out each groove section. Regeneration
@@ -1610,10 +1648,23 @@ songs with a single hit.
 
 Soho has its own pools where base Chill's are wrong:
 
-- **Texture**: Trumpet, French Horns, Muted Trumpet, Vibraphone, Celesta, Glockenspiel, Solo Vox,
-  Halo Pad — brass weighted first. Brass Section (61), Clean Guitar (27) and Baritone Sax (67) are
-  **not in `Zudio.sf2`** and would play silent
+- **Texture**: Trumpet 30%, Trombone 20%, Muted Trumpet 20%, Vibraphone 20%, Xylophone 10% —
+  brass leads at 70% of picks, the two mallets are colour. Brass Section
+  (61), Clean Guitar (27) and Baritone Sax (67) are **not in `Zudio.sf2`** and would play silent.
+  **Trumpet is at CC7 80, and Vibraphone and Xylophone at 75** — a mallet attack cuts through the horn punctuation
+  harder than the brass patches it shares the pool with, and open trumpet is the loudest thing in the pool — brighter than the muted trumpet and higher than the trombone. The trumpet's cut is the lighter one: it is the pool's main voice at 30% of picks. French Horns (60) was the section voice
+  until it proved wrong for the punctuation; **Trombone (57)** took its slot. **No synth brass**:
+  the bank-0 Synth Brass 1 and 2 and the bank-8 variation samples 3 and 4 were all tried on this
+  track and all rejected — this music wants real horns. Celesta, Glockenspiel, Solo Vox, Halo Pad
+  and Crystal all came out on 2026-10-12. Nothing left sustains except the brass, so a Sustained
+  Halo song drawing one of the two mallets gets a note that rings and decays inside its written
+  length instead of holding — the brass covers 70% of picks
 - **Lead 2**: as above
+- **Bass**: Fretless 37%, Acoustic 37%, **Elec Bass 25%** — base Chill draws all three evenly,
+  Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low and Comp**
+  on top of its reverb, set in both `AppState.restoreDefaultEffects` and
+  `TrackRowView.applyDefaultEffects`, which must stay in step; the chips and the audio chain are
+  the same switch, so they cannot drift
 - **Drums**: Brush Kit and Jazz Drums only — never the 808
 - **Lead 1 delay is off** by default; a delayed lead is a St Germain signature
 - Lead 1, Rhythm, Pads and Bass still draw from base Chill's pools
@@ -1637,6 +1688,10 @@ is not a title.
 - **Turnarounds** are marked in the performance log as `Bar nnn  Turnaround`, in **both Chill
   Soho and Chill Blues**. Soho names the bass treatment — `Turnaround  walking quarters` — while
   Blues, which has none, carries no description and marks the V7 at cycle bar 12
+- The Soho mark fires on the bar the turnaround is **played**, not the bar its chords begin. The
+  detour's first two bars are still the ordinary groove, so marking the chord change read two
+  bars early against the ear. An **original form** turnaround has no bass figure to hear, so it
+  is marked where its chords turn — the only cue there is
 
 ### Verification
 
@@ -1675,3 +1730,109 @@ The reuse added above means the new-rule count rose from nine to eleven, but the
 
 Nothing in Ambient, Kosmic or Motorik. No playback or export changes. No new instruments or
 soundfont work — every patch this substyle needs is already in the Chill pools.
+
+### Harmonic Drone
+
+Four bars, and until 2026-10-12 it was four bars of one unresolved Isus4 with Lead 1 barred from
+it, which made it the dullest section in the substyle: 21% of its bars had nothing pitched
+playing at all, pads reached only 21% of them, and Lead 1 10%.
+
+- **The harmony moves once, halfway.** The suspension either resolves onto the tonic (40%), lifts
+  to IV (35%), or steps to bVII and returns unresolved into the re-entry (25%). Two bars each, so
+  the section is no busier than before. `buildSohoChordPlan` only, so no other breakdown style and
+  no other substyle is touched
+- **Lead 1 plays through it** — the one breakdown where it does. It is a held chord with nothing
+  else carrying a melody. Drone bars are also removed from the lead's rest mask, because a single
+  rest landing on a four-bar section silenced the lead for all of it
+- Result: bars with nothing pitched fall from 21% to 11%, Lead 1 reaches 49% of drone bars
+
+Not done, and worth revisiting if it still feels thin: giving the drone a genuinely sustained bed.
+Pads are absent from 15% of these songs entirely (`CHL-PAD-000`), and the ABSENT ruling says a
+track that is absent does not appear at all, so the bed would have to come from the rhythm
+instrument instead.
+
+### CHL-LD1-011 Sustained Tone — the phrase around the held note
+
+A held tone on its own sounded wrong wherever it appeared (Zack, 2026-10-12), so **every phrase
+carries an answering figure** — two to four notes, exactly one of them long.
+
+The **held note is 1.5, 2, 2.5 or 3 bars** (24, 32, 40 or 48 steps), weighted 30/30/25/15. It was
+a continuous 32–48 steps before, which read as "always three bars".
+
+The figure beside it is **measured, not invented** — `tools/soho_sustained.py` finds every phrase
+in the corpus containing a note of three beats or more (42 of them across the 14 files) and
+reports its shape:
+
+- the held tone lands **last** in 55%, first in 29%, mid-phrase in 17%. `sustainedCells` is
+  weighted 65/35 last-to-first, which is that split with the mid-phrase cases set aside
+- the notes beside it are **short** — 1–2 steps in 80% of cases
+- they sit **very close**: unison (43 occurrences), a tone above (41), a tone below (26) and a
+  minor third above (16) are the whole top of the interval histogram
+- their onsets are **2 steps apart**, not 4
+
+The cells are lifted from Holding Back the Years, Black Cow and Your Love Is King. Their
+intervals are semitones from the held tone, snapped to the scale at use, so the contour is the
+measurement and the pitches stay diatonic.
+
+### CHL-LD1-012 Tight Hook — two hooks, not one
+
+Measured from **Avalon**, whose lead channel plays **16 phrases in 9 distinct shapes**: its main
+figure recurs five times, a second three times, a third twice, then one-offs. The rule used to
+draw **one** hook and nudge it every ten bars, so a song was that one figure with minor
+variations throughout — monotonous (Zack, 2026-10-13).
+
+- **Three hooks per song**, weighted 55 / 25 / 20 as Avalon weights its own (7 / 3 / 2 across its three recurring contours). Each must differ in note count *and* rhythm, and must move rather
+  than repeat pitches. Each mutates independently as the song goes
+- **Episodes alternate.** Drawing independently at 65% stacked up runs of eight identical
+  statements, so a hook that just played gets one chance to be passed over
+- **Alternation is the norm, repetition the exception.** Three statements of one hook read as a
+  carbon copy; `A B A` reads as a call and its answer, and that is what makes a section sound
+  musical rather than mechanical (Zack, 2026-10-13). An episode's plan is drawn by its length:
+  a pair is `A B` 65% of the time, a three is `A B A` 46% / `A A B` 24% / `A B B` 20% / `A A A`
+  10%, and a four alternates in four shapes with `A A A A` at 7%. B is a *different hook*, so it
+  differs in notes, not only in phrasing
+- **The next episode usually leads with the hook that just answered** — after an `A B A` the
+  natural move is `B A B`, so 60% of the time the previous episode's second hook leads the next
+- Straight copies now run 19% of two-statement episodes, 2% of threes, 0% of fours — **6%
+  overall**, rare enough to build a little tension when one does land
+- **Hooks are drawn from `counterLineCells`**, the bank that gives the reed and flute cells full
+  weight, not the vocal-weighted `cellBank` whose heaviest entry is literally `[0, 0, -2]`.
+  Avalon's hook is a flute line. On the vocal bank a statement came out as `0, 0, -2, 0, 0` —
+  one note stuttering, not a figure
+- **A measured fallback.** Hooks are built by concatenating cells, so a drawn hook can be nearly
+  all repeated pitches no matter how often it is redrawn. If twenty-four draws all fail the
+  movement test, Avalon's own figures are used: `[+2, -2]` over durs `[2, 1, 3]` (its x5 hook) and
+  `[0, +5, -5, 0]` over `[2, 1, 2, 3, 1]`
+
+Result across 96 Tight Hook songs: statements that are mostly repeated pitch fell from 30% to 3%,
+and the commonest statement takes a median 17% of a song (worst 52%), so no song is one figure
+throughout. Distinct shapes per statement: 39% against Avalon's 56%.
+
+### CHL-LD2-002 Shadow Hold — a companion for the held note
+
+**Every Chill form**, base and Soho alike (Zack, 2026-10-13). A lone held note sounded wrong on
+Lead 1's Sustained Tone and sounds wrong here for the same reason, so **70% of holds get a
+companion** — about 76% end up with one once placement constraints are applied.
+
+This is the one change in the substyle's history that deliberately alters released base Chill
+songs. Base Chill draws Shadow Hold on 53% of its songs (the gate is 50%; Soho's is 25%, drawing
+17%), and **92 of the ~178 base Chill songs in the fingerprint sample changed — 52%, matching the
+share that use the rule**. Verified that nothing else leaked: re-gating this one change to Soho
+returns 229 of 229 base Chill songs identical.
+
+Shape and intervals come from the same corpus measurement as Sustained Tone
+(`tools/soho_sustained.py`): a short note of two steps, on the unison or within a tone or two of
+the held pitch (weighted 0.34 / 0.32 / 0.21 / 0.13 across unison, +2, −2, +3), leading in two
+thirds of the time and answering the rest. Velocity stays soft — six above the hold's, so the
+shadow still sits under Lead 1 rather than competing with it.
+
+Soho caps Lead 2 at two notes a bar, so a lead-in shares the hold's bar and an answer falls in
+the bar after the hold lets go; neither can make a third note in one bar.
+
+### Lead 2 sitting out
+
+Lead 2 sits out the opening **8–16 bars** of a groove section about a third of the time. It used
+to sit out the *whole* section: in a two-section song with a 56-bar B that meant vanishing from
+bar 45 to the end while the log still listed a rule and a note count for it, and **29% of Soho
+songs had Lead 2 silent for over 40% of their length** (Zack, 2026-10-12). Now 2% do, and the
+longest silence seen across 400 songs fell from 105 bars to 62.
