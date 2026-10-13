@@ -1682,12 +1682,11 @@ Soho has its own pools where base Chill's are wrong:
   the saxes, open trumpet and trombone take it; flute, recorder, muted trumpet, the mallets
   and synth brass do not. An index-based rule silently re-aimed itself the moment the Lead 1
   pools were split per form
-- **Pads**: Stereo Strings 32%, Synth Strings 28%, Halo Pad 24%, Bowed Glass 16%. Each Chill form
-  keeps **two pads the other two do not have** — base Chill has String Pad (p48) and Sweep Pad,
-  Blues has Warm Pad, Soho has Bowed Glass and Halo Pad — and only Synth
-  Strings is common to all three (Zack, 2026-10-13). Sweep Pad is a filter sweep that suits base
-  Chill's electronic and St Germain beat styles and neither other form; Halo Pad is the
-  longest-sustaining pad voice in the corpus at 3.4 beats a note.
+- **Pads**: Stereo Strings 42%, Halo Pad 33%, Bowed Glass 25% (at CC7 115 — it is a soft patch).
+  **No pad is common to all three Chill forms** (Zack, 2026-10-13). Base Chill's three — Warm Pad,
+  String Pad (p48) and Sweep Pad — are all its own; Synth Strings is Blues's alone; Bowed Glass
+  and Halo Pad are Soho's. Stereo Strings (p49) is the only pad shared at all, by Blues and Soho.
+  Halo Pad is the longest-sustaining pad voice in the corpus at 3.4 beats a note.
   The corpus's sustained voices are **Stereo Strings Slow (p49)** — 850 notes across 4 files at
   3.2 beats a note — and Synth Strings 1 (p50) at 848 across 4, so those two lead. Base Chill's
   "String Pad" is p48, Stereo Strings *Fast*, which no corpus file uses and which is the wrong
