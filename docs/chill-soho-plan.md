@@ -1682,6 +1682,14 @@ Soho has its own pools where base Chill's are wrong:
   the saxes, open trumpet and trombone take it; flute, recorder, muted trumpet, the mallets
   and synth brass do not. An index-based rule silently re-aimed itself the moment the Lead 1
   pools were split per form
+- **Pads**: Stereo Strings 28%, Synth Strings 28%, Warm Pad 20%, Bowed Glass 12%, Sweep Pad 12%.
+  The corpus's sustained voices are **Stereo Strings Slow (p49)** — 850 notes across 4 files at
+  3.2 beats a note — and Synth Strings 1 (p50) at 848 across 4, so those two lead. Base Chill's
+  "String Pad" is p48, Stereo Strings *Fast*, which no corpus file uses and which is the wrong
+  articulation for a pad; Soho takes the slow one. **Bowed Glass (p92)** is in 2 files and is the
+  one voice here that is neither strings nor a synth sweep. The vocal pads the corpus also uses —
+  Choir Aahs in 3 files, Voice Oohs in 2 — are deliberately out: they sound artificial on this
+  soundfont (Zack, 2026-10-13)
 - **Lead 2**: as above
 - **Bass**: Fretless 37%, Acoustic 37%, **Elec Bass 25%** — base Chill draws all three evenly,
   Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low and Comp**

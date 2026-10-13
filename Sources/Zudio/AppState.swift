@@ -613,6 +613,14 @@ final class AppState: ObservableObject {
         case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal"]
         case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar","Square Lead","Synth Lead","Saw Lead","5th Saw Wave"]
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
+        // Chill pads. The corpus's sustained voices are Stereo Strings Slow (p49, 850 notes
+        // across 4 files, 3.2 beats a note) and Synth Strings 1 (p50, 848 notes across 4).
+        // Base Chill's "String Pad" is p48, Stereo Strings *Fast*, which no corpus file uses and
+        // which is the wrong articulation for a pad — Soho and Blues take the slow one instead.
+        // Soho adds Bowed Glass (p92, 2 files); Blues adds a detuned tonewheel organ, the bed
+        // under a blues ballad, and the one organ its Rhythm track never uses (Zack, 2026-10-13).
+        case (kTrackPads,    .chill) where isChillSoho:  return ["Warm Pad","Synth Strings","Stereo Strings","Sweep Pad","Bowed Glass"]
+        case (kTrackPads,    .chill) where isChillBlues: return ["Warm Pad","Synth Strings","Stereo Strings","Sweep Pad","Tonewheel Organ"]
         case (kTrackPads,    .chill):   return ["Warm Pad","Synth Strings","String Pad","Sweep Pad"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
@@ -670,6 +678,8 @@ final class AppState: ObservableObject {
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
+        case (kTrackPads, .chill) where isChillSoho:  return [89, 50, 49, 95, 92]
+        case (kTrackPads, .chill) where isChillBlues: return [89, 50, 49, 95, 8016]
         case (kTrackPads, .chill):     return [89, 50, 48, 95]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
@@ -725,6 +735,9 @@ final class AppState: ObservableObject {
             // patches, which are pads and organs sitting further back.
             case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
+            // The same detuned tonewheel, held as a pad: quieter still, since it sustains under
+            // everything rather than comping in gaps.
+            case (kTrackPads,    .chill,   "Tonewheel Organ"): return 70
             // Chill Soho Lead 2 only — base Chill's Lead 2 pool has no Synth Brass. It is the
             // loudest and brightest patch in that pool and sat over the top of Lead 1.
             case (kTrackLead2,   .chill,   "Synth Brass 1"): return 70
@@ -2272,6 +2285,13 @@ final class AppState: ObservableObject {
             // Chill Soho drums are rim click, brushes and a soft backbeat — never the 808.
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
+        case kTrackPads where isSoho:
+            // [0=Warm Pad, 1=Synth Strings, 2=Stereo Strings, 3=Sweep Pad, 4=Bowed Glass].
+            // The two the corpus leans on take 28% each; Bowed Glass is colour at 12%.
+            return [0,0,0,0,0, 1,1,1,1,1,1,1, 2,2,2,2,2,2,2, 3,3,3, 4,4,4].filter { $0 < poolCount }
+        case kTrackPads where isBlues:
+            // [0=Warm Pad, 1=Synth Strings, 2=Stereo Strings, 3=Sweep Pad, 4=Tonewheel Organ].
+            return [0,0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2,2,2, 3,3,3, 4,4,4,4].filter { $0 < poolCount }
         case kTrackLead1 where isSoho:
             // [0=Tenor Sax, 1=Alto Sax, 2=Flute, 3=Soprano Sax, 4=Recorder]. Mirrors
             // ChillMusicalFrameGenerator.pickLeadInstrumentSoho (30/22/22/13/13) — that is what
@@ -2387,8 +2407,16 @@ final class AppState: ObservableObject {
                 bluePadsSaved = true
                 bluePadsRestoreValue = instrumentOverrides[kTrackPads]
             }
-            // Warm Pad (0) or String Pad (2) — equally weighted, both suit the blues texture.
-            instrumentOverrides[kTrackPads] = Bool.random() ? 0 : 2
+            // Drawn from the Blues pads pick pool rather than a hard-coded index pair, so the
+            // pool, the picker and this selector cannot drift apart (Zack, 2026-10-13).
+            let padNames = Self.instrumentPoolNames(trackIndex: kTrackPads, style: .chill,
+                                                    isChillBlues: true)
+            let allowed = Self.instrumentPickPoolStatic(trackIndex: kTrackPads, style: .chill,
+                                                        poolCount: padNames.count, state: state)
+            if !allowed.isEmpty {
+                var rng = SystemRandomNumberGenerator()
+                instrumentOverrides[kTrackPads] = allowed[Int.random(in: 0..<allowed.count, using: &rng)]
+            }
         } else {
             if bluePadsSaved {
                 instrumentOverrides[kTrackPads] = bluePadsRestoreValue
