@@ -1245,12 +1245,12 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — general fallback
             } else if trackIndex == kTrackBass && kosmicStyle {
                 vol = 0.80   // Kosmic bass slightly quieter overall
-            } else if trackIndex == kTrackBass && chillPadsMode && program == 32 {
-                vol = 0.48   // Acoustic Bass runs hot on Chill bass — 1.6 dB under Elec Bass (0.58)
-            } else if trackIndex == kTrackBass && chillPadsMode && program == 35 {
-                vol = 0.48   // Fretless Bass runs hot on Chill bass — 1.6 dB under Elec Bass (0.58)
             } else if trackIndex == kTrackBass && chillPadsMode {
-                vol = 0.58   // Chill bass quieter overall (Elec Bass, program 33) — 3 dB under old 0.82
+                // Every Chill bass at the same level. Acoustic (32) and Fretless (35) were pulled
+                // to 0.48 and Elec Bass (33) left at 0.58, so the electric sat 1.6 dB above the
+                // other two; it is now level with them (Zack, 2026-10-13). One branch rather than
+                // three, so a bass added later cannot inherit the louder default.
+                vol = 0.48
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 8080 {
                 vol = 0.80   // Sine Wave — lower from initial guess
             } else if trackIndex == kTrackLead1 && kosmicStyle && songState?.isKosmicDrift == true && program == 76 {
