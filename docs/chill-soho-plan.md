@@ -1658,6 +1658,19 @@ Soho has its own pools where base Chill's are wrong:
   real horns. Nothing in the pool sustains except the brass, so a Sustained Halo song drawing one
   of the mallets gets a note that rings and decays inside its written length rather than holding —
   the brass covers 70% of picks
+- **Rhythm**: Rhodes 16%, Muted Guitar 16%, Nylon Guitar 16%, Hawaiian Guitar 16%, Wurlitzer 11%,
+  Stereo Piano 11%, B3 5%, Tonewheel 5% — half keys, half guitar. Guitar is the corpus's dominant
+  comping voice: Jazz Guitar is in 8 of the 14 records and Clean Guitar in 7, between them more
+  notes than any other instrument. Neither is in `Zudio.sf2`, so these three stand in — Muted
+  Guitar is the damped offbeat chord this music comps on, Nylon is warmer and suits the Latin
+  side, and Hawaiian sits in the SC-55 bank at GM 26, Jazz Guitar's own slot. **All three are on
+  trial**; the split is even so each is easy to hear
+- **Lead 1**: Tenor Sax 25%, **Flute 20%**, Alto Sax 17%, Muted Trumpet 15%, Trumpet 12%,
+  Clarinet 8%. Weighted to the corpus — Tenor Sax appears in 6 of the 14 files, Alto Sax in 4 and
+  Flute in 4, the flute standing in for the singer. Base Chill has no flute in its lead pool and
+  draws all five of its instruments evenly. Set in
+  `ChillMusicalFrameGenerator.pickLeadInstrumentSoho`, **not** in the AppState pool: Lead 1's
+  instrument is chosen in the frame generator, unlike every other track
 - **Lead 2**: as above
 - **Bass**: Fretless 37%, Acoustic 37%, **Elec Bass 25%** — base Chill draws all three evenly,
   Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low and Comp**

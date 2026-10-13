@@ -579,6 +579,12 @@ final class AppState: ObservableObject {
         // Chill Soho Lead 2: what answers the singer in the corpus. Baritone Sax (67) was measured
         // too but is not in Zudio.sf2.
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return ["Alto Sax","Tenor Sax","Synth Brass 1","Trombone","Vibraphone"] }
+        // Chill Soho rhythm: base Chill's keyboards plus guitars. Guitar is the corpus's dominant
+        // comping voice — Jazz Guitar is in 8 of the 14 records and Clean Guitar in 7, between
+        // them more notes than anything else — and neither is in Zudio.sf2. These three are what
+        // it has: Muted Guitar is the damped offbeat chord this music comps on, Nylon is warmer
+        // and suits the Latin side, Hawaiian sits in the SC-55 bank at GM 26, Jazz Guitar's slot.
+        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Muted Guitar","Nylon Guitar","Hawaiian Guitar"] }
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
@@ -630,6 +636,7 @@ final class AppState: ObservableObject {
         // 2026-10-12). Brass Section (61) is not in Zudio.sf2 and would play silent.
         if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 57, 59, 11, 13] }
         if isChillSoho && style == .chill && trackIndex == kTrackLead2 { return [65, 66, 62, 57, 11] }
+        if isChillSoho && style == .chill && trackIndex == kTrackRhythm { return [4, 5, 17, 16, 61001, 18, 8016, 28, 24, 8026] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71]
@@ -2242,6 +2249,13 @@ final class AppState: ObservableObject {
             // Chill Soho drums are rim click, brushes and a soft backbeat — never the 808.
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
+        case kTrackRhythm where isSoho:
+            // [0=Rhodes, 1=Wurlitzer, 2=B3, 3=Perc Organ, 4=Stereo Piano, 5=Rock Organ,
+            //  6=Tonewheel, 7=Muted Guitar, 8=Nylon Guitar, 9=Hawaiian Guitar].
+            // Half keys, half guitar, the three guitars evenly split so each is easy to hear.
+            // Filtered by poolCount so a caller sizing without isChillSoho cannot overrun the
+            // 7-entry base Chill list.
+            return [0,0,0, 1,1, 2, 4,4, 6, 7,7,7, 8,8,8, 9,9,9].filter { $0 < poolCount }
         case kTrackRhythm:
             return isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5] : [0,0,0,1,1,1,2,2,4,4,6,6]
         case kTrackLead2:

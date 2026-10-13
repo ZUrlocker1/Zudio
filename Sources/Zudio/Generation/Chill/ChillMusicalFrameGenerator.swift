@@ -53,10 +53,12 @@ struct ChillMusicalFrameGenerator {
 
         let progFamily = pickProgressionFamily(rng: &rng)
 
-        // Blues uses a dedicated instrument pool (all blues-appropriate horns/reeds).
+        // Blues uses a dedicated instrument pool (all blues-appropriate horns/reeds), and Soho
+        // weights its own toward what the corpus actually plays.
         let leadInst = bluesVariation
             ? pickLeadInstrumentBlues(rng: &rng)
-            : pickLeadInstrument(rng: &rng)
+            : sohoVariation ? pickLeadInstrumentSoho(rng: &rng)
+                            : pickLeadInstrument(rng: &rng)
 
         // Blues excludes stGermain and hipHopJazz beat styles.
         // forceBeatStyle from best-first-song/load path takes priority in all cases.
@@ -160,6 +162,16 @@ struct ChillMusicalFrameGenerator {
     private static func pickLeadInstrument(rng: inout SeededRNG) -> ChillLeadInstrument {
         let insts: [ChillLeadInstrument] = [.mutedTrumpet, .saxophone, .trumpet, .tenorSax, .clarinet]
         return insts[rng.nextInt(upperBound: insts.count)]
+    }
+
+    /// Chill Soho's lead, weighted to the corpus rather than drawn evenly. Across the 14 files
+    /// Tenor Sax appears in 6, Alto Sax in 4 and **Flute in 4** — the flute standing in for the
+    /// singer is a voice base Chill's pool does not have at all. Muted trumpet, trumpet and
+    /// clarinet stay in but take the smaller share; the clarinet is barely in the corpus.
+    private static func pickLeadInstrumentSoho(rng: inout SeededRNG) -> ChillLeadInstrument {
+        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .flute,
+                                            .mutedTrumpet, .trumpet, .clarinet]
+        return insts[rng.weightedPick([0.25, 0.20, 0.20, 0.15, 0.12, 0.08])]
     }
 
     /// Chill Soho: Latin 55% / Soul 45%, matching the reference set. The drum, bass and rhythm
