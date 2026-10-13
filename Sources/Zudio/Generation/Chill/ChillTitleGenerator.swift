@@ -214,10 +214,10 @@ struct ChillTitleGenerator {
     static let sohoStreetsKnown = ["Wardour", "Berwick", "Dean", "Frith", "Greek", "Carnaby",
                                    "Brewer", "Old Compton"]
 
-    static let sohoLondon  = ["Fitzrovia", "Marylebone", "Mayfair", "Camden", "Islington",
+    static let sohoLondon  = ["Fitzrovia", "Belgravia", "Mayfair", "Camden", "Islington",
                               "Hackney", "Brixton", "Portobello", "Ladbroke Grove", "Kensington",
                               "Chelsea", "Shoreditch", "Clerkenwell", "Bloomsbury", "Pimlico",
-                              "Barbican", "Bermondsey", "Shepherd's Bush", "Maida Vale",
+                              "Barbican", "Clubland", "Shepherd's Bush", "Maida Vale",
                               "Covent Garden", "Holborn",
                               "West End", "East End", "Woking", "Dorking",
                               "Bromley", "Guildford", "Dagenham"]

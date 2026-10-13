@@ -440,11 +440,11 @@ struct TrackRowView: View {
             let isSoho     = appState.songState?.chillSohoVariation == true
             let lead1FX: [TrackEffect] = isSoho ? [.space] : baseLeadFX
 
-            // Rhythm organ tremolo: Blues 50% for B3(2)/Perc(3)/Rock(5); regular 20% for B3(2)/Tonewheel(6)
-            let rhythmIdx  = trackIndex == kTrackRhythm ? (appState.instrumentOverrides[kTrackRhythm] ?? 0) : -1
-            let rhythmTrem = isBlues
-                ? [2, 3, 5].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.50
-                : [2, 6].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.20
+            // Rhythm organ tremolo, matched by instrument name — see the note in
+            // AppState.rhythmUsesTremolo. Keep the two in step.
+            let rhythmTrem = AppState.rhythmUsesTremolo(trackIndex: trackIndex,
+                                                        state: appState.songState,
+                                                        overrides: appState.instrumentOverrides)
 
             // Lead vibrato, 20% of songs, matched by instrument NAME — see the note in
             // AppState.restoreDefaultEffects. Keep the two in step.
@@ -455,10 +455,11 @@ struct TrackRowView: View {
                                                  state: appState.songState,
                                                  overrides: appState.instrumentOverrides)
 
-            // Chill Soho's Elec Bass (pool index 2) wants Low and Comp under it.
+            // Chill Soho's Elec Bass wants Low and Comp under it, matched by name.
             // Mirrored in AppState.restoreDefaultEffects — keep the two in step.
-            let sohoElecBass = isSoho && trackIndex == kTrackBass
-                && (appState.instrumentOverrides[kTrackBass] ?? 0) == 2
+            let sohoElecBass = AppState.sohoBassTakesLowComp(trackIndex: trackIndex,
+                                                             state: appState.songState,
+                                                             overrides: appState.instrumentOverrides)
 
             defaults = switch trackIndex {
             case kTrackLead1:   l1Vib      ? lead1FX + [.vibrato]    : lead1FX

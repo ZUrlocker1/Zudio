@@ -2216,7 +2216,16 @@ final class AppState: ObservableObject {
             if let cur = overrides[kTrackLead2], !Set(vp2).contains(cur) {
                 overrides[kTrackLead2] = vp2[Int.random(in:0..<vp2.count, using:&rng)]
             }
-            overrides[kTrackPads] = Bool.random() ? 0 : 2   // Warm Pad or String Pad
+            // Drawn from the Blues pads pick pool, not hard-coded indices. This read
+            // `Bool.random() ? 0 : 2` with the comment "Warm Pad or String Pad"; after the pads
+            // were split per Chill form those indices meant Strings Slow and Cello, and neither
+            // Warm Pad nor String Pad is in the Blues pool at all (Zack, 2026-10-13).
+            let padPool = instrumentPoolNames(trackIndex: kTrackPads, style: .chill, isChillBlues: true)
+            let padPicks = instrumentPickPoolStatic(trackIndex: kTrackPads, style: .chill,
+                                                    poolCount: padPool.count, state: state)
+            if !padPicks.isEmpty {
+                overrides[kTrackPads] = padPicks[Int.random(in: 0..<padPicks.count, using: &rng)]
+            }
         }
 
         // Save last-used for next song's no-repeat check
@@ -3893,6 +3902,37 @@ final class AppState: ObservableObject {
         return Float.random(in: 0..<1) < 0.20
     }
 
+    /// Whether this Chill rhythm instrument takes the Leslie-style tremolo, matched by NAME.
+    /// Blues gives its organs a 50% chance; base Chill and Soho give theirs 20%.
+    ///
+    /// This was `[2, 3, 5]` and `[2, 6]`, raw pool indices. It survived the Soho rhythm pool
+    /// gaining a guitar only because the guitar was appended rather than inserted — had it gone
+    /// anywhere earlier, tremolo would have silently moved onto the wrong instruments, exactly
+    /// as it did with the lead vibrato (Zack, 2026-10-13).
+    nonisolated static func rhythmUsesTremolo(trackIndex: Int, state: SongState?,
+                                              overrides: [Int: Int]) -> Bool {
+        guard trackIndex == kTrackRhythm, state?.style == .chill else { return false }
+        let blues = state?.chillBluesVariation == true
+        let names = instrumentPoolNames(trackIndex: kTrackRhythm, style: .chill,
+                                        isChillSoho: state?.chillSohoVariation == true,
+                                        isChillBlues: blues)
+        let eligible: Set<String> = blues ? ["B3 Organ", "Perc Organ", "Rock Organ"]
+                                          : ["B3 Organ", "Tonewheel"]
+        let idx = overrides[kTrackRhythm] ?? 0
+        guard idx >= 0, idx < names.count, eligible.contains(names[idx]) else { return false }
+        return Float.random(in: 0..<1) < (blues ? 0.50 : 0.20)
+    }
+
+    /// Chill Soho's Elec Bass takes Low and Comp under it. Matched by name for the same reason:
+    /// it was `instrumentOverrides[kTrackBass] == 2`, and index 2 only happens to be Elec Bass.
+    nonisolated static func sohoBassTakesLowComp(trackIndex: Int, state: SongState?,
+                                                 overrides: [Int: Int]) -> Bool {
+        guard trackIndex == kTrackBass, state?.chillSohoVariation == true else { return false }
+        let names = instrumentPoolNames(trackIndex: kTrackBass, style: .chill, isChillSoho: true)
+        let idx = overrides[kTrackBass] ?? 0
+        return idx >= 0 && idx < names.count && names[idx] == "Elec Bass"
+    }
+
     /// Removes all active effects from a track.
     func clearAllEffects(forTrack trackIndex: Int) {
         for fx in TrackEffect.allCases {
@@ -3932,11 +3972,10 @@ final class AppState: ObservableObject {
             // Chill Soho: no delay on Lead 1 (a St Germain signature). Mirrors TrackRowView.
             let lead1FX: [TrackEffect] = songState?.chillSohoVariation == true ? [.space] : baseLeadFX
 
-            // Rhythm organ tremolo: Blues 50% for B3(2)/Perc(3)/Rock(5); regular 20% for B3(2)/Tonewheel(6)
-            let rhythmIdx  = trackIndex == kTrackRhythm ? (instrumentOverrides[kTrackRhythm] ?? 0) : -1
-            let rhythmTrem = isBlues
-                ? [2, 3, 5].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.50
-                : [2, 6].contains(rhythmIdx) && Float.random(in: 0..<1) < 0.20
+            // Rhythm organ tremolo — matched by instrument name, not pool index. See
+            // rhythmUsesTremolo. Mirrored in TrackRowView.applyDefaultEffects.
+            let rhythmTrem = Self.rhythmUsesTremolo(trackIndex: trackIndex, state: songState,
+                                                    overrides: instrumentOverrides)
 
             // Lead vibrato, 20% of songs, on the instruments that actually use it: the saxes,
             // the open trumpet, the flute and the trombone. Muted trumpet is out (a harmon mute
@@ -3951,11 +3990,11 @@ final class AppState: ObservableObject {
             let l2Vib = Self.leadUsesVibrato(trackIndex: trackIndex, lead: kTrackLead2, state: songState,
                                              overrides: instrumentOverrides)
 
-            // Chill Soho's Elec Bass (pool index 2) wants Low and Comp under it — the chips and
-            // the audio chain are the same switch, so they cannot drift (Zack, 2026-10-12).
-            // Mirrored in TrackRowView.applyDefaultEffects.
-            let sohoElecBass = songState?.chillSohoVariation == true
-                && trackIndex == kTrackBass && (instrumentOverrides[kTrackBass] ?? 0) == 2
+            // Chill Soho's Elec Bass wants Low and Comp under it — the chips and the audio chain
+            // are the same switch, so they cannot drift. Matched by name; see
+            // sohoBassTakesLowComp. Mirrored in TrackRowView.applyDefaultEffects.
+            let sohoElecBass = Self.sohoBassTakesLowComp(trackIndex: trackIndex, state: songState,
+                                                         overrides: instrumentOverrides)
 
             defaults = switch trackIndex {
             case kTrackLead1:   l1Vib      ? lead1FX + [.vibrato]    : lead1FX
