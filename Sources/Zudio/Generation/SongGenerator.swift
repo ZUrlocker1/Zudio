@@ -3904,6 +3904,24 @@ struct SongGenerator {
         }
         trackEvents[kTrackLead2] = lead2EventsFinal
 
+        // A Chill song with no intro starts on the groove, and a lead entering on its very first
+        // downbeat lands with no runway at all (Zack, 2026-10-13). Give the band a bar: both
+        // leads sit out bar 0 when there is no intro to have arrived through.
+        //
+        // Applied here rather than in the lead generators because three paths can produce these
+        // notes — Soho's own rules, the base Chill rules Soho reuses (which is where it actually
+        // came from, CHL-LD1-001 and 004 bypassing Soho's own bar-0 guard), and Lead 2's
+        // call-and-response. One rule in one place cannot be half-applied.
+        //
+        // Chill only. Ambient reaches its first bar with no intro in 40% of songs and a lead
+        // already sounding in most of those — drifting in with no runway is what that style is.
+        let hasIntroBars = structure.sections.contains { $0.label == .intro && $0.lengthBars > 0 }
+        if !hasIntroBars {
+            for lead in [kTrackLead1, kTrackLead2] {
+                trackEvents[lead] = trackEvents[lead].filter { $0.stepIndex >= 16 }
+            }
+        }
+
         // Step 7 — Rhythm (Rhodes active comping)
         var rhythmRules: Set<String> = []
         var chillRhythmSwitchAnnotation: (bar: Int, ruleID: String)? = nil
