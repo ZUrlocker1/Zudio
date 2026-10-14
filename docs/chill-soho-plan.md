@@ -202,7 +202,7 @@ substyle wants. The two-case groove above is the same idea at a fraction of the 
 
 ---
 
-## Groove magnet — aligning the leads to the rhythm section
+## Groove fixup — aligning the leads to the rhythm section
 
 The lead generators place notes on their own grid and never read the rhythm section, so a line
 could land where the band is silent and read as being in a different time from it. Two passes run
@@ -241,7 +241,7 @@ aligned.
 A one-line summary goes in the generation log whenever the pass runs, so an absent row means the
 Latin gate did not fire rather than that the pass found nothing:
 
-    Groove magnet    L1 80 of 128 · L2 1 of 25 notes adjusted
+    Groove fixup  L1: 80 / 128,  L2: 1 / 25 changes
 
 This, and the Texture track reading the finished drums for its stabs, are the only places one Soho
 track reads another's output. Everything else coordinates through `ChillBeatStyle` alone.

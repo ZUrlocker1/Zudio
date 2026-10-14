@@ -1860,7 +1860,7 @@ struct SongGenerator {
         // the lead has to sit against. If bass or drums are regenerated in the same batch the
         // lead is aligned to the outgoing groove, not the incoming one — today that only arises
         // when an absent bass or drum track is added to an evolve pass.
-        var grooveMagnetRegen: String? = nil
+        var grooveFixupRegen: String? = nil
         if isChill, songState.chillBeatStyle == .sohoLatin,
            trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
             let grooveBars = Set(songState.structure.sections
@@ -1869,11 +1869,14 @@ struct SongGenerator {
             let pulse = grooveStepSupport(drums: songState.trackEvents[kTrackDrums],
                                           bass: songState.trackEvents[kTrackBass], bars: grooveBars)
             let before = events
-            events = magnetiseLeadsToGroove(events, support: pulse, bars: grooveBars)
+            events = fixupLeadsToGroove(events, support: pulse, bars: grooveBars)
             events = smoothLeadArticulation(events)
             if !before.isEmpty {
-                grooveMagnetRegen = "\(adjustedNoteCount(before: before, after: events)) of "
-                                  + "\(before.count) notes adjusted"
+                // L1 always first, so the row reads the same way as the generation log's.
+                let mine = "\(adjustedNoteCount(before: before, after: events)) / \(before.count)"
+                let l1   = trackIndex == kTrackLead1 ? mine : "N/A"
+                let l2   = trackIndex == kTrackLead1 ? "N/A" : mine
+                grooveFixupRegen = "L1: \(l1),  L2: \(l2) changes"
             }
         }
 
@@ -1882,8 +1885,8 @@ struct SongGenerator {
         var regenLog: [GenerationLogEntry] = [
             GenerationLogEntry(tag: "⚡ REGEN", description: trackName, isTitle: true)
         ]
-        if let g = grooveMagnetRegen {
-            regenLog.append(GenerationLogEntry(tag: "Groove magnet", description: g))
+        if let g = grooveFixupRegen {
+            regenLog.append(GenerationLogEntry(tag: "Groove fixup", description: g))
         }
         if usedRules.isEmpty {
             regenLog.append(GenerationLogEntry(tag: "—", description: "no rules captured"))
@@ -3952,8 +3955,8 @@ struct SongGenerator {
             }
         }
 
-        // Pull the leads onto the groove. See magnetiseLeadsToGroove.
-        var grooveMagnetSummary: String? = nil
+        // Groove fixup — pull the leads onto the groove. See fixupLeadsToGroove.
+        var grooveFixupSummary: String? = nil
         if chillBeatStyle == .sohoLatin {
             let grooveBars = Set(structure.sections.filter { $0.label == .A || $0.label == .B }
                                   .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
@@ -3962,7 +3965,7 @@ struct SongGenerator {
             var adjusted: [Int: (changed: Int, total: Int)] = [:]
             for lead in [kTrackLead1, kTrackLead2] {
                 let before = trackEvents[lead]
-                trackEvents[lead] = magnetiseLeadsToGroove(trackEvents[lead],
+                trackEvents[lead] = fixupLeadsToGroove(trackEvents[lead],
                                                            support: pulse, bars: grooveBars)
                 trackEvents[lead] = smoothLeadArticulation(trackEvents[lead])
                 adjusted[lead] = (adjustedNoteCount(before: before, after: trackEvents[lead]),
@@ -3971,12 +3974,12 @@ struct SongGenerator {
             // Recorded here and logged after buildChillLog, which runs later. The row is only
             // emitted when the pass actually runs, so its presence confirms the Latin gate
             // fired and its absence is not ambiguous.
-            func magnetShare(_ label: String, _ track: Int) -> String {
-                guard let a = adjusted[track], a.total > 0 else { return "\(label) —" }
-                return "\(label) \(a.changed) of \(a.total)"
+            func fixupShare(_ label: String, _ track: Int) -> String {
+                guard let a = adjusted[track], a.total > 0 else { return "\(label): N/A" }
+                return "\(label): \(a.changed) / \(a.total)"
             }
-            grooveMagnetSummary = magnetShare("L1", kTrackLead1) + " · "
-                                + magnetShare("L2", kTrackLead2) + " notes adjusted" 
+            grooveFixupSummary = fixupShare("L1", kTrackLead1) + ",  "
+                                + fixupShare("L2", kTrackLead2) + " changes" 
         }
 
         // Step 7 — Rhythm (Rhodes active comping)
@@ -4135,8 +4138,8 @@ struct SongGenerator {
             lead1Rules: lead1Rules, lead2Rules: lead2Rules, rhythmRules: rhythmRules,
             drumFillBars: drumFillBars
         )
-        if let summary = grooveMagnetSummary {
-            log.append(GenerationLogEntry(tag: "Groove magnet", description: summary))
+        if let summary = grooveFixupSummary {
+            log.append(GenerationLogEntry(tag: "Groove fixup", description: summary))
         }
 
         let bluesIVVDesc: String = {
@@ -4297,7 +4300,7 @@ struct SongGenerator {
     ///
     /// This exists because attack density is not metric strength. A samba bass anticipates beat 3
     /// and ties over it, so beat 3 can carry almost no attacks while remaining the second
-    /// strongest position in the bar; an earlier version of the magnet read that as a hole and
+    /// strongest position in the bar; an earlier version of this fixup read that as a hole and
     /// dragged lead notes off beat 3 onto the anticipation (Zack, 2026-10-13).
     nonisolated static let sixteenthMetricWeight: [Double] = [
         1.00, 0.05, 0.40, 0.25,   // beat 1 · its sixteenth · the "and" · anticipation of beat 2
@@ -4327,7 +4330,7 @@ struct SongGenerator {
     /// crossing a barline would put the note over a different chord, and notes held a bar or
     /// longer are left where they are — nudging them by a sixteenth buys no alignment and the
     /// fixed end point would eat the tail.
-    private static func magnetiseLeadsToGroove(_ events: [MIDIEvent], support: [Double],
+    private static func fixupLeadsToGroove(_ events: [MIDIEvent], support: [Double],
                                                bars: Set<Int>,
                                                holeThreshold: Double = 0.15,
                                                weakStep: Double = 0.25,
