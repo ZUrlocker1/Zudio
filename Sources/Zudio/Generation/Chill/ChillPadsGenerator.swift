@@ -218,7 +218,7 @@ struct ChillPadsGenerator {
 
         for bar in 0..<frame.totalBars {
             if structure.section(atBar: bar)?.label == .bridge { continue }
-            guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { continue }
+            guard let chord = structure.chordWindow(atBar: bar) else { continue }
             let notes = sohoVoicing(chord, frame: frame, snapTable: snapTable, count: voiceCount)
             let vel   = 42 + rng.nextInt(upperBound: 14)              // 42–55
 
@@ -229,7 +229,7 @@ struct ChillPadsGenerator {
             // not clear a second step-15 attack.
             if next < frame.totalBars, !anticipated.contains(bar),
                structure.section(atBar: next)?.label != .bridge,
-               let nextChord = structure.chordPlan.first(where: { $0.contains(bar: next) }),
+               let nextChord = structure.chordWindow(atBar: next),
                nextChord.startBar == next, rng.nextDouble() < 0.15 {
                 anticipateNext = true
                 let nextNotes = sohoVoicing(nextChord, frame: frame, snapTable: snapTable, count: voiceCount)
@@ -263,7 +263,7 @@ struct ChillPadsGenerator {
 
         for bar in 0..<frame.totalBars {
             if structure.section(atBar: bar)?.label == .bridge { continue }
-            guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { continue }
+            guard let chord = structure.chordWindow(atBar: bar) else { continue }
             let notes = sohoVoicing(chord, frame: frame, snapTable: snapTable, count: voiceCount)
             let vel   = 44 + rng.nextInt(upperBound: 12)              // 44–55
             emit(notes, at: bar * 16,     hold: sohoHalfHold, vel: vel,     into: &events, rng: &rng)
@@ -313,7 +313,7 @@ struct ChillPadsGenerator {
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
-            let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord   = structure.chordWindow(atBar: bar)
             let base    = bar * 16
 
             // Pads are silent in breakdown (breakdownPad() handles bridge for all modes)
@@ -373,7 +373,7 @@ struct ChillPadsGenerator {
                 let section = structure.section(atBar: bar)
                 if section?.label == .bridge { continue }
 
-                let chord = structure.chordPlan.first { $0.contains(bar: bar) }
+                let chord = structure.chordWindow(atBar: bar)
                 let chordRootPC = (frame.keySemitoneValue + degreeSemitone(chord?.chordRoot ?? "1")) % 12
 
                 // Only emit on chord change bars (or first bar)
@@ -424,7 +424,7 @@ struct ChillPadsGenerator {
             // Silent in breakdown (breakdownPad handles bridge for all modes)
             if label == .bridge { continue }
 
-            let chord       = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord       = structure.chordWindow(atBar: bar)
             let windowStart = chord?.startBar ?? 0
             let barInWindow = bar - windowStart
 
@@ -477,7 +477,7 @@ struct ChillPadsGenerator {
 
             if label == .bridge { continue }
 
-            let chord       = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord       = structure.chordWindow(atBar: bar)
             let windowStart = chord?.startBar ?? 0
 
             // Only attack on the first bar of each chord window
@@ -547,7 +547,7 @@ struct ChillPadsGenerator {
             let section = structure.section(atBar: bar)
             if section?.label == .bridge { continue }
 
-            let chord       = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord       = structure.chordWindow(atBar: bar)
             let windowStart = chord?.startBar ?? 0
             let windowEnd   = chord?.endBar   ?? frame.totalBars
             let windowLen   = windowEnd - windowStart
@@ -649,7 +649,7 @@ struct ChillPadsGenerator {
             let label   = section?.label ?? .A
             if label == .bridge { continue }
 
-            let chord       = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord       = structure.chordWindow(atBar: bar)
             let windowStart = chord?.startBar ?? 0
             let barInWindow = bar - windowStart
 
@@ -721,7 +721,7 @@ struct ChillPadsGenerator {
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             guard section?.label == .bridge else { continue }
-            let chord = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord = structure.chordWindow(atBar: bar)
             let chordRootPC = (frame.keySemitoneValue + degreeSemitone(chord?.chordRoot ?? "1")) % 12
             let voiceNotes  = buildUpperStructure(chordRootPC: chordRootPC,
                                                    chordType: chord?.chordType ?? .sus4,

@@ -345,7 +345,7 @@ struct ChillRhythmGenerator {
             if case .coldStop = structure.outroStyle, let outroEnd = structure.outroSection?.endBar {
                 if bar >= outroEnd - 1 { continue }
                 if bar == outroEnd - 2 {
-                    let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                    let chord   = structure.chordWindow(atBar: bar)
                     let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
                     let base    = bar * 16
                     for note in voicing {
@@ -384,7 +384,7 @@ struct ChillRhythmGenerator {
             // Breakdown handling
             if label == .bridge {
                 let breakdownBar = bar - (section?.startBar ?? bar)
-                let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                let chord   = structure.chordWindow(atBar: bar)
                 let base    = bar * 16
                 let sectionLen = section?.lengthBars ?? 4
 
@@ -460,7 +460,7 @@ struct ChillRhythmGenerator {
             // with the rest of the band. Overrides the rest-bar and dropout logic below — this
             // bar is the way in, and the band does not sit it out.
             if remixEntry.contains(bar) {
-                let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+                let chord   = structure.chordWindow(atBar: bar)
                 let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
                 let base    = bar * 16
                 for step in [8, 12] {
@@ -495,7 +495,7 @@ struct ChillRhythmGenerator {
                 continue
             }
 
-            let chord     = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord     = structure.chordWindow(atBar: bar)
             let voicing   = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
             let base      = bar * 16
 

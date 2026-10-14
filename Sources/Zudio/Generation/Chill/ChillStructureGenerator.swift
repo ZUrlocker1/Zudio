@@ -597,7 +597,7 @@ struct ChillStructureGenerator {
             SongGenerator.sohoTurnaround(mode: frame.mode, tonicType: tonicType, bright: $0).map(\.0)
         }
         func root(_ bar: Int) -> String {
-            structure.chordPlan.first { $0.contains(bar: bar) }?.chordRoot ?? ""
+            structure.chordWindow(atBar: bar)?.chordRoot ?? ""
         }
         var out = Set<Int>()
         for section in structure.sections where section.label == .A || section.label == .B {

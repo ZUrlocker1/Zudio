@@ -313,8 +313,8 @@ struct ChillLeadGenerator {
                     // Blues increases blue-note probability from 15% to 50%.
                     let bluePcProb = bluesVariation ? 0.50 : 0.15
                     let phraseBluePc = rng.nextDouble() < bluePcProb ? blueNote : nil
-                    let phraseEndChord   = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
-                    let phraseStartChord = bluesVariation ? structure.chordPlan.first { $0.contains(bar: bar) } : nil
+                    let phraseEndChord   = structure.chordWindow(atBar: bar + actualPhraseLen - 1)
+                    let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
                     let phraseNotes = buildPhrase(frame: frame, bar: bar, bars: actualPhraseLen,
                                                    leadInstrument: leadInstrument,
                                                    pentatonic: pentatonic, scale: scale,
@@ -388,8 +388,8 @@ struct ChillLeadGenerator {
             // Blues raises blue-note probability from 15% to 50%.
             let bluePcProb2 = bluesVariation ? 0.50 : 0.15
             let phraseBluePc = rng.nextDouble() < bluePcProb2 ? blueNote : nil
-            let phraseEndChord   = structure.chordPlan.first { $0.contains(bar: bar + actualPhraseLen - 1) }
-            let phraseStartChord = bluesVariation ? structure.chordPlan.first { $0.contains(bar: bar) } : nil
+            let phraseEndChord   = structure.chordWindow(atBar: bar + actualPhraseLen - 1)
+            let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
             let phraseNotes = buildPhrase(
                 frame: frame, bar: bar, bars: actualPhraseLen,
                 leadInstrument: leadInstrument,
@@ -544,7 +544,7 @@ struct ChillLeadGenerator {
             let gapFree = (bar..<bar + phraseLen).allSatisfy { !lead1BarSet.contains($0) }
             guard gapFree else { bar += 1; continue }
 
-            let ld2PhraseStartChord = bluesVariation ? structure.chordPlan.first { $0.contains(bar: bar) } : nil
+            let ld2PhraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
             let phraseNotes = buildPhrase(
                 frame: frame, bar: bar, bars: phraseLen,
                 leadInstrument: inst2,
@@ -609,7 +609,7 @@ struct ChillLeadGenerator {
             guard bar >= lastPlaced + 2 else { continue }   // minimum 2-bar spacing
             guard rng.nextDouble() < 0.50 else { continue } // 50% chance when gap is met
 
-            let chord        = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord        = structure.chordWindow(atBar: bar)
             let chordTonePCs = chord?.chordTones ?? Set<Int>()
             var pool = scale.filter { $0 >= regLow && $0 <= shadowHigh }
             if !chordTonePCs.isEmpty {
@@ -1152,6 +1152,21 @@ struct ChillLeadGenerator {
         }
     }
 
+    /// Every scale note across five octaves, 36–96.
+    ///
+    /// **The order of this array is load-bearing. Do not sort it here.** It comes back grouped
+    /// by interval and then by octave, so consecutive indices are an octave apart rather than a
+    /// scale step apart. Two call sites depend on that in opposite ways:
+    ///
+    /// - Lead 2 Shadow Hold draws a note with `pool[rng.nextInt(upperBound: pool.count)]` from
+    ///   an unsorted filter of this array. Sorting here changes which note that draw lands on,
+    ///   in every Chill form, for every Shadow Hold song.
+    /// - The harmony pass at `scaleNotes(frame:).sorted()` does `scale[idx - intervalSteps]`,
+    ///   stepping down the scale by index. That is only correct because it sorts first.
+    ///
+    /// A caller that needs scale-step arithmetic must sort; a caller that is only picking from
+    /// a pool must not, or existing songs change. `DeterminismTests` will catch a change here,
+    /// but the diff reads as "every Chill song is different", which is a long way from the cause.
     static func scaleNotes(frame: GlobalMusicalFrame) -> [Int] {
         let root = 60 + frame.keySemitoneValue
         return frame.mode.intervals.flatMap { interval -> [Int] in
@@ -1401,7 +1416,7 @@ struct ChillLeadGenerator {
 
                 // Snap last burst note to a chord tone for strong phrase resolution
                 if let lastIdx = burstIndices.indices.last {
-                    let activeChord = structure.chordPlan.first { $0.contains(bar: activeCursor) }
+                    let activeChord = structure.chordWindow(atBar: activeCursor)
                     if let chord = activeChord, !chord.chordTones.isEmpty {
                         let chordPool = pool.filter { chord.chordTones.contains($0 % 12) }
                         if !chordPool.isEmpty {

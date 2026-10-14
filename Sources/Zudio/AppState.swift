@@ -1217,10 +1217,13 @@ final class AppState: ObservableObject {
     // MARK: - Log append helper
 
     // Single entry point for all statusLog mutations. Increments statusLogVersion
+    // (StatusBoxView redraws on that, NOT on statusLog itself — append without it and rows
+    // accumulate invisibly until something else bumps the version). Internal rather than
+    // private so extensions in other files use this instead of re-implementing the invariant.
     // so StatusBoxView.onChange fires even when the net count is unchanged.
     // Trims front of log when it exceeds 600 entries (drops down to 400).
     // Using a large drop (not a 1-entry trim) ensures the count changes noticeably.
-    private func appendToLog(_ entries: [GenerationLogEntry]) {
+    func appendToLog(_ entries: [GenerationLogEntry]) {
         guard !entries.isEmpty else { return }
         statusLog.append(contentsOf: entries)
         if statusLog.count > 600 {

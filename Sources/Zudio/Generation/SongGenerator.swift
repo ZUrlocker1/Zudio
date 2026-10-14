@@ -67,7 +67,11 @@ struct SongGenerator {
         useBrushKit:          Bool    = false,
         forceBluesVariation:  Bool    = false,
         forceSohoVariation:   Bool    = false,
-        forceAmbientPianoRule: String? = nil
+        forceAmbientPianoRule: String? = nil,
+        // GROOVE FIXUP TEST MODE — lets ⌘J rebuild the same song with the groove passes off, so
+        // it can toggle a Latin song (which generation already fixed) back to its raw leads.
+        // Temporary; remove with the rest of the test mode.
+        skipGrooveFixup: Bool = false
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -94,7 +98,8 @@ struct SongGenerator {
                                    useBrushKit: useBrushKit,
                                    forceAmbientPianoRule: forceAmbientPianoRule)
         case .chill:
-            return generateChill(seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
+            return generateChill(skipGrooveFixup: skipGrooveFixup,
+                                 seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                  moodOverride: moodOverride,
                                  forceBassRuleID: forceBassRuleID,
                                  forceDrumRuleID: forceDrumRuleID,
@@ -1850,7 +1855,7 @@ struct SongGenerator {
             return songState
         }
 
-        // A regenerated Latin Soho lead gets the same groove passes the full generator applies.
+        // A regenerated Chill lead gets the same groove passes the full generator applies.
         // Without this it reverts to raw generator output — strays back on the weak sixteenths,
         // clipped joins back in — and the song audibly changes feel mid-way. That matters most in
         // evolve mode, whose first pass regenerates exactly Lead 1 and Lead 2, but it reaches the
@@ -1861,22 +1866,23 @@ struct SongGenerator {
         // lead is aligned to the outgoing groove, not the incoming one — today that only arises
         // when an absent bass or drum track is added to an evolve pass.
         var grooveFixupRegen: String? = nil
-        if isChill, songState.chillBeatStyle == .sohoLatin,
-           trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
+        if isChill, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
             let grooveBars = Set(songState.structure.sections
                 .filter { $0.label == .A || $0.label == .B }
                 .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
             let pulse = grooveStepSupport(drums: songState.trackEvents[kTrackDrums],
                                           bass: songState.trackEvents[kTrackBass], bars: grooveBars)
             let before = events
-            events = fixupLeadsToGroove(events, support: pulse, bars: grooveBars)
-            events = smoothLeadArticulation(events)
+            let pass = fixupLeadsToGroove(events, support: pulse, bars: grooveBars)
+            events = smoothLeadArticulation(
+                pass.events, overlapSteps: GrooveFixupOptions.standard.legatoOverlapSteps)
             if !before.isEmpty {
                 // L1 always first, so the row reads the same way as the generation log's.
-                let mine = "\(adjustedNoteCount(before: before, after: events)) / \(before.count)"
+                let n    = adjustedNoteCount(before: before, after: events)
+                let mine = "\(n)/\(before.count)"
                 let l1   = trackIndex == kTrackLead1 ? mine : "N/A"
                 let l2   = trackIndex == kTrackLead1 ? "N/A" : mine
-                grooveFixupRegen = "L1: \(l1),  L2: \(l2) changes"
+                grooveFixupRegen = n == 0 ? "No changes!" : "L1: \(l1),  L2: \(l2) fixes"
             }
         }
 
@@ -3675,6 +3681,7 @@ struct SongGenerator {
     // MARK: - Chill generation path
 
     private static func generateChill(
+        skipGrooveFixup: Bool = false,
         seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
@@ -3956,8 +3963,15 @@ struct SongGenerator {
         }
 
         // Groove fixup — pull the leads onto the groove. See fixupLeadsToGroove.
+        //
+        // Runs for EVERY Chill song (2026-10-14, Zack), not just the Latin Soho grooves it was
+        // built for. The two passes read the song's own drums and bass, so they adapt to
+        // whatever the rhythm section is doing: nothing about them assumes a Latin pulse.
+        //
+        // `skipGrooveFixup` is only set by the ⌃G/⌘J test mode, which rebuilds the same song
+        // with the passes off so it can toggle between the raw and fixed leads.
         var grooveFixupSummary: String? = nil
-        if chillBeatStyle == .sohoLatin {
+        if !skipGrooveFixup {
             let grooveBars = Set(structure.sections.filter { $0.label == .A || $0.label == .B }
                                   .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
             let pulse = grooveStepSupport(drums: trackEvents[kTrackDrums],
@@ -3965,9 +3979,9 @@ struct SongGenerator {
             var adjusted: [Int: (changed: Int, total: Int)] = [:]
             for lead in [kTrackLead1, kTrackLead2] {
                 let before = trackEvents[lead]
-                trackEvents[lead] = fixupLeadsToGroove(trackEvents[lead],
-                                                           support: pulse, bars: grooveBars)
-                trackEvents[lead] = smoothLeadArticulation(trackEvents[lead])
+                let pass = fixupLeadsToGroove(trackEvents[lead], support: pulse, bars: grooveBars)
+                trackEvents[lead] = smoothLeadArticulation(
+                    pass.events, overlapSteps: GrooveFixupOptions.standard.legatoOverlapSteps)
                 adjusted[lead] = (adjustedNoteCount(before: before, after: trackEvents[lead]),
                                   before.count)
             }
@@ -3976,10 +3990,12 @@ struct SongGenerator {
             // fired and its absence is not ambiguous.
             func fixupShare(_ label: String, _ track: Int) -> String {
                 guard let a = adjusted[track], a.total > 0 else { return "\(label): N/A" }
-                return "\(label): \(a.changed) / \(a.total)"
+                return "\(label): \(a.changed)/\(a.total)"
             }
-            grooveFixupSummary = fixupShare("L1", kTrackLead1) + ",  "
-                                + fixupShare("L2", kTrackLead2) + " changes" 
+            let totalChanged = adjusted.values.reduce(0) { $0 + $1.changed }
+            grooveFixupSummary = totalChanged == 0 ? "No changes!"
+                : fixupShare("L1", kTrackLead1) + ",  "
+                + fixupShare("L2", kTrackLead2) + " fixes" 
         }
 
         // Step 7 — Rhythm (Rhodes active comping)
@@ -4330,41 +4346,175 @@ struct SongGenerator {
     /// crossing a barline would put the note over a different chord, and notes held a bar or
     /// longer are left where they are — nudging them by a sixteenth buys no alignment and the
     /// fixed end point would eat the tail.
+    /// Tuning for the two groove passes. `.standard` is what both the generation path and the
+    /// ⌃G/⌘J test mode use; `.original` is what generation used before 2026-10-14 and exists so
+    /// the change stays measurable.
+    struct GrooveFixupOptions: Sendable {
+        /// Highest metric weight a note may sit on and still be considered stranded. At 0.25 the
+        /// sixteenths *before* a beat (anticipations) are eligible; at 0.05 only the sixteenths
+        /// *after* one are, which leaves pushes alone on grooves whose band never syncopates.
+        var weakStep: Double = 0.25
+        /// When the best target step is already occupied by another lead note, try the other
+        /// neighbour instead of abandoning the move.
+        var tryAlternateTarget: Bool = false
+        /// Also close a two-sixteenth hole when the pass itself opened it by moving a note later.
+        var closeHolesOpenedByMoves: Bool = false
+        /// Rank a target the band actually plays above a metrically stronger one it ignores.
+        var preferPlayedTargets: Bool = false
+        /// Resolve a note still sounding when a later note of the SAME pitch starts.
+        ///
+        /// Off by default because the default is pinned to the build that sounded right
+        /// (commit d17be9b). It fixes a genuine fault — the sampler has one voice per pitch, so
+        /// the first note's note-off lands after the second's note-on and cuts it short, 543
+        /// times across 200 songs — but it is a change from that build, so it is opt-in until
+        /// it has been heard.
+        var trimSamePitchCollisions: Bool = false
+        /// How far a note runs PAST the next onset when the pass joins them, in sixteenths.
+        ///
+        /// A sampler cannot slur: `stopNote` fires the sample's release, so a note ending exactly
+        /// where the next begins puts a small articulated seam on every join and the line stops
+        /// reading as one phrase. A brief overlap is what sounds like legato on a flute or a sax
+        /// (Zack, 2026-10-14, by ear — the measurements could not have shown this).
+        ///
+        /// The corpus agrees: consecutive notes overlap 15% of the time on Half a Minute's flute
+        /// and 25% on Do It Again's jazz guitar. 0 restores strict flush joins.
+        var legatoOverlapSteps: Int = 0
+
+        static let standard = GrooveFixupOptions()
+        /// Pre-2026-10-14 behaviour, kept as the baseline for A/B measurement.
+        /// The five refinements measured on 2026-10-14. Kept for A/B; NOT the default, because
+        /// by ear they lost the fluidity of the shipped build.
+        static let refined = GrooveFixupOptions(weakStep: 0.05, tryAlternateTarget: true,
+                                                closeHolesOpenedByMoves: true,
+                                                preferPlayedTargets: true,
+                                                trimSamePitchCollisions: true,
+                                                legatoOverlapSteps: 1)
+    }
+
     private static func fixupLeadsToGroove(_ events: [MIDIEvent], support: [Double],
                                                bars: Set<Int>,
+                                               options: GrooveFixupOptions = .standard,
                                                holeThreshold: Double = 0.15,
-                                               weakStep: Double = 0.25,
-                                               eighthGrid: Double = 0.40) -> [MIDIEvent] {
+                                               eighthGrid: Double = 0.40)
+    -> (events: [MIDIEvent], movedLater: Set<Int>, movedEarlier: Set<Int>) {
         var taken = Set(events.map(\.stepIndex))
+        var movedLater = Set<Int>(), movedEarlier = Set<Int>()
         var out: [MIDIEvent] = []
         out.reserveCapacity(events.count)
         let weight = sixteenthMetricWeight
         for e in events {
             let bar = e.stepIndex / 16, step = e.stepIndex % 16
             guard e.durationSteps < 16, bars.contains(bar),
-                  weight[step] <= weakStep, support[step] < holeThreshold
+                  weight[step] <= options.weakStep, support[step] < holeThreshold
             else { out.append(e); continue }
             // Strongest neighbour wins; on a tie the earlier one, because arriving ahead of the
             // beat is the idiom here and dragging onto it from behind is not.
+            // Rank the two neighbours. Metric strength leads, but with `preferPlayedTargets`
+            // a step the band never articulates is demoted below one it does: beat 2 is the
+            // stronger position in theory, yet in a Latin bar where the accent is on the "and"
+            // of 2 it can be all but silent, and moving a note onto silence buys little.
             let candidates = [step - 1, step + 1]
                 .filter { $0 >= 0 && $0 < 16 && weight[$0] >= eighthGrid }
                 .sorted {
-                    weight[$0] != weight[$1] ? weight[$0] > weight[$1]
+                    if options.preferPlayedTargets {
+                        let a = support[$0] >= holeThreshold, b = support[$1] >= holeThreshold
+                        if a != b { return a }
+                    }
+                    return weight[$0] != weight[$1] ? weight[$0] > weight[$1]
                         : (support[$0] != support[$1] ? support[$0] > support[$1] : $0 < $1)
                 }
-            guard let target = candidates.first else { out.append(e); continue }
+            // A target already holding a lead note is no use. Without `tryAlternateTarget` the
+            // move is abandoned outright, which strands notes whose preferred beat happens to be
+            // occupied — measured at ~14% of one song's Lead 1 onsets.
+            let usable = options.tryAlternateTarget ? candidates : Array(candidates.prefix(1))
+            guard let target = usable.first(where: { !taken.contains(bar * 16 + $0) })
+            else { out.append(e); continue }
             let moved = bar * 16 + target
-            guard !taken.contains(moved) else { out.append(e); continue }
             taken.remove(e.stepIndex)
             taken.insert(moved)
+            if target > step { movedLater.insert(moved) } else { movedEarlier.insert(moved) }
             let newDur = Swift.max(1, e.durationSteps - (target - step))
             out.append(MIDIEvent(stepIndex: moved, note: e.note,
                                  velocity: e.velocity, durationSteps: newDur))
         }
-        return out.sorted { $0.stepIndex < $1.stepIndex }
+        return (out.sorted { $0.stepIndex < $1.stepIndex }, movedLater, movedEarlier)
     }
 
-    /// How many of a track's notes the two groove passes actually changed — an onset moved, a
+    /// End a note where the next note of the SAME pitch begins.
+    ///
+    /// Overlap between different pitches is wanted — it is what reads as legato on a flute or a
+    /// sax, and the corpus leads do it 15–25% of the time. Overlap on the same pitch is not: the
+    /// sampler has one voice per pitch, so the first note's note-off lands after the second's
+    /// note-on and cuts the new note short. Audible as notes that randomly vanish.
+    ///
+    /// The magnet creates these by moving one note later (keeping its end) and the next earlier.
+    /// Measured at 543 collisions across 200 songs once blanket overlap-trimming was switched
+    /// off, so this runs unconditionally rather than behind an option (Zack, 2026-10-14).
+    private static func trimSamePitchOverlaps(_ events: [MIDIEvent]) -> [MIDIEvent] {
+        let sorted = events.sorted { $0.stepIndex < $1.stepIndex }
+        // index -> onset of the FIRST later note of the same pitch that starts while this one is
+        // still sounding. Anything at or past this note's end cannot collide, so the scan stops
+        // there; taking a later match instead of the first would trim to the wrong point.
+        var collidesAt: [Int: Int] = [:]
+        for (i, e) in sorted.enumerated() {
+            let end = e.stepIndex + e.durationSteps
+            var j = i + 1
+            while j < sorted.count {
+                let o = sorted[j]
+                if o.stepIndex >= end { break }
+                if o.stepIndex > e.stepIndex, o.note == e.note { collidesAt[i] = o.stepIndex; break }
+                j += 1
+            }
+        }
+        return sorted.enumerated().map { i, e in
+            guard let next = collidesAt[i] else { return e }
+            return MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity,
+                             durationSteps: Swift.max(1, next - e.stepIndex))
+        }
+    }
+
+    /// Applies the groove passes to Lead 1 and Lead 2 of `state`, **ignoring the Latin gate**,
+    /// and returns the new state with a one-line summary in the generation log's format.
+    ///
+    /// `generateChill` runs the passes itself behind its gate; this is the ungated entry point,
+    /// used by the ⌃G/⌘J test mode and by anything that later widens that gate. The pulse is read
+    /// from whatever drums and bass the state carries, so a song with neither simply produces an
+    /// all-zero support vector and no changes.
+    ///
+    /// Order matters: move, then join, then resolve same-pitch collisions — the last step runs
+    /// after the join so it also catches anything the join itself could create.
+    ///
+    /// The passes are idempotent, so applying this to an already-fixed song reports no changes
+    /// rather than moving anything twice.
+    nonisolated static func applyGrooveFixup(to state: SongState,
+                                            options: GrooveFixupOptions = .standard)
+    -> (state: SongState, summary: String) {
+        let grooveBars = Set(state.structure.sections
+            .filter { $0.label == .A || $0.label == .B }
+            .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+        let pulse = grooveStepSupport(drums: state.trackEvents[kTrackDrums],
+                                      bass: state.trackEvents[kTrackBass], bars: grooveBars)
+        var updated = state
+        var parts: [String] = []
+        var changed = 0
+        for (label, lead) in [("L1", kTrackLead1), ("L2", kTrackLead2)] {
+            let before = updated.trackEvents[lead]
+            guard !before.isEmpty else { parts.append("\(label): N/A"); continue }
+            let pass = fixupLeadsToGroove(before, support: pulse, bars: grooveBars, options: options)
+            let joined = smoothLeadArticulation(
+                pass.events, overlapSteps: options.legatoOverlapSteps,
+                closeTwoStepHolesAt: options.closeHolesOpenedByMoves ? pass.movedLater : [])
+            let events = options.trimSamePitchCollisions ? trimSamePitchOverlaps(joined) : joined
+            updated = updated.replacingEvents(events, forTrack: lead)
+            let n = adjustedNoteCount(before: before, after: events)
+            changed += n
+            parts.append("\(label): \(n)/\(before.count)")
+        }
+        guard changed > 0 else { return (updated, "No changes!") }
+        return (updated, parts.joined(separator: ",  ") + " fixes")
+    }
+
+    /// How many of a track's notes the groove passes actually changed — an onset moved, a
     /// duration lengthened, or both. Counted by comparing the finished events against the
     /// originals rather than by tallying inside each pass, so a note that was both moved and
     /// joined counts once and the number means "notes that came out different".
@@ -4377,6 +4527,11 @@ struct SongGenerator {
             if let n = remaining[key], n > 0 { remaining[key] = n - 1 } else { changed += 1 }
         }
         return changed
+    }
+
+    /// Public face of `adjustedNoteCount`, for the ⌃G/⌘J test mode's log row.
+    nonisolated static func differingNoteCount(before: [MIDIEvent], after: [MIDIEvent]) -> Int {
+        adjustedNoteCount(before: before, after: after)
     }
 
     /// Close the single-sixteenth holes inside a phrase, so the line is played rather than tapped.
@@ -4393,18 +4548,36 @@ struct SongGenerator {
     /// is a phrase boundary; both are left alone. Nothing moves and nothing is added — a note
     /// only grows to meet the attack that follows it, so it can never sound over a new chord.
     private static func smoothLeadArticulation(_ events: [MIDIEvent],
-                                               maxSpacing: Int = 8) -> [MIDIEvent] {
+                                               maxSpacing: Int = 8,
+                                               // No default overlap: a default here silently
+                                               // outranked GrooveFixupOptions for the generation
+                                               // and regen paths, which call this positionally.
+                                               overlapSteps: Int = 0,
+                                               closeTwoStepHolesAt: Set<Int> = []) -> [MIDIEvent] {
         let sorted = events.sorted { $0.stepIndex < $1.stepIndex }
         let onsets = Array(Set(sorted.map(\.stepIndex))).sorted()
         var nextOnset: [Int: Int] = [:]
         for (a, b) in zip(onsets, onsets.dropFirst()) { nextOnset[a] = b }
+        // Pitches starting at each onset. A note may only run past the next onset when that
+        // onset is a DIFFERENT pitch: the sampler has one voice per pitch, so a note-off landing
+        // after a re-attack of the same note would cut the new one short.
+        var pitchesAt: [Int: Set<UInt8>] = [:]
+        for e in sorted { pitchesAt[e.stepIndex, default: []].insert(e.note) }
+
         return sorted.map { e in
-            guard let next = nextOnset[e.stepIndex],
-                  next - e.stepIndex <= maxSpacing,
-                  next - (e.stepIndex + e.durationSteps) == 1
+            guard let next = nextOnset[e.stepIndex], next - e.stepIndex <= maxSpacing
             else { return e }
+            let hole = next - (e.stepIndex + e.durationSteps)
+            // A hole of two is normally a rest the generator meant. The exception is one the
+            // magnet opened itself by pushing `next` a sixteenth later, which is an artefact
+            // rather than an intention.
+            let joins = hole == 1 || (hole == 2 && closeTwoStepHolesAt.contains(next))
+            guard joins || hole == 0 else { return e }
+            let samePitchNext = pitchesAt[next]?.contains(e.note) ?? false
+            let overlap = samePitchNext ? 0 : overlapSteps
+            guard hole + overlap > 0 else { return e }
             return MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity,
-                             durationSteps: e.durationSteps + 1)
+                             durationSteps: e.durationSteps + hole + overlap)
         }
     }
 

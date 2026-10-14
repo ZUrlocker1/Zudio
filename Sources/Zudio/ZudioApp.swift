@@ -399,6 +399,15 @@ struct ZudioApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Generate New") { appState.generateNew(thenPlay: true) }
                     .keyboardShortcut("g", modifiers: .command)
+
+                // GROOVE FIXUP TEST MODE — temporary; delete this item, the ⌃G block in
+                // ContentView's key monitor, and Sources/Zudio/GrooveFixupTestMode.swift
+                // together. The menu item exists as well as ⌃G so the action can be invoked
+                // by clicking, which separates "did the key arrive" from "did the action run".
+                Divider()
+                Button("Groove Fixup (test)") { appState.toggleGrooveFixupTestMode() }
+                    .keyboardShortcut("j", modifiers: .command)
+                    .disabled(appState.songState == nil || appState.isGenerating)
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Load Song") { appState.loadFromLog() }

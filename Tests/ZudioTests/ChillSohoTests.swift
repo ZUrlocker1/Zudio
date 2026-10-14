@@ -222,7 +222,7 @@ import Foundation
         var checked = 0
         for s in Self.sohoSongs()
         where s.generationLog.contains(where: { $0.tag == "CHL-TEXT-002" }) {
-            let crashes = ChillSohoTextureGenerator.crashBars(s.trackEvents[kTrackDrums])
+            let crashes = ChillSohoTextureGenerator.CrashPoints(s.trackEvents[kTrackDrums]).bars
             let stabSteps = Set(s.trackEvents[kTrackTexture].map { $0.stepIndex })
             for bar in crashes {
                 #expect(stabSteps.contains(bar * 16), "no stab on the crash at bar \(bar)")
@@ -605,7 +605,7 @@ import Foundation
         for s in Self.sohoSongs() + Self.remixSongs()
         where Self.uses(s, "CHL-TEXT-002") {
             let stabSteps = Set(s.trackEvents[kTrackTexture].map(\.stepIndex))
-            for at in ChillSohoTextureGenerator.crashSteps(s.trackEvents[kTrackDrums]) {
+            for at in ChillSohoTextureGenerator.CrashPoints(s.trackEvents[kTrackDrums]).steps {
                 #expect(stabSteps.contains(at), "no stab on the crash at step \(at)")
             }
         }

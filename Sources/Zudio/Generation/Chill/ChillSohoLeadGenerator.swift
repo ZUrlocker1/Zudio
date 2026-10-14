@@ -625,7 +625,7 @@ extension ChillLeadGenerator {
 
             let offset = rng.nextDouble() < 0.70 ? 0 : 2
             let available = span * 16 - offset - 2
-            guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { bar += 1; continue }
+            guard let chord = structure.chordWindow(atBar: bar) else { bar += 1; continue }
             // A colour tone where there is one (the 9th, the 6th), else a chord tone; never the
             // pitch just held, so successive tones move.
             let colour = band.filter { chord.scaleTensions.contains($0 % 12) && $0 != previous }
@@ -707,7 +707,7 @@ extension ChillLeadGenerator {
                                      pool: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         for bar in returns {
-            guard let chord = structure.chordPlan.first(where: { $0.contains(bar: bar) }) else { continue }
+            guard let chord = structure.chordWindow(atBar: bar) else { continue }
             let landings = pool.indices.filter { $0 >= 3 && chord.chordTones.contains(pool[$0] % 12) }
             guard !landings.isEmpty else { continue }
             let mid = pool.count / 2
@@ -746,7 +746,7 @@ extension ChillLeadGenerator {
     /// where the last one left off.
     private static func anchor(near pitch: Int, bar: Int, structure: SongStructure,
                                frame: GlobalMusicalFrame, pool: [Int]) -> Int {
-        let tones = structure.chordPlan.first { $0.contains(bar: bar) }?.chordTones ?? []
+        let tones = structure.chordWindow(atBar: bar)?.chordTones ?? []
         let candidates = pool.filter { tones.contains($0 % 12) }
         return (candidates.isEmpty ? pool : candidates).min { abs($0 - pitch) < abs($1 - pitch) }!
     }

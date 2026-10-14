@@ -204,9 +204,13 @@ substyle wants. The two-case groove above is the same idea at a fraction of the 
 
 ## Groove fixup — aligning the leads to the rhythm section
 
+Applies to **every Chill song** — base, Blues and Soho — not only to Soho. It is documented here
+because it was built for the Latin grooves, where the fault was most audible.
+
 The lead generators place notes on their own grid and never read the rhythm section, so a line
 could land where the band is silent and read as being in a different time from it. Two passes run
-over Lead 1 and Lead 2 once every track is final, on **Latin grooves only**.
+over Lead 1 and Lead 2 once every track is final. They read the song's own drums and bass, so
+nothing in them assumes a Latin pulse.
 
 **Placement.** A note moves one sixteenth onto the eighth-note grid only when two tests agree it
 is stranded: its position is metrically weak, *and* the band almost never plays there. Metric
@@ -228,9 +232,10 @@ held a bar or longer is left alone.
 the first note grows to meet the second. Measured across the corpus leads (Smooth Operator's alto
 sax, Do It Again's organ and jazz guitar, Half a Minute's flute and bari sax), a note inside a
 phrase ends exactly where the next begins 51–92% of the time, and 79–92% for the horns and organ.
-Soho's leads managed 60%, and almost all the remainder were single-sixteenth holes: long enough to
-clip the note, too short to hear as a rest. That is what made the solos choppy. A gap of two
-sixteenths or more is a rest the generator meant, and is left alone.
+Chill's leads managed 60%, and almost all the remainder were single-sixteenth holes: long enough
+to clip the note and too short to hear as a rest. That is what made the solos choppy. A gap of two
+sixteenths or more is a rest the generator meant, and is left alone. Joins now run flush about 85%
+of the time in every Chill form.
 
 **Where it runs.** In the generator for a new song, and in `regenerateTrack` for a regenerated
 lead — the ⚡ REGEN button, an instrument override, and evolve mode, whose first pass regenerates
@@ -238,10 +243,15 @@ exactly Lead 1 and Lead 2. Without the second the song would audibly change feel
 second pass regenerates Pads and Rhythm and restores the anchor's leads, which are already
 aligned.
 
-A one-line summary goes in the generation log whenever the pass runs, so an absent row means the
-Latin gate did not fire rather than that the pass found nothing:
+A one-line summary goes in the generation log, and `No changes!` when a song needed none:
 
-    Groove fixup  L1: 80 / 128,  L2: 1 / 25 changes
+    Groove fixup     L1: 80/128,  L2: 1/25 fixes
+
+**Tuning.** `GrooveFixupOptions` carries the knobs. The default is `.standard`; `.refined` holds a
+set of alternatives — protecting anticipations, trying the second-choice target, closing holes the
+pass itself opened, deliberate legato overlap — which measured better on every metric but sounded
+less fluid, and are kept only for A/B. The lesson is recorded rather than the history: on
+articulation, the measurements and the ear disagreed, and the ear was right.
 
 This, and the Texture track reading the finished drums for its stabs, are the only places one Soho
 track reads another's output. Everything else coordinates through `ChillBeatStyle` alone.

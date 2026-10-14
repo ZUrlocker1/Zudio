@@ -245,7 +245,6 @@ struct ChillDrumGenerator {
 
         var events: [MIDIEvent] = []
         var crashNextBar = false
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         func hit(_ step: Int, _ note: UInt8, _ vel: UInt8, _ base: Int) {
             events.append(MIDIEvent(stepIndex: base + step, note: note, velocity: vel, durationSteps: 1))
         }
@@ -276,28 +275,28 @@ struct ChillDrumGenerator {
             if label == .bridge && breakdownStyle == .sohoRemix {
                 let bdBar  = bar - (section?.startBar ?? bar)
                 let isLast = bdBar == (section?.lengthBars ?? 12) - 1
-                for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? v(42, 8) : v(32, 7), base) }
+                for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? rng.velocity(42, 8) : rng.velocity(32, 7), base) }
                 if isLast {
                     if remixExitStabs {
                         for step in [0, 8] {
-                            hit(step, kick, v(88, 10), base); hit(step, snare, v(80, 10), base)
-                            hit(step, crash, v(84, 10), base)
+                            hit(step, kick, rng.velocity(88, 10), base); hit(step, snare, rng.velocity(80, 10), base)
+                            hit(step, crash, rng.velocity(84, 10), base)
                         }
                     } else {
-                        hit(0, kick, v(70, 10), base)
+                        hit(0, kick, rng.velocity(70, 10), base)
                         events += stopTimeFill(barStart: base, option: fillOpt,
                                                kick: kick, snare: snare, hat: hat, rng: &rng)
                     }
                     crashNextBar = true
                     continue
                 }
-                for step in [0, 4, 8, 12] { hit(step, kick, step % 8 == 0 ? v(80, 8) : v(66, 8), base) }
+                for step in [0, 4, 8, 12] { hit(step, kick, step % 8 == 0 ? rng.velocity(80, 8) : rng.velocity(66, 8), base) }
                 if bdBar >= 2 {
                     // Tambourine rings and the side stick is dry, so they sit differently.
                     let backbeatVel = remixBackbeat == GMDrum.tambourine.rawValue ? 56
                                     : remixBackbeat == GMDrum.sidestick.rawValue  ? 68 : 64
-                    for step in [4, 12] { hit(step, remixBackbeat, v(backbeatVel, 10), base) }
-                    for step in [2, 6, 10, 14] { hit(step, openHat, v(46, 10), base) }
+                    for step in [4, 12] { hit(step, remixBackbeat, rng.velocity(backbeatVel, 10), base) }
+                    for step in [2, 6, 10, 14] { hit(step, openHat, rng.velocity(46, 10), base) }
                 }
                 continue
             }
@@ -317,23 +316,23 @@ struct ChillDrumGenerator {
                 let bdBar  = bar - (section?.startBar ?? bar)
                 let isLast = bdBar == (section?.lengthBars ?? 4) - 1
                 let pcut   = isLast ? 12 : 16
-                hit(0, kick, v(70, 10), base)
-                if rng.nextDouble() < 0.60 { hit(8, kick, v(60, 10), base) }
+                hit(0, kick, rng.velocity(70, 10), base)
+                if rng.nextDouble() < 0.60 { hit(8, kick, rng.velocity(60, 10), base) }
                 let feature: [(Int, UInt8)] = [(0, lowConga), (2, muteConga), (3, openConga),
                                                (6, muteConga), (8, lowConga), (10, muteConga),
                                                (11, openConga), (14, openConga)]
-                for (step, note) in feature where step < pcut { hit(step, note, v(60, 16), base) }
-                for step in stride(from: 1, to: 16, by: 2) where step < pcut { hit(step, shaker, v(34, 8), base) }
+                for (step, note) in feature where step < pcut { hit(step, note, rng.velocity(60, 16), base) }
+                for step in stride(from: 1, to: 16, by: 2) where step < pcut { hit(step, shaker, rng.velocity(34, 8), base) }
                 if bdBar % 2 == 1 && !isLast {
                     for (step, note) in [(12, muteConga), (13, openConga), (14, hiBongo), (15, loBongo)] as [(Int, UInt8)] {
-                        hit(step, note, v(64, 14), base)
+                        hit(step, note, rng.velocity(64, 14), base)
                     }
                 }
                 if isLast {
                     for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)] as [(Int, UInt8)] {
-                        hit(step, note, v(66, 14), base)
+                        hit(step, note, rng.velocity(66, 14), base)
                     }
-                    hit(14, cabasa, v(50, 8), base)
+                    hit(14, cabasa, rng.velocity(50, 8), base)
                     crashNextBar = true
                 }
                 continue
@@ -344,21 +343,21 @@ struct ChillDrumGenerator {
                 let bdBar  = bar - (section?.startBar ?? bar)
                 let isLast = bdBar == (section?.lengthBars ?? 4) - 1
                 if isLast {
-                    hit(0, kick, v(60, 10), base)
+                    hit(0, kick, rng.velocity(60, 10), base)
                     events += stopTimeFill(barStart: base, option: fillOpt,
                                            kick: kick, snare: snare, hat: hat, rng: &rng)
                     crashNextBar = true
                 } else {
-                    hit(0, hat, v(38, 12), base); hit(8, hat, v(38, 12), base)
-                    if bdBar % 2 == 0 { hit(0, kick, v(52, 10), base) }
+                    hit(0, hat, rng.velocity(38, 12), base); hit(8, hat, rng.velocity(38, 12), base)
+                    if bdBar % 2 == 0 { hit(0, kick, rng.velocity(52, 10), base) }
                 }
                 continue
             }
 
-            if crashNextBar { hit(0, crash, v(78, 12), base); crashNextBar = false }
+            if crashNextBar { hit(0, crash, rng.velocity(78, 12), base); crashNextBar = false }
             // The shaker returning is an event, not a resumption.
             else if shakerReturns.contains(bar) && !shakerRests.contains(bar) {
-                hit(0, crash, v(72, 12), base)
+                hit(0, crash, rng.velocity(72, 12), base)
             }
 
             let isIntro = label == .intro
@@ -382,32 +381,32 @@ struct ChillDrumGenerator {
                 switch rule {
                 case "CHL-DRUM-009":
                     for step in stride(from: 0, to: 16, by: 2) {
-                        hit(step, hat, step % 4 == 0 ? v(38, 8) : v(30, 7), base)
+                        hit(step, hat, step % 4 == 0 ? rng.velocity(38, 8) : rng.velocity(30, 7), base)
                     }
-                    if introBar >= 1 { hit(0, kick, v(54, 8), base) }
+                    if introBar >= 1 { hit(0, kick, rng.velocity(54, 8), base) }
                     if introBar >= 2 {
-                        for step in (bar % 2 == 0 ? [0, 6, 12] : [4, 10]) { hit(step, rim, v(44, 8), base) }
-                        hit(6, kick, v(50, 8), base)
+                        for step in (bar % 2 == 0 ? [0, 6, 12] : [4, 10]) { hit(step, rim, rng.velocity(44, 8), base) }
+                        hit(6, kick, rng.velocity(50, 8), base)
                     }
                 case "CHL-DRUM-010":
-                    for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? v(32, 7) : v(24, 6), base) }
-                    if introBar >= 1 { hit(0, surdoMute, v(46, 8), base); hit(8, surdoOpen, v(56, 8), base) }
-                    if introBar >= 2 { for step in [4, 12] { hit(step, rim, v(50, 9), base) } }
+                    for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? rng.velocity(32, 7) : rng.velocity(24, 6), base) }
+                    if introBar >= 1 { hit(0, surdoMute, rng.velocity(46, 8), base); hit(8, surdoOpen, rng.velocity(56, 8), base) }
+                    if introBar >= 2 { for step in [4, 12] { hit(step, rim, rng.velocity(50, 9), base) } }
                 case "CHL-DRUM-011":
                     // Latin Sway is the sparsest rule in the style, and left Thunder in the Side
                     // Street with almost nothing at all. Its intro is fuller than the others by
                     // design: the full tumbao from bar one, with a shaker under it.
                     for (step, note) in [(0, lowConga), (3, muteConga), (6, openConga),
                                          (10, muteConga), (13, openConga)] as [(Int, UInt8)] {
-                        hit(step, note, v(44, 14), base)
+                        hit(step, note, rng.velocity(44, 14), base)
                     }
-                    for step in stride(from: 1, to: 16, by: 2) { hit(step, shaker, v(26, 8), base) }
-                    if introBar >= 1 { hit(0, kick, v(56, 8), base) }
-                    if introBar >= 2 { hit(8, rim, v(50, 8), base); hit(11, kick, v(48, 8), base) }
+                    for step in stride(from: 1, to: 16, by: 2) { hit(step, shaker, rng.velocity(26, 8), base) }
+                    if introBar >= 1 { hit(0, kick, rng.velocity(56, 8), base) }
+                    if introBar >= 2 { hit(8, rim, rng.velocity(50, 8), base); hit(11, kick, rng.velocity(48, 8), base) }
                 default:
-                    for step in [0, 8] { hit(step, hat, v(38, 10), base) }
-                    if introBar >= 1 { hit(0, kick, v(56, 10), base) }
-                    if introBar >= 2 { for step in [4, 12] { hit(step, rim, v(52, 9), base) } }
+                    for step in [0, 8] { hit(step, hat, rng.velocity(38, 10), base) }
+                    if introBar >= 1 { hit(0, kick, rng.velocity(56, 10), base) }
+                    if introBar >= 2 { for step in [4, 12] { hit(step, rim, rng.velocity(52, 9), base) } }
                 }
                 // The Latin percussion joins from the second bar, so the intro gains momentum
                 // rather than repeating itself.
@@ -435,22 +434,22 @@ struct ChillDrumGenerator {
                 // Bossa Clave. Rim carries a 3-2 clave across the bar pair; no snare backbeat —
                 // the rim replaces it. Kick is the MEASURED Latin figure 0, 6, 8 (+14).
                 for step in stride(from: 0, to: 16, by: 2) where keep(step) {
-                    hit(step, hat, step % 4 == 0 ? v(50, 9) : v(40, 8), base)
+                    hit(step, hat, step % 4 == 0 ? rng.velocity(50, 9) : rng.velocity(40, 8), base)
                 }
-                for step in (bar % 2 == 0 ? [0, 6, 12] : [4, 10]) where keep(step) { hit(step, rim, v(58, 10), base) }
-                for step in [0, 6, 8] { hit(step, kick, step == 0 ? v(68, 8) : v(60, 8), base) }
+                for step in (bar % 2 == 0 ? [0, 6, 12] : [4, 10]) where keep(step) { hit(step, rim, rng.velocity(58, 10), base) }
+                for step in [0, 6, 8] { hit(step, kick, step == 0 ? rng.velocity(68, 8) : rng.velocity(60, 8), base) }
 
             case "CHL-DRUM-010":
                 // Soft Samba (Matt Bianco / Basia). Shaker sixteenths are the engine; a real surdo
                 // carries the low end — light on 0, weighted on 8, the samba's second-half weight.
                 // Rim on 4 and 12; hats on the offbeat eighths only.
                 if !shakerRests.contains(bar) {
-                    for step in 0..<16 where keep(step) { hit(step, shaker, step % 2 == 0 ? v(40, 8) : v(30, 7), base) }
+                    for step in 0..<16 where keep(step) { hit(step, shaker, step % 2 == 0 ? rng.velocity(40, 8) : rng.velocity(30, 7), base) }
                 }
-                hit(0, surdoMute, v(56, 8), base)
-                hit(8, surdoOpen, v(70, 8), base)
-                for step in [4, 12] where keep(step) { hit(step, rim, v(56, 9), base) }
-                for step in [2, 6, 10, 14] where keep(step) { hit(step, hat, v(38, 8), base) }
+                hit(0, surdoMute, rng.velocity(56, 8), base)
+                hit(8, surdoOpen, rng.velocity(70, 8), base)
+                for step in [4, 12] where keep(step) { hit(step, rim, rng.velocity(56, 9), base) }
+                for step in [2, 6, 10, 14] where keep(step) { hit(step, hat, rng.velocity(38, 8), base) }
 
             case "CHL-DRUM-011":
                 // Latin Sway (Sade) — half-time, sparse, conga-forward; the quietest rule in Chill.
@@ -458,11 +457,11 @@ struct ChillDrumGenerator {
                 // 0, and 11 on alternate bars. Leaves the bass exposed.
                 let congas: [(Int, UInt8)] = [(0, lowConga), (3, muteConga), (6, openConga),
                                               (10, muteConga), (13, openConga)]
-                for (step, note) in congas where keep(step) { hit(step, note, v(50, 21), base) }
-                hit(8, rim, v(52, 8), base)
-                for step in [0, 8] { hit(step, hat, v(32, 8), base) }
-                hit(0, kick, v(62, 8), base)
-                if bar % 2 == 1 { hit(11, kick, v(52, 8), base) }
+                for (step, note) in congas where keep(step) { hit(step, note, rng.velocity(50, 21), base) }
+                hit(8, rim, rng.velocity(52, 8), base)
+                for step in [0, 8] { hit(step, hat, rng.velocity(32, 8), base) }
+                hit(0, kick, rng.velocity(62, 8), base)
+                if bar % 2 == 1 { hit(11, kick, rng.velocity(52, 8), base) }
 
             case "CHL-DRUM-012":
                 // Soft Soul Backbeat (You're the Best Thing / More Than This). Rim on 4 and 12, no
@@ -470,34 +469,34 @@ struct ChillDrumGenerator {
                 // lift on return.
                 let eighths = (label == .B) ? !hatEighthsBase : hatEighthsBase
                 for step in (eighths ? Array(stride(from: 0, to: 16, by: 2)) : [0, 4, 8, 12]) where keep(step) {
-                    hit(step, hat, v(45, 14), base)
+                    hit(step, hat, rng.velocity(45, 14), base)
                 }
-                for step in [4, 12] where keep(step) { hit(step, rim, v(60, 9), base) }
-                hit(0, kick, v(68, 8), base)
-                hit(kickPush ? 7 : 8, kick, v(58, 8), base)
+                for step in [4, 12] where keep(step) { hit(step, rim, rng.velocity(60, 9), base) }
+                hit(0, kick, rng.velocity(68, 8), base)
+                hit(kickPush ? 7 : 8, kick, rng.velocity(58, 8), base)
 
             case "CHL-DRUM-013":
                 // Ballad Half-Time (No Ordinary Love) — the sparsest rule, leaving the bass most
                 // exposed. Rim on beat 3 only; kick on 0, and 6 on alternate bars; hats on 0 and 8
                 // under velocity 45 and absent on a third of bars; a 25% sixteenth pickup into 8.
-                hit(8, rim, v(54, 8), base)
-                hit(0, kick, v(62, 8), base)
-                if bar % 2 == 1 { hit(6, kick, v(50, 8), base) }
-                if rng.nextDouble() >= 1.0 / 3.0 { for step in [0, 8] { hit(step, hat, v(30, 14), base) } }
-                if rng.nextDouble() < 0.25 && !shakerRests.contains(bar) { hit(7, shaker, v(34, 8), base) }
+                hit(8, rim, rng.velocity(54, 8), base)
+                hit(0, kick, rng.velocity(62, 8), base)
+                if bar % 2 == 1 { hit(6, kick, rng.velocity(50, 8), base) }
+                if rng.nextDouble() >= 1.0 / 3.0 { for step in [0, 8] { hit(step, hat, rng.velocity(30, 14), base) } }
+                if rng.nextDouble() < 0.25 && !shakerRests.contains(bar) { hit(7, shaker, rng.velocity(34, 8), base) }
 
             default:
                 break
             }
 
             if !isSectionEnd && ["CHL-DRUM-009", "CHL-DRUM-012"].contains(rule) && rng.nextDouble() < pickupProb {
-                hit(14, kick, v(52, 8), base)
+                hit(14, kick, rng.velocity(52, 8), base)
             }
 
             // Soul groove pocket: handclaps on the backbeat, the soul-record way of lifting a
             // section without adding a single drum.
             if pocketBridge {
-                for step in [4, 12] where step < cut { hit(step, clap, v(70, 10), base) }
+                for step in [4, 12] where step < cut { hit(step, clap, rng.velocity(70, 10), base) }
             }
 
             // The outro keeps the percussion too. The kit's own rule already played there, but the
@@ -517,13 +516,13 @@ struct ChillDrumGenerator {
                 events.removeSubrange(mark...)
                 events.append(contentsOf: kept)
                 for step in [8, 12] {
-                    hit(step, kick, v(88, 10), base); hit(step, snare, v(80, 10), base)
-                    hit(step, crash, v(84, 10), base)
+                    hit(step, kick, rng.velocity(88, 10), base); hit(step, snare, rng.velocity(80, 10), base)
+                    hit(step, crash, rng.velocity(84, 10), base)
                 }
                 // The crash on the break's own downbeat. `crashNextBar` cannot do it: the bridge
                 // branches run before it is read, so it would survive to the wrong bar.
                 events.append(MIDIEvent(stepIndex: base + 16, note: crash,
-                                        velocity: v(84, 10), durationSteps: 1))
+                                        velocity: rng.velocity(84, 10), durationSteps: 1))
                 continue
             }
 
@@ -533,11 +532,11 @@ struct ChillDrumGenerator {
                 events.removeAll { $0.stepIndex >= base + 12 && $0.stepIndex < base + 16 }
                 if latin {
                     for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, hiBongo)] as [(Int, UInt8)] {
-                        hit(step, note, v(58, 14), base)
+                        hit(step, note, rng.velocity(58, 14), base)
                     }
                 } else {
                     for (i, step) in [12, 13, 14, 15].enumerated() {
-                        hit(step, snare, v(48 + i * 8, 8), base)
+                        hit(step, snare, rng.velocity(48 + i * 8, 8), base)
                     }
                 }
                 crashNextBar = true
@@ -550,10 +549,10 @@ struct ChillDrumGenerator {
                 // which is where CHL-TEXT-002's horn stabs read their accents from.
                 if latin && rng.nextDouble() < 0.5 {
                     let flourish: [(Int, UInt8)] = [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)]
-                    for (step, note) in flourish { hit(step, note, v(60, 14), base) }
-                    hit(14, cabasa, v(48, 8), base)
+                    for (step, note) in flourish { hit(step, note, rng.velocity(60, 14), base) }
+                    hit(14, cabasa, rng.velocity(48, 8), base)
                 } else {
-                    hit(13, snare, v(54, 8), base); hit(14, snare, v(62, 8), base); hit(15, snare, v(70, 8), base)
+                    hit(13, snare, rng.velocity(54, 8), base); hit(14, snare, rng.velocity(62, 8), base); hit(15, snare, rng.velocity(70, 8), base)
                 }
                 crashNextBar = true
             }
@@ -570,7 +569,6 @@ struct ChillDrumGenerator {
                                           shakerRest: Bool = false,
                                           rng: inout SeededRNG) -> [MIDIEvent] {
         var out: [MIDIEvent] = []
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         func add(_ step: Int, _ note: UInt8, _ vel: UInt8) {
             if step < cut { out.append(MIDIEvent(stepIndex: base + step, note: note, velocity: vel, durationSteps: 1)) }
         }
@@ -578,22 +576,22 @@ struct ChillDrumGenerator {
                                       (8, muteConga), (10, muteConga), (12, openConga), (14, openConga)]
         switch ruleID {
         case "CHL-DRUM-009":                       // bossa: congas + soft shaker eighths
-            for (s, n) in tumbao { add(s, n, s >= 12 ? v(56, 10) : v(42, 10)) }
-            if !shakerRest { for s in stride(from: 1, to: 16, by: 2) { add(s, shaker, v(30, 8)) } }
+            for (s, n) in tumbao { add(s, n, s >= 12 ? rng.velocity(56, 10) : rng.velocity(42, 10)) }
+            if !shakerRest { for s in stride(from: 1, to: 16, by: 2) { add(s, shaker, rng.velocity(30, 8)) } }
         case "CHL-DRUM-010":                       // samba (kit has the shaker): congas + bongos
-            for (s, n) in tumbao { add(s, n, s >= 12 ? v(54, 10) : v(40, 10)) }
-            for s in stride(from: 1, to: 16, by: 2) { add(s, s % 4 == 1 ? hiBongo : loBongo, v(34, 8)) }
+            for (s, n) in tumbao { add(s, n, s >= 12 ? rng.velocity(54, 10) : rng.velocity(40, 10)) }
+            for s in stride(from: 1, to: 16, by: 2) { add(s, s % 4 == 1 ? hiBongo : loBongo, rng.velocity(34, 8)) }
         case "CHL-DRUM-011":                       // sway (kit has the congas): cabasa + shaker
-            for s in [2, 6, 10, 14] { add(s, cabasa, v(34, 8)) }
-            if !shakerRest { for s in [0, 4, 8, 12] { add(s, shaker, v(30, 8)) } }
+            for s in [2, 6, 10, 14] { add(s, cabasa, rng.velocity(34, 8)) }
+            if !shakerRest { for s in [0, 4, 8, 12] { add(s, shaker, rng.velocity(30, 8)) } }
         case "CHL-DRUM-012", "CHL-DRUM-003":       // soul: lighter congas + cabasa
             for (s, n) in [(0, muteConga), (4, muteConga), (6, openConga), (12, muteConga), (14, openConga)] as [(Int, UInt8)] {
-                add(s, n, v(40, 12))
+                add(s, n, rng.velocity(40, 12))
             }
-            for s in [2, 10] { add(s, cabasa, v(30, 8)) }
+            for s in [2, 10] { add(s, cabasa, rng.velocity(30, 8)) }
         case "CHL-DRUM-013":                       // ballad: a whisper of conga only
-            add(0, lowConga, v(36, 8))
-            if bar % 2 == 1 { add(6, muteConga, v(32, 8)) }
+            add(0, lowConga, rng.velocity(36, 8))
+            if bar % 2 == 1 { add(6, muteConga, rng.velocity(32, 8)) }
         default:
             break
         }

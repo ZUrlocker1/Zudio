@@ -32,9 +32,10 @@ struct ChillSohoTextureGenerator {
                          usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
         let useStabs = rng.nextDouble() < 0.55
         usedRuleIDs.insert(useStabs ? "CHL-TEXT-002" : "CHL-TEXT-001")
+        let crashes = CrashPoints(drumEvents)
         var events = useStabs
-            ? punctuationStabs(frame: frame, structure: structure, drumEvents: drumEvents, rng: &rng)
-            : sustainedHalo(frame: frame, structure: structure, drumEvents: drumEvents, rng: &rng)
+            ? punctuationStabs(frame: frame, structure: structure, crashes: crashes, rng: &rng)
+            : sustainedHalo(frame: frame, structure: structure, crashes: crashes, rng: &rng)
         // The horns answer a harmonic drone whichever rule is running. Without them the drone is
         // the one Soho break with no voice at all — bass and pads hold, drums tick, and the rhythm
         // part and both leads are out — which is why it sounded like base Chill (Zack, 2026-10-11).
@@ -73,7 +74,7 @@ struct ChillSohoTextureGenerator {
             // Never struck on a step the stabs or the halo already sound on: two figures at one
             // instant with different lengths is the staggered chord this track avoids.
             guard !taken.contains(bar * 16) else { continue }
-            guard let c = chord(atBar: bar, in: structure) else { continue }
+            guard let c = structure.chordWindow(atBar: bar) else { continue }
             let pool = notes(c.chordTones, 58, 71)
             guard pool.count >= 2 else { continue }
             // A single hit here, deliberately: the bass is already walking back to the top and the
@@ -82,7 +83,7 @@ struct ChillSohoTextureGenerator {
             // Length drawn once for the whole hit. Drawing it per note gave the two pitches
             // different lengths, which is the staggered chord that reads as mush rather than as
             // one "bap" (Zack, 2026-10-12).
-            let vel = v(60, 12, &rng)
+            let vel = rng.velocity(60, 12)
             let length = 2 + rng.nextInt(upperBound: 3)
             for n in [pool[0], pool[pool.count / 2]] {
                 events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(n), velocity: vel,
@@ -108,7 +109,7 @@ struct ChillSohoTextureGenerator {
                                         taken: Set<Int>, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         func hits(_ bar: Int, _ steps: [Int], _ lo: Int, _ hi: Int, _ vel: UInt8, _ dur: Int) {
-            guard let c = chord(atBar: bar, in: structure) else { return }
+            guard let c = structure.chordWindow(atBar: bar) else { return }
             let pool = notes(c.chordTones, lo, hi)
             guard pool.count >= 2 else { return }
             // Never on a step the stabs or the halo already sound on — two figures at one instant
@@ -130,17 +131,17 @@ struct ChillSohoTextureGenerator {
                 for (i, steps) in figure.enumerated() {
                     let bar = last - (figure.count - 1 - i)
                     guard bar >= section.startBar else { continue }
-                    hits(bar, steps, 58, 71, v(64 + i * 6, 10, &rng), 2)
+                    hits(bar, steps, 58, 71, rng.velocity(64 + i * 6, 10), 2)
                 }
                 continue
             }
             for bar in stride(from: section.startBar, to: section.endBar, by: 2) {
-                hits(bar, [0], 56, 68, v(46, 10, &rng), 4 + rng.nextInt(upperBound: 5))
+                hits(bar, [0], 56, 68, rng.velocity(46, 10), 4 + rng.nextInt(upperBound: 5))
             }
             // The way out: a single short note on beat 4 of the last bar, into the return.
-            if let c = chord(atBar: last, in: structure), let n = notes(c.chordTones, 58, 71).last {
+            if let c = structure.chordWindow(atBar: last), let n = notes(c.chordTones, 58, 71).last {
                 events.append(MIDIEvent(stepIndex: last * 16 + 12, note: UInt8(n),
-                                        velocity: v(60, 10, &rng), durationSteps: 2))
+                                        velocity: rng.velocity(60, 10), durationSteps: 2))
             }
         }
         return events
@@ -155,19 +156,30 @@ struct ChillSohoTextureGenerator {
     /// construction — two independent random streams never have to agree. The plan proposed a
     /// shared `sohoAccentSteps(forBar:)` helper for this; reading the drum track is stricter,
     /// because the two can never drift apart.
-    static func crashBars(_ drumEvents: [MIDIEvent]) -> [Int] {
-        let crash = Int(GMDrum.crash1.rawValue)
-        let bars = drumEvents
-            .filter { Int($0.note) == crash && $0.stepIndex % 16 == 0 && $0.stepIndex > 0 }
-            .map { $0.stepIndex / 16 }
-        return Array(Set(bars)).sorted()
-    }
+    /// Where the kit crashes, read once from the finished drum track.
+    ///
+    /// `steps` is every step carrying a crash — including the Remix Break exit, whose unison
+    /// stabs fall on steps 0 AND 8 of its last bar — and `bars` is the bars whose downbeat
+    /// carries one. Both exclude step 0 of the song.
+    ///
+    /// Built in a single pass and handed to the rules, which previously each re-scanned the
+    /// whole drum track: up to three scans of a median 1,601 drum events per song (2026-10-14).
+    struct CrashPoints {
+        let steps: [Int]
+        let bars:  [Int]
 
-    /// Every step that carries a drum crash — including the Remix Break exit, whose unison stabs
-    /// fall on steps 0 AND 8 of its last bar. Used by Punctuation Stabs so the horns double each hit.
-    static func crashSteps(_ drumEvents: [MIDIEvent]) -> [Int] {
-        let crash = Int(GMDrum.crash1.rawValue)
-        return Array(Set(drumEvents.filter { Int($0.note) == crash && $0.stepIndex > 0 }.map(\.stepIndex))).sorted()
+        init(_ drumEvents: [MIDIEvent]) {
+            let crash = Int(GMDrum.crash1.rawValue)
+            var stepSet = Set<Int>(), barSet = Set<Int>()
+            for e in drumEvents where Int(e.note) == crash && e.stepIndex > 0 {
+                stepSet.insert(e.stepIndex)
+                if e.stepIndex % 16 == 0 { barSet.insert(e.stepIndex / 16) }
+            }
+            // Sorted, so Set iteration order never reaches a musical decision — see the header
+            // of DeterminismTests.
+            steps = stepSet.sorted()
+            bars  = barSet.sorted()
+        }
     }
 
     /// Absolute MIDI notes in [lo, hi] whose pitch class is in `pcs`, in ascending order.
@@ -175,14 +187,6 @@ struct ChillSohoTextureGenerator {
     /// header of DeterminismTests.
     private static func notes(_ pcs: Set<Int>, _ lo: Int, _ hi: Int) -> [Int] {
         (lo...hi).filter { pcs.contains(($0 % 12 + 12) % 12) }
-    }
-
-    private static func chord(atBar bar: Int, in structure: SongStructure) -> ChordWindow? {
-        structure.chordPlan.first { $0.contains(bar: bar) }
-    }
-
-    private static func v(_ lo: Int, _ span: Int, _ rng: inout SeededRNG) -> UInt8 {
-        UInt8(lo + rng.nextInt(upperBound: span))
     }
 
     // MARK: - CHL-TEXT-002 Punctuation Stabs
@@ -199,13 +203,13 @@ struct ChillSohoTextureGenerator {
     /// notes, and when it has more than one they are given their own lengths — short then long,
     /// long then short, or all equal — so the figure has a shape instead of being a single block.
     private static func punctuationStabs(frame: GlobalMusicalFrame, structure: SongStructure,
-                                         drumEvents: [MIDIEvent],
+                                         crashes: CrashPoints,
                                          rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         // Any bar carrying a crash, not only one on the downbeat: a crash on beat 4 draws an
         // accent to step 12, which is exactly where a phrase-end pickup goes, and the two
         // doubled up on the same step.
-        let crashes = Set(crashSteps(drumEvents).map { $0 / 16 }).union(crashBars(drumEvents))
+        let crashBarSet = Set(crashes.steps.map { $0 / 16 }).union(crashes.bars)
         let phrase = 8 + 2 * rng.nextInt(upperBound: 5)          // 8, 10, 12, 14 or 16 bars
 
         /// One horn figure. `weights` picks how many notes are in the chord — the accents want a
@@ -216,7 +220,7 @@ struct ChillSohoTextureGenerator {
         /// (Zack, 2026-10-12). A real section plays figures, so most stabs are now two or three
         /// hits of the same chord with their own rhythm — short-short, short-long, short-short-long.
         func stab(_ bar: Int, step: Int, weights: [Double], vel: UInt8, maxHits: Int, room: Int) {
-            guard let c = chord(atBar: bar, in: structure) else { return }
+            guard let c = structure.chordWindow(atBar: bar) else { return }
             let pool = notes(c.chordTones, 58, 71)
             guard !pool.isEmpty else { return }
             let count = Swift.min(1 + rng.weightedPick(weights), pool.count)
@@ -242,12 +246,12 @@ struct ChillSohoTextureGenerator {
         // A figure has to finish before the next accent in the same bar. The Remix Break's exit
         // crashes on steps 0 AND 8, and a bar can crash on 8 and 12, so a figure left to run the
         // rest of the bar would strike the same instant as the next one with a different length.
-        let accents = crashSteps(drumEvents)
+        let accents = crashes.steps
         for (i, at) in accents.enumerated() where at / 16 < frame.totalBars {
             let nextInBar = i + 1 < accents.count && accents[i + 1] / 16 == at / 16
                 ? accents[i + 1] % 16 : 16
             stab(at / 16, step: at % 16, weights: [0.16, 0.34, 0.50],
-                 vel: v(78, 12, &rng), maxHits: 3, room: nextInBar - at % 16)
+                 vel: rng.velocity(78, 12), maxHits: 3, room: nextInBar - at % 16)
         }
 
         // Pickups are lighter: mostly 1 or 2 notes.
@@ -255,10 +259,10 @@ struct ChillSohoTextureGenerator {
             var bar = section.startBar + phrase - 1
             while bar < section.endBar - 1 {
                 // Leave the section's own last bar to the drum fill and the crash that follows.
-                if !crashes.contains(bar) && !crashes.contains(bar + 1) {
+                if !crashBarSet.contains(bar) && !crashBarSet.contains(bar + 1) {
                     // A pickup sits on beat 4 with only a beat of room, so at most two hits.
                     stab(bar, step: 12, weights: [0.40, 0.45, 0.15],
-                         vel: v(64, 12, &rng), maxHits: 2, room: 4)
+                         vel: rng.velocity(64, 12), maxHits: 2, room: 4)
                 }
                 bar += phrase
             }
@@ -313,9 +317,9 @@ struct ChillSohoTextureGenerator {
     /// Placed where an arrangement would reach for colour: the start of each groove section,
     /// the breakdown, and the returns marked by the drum crashes.
     private static func sustainedHalo(frame: GlobalMusicalFrame, structure: SongStructure,
-                                      drumEvents: [MIDIEvent],
+                                      crashes: CrashPoints,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
-        var candidates = Set<Int>(crashBars(drumEvents))
+        var candidates = Set<Int>(crashes.bars)
         for section in structure.sections {
             switch section.label {
             case .A, .B:
@@ -341,7 +345,7 @@ struct ChillSohoTextureGenerator {
 
         var events: [MIDIEvent] = []
         for bar in chosen {
-            guard let c = chord(atBar: bar, in: structure) else { continue }
+            guard let c = structure.chordWindow(atBar: bar) else { continue }
             // Prefer a colour tone (a scale tension such as the 9th) over a bare chord tone; it
             // is what makes a single held note read as harmony rather than as a stray pitch.
             let colour = notes(c.scaleTensions, 72, 84)
@@ -351,7 +355,7 @@ struct ChillSohoTextureGenerator {
             let note = pool[rng.nextInt(upperBound: pool.count)]
             let dur  = 8 + rng.nextInt(upperBound: 9)            // 8–16 steps
             events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(note),
-                                    velocity: v(50, 14, &rng), durationSteps: dur))
+                                    velocity: rng.velocity(50, 14), durationSteps: dur))
         }
         return events
     }

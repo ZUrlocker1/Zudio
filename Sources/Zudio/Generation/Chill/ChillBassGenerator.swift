@@ -69,12 +69,12 @@ struct ChillBassGenerator {
         let ostinatoPattern: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(variant: false) : nil
         let ostinatoVariant: [(Int, Int)]? = useOstinato ? buildOstinatoPattern(variant: true) : nil
 
+        let scale = scalePitchClasses(frame: frame)   // loop-invariant
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
-            let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord   = structure.chordWindow(atBar: bar)
             let chordRoot = chordRootNote(frame: frame, chord: chord)
-            let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
             switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
@@ -392,12 +392,12 @@ struct ChillBassGenerator {
                                            rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
 
+        let scale = scalePitchClasses(frame: frame)   // loop-invariant
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
-            let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord   = structure.chordWindow(atBar: bar)
             let chordRoot = chordRootNote(frame: frame, chord: chord)
-            let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
             switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
@@ -692,20 +692,19 @@ struct ChillBassGenerator {
                 (exit, ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure,
                                                                   index: i))
             })
-        let scalePCs = Set(scaleNotes(frame: frame, chord: nil))
+        let scalePCs = Set(scalePitchClasses(frame: frame))
         // Scale notes inside clampBass's 40–52 window. 014 and 015 walk this ladder and reflect at
         // the ends; folding by octave would turn a step into a ninth-wide jump.
         let ladder = (40...52).filter { scalePCs.contains($0 % 12) }
 
         var events: [MIDIEvent] = []
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
 
+        let scale = scalePitchClasses(frame: frame)   // loop-invariant
         for bar in 0..<frame.totalBars {
             let section   = structure.section(atBar: bar)
             let label     = section?.label ?? .A
-            let chord     = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord     = structure.chordWindow(atBar: bar)
             let chordRoot = chordRootNote(frame: frame, chord: chord)
-            let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
             switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
@@ -726,7 +725,7 @@ struct ChillBassGenerator {
             if remixEntry.contains(bar) {
                 for step in [8, 12] {
                     events.append(MIDIEvent(stepIndex: base + step, note: UInt8(root),
-                                            velocity: v(86, 8), durationSteps: 2))
+                                            velocity: rng.velocity(86, 8), durationSteps: 2))
                 }
                 continue
             }
@@ -741,14 +740,14 @@ struct ChillBassGenerator {
                 let high = low + 12
                 if bdBar == (section?.lengthBars ?? 12) - 1 {
                     for step in [0, 8] {
-                        events.append(MIDIEvent(stepIndex: base + step, note: UInt8(low), velocity: v(86, 8), durationSteps: 2))
+                        events.append(MIDIEvent(stepIndex: base + step, note: UInt8(low), velocity: rng.velocity(86, 8), durationSteps: 2))
                     }
                     continue
                 }
                 for step in stride(from: 0, to: 16, by: 2) {
                     let note = (step / 2) % 2 == 0 ? low : high
                     events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
-                                            velocity: step % 8 == 0 ? v(80, 8) : v(66, 10),
+                                            velocity: step % 8 == 0 ? rng.velocity(80, 8) : rng.velocity(66, 10),
                                             durationSteps: 1 + rng.nextInt(upperBound: 2)))
                 }
                 continue
@@ -758,7 +757,7 @@ struct ChillBassGenerator {
             // otherwise CHL-BASS-005, a held root every other bar, leaves the space the section is for.
             if label == .bridge && breakdownStyle != .bassOstinato {
                 if (bar - (section?.startBar ?? bar)) % 2 == 0 {
-                    events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: v(70, 10), durationSteps: 8))
+                    events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: rng.velocity(70, 10), durationSteps: 8))
                 }
                 continue
             }
@@ -777,14 +776,14 @@ struct ChillBassGenerator {
                 let figureFrom = (section?.endBar ?? bar + 1) - (leads ? 2 : 1)
                 if bar < figureFrom {
                     events.append(MIDIEvent(stepIndex: base, note: UInt8(root),
-                                            velocity: v(72, 8), durationSteps: 4))
+                                            velocity: rng.velocity(72, 8), durationSteps: 4))
                     if introBar >= 1 {
                         events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),
-                                                velocity: v(64, 8), durationSteps: 4))
+                                                velocity: rng.velocity(64, 8), durationSteps: 4))
                     }
                     if introBar >= 2 {
                         events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(root),
-                                                velocity: v(60, 8), durationSteps: 2))
+                                                velocity: rng.velocity(60, 8), durationSteps: 2))
                     }
                     continue
                 }
@@ -839,7 +838,7 @@ struct ChillBassGenerator {
                 for (step, deg) in active where step / 16 == bar % 4 {
                     let note = snapToScale(chordRoot + deg, scale: scale)
                     events.append(MIDIEvent(stepIndex: base + (step % 16), note: UInt8(clampBass(note)),
-                                            velocity: v(76, 11), durationSteps: 2))
+                                            velocity: rng.velocity(76, 11), durationSteps: 2))
                 }
             case "CHL-BASS-001":
                 events += rootSustainPattern(base: base, chordRoot: chordRoot, scale: scale, rng: &rng)
@@ -859,7 +858,7 @@ struct ChillBassGenerator {
                     let landingBar = isExit ? bar + 1 : bar + 2
                     let landing = clampBass(chordRootNote(
                         frame: frame,
-                        chord: structure.chordPlan.first { $0.contains(bar: landingBar) }))
+                        chord: structure.chordWindow(atBar: landingBar)))
                     events.removeSubrange(mark...)
                     // The figure's pedal roots, in bar order. Style 3 holds one note under all
                     // four pairs, so it passes only the turnaround's first bar's root and does
@@ -868,7 +867,7 @@ struct ChillBassGenerator {
                     let firstBar = isExit ? bar - 1 : bar
                     func rootOf(_ b: Int) -> Int {
                         chordRootNote(frame: frame,
-                                      chord: structure.chordPlan.first { $0.contains(bar: b) })
+                                      chord: structure.chordWindow(atBar: b))
                     }
                     let pedalRoots: [Int]
                     switch turnaroundStyle {
@@ -907,7 +906,6 @@ struct ChillBassGenerator {
         guard !ladder.isEmpty else {
             return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 80, durationSteps: 4)]
         }
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         func note(_ step: Int, _ n: Int, _ vel: UInt8, _ dur: Int) -> MIDIEvent {
             MIDIEvent(stepIndex: base + step, note: UInt8(clampBass(n)), velocity: vel, durationSteps: dur)
         }
@@ -920,11 +918,11 @@ struct ChillBassGenerator {
         switch style {
         case 1:
             // Root and approach.
-            var out = [note(0, root, v(84, 8), 12)]
+            var out = [note(0, root, rng.velocity(84, 8), 12)]
             let approach = isExit ? leadingTone(into: nextRoot)
                                   : ladder[Swift.max(0, Swift.min(ladder.count - 1, index(nextRoot) - 1))]
-            out.append(note(13, root, v(62, 8), 1))
-            out.append(note(14, approach, v(74, 10), 2))
+            out.append(note(13, root, rng.velocity(62, 8), 1))
+            out.append(note(14, approach, rng.velocity(74, 10), 2))
             return out
 
         case 2, 3, 4:
@@ -962,7 +960,7 @@ struct ChillBassGenerator {
             }
             return zip([0, 8], isExit ? [2, 3] : [0, 1]).flatMap { step, k -> [MIDIEvent] in
                 let line = lineAll[k]
-                let vel = v(step == 0 ? 80 : 72, 9)
+                let vel = rng.velocity(step == 0 ? 80 : 72, 9)
                 // The figure sounds pedal, line, pedal, line…, so a pedal equal to the line note
                 // on *either* side of it gives two notes of the same pitch in a row, which reads
                 // as one repeated note rather than as an alternation (Zack, 2026-10-12). That
@@ -999,10 +997,10 @@ struct ChillBassGenerator {
                 mid1 = a + away
                 mid2 = a + 2 * away
             }
-            return [note(0, root, v(84, 8), 3),
-                    note(4, at(mid1), v(72, 9), 3),
-                    note(8, at(mid2), v(76, 9), 3),
-                    note(12, lead, v(78, 9), 3)]
+            return [note(0, root, rng.velocity(84, 8), 3),
+                    note(4, at(mid1), rng.velocity(72, 9), 3),
+                    note(8, at(mid2), rng.velocity(76, 9), 3),
+                    note(12, lead, rng.velocity(78, 9), 3)]
         }
     }
 
@@ -1024,7 +1022,6 @@ struct ChillBassGenerator {
     private static func rootPedalWalkBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
                                          variant: Int, ladder: [Int],
                                          rng: inout SeededRNG) -> [MIDIEvent] {
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         guard !ladder.isEmpty else {
             return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 78, durationSteps: 2)]
         }
@@ -1046,17 +1043,17 @@ struct ChillBassGenerator {
         // takes the bar from eight notes to the measured 5–6.
         for step in (variant == 2 ? [0, 4] : [0, 2, 4, 6]) {
             if step != 0 && rng.nextDouble() < 0.18 { continue }
-            note(step, root, step == 0 ? v(84, 8) : v(70, 10), 2)
+            note(step, root, step == 0 ? rng.velocity(84, 8) : rng.velocity(70, 10), 2)
         }
         // The busier variant doubles the root into sixteenths, where the measurement found them.
         if variant == 1 {
-            note([1, 3, 7][rng.nextInt(upperBound: 3)], root, v(62, 8), 1)
+            note([1, 3, 7][rng.nextInt(upperBound: 3)], root, rng.velocity(62, 8), 1)
         }
 
         // Second half: away from the root, then back toward the fifth.
-        if rng.nextDouble() < 0.80 { note(8,  degree(10), v(72, 10), 2) }
-        if rng.nextDouble() < 0.75 { note(10, degree(5),  v(68, 10), 2) }
-        if rng.nextDouble() < 0.70 { note(12, degree(7),  v(70, 10), 2) }
+        if rng.nextDouble() < 0.80 { note(8,  degree(10), rng.velocity(72, 10), 2) }
+        if rng.nextDouble() < 0.75 { note(10, degree(5),  rng.velocity(68, 10), 2) }
+        if rng.nextDouble() < 0.70 { note(12, degree(7),  rng.velocity(70, 10), 2) }
 
         // The last eighth lands on the fifth or the flat seventh — or, where the chord is about
         // to change, a scale step short of the next root.
@@ -1064,7 +1061,7 @@ struct ChillBassGenerator {
         if changesNext, rng.nextDouble() < 0.30, let i = ladder.firstIndex(where: { $0 >= nextRoot }) {
             landing = ladder[i > 0 ? i - 1 : Swift.min(i + 1, ladder.count - 1)]
         }
-        note(14, landing, v(74, 10), 2)
+        note(14, landing, rng.velocity(74, 10), 2)
         return out
     }
 
@@ -1082,7 +1079,6 @@ struct ChillBassGenerator {
     private static func sambaPickupBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
                                        variant: Int, ladder: [Int],
                                        rng: inout SeededRNG) -> [MIDIEvent] {
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         func note(_ step: Int, _ n: Int, _ vel: UInt8, _ dur: Int) -> MIDIEvent {
             MIDIEvent(stepIndex: base + step, note: UInt8(n), velocity: vel, durationSteps: dur)
         }
@@ -1092,22 +1088,22 @@ struct ChillBassGenerator {
         let lowRoot = root - 12 >= 28 ? root - 12 : root
 
         var out: [MIDIEvent] = []
-        out.append(note(0, root, v(84, 10), 2))
-        out.append(note(3, root, v(70, 10), 1))
-        out.append(note(4, fifth, v(80, 10), 3))
+        out.append(note(0, root, rng.velocity(84, 10), 2))
+        out.append(note(3, root, rng.velocity(70, 10), 1))
+        out.append(note(4, fifth, rng.velocity(80, 10), 3))
         if variant != 2 {
-            out.append(note(7, rng.nextDouble() < 0.45 ? lowRoot : root, v(68, 10), 1))
+            out.append(note(7, rng.nextDouble() < 0.45 ? lowRoot : root, rng.velocity(68, 10), 1))
         }
         if variant == 1 {
             // A step above or below the root, as the measured step-9 notes are.
             let i = ladder.firstIndex(of: root) ?? ladder.firstIndex(where: { $0 >= root }) ?? 0
             let j = rng.nextDouble() < 0.5 ? Swift.min(ladder.count - 1, i + 1) : Swift.max(0, i - 1)
-            out.append(note(9, ladder.isEmpty ? root : ladder[j], v(66, 10), 2))
+            out.append(note(9, ladder.isEmpty ? root : ladder[j], rng.velocity(66, 10), 2))
         }
         if variant != 2 {
-            out.append(note(11, root, v(70, 10), 1))
+            out.append(note(11, root, rng.velocity(70, 10), 1))
         }
-        out.append(note(12, fifth, v(78, 10), 2))
+        out.append(note(12, fifth, rng.velocity(78, 10), 2))
 
         // Step 14 leads somewhere: into the next chord's root by a scale step when it changes,
         // otherwise the second above the root or the octave below.
@@ -1120,7 +1116,7 @@ struct ChillBassGenerator {
             passing = lowRoot
         }
         if passing == root { passing = lowRoot }
-        out.append(note(14, passing, v(72, 10), 2))
+        out.append(note(14, passing, rng.velocity(72, 10), 2))
         return out
     }
 
@@ -1132,7 +1128,6 @@ struct ChillBassGenerator {
     private static func syncopatedPocketBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
                                             variant: Int, ladder: [Int],
                                             rng: inout SeededRNG) -> [MIDIEvent] {
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         let fifth = clampBass(root + 7)
         let sixth = clampBass(root + 9)
         // The approach into the next chord: the scale step just below its root.
@@ -1150,7 +1145,7 @@ struct ChillBassGenerator {
         for (i, (step, note)) in figure.enumerated() {
             let next = i + 1 < figure.count ? figure[i + 1].0 : 16
             out.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
-                                 velocity: step == 0 ? v(80, 10) : v(66, 12),
+                                 velocity: step == 0 ? rng.velocity(80, 10) : rng.velocity(66, 12),
                                  durationSteps: Swift.max(1, Swift.min(2, next - step))))
         }
         return out
@@ -1166,24 +1161,23 @@ struct ChillBassGenerator {
     private static func bossaRootFifthBar(base: Int, root: Int, nextRoot: Int, changesNext: Bool,
                                           startsChord: Bool, variant: Int, sparse: Bool,
                                           ladder: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         // clampBass may fold the fifth below the root — the low fifth is idiomatic bossa.
         let fifth = clampBass(root + 7)
         var out: [MIDIEvent] = []
 
         // Octave drop on a chord-change downbeat, 30% (plan). Only where it stays playable.
         let downbeat = (startsChord && root - 12 >= 33 && rng.nextDouble() < 0.30) ? root - 12 : root
-        out.append(MIDIEvent(stepIndex: base, note: UInt8(downbeat), velocity: v(82, 10), durationSteps: 3))
+        out.append(MIDIEvent(stepIndex: base, note: UInt8(downbeat), velocity: rng.velocity(82, 10), durationSteps: 3))
         if sparse { return out }   // intro: downbeat only
 
-        out.append(MIDIEvent(stepIndex: base + 6, note: UInt8(fifth), velocity: v(70, 10), durationSteps: 2))
+        out.append(MIDIEvent(stepIndex: base + 6, note: UInt8(fifth), velocity: rng.velocity(70, 10), durationSteps: 2))
         let thirdStep = variant == 1 ? 10 : 8
         let thirdNote = (variant == 2 && root + 12 <= 52) ? root + 12 : root
-        out.append(MIDIEvent(stepIndex: base + thirdStep, note: UInt8(thirdNote), velocity: v(74, 10), durationSteps: 2))
+        out.append(MIDIEvent(stepIndex: base + thirdStep, note: UInt8(thirdNote), velocity: rng.velocity(74, 10), durationSteps: 2))
 
         // Secondary placement reaches the measured 4–6 notes a bar.
         if variant != 1 && rng.nextDouble() < 0.30 {
-            out.append(MIDIEvent(stepIndex: base + 12, note: UInt8(root), velocity: v(62, 8), durationSteps: 2))
+            out.append(MIDIEvent(stepIndex: base + 12, note: UInt8(root), velocity: rng.velocity(62, 8), durationSteps: 2))
         }
 
         // Pickup: approach the next chord's root by a scale step when the chord changes —
@@ -1193,7 +1187,7 @@ struct ChillBassGenerator {
         if changesNext, let i = ladder.firstIndex(where: { $0 >= nextRoot }) {
             pickup = ladder[i > 0 ? i - 1 : Swift.min(i + 1, ladder.count - 1)]
         }
-        out.append(MIDIEvent(stepIndex: base + pickupStep, note: UInt8(pickup), velocity: v(66, 10), durationSteps: 2))
+        out.append(MIDIEvent(stepIndex: base + pickupStep, note: UInt8(pickup), velocity: rng.velocity(66, 10), durationSteps: 2))
         return out
     }
 
@@ -1206,7 +1200,6 @@ struct ChillBassGenerator {
     /// contour — rising, falling, or turning about the root — and rotates every 12–18 bars.
     private static func melodicBassBar(base: Int, root: Int, variant: Int, sparse: Bool,
                                        ladder: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
-        func v(_ lo: Int, _ span: Int) -> UInt8 { UInt8(lo + rng.nextInt(upperBound: span)) }
         guard !ladder.isEmpty else {
             return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 74, durationSteps: 4)]
         }
@@ -1243,7 +1236,7 @@ struct ChillBassGenerator {
             let nextOnset = n + 1 < steps.count ? steps[n + 1] : 16
             let dur = Swift.max(1, Swift.min(4, nextOnset - st))
             out.append(MIDIEvent(stepIndex: base + st, note: UInt8(notes[n]),
-                                 velocity: st == 0 ? v(74, 8) : v(64, 10), durationSteps: dur))
+                                 velocity: st == 0 ? rng.velocity(74, 8) : rng.velocity(64, 10), durationSteps: dur))
         }
         return out
     }
@@ -1256,13 +1249,16 @@ struct ChillBassGenerator {
     }
 
     private static func nextChordRootNote(bar: Int, frame: GlobalMusicalFrame, structure: SongStructure) -> Int {
-        let nextChord = structure.chordPlan.first { $0.contains(bar: bar + 1) }
-            ?? structure.chordPlan.first { $0.contains(bar: bar) }
+        let nextChord = structure.chordWindow(atBar: bar + 1)
+            ?? structure.chordWindow(atBar: bar)
         return chordRootNote(frame: frame, chord: nextChord)
     }
 
-    private static func scaleNotes(frame: GlobalMusicalFrame, chord: ChordWindow?) -> [Int] {
-        // CHL-SYNC-001: scale pool anchors to frame.key + frame.mode (never chord root)
+    /// The key's seven pitch classes. Depends on the frame alone — the chord does NOT
+    /// narrow it (CHL-SYNC-001: the scale pool anchors to frame.key + frame.mode, never the
+    /// chord root). It used to take a `chord` argument it never read, which made it look
+    /// bar-dependent, so five rules called it once per bar for an identical answer.
+    private static func scalePitchClasses(frame: GlobalMusicalFrame) -> [Int] {
         let root = 60 + frame.keySemitoneValue
         return frame.mode.intervals.map { (root + $0) % 12 }
     }
@@ -1298,12 +1294,12 @@ struct ChillBassGenerator {
         // Fill interval: one walking-fill bar every fillInterval bars, then back to arpeggio
         let fillInterval = 8 + rng.nextInt(upperBound: 5)  // 8–12 bars between fill bars
 
+        let scale = scalePitchClasses(frame: frame)   // loop-invariant
         for bar in 0..<frame.totalBars {
             let section   = structure.section(atBar: bar)
             let label     = section?.label ?? .A
-            let chord     = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord     = structure.chordWindow(atBar: bar)
             let chordRoot = chordRootNote(frame: frame, chord: chord)
-            let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
             switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
@@ -1530,12 +1526,12 @@ struct ChillBassGenerator {
         let bSectionStart = structure.sections.first { $0.label == .B }?.startBar ?? -1
         let aSectionStart = structure.sections.first { $0.label == .A }?.startBar ?? bSectionStart
 
+        let scale = scalePitchClasses(frame: frame)   // loop-invariant
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
-            let chord   = structure.chordPlan.first { $0.contains(bar: bar) }
+            let chord   = structure.chordWindow(atBar: bar)
             let chordRoot = chordRootNote(frame: frame, chord: chord)
-            let scale     = scaleNotes(frame: frame, chord: chord)
             let base      = bar * 16
 
             switch coldEdgeAction(bar: bar, base: base, chordRoot: chordRoot, structure: structure) {
@@ -2013,8 +2009,8 @@ struct ChillBassGenerator {
     }
 
     private static func isBeforeChordChange(bar: Int, structure: SongStructure) -> Bool {
-        let current = structure.chordPlan.first { $0.contains(bar: bar) }
-        let next    = structure.chordPlan.first { $0.contains(bar: bar + 1) }
+        let current = structure.chordWindow(atBar: bar)
+        let next    = structure.chordWindow(atBar: bar + 1)
         return current?.chordRoot != next?.chordRoot
     }
 }

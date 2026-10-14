@@ -425,15 +425,32 @@ struct ContentView: View {
             // so the window may launch smaller than the default. Delay lets it settle first.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { appState.syncCompactStateFromWindow() }
 
+            // onAppear can fire more than once for the same view. Installing a second monitor
+            // leaks the first — which keeps firing — so every key is handled twice. For a toggle
+            // that means apply-then-undo and nothing visibly happening.
+            guard fontSizeMonitor == nil else { return }
             fontSizeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak appState] event in
                 guard let appState else { return event }
                 // A modal window (NSSavePanel, NSOpenPanel) is running — give it full keyboard control.
                 guard NSApp.modalWindow == nil else { return event }
+                let key  = event.charactersIgnoringModifiers ?? ""
+                let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+                // GROOVE FIXUP TEST MODE — temporary; delete this block and
+                // Sources/Zudio/GrooveFixupTestMode.swift together. ⌃G toggles the fixup on
+                // Lead 1 and Lead 2 so the moved notes can be compared in the MIDI lanes.
+                //
+                // Deliberately handled BEFORE the text-field guard below: ⌃G is not a text
+                // editing key, so trapping it with the BPM field focused costs nothing and
+                // the toggle works wherever focus happens to be. keyCode 5 is ANSI G —
+                // Control folds the character to a control code on some layouts, so the key
+                // code is the reliable test.
+                if mods == [.control], key.lowercased() == "g" || event.keyCode == 5 {
+                    appState.toggleGrooveFixupTestMode()
+                    return nil   // consume
+                }
                 // Don't steal keys from focused text fields (e.g. BPM input)
                 if let fr = NSApp.keyWindow?.firstResponder,
                    (fr is NSTextField || fr is NSTextView) { return event }
-                let key  = event.charactersIgnoringModifiers ?? ""
-                let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
                 // = key covers =, +, Cmd-=, Cmd-+ (shift changes = to + but same physical key)
                 if key == "=" && !mods.contains(.option) && !mods.contains(.control) {
                     appState.statusLogFontOffset = min(8, appState.statusLogFontOffset + 1)

@@ -54,3 +54,17 @@ extension SeededRNG {
         return trackSeed(globalSeed: songState.globalSeed, trackIndex: trackIndex)
     }
 }
+
+// MARK: - Velocity
+
+extension SeededRNG {
+    /// A MIDI velocity in `lo ..< lo + span`.
+    ///
+    /// This existed as an identical five-word local `func v(_:_:)` in nine places across the
+    /// Chill bass and drum generators, plus a tenth variant in the Soho texture generator that
+    /// took the RNG explicitly (2026-10-14). The body is unchanged, so the numbers a given seed
+    /// produces are unchanged.
+    mutating func velocity(_ lo: Int, _ span: Int) -> UInt8 {
+        UInt8(lo + nextInt(upperBound: span))
+    }
+}
