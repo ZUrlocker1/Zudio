@@ -1282,7 +1282,7 @@ import Foundation
         #expect(checked > 0)
     }
 
-    // MARK: - CHL-BASS-017 Root Pedal Walk
+    // MARK: - CHL-BASS-017 Stylish Root Pedal Walk
 
     /// The bar is in two halves: the root pedalled in eighths, then a walk away from it landing
     /// on the fifth or the flat seventh. Measured 5.8 notes a bar with 36% repeated pitches —

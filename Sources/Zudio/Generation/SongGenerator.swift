@@ -1850,11 +1850,41 @@ struct SongGenerator {
             return songState
         }
 
+        // A regenerated Latin Soho lead gets the same groove passes the full generator applies.
+        // Without this it reverts to raw generator output — strays back on the weak sixteenths,
+        // clipped joins back in — and the song audibly changes feel mid-way. That matters most in
+        // evolve mode, whose first pass regenerates exactly Lead 1 and Lead 2, but it reaches the
+        // ⚡ REGEN button and the instrument-override rebuilds by the same route.
+        //
+        // The rhythm section is read from `songState`: the groove already playing, which is what
+        // the lead has to sit against. If bass or drums are regenerated in the same batch the
+        // lead is aligned to the outgoing groove, not the incoming one — today that only arises
+        // when an absent bass or drum track is added to an evolve pass.
+        var grooveMagnetRegen: String? = nil
+        if isChill, songState.chillBeatStyle == .sohoLatin,
+           trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
+            let grooveBars = Set(songState.structure.sections
+                .filter { $0.label == .A || $0.label == .B }
+                .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+            let pulse = grooveStepSupport(drums: songState.trackEvents[kTrackDrums],
+                                          bass: songState.trackEvents[kTrackBass], bars: grooveBars)
+            let before = events
+            events = magnetiseLeadsToGroove(events, support: pulse, bars: grooveBars)
+            events = smoothLeadArticulation(events)
+            if !before.isEmpty {
+                grooveMagnetRegen = "\(adjustedNoteCount(before: before, after: events)) of "
+                                  + "\(before.count) notes adjusted"
+            }
+        }
+
         // Build regen log entries for the status box
         let trackName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
         var regenLog: [GenerationLogEntry] = [
             GenerationLogEntry(tag: "⚡ REGEN", description: trackName, isTitle: true)
         ]
+        if let g = grooveMagnetRegen {
+            regenLog.append(GenerationLogEntry(tag: "Groove magnet", description: g))
+        }
         if usedRules.isEmpty {
             regenLog.append(GenerationLogEntry(tag: "—", description: "no rules captured"))
         } else {
@@ -3922,6 +3952,33 @@ struct SongGenerator {
             }
         }
 
+        // Pull the leads onto the groove. See magnetiseLeadsToGroove.
+        var grooveMagnetSummary: String? = nil
+        if chillBeatStyle == .sohoLatin {
+            let grooveBars = Set(structure.sections.filter { $0.label == .A || $0.label == .B }
+                                  .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
+            let pulse = grooveStepSupport(drums: trackEvents[kTrackDrums],
+                                          bass: trackEvents[kTrackBass], bars: grooveBars)
+            var adjusted: [Int: (changed: Int, total: Int)] = [:]
+            for lead in [kTrackLead1, kTrackLead2] {
+                let before = trackEvents[lead]
+                trackEvents[lead] = magnetiseLeadsToGroove(trackEvents[lead],
+                                                           support: pulse, bars: grooveBars)
+                trackEvents[lead] = smoothLeadArticulation(trackEvents[lead])
+                adjusted[lead] = (adjustedNoteCount(before: before, after: trackEvents[lead]),
+                                  before.count)
+            }
+            // Recorded here and logged after buildChillLog, which runs later. The row is only
+            // emitted when the pass actually runs, so its presence confirms the Latin gate
+            // fired and its absence is not ambiguous.
+            func magnetShare(_ label: String, _ track: Int) -> String {
+                guard let a = adjusted[track], a.total > 0 else { return "\(label) —" }
+                return "\(label) \(a.changed) of \(a.total)"
+            }
+            grooveMagnetSummary = magnetShare("L1", kTrackLead1) + " · "
+                                + magnetShare("L2", kTrackLead2) + " notes adjusted" 
+        }
+
         // Step 7 — Rhythm (Rhodes active comping)
         var rhythmRules: Set<String> = []
         var chillRhythmSwitchAnnotation: (bar: Int, ruleID: String)? = nil
@@ -4065,7 +4122,7 @@ struct SongGenerator {
                   : baseTitle
 
         // Log
-        let log = buildChillLog(
+        var log = buildChillLog(
             title: title, frame: frame, structure: structure,
             chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
             chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle,
@@ -4078,6 +4135,9 @@ struct SongGenerator {
             lead1Rules: lead1Rules, lead2Rules: lead2Rules, rhythmRules: rhythmRules,
             drumFillBars: drumFillBars
         )
+        if let summary = grooveMagnetSummary {
+            log.append(GenerationLogEntry(tag: "Groove magnet", description: summary))
+        }
 
         let bluesIVVDesc: String = {
             if bassRules.contains("CHL-BLUES-IVV-HOLD")     { return "root hold" }
@@ -4210,6 +4270,141 @@ struct SongGenerator {
     /// Your Love Is King measured as "Vmaj9 | Imaj9", but the analyser takes the tonic to be
     /// the most frequent bass root, which in a two-chord vamp can be the wrong chord. A maj7 on
     /// V is not diatonic in a major key; read in its true key it is Imaj9 | IVmaj9.
+    /// How often the band's structural pulse sounds at each step-position 0..15, as a fraction of
+    /// the groove bars.
+    ///
+    /// Only the kick, snare and rim count, plus the bass. Hats and hand percussion are excluded
+    /// deliberately: the Latin grooves run shakers and congas in near-continuous sixteenths, so
+    /// counting them makes every position look occupied and hides the shape entirely.
+    private static func grooveStepSupport(drums: [MIDIEvent], bass: [MIDIEvent],
+                                          bars: Set<Int>) -> [Double] {
+        let pulseVoices: Set<UInt8> = [GMDrum.kick.rawValue, GMDrum.snare.rawValue,
+                                       GMDrum.sidestick.rawValue]
+        var seen = [Set<Int>](repeating: [], count: 16)
+        for e in drums where pulseVoices.contains(e.note) && bars.contains(e.stepIndex / 16) {
+            seen[e.stepIndex % 16].insert(e.stepIndex / 16)
+        }
+        for e in bass where bars.contains(e.stepIndex / 16) {
+            seen[e.stepIndex % 16].insert(e.stepIndex / 16)
+        }
+        return (0..<16).map { Double(seen[$0].count) / Double(Swift.max(1, bars.count)) }
+    }
+
+    /// Metric strength of each sixteenth of a 4/4 bar, independent of what the band happens to
+    /// play. Beat 1 is strongest, beat 3 next, beats 2 and 4 after that, then the off-eighths,
+    /// then the sixteenth *before* a beat — an anticipation, which is idiomatic in samba — and
+    /// last the sixteenth *after* a beat, the one that reads as dragging.
+    ///
+    /// This exists because attack density is not metric strength. A samba bass anticipates beat 3
+    /// and ties over it, so beat 3 can carry almost no attacks while remaining the second
+    /// strongest position in the bar; an earlier version of the magnet read that as a hole and
+    /// dragged lead notes off beat 3 onto the anticipation (Zack, 2026-10-13).
+    nonisolated static let sixteenthMetricWeight: [Double] = [
+        1.00, 0.05, 0.40, 0.25,   // beat 1 · its sixteenth · the "and" · anticipation of beat 2
+        0.60, 0.05, 0.40, 0.25,   // beat 2 · …
+        0.80, 0.05, 0.40, 0.25,   // beat 3 · …
+        0.60, 0.05, 0.40, 0.25,   // beat 4 · …
+    ]
+
+    /// Pull lead notes off weak sixteenths the band leaves empty, onto the eighth-note grid.
+    ///
+    /// The lead generators place notes without consulting the rhythm section, so a line can land
+    /// on a sixteenth that is both metrically weak and unplayed — the note then reads as being in
+    /// a different time from the band.
+    ///
+    /// A note moves only when BOTH tests agree it is stranded: its position is metrically weak
+    /// (`weakStep` — the odd sixteenths, never a beat and never an off-eighth) AND the band
+    /// almost never plays there (`holeThreshold`). The second test is what protects idiomatic
+    /// anticipation: when the groove itself anticipates a beat, a lead note on that same
+    /// sixteenth is in step with the band and is left where it is.
+    ///
+    /// The target is the neighbouring eighth-note-grid position with the greater metric weight,
+    /// so a late sixteenth falls back onto its beat and a lone anticipation resolves forward onto
+    /// the beat it was reaching for.
+    ///
+    /// Only the onset moves. Pitch, note count and phrase shape are untouched, and the duration
+    /// is adjusted so the note still ends where it did. Moves stay inside the bar, because
+    /// crossing a barline would put the note over a different chord, and notes held a bar or
+    /// longer are left where they are — nudging them by a sixteenth buys no alignment and the
+    /// fixed end point would eat the tail.
+    private static func magnetiseLeadsToGroove(_ events: [MIDIEvent], support: [Double],
+                                               bars: Set<Int>,
+                                               holeThreshold: Double = 0.15,
+                                               weakStep: Double = 0.25,
+                                               eighthGrid: Double = 0.40) -> [MIDIEvent] {
+        var taken = Set(events.map(\.stepIndex))
+        var out: [MIDIEvent] = []
+        out.reserveCapacity(events.count)
+        let weight = sixteenthMetricWeight
+        for e in events {
+            let bar = e.stepIndex / 16, step = e.stepIndex % 16
+            guard e.durationSteps < 16, bars.contains(bar),
+                  weight[step] <= weakStep, support[step] < holeThreshold
+            else { out.append(e); continue }
+            // Strongest neighbour wins; on a tie the earlier one, because arriving ahead of the
+            // beat is the idiom here and dragging onto it from behind is not.
+            let candidates = [step - 1, step + 1]
+                .filter { $0 >= 0 && $0 < 16 && weight[$0] >= eighthGrid }
+                .sorted {
+                    weight[$0] != weight[$1] ? weight[$0] > weight[$1]
+                        : (support[$0] != support[$1] ? support[$0] > support[$1] : $0 < $1)
+                }
+            guard let target = candidates.first else { out.append(e); continue }
+            let moved = bar * 16 + target
+            guard !taken.contains(moved) else { out.append(e); continue }
+            taken.remove(e.stepIndex)
+            taken.insert(moved)
+            let newDur = Swift.max(1, e.durationSteps - (target - step))
+            out.append(MIDIEvent(stepIndex: moved, note: e.note,
+                                 velocity: e.velocity, durationSteps: newDur))
+        }
+        return out.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    /// How many of a track's notes the two groove passes actually changed — an onset moved, a
+    /// duration lengthened, or both. Counted by comparing the finished events against the
+    /// originals rather than by tallying inside each pass, so a note that was both moved and
+    /// joined counts once and the number means "notes that came out different".
+    private static func adjustedNoteCount(before: [MIDIEvent], after: [MIDIEvent]) -> Int {
+        var remaining: [[Int]: Int] = [:]
+        for e in before { remaining[[e.stepIndex, Int(e.note), e.durationSteps], default: 0] += 1 }
+        var changed = 0
+        for e in after {
+            let key = [e.stepIndex, Int(e.note), e.durationSteps]
+            if let n = remaining[key], n > 0 { remaining[key] = n - 1 } else { changed += 1 }
+        }
+        return changed
+    }
+
+    /// Close the single-sixteenth holes inside a phrase, so the line is played rather than tapped.
+    ///
+    /// Measured on the Latin corpus — Smooth Operator's alto sax, Do It Again's organ and jazz
+    /// guitar, Half a Minute's flute and bari sax — a note inside a phrase ends exactly where the
+    /// next one begins 51–92% of the time, and for the horns and the organ 79–92%. Zudio's Latin
+    /// leads managed 60%; almost all of the remainder were holes of one sixteenth, long enough to
+    /// clip the note and too short to hear as a rest. That is what made the solos choppy
+    /// (Zack, 2026-10-13).
+    ///
+    /// Only a one-step hole is closed, and only between notes less than an eighth-note-and-a-half
+    /// apart. A gap of two sixteenths or more is a rest the generator meant, and a wider spacing
+    /// is a phrase boundary; both are left alone. Nothing moves and nothing is added — a note
+    /// only grows to meet the attack that follows it, so it can never sound over a new chord.
+    private static func smoothLeadArticulation(_ events: [MIDIEvent],
+                                               maxSpacing: Int = 8) -> [MIDIEvent] {
+        let sorted = events.sorted { $0.stepIndex < $1.stepIndex }
+        let onsets = Array(Set(sorted.map(\.stepIndex))).sorted()
+        var nextOnset: [Int: Int] = [:]
+        for (a, b) in zip(onsets, onsets.dropFirst()) { nextOnset[a] = b }
+        return sorted.map { e in
+            guard let next = nextOnset[e.stepIndex],
+                  next - e.stepIndex <= maxSpacing,
+                  next - (e.stepIndex + e.durationSteps) == 1
+            else { return e }
+            return MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity,
+                             durationSteps: e.durationSteps + 1)
+        }
+    }
+
     private static func buildSohoChordPlan(frame: GlobalMusicalFrame, structure: SongStructure,
                                            remix: Bool = false, drone: Bool = false,
                                            rng: inout SeededRNG)
@@ -4608,10 +4803,10 @@ struct SongGenerator {
         case "CHL-DRUM-013": return "Ballad half-time"
         case "CHL-DRUM-014": return "Latin percussion"
         case "CHL-BASS-013": return "Bossa root-fifth"
-        case "CHL-BASS-014": return "Melodic bass"
+        case "CHL-BASS-014": return "Best melodic bass"
         case "CHL-BASS-015": return "Syncopated pocket"
         case "CHL-BASS-016": return "Samba pickup"
-        case "CHL-BASS-017": return "Root pedal walk"
+        case "CHL-BASS-017": return "Stylish root pedal walk"
         case "CHL-RHY-007":  return "Chordal comp"
         case "CHL-RHY-008":  return "Single-note line"
         case "CHL-RHY-009":  return "Root-and-chord eighths"

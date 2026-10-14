@@ -618,9 +618,9 @@ struct ChillBassGenerator {
         return .proceed
     }
 
-    // MARK: - Chill Soho (CHL-BASS-013 Bossa Root-Fifth, CHL-BASS-014 Melodic Bass,
+    // MARK: - Chill Soho (CHL-BASS-013 Bossa Root-Fifth, CHL-BASS-014 Best Melodic Bass,
     //         CHL-BASS-015 Syncopated Pocket, CHL-BASS-016 Samba Pickup,
-    //         CHL-BASS-017 Root Pedal Walk)
+    //         CHL-BASS-017 Stylish Root Pedal Walk)
 
     /// Chill Soho bass. See docs/chill-soho-plan.md, "Bass" and "Variation and space".
     ///
@@ -1006,7 +1006,7 @@ struct ChillBassGenerator {
         }
     }
 
-    /// CHL-BASS-017 Root Pedal Walk — My Ever Changing Moods, the one Style Council bass not
+    /// CHL-BASS-017 Stylish Root Pedal Walk — My Ever Changing Moods, the one Style Council bass not
     /// already in the pool. The bar is in two halves: the first pedals the root in eighths, the
     /// second walks away from it.
     ///
@@ -1197,7 +1197,7 @@ struct ChillBassGenerator {
         return out
     }
 
-    /// CHL-BASS-014 Melodic Bass — measured from the Fretless Bass track of You're the Best
+    /// CHL-BASS-014 Best Melodic Bass — measured from the Fretless Bass track of You're the Best
     /// Thing: ~2.8 notes a bar, SUSTAINED 4-step notes, step 0 dominant then a cluster at 12, 14
     /// and 15 with light weight on 4 and 8. Space and sustain, the opposite of 013.
     ///

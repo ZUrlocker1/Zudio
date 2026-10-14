@@ -164,7 +164,7 @@ new has to be plumbed — each generator picks its pool from it:
 - **`.sohoLatin`** — drums from Bossa Clave / Soft Samba / Latin Sway; bass from Bossa
   Root-Fifth / Syncopated Pocket / Rumba; rhythm from `CHL-RHY-007` / `008`
 - **`.sohoSoul`** — drums from Soft Soul Backbeat / Ballad Half-Time / Brush Kit; bass from
-  Melodic Bass / Syncopated Pocket / Syncopated Groove / Air Ostinato; rhythm from `CHL-RHY-007` / `008` /
+  Best Melodic Bass / Syncopated Pocket / Syncopated Groove / Air Ostinato; rhythm from `CHL-RHY-007` / `008` /
   `005` / `006`
 
 Within a pool the rule is an ordinary weighted draw, as everywhere else in Chill. The three
@@ -202,11 +202,57 @@ substyle wants. The two-case groove above is the same idea at a fraction of the 
 
 ---
 
+## Groove magnet — aligning the leads to the rhythm section
+
+The lead generators place notes on their own grid and never read the rhythm section, so a line
+could land where the band is silent and read as being in a different time from it. Two passes run
+over Lead 1 and Lead 2 once every track is final, on **Latin grooves only**.
+
+**Placement.** A note moves one sixteenth onto the eighth-note grid only when two tests agree it
+is stranded: its position is metrically weak, *and* the band almost never plays there. Metric
+strength is a fixed property of 4/4 — beat 1 strongest, then beat 3, then beats 2 and 4, then the
+off-eighths, then the sixteenth before a beat, and last the sixteenth after one.
+
+Both tests are needed, because **attack density is not metric strength**. A samba bass anticipates
+beat 3 and ties over it, so beat 3 can carry almost no attacks while remaining the second
+strongest position in the bar; judged on attacks alone it looks like a hole, and filling it drags
+the solo off the strong beats — exactly backwards. The measured half does the complementary job:
+where the groove itself anticipates a beat, a lead note on that same sixteenth is in step with the
+band and stays put.
+
+Only the onset moves. Pitch, note count and phrase shape are untouched, the duration is adjusted
+so the note still ends where it did, a move never crosses a barline onto a new chord, and a note
+held a bar or longer is left alone.
+
+**Articulation.** A hole of exactly one sixteenth between two notes inside a phrase is closed —
+the first note grows to meet the second. Measured across the corpus leads (Smooth Operator's alto
+sax, Do It Again's organ and jazz guitar, Half a Minute's flute and bari sax), a note inside a
+phrase ends exactly where the next begins 51–92% of the time, and 79–92% for the horns and organ.
+Soho's leads managed 60%, and almost all the remainder were single-sixteenth holes: long enough to
+clip the note, too short to hear as a rest. That is what made the solos choppy. A gap of two
+sixteenths or more is a rest the generator meant, and is left alone.
+
+**Where it runs.** In the generator for a new song, and in `regenerateTrack` for a regenerated
+lead — the ⚡ REGEN button, an instrument override, and evolve mode, whose first pass regenerates
+exactly Lead 1 and Lead 2. Without the second the song would audibly change feel mid-way. Evolve's
+second pass regenerates Pads and Rhythm and restores the anchor's leads, which are already
+aligned.
+
+A one-line summary goes in the generation log whenever the pass runs, so an absent row means the
+Latin gate did not fire rather than that the pass found nothing:
+
+    Groove magnet    L1 80 of 128 · L2 1 of 25 notes adjusted
+
+This, and the Texture track reading the finished drums for its stabs, are the only places one Soho
+track reads another's output. Everything else coordinates through `ChillBeatStyle` alone.
+
+---
+
 ## Rule naming
 
 **Rule names describe the figure, never the instrument that plays it.** A rule is a pattern of
 steps, durations and intervals; which patch it lands on is decided by the instrument pool and
-can change without the rule changing. "Melodic Bass" rather than "Fretless Counter-Line",
+can change without the rule changing. "Best Melodic Bass" rather than "Fretless Counter-Line",
 "Single-Note Line" rather than "Chorused Guitar Figure".
 
 Instrument preferences still belong in a rule's body — `CHL-BASS-013` noting that fretless
@@ -346,7 +392,7 @@ long ringing ones this bass is usually described as.
 - Octave drop on chord-change bars, 30% of the time
 - Fretless Bass for preference
 
-### CHL-BASS-014 — Melodic Bass
+### CHL-BASS-014 — Best Melodic Bass
 
 Bass as melodic voice rather than anchor. The Sade model.
 
@@ -385,7 +431,7 @@ extreme at **51% leaps of a fourth or more** (5th x154, octave x40); *Smooth Ope
 *Do It Again* sit at 23%. Steps **0, 6, 8, 14** with 10 and 12 secondary. 4–6 notes/bar,
 2–3 step durations, compass 17–24 semitones.
 
-**`CHL-BASS-014` Melodic Bass** — the melodic, sparse, **sustained** model, and the one rule
+**`CHL-BASS-014` Best Melodic Bass** — the melodic, sparse, **sustained** model, and the one rule
 that breaks the short-duration pattern.
 
 Measured directly from the **Fretless Bass track** of *You're the Best Thing*, recovered once

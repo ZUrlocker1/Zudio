@@ -1537,8 +1537,13 @@ final class PlaybackEngine: ObservableObject {
         // All active tracks on the small bus (.mediumHall).
         // Texture sampler is unused in Chill (AudioTexturePlayer handles it) — zero send.
         setBusPresets(small: .mediumHall)
-        connectSend(kTrackLead1,     to: .small, wetDryMix: 45)
-        connectSend(kTrackLead2,     to: .small, wetDryMix: 40)
+        // Leads and drums all cut to 22 on 2026-10-13 (Zack), from 45 / 40 / 40. The leads sat
+        // too wet for a sustained sax or flute, and the drums were washing out: Chill Soho's
+        // Latin grooves run ~25 drum hits a bar against a ~1.9 s hall tail, so roughly twenty
+        // tails overlap at any moment and the reverb stops reading as a room. Applies to every
+        // Chill form — these levels were never per-substyle.
+        connectSend(kTrackLead1,     to: .small, wetDryMix: 22)
+        connectSend(kTrackLead2,     to: .small, wetDryMix: 22)
         connectSend(kTrackPads,      to: .small, wetDryMix: 55)
         connectSend(kTrackRhythm,    to: .small, wetDryMix: 40)
         // Base Chill: the texture sampler is unused (AudioTexturePlayer handles texture) — zero send.
@@ -1546,7 +1551,7 @@ final class PlaybackEngine: ObservableObject {
         // send level; the reverb chip still decides whether it is heard.
         connectSend(kTrackTexture,   to: .small, wetDryMix: chillSohoMode ? 45 : 0)
         connectSend(kTrackBass,      to: .small, wetDryMix: 35)
-        connectSend(kTrackDrums,     to: .small, wetDryMix: 40)
+        connectSend(kTrackDrums,     to: .small, wetDryMix: 22)
         connectSend(kTrackLeadSynth, to: .small, wetDryMix: 0)
         perTrackReverbPresets[kTrackLead1]     = .mediumHall
         perTrackReverbPresets[kTrackLead2]     = .mediumHall

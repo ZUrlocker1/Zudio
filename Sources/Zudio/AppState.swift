@@ -765,8 +765,10 @@ final class AppState: ObservableObject {
             // released song can match this. Vibraphone's mallet attack cuts through the horn
             // punctuation far harder than the brass patches it shares the pool with (Zack,
             // 2026-10-12).
-            case (kTrackTexture, .chill,   "Vibraphone"):    return 75
-            // Xylophone is drier and brighter still than the vibraphone, so it gets the same cut.
+            // Cut again to 60 on 2026-10-13: at 75 the mallets still rang out over the horns.
+            case (kTrackTexture, .chill,   "Vibraphone"):    return 60
+            // Xylophone is drier and brighter still than the vibraphone, but it is shorter and
+            // does not ring, so it keeps the lighter cut rather than following the vibraphone down.
             case (kTrackTexture, .chill,   "Xylophone"):     return 75
             // Open trumpet is the loudest thing in the Soho texture pool — brighter than the
             // muted trumpet and higher than the trombone it shares the brass slots with (Zack,
