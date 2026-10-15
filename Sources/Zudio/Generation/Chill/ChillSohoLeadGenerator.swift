@@ -7,7 +7,7 @@
 // and two base Chill rules reused as they are:
 //
 //   CHL-LD1-010 Soho Counter-Line — 30%: 8–13 note phrases, a longer note to end, open-ended
-//   CHL-LD1-012 Tight Hook        — 20%: a 3–6 note figure within a tenth, restated and varied
+//   CHL-LD1-012 Avalon Hook        — 20%: a 3–6 note figure within a tenth, restated and varied
 //   CHL-LD1-004 Blues lead        — 20%: base Chill's rule
 //   CHL-LD1-001 Long phrase       — 15%: base Chill's rule
 //   CHL-LD1-011 Sustained Tone    — 15%: one long note per phrase, held two to three bars, long rests
@@ -43,14 +43,14 @@ extension ChillLeadGenerator {
         ([3, 2, 2], 29), ([2, 3, 2], 24), ([2, 2, 1], 22), ([-3, -2, 2], 18), ([1, -3, -2], 17),
     ]
 
-    /// The default bank: vocal-led, with the sax cells at a third of their counts. Tight Hook
+    /// The default bank: vocal-led, with the sax cells at a third of their counts. Avalon Hook
     /// uses it, and its repeated pitches are what make that rule sound sung.
     private static let cellBank = vocalCells + saxCells.map { (cell: $0.cell, weight: $0.weight / 3) }
 
     /// Counter-Line's bank gives the sax cells their full weight. Measured, this rule comes from
     /// the reed and flute lines as much as the vocals — Smooth Operator, Black Cow — and those
     /// move stepwise where the vocals repeat. On the shared bank it drew 63% repeated pitches and
-    /// barely travelled, which is why it sounded like a weaker Tight Hook (Zack, 2026-10-11).
+    /// barely travelled, which is why it sounded like a weaker Avalon Hook (Zack, 2026-10-11).
     private static let counterLineCells = vocalCells + saxCells
 
     /// Durations of a phrase's first four notes, in steps. Three eighths then a quarter dominates.
@@ -75,7 +75,9 @@ extension ChillLeadGenerator {
         forceRuleID: String?,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
-    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
+    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>,
+          hookTreatments: String?) {
+        var hookTreatments: String? = nil
         let ruleID: String
         if let forced = forceRuleID, sohoLead1Rules.contains(forced) {
             ruleID = forced
@@ -89,14 +91,15 @@ extension ChillLeadGenerator {
                    :            "CHL-LD1-011"
         }
         if sohoReusedLead1Rules.contains(ruleID) {
-            return reusedLead1(ruleID, frame: frame, structure: structure, leadInstrument: leadInstrument,
-                               breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs)
+            let r = reusedLead1(ruleID, frame: frame, structure: structure, leadInstrument: leadInstrument,
+                                breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs)
+            return (r.events, r.phraseOnsets, r.handoffBars, nil)   // not an Avalon Hook
         }
         usedRuleIDs.insert(ruleID)
 
         let (regLow, regHigh) = register(for: leadInstrument)
         let pool = Array(Set(scaleNotes(frame: frame).filter { $0 >= regLow && $0 <= regHigh })).sorted()
-        guard pool.count >= 4 else { return ([], [], []) }
+        guard pool.count >= 4 else { return ([], [], [], nil) }
 
         // Where Lead 1 may play: the groove and the outro. Never the intro or a breakdown, never
         // the cold-start bar, and never the last two bars of a cold stop or of the song.
@@ -115,7 +118,8 @@ extension ChillLeadGenerator {
             default:                return false
             }
         }
-        guard let firstPlayable = (0..<frame.totalBars).first(where: playable) else { return ([], [], []) }
+        guard let firstPlayable = (0..<frame.totalBars).first(where: playable)
+        else { return ([], [], [], nil) }
 
         // Remix Break returns: Lead 1 picks up into the downbeat on both exits, so the first bar
         // back is never a rest and its own phrase starts after the landing note.
@@ -147,7 +151,8 @@ extension ChillLeadGenerator {
                           open: open, remixReturns: remixReturns,
                           events: &events, onsets: &onsets, rng: &rng)
         case "CHL-LD1-012":
-            tightHook(frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
+            tightHook(treatmentNote: &hookTreatments,
+                      frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
                       open: open, remixReturns: remixReturns,
                       events: &events, onsets: &onsets, rng: &rng)
         default:
@@ -165,7 +170,8 @@ extension ChillLeadGenerator {
         }
         let soundingBars = Set(events.map { $0.stepIndex / 16 })
         onsets = onsets.filter { o in (o.startBar..<o.endBar).contains(where: soundingBars.contains) }
-        return (events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }, onsets, [])
+        return (events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }, onsets, [],
+                hookTreatments)
     }
 
     // MARK: - Reused base Chill rules
@@ -179,7 +185,7 @@ extension ChillLeadGenerator {
         leadInstrument: ChillLeadInstrument, breakdownStyle: ChillBreakdownStyle,
         rng: inout SeededRNG, usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
-        let (base, _, handoff) = generateLead1(
+        let (base, _, handoff, _) = generateLead1(
             frame: frame, structure: structure, leadInstrument: leadInstrument,
             beatStyle: .electronic,   // only consulted by the St Germain staccato roll, which forcing skips
             breakdownStyle: breakdownStyle, forceRuleID: ruleID,
@@ -276,7 +282,7 @@ extension ChillLeadGenerator {
     /// simply more eighths. `contour` is 0 rising, 1 falling, 2 an arch — the cells keep their
     /// shape but are turned to follow it, so the line travels instead of circling one register.
     ///
-    /// Lengthened and widened after Zack heard it beside Tight Hook (2026-10-11): both drew on
+    /// Lengthened and widened after Zack heard it beside Avalon Hook (2026-10-11): both drew on
     /// the same cells and the same opening rhythms, so the longer rule did not sound longer. The
     /// corpus separates them — Counter-Line's compass measures 19–29 semitones against the hook's
     /// 10 — and leaps of a fourth or more are 17–20% of its intervals, which the cell bank alone,
@@ -321,7 +327,7 @@ extension ChillLeadGenerator {
         if n >= 9 && rng.nextDouble() < 0.35 {
             durs[(n * 2) / 3] += 2 + rng.nextInt(upperBound: 3)
         }
-        return SohoPhrase(intervals: intervals, durs: durs)
+        return madeToMove(SohoPhrase(intervals: intervals, durs: durs))
     }
 
     /// One small change: an interval nudged by a step, or a quarter and an eighth swapped. The
@@ -347,13 +353,14 @@ extension ChillLeadGenerator {
         return Array(intervals.dropLast()) + [last]
     }
 
-    // MARK: - CHL-LD1-012 Tight Hook
+    // MARK: - CHL-LD1-012 Avalon Hook
 
     /// A 3–6 note figure inside a tenth, stated two to four times in succession with short rests,
     /// then a bar or two off. Measured from Avalon: it recurs and varies rather than developing.
     /// About 30% of hooks close on their first pitch; closure belongs to this rule alone, so a
     /// closed hook mutates with the interval-preserving trade Motorik Europe's `varyCell` uses.
-    private static func tightHook(frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
+    private static func tightHook(treatmentNote: inout String?,
+                                  frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                   firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
                                   events: inout [MIDIEvent], onsets: inout [(startBar: Int, endBar: Int)],
                                   rng: inout SeededRNG) {
@@ -419,11 +426,25 @@ extension ChillLeadGenerator {
             if !contrasts(best) { best = SohoPhrase(intervals: [0, 2], durs: [2, 4, 1]) }  // Avalon's x3
             return best
         }()
+        // Two treatments for this song, applied to all three hooks so the song is internally
+        // consistent while differing from the next one. See HookTreatment.
+        let treatments = pickTreatments(rng: &rng)
+        treatmentNote = treatments.map(\.name).sorted().joined(separator: ", ")
+        hook  = treated(hook,  treatments, closed: closed, rng: &rng)
+        hookB = treated(hookB, treatments, closed: closed, rng: &rng)
+        hookC = treated(hookC, treatments, closed: closed, rng: &rng)
+        let augmented = treatments.contains(.augmented)
+
         var nextMutation = firstPlayable + 24 + rng.nextInt(upperBound: 9)
         var lastHook = -1, lastOther = -1
         let home = pool[pool.count / 3]
         let length = hook.durs.reduce(0, +)
-        let preferred = length <= 12 ? [0, 2, 4][rng.nextInt(upperBound: 3)] : 0
+        // Displacement moves the figures off the downbeat, onto even sixteenths only: the groove
+        // fixup pulls a lead note off an unplayed odd sixteenth, so displacing onto one would be
+        // partly undone by the pass that runs after this.
+        let preferred = treatments.contains(.displaced)
+            ? [4, 6, 8][rng.nextInt(upperBound: 3)]
+            : (length <= 12 ? [0, 2, 4][rng.nextInt(upperBound: 3)] : 0)
         var bar = firstPlayable + rng.nextInt(upperBound: 2)
 
         while bar < frame.totalBars {
@@ -496,14 +517,127 @@ extension ChillLeadGenerator {
                 }
                 let offset = remixReturns.contains(bar) ? 8 : preferred
                 let start = anchor(near: home, bar: bar, structure: structure, frame: frame, pool: pool)
-                events += realise(figure, at: bar * 16 + offset, from: start, limit: (bar + 1) * 16,
+                // About as often as a figure gets its last note held, one instead runs on with
+                // two or three more notes. The continuation is built from the figure's own moves,
+                // mirrored, so it reads as the same idea carrying on rather than a new one
+                // starting (Zack, 2026-10-14). Not on an augmented song: those figures are
+                // already twice their length.
+                var ranOn = false
+                if !augmented, rng.nextDouble() < 0.15, !figure.intervals.isEmpty {
+                    let seedIv = figure.intervals, seedDur = figure.durs
+                    for _ in 0..<(2 + rng.nextInt(upperBound: 2)) {
+                        figure.intervals.append(-seedIv[figure.intervals.count % seedIv.count])
+                        figure.durs.append(seedDur[figure.durs.count % seedDur.count])
+                    }
+                    ranOn = true
+                }
+                // Give the statement as many bars as the figure actually needs. `realise` stops
+                // at its limit and drops whatever is left, so a figure that is both doubled and
+                // extended — one of the ten treatment pairs — would otherwise be cut off
+                // mid-phrase. Three bars is the ceiling; nothing legitimate reaches it.
+                let needed = (offset + figure.durs.reduce(0, +) + 15) / 16
+                let span = Swift.max(1, Swift.min(3, needed))
+                // Every bar the statement covers has to be playable, not just the one it starts
+                // in: a doubled or extended figure runs on past its first bar and would otherwise
+                // sound through an intro or a breakdown, where this lead must rest.
+                guard (0..<span).allSatisfy({ bar + $0 < frame.totalBars && open(bar + $0) })
+                else { break }
+                events += realise(figure, at: bar * 16 + offset, from: start,
+                                  limit: (bar + span) * 16,
                                   pool: pool, vel: velocity(at: bar, structure: structure), rng: &rng)
                 stated += 1
-                bar += everyOther ? 2 : 1
+                bar += span > 1 ? span : (everyOther ? 2 : 1)
             }
             if stated > 0 { onsets.append((startBar: episodeStart, endBar: bar)) }
             bar += 1 + rng.nextInt(upperBound: 2)                    // a bar or two off
         }
+        events = holdSomeFigureEndings(events, structure: structure, rng: &rng)
+    }
+
+    /// Occasionally hold the last note of a figure, so a rule built from short bursts breathes.
+    ///
+    /// Avalon Hook states a 3–6 note figure and stops; measured on one song, every figure ended
+    /// on a sixteenth or a dotted eighth and every one was followed by at least eight steps of
+    /// silence. Letting one in six of them ring into that silence is what a horn player does at
+    /// the end of a phrase, and it breaks up a rule that otherwise reads as the same short burst
+    /// over and over (Zack, 2026-10-14).
+    ///
+    /// Restrained, because the rule's character is that it is tight — but not so restrained it
+    /// goes unnoticed, which is where it started:
+    /// - only a figure whose last note is already an eighth or longer — stretching a clipped
+    ///   sixteenth changes the gesture rather than extending it
+    /// - never twice running, and never in the opening bars, so the hook establishes itself first
+    /// - only a chord tone. A sixteenth passing through a tension is fine; the same note held for
+    ///   two or three beats is a clash
+    /// - clamped to the next figure's onset and to the end of the chord window, so it can neither
+    ///   collide with what follows nor ring over a chord change
+    private static func holdSomeFigureEndings(_ events: [MIDIEvent], structure: SongStructure,
+                                              rng: inout SeededRNG) -> [MIDIEvent] {
+        let sorted = events.sorted { $0.stepIndex < $1.stepIndex }
+        guard sorted.count > 2 else { return events }
+        // Figures are separated by a rest; inside one, notes are at most a quarter apart.
+        var figures: [[Int]] = [[0]]
+        for i in 1..<sorted.count {
+            let prev = sorted[i - 1]
+            if sorted[i].stepIndex - (prev.stepIndex + prev.durationSteps) > 4 { figures.append([i]) }
+            else { figures[figures.count - 1].append(i) }
+        }
+        var out = sorted
+        var heldPrevious = false
+        for f in figures {
+            guard let i = f.last else { continue }
+            let e = sorted[i]
+            let bar = e.stepIndex / 16
+            let nextOnset = i + 1 < sorted.count ? sorted[i + 1].stepIndex : Int.max
+            let room = nextOnset - e.stepIndex
+            var held = false
+            if !heldPrevious, bar >= 8, e.durationSteps >= 2, room >= 8,
+               let w = structure.chordWindow(atBar: bar),
+               w.chordTones.contains(((Int(e.note) % 12) + 12) % 12),
+               // A figure at the end of a phrase has 16+ steps before the next one and is where
+               // a player would lean on a note; mid-phrase there are only eight to fourteen, so
+               // a hold there can only ever be a half note. Hold the phrase ends more often.
+               rng.nextDouble() < (room >= 16 ? 0.55 : 0.25) {
+                // A half, a dotted half or a whole bar, chosen from the lengths that FIT rather
+                // than drawn and then trimmed. Drawing first clamped nearly every long note back
+                // to a half, because mid-phrase there are only eight to fourteen steps before the
+                // next figure; the room is wide only at a phrase end. Choosing from what fits
+                // puts the whole-bar holds where the music has space for them, which is where a
+                // player would take them anyway.
+                //
+                // Raised twice on 2026-10-14: one figure in six at a dotted quarter was too
+                // subtle to register against a rule this busy.
+                // A hold may ring through a chord change, but only on a common tone — a note
+                // that is a chord tone of the next window too. That is ordinary practice and it
+                // is what makes a long note possible at all here: a figure sitting late in its
+                // window otherwise has only a few steps before the chord moves, which is why
+                // nearly every hold came out as the shortest option (2026-10-14).
+                let pc = ((Int(e.note) % 12) + 12) % 12
+                var limit = w.endBar * 16
+                for _ in 0..<3 {
+                    guard limit - e.stepIndex < room,
+                          let next = structure.chordWindow(atBar: limit / 16),
+                          next.endBar > limit / 16,
+                          next.chordTones.contains(pc) else { break }
+                    limit = next.endBar * 16
+                }
+                let headroom = Swift.min(room, limit - e.stepIndex)
+                // Capped at a whole bar: longer than that and the hold stops reading as a
+                // held note at the end of a figure and starts sounding like a different rule.
+                let fits = [8, 12, 16].filter { $0 <= headroom }
+                if !fits.isEmpty {
+                    // Weighted toward the longest that fits, so the space gets used.
+                    let weights: [Double] = fits.count == 1 ? [1.0]
+                                          : fits.count == 2 ? [0.42, 0.58]
+                                                            : [0.28, 0.40, 0.32]
+                    out[i] = MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: e.velocity,
+                                       durationSteps: fits[rng.weightedPick(weights)])
+                    held = true
+                }
+            }
+            heldPrevious = held
+        }
+        return out
     }
 
     /// Hooks are drawn from `counterLineCells`, the bank that gives the reed and flute cells their
@@ -512,6 +646,128 @@ extension ChillLeadGenerator {
     /// repeated pitches: a statement like `0, 0, -2` stutters one note rather than playing a
     /// figure (Zack, 2026-10-13). The same comment on `counterLineCells` records that bank
     /// drawing 63% repeated pitches.
+    /// A per-song treatment of the hook figures.
+    ///
+    /// Avalon Hook is drawn from one small bank, so every song circled the same handful of
+    /// shapes however many hooks it built (Zack, 2026-10-14). Two treatments are drawn per song
+    /// and applied to all three of its hooks, which gives ten combinations and makes one song's
+    /// hook recognisably not another's, while each song stays internally consistent.
+    ///
+    /// These are the classical motivic transformations, which is what a player varying a figure
+    /// over a long take actually does.
+    enum HookTreatment: CaseIterable {
+        /// Start the figures off the downbeat. 98% of hooks began in the first quarter of the bar.
+        case displaced
+        /// Double every duration, the figure then taking two bars per statement.
+        case augmented
+        /// Flip the interval signs — the same contour upside down.
+        case inverted
+        /// Play the figure's moves and rhythm backwards.
+        case retrograde
+        /// Six to eight notes rather than three to six.
+        case expanded
+
+        /// For the generation log, which shows the pair beside the rule name. Abbreviated so the
+        /// row stays short: the longest it gets is "Avalon hook displace,  retro".
+        var name: String {
+            switch self {
+            case .displaced:  return "displace"
+            case .augmented:  return "aug"
+            case .inverted:   return "invert"
+            case .retrograde: return "retro"
+            case .expanded:   return "expand"
+            }
+        }
+    }
+
+    /// One or two distinct treatments, drawn once per song.
+    ///
+    /// Five treatments give five single-treatment characters and ten pairs — fifteen in all. A
+    /// third single and two thirds pairs makes each of those fifteen equally likely, so no song
+    /// character is commoner than another. It also spreads the songs by DEGREE as well as kind:
+    /// always drawing two left nothing sitting near the Avalon original, and a displaced-only
+    /// song is a far milder variation than an augmented and expanded one (Zack, 2026-10-14).
+    private static func pickTreatments(rng: inout SeededRNG) -> [HookTreatment] {
+        let all = HookTreatment.allCases
+        let a = rng.nextInt(upperBound: all.count)
+        guard rng.nextDouble() >= 1.0 / 3.0 else { return [all[a]] }
+        var b = rng.nextInt(upperBound: all.count - 1)
+        if b >= a { b += 1 }
+        return [all[a], all[b]]
+    }
+
+    /// Applies the song's treatments to one figure.
+    ///
+    /// Inversion and retrograde both preserve the interval sum, so a closed hook — one that
+    /// returns to its first pitch, which this rule alone does — stays closed through either.
+    /// Expansion does not, so closure is re-derived afterwards.
+    private static func treated(_ p: SohoPhrase, _ ts: [HookTreatment],
+                                closed: Bool, rng: inout SeededRNG) -> SohoPhrase {
+        var r = p
+        for t in ts {
+            switch t {
+            case .inverted:
+                r.intervals = r.intervals.map { -$0 }
+            case .retrograde:
+                r.intervals.reverse()
+                r.durs.reverse()
+            case .augmented:
+                // Capped at a half note so a doubled figure cannot become one long tone.
+                r.durs = r.durs.map { Swift.min(8, $0 * 2) }
+            case .expanded:
+                // Grows the figure AS IT STANDS, not the untreated one, so the two treatments
+                // commute: "inverted, expanded" and "expanded, inverted" give the same figure,
+                // and a song's character depends on which pair it drew rather than the order.
+                let want = 6 + rng.nextInt(upperBound: 3)
+                let seedIv = r.intervals.isEmpty ? [2] : r.intervals
+                let seedDur = r.durs.isEmpty ? [2] : r.durs
+                while r.durs.count < want {
+                    // Restate the figure's own moves mirrored, so it grows out of itself
+                    // rather than wandering into a different shape.
+                    r.intervals.append(-seedIv[r.intervals.count % seedIv.count])
+                    r.durs.append(seedDur[r.durs.count % seedDur.count])
+                }
+            case .displaced:
+                break      // acts on where a statement starts, not on the figure
+            }
+        }
+        if closed, r.intervals.count >= 2 {
+            r.intervals[r.intervals.count - 1] = -r.intervals.dropLast().reduce(0, +)
+        }
+        return madeToMove(r)
+    }
+
+    /// Make a drawn figure move, instead of throwing it away and redrawing.
+    ///
+    /// The hook rules test a drawn figure with `moves` — it needs one real step and no more than
+    /// half its moves standing still — and redrew up to 25 times when it failed. Against a cell
+    /// bank whose heaviest entries are zero-heavy (`[0, 0, -2]` is the commonest vocal cell),
+    /// concatenating cells almost never clears that bar, so the redraws all failed and the
+    /// hard-coded fallbacks took over: measured 2026-10-14, the first hook fell back to Avalon's
+    /// own figure in 76% of songs and the second and third in 100% of them. Nearly every song
+    /// played the same three shapes, which is exactly what it sounded like.
+    ///
+    /// Repairing keeps the drawn figure's own shape and only lifts the stationary moves, so the
+    /// variety in the bank survives instead of collapsing onto one transcription.
+    private static func madeToMove(_ p: SohoPhrase) -> SohoPhrase {
+        func moves(_ iv: [Int]) -> Bool {
+            iv.contains { abs($0) >= 2 } && iv.filter { $0 != 0 }.count * 2 >= iv.count
+        }
+        var iv = p.intervals
+        guard !iv.isEmpty else { return p }
+        var guardCount = 0
+        while !moves(iv), guardCount < 8 {
+            // Step opposite to the direction the figure has travelled so far, so lifting a
+            // stationary move cannot walk the line out of its tenth.
+            let step = iv.reduce(0, +) <= 0 ? 2 : -2
+            if let i = iv.firstIndex(of: 0) { iv[i] = step }
+            else if let i = iv.indices.first(where: { abs(iv[$0]) < 2 }) { iv[i] = step }
+            else { break }
+            guardCount += 1
+        }
+        return SohoPhrase(intervals: iv, durs: p.durs)
+    }
+
     private static func hookPhrase(closed: Bool, rng: inout SeededRNG) -> SohoPhrase {
         let n = 3 + rng.nextInt(upperBound: 4)                       // 3–6 notes
         var intervals: [Int] = [0, 2, -2]
@@ -526,7 +782,7 @@ extension ChillLeadGenerator {
         var durs = Array(openingRhythms[rng.weightedPick(openingRhythms.map(\.weight))].durs.prefix(n))
         while durs.count < n { durs.append(2) }
         durs[n - 1] = 4
-        return SohoPhrase(intervals: intervals, durs: durs)
+        return madeToMove(SohoPhrase(intervals: intervals, durs: durs))
     }
 
     /// Range of a figure in semitones, from its running pitch.

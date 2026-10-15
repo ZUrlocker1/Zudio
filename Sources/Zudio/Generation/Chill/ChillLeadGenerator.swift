@@ -23,7 +23,8 @@ struct ChillLeadGenerator {
         forceRuleID: String? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
-    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
+    ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>,
+          hookTreatments: String?) {
         // Chill Soho has its own three rules (ChillSohoLeadGenerator.swift) and never reaches the
         // St Germain staccato roll below.
         if sohoVariation {
@@ -40,7 +41,7 @@ struct ChillLeadGenerator {
                                            breakdownStyle: breakdownStyle, rng: &rng)
             // Build phraseOnsets from the events for Lead 2 call-and-response awareness
             let onsets = eventsToOnsets(events: events, totalBars: frame.totalBars)
-            return (events, onsets, [])   // staccato already has long silences; no extra handoff
+            return (events, onsets, [], nil)   // staccato already has long silences; no extra handoff
         }
 
         // Rule selection is independent of instrument — instrument controls timbre/register,
@@ -415,7 +416,7 @@ struct ChillLeadGenerator {
             let extraRest = (label == .B || (bluesVariation && isShortPunch)) ? 0 : rng.nextInt(upperBound: 2)
             bar += 1 + extraRest
         }
-        return (events, phraseOnsets, handoffBarSet)
+        return (events, phraseOnsets, handoffBarSet, nil)   // Avalon Hook is Soho-only
     }
 
     // MARK: - Lead 2

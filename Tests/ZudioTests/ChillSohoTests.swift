@@ -813,8 +813,14 @@ import Foundation
                 "only \(multiNote)/\(phrases) phrases have more than one note")
     }
 
-    /// Tight Hook: each bar's figure fits inside about a tenth.
-    @Test func tightHookStaysNarrow() {
+    /// Avalon Hook: each bar's figure stays inside about a tenth, and no bar turns into a run.
+    ///
+    /// The per-song treatments (2026-10-14) deliberately break the original 3–6 note figure:
+    /// `expanded` draws 6–8 notes and a figure may run on with 2–3 more, so a bar can legitimately
+    /// carry more than six. The compass is what the rule is actually about — Avalon's hook sits
+    /// inside a tenth however it is transformed — so that is pinned tightly, and the note count
+    /// only loosely, to catch a figure that has become a scale run rather than a hook.
+    @Test func avalonHookStaysNarrow() {
         var found = 0
         for s in Self.sohoSongs() where Self.lead1Rule(s) == "CHL-LD1-012" {
             found += 1
@@ -824,7 +830,7 @@ import Foundation
             for (bar, notes) in byBar {
                 let ps = notes.map { Int($0.note) }
                 #expect(ps.max()! - ps.min()! <= 12, "bar \(bar) spans \(ps.max()! - ps.min()!) semitones")
-                #expect(notes.count <= 6)
+                #expect(notes.count <= 12, "bar \(bar) carries \(notes.count) notes")
             }
         }
         #expect(found > 0)
@@ -1138,7 +1144,7 @@ import Foundation
         #expect(Double(withPerc) / Double(checked) > 0.9, "outro percussion in \(withPerc)/\(checked)")
     }
 
-    /// Counter-Line is longer than Tight Hook and ranges much wider — the two sounded alike
+    /// Counter-Line is longer than Avalon Hook and ranges much wider — the two sounded alike
     /// because both drew on the same cells and rhythms.
     @Test func counterLineIsLongerAndWiderThanTheHook() {
         func stats(_ rule: String) -> (notes: Double, compass: Double) {

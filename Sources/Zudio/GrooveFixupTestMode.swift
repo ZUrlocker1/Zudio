@@ -107,7 +107,7 @@ extension AppState {
                 total += n
                 return "\(label): \(n) / \(was.count)"
             }
-            return total == 0 ? "No changes!" : parts.joined(separator: ",  ") + " changes"
+            return total == 0 ? "No changes!" : parts.joined(separator: ", ") + " changes"
         }
 
         let rawRun   = SongGenerator.generate(seed: song.globalSeed, style: song.style,
