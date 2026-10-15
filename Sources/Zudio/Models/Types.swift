@@ -634,7 +634,28 @@ struct RegisterBounds {
     let high: Int
 
     func clamp(_ note: Int) -> Int { max(low, min(high, note)) }
+
+    /// Folds a note into the register by octaves, keeping its pitch class.
+    ///
+    /// Clamping a melody squashes it onto the boundary and turns a line into a repeated note;
+    /// folding moves it by octaves, so the figure survives. Use this for melodic tracks and
+    /// `clamp` only where the exact pitch does not matter.
+    func fold(_ note: Int) -> Int {
+        guard high - low >= 12 else { return clamp(note) }
+        var n = note
+        while n > high { n -= 12 }
+        while n < low  { n += 12 }
+        return n
+    }
 }
+
+/// Per-track registers. Chill's leads ALSO have a per-instrument register in
+/// `ChillLeadGenerator.register(for:)`, which is narrower and is the one that matters there —
+/// a tenor sax tops out well below Lead 1's track ceiling. Where both apply the instrument wins;
+/// see `GlobalMusicalFrame.leadRegisters` and `ChillLeadRegisterTests`.
+///
+/// Note `kTrackDrums` holds percussion key numbers, not pitches, so its bounds are nominal and
+/// nothing should fold a drum note into them.
 
 let kRegisterBounds: [Int: RegisterBounds] = [
     kTrackLead1:      RegisterBounds(low: 52, high: 79),

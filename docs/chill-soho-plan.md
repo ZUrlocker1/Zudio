@@ -1924,6 +1924,22 @@ The cells are lifted from Holding Back the Years, Black Cow and Your Love Is Kin
 intervals are semitones from the held tone, snapped to the scale at use, so the contour is the
 measurement and the pitches stay diatonic.
 
+### Registers are per instrument, not per track
+
+Zudio carries two register tables and they are not meant to agree. `kRegisterBounds` is per track
+and shared with Motorik, Kosmic and Ambient; `ChillLeadGenerator.register(for:)` is per instrument
+and is the one that governs Chill — a tenor sax tops out at 72 where Lead 1's generic ceiling is
+79, and a flute runs to 85, past it.
+
+`HarmonicFilter`'s octave lift used the track bound, so it pushed notes into the gap between the
+two: 41% of tenor and alto sax notes finished above their own ceiling, and trombone reached 85
+against a declared 65. The lift now takes the instrument registers, and anything still outside is
+folded back by octaves — folded, not clamped, because clamping squashes a melody onto the
+boundary and turns a line into one repeated note. `ChillLeadRegisterTests` checks the finished
+song rather than the generator, which produced no out-of-range notes at any point.
+
+---
+
 ### CHL-LD1-012 Avalon Hook — three hooks in conversation
 
 Measured from **Avalon**, whose lead channel plays **13 phrases across three recurring contours**

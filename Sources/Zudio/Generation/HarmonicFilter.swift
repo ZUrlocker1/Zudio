@@ -26,7 +26,13 @@ struct HarmonicFilter {
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        skipLead1ClashFilter: Bool = false
+        skipLead1ClashFilter: Bool = false,
+        // Narrower, per-instrument registers that override `kRegisterBounds` for these tracks.
+        // Chill passes its leads' instrument registers here: a tenor sax tops out at 72 while
+        // Lead 1's track ceiling is 79, and Pass B used to push notes into that gap — 41% of a
+        // tenor's notes ended up above its own ceiling, which is where the screech came from
+        // (Zack, 2026-10-14).
+        registerOverrides: [Int: RegisterBounds] = [:]
     ) -> [[MIDIEvent]] {
         var events = trackEvents
 
@@ -57,7 +63,8 @@ struct HarmonicFilter {
                       leadMedian < padMedian + 4
                 else { continue }
 
-                let bounds = kRegisterBounds[track] ?? RegisterBounds(low: 55, high: 88)
+                let bounds = registerOverrides[track] ?? kRegisterBounds[track]
+                           ?? RegisterBounds(low: 55, high: 88)
                 events[track] = pushLeadAbovePads(
                     events[track], startStep: startStep, endStep: endStep,
                     padMedian: padMedian, bounds: bounds

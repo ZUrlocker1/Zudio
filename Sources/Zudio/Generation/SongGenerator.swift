@@ -4092,7 +4092,32 @@ struct SongGenerator {
         }
 
         // Post-processing: harmonic filter
-        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+        // The leads' instrument registers beat the per-track ones — see RegisterBounds.
+        let leadRegisters: [Int: RegisterBounds] = [
+            kTrackLead1: {
+                let r = ChillLeadGenerator.register(for: chillLeadInstrument)
+                return RegisterBounds(low: r.low, high: r.high)
+            }(),
+            kTrackLead2: {
+                let r = ChillLeadGenerator.register(for: chillLead2Instrument)
+                return RegisterBounds(low: r.low, high: r.high)
+            }(),
+        ]
+        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame,
+                                           structure: structure,
+                                           registerOverrides: leadRegisters)
+        // Belt and braces: fold anything still outside its instrument's register back in by
+        // octaves. Nothing should reach here out of range, but a future pass that moves a lead
+        // note would otherwise break the register silently, and the symptom — a sax playing above
+        // its own ceiling — is hard to recognise as a bug. ChillLeadRegisterTests pins it.
+        for (track, bounds) in leadRegisters {
+            trackEvents[track] = trackEvents[track].map { e in
+                let folded = bounds.fold(Int(e.note))
+                guard folded != Int(e.note) else { return e }
+                return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(folded),
+                                 velocity: e.velocity, durationSteps: e.durationSteps)
+            }
+        }
 
         // Post-processing: drum fills + cymbal variation.
         // Only stGermain (CHL-DRUM-004) is four-on-the-floor like Motorik; other Chill
