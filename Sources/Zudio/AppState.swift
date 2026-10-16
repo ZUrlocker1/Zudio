@@ -510,6 +510,7 @@ final class AppState: ObservableObject {
 
         // Restore first-best-song behavior for all styles
         stylesWithGeneratedSongs = []
+        hasHadSohoSong           = false
         songGenerationCount      = 0
 
         // Reset Endless / Evolve mode state
@@ -560,6 +561,31 @@ final class AppState: ObservableObject {
     private var songGenerationCount = 0
     // Tracks which styles have had at least one song generated — used for best-song mode.
     private var stylesWithGeneratedSongs: Set<MusicStyle> = []
+    /// Whether a Chill Soho song has been generated yet: the history holds one at launch, or one
+    /// was made this session. Until then the first Soho song is a curated one — see
+    /// `firstSohoSeeds`. Cleared with the first-best songs.
+    private var hasHadSohoSong = false
+
+    /// Seeds whose natural song is the best first Chill Soho song: a Latin groove in drums and
+    /// bass, Operator (CHL-LD1-010) on flute, and a breakdown — the Remix Break, the Duo or the
+    /// bass ostinato — with the hook coming home three to six times. Natural rather than forced,
+    /// so the song replays exactly with no forced settings, and each one is Soho under the
+    /// release activation mix as well as today's test mix. ReplayFidelityTests'
+    /// `firstSohoSeedsStillQualify` fails if a generator change stops any of them qualifying —
+    /// re-run the search then (chosen 2026-10-16).
+    nonisolated static let firstSohoSeeds: [UInt64] = [
+        2070, 4819, 6165,               // Remix Break
+        727, 974, 4673, 4460, 5825,     // Duo
+        744, 3630, 5341, 4235,          // bass ostinato
+    ]
+
+    /// `state`, or the curated first Soho song in its place when `state` is the first Chill Soho
+    /// song (`hadSoho` false). The curated song takes a seed from `firstSohoSeeds` at random.
+    nonisolated static func withFirstSohoSong(_ state: SongState, hadSoho: Bool) -> SongState {
+        guard !hadSoho, state.style == .chill, state.chillSohoVariation,
+              let seed = firstSohoSeeds.randomElement() else { return state }
+        return SongGenerator.generate(seed: seed, style: .chill)
+    }
     var instrumentOverrides: [Int: Int] = [:]
     /// Saves the pads instrument override that was active before the most recent blues song,
     /// so it can be restored when returning to a regular Chill song.
@@ -1031,6 +1057,7 @@ final class AppState: ObservableObject {
         // Pre-populate from persisted history so "first best" rules only fire on a true clean
         // slate (new install or after reset). A returning user with any saved songs skips them.
         stylesWithGeneratedSongs = Set(persistedHistory.map { $0.style })
+        hasHadSohoSong = persistedHistory.contains { $0.displaySubstyleName == "Chill Soho" }
         preloadPersistedSongs()
         // Sleep timer arms when playback actually starts (see prepareSleepTimerForPlayback()),
         // not at app launch — a countdown with nothing playing isn't meaningful.
@@ -1407,6 +1434,9 @@ final class AppState: ObservableObject {
         let isFirstForStyle = !stylesWithGeneratedSongs.contains(style)
         // Brush Kit is index 1 in the Ambient drum pool ["Percussion Kit", "Brush Kit"]
         let useBrushKit = style == .ambient && (instrumentOverrides[kTrackDrums] ?? 0) == 1
+        // The curated first Soho song only stands in when nothing is overridden: a key, tempo or
+        // mood override would change it, and the user asked for that override.
+        let hadSoho = hasHadSohoSong || keyOverride != nil || tempoOverride != nil || moodOverride != nil
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             // Best-song params: applied on first generation per style; testConfig overrides where set.
@@ -1455,7 +1485,7 @@ final class AppState: ObservableObject {
                 bestBridge = false
             }
             let useBest = isFirstForStyle
-            let state = SongGenerator.generate(
+            let generated = SongGenerator.generate(
                 keyOverride:     await self.keyOverride,
                 tempoOverride:   await self.tempoOverride,
                 moodOverride:    await self.moodOverride,
@@ -1469,6 +1499,7 @@ final class AppState: ObservableObject {
                 forceBridge:          useBest ? bestBridge : false,
                 useBrushKit:          useBrushKit
             )
+            let state = useBest ? generated : Self.withFirstSohoSong(generated, hadSoho: hadSoho)
             await MainActor.run {
                 self.songState    = state
                 self.generationHistory.append(state)
@@ -1518,6 +1549,7 @@ final class AppState: ObservableObject {
                 self.saveLastUsedInstruments(style: style)
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
+                if state.chillSohoVariation { self.hasHadSohoSong = true }
 
                 self.appendGenerationLog(state.generationLog)
                 self.applyAmbientPianoInstrument(for: state)
@@ -1829,11 +1861,13 @@ final class AppState: ObservableObject {
         guard playMode == .endless, !isPreGenerating, nextSongState == nil else { return }
         isPreGenerating = true
         let nextStyle = decideNextStyle()
+        let hadSoho = hasHadSohoSong
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
-            let state = SongGenerator.generate(style: nextStyle)
+            let state = Self.withFirstSohoSong(SongGenerator.generate(style: nextStyle), hadSoho: hadSoho)
             await MainActor.run {
                 guard self.playMode == .endless else { return }
+                if state.chillSohoVariation { self.hasHadSohoSong = true }
                 self.nextSongState   = state
                 self.isPreGenerating = false
                 if self.shouldLogNextUpWhenReady {
@@ -2421,11 +2455,13 @@ final class AppState: ObservableObject {
         appendToLog([GenerationLogEntry(tag: "Endless", description: "Loading next song...", isTitle: false)])
         let nextStyle = decideNextStyle()
         let transitionToken = endlessTransitionToken  // capture so a stop() during generation cancels this
+        let hadSoho = hasHadSohoSong
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let state = SongGenerator.generate(style: nextStyle)
+            let state = Self.withFirstSohoSong(SongGenerator.generate(style: nextStyle), hadSoho: hadSoho)
             await MainActor.run {
                 guard self.endlessTransitionToken == transitionToken else { return }
+                if state.chillSohoVariation { self.hasHadSohoSong = true }
                 self.startEndlessSong(state)
             }
         }

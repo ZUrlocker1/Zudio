@@ -412,13 +412,13 @@ Measured from the named vocal tracks and the flute channels that stand in for th
 the reed lines for the counter-line. Phrases are open-ended — only 16% return to their starting
 pitch — so Motorik Europe's closed-cell machinery is not used.
 
-- `CHL-LD1-010` Soho counter-line 30%
+- `CHL-LD1-010` Operator 30%
 - `CHL-LD1-012` Avalon 20%
 - base Chill's `CHL-LD1-004` Blues lead 20%
 - base Chill's `CHL-LD1-001` Long phrase 15%
 - `CHL-LD1-011` Sustained tone 15%
 
-**`010` Soho counter-line** — *Smooth Operator*, *Cherish the Day*, *Black Cow*. Flowing phrases
+**`010` Operator** — *Smooth Operator*, *Cherish the Day*, *Black Cow*; named for the first, which most of its measurements come from (called Soho Counter-Line until 2026-10-16). Flowing phrases
 of about 8 notes in eighths and sixteenths, mostly stepwise, with rests of about a bar and a
 half. Built from `counterLineCells`, the sax and flute figures at full weight — ascending thirds
 and tones such as `[+3, +2, +2]`, neighbour-tone turns, descending answers — with a leap at most
@@ -627,7 +627,7 @@ tone is light, continuing base Chill's wry register.
   `Turnaround` with the treatment (`walking quarters`) on the bar the bass treatment plays; one Groove fixup row
 - **Weighted picks:** `SeededRNG.weightedPick` expects weights that sum to 1. Picks over raw
   corpus counts go through `weightedIndex`, which normalises them; the one deliberate exception
-  is Counter-Line (see `010`)
+  is Operator (see `010`)
 - **Harmonic filter (all styles):** when a lead sits within four semitones of the pads, Pass B
   lifts a figure an octave whole — notes less than a bar apart, found across the whole track and
   decided by the window it starts in — if any of it dips below the pads' median and all of it
@@ -646,6 +646,12 @@ tone is light, continuing base Chill's wry register.
   the RNG, so no note changes
 - **Instruments on replay:** a song is written to the persisted history only after its
   instruments are final, and replaying one re-pins the Chill leads to what the generator chose
+- **Best first Soho song:** the first Chill Soho song (no Soho song in the history, nothing
+  overridden) is swapped for one of `AppState.firstSohoSeeds` — twelve seeds whose natural song
+  has a Latin groove, Operator on flute, a Remix Break, Duo or bass-ostinato breakdown and the
+  hook coming home three or more times, chosen to be Soho under the release activation mix too.
+  Natural seeds rather than forced settings, so replay needs nothing recorded.
+  `firstSohoSeedsStillQualify` fails if a generator change breaks one; re-run the search then
 - **Load paths (AppState):** `regenerateSong` is the one replay of a saved song (Songs list,
   startup preload, .zudio file), passing every recorded forced setting; `applyLoadedInstruments`
   and `configurePlaybackStyle` are the instrument and playback set-up every load runs. A forced

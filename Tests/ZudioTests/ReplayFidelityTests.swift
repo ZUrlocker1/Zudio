@@ -45,4 +45,34 @@ import Testing
             }
         }
     }
+
+    /// Each curated first-Soho seed still gives what it was chosen for: Soho under both the
+    /// test and the release activation mix, a Latin groove, Operator on flute, a Remix Break,
+    /// Duo or bass-ostinato breakdown, and the hook coming home at least three times. A
+    /// generator change that breaks one fails here; re-run the search in AppState's comment.
+    @Test func firstSohoSeedsStillQualify() {
+        for seed in AppState.firstSohoSeeds {
+            var r = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 90))
+            #expect(r.nextDouble() < 0.25, "seed \(seed) is not Soho under the release mix")
+            let s = SongGenerator.generate(seed: seed, style: .chill)
+            #expect(s.chillSohoVariation && s.chillBeatStyle == .sohoLatin, "seed \(seed) groove")
+            #expect(s.chillLeadInstrument == .flute, "seed \(seed) lead \(s.chillLeadInstrument)")
+            #expect(s.generationLog.contains { $0.tag == "CHL-LD1-010" }, "seed \(seed) lead rule")
+            #expect([.sohoRemix, .sohoDuo, .bassOstinato].contains(s.chillBreakdownStyle)
+                    && s.structure.sections.contains { $0.label == .bridge }, "seed \(seed) breakdown")
+            let homes = s.stepAnnotations.values.filter { $0.contains { $0.description == "return to form" } }.count
+            #expect(homes >= 3, "seed \(seed): hook comes home \(homes) times")
+        }
+    }
+
+    /// The first Chill Soho song is swapped for a curated one, once; anything else passes through.
+    @Test func firstSohoSongIsCurated() throws {
+        let soho = try #require((UInt64(1)...200).lazy.map { SongGenerator.generate(seed: $0, style: .chill) }
+            .first { $0.chillSohoVariation && !AppState.firstSohoSeeds.contains($0.globalSeed) })
+        let swapped = AppState.withFirstSohoSong(soho, hadSoho: false)
+        #expect(AppState.firstSohoSeeds.contains(swapped.globalSeed))
+        #expect(AppState.withFirstSohoSong(soho, hadSoho: true).globalSeed == soho.globalSeed)
+        let motorik = SongGenerator.generate(seed: 3, style: .motorik)
+        #expect(AppState.withFirstSohoSong(motorik, hadSoho: false).globalSeed == motorik.globalSeed)
+    }
 }

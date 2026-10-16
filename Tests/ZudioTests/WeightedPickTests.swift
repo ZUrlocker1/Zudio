@@ -9,7 +9,7 @@
 // the weights must sum to 1.0. Getting that wrong fails silently rather than loudly: pass
 // percentages and the first weight alone exceeds the draw, so index 0 comes back every time.
 //
-// Two sites in Soho Counter-Line passed `[35, 30, 15, 20]` and `[35, 45, 20]`. The result was
+// Two sites in Operator (CHL-LD1-010) passed `[35, 30, 15, 20]` and `[35, 45, 20]`. The result was
 // that every phrase began on the downbeat — 99% of them, measured — and every rest between
 // phrases took its shortest option. The rule had been written to vary both and never did
 // (found 2026-10-15).

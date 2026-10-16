@@ -755,7 +755,7 @@ import Foundation
         }
     }
 
-    /// Counter-Line: eighth-note motion, repeated pitches present, few leaps.
+    /// Operator: eighth-note motion, repeated pitches present, few leaps.
     @Test func counterLineMatchesItsMeasurements() {
         var iois = 0, eighths = 0, intervals = 0, repeats = 0, leaps = 0
         for s in Self.sohoSongs() where Self.lead1Rule(s) == "CHL-LD1-010" {
@@ -1065,7 +1065,7 @@ import Foundation
         }
     }
 
-    // MARK: - Texture horns, Latin intro and outro, Counter-Line variety
+    // MARK: - Texture horns, Latin intro and outro, Operator variety
 
     /// The Soho texture pool is real horns and tuned percussion — no synth brass — and every
     /// program is in Zudio.sf2's preset list.
@@ -1175,7 +1175,7 @@ import Foundation
         #expect(Double(withPerc) / Double(checked) > 0.9, "outro percussion in \(withPerc)/\(checked)")
     }
 
-    /// Counter-Line is longer than Avalon Hook and ranges much wider — the two sounded alike
+    /// Operator is longer than Avalon Hook and ranges much wider — the two sounded alike
     /// because both drew on the same cells and rhythms.
     @Test func counterLineIsLongerAndWiderThanTheHook() {
         func stats(_ rule: String) -> (notes: Double, compass: Double) {

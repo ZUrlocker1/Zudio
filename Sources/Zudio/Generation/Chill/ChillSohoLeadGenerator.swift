@@ -6,7 +6,7 @@
 // measured per song from the corpus — see "Lead 1 — the sax voice" in docs/chill-soho-plan.md —
 // and two base Chill rules reused as they are:
 //
-//   CHL-LD1-010 Soho Counter-Line — 30%: 8–13 note phrases, a longer note to end, open-ended
+//   CHL-LD1-010 Operator          — 30%: 8–13 note phrases, a longer note to end, open-ended
 //   CHL-LD1-012 Avalon Hook        — 20%: a 3–6 note figure within a tenth, restated and varied
 //   CHL-LD1-004 Blues lead        — 20%: base Chill's rule
 //   CHL-LD1-001 Long phrase       — 15%: base Chill's rule
@@ -43,7 +43,7 @@ extension ChillLeadGenerator {
         ([3, 2, 2], 29), ([2, 3, 2], 24), ([2, 2, 1], 22), ([-3, -2, 2], 18), ([1, -3, -2], 17),
     ]
 
-    /// Counter-Line's bank gives the sax cells their full weight. Measured, this rule comes from
+    /// Operator's bank gives the sax cells their full weight. Measured, this rule comes from
     /// the reed and flute lines as much as the vocals — Smooth Operator, Black Cow — and those
     /// move stepwise where the vocals repeat. On the shared bank it drew 63% repeated pitches and
     /// barely travelled, which is why it sounded like a weaker Avalon Hook (Zack, 2026-10-11).
@@ -82,7 +82,7 @@ extension ChillLeadGenerator {
         if let forced = forceRuleID, sohoLead1Rules.contains(forced) {
             ruleID = forced
         } else {
-            // Counter-Line was 50% and carried too many songs.
+            // Operator was 50% and carried too many songs.
             let r = rng.nextDouble()
             ruleID = r < 0.30 ? "CHL-LD1-010"
                    : r < 0.50 ? "CHL-LD1-012"
@@ -257,7 +257,7 @@ extension ChillLeadGenerator {
         return out
     }
 
-    // MARK: - CHL-LD1-010 Soho Counter-Line
+    // MARK: - CHL-LD1-010 Operator (named for Smooth Operator; the code still calls it counterLine)
 
     /// Sung-melody phrases answering an implied vocal: 8–13 notes in eighths with a longer note
     /// to end, rests of about a bar and a half between them, and phrases that land somewhere new
@@ -344,13 +344,13 @@ extension ChillLeadGenerator {
         }
     }
 
-    /// A Counter-Line phrase: 8–13 notes, the measured opening rhythm, then a tail that is not
+    /// A Operator phrase: 8–13 notes, the measured opening rhythm, then a tail that is not
     /// simply more eighths. `contour` is 0 rising, 1 falling, 2 an arch — the cells keep their
     /// shape but are turned to follow it, so the line travels instead of circling one register.
     ///
     /// Lengthened and widened after Zack heard it beside Avalon Hook (2026-10-11): both drew on
     /// the same cells and the same opening rhythms, so the longer rule did not sound longer. The
-    /// corpus separates them — Counter-Line's compass measures 19–29 semitones against the hook's
+    /// corpus separates them — Operator's compass measures 19–29 semitones against the hook's
     /// 10 — and leaps of a fourth or more are 17–20% of its intervals, which the cell bank alone,
     /// none of whose steps exceed 3 semitones, could never produce.
     ///
@@ -441,7 +441,7 @@ extension ChillLeadGenerator {
         return (m, false)
     }
 
-    /// Counter-Line phrases never return to their first pitch, counted in semitones. The scale
+    /// Operator phrases never return to their first pitch, counted in semitones. The scale
     /// snap can still close one, which `counterLine` catches once the notes are placed.
     private static func keepOpen(_ intervals: [Int]) -> [Int] {
         guard var last = intervals.last, intervals.reduce(0, +) == 0 else { return intervals }
@@ -471,7 +471,7 @@ extension ChillLeadGenerator {
         let closed = rng.nextDouble() < 0.30
         // Avalon's hooks move: [+2,-2], [0,+2], [+3,0]. A figure that is mostly repeated pitches
         // reads as one note stuttering, so both hooks need at least one real step and no more
-        // than half their moves standing still. (Repeated pitch is Counter-Line's signature,
+        // than half their moves standing still. (Repeated pitch is Operator's signature,
         // CHL-LD1-010, not this rule's.)
         func moves(_ c: SohoPhrase) -> Bool {
             c.intervals.contains { abs($0) >= 2 }
@@ -813,7 +813,7 @@ extension ChillLeadGenerator {
     }
 
     /// Hooks are drawn from `counterLineCells`, the bank that gives the reed and flute cells their
-    /// full weight, not the vocal-weighted bank it once shared with Counter-Line. Avalon's hook — the figure this rule is
+    /// full weight, not the vocal-weighted bank it once shared with Operator. Avalon's hook — the figure this rule is
     /// measured from — is a flute line, and on the vocal-weighted bank the hook came out as
     /// repeated pitches: a statement like `0, 0, -2` stutters one note rather than playing a
     /// figure (Zack, 2026-10-13). The same comment on `counterLineCells` records that bank
@@ -1182,7 +1182,7 @@ extension ChillLeadGenerator {
     /// A weighted pick over raw counts. `SeededRNG.weightedPick` expects weights that sum to 1;
     /// handed the cell banks' corpus counts (30, 25, 24…) it returned the first entry every time,
     /// so until 2026-10-16 Avalon Hook drew only `[0, 0, -2]` and opened every phrase on three
-    /// eighths and a quarter. Counter-Line keeps that behaviour on purpose; see
+    /// eighths and a quarter. Operator keeps that behaviour on purpose; see
     /// `counterLinePhrase`.
     private static func weightedIndex(_ counts: [Double], rng: inout SeededRNG) -> Int {
         let total = counts.reduce(0, +)

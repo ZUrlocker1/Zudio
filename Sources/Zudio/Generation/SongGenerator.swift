@@ -5107,7 +5107,7 @@ struct SongGenerator {
         case "CHL-RHY-007":  return "Chordal comp"
         case "CHL-RHY-008":  return "Single-note line"
         case "CHL-RHY-009":  return "Root-and-chord eighths"
-        case "CHL-LD1-010":  return "Soho counter-line"
+        case "CHL-LD1-010":  return "Operator"
         case "CHL-LD1-011":  return "Sustained tone"
         case "CHL-LD1-012":  return "Avalon"
         case "CHL-PAD-007":  return "Soho chord hold"
