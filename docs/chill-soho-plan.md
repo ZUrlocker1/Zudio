@@ -130,15 +130,35 @@ What each record contributed:
 
 ---
 
+## The best first song
+
+The first Chill Soho song a listener hears is chosen, not drawn, because it is the substyle's
+introduction. The ideal first song:
+
+- **A Latin groove in drums and bass** — Bossa clave, Soft samba or Latin sway on the kit, with
+  a Latin bass line (Bossa root-fifth, Rumba, Syncopated or their major-key partners)
+- **Operator (`CHL-LD1-010`) on Lead 1, played on flute**, with **vibraphone on Lead 2**
+  answering it
+- **A breakdown**: the Remix Break, the Duo or the bass ostinato — the Soho-only breaks first
+- **A hook that comes home** three or more times ("Lead 1 return to form" in the log)
+
+Base Chill keeps its own first song (the St Germain groove). The Soho one plays the first time a
+Soho song would be generated — from Generate or in Endless — on a clean slate (no Soho song in
+the history) with no key, tempo or mood override. It is one of twelve curated seeds in
+`AppState.firstSohoSeeds` (four of each breakdown), picked at random; each one's natural song
+meets the list above, so it replays exactly with no forced settings. They were chosen under a
+Soho roll below 0.25, so they stay Soho under any mix at least that generous.
+`firstSohoSeedsStillQualify` checks each against the list; when a generator or mix change breaks
+one, search for a replacement with the same criteria.
+
 ## Activation and the groove
 
 - `SongState.chillSohoVariation: Bool`, alongside `chillBluesVariation`; a song is never both.
   Every `withXxx()` copy method passes it explicitly
 - `displayStyleName` is `"Chill Soho"`; `.zudio` files write it on `Substyle:`, `Style:` stays
   `Chill`
-- **Share:** Blues 15% on the main stream, then `sohoShareOfNonBlues` (`70/85`) — **70% Soho /
-  15% Blues / 15% base**. This is a **testing mix**; before release restore `0.20` for Blues and
-  `0.25` for `sohoShareOfNonBlues` (60/20/20) and re-pin the fingerprint baseline
+- **Share:** Blues 20% on the main stream, then `sohoShareOfNonBlues` (`60/80`) — **60% Soho /
+  20% Blues / 20% base** (Zack, 2026-10-16, replacing the 70/15/15 testing mix)
 - **Groove**, once per song: `ChillBeatStyle.sohoLatin` 55%, `.sohoSoul` 45%
 - **Tempo:** 84–128 BPM, triangular with a peak at 100, independent of the groove
 - **Mode:** base Chill's weights — Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%
@@ -646,12 +666,8 @@ tone is light, continuing base Chill's wry register.
   the RNG, so no note changes
 - **Instruments on replay:** a song is written to the persisted history only after its
   instruments are final, and replaying one re-pins the Chill leads to what the generator chose
-- **Best first Soho song:** the first Chill Soho song (no Soho song in the history, nothing
-  overridden) is swapped for one of `AppState.firstSohoSeeds` — twelve seeds whose natural song
-  has a Latin groove, Operator on flute, vibraphone on Lead 2, a Remix Break, Duo or bass-ostinato breakdown and the
-  hook coming home three or more times, chosen to be Soho under the release activation mix too.
-  Natural seeds rather than forced settings, so replay needs nothing recorded.
-  `firstSohoSeedsStillQualify` fails if a generator change breaks one; re-run the search then
+- **Best first Soho song:** see "The best first song" above (`AppState.firstSohoSeeds`,
+  `withFirstSohoSong`)
 - **Load paths (AppState):** `regenerateSong` is the one replay of a saved song (Songs list,
   startup preload, .zudio file), passing every recorded forced setting; `applyLoadedInstruments`
   and `configurePlaybackStyle` are the instrument and playback set-up every load runs. A forced
@@ -683,5 +699,5 @@ tone is light, continuing base Chill's wry register.
 - `swift test --filter ChillSohoTests` is the behavioural suite; `ChillLeadRegisterTests`,
   `InstrumentPoolDriftTests` and `WeightedPickTests` pin the registers, pools and weights
 
-**Before a real release:** revert the 70/15/15 activation mix, and remove the ⌘J / ⌃G Groove
-Fixup test toggle (`GrooveFixupTestMode.swift`, its menu item and key monitor).
+**Before a real release:** remove the ⌘J / ⌃G Groove Fixup test toggle
+(`GrooveFixupTestMode.swift`, its menu item and key monitor), and re-pin the fingerprint baseline.

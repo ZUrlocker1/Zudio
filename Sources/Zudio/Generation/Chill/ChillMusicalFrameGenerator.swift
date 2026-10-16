@@ -10,13 +10,13 @@ import Foundation
 
 struct ChillMusicalFrameGenerator {
 
-    /// Share of NON-Blues Chill songs that become Chill Soho. Blues takes 15% of Chill on the
-    /// main stream, so Soho's overall share is 0.85 x this.
+    /// Share of NON-Blues Chill songs that become Chill Soho. Blues takes 20% of Chill on the
+    /// main stream, so Soho's overall share is 0.80 x this.
     ///
-    /// The target mix is **70% Soho, 15% Blues, 15% base Chill** (Zack, 2026-10-13), which makes
-    /// this 70/85. Changing it changes which existing Chill seeds are Soho, but never their
-    /// main-stream draws. See docs/chill-soho-plan.md.
-    static let sohoShareOfNonBlues: Double = 70.0 / 85.0
+    /// The mix is **60% Soho, 20% Blues, 20% base Chill** (Zack, 2026-10-16; it was a 70/15/15
+    /// testing mix), which makes this 60/80. Changing it changes which existing Chill seeds are
+    /// Soho, but never their main-stream draws. See docs/chill-soho-plan.md.
+    static let sohoShareOfNonBlues: Double = 60.0 / 80.0
 
     static func generate(
         rng: inout SeededRNG,
@@ -38,13 +38,13 @@ struct ChillMusicalFrameGenerator {
         let mood = moodOverride ?? pickMood(rng: &rng)
         let key  = keyOverride  ?? pickKey(rng: &rng)
 
-        // Blues Chill activation: 15% of Chill songs.
-        let bluesVariation = forceBluesVariation || rng.nextDouble() < 0.15
+        // Blues Chill activation: 20% of Chill songs.
+        let bluesVariation = forceBluesVariation || rng.nextDouble() < 0.20
 
         // Chill Soho activation. `sohoRoll` comes from a DERIVED stream in the caller and is
         // never drawn from `rng`, so base Chill and Blues make exactly the same main-stream draws
-        // as they did before Soho existed. Blues keeps precedence: 15% Blues, then 70/85 of the
-        // remaining 85% = 70% Soho overall, leaving 15% base Chill.
+        // as they did before Soho existed. Blues keeps precedence: 20% Blues, then 60/80 of the
+        // remaining 80% = 60% Soho overall, leaving 20% base Chill.
         // The default of 1.0 means a caller that does not pass a roll never gets Soho.
         let sohoVariation = !bluesVariation && (forceSohoVariation || sohoRoll < sohoShareOfNonBlues)
 

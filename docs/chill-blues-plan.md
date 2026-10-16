@@ -18,7 +18,8 @@ implementation scope minimal.
 
 ## Activation
 
-- Probability: ~20% of Chill songs activate the blues variation at frame generation time
+- Probability: 20% of Chill songs activate the blues variation at frame generation time (60% are
+  Chill Soho and 20% base Chill; see docs/chill-soho-plan.md)
 - A `bluesVariation: Bool` flag is set in `ChillMusicalFrame` (or equivalent song frame)
 - When active, the drum generator routes to CHL-DRUM-006 (Intro, Groove A, Breakdown, Outro)
   and CHL-DRUM-007 (Groove B only) instead of CHL-DRUM-001 through 005
