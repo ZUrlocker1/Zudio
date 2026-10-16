@@ -649,13 +649,23 @@ struct RegisterBounds {
     }
 }
 
-/// Per-track registers. Chill's leads ALSO have a per-instrument register in
-/// `ChillLeadGenerator.register(for:)`, which is narrower and is the one that matters there —
-/// a tenor sax tops out well below Lead 1's track ceiling. Where both apply the instrument wins;
-/// see `GlobalMusicalFrame.leadRegisters` and `ChillLeadRegisterTests`.
+/// Per-track registers. **Only the Lead 1 and Lead 2 entries are enforced.** They are read by
+/// `GlobalMusicalFrame.clampToRegister` and by `HarmonicFilter`'s octave lift; every generator
+/// calls `clampToRegister` with its own explicit low and high instead of consulting this table.
 ///
-/// Note `kTrackDrums` holds percussion key numbers, not pitches, so its bounds are nominal and
-/// nothing should fold a drum note into them.
+/// The rest are nominal, and the music deliberately exceeds them — audited 2026-10-14:
+///
+/// - **Bass** reads 40–64 but genuinely plays down to **28**. Samba Pickup and Bossa Root-Fifth
+///   drop an octave below the root (`root - 12 >= 28`) and to the fifth below (`root - 5 >= 33`),
+///   which is what a samba surdo does. Do not "fix" the bass to 40 — that deletes the device.
+/// - **Pads** read 48–84 and reach 95 on CHL-PAD-002's staggered entry voicings.
+/// - **Drums** hold percussion key numbers, not pitches. GM runs to 87, so the bounds are
+///   meaningless there and nothing should fold a drum note into them.
+///
+/// Chill's leads ALSO have a per-instrument register in `ChillLeadGenerator.register(for:)`,
+/// which is narrower and is the one that matters there — a tenor sax tops out well below Lead 1's
+/// track ceiling, while a flute reaches past it. Where both apply the instrument wins; see
+/// `ChillLeadRegisterTests`.
 
 let kRegisterBounds: [Int: RegisterBounds] = [
     kTrackLead1:      RegisterBounds(low: 52, high: 79),

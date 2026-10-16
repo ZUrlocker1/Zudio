@@ -244,23 +244,25 @@ struct ChillRhythmGenerator {
     private static let allSohoSoulModes:  [CompingMode] = [.chordalComp, .singleNoteLine,
         .chordHold, .downbeatPulse, .rootAndChordEighths]
 
-    /// Chill Soho, Latin pool: CHL-RHY-007 45%, CHL-RHY-009 30%, CHL-RHY-008 25%.
+    /// Chill Soho, Latin pool: CHL-RHY-007 40%, CHL-RHY-009 30%, CHL-RHY-008 30%.
+    /// Levelled from 45/30/25 at Zack's call (2026-10-15).
     private static func pickSohoLatinCompingMode(rng: inout SeededRNG) -> CompingMode {
         let roll = rng.nextDouble()
-        if roll < 0.45 { return .chordalComp }
-        if roll < 0.75 { return .rootAndChordEighths }
+        if roll < 0.40 { return .chordalComp }
+        if roll < 0.70 { return .rootAndChordEighths }
         return .singleNoteLine
     }
 
-    /// Chill Soho, Soul pool: CHL-RHY-007 30%, CHL-RHY-008 30%, the reused Chord Hold and
-    /// Downbeat Pulse at 15% each, and CHL-RHY-009 at 10% (both EBTG sources are non-Latin).
+    /// Chill Soho, Soul pool: CHL-RHY-007 25%, CHL-RHY-008 25%, the reused Chord Hold and
+    /// Downbeat Pulse at 15% each, and CHL-RHY-009 at 20%. 009 was 10% (both EBTG sources are
+    /// non-Latin) and was raised at Zack's call (2026-10-15), from 007 and 008 equally.
     /// Bosa Moon (not a bossa) and the Moby backbeat stay excluded.
     private static func pickSohoSoulCompingMode(rng: inout SeededRNG) -> CompingMode {
         let roll = rng.nextDouble()
-        if roll < 0.30 { return .chordalComp }
-        if roll < 0.60 { return .singleNoteLine }
-        if roll < 0.75 { return .chordHold }
-        if roll < 0.90 { return .downbeatPulse }
+        if roll < 0.25 { return .chordalComp }
+        if roll < 0.50 { return .singleNoteLine }
+        if roll < 0.65 { return .chordHold }
+        if roll < 0.80 { return .downbeatPulse }
         return .rootAndChordEighths
     }
 

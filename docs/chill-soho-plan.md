@@ -741,7 +741,7 @@ median duration **47.6 steps** (nearly three bars), one note per phrase, rests o
 more. A sax holding long tones, closer to a pad than a melody. Compass 12 semitones.
 Weight ~20% — striking, and tiring if overused.
 
-**`CHL-LD1-012` Avalon Hook** — *Avalon* ch3. Base figure **3–6 notes** (6–8 under `expand`, plus
+**`CHL-LD1-012` Avalon Hook** — *Avalon* ch3. Base figure **3–6 notes** (6–8 under `extend`, plus
 an occasional run-on), compass only **10 semitones**, short rests (0.4 bars), and **30% closed**. A narrow repeating figure rather
 than a line — it recurs and varies instead of developing. Weight ~30%.
 
@@ -1013,7 +1013,7 @@ horn swell for the halo rule.
   solo alternative to the section
 - **Vibraphone (p11)** — *More Than This* ch3. The best non-brass dual-purpose patch: rings
   when held, percussive when short
-- ~~Clean Guitar (p27)~~ — **not in `Zudio.sf2`; would play silent**
+- ~~Clean Guitar (p27)~~ — not used on Texture
 - **Synth Lead (p85)** — *Avalon* ch13
 - **Celesta (p8)** — not measured, but bells decay naturally so they serve both rules, and they
   suit the Roxy Music end
@@ -1758,14 +1758,15 @@ Soho has its own pools where base Chill's are wrong:
   real horns. Nothing in the pool sustains except the brass, so a Sustained Halo song drawing one
   of the mallets gets a note that rings and decays inside its written length rather than holding —
   the brass covers 70% of picks
-- **Rhythm**: Rhodes 28%, Stereo Piano 24%, **Nylon Guitar 24%**, Wurlitzer 16%, Tonewheel 8%.
-  B3 Organ was dropped from Soho because base Chill and Blues both draw it. Nylon Guitar always
-  takes tremolo, at 4 Hz and 0.32 depth rather than the organs' 8 Hz and 0.40. Guitar is the corpus's dominant comping
-  voice: Jazz Guitar is in 8 of the 14 records and Clean Guitar in 7, between them more notes than
-  any other instrument, and neither is in `Zudio.sf2`. Muted Guitar is the damped offbeat chord
-  this music comps on; Nylon is warmer and suits the Latin side. Hawaiian Guitar (`8026`, which
-  sits in Jazz Guitar's slot in the SC-55 bank) was tried here and is out
-- **Lead 1**: Tenor Sax 30%, **Flute 22%**, Alto Sax 22%, **Soprano Sax 13%**, **Recorder 13%**.
+- **Rhythm**: Rhodes, Stereo Piano, **Nylon Guitar**, **Jazz Guitar** and **Funk Guitar** at 20%
+  each. Guitar is the corpus's dominant comping voice — Jazz Guitar in 8 of the 14 records, Clean
+  Guitar in 7 — and leads the part at 60%. Jazz and Funk Guitar were copied into `Zudio.sf2` from
+  GeneralUser GS 2.0.3 by `tools/sf2_copy_presets.py`; Funk is built on GeneralUser's Clean Guitar
+  samples, which come with it. Wurlitzer, Tonewheel and B3 Organ are not drawn in Soho. The guitars
+  sit together after Nylon in the one Chill rhythm pool, so every Chill form can pick them by hand.
+  Every guitar takes a 4 Hz, 0.32-depth amp tremolo by default (not the organs' 8 Hz Leslie).
+  Jazz Guitar is lifted: CC7 127 plus a 1.5× rhythm boost
+- **Lead 1**: Tenor Sax 25%, Alto Sax 25%, **Flute 24%**, **Soprano Sax 13%**, **Recorder 13%**.
   No brass at all — Muted Trumpet, Clarinet and Trumpet are all out (Zack, 2026-10-13), the last
   because it is in only 1 of the 14 files and for 154 notes. The first three follow the corpus:
   Tenor Sax is in 6 files, Alto Sax in 4, Flute in 4, the flute standing in for the singer.
@@ -1801,7 +1802,7 @@ Soho has its own pools where base Chill's are wrong:
   soundfont
 - **Lead 2**: as above
 - **Bass**: Fretless 37%, Acoustic 37%, **Elec Bass 25%** — base Chill draws all three evenly,
-  Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low and Comp**
+  Soho leans away from the electric. When Elec Bass is drawn the bass track takes **Low**
   on top of its reverb, set in both `AppState.restoreDefaultEffects` and
   `TrackRowView.applyDefaultEffects`, which must stay in step; the chips and the audio chain are
   the same switch, so they cannot drift
@@ -1962,11 +1963,12 @@ A dominant figure and two foils, not one figure and not thirty.
 
 **Per-song treatments.** Drawn once per song and applied to all three hooks, so a song is
 internally consistent but unlike the next: `displace` (figures start off the downbeat, on even
-sixteenths only — the groove fixup would pull them off odd ones), `aug` (durations doubled, the
-statement taking the bars it needs), `invert`, `retro`, `expand` (6–8 notes). **One third of songs
+sixteenths only — the groove fixup would pull them off odd ones), `lengthen` (every note twice as
+long, the statement taking the bars it needs), `invert`, `reverse` (moves and rhythm backwards in
+time), `extend` (6–8 notes). **One third of songs
 draw one treatment, two thirds draw two** — five singles and ten pairs, fifteen characters, each
 about equally likely. The treatments commute, so a pair's order never changes the result. The
-generation log names them: `Avalon hook aug, displace`.
+generation log names them: `Avalon displace lengthen`.
 
 **Figures breathe.** About one figure in seven runs on with 2–3 more notes built from its own
 moves mirrored, and a figure ending on an eighth or longer may have that note **held** — a half,

@@ -29,6 +29,7 @@ The download is `2.7` (build 132), a **work-in-progress build** with Chill Soho 
 - **Leads that sound sung** — phrases built from figures measured in the vocal lines and horn parts of the original records, with a saxophone answering in the gaps. A solo states a figure, answers it with a different one and returns to the first, the way the records do, rather than repeating itself. The hook rule taken from *Avalon* transforms its figures differently in every song — played off the beat, at double length, upside down, backwards or stretched longer — and lets a phrase run on, or end on a held note
 - **Solos that sit on the beat** — across every Chill song the leads are pulled into line with the rhythm section, so a phrase lands with the band rather than against it, and the notes of a phrase run into one another instead of being clipped short. Ordinary syncopation is left alone — where the groove anticipates a beat, the solo anticipates with it
 - **A Remix Break** — a short house-flavoured section mid-song, the band dropping into four-on-the-floor and hitting its way back out
+- **Guitar-led rhythm** — Nylon, Jazz and Funk guitar carry most of the comping, with Rhodes and piano
 
 **In development — Mac only:** ⌘J, or **File ▸ Groove Fixup (test)**, toggles the groove fixup on the current song's two lead tracks so the raw and corrected versions can be compared by ear. The MIDI lanes redraw on each press. It is a testing aid rather than a feature, there is no equivalent gesture on iPhone or iPad, and it is expected to be removed once the fixup has settled.
 

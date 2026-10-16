@@ -27,25 +27,29 @@ struct ChillPadsGenerator {
         if sohoVariation {
             // Soho pool, on the same roll. 003 Moby anchor is excluded — it is coded to its
             // reference. 000 Absent returns at once: no breakdown pad, no rest windows, nothing.
+            // Levelled 2026-10-15 (Zack): Soho Chord Hold was 30% and carried too many songs,
+            // so it and Half-Bar Pad now share 20% each and the freed weight lifts every one of
+            // the rarer rules rather than concentrating anywhere.
+            // 000 20 · 007 20 · 008 20 · 001 13 · 005 11 · 006 7 · 002 5 · 004 4
             if roll < 0.20 {
                 usedRuleIDs.insert("CHL-PAD-000")
                 return []
-            } else if roll < 0.50 {
+            } else if roll < 0.40 {
                 usedRuleIDs.insert("CHL-PAD-007")
                 events = sohoChordHold(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.65 {
+            } else if roll < 0.60 {
                 usedRuleIDs.insert("CHL-PAD-008")
                 events = halfBarPad(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.77 {
+            } else if roll < 0.73 {
                 usedRuleIDs.insert("CHL-PAD-001")
                 events = chordSustain(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.87 {
+            } else if roll < 0.84 {
                 usedRuleIDs.insert("CHL-PAD-005")
                 events = slowChordBuild(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.93 {
+            } else if roll < 0.91 {
                 usedRuleIDs.insert("CHL-PAD-006")
                 events = portisheadStrings(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.97 {
+            } else if roll < 0.96 {
                 usedRuleIDs.insert("CHL-PAD-002")
                 events = staggeredEntry(frame: frame, structure: structure, rng: &rng)
             } else {

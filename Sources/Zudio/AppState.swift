@@ -604,9 +604,8 @@ final class AppState: ObservableObject {
         // too but is not in Zudio.sf2.
         // Chill Soho rhythm: base Chill's keyboards plus guitars. Guitar is the corpus's dominant
         // comping voice — Jazz Guitar is in 8 of the 14 records and Clean Guitar in 7, between
-        // them more notes than anything else — and neither is in Zudio.sf2. These three are what
-        // it has: Muted Guitar is the damped offbeat chord this music comps on, Nylon is warmer
-        // and suits the Latin side, Hawaiian sits in the SC-55 bank at GM 26, Jazz Guitar's slot.
+        // them more notes than anything else. Neither was in Zudio.sf2 until both were copied in
+        // for the 2026-10-15 audition, alongside five more — see the Soho rhythm branch above.
         // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
@@ -640,11 +639,21 @@ final class AppState: ObservableObject {
         //           a part for a choir
         // Stereo Strings (p49) is the only pad shared at all, by Blues and Soho; nothing is
         // common to all three.
-        case (kTrackPads,    .chill):   return ["Warm Pad","Strings Fast","Sweep Pad","Soundtrack","Cello","Synth Strings 4","Synth Strings 5","Strings Slow","Halo Pad","Bowed Glass"]
+        case (kTrackPads,    .chill):   return ["Warm Pad","Strings Fast","Sweep Pad","Soundtrack","Cello","Synth Strings 5","Strings Slow","Halo Pad","Bowed Glass"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
         case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
-        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar"]
+        // Chill rhythm, every form. The guitars after Nylon were copied into Zudio.sf2 from
+        // GeneralUser GS 2.0.3 (tools/sf2_copy_presets.py) for a Soho audition (2026-10-15) and
+        // are kept adjacent so the picker reads as one block. Only Soho draws them at random;
+        // base Chill and Blues reach them through the picker — one pool for all three forms,
+        // no per-form pickers (Zack, 2026-10-15). Wah Guitar (11029), 12-String Guitar (8025),
+        // Steel Guitar (25) and Clean Guitar 2 (12027) came out after listening and were removed
+        // from the soundfont again by tools/sf2_remove_presets.py. Clean Guitar (27) came out of
+        // the pool later; it stays in the soundfont, as Funk Guitar is built on its samples. Every guitar takes the amp
+        // tremolo by default — see rhythmUsesTremolo, which keys on the GM guitar family.
+        case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar",
+                                                 "Jazz Guitar","Funk Guitar"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1"]
@@ -693,10 +702,10 @@ final class AppState: ObservableObject {
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
         case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
-        case (kTrackPads, .chill):     return [89, 48, 95, 97, 42, 11050, 11051, 49, 94, 92]
+        case (kTrackPads, .chill):     return [89, 48, 95, 97, 42, 11051, 49, 94, 92]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
-        case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016, 24]
+        case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016, 24, 26, 8028]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096]  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
         // Clavinet (GM 7) was removed in build 131: the preset is not present in Zudio.sf2, so it
         // played silent and logged "Missing MIDI patch 7".
@@ -749,6 +758,9 @@ final class AppState: ObservableObject {
             // patches, which are pads and organs sitting further back.
             case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
             case (kTrackRhythm,  .chill,   "Tonewheel"):    return 65
+            // Chill audition guitar (Zack, 2026-10-15): Jazz sat under the rest of the rhythm
+            // pool. 127 is the CC7 ceiling; the rest of its lift is PlaybackEngine's rhythm boost.
+            case (kTrackRhythm,  .chill,   "Jazz Guitar"):   return 127
             // Bowed Glass is a soft patch and sat under the rest of the Chill pad pool. 115 was
             // still too quiet, so it now takes the CC7 ceiling (Zack, 2026-10-13). Nothing more
             // is available through channel volume; a further lift would need
@@ -898,8 +910,14 @@ final class AppState: ObservableObject {
 
     // MARK: - Per-track UI state
 
-    @Published var muteState: [Bool] = Array(repeating: false, count: kTrackCount)
-    @Published var soloState: [Bool] = Array(repeating: false, count: kTrackCount)
+    // Both observed so the audio texture follows every write — the toggles and the six places a
+    // new song resets them. It plays outside PlaybackEngine's mixer, so engine mute misses it.
+    @Published var muteState: [Bool] = Array(repeating: false, count: kTrackCount) {
+        didSet { syncAudioTextureSilence() }
+    }
+    @Published var soloState: [Bool] = Array(repeating: false, count: kTrackCount) {
+        didSet { syncAudioTextureSilence() }
+    }
 
     /// trackIndex → Date when a flash was triggered (dry/wet toggle, instrument regen).
     /// VisualizerView reads this each frame via TimelineView — does NOT need @Published.
@@ -1438,38 +1456,8 @@ final class AppState: ObservableObject {
                     self.randomizeTwoInstruments(style: style)
                 }
                 self.replaceOnceOnlyInstruments(style: style)
-                self.sanitiseBluesInstruments(for: state)
-                self.sanitiseSohoInstruments(for: state)
-                self.sanitiseNoirInstruments(for: state)
-                self.sanitiseDriftInstruments(for: state)
-                self.sanitiseArcadeInstruments(for: state)
-                self.sanitiseSyncInstruments(for: state)
+                self.sanitiseInstruments(for: state)
                 self.applyBluesPadsInstrument(for: state)
-                // Chill: sync Lead 1 and Lead 2 overrides to generation-time instruments so log and
-                // playback agree. chillLeadInstrument/chillLead2Instrument drive musical generation
-                // (phrasing, register); instrumentOverrides drives the sampler patch — they must match.
-                if style == .chill {
-                    let l1Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill,
-                                                             isChillSoho: state.chillSohoVariation)
-                    if let idx = l1Pool.firstIndex(of: Int(state.chillLeadInstrument.gmProgram)) {
-                        self.instrumentOverrides[kTrackLead1] = idx
-                    }
-                    let l2Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill,
-                                                             isChillSoho: state.chillSohoVariation)
-                    if let idx = l2Pool.firstIndex(of: Int(state.chillLead2Instrument.gmProgram)) {
-                        self.instrumentOverrides[kTrackLead2] = idx
-                    }
-                    // Chill Soho's texture is MIDI: its override is a real pool index, already set
-                    // by randomise/seed and kept in range by sanitiseSohoInstruments.
-                    if !state.chillSohoVariation {
-                        self.instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
-                    }
-                }
-                // Ambient audio texture: set picker index to match the chosen file.
-                if style == .ambient, let audioTex = state.ambientAudioTexture {
-                    let prog = Self.ambientAudioProgram(forFilename: audioTex)
-                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
-                }
                 // Snapshot the final overrides — resetEffectsToDefaults() restores from here.
                 self.songInstrumentOverrides = self.instrumentOverrides
                 self.sessionInstrumentOverrides[state.globalSeed] = self.instrumentOverrides
@@ -1895,111 +1883,75 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Ensures Motorik bass and Lead 1 instruments are appropriate for Noir vs regular.
-    /// Fixes any stale override left over from the previous song when the Noir flag changed.
-    private func sanitiseNoirInstruments(for state: SongState) {
-        guard state.style == .motorik else { return }
-        let isNoir = state.motorikNoirVariation
-        var rng    = SystemRandomNumberGenerator()
-
-        // Bass pool: [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass]
-        let bassNoirOnly: Set<Int>    = [4, 5]
-        let bassRegularOnly: Set<Int> = [2, 3]
-        let currentBass = instrumentOverrides[kTrackBass] ?? 0
-        if isNoir ? bassRegularOnly.contains(currentBass) : bassNoirOnly.contains(currentBass) {
-            let valid = isNoir ? [0, 1, 4, 5] : [0, 1, 2, 3]
-            instrumentOverrides[kTrackBass] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Lead 1 pool: [0=Mono Synth, 1=Saw Lead 3, 2=Soft Brass, 3=Polysynth, 4=Chiff Lead, 5=Square Lead, 6=Synth Lead, 7=Saw Stack]
-        let ld1NoirOnly: Set<Int>    = [5, 7]
-        let ld1RegularOnly: Set<Int> = [0, 2, 3]
-        let currentLd1 = instrumentOverrides[kTrackLead1] ?? 0
-        if isNoir ? ld1RegularOnly.contains(currentLd1) : ld1NoirOnly.contains(currentLd1) {
-            let valid = isNoir ? [1, 4, 5, 6, 7] : [0, 1, 2, 3, 4, 6]
-            instrumentOverrides[kTrackLead1] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Rhythm pool: [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass, 5=Pick Bass, 6=Synth Bass 3, 7=Charang]
-        let rhtmNoirOnly: Set<Int>    = [3, 7]       // Doctor Solo + Charang are Noir-only
-        let rhtmRegularOnly: Set<Int> = [0, 1, 4]    // Guitar Pulse + Crunch Guitar + Acoustic Bass are regular-only
-        let currentRhtm = instrumentOverrides[kTrackRhythm] ?? 0
-        if isNoir ? rhtmRegularOnly.contains(currentRhtm) : rhtmNoirOnly.contains(currentRhtm) {
-            let valid = isNoir ? [2, 3, 5, 6, 7] : [0, 1, 2, 4, 5, 6]
-            instrumentOverrides[kTrackRhythm] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Texture pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes,
-        //                5=Solar Wind, 6=Interference, 7=Guitar Fdbk]
-        let texNoirOnly: Set<Int>    = [0, 2, 6, 7]
-        let texRegularOnly: Set<Int> = [1, 4]
-        let currentTex = instrumentOverrides[kTrackTexture] ?? 0
-        if isNoir ? texRegularOnly.contains(currentTex) : texNoirOnly.contains(currentTex) {
-            let valid = isNoir ? [0, 2, 3, 5, 6, 7] : [1, 3, 4, 5]
-            instrumentOverrides[kTrackTexture] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Drums pool: [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit]
-        let currentDrums = instrumentOverrides[kTrackDrums] ?? 0
-        if isNoir && currentDrums == 2 {
-            // Dance Drums not available in Noir — swap to Rock Kit, Brush Kit, or Machine Kit
-            let valid = [0, 1, 3]
-            instrumentOverrides[kTrackDrums] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        } else if !isNoir && !state.motorikArcadeVariation && currentDrums == 3 {
-            // Machine Kit not available in Regular — swap to Rock Kit, Brush Kit, or Dance Drums
-            instrumentOverrides[kTrackDrums] = Int.random(in: 0..<3, using: &rng)
-        }
-    }
-
-    /// Forces every Kraftwerk-sync track into its restricted instrument subset.
-    ///
-    /// The pick pool alone is not enough. Only two instruments are re-picked per song, so the
-    /// other five carry over from the previous song untouched — a sync could inherit Fuzz
-    /// Guitar on Rhythm, which is a guitar riff rather than a sequencer and is the exact case
-    /// the subsets exist to prevent. Noir and Arcade each have a sanitiser for the same reason;
-    /// this is the sync's. It also covers the first song of a style, where every override
-    /// defaults to index 0.
-    private func sanitiseSyncInstruments(for state: SongState) {
-        guard state.style == .motorik, state.motorikSync.isActive else { return }
-        sanitiseInstrumentsToPool(for: state)
-    }
-
-    /// Forces every track's instrument into the set its substyle allows.
+    /// Brings every track's instrument inside the set its style and substyle allow, then pins the
+    /// tracks the generator chose for itself. The one sanitiser, for every style.
     ///
     /// Only two instruments are re-picked per song, so the other five carry over from the
-    /// previous song untouched — an Arcade song could inherit Fuzz Guitar on Rhythm, or a sync
-    /// song a guitar where a sequencer belongs. This also covers the first song of a style,
-    /// where every override defaults to index 0.
+    /// previous song untouched: a Noir song could inherit a regular Motorik bass, a base Chill
+    /// song a Soho guitar, a sync song a guitar where a sequencer belongs. This also covers the
+    /// first song of a style, where every override defaults to index 0.
     ///
-    /// Driven by `instrumentPickPool`, so the allowed set is written down once. Arcade and the
-    /// sync groups both express their restriction as "this subset of the pool", which is what
-    /// this enforces. Noir does not — see `sanitiseNoirInstruments`.
-    private func sanitiseInstrumentsToPool(for state: SongState) {
+    /// There used to be seven of these — Noir, Arcade, Sync, Drift, Blues, Soho and base Chill —
+    /// and they did not agree. Noir, Drift and Blues carried their own hard-coded index lists,
+    /// which had drifted from the pick pools; regular Kosmic had none at all; and the Endless and
+    /// Evolve paths each skipped a different subset of them (Zack, 2026-10-15: "make sure they all
+    /// are consistent"). The allowed set is now written down once, in `instrumentPickPoolStatic`,
+    /// and every generation path calls this.
+    private func sanitiseInstruments(for state: SongState) {
         var rng = SystemRandomNumberGenerator()
-        for track in 0..<kTrackCount {
-            let pool = Self.instrumentPoolNames(trackIndex: track, style: state.style,
-                                                isChillSoho: state.chillSohoVariation)
-            guard pool.count > 1 else { continue }
-            let allowed = instrumentPickPool(trackIndex: track, style: state.style,
-                                             poolCount: pool.count)
-            guard !allowed.isEmpty,
-                  !allowed.contains(instrumentOverrides[track] ?? 0) else { continue }
-            instrumentOverrides[track] = allowed[Int.random(in: 0..<allowed.count, using: &rng)]
+        instrumentOverrides = Self.sanitisedOverrides(instrumentOverrides, for: state, using: &rng)
+        syncGeneratedInstruments(for: state)
+    }
+
+    /// The pure part of `sanitiseInstruments`, static so it can be tested. An override already
+    /// inside its pick pool is never touched — so a manual choice survives whenever the new song's
+    /// form allows it — and one outside is re-picked from the pool, weights included.
+    /// Chill's Lead 1 and Lead 2 are skipped: the generator chooses those and
+    /// `syncGeneratedInstruments` pins them to the song.
+    nonisolated static func sanitisedOverrides<R: RandomNumberGenerator>(
+        _ overrides: [Int: Int], for state: SongState, using rng: inout R) -> [Int: Int] {
+        var out = overrides
+        let generatorOwned: Set<Int> = state.style == .chill ? [kTrackLead1, kTrackLead2] : []
+        for track in 0..<kTrackCount where !generatorOwned.contains(track) {
+            let count = instrumentPoolNames(trackIndex: track, style: state.style,
+                                            isChillSoho: state.chillSohoVariation).count
+            guard count > 1 else { continue }
+            let allowed = instrumentPickPoolStatic(trackIndex: track, style: state.style,
+                                                   poolCount: count, state: state)
+            guard !allowed.isEmpty, !allowed.contains(out[track] ?? 0) else { continue }
+            out[track] = allowed[Int.random(in: 0..<allowed.count, using: &rng)]
         }
+        return out
     }
 
-    private func sanitiseArcadeInstruments(for state: SongState) {
-        guard state.style == .motorik, state.motorikArcadeVariation else { return }
-        sanitiseInstrumentsToPool(for: state)
-    }
-
-    /// Chill Soho: keeps every track inside the pools `instrumentPickPoolStatic` allows for Soho.
-    /// Needed for the same reason as the others — only two instruments are re-picked per song,
-    /// so a Soho song would otherwise inherit the previous song's 808 Kit. Called on all three
-    /// generation paths; Arcade and Sync are currently only called on one of them.
-    private func sanitiseSohoInstruments(for state: SongState) {
-        guard state.style == .chill, state.chillSohoVariation else { return }
-        sanitiseInstrumentsToPool(for: state)
+    /// Points the picker at what the song was generated with, for the tracks the generator chooses
+    /// itself. Chill's leads drive phrasing and register at generation time and the sampler patch
+    /// comes from `instrumentOverrides`, so the two must match — this used to run on the Generate
+    /// path only, and an Endless or Evolve Chill song played its leads on whatever patch the
+    /// previous song left behind.
+    private func syncGeneratedInstruments(for state: SongState) {
+        if state.style == .chill {
+            let l1Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill,
+                                                     isChillSoho: state.chillSohoVariation)
+            if let idx = l1Pool.firstIndex(of: Int(state.chillLeadInstrument.gmProgram)) {
+                instrumentOverrides[kTrackLead1] = idx
+            }
+            let l2Pool = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill,
+                                                     isChillSoho: state.chillSohoVariation)
+            if let idx = l2Pool.firstIndex(of: Int(state.chillLead2Instrument.gmProgram)) {
+                instrumentOverrides[kTrackLead2] = idx
+            }
+            // Chill Soho's texture is MIDI: its override is a real pool index, already set by
+            // randomise/seed and kept in range by the sanitiser.
+            if !state.chillSohoVariation {
+                instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
+            }
+        }
+        // Ambient audio texture: set picker index to match the chosen file.
+        if state.style == .ambient, let audioTex = state.ambientAudioTexture {
+            let prog = Self.ambientAudioProgram(forFilename: audioTex)
+            instrumentOverrides[kTrackTexture] = Int(prog) - 231
+        }
     }
 
     /// Forces Lead 1 to Stereo Piano (pool index 0) for Ambient Piano songs.
@@ -2169,64 +2121,9 @@ final class AppState: ObservableObject {
             overrides[entry.track] = newIdx
         }
 
-        // Substyle sanitisation (same logic as sanitiseXxx methods)
-        if style == .motorik, state.motorikNoirVariation {
-            let bassNoirOnly: Set<Int> = [4, 5]; let bassRegOnly: Set<Int> = [2, 3]
-            let cb = overrides[kTrackBass] ?? 0
-            if bassRegOnly.contains(cb) { overrides[kTrackBass] = [0,1,4,5][Int.random(in:0..<4,using:&rng)] }
-            let cl = overrides[kTrackLead1] ?? 0
-            if [0,2,3].contains(cl)    { overrides[kTrackLead1] = [1,4,5,6,7][Int.random(in:0..<5,using:&rng)] }
-            let cr = overrides[kTrackRhythm] ?? 0
-            if [0,1,4].contains(cr)    { overrides[kTrackRhythm] = [2,3,5,6,7][Int.random(in:0..<5,using:&rng)] }
-            let cd = overrides[kTrackDrums] ?? 0
-            if cd == 2 { overrides[kTrackDrums] = [0,1,3][Int.random(in:0..<3,using:&rng)] }
-            let _ = bassNoirOnly  // silence unused warning
-        } else if style == .motorik, state.motorikArcadeVariation {
-            // Arcade: enforce restricted pools — covers first song (index 0 default) and cross-style bleed
-            let cd = overrides[kTrackDrums] ?? 0
-            if ![2, 3].contains(cd) { overrides[kTrackDrums] = Bool.random(using: &rng) ? 2 : 3 }
-            let cl2 = overrides[kTrackLead2] ?? 0
-            if ![2, 5, 7].contains(cl2) { overrides[kTrackLead2] = [2, 5, 7][Int.random(in: 0..<3, using: &rng)] }
-            let cb = overrides[kTrackBass] ?? 0
-            if ![1, 3, 4, 5, 6].contains(cb) { overrides[kTrackBass] = [1, 3, 4, 5, 6][Int.random(in: 0..<5, using: &rng)] }
-            // [0, 1, 6, 7], matching instrumentPickPoolStatic. This read [0, 1, 5, 6, 7], which
-            // additionally permitted Square Lead (5) — a lead the pick pool never selects for
-            // Arcade, so it could only ever appear by carrying over from a previous song
-            // (Zack, 2026-10-13).
-            let cl1 = overrides[kTrackLead1] ?? 0
-            if ![0, 1, 6, 7].contains(cl1) { overrides[kTrackLead1] = [0, 1, 6, 7][Int.random(in: 0..<4, using: &rng)] }
-            let cr = overrides[kTrackRhythm] ?? 0
-            if ![0, 6, 9].contains(cr) { overrides[kTrackRhythm] = [0, 6, 9][Int.random(in: 0..<3, using: &rng)] }
-            let cp = overrides[kTrackPads] ?? 0
-            if cp == 2 { overrides[kTrackPads] = Bool.random(using: &rng) ? 0 : 3 }
-            let ct = overrides[kTrackTexture] ?? 0
-            if ![0, 3, 5, 6, 8, 9, 10].contains(ct) { overrides[kTrackTexture] = [0, 3, 5, 6, 8, 9, 10][Int.random(in: 0..<7, using: &rng)] }
-        } else if style == .motorik, state.motorikSync.isActive {
-            // Kraftwerk sync — same enforcement as sanitiseSyncInstruments, and it takes
-            // precedence over the plain base-Motorik pass below.
-            for track in 0..<kTrackCount {
-                guard let subset = state.motorikSync.instrumentSubset(forTrack: track),
-                      !subset.contains(overrides[track] ?? 0) else { continue }
-                overrides[track] = subset[Int.random(in: 0..<subset.count, using: &rng)]
-            }
-        } else if style == .motorik {
-            let cd = overrides[kTrackDrums] ?? 0
-            if cd == 3 { overrides[kTrackDrums] = Int.random(in:0..<3, using:&rng) }
-        }
-        if style == .kosmic, state.isKosmicDrift {
-            // Replacement menu matches instrumentPickPoolStatic. It read [1,2,3,4], which offered
-            // Mono Synth (2) — excluded from Drift bass by the pick pool (Zack, 2026-10-13).
-            let cb = overrides[kTrackBass] ?? 0;   if cb == 0           { overrides[kTrackBass]    = [1,3,4,6,7][Int.random(in:0..<5,using:&rng)] }
-            let cl = overrides[kTrackLead1] ?? 0;  if cl <= 3           { overrides[kTrackLead1]   = [4,5,6,7][Int.random(in:0..<4,using:&rng)] }
-            let cr = overrides[kTrackRhythm] ?? 0; if (1...3).contains(cr) { overrides[kTrackRhythm] = [0,4,5,6,7][Int.random(in:0..<5,using:&rng)] }
-            let cd = overrides[kTrackDrums] ?? 0;  if cd == 0 || cd == 1{ overrides[kTrackDrums]   = [2,3,4][Int.random(in:0..<3,using:&rng)] }
-        }
+        // Substyle sanitisation — the same function the live paths call.
+        overrides = sanitisedOverrides(overrides, for: state, using: &rng)
         if style == .chill, state.chillBluesVariation {
-            let pool2 = instrumentPoolNames(trackIndex: kTrackLead2, style: .chill)
-            let vp2   = instrumentPickPoolStatic(trackIndex: kTrackLead2, style: .chill, poolCount: pool2.count, state: state)
-            if let cur = overrides[kTrackLead2], !Set(vp2).contains(cur) {
-                overrides[kTrackLead2] = vp2[Int.random(in:0..<vp2.count, using:&rng)]
-            }
             // Drawn from the Blues pads pick pool, not hard-coded indices. This read
             // `Bool.random() ? 0 : 2` with the comment "Warm Pad or String Pad"; after the pads
             // were split per Chill form those indices meant Strings Slow and Cello, and neither
@@ -2281,9 +2178,15 @@ final class AppState: ObservableObject {
             return Array(0..<poolCount)
         }
         if style == .motorik && trackIndex == kTrackTexture {
-            // Pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk]
+            // Pool: [0=Fifths Lead, 1=Halo Pad, 2=Warm Pad, 3=FX Atmosphere, 4=FX Echoes, 5=Solar Wind, 6=Interference, 7=Guitar Fdbk,
+            //        8=Metal Pad, 9=Ice Rain, 10=Mystery Pad]
             if state?.motorikArcadeVariation == true { return [0, 3, 5, 6, 8, 9, 10] }  // Arcade: electronic textures only
-            return state?.motorikNoirVariation == true ? [0, 2, 3, 5, 6, 7] : Array(0..<poolCount)
+            // Regular: Halo Pad, FX Atmosphere, FX Echoes and Solar Wind. Fifths Lead, Warm Pad,
+            // Interference and Guitar Fdbk are Noir's; Metal Pad, Ice Rain and Mystery Pad (8-10)
+            // were added for Arcade (Zack, 2026-10-15). This list used to be the whole pool while
+            // the old Noir sanitiser swapped Noir's four straight back out, which let the Arcade
+            // three through.
+            return state?.motorikNoirVariation == true ? [0, 2, 3, 5, 6, 7] : [1, 3, 4, 5]
         }
         if style == .kosmic {
             let isDrift = state?.isKosmicDrift == true
@@ -2311,27 +2214,28 @@ final class AppState: ObservableObject {
         case kTrackBass where isSoho:
             // Chill Soho bass: [0=Fretless, 1=Acoustic, 2=Elec Bass]. Elec Bass is in the mix but
             // less often than the other two — 25% against base Chill's even 33% (Zack,
-            // 2026-10-12). When it is drawn it takes Low and Comp, in both effect-default paths.
+            // 2026-10-12). When it is drawn it takes Low, in both effect-default paths.
             return [0, 0, 0, 1, 1, 1, 2, 2].filter { $0 < poolCount }
         case kTrackDrums where isSoho:
             // Chill Soho drums are rim click, brushes and a soft backbeat — never the 808.
             // Pool: [0=Brush Kit, 1=808 Kit, 2=Jazz Drums]. See docs/chill-soho-plan.md.
             return [0, 2].filter { $0 < poolCount }
         // ---- Chill pads. Pool (all forms):
-        //   [0=Warm Pad, 1=Strings Fast, 2=Sweep Pad, 3=Soundtrack, 4=Cello, 5=Synth Strings 4,
-        //    6=Synth Strings 5, 7=Strings Slow, 8=Halo Pad, 9=Bowed Glass]
+        //   [0=Warm Pad, 1=Strings Fast, 2=Sweep Pad, 3=Soundtrack, 4=Cello, 5=Synth Strings 5,
+        //    6=Strings Slow, 7=Halo Pad, 8=Bowed Glass]
         case kTrackPads where isSoho:
             // Strings Slow 42%, Halo Pad 33%, Bowed Glass 25%. Concert Choir was tried and
             // removed: the pads are too busy a part to carry a choir, and the Texture track that
             // might have suited it occasionally is doing horn hits (Zack, 2026-10-13).
-            return [7,7,7,7,7, 8,8,8,8, 9,9,9].filter { $0 < poolCount }
+            return [6,6,6,6,6, 7,7,7,7, 8,8,8].filter { $0 < poolCount }
         case kTrackPads where isBlues:
-            // Strings Fast, Cello, Synth Strings 4 and 5, evenly. Synth Strings 1 and 3, then
-            // Strings Slow, were auditioned here and dropped.
+            // Strings Fast, Cello and Synth Strings 5, evenly. Synth Strings 1 and 3, then
+            // Strings Slow, were auditioned here and dropped, and Synth Strings 4 came out of the
+            // pool (Zack, 2026-10-15).
             //
             // Zudio.sf2 has NO Violin, Viola, Contrabass, Tremolo Strings or Pizzicato — those GM
             // slots were stripped from GeneralUser GS in build 119.
-            return [1, 4, 5, 6].filter { $0 < poolCount }
+            return [1, 4, 5].filter { $0 < poolCount }
         case kTrackPads where style == .chill:
             // Warm Pad 28%, Strings Fast 24%, Sweep Pad 24%, Soundtrack 24%. Base Chill is the
             // one Chill form where a frankly synthetic pad belongs: its beat styles include
@@ -2355,15 +2259,18 @@ final class AppState: ObservableObject {
 
         // ---- Chill rhythm. Pool (all forms):
         //   [0=Rhodes, 1=Wurlitzer, 2=B3 Organ, 3=Perc Organ, 4=Stereo Piano, 5=Rock Organ,
-        //    6=Tonewheel, 7=Nylon Guitar]
+        //    6=Tonewheel, 7=Nylon Guitar, 8=Jazz Guitar, 9=Funk Guitar]
         case kTrackRhythm where isSoho:
-            // Rhodes 28%, Stereo Piano 24%, Nylon Guitar 24%, Wurlitzer 16%, Tonewheel 8%.
-            // B3 Organ is out: base Chill and Blues both draw it, so it did not separate Soho.
-            // Nylon Guitar always takes tremolo — see AppState.rhythmUsesTremolo.
-            return [0,0,0,0,0,0,0, 1,1,1,1, 4,4,4,4,4,4, 6,6, 7,7,7,7,7,7].filter { $0 < poolCount }
+            // Guitar-led for now (Zack, 2026-10-15): Rhodes, Stereo Piano, Nylon, Jazz and Funk
+            // Guitar at 20% each, the three guitars 60% between them. Guitar is the
+            // corpus's dominant comping voice, Jazz Guitar in 8 of the 14 records and Clean Guitar
+            // in 7. Wurlitzer and Tonewheel are out of Soho; B3 Organ already was, because base
+            // Chill and Blues both draw it. All three stay in the shared picker.
+            // Every guitar always takes tremolo — see AppState.rhythmUsesTremolo.
+            return [0, 4, 7, 8, 9].filter { $0 < poolCount }
         case kTrackRhythm where style == .chill:
             // Blues is organ-led: B3, Perc Organ, Stereo Piano, Rock Organ. Base Chill favours
-            // the electric pianos.
+            // the electric pianos. Neither draws the guitars at random; both can pick them.
             return (isBlues ? [2,2,2,2,3,3,3,3,3,3,4,4,4,4,5,5,5,5,5,5]
                             : [0,0,0,1,1,1,2,2,4,4,6,6]).filter { $0 < poolCount }
 
@@ -2397,60 +2304,6 @@ final class AppState: ObservableObject {
     private func instrumentPickPool(trackIndex: Int, style: MusicStyle, poolCount: Int) -> [Int] {
         Self.instrumentPickPoolStatic(trackIndex: trackIndex, style: style,
                                       poolCount: poolCount, state: songState)
-    }
-
-    /// Ensures Kosmic Drift bass is never Moog (index 0) — Moog is Kosmic-regular only.
-    /// Fixes stale overrides from prior regular-Kosmic songs where Moog was the default.
-    private func sanitiseDriftInstruments(for state: SongState) {
-        guard state.style == .kosmic, state.isKosmicDrift else { return }
-        var rng = SystemRandomNumberGenerator()
-
-        // Bass: [0=Moog, 1=Lead Bass, 2=Mono Synth, 3=Rock Bass, 4=Synth Bass 3, 5=Pulse Bass, 6=Tonewheel, 7=Warm Pad] — Moog excluded from Drift random.
-        let currentBass = instrumentOverrides[kTrackBass] ?? 0
-        if currentBass == 0 {
-            let valid = [1, 2, 3, 4, 6, 7]
-            instrumentOverrides[kTrackBass] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Lead 1: [0=Flute, 1=Brightness, 2=Oboe, 3=Recorder, 4=Warm Pad, 5=Sine Wave, 6=Bottle Blow, 7=Shenai]
-        // Regular-only instruments (0-3) must not appear in Drift — swap to Drift-appropriate.
-        let currentLd1 = instrumentOverrides[kTrackLead1] ?? 0
-        if currentLd1 <= 3 {
-            let valid = [4, 5, 6, 7]
-            instrumentOverrides[kTrackLead1] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Rhythm: [0=Moog, 1=Wurlitzer, 2=Rock Organ, 3=Harpsi Pad, 4=New Age Pad, 5=Synth Mallet, 6=Synth Chime, 7=Mystery Pad]
-        // Regular-only: Wurlitzer/Rock Organ/Harpsi Pad (1-3) — Moog (0) is shared.
-        let currentRhtm = instrumentOverrides[kTrackRhythm] ?? 0
-        if (1...3).contains(currentRhtm) {
-            let valid = [0, 4, 5, 6, 7]
-            instrumentOverrides[kTrackRhythm] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-
-        // Drums: [0=808 Kit, 1=Machine Kit, 2=Standard Kit, 3=Brush Kit, 4=Jazz Kit]
-        // 808 Kit (0) and Machine Kit (1) are Regular-only — swap to Drift-appropriate.
-        let currentDrums = instrumentOverrides[kTrackDrums] ?? 0
-        if currentDrums == 0 || currentDrums == 1 {
-            let valid = [2, 3, 4]
-            instrumentOverrides[kTrackDrums] = valid[Int.random(in: 0..<valid.count, using: &rng)]
-        }
-    }
-
-    /// After randomisation, enforce per-song instrument constraints.
-    /// Chill blues: Lead 2 must not be Flute (index 1) or Xylophone (index 4).
-    /// These instruments can be stale from a prior regular-Chill song when the randomly chosen
-    /// 2 tracks didn't happen to include Lead 2 or Rhythm.
-    private func sanitiseBluesInstruments(for state: SongState) {
-        guard state.style == .chill, state.chillBluesVariation else { return }
-        var rng = SystemRandomNumberGenerator()
-        for trackIdx in [kTrackLead2, kTrackRhythm] {
-            guard let current = instrumentOverrides[trackIdx] else { continue }
-            let pool = Self.instrumentPoolNames(trackIndex: trackIdx, style: .chill)
-            let validPool = instrumentPickPool(trackIndex: trackIdx, style: .chill, poolCount: pool.count)
-            guard !Set(validPool).contains(current) else { continue }
-            instrumentOverrides[trackIdx] = validPool[Int.random(in: 0..<validPool.count, using: &rng)]
-        }
     }
 
     /// Sets pad instrument for blues songs (Warm Pad or String Pad, equally weighted) and
@@ -2498,9 +2351,7 @@ final class AppState: ObservableObject {
             self.appendGenerationLog(state.generationLog)
             self.randomizeTwoInstruments(style: state.style)
             self.replaceOnceOnlyInstruments(style: state.style)
-            self.sanitiseBluesInstruments(for: state)
-            self.sanitiseSohoInstruments(for: state)
-            self.sanitiseNoirInstruments(for: state)
+            self.sanitiseInstruments(for: state)
             self.applyBluesPadsInstrument(for: state)
             self.applyAmbientPianoInstrument(for: state)
             self.restoreLead2Mirror()
@@ -3086,10 +2937,7 @@ final class AppState: ObservableObject {
         appendGenerationLog(state.generationLog)
         if !alreadyEvolved { randomizeTwoInstruments(style: state.style) }
         replaceOnceOnlyInstruments(style: state.style)
-        sanitiseBluesInstruments(for: state)
-        sanitiseSohoInstruments(for: state)
-        sanitiseNoirInstruments(for: state)
-        sanitiseDriftInstruments(for: state)
+        sanitiseInstruments(for: state)
         applyBluesPadsInstrument(for: state)
         applyAmbientPianoInstrument(for: state)
         restoreLead2Mirror()
@@ -3814,10 +3662,15 @@ final class AppState: ObservableObject {
     func toggleSolo(_ trackIndex: Int) {
         soloState[trackIndex].toggle()
         playback.soloState = soloState
-        // AudioTexturePlayer is outside PlaybackEngine's mute graph — update its volume manually.
-        // Mute it when any solo is active and kTrackTexture is NOT one of the soloed tracks.
-        let textureSoloed = !isAnySolo || soloState[kTrackTexture]
-        audioTexture.setSoloMuted(!textureSoloed)
+    }
+
+    /// AudioTexturePlayer (the Chill café loops and Ambient audio textures) is outside
+    /// PlaybackEngine's mute graph, so it is silenced here: when the Texture track is muted, or
+    /// another track is soloed and Texture is not.
+    private func syncAudioTextureSilence() {
+        guard muteState.count > kTrackTexture, soloState.count > kTrackTexture else { return }
+        let soloedOut = soloState.contains(true) && !soloState[kTrackTexture]
+        audioTexture.setSilenced(muteState[kTrackTexture] || soloedOut)
     }
 
     // MARK: - Solo visual helper
@@ -3944,9 +3797,9 @@ final class AppState: ObservableObject {
         return Float.random(in: 0..<1) < (blues ? 0.50 : 0.20)
     }
 
-    /// Chill Soho's Elec Bass takes Low and Comp under it. Matched by name for the same reason:
+    /// Chill Soho's Elec Bass takes Low under it (Comp came off 2026-10-15). Matched by name for the same reason:
     /// it was `instrumentOverrides[kTrackBass] == 2`, and index 2 only happens to be Elec Bass.
-    nonisolated static func sohoBassTakesLowComp(trackIndex: Int, state: SongState?,
+    nonisolated static func sohoBassTakesLow(trackIndex: Int, state: SongState?,
                                                  overrides: [Int: Int]) -> Bool {
         guard trackIndex == kTrackBass, state?.chillSohoVariation == true else { return false }
         let names = instrumentPoolNames(trackIndex: kTrackBass, style: .chill, isChillSoho: true)
@@ -4011,10 +3864,10 @@ final class AppState: ObservableObject {
             let l2Vib = Self.leadUsesVibrato(trackIndex: trackIndex, lead: kTrackLead2, state: songState,
                                              overrides: instrumentOverrides)
 
-            // Chill Soho's Elec Bass wants Low and Comp under it — the chips and the audio chain
-            // are the same switch, so they cannot drift. Matched by name; see
-            // sohoBassTakesLowComp. Mirrored in TrackRowView.applyDefaultEffects.
-            let sohoElecBass = Self.sohoBassTakesLowComp(trackIndex: trackIndex, state: songState,
+            // Chill Soho's Elec Bass wants Low under it — the chips and the audio chain are the
+            // same switch, so they cannot drift. Matched by name; see sohoBassTakesLow. Mirrored
+            // in TrackRowView.applyDefaultEffects. Comp came off (Zack, 2026-10-15).
+            let sohoElecBass = Self.sohoBassTakesLow(trackIndex: trackIndex, state: songState,
                                                          overrides: instrumentOverrides)
 
             defaults = switch trackIndex {
@@ -4024,7 +3877,7 @@ final class AppState: ObservableObject {
             case kTrackPads:    [.sweep, .tremolo]
             // Chill Soho's texture is MIDI horns/bells — mirrors TrackRowView.
             case kTrackTexture: songState?.chillSohoVariation == true ? [.space, .reverb] : [.lowShelf, .reverb]
-            case kTrackBass:    sohoElecBass ? [.reverb, .lowShelf, .compression] : [.reverb]
+            case kTrackBass:    sohoElecBass ? [.reverb, .lowShelf] : [.reverb]
             case kTrackDrums:   [.space]
             default:            []
             }
@@ -4300,7 +4153,9 @@ final class AppState: ObservableObject {
             let muted  = muteState[idx] || (anySolo && !soloState[idx])
             if muted { snapshots[i].volume = 0.0 }
         }
-        let textureSnapshot = audioTexture.exportSnapshot()
+        // The audio texture is outside the snapshots above, so mute and solo apply to it here.
+        let textureMuted    = muteState[kTrackTexture] || (anySolo && !soloState[kTrackTexture])
+        let textureSnapshot = textureMuted ? nil : audioTexture.exportSnapshot()
         let genre           = song.displayStyleName   // e.g. "Chill Blues", "Motorik Noir", not just "Chill"
 
         // Muted-track comment — list any user-visible tracks that are silent in this export
@@ -4422,7 +4277,6 @@ final class AppState: ObservableObject {
         soloState = Array(repeating: false, count: kTrackCount)
         playback.muteState = muteState
         playback.soloState = soloState
-        audioTexture.setSoloMuted(false)
         // Restore instruments to what they were when the song was generated/loaded.
         instrumentOverrides = songInstrumentOverrides
         defaultsResetToken += 1

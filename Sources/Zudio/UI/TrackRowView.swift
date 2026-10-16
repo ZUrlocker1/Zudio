@@ -451,9 +451,9 @@ struct TrackRowView: View {
                                                  state: appState.songState,
                                                  overrides: appState.instrumentOverrides)
 
-            // Chill Soho's Elec Bass wants Low and Comp under it, matched by name.
+            // Chill Soho's Elec Bass wants Low under it, matched by name.
             // Mirrored in AppState.restoreDefaultEffects — keep the two in step.
-            let sohoElecBass = AppState.sohoBassTakesLowComp(trackIndex: trackIndex,
+            let sohoElecBass = AppState.sohoBassTakesLow(trackIndex: trackIndex,
                                                              state: appState.songState,
                                                              overrides: appState.instrumentOverrides)
 
@@ -465,7 +465,7 @@ struct TrackRowView: View {
             // Base Chill's texture is an audio loop; Chill Soho's is MIDI horns and bells, which
             // want the same space as the leads rather than the loop's low shelf.
             case kTrackTexture: isSoho ? [.space, .reverb] : [.lowShelf, .reverb]
-            case kTrackBass:    sohoElecBass ? [.reverb, .lowShelf, .compression] : [.reverb]
+            case kTrackBass:    sohoElecBass ? [.reverb, .lowShelf] : [.reverb]
             case kTrackDrums:   [.space]
             default:            []
             }

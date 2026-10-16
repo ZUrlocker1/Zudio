@@ -247,7 +247,7 @@ extension ChillLeadGenerator {
 
             var span = 0
             while span < 4 && open(bar + span) { span += 1 }
-            let offset = remixReturns.contains(bar) ? 8 : [0, 2, 4, 8][rng.weightedPick([35, 30, 15, 20])]
+            let offset = remixReturns.contains(bar) ? 8 : [0, 2, 4, 8][rng.weightedPick([0.35, 0.30, 0.15, 0.20])]
 
             let phrase: SohoPhrase
             if var m = motif, rng.nextDouble() < 0.35 {
@@ -274,7 +274,7 @@ extension ChillLeadGenerator {
             let endBar = (last.stepIndex + last.durationSteps + 15) / 16
             onsets.append((startBar: bar, endBar: Swift.max(bar + 1, endBar)))
             // Rests of about a bar and a half: the partial bar after the phrase plus 0–2 more.
-            bar = endBar + [0, 1, 2][rng.weightedPick([35, 45, 20])]
+            bar = endBar + [0, 1, 2][rng.weightedPick([0.35, 0.45, 0.20])]
         }
     }
 
@@ -429,11 +429,11 @@ extension ChillLeadGenerator {
         // Two treatments for this song, applied to all three hooks so the song is internally
         // consistent while differing from the next one. See HookTreatment.
         let treatments = pickTreatments(rng: &rng)
-        treatmentNote = treatments.map(\.name).sorted().joined(separator: ", ")
+        treatmentNote = treatments.map(\.name).sorted().joined(separator: " ")
         hook  = treated(hook,  treatments, closed: closed, rng: &rng)
         hookB = treated(hookB, treatments, closed: closed, rng: &rng)
         hookC = treated(hookC, treatments, closed: closed, rng: &rng)
-        let augmented = treatments.contains(.augmented)
+        let lengthened = treatments.contains(.lengthened)
 
         var nextMutation = firstPlayable + 24 + rng.nextInt(upperBound: 9)
         var lastHook = -1, lastOther = -1
@@ -520,10 +520,10 @@ extension ChillLeadGenerator {
                 // About as often as a figure gets its last note held, one instead runs on with
                 // two or three more notes. The continuation is built from the figure's own moves,
                 // mirrored, so it reads as the same idea carrying on rather than a new one
-                // starting (Zack, 2026-10-14). Not on an augmented song: those figures are
+                // starting (Zack, 2026-10-14). Not on an lengthened song: those figures are
                 // already twice their length.
                 var ranOn = false
-                if !augmented, rng.nextDouble() < 0.15, !figure.intervals.isEmpty {
+                if !lengthened, rng.nextDouble() < 0.15, !figure.intervals.isEmpty {
                     let seedIv = figure.intervals, seedDur = figure.durs
                     for _ in 0..<(2 + rng.nextInt(upperBound: 2)) {
                         figure.intervals.append(-seedIv[figure.intervals.count % seedIv.count])
@@ -658,24 +658,24 @@ extension ChillLeadGenerator {
     enum HookTreatment: CaseIterable {
         /// Start the figures off the downbeat. 98% of hooks began in the first quarter of the bar.
         case displaced
-        /// Double every duration, the figure then taking two bars per statement.
-        case augmented
+        /// Every note twice as long — the figure plays at half speed, taking the bars it needs.
+        case lengthened
         /// Flip the interval signs — the same contour upside down.
         case inverted
-        /// Play the figure's moves and rhythm backwards.
-        case retrograde
+        /// Play the figure's moves and rhythm backwards in time.
+        case reversed
         /// Six to eight notes rather than three to six.
-        case expanded
+        case extended
 
         /// For the generation log, which shows the pair beside the rule name. Abbreviated so the
-        /// row stays short: the longest it gets is "Avalon hook displace,  retro".
+        /// row stays short: the longest it gets is "Avalon displace lengthen".
         var name: String {
             switch self {
             case .displaced:  return "displace"
-            case .augmented:  return "aug"
+            case .lengthened: return "lengthen"
             case .inverted:   return "invert"
-            case .retrograde: return "retro"
-            case .expanded:   return "expand"
+            case .reversed:   return "reverse"
+            case .extended:   return "extend"
             }
         }
     }
@@ -686,7 +686,7 @@ extension ChillLeadGenerator {
     /// third single and two thirds pairs makes each of those fifteen equally likely, so no song
     /// character is commoner than another. It also spreads the songs by DEGREE as well as kind:
     /// always drawing two left nothing sitting near the Avalon original, and a displaced-only
-    /// song is a far milder variation than an augmented and expanded one (Zack, 2026-10-14).
+    /// song is a far milder variation than a lengthened and extended one (Zack, 2026-10-14).
     private static func pickTreatments(rng: inout SeededRNG) -> [HookTreatment] {
         let all = HookTreatment.allCases
         let a = rng.nextInt(upperBound: all.count)
@@ -698,9 +698,9 @@ extension ChillLeadGenerator {
 
     /// Applies the song's treatments to one figure.
     ///
-    /// Inversion and retrograde both preserve the interval sum, so a closed hook — one that
+    /// Inverting and reversing both preserve the interval sum, so a closed hook — one that
     /// returns to its first pitch, which this rule alone does — stays closed through either.
-    /// Expansion does not, so closure is re-derived afterwards.
+    /// Extending does not, so closure is re-derived afterwards.
     private static func treated(_ p: SohoPhrase, _ ts: [HookTreatment],
                                 closed: Bool, rng: inout SeededRNG) -> SohoPhrase {
         var r = p
@@ -708,15 +708,41 @@ extension ChillLeadGenerator {
             switch t {
             case .inverted:
                 r.intervals = r.intervals.map { -$0 }
-            case .retrograde:
+            case .reversed:
                 r.intervals.reverse()
                 r.durs.reverse()
-            case .augmented:
-                // Capped at a half note so a doubled figure cannot become one long tone.
+            case .lengthened:
+                // Double everything, then put one or two INTERIOR notes back to their original
+                // length. Doubling alone preserves the figure's ratios but destroys its absolute
+                // quickness: measured on one song, 70 of 98 notes came out as quarters, three as
+                // eighths and none shorter, so the line plodded (Zack, 2026-10-15). Restoring an
+                // interior note or two keeps the song genuinely slower while leaving motion
+                // inside each figure.
+                //
+                // Interior only: the first and last stay doubled, so the figure still launches
+                // and lands long and reads as lengthened rather than as a stutter. Capped at a
+                // half note so a doubled figure cannot become one long tone.
+                let original = r.durs
                 r.durs = r.durs.map { Swift.min(8, $0 * 2) }
-            case .expanded:
+                if r.durs.count >= 3 {
+                    let interior = Array(1..<(r.durs.count - 1))
+                    // Two for a long figure, one for a short one, spaced apart rather than
+                    // adjacent so the motion is spread through the figure.
+                    let wanted = r.durs.count >= 5 ? 2 : 1
+                    var picks: [Int] = []
+                    if wanted == 1 {
+                        picks = [interior[interior.count / 2]]
+                    } else if interior.count >= 2 {
+                        picks = [interior[interior.count / 3], interior[2 * interior.count / 3]]
+                        if picks[0] == picks[1] { picks = [interior.first!, interior.last!] }
+                    } else {
+                        picks = interior
+                    }
+                    for i in picks where i < original.count { r.durs[i] = original[i] }
+                }
+            case .extended:
                 // Grows the figure AS IT STANDS, not the untreated one, so the two treatments
-                // commute: "inverted, expanded" and "expanded, inverted" give the same figure,
+                // commute: "invert, extend" and "extend, invert" give the same figure,
                 // and a song's character depends on which pair it drew rather than the order.
                 let want = 6 + rng.nextInt(upperBound: 3)
                 let seedIv = r.intervals.isEmpty ? [2] : r.intervals

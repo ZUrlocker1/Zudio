@@ -75,23 +75,33 @@ final class AudioTexturePlayer {
     /// Live swap to a different texture (e.g. user cycling picker): fast crossfade ≤500 ms.
     func switchTexture(_ filename: String?, offsetSeconds: Int = 0) {
         guard let filename else { stopImmediate(); return }
+        isFadingOut = true
         fastFadeOut { [weak self] in
             guard let self else { return }
+            self.isFadingOut = false
             self.playerNode.stop()
             self.startFile(filename: filename, fastFadeIn: true, offsetSeconds: offsetSeconds)
         }
     }
 
-    /// Called when solo state changes. Instantly silences (or restores) the texture without
-    /// a full fade — preserves position in the file so unsoloing resumes cleanly.
-    /// Whether a solo elsewhere is currently silencing this texture. Held here because the mute
-    /// can be asked for before the player is running — `startFile` reads it rather than fading up
-    /// into a solo it should be silent for.
-    private(set) var soloMuted = false
+    /// Whether the texture is silenced, by its own mute or by a solo on another track. The file
+    /// sits outside PlaybackEngine's mixer, so engine mute never reaches it — AppState drives this
+    /// from `muteState` and `soloState` instead. Held here because it can be asked for before the
+    /// player is running: `startFile` reads it rather than fading up into a mute.
+    ///
+    /// Only solo used to reach it. Muting the Texture track on a base Chill or Chill Blues song
+    /// changed nothing and the café loop played on (Zack, 2026-10-15).
+    private(set) var silenced = false
 
-    func setSoloMuted(_ muted: Bool) {
-        soloMuted = muted
-        guard playerNode.isPlaying else { return }
+    /// Instantly silences (or restores) the texture without a full fade — keeps the position in
+    /// the file so unmuting resumes cleanly.
+    func setSilenced(_ muted: Bool) {
+        guard muted != silenced else { return }
+        silenced = muted
+        // A fade-out in progress (Stop, or a texture switch) owns the volume and finishes by
+        // stopping or restarting the player, and startFile reads `silenced` when it does.
+        // Cancelling that fade here would orphan its completion and leave the old file looping.
+        guard playerNode.isPlaying, !isFadingOut else { return }
         if muted {
             // Cancel the fade first: a running fade timer steps the volume back up within a
             // frame or two and the texture stays audible through the solo (Zack, 2026-10-13).
@@ -230,9 +240,9 @@ final class AudioTexturePlayer {
             playerNode.scheduleBuffer(tailBuffer, at: nil, completionHandler: nil)
             playerNode.scheduleBuffer(loopBuffer, at: nil, options: .loops, completionHandler: nil)
             playerNode.play()
-            // A texture that starts while another track is soloed stays silent until the solo
-            // clears, rather than fading up underneath it.
-            if soloMuted { playerNode.volume = 0.0 } else {
+            // A texture that starts muted, or while another track is soloed, stays silent until
+            // that clears rather than fading up underneath it.
+            if silenced { playerNode.volume = 0.0 } else {
                 fadeIn(duration: fastFadeIn ? 0.20 : fadeDuration)
             }
             startPan()

@@ -1245,6 +1245,11 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.75   // Kosmic arpeggio runs hot and overpowers leads — general fallback
             } else if trackIndex == kTrackBass && kosmicStyle {
                 vol = 0.80   // Kosmic bass slightly quieter overall
+            } else if trackIndex == kTrackBass && chillSohoMode && program % 1000 == 33 {
+                // Chill Soho's Elec Bass sits below the other two. At the shared 0.48 it still
+                // read louder, because in Soho it is the one bass with Comp under it, which lifts
+                // its perceived level (Zack, 2026-10-15). About 1.6 dB down.
+                vol = 0.40
             } else if trackIndex == kTrackBass && chillPadsMode {
                 // Every Chill bass at the same level. Acoustic (32) and Fretless (35) were pulled
                 // to 0.48 and Elec Bass (33) left at 0.58, so the electric sat 1.6 dB above the
@@ -1273,7 +1278,10 @@ final class PlaybackEngine: ObservableObject {
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
             } else if trackIndex == kTrackRhythm {
-                let mult: Float = (program == 61001) ? 2.0 : 1.0   // Stereo Piano needs boost; all others unity
+                // Stereo Piano needs boost. Jazz Guitar sat under the rest of the Chill rhythm pool
+                // even at CC7 127 (Zack, 2026-10-15); 1.5 is about +3.5 dB. All others unity.
+                let mult: Float = program == 61001 ? 2.0
+                                : (program == 26 && chillPadsMode) ? 1.5 : 1.0
                 boostBaseMultiplier[kTrackRhythm] = mult
                 boosts[kTrackRhythm].outputVolume = mult * (boostEffectEnabled[kTrackRhythm] ? 1.7 : 1.0)
             }

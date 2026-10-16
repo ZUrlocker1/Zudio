@@ -361,12 +361,14 @@ for old_iidx in keep_i:
         for m in range(m_s, min(m_e, NM_I)):
             new_imod_bytes += imod[m]
 
-# terminal ibag → terminal inst
+# terminal ibag → terminal inst. EOI points AT the terminal bag, not past it — taking the length
+# after appending the terminal made the last instrument run off the end of ibag (fixed 2026-10-15;
+# AVAudioUnitSampler tolerated it, strict SF2 parsers do not).
+ti = bytearray(inst[-1])
+struct.pack_into('<H', ti, 20, len(new_ibag_bytes)//4)
 new_ibag_bytes += struct.pack('<HH', len(new_igen_bytes)//4, len(new_imod_bytes)//10)
 new_igen_bytes += igen[-1]
 new_imod_bytes += imod[-1]
-ti = bytearray(inst[-1])
-struct.pack_into('<H', ti, 20, len(new_ibag_bytes)//4)
 new_inst_bytes += bytes(ti)
 
 # ── build new PHDR / PBAG / PMOD / PGEN ──────────────────────────────────────
@@ -398,12 +400,12 @@ for p_idx in keep_p:
         for m in range(m_s, min(m_e, NM_P)):
             new_pmod_bytes += pmod[m]
 
-# terminal pbag → terminal phdr
+# terminal pbag → terminal phdr. Same as EOI above: EOP points at the terminal bag.
+tp = bytearray(phdr[-1])
+struct.pack_into('<H', tp, 24, len(new_pbag_bytes)//4)
 new_pbag_bytes += struct.pack('<HH', len(new_pgen_bytes)//4, len(new_pmod_bytes)//10)
 new_pgen_bytes += pgen[-1]
 new_pmod_bytes += pmod[-1]
-tp = bytearray(phdr[-1])
-struct.pack_into('<H', tp, 24, len(new_pbag_bytes)//4)
 new_phdr_bytes += bytes(tp)
 
 # ── reassemble SF2 ────────────────────────────────────────────────────────────
