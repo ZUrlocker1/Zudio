@@ -136,7 +136,10 @@ The first Chill Soho song a listener hears is chosen, not drawn, because it is t
 introduction. The ideal first song:
 
 - **A Latin groove in drums and bass** — Bossa clave, Soft samba or Latin sway on the kit, with
-  a Latin bass line (Bossa root-fifth, Rumba, Syncopated or their major-key partners)
+  a Latin bass line (Bossa root-fifth, Rumba, Syncopated or their major-key partners) — **or** a
+  Soul groove with **Best Melodic bass (`CHL-BASS-014`)**, the fretless line, which also brings the
+  bass slides (Zack, 2026-10-16). `014` is in the Soul pool only, so it never pairs with a Latin
+  kit. The curated seeds are all Latin today; add `014` ones when the seeds are next refreshed
 - **Operator (`CHL-LD1-010`) on Lead 1, played on flute**, with **vibraphone on Lead 2**
   answering it
 - **A breakdown**: the Remix Break, the Duo or the bass ostinato — the Soho-only breaks first
