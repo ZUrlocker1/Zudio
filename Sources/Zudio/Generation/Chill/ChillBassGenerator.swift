@@ -156,7 +156,7 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 45, durationSteps: 12))
                     }
                     // Bars 1-2 (breakdownBar 0-1): bass silent — pad holds the void alone
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     // Last bar of 8-bar pocket: ascending pickup into groove return
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
@@ -457,7 +457,7 @@ struct ChillBassGenerator {
                     if bar < frame.totalBars - 1 {
                         events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(approach), velocity: 72, durationSteps: 2))
                     }
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
                     let third  = clampBass(snapToScale(chordRoot + 3, scale: scale))
@@ -640,7 +640,7 @@ struct ChillBassGenerator {
                                  usedRuleIDs: inout Set<String>) -> [MIDIEvent] {
         let latin = beatStyle == .sohoLatin
         let minorModes: Set<Mode> = [.Dorian, .Aeolian, .Phrygian, .HarmonicMinor, .MinorPentatonic]
-        // Pools from the plan's implementation contract. The reused CHL-BASS-012 Rumba hardcodes a
+        // Pools as in docs/chill-soho-plan.md (Bass). The reused CHL-BASS-012 Rumba hardcodes a
         // MINOR third — its measured shape is root, m3, 5th, 6th — so it joins the Latin pool only
         // in minor modes; over a major chord that third is a clash. Its weight moves to 013 and 015.
         // CHL-BASS-016 Samba Pickup joins both Latin pools; the major pool, with no Rumba, was
@@ -661,7 +661,7 @@ struct ChillBassGenerator {
         let rule = pool[rng.weightedPick(pool.map { $0.1 })].0
         usedRuleIDs.insert(rule)
         if structure.sections.contains(where: { $0.label == .bridge })
-            && breakdownStyle != .bassOstinato && breakdownStyle != .sohoRemix {
+            && ![.bassOstinato, .sohoRemix, .sohoDuo].contains(breakdownStyle) {
             usedRuleIDs.insert("CHL-BASS-005")      // breakdown root drone
         }
 
@@ -753,9 +753,10 @@ struct ChillBassGenerator {
                 continue
             }
 
-            // Breakdown: under bassOstinato the bass IS the breakdown, so it keeps its groove;
-            // otherwise CHL-BASS-005, a held root every other bar, leaves the space the section is for.
-            if label == .bridge && breakdownStyle != .bassOstinato {
+            // Breakdown: under bassOstinato the bass IS the breakdown, and in the Duo it is half of
+            // it, so both keep the groove; otherwise CHL-BASS-005, a held root every other bar,
+            // leaves the space the section is for.
+            if label == .bridge && breakdownStyle != .bassOstinato && breakdownStyle != .sohoDuo {
                 if (bar - (section?.startBar ?? bar)) % 2 == 0 {
                     events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: rng.velocity(70, 10), durationSteps: 8))
                 }
@@ -1387,7 +1388,7 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base + 10, note: UInt8(b7),    velocity: swell + 4, durationSteps: 2))
                         events.append(MIDIEvent(stepIndex: base + 14, note: UInt8(fifth), velocity: swell + 2, durationSteps: 2))
                     }
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
                     let oct = clampBass(chordRoot + 12)

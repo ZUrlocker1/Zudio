@@ -2,208 +2,188 @@
 
 ## V 2.7 (Build 132) — in development, Chill Soho
 
-- **New Chill Soho substyle** — A third Chill presentation alongside Chill Blues, modelled on the British sophisticated pop of the early 80s: Sade, Everything but the Girl, The Style Council, Simply Red, Matt Bianco and Roxy Music. Its rules were measured from MIDI transcriptions of those records rather than written from description, which is why almost nothing is shared with base Chill. Twenty-one new rules across every track: bossa, samba, Latin sway and soul grooves with congas, bongos, shakers and surdo layered over the kit; sixth, seventh and ninth chords in place of triads, a separate chord cycle for the B section and a four-bar turnaround the whole band plays through; trumpet, trombone and muted trumpet stabs on the Texture track, which is MIDI here rather than the café ambience base Chill uses; leads built from figures measured in the vocal lines of the originals, with a saxophone answering in the gaps; and a house-flavoured Remix Break that drops into four-on-the-floor mid-song and hits its way back out. Songs take a Soho title — the streets, clubs and objects of the period.
-- **Groove fixup — solos that sit on the beat** — The solos are written without reference to the rhythm section, so a lead note could land on a sixteenth where the kick, the rim and the bass are all silent, and the line read as being in a different time from the band. Two passes now run over Lead 1 and Lead 2 of **every Chill song** — base, Blues and Soho alike — once the other tracks are final. The first moves a note onto the beat, but only where its position is both metrically weak and unplayed by the band, so ordinary syncopation is left alone and a lead may anticipate a beat wherever the groove anticipates it too. Only the onset moves: pitch, note count and phrase shape are untouched and a note never crosses onto a new chord. The second closes the single-sixteenth holes inside a phrase, which were long enough to clip a note and too short to hear as a rest — the choppiness. Notes inside a phrase now run flush into one another about 85% of the time. Regenerating a lead applies the same treatment, so a song does not change character mid-way, and the generation log reports what each pass did.
-- **Chill Soho tuning** — Six turnaround treatments instead of three, including a root pedalled under the descending line; a song draws two or three of them, so its turnarounds are never all identical nor all different. Fixed a descending turnaround that did not descend in more than half of cases. Lead solos state a figure and answer it with a different one rather than repeating the same phrase through a section, and the phrases around a sustained note were measured from the records rather than invented. Texture horns are trumpet, trombone and muted trumpet — no synth brass, no French horn — with vibraphone and xylophone for colour. Electric bass joins the Soho bass pool at a quarter of songs, with a low shelf under it. The Harmonic Drone breakdown now changes chord halfway and Lead 1 plays over it.
-- **Leads play in their own register** — A tenor sax was reaching notes a fifth above the top of its range, and a trombone almost an octave and a half above its, because the pass that lifts a lead above the pads checked a general per-track ceiling rather than the instrument's own. Two in five sax notes finished above where the instrument can comfortably play, which is what made Chill Soho's leads sound thin and screechy; the same fault put the Lead 2 synth below its floor. Every Chill lead now stays inside its instrument's register, and a note that would fall outside is moved by an octave rather than squashed onto the boundary. Tenor and alto sax drop about a fourth on average as a result.
-- **Avalon Hook rebuilt** — Chill Soho's hook rule, measured from Roxy Music's *Avalon*, was playing nearly the same solo in every song: its figures were drawn by trial and rejected if they did not move enough, and against a bank of mostly-repeated pitches almost every draw failed, so a hard-coded fallback took over in 76–100% of songs. The draw now repairs a figure instead of discarding it, and the number of distinct opening figures went from 24 to 65 across 70 songs. On top of that each song draws one or two transformations applied to all its hooks — displace, lengthen, invert, reverse or extend — giving fifteen song characters in place of one. Figures also breathe now: roughly one in seven runs on with two or three more notes, and a figure may end on a note held for up to a bar, which only rings through a chord change when the note belongs to both chords. The rule is renamed from Tight Hook, and the generation log names the transformations a song drew.
-- **Groove fixup settings** — The fixup has six switches, tuned by ear against the source records and settled as follows. **On:** *protect anticipations* (a lead note on the sixteenth before a beat is never moved onto it); *close opened holes* (a two-sixteenth gap the pass itself created is closed, rather than left as a rest nobody wrote); *resolve same-pitch collisions* (a note still sounding when the same pitch re-attacks is ended first, because the sampler has one voice per pitch and would otherwise cut the new note to a blip). **Off:** *try the second-choice target* and *prefer the target the band plays* — both reduce the count of stranded notes but move the phrasing further from, or no closer to, the records; and *legato overlap*, which ran every joined note past the next and traded the flush joins that make a line sound fluid for a muddier overlap. Notes inside a phrase now run flush into one another about 90% of the time in every Chill form, and same-pitch collisions are essentially gone.
-- **Groove fixup toggle — in development, Mac only** — ⌘J, or **File ▸ Groove Fixup (test)**, switches the current song between its raw leads and its fixed ones so the two can be compared by ear; ⌃G does the same thing. The MIDI lanes redraw on each press and the status log reports what changed, or `No changes!`. It is a testing aid rather than a feature: it is Mac only, because there is no gesture for it on iPhone or iPad, and it is expected to be removed once the fixup has settled.
-- **Chill mix** — The leads and drums were carrying more reverb than the music wanted, most audibly on the Latin grooves, where the hand percussion runs around 25 hits a bar and every tail overlaps the next. Lead 1, Lead 2 and Drums are all drier now, across base Chill, Chill Blues and Chill Soho. The Chill Soho texture vibraphone is quieter again.
-- **Guitar-led Chill Soho rhythm** — Jazz Guitar and Funk Guitar are new to the soundfont, copied from GeneralUser GS 2.0.3 without touching any existing sound. With Nylon Guitar they take 60% of Chill Soho's Rhythm track, Rhodes and Stereo Piano 20% each; Wurlitzer and Tonewheel are no longer drawn there. Like every guitar they play with a slow amp tremolo by default. The unused SFX drum kit is gone, so the soundfont is slightly smaller than before at 21.2 MB.
-- **Chill instruments** — Each instrument picker lists the same instruments in every Chill form; the forms differ only in what they choose at random. Chill Blues pads are Strings Fast, Cello and Synth Strings 5. Chill Soho's Elec Bass plays with Low but no longer Comp, which also makes it a little quieter.
-- **Instruments stay inside their style** — A new song re-picks only two instruments and keeps the rest, so an instrument the new song's style never chooses — a Noir bass in regular Motorik, a Drift lead in regular Kosmic, a Soho guitar in base Chill — has to be pulled back. One rule now does that for every style and every play mode, replacing seven that disagreed. Regular Motorik no longer draws Arcade's Metal Pad, Ice Rain or Mystery Pad. Chill songs in Endless and Evolve now play their leads on the instrument the solo was written for.
-- **Muting an audio texture works** — Muting the Texture track did nothing when the texture was an audio loop (base Chill, Chill Blues, Ambient). It now silences it on every platform, exports leave it out, and a texture silenced by a solo comes back with the next song.
-- **Chill Lead 2 fixes, all Chill forms** — A held Shadow Hold note now has a short companion note beside it instead of sounding alone. In Chill Soho, Lead 2 used to sit out an entire groove section, which in a two-section song meant disappearing for more than half of it; it now rests for 8–16 bars instead. Lead 2 vibraphone is quieter across every Chill form.
+- **New Chill Soho substyle** — A third Chill form modelled on early-80s British sophisticated pop: Sade, Everything but the Girl, The Style Council, Simply Red, Roxy Music, Matt Bianco. Twenty-one new rules measured from MIDI of those records: bossa, samba, Latin sway and soul grooves with hand percussion; 6th, 7th and 9th chords with a separate B-section cycle and a four-bar turnaround the band plays; horn stabs and halos on a MIDI Texture track; sax-led leads built from vocal-line figures; and a house-style Remix Break. Soho song titles.
+- **Guitar-led Soho rhythm** — Jazz and Funk Guitar added to the soundfont. Soho Rhythm is Rhodes, Stereo Piano, Nylon, Jazz and Funk Guitar at 20% each; guitars play with a slow amp tremolo by default. The unused SFX drum kit is gone; the soundfont is 21.2 MB.
+- **Avalon lead** — The hook rule now draws far more varied figures, and each song applies one or two treatments to them — displace, lengthen, invert, reverse or extend. Figures sometimes run on or end on a held note. The log names the treatments.
+- **Groove fixup** — On every Chill song, lead notes stranded on weak sixteenths the band doesn't play are moved onto the beat, and one-sixteenth gaps inside a phrase are closed, so solos sit with the band and flow. Regenerating a lead does the same. The log reports how many notes changed.
+- **Groove fixup toggle (Mac, temporary)** — ⌘J / ⌃G or **File ▸ Groove Fixup (test)** switches the current song between raw and fixed leads for comparison.
+- **Leads stay in their register** — Chill leads now stay inside each instrument's own range; saxes no longer reach screechy altissimo notes.
+- **Chill Soho tuning** — Six bass turnaround treatments, two or three per song. Lead solos answer a figure with a different one. The Harmonic Drone breakdown changes chord halfway and Lead 1 plays over it. Lead 2 rests 8–16 bars rather than whole sections, and a held Shadow Hold note gets a companion note (all Chill forms).
+- **Chill instruments** — Each Chill picker lists the same instruments in all three forms; forms differ only in their random odds. Chill Blues pads are Strings Fast, Cello and Synth Strings 5. Soho Elec Bass plays with Low but no Comp.
+- **Soho Duo breakdown** — A new Chill Soho breakdown, about one song in five: 8 or 12 bars of Rhythm and Bass alone. The bass keeps its groove, the comp plays every bar a little forward in the mix, and the chords keep moving. The kit drops to a soft shaker, closed hats or ride, and a snare pickup leads back in. Pads and leads sit out; the horns reply with a soft held chord every few bars and a stab into the return.
+- **Soho horns sound like a section** — Horn stabs are two- or three-note chords far more often, turnaround stabs included, and each song has its own voicing (open, close, or with a 9th or 6th) that changes now and then. Half of the Sustained Halo's long notes are now two-note chords as well. Xylophone is gone from the Soho texture pool; Vibraphone takes its share.
+- **Soho bass slides** — In Chill Soho songs on the Best Melodic bass, the bass now slides into a note from a whole or half step away now and then, from the side the line is coming from, about once every twelve bars, and often into the root after a turnaround. Chill Blues songs on the B.B. King pickup riff slide up a half step into the root at the top of every form. On any bass instrument, in playback and in exports, and marked "Bass slide" in the log.
+- **Soho Rhodes tremolo** — Rhodes in Chill Soho plays with the slow amp tremolo by default, as the guitars do. Any Rhodes with tremolo switched on now uses that slow setting rather than the organ's fast Leslie.
+- **Chill mix** — Lead 1, Lead 2 and Drums are drier in all Chill forms; Lead 2 and texture vibraphone are quieter.
+- **Instruments stay inside their style** — One rule, for every style and play mode, now replaces an instrument carried over from the previous song that the new song's style never uses. Regular Motorik no longer gets Arcade's Metal Pad, Ice Rain or Mystery Pad. Chill songs in Endless and Evolve play their leads on the right instrument.
+- **Muting an audio texture works** — Muting Texture now silences audio-loop textures (Chill, Chill Blues, Ambient) on every platform, and exports leave them out.
 
 ## V 2.6 (Build 131)  Motorik Europe, reverb restored
 
-- **New Motorik Europe style derived from Kraftwerk** — About one Motorik song in five is shown as **Motorik Europe**: a synchronised group of tracks adopts Kraftwerk rules together while the rest of the song draws from normal rotation. Twelve new rules across drums, bass, rhythm, both leads and texture — rigid single-pitch percussion with a step sequencer's accent pattern, tiny sequencer cells locked to the barline, octave-unison doubling, and leads that make short statements and then stop. The synced tracks drop out together twice a song while Pads and Texture play through, and draw from a restricted set of the existing electronic instruments. Europe songs run 120-132 BPM and take a German-flavoured title. The generation log names the synced tracks on a `Sync` line.
-- **Melodic Motorik leads** — The two Kraftwerk lead rules build their line from short figures measured in Autobahn, The Robots and Computer Love, whose intervals cancel out so the line returns to where it started. They are anchored to the chord and varied the way the originals are, and no leap within a phrase exceeds an octave.
-- **Motorik leads breathe** — Rest windows scale with song length, a replayed phrase varies on each return, and a phrase ends on a held note that often settles onto the root. A pitch struck three times running drops the third and leaves silence. The two densest rules, Noir's Melodic Spiral and Arcade's Octave Bounce, are capped at twenty bars.
-- **Motorik bass pool concentrated** — Four rules were retired from the base Motorik bass pool: McCartney Drive, LA Woman Sustain, Hook Ascent and Quo Arc. All four remain in Motorik Noir or Arcade. The freed weight went to the rules that pull hardest in either direction — both Kraftwerk bass rules rise from 15% combined to 26%, and Neu! Hallogallo doubles.
-- **Instrument variety** — Every track gets a real choice when a style starts, rather than defaulting to whichever instrument sits first in its pool. Mono Synth is weighted down in the Motorik Europe lead pool and never plays two songs running. The table deciding which instruments a substyle may use also existed in two copies that had drifted apart, so the same song could get different instruments depending on which path ran; there is now one table.
-- **Kosmic levels** — Moog, Mono Synth and Synth Bass 3 on bass, and Synth Chime on rhythm, were sitting forward of the rest of their pools against Kosmic's sustained pads. All four turned down.
-- **Motorik lead mix** — Call and Answer is down from 14% to 11% of base Motorik lead picks, its share going to Punch solo, Long arc solo and Vanishing solo. It is the most recognisable shape in the pool and a rule usually carries a whole song, so it registered as more frequent than it was.
-- **Chill pads breathe** — The pads were audible in every bar of a song. Onsets looked sparse, but each chord holds long enough to cover the bars between, so the part never actually stopped. They now rest for a few bars at a time, alternating short breaks with longer ones, and a chord already sounding decays into the gap rather than being cut off. Chill Blues is unchanged — its silence is already written into the form.
-- **The reverb chip is now definitive** — A track could be audibly wet with no reverb chip lit. The per-style reverb amounts say how much reverb a track uses *when its chip is on*, but since build 124 they were being applied when the style loaded, whether or not the chip was on — so Kosmic drums sat wetter than Chill's, while only Chill showed a chip. It was inaudible until the reverb buses were reconnected. The chip now decides, on every platform. Several tracks are drier as a result, which is the original design: reverb is expensive and was used sparingly. Mac and iPhone effect defaults were also brought into line — they differed on two Ambient tracks, and both now follow the Mac behaviour.
-- **Reverb restored** — Playback had no reverb at all since build 124: the shared reverb buses were connected to mixer inputs that each track then claimed, silently disconnecting them. Exports were unaffected, which is why they sounded much wetter. Both are fixed and every track is back to its intended level. Ambient and Kosmic gain the most.
-- **Audio timers made thread-safe** — The four timers driving tremolo, vibrato, filter sweeps, panning and the Ambient and Kosmic fades ran on a background thread while touching state the main thread also writes. They now run where they were meant to, removing a source of rare glitches and crashes during long playback.
-- **Saved songs reload note-for-note** — A saved song stores its seed and is rebuilt from it, and a few places in the generators could return a different pitch each time. The same seed now always produces the same song.
-- **Crash fix** — A song could fail to generate outright, depending on how its sections lined up with its bar count. Present since March; verified against 80,000 songs across all four styles.
-- **Minor fixes** — Removed Clavinet from the Motorik instrument pool: the sound was missing from the soundfont, so that track played silent. Corrected the iPhone info sheet, which still showed v2.4.
-- **Regression tests** — Added `DeterminismTests`, which generates 200 seeds per style twice over and requires identical notes. Also suites covering Motorik Europe, reverb send and bus routing, lead density and the annotation crash — each pins a fault found in this release so it cannot return unnoticed.
+- **New Motorik Europe substyle** — About one Motorik song in five: a synchronised group of tracks plays twelve new Kraftwerk-derived rules — rigid sequencer percussion and cells, octave doubling, short lead statements — dropping out together twice a song. 120–132 BPM, German-flavoured titles, a `Sync` line in the log.
+- **Melodic Motorik leads** — The Kraftwerk lead rules use figures measured from Autobahn, The Robots and Computer Love, anchored to the chord, with no leap over an octave.
+- **Motorik leads breathe** — Rest windows scale with song length, replayed phrases vary, phrases end on a held note, and the two densest rules are capped at twenty bars.
+- **Motorik bass pool** — McCartney Drive, LA Woman Sustain, Hook Ascent and Quo Arc moved out of base Motorik (still in Noir or Arcade); the Kraftwerk rules rise to 26% and Neu! Hallogallo doubles.
+- **Instrument variety** — Every track gets a real choice when a style starts; Mono Synth is weighted down in Europe and never repeats.
+- **Kosmic levels** — Moog, Mono Synth and Synth Bass 3 on bass, and Synth Chime on rhythm, turned down.
+- **Motorik lead mix** — Call and Answer down from 14% to 11%.
+- **Chill pads breathe** — Pads now rest for a few bars at a time, decaying into the gap.
+- **Reverb restored** — Playback had lost all reverb since build 124; it's back, and the reverb chip now decides whether a track is wet on every platform.
+- **Audio timers thread-safe** — Removes a source of rare glitches and crashes in long playback.
+- **Saved songs reload note-for-note** — The same seed now always produces the same song.
+- **Crash fix** — A song could fail to generate depending on how its sections lined up.
+- **Minor fixes** — Removed Clavinet from Motorik (missing from the soundfont); iPhone info sheet showed v2.4.
+- **Regression tests** — Determinism, Motorik Europe, reverb routing, lead density and annotation tests.
 
 ---
 
 ## V 2.5 (Build 130)  Improvements to Endless, Chill, bug fixes
-- Endless mode style mix modified to increase Kosmik and Motorik, decrease Chill, Ambient slightly: 
-    - Ambient ~19.5%
-    - Chill ~24%
-    - Kosmic ~32%
-    - Motorik ~24.5%
-- **Endless mode streak cap** — In order to prevent Endless mode from getting stuck for long stretches bouncing beween Ambient / Chill, or Kosmic / Motorik, a hard cap has been added. After 8 songs in a row for Ambient / Chill or 12 for Kosmic / Motorik, Zudio will force a switch to the other style.
-- **Chill variety** — Chill Bass and Rhythm (keyboard comping) tracks now evolve more within a song instead of looping the same patterns throughout. The Rhythm comping track switches style between the A and B sections and takes occasional rest bars. The more repetitive bass patterns (including the Chill Blues Quarter-pulse and Pickup grooves) now vary every 16 bars instead of staying fixed for the whole song.
-- **Chill Rhythm rebalance** — Bosa Moon (the busiest comping mode) has been reduced in frequency and adjusted so it is less repetitive and dense. Two new Rhythm rules have been added:  **CHL-RHY-005 Chord Hold** (a single chord with occasional syncopation, staccato punctuation, and breathing gaps) and **CHL-RHY-006 Downbeat Pulse** (a plain chord on beats 1 and 3, with occasional staccato hits, a pushed beat 3, or a dropped beat 3). Both new rules are available in Chill Blues too. Each A/B section is tiled into 12-16 bar segments, each independently with a 35% chance of going sparse (up to 2 per section) — the busier modes fall back to their sparse shape (Moby Backbeat gets a half-time variant: a single beat-3 hit instead of the full beat-2/4 pattern). Added a rarer, more dramatic "dropout" fragment (Rhythm goes fully silent for one 12-16 bar stretch) in 20% of songs — always when Bosa Moon is in play, since it benefits most from a real break.
-- **Chill Blues bass variation** — During the long 8-bar stretch of I chord in the 16-bar blues form, the bass now gets one small, randomly-placed variation per repeat (somewhere in bars 4-6) — an octave displacement, a repeated note, a reordered phrase, or a passing tone — so it feels less static regardless of which bass pattern is playing.
-- **Chill mood-architecture cleanup** — Overall theme of this round of Chill work: less relentless, more breathing room, easier to reason about. Comping-mode selection no longer varies by song mood  — same rule mix heard, but "how often does rule X show up" is now a direct read instead of a simulation. Also removed an unused mood parameter from lead-instrument selection (it never actually affected the pick), and corrected several stale claims in the Chill design doc that no longer matched the shipped code.
-- **Chill bass levels reduced** — All three Chill bass instruments have been turned down. Acoustic Bass and Fretless Bass were running noticeably hot and come down the most; Elec Bass drops 3 dB. Chill Blues is affected too, since it draws from the same three-instrument pool.
-- **Ambient Piano mix** — Slightly more reverb and a soft echo on the piano so it doesn't sound as bare/flat in sparse arrangements.
-- **New Ambient texture** — Added "Long Lake" (AMB-TEXT-010) to the Ambient audio texture pool: loon calls recorded over a lake, sparse and tonal rather than a continuous wash. The pool is now seven textures.
-- **Audio texture fixed on reload** — Reloading a song that was still in session memory played every MIDI track but left the Ambient or Chill audio texture silent. The fast reload path called the MIDI engine directly, bypassing the separate audio-texture engine; it now starts the texture itself, as the regenerate-from-seed path already did. 
-- **Instruments changed on reload** — An Ambient Piano song pinned Lead 1 to Stereo Piano and never released it, so every later Ambient song inherited the piano. Reloads could also lose the assignment entirely and fall back to the first instrument in each pool, silently, because instrument picks are not derived from the song seed and so cannot be recomputed. A song's instruments are now recovered from the `Instruments` line already stored in its own log, and an unrecoverable assignment is reported in the log instead of being quietly replaced.
-- **Air effect fixed in stem export** — When exporting separate track stems, the Air effect used the wrong EQ shape (a single 12 kHz shelf rather than the 4 kHz presence peak plus 8 kHz shelf used in playback), so Air-enabled stems exported noticeably duller than the same song's mix. The normal M4A mix export was not affected.
-- **Audio interruption logging** — When playback stops because another app takes over audio or the output device disconnects, the status log now shows a short line (e.g. "AUDIO  Stopped by another app") so it's visible after the fact.
-- **Sleep Timer Bug fix** — Sleep timer could show its "playback stopped" message after play was manually stopped and stayed visible long after necessary. The timer now starts when playback starts and cancels when playback stops.
-- **Chill breakdown bass rewritten** — In a Chill song with a harmonic-drone breakdown, the Acid Jazz bass rule (CHL-BASS-008) played the root on every beat of every bridge bar — four identical bars, sixteen identical notes, which sounded like a stuck loop rather than a breakdown. The bridge now follows a four-bar arc: pulse, motion, tighter pulse, release. Pulse bars stay on the root so the repetition still builds tension, but they play a funk cell — accent on the beat, ghost note on the "a", push on the "and" — repeated across both halves of the bar. Moving bars leave the root for the b7 and 5th, land on off-beats, and end on the swung "and of 4" so they lift into the next bar instead of closing square. The final bar walks up to a chromatic leading tone into the groove return. Pulse and moving bars alternate, so no two repetitive bars ever land in a row at any bridge length. The other two harmonic-drone bass rules already varied and are unchanged.
-- **Song sharing fixed on iOS 26/27** — iOS 26 stopped offering any way to open a shared song on iPhone, and iOS 27 did not restore it. Tapping a shared song now offers **"Copy to Zudio"** again, and Zudio also appears in the iOS share sheet so songs can be handed to it from Files and other apps. Three pieces, which only work together:
-    - **`ZudioQuickLook`**, a Quick Look preview extension declaring `QLSupportedContentTypes = com.zudio.song`. This is what restores the handoff — not because of what it draws, but because its presence makes Zudio the only thing on the system that can render a `.zudio`. Do not remove it because the preview looks unused.
-    - **An opaque file type on iOS** (`public.data` + `public.content`). A matched pair with the extension above: while `.zudio` conformed to a text type, iOS used its own previewer and never consulted ours. Mac stays text-conforming, so Finder Quick Look still previews as text and Open With still offers TextEdit.
-    - **`ZudioShare`**, a Share Extension that copies a song into a shared App Group container and launches Zudio via a new `zudio://` URL scheme. Since an extension cannot reliably launch its own app, Zudio also sweeps that container whenever it becomes active.
-    The trade is no inline text preview of `.zudio` on iPhone or iPad — the attachment shows the Zudio icon instead. Mac behaviour is unchanged. Reported to Apple as FB24777501, since the underlying bug affects any text attachment, not just Zudio.
-- **Regression tests** — Added tests pinning the `.zudio` document-type declarations across both platforms, and tests asserting the effect chains stay in sync between live playback and both export paths. Both classes of bug above were silent drift introduced inside commits about unrelated features.
+
+- **Endless mix** — Ambient ~19.5%, Chill ~24%, Kosmic ~32%, Motorik ~24.5%.
+- **Endless streak cap** — After 8 Ambient/Chill songs or 12 Kosmic/Motorik songs in a row, Endless switches to the other pair.
+- **Chill variety** — Bass and Rhythm evolve within a song: Rhythm switches between A and B and takes rest bars; repetitive bass patterns vary every 16 bars.
+- **Chill Rhythm rebalance** — Bosa Moon reduced. New **CHL-RHY-005 Chord Hold** and **CHL-RHY-006 Downbeat Pulse** (also in Chill Blues). Sections tile into 12–16 bar segments that may go sparse, and 20% of songs get a full dropout.
+- **Chill Blues bass variation** — One small variation per pass through the long I-chord stretch.
+- **Chill comping and lead selection** — No longer vary by mood.
+- **Chill bass levels** — All three Chill basses turned down.
+- **Ambient Piano mix** — More reverb and a soft echo.
+- **New Ambient texture** — "Long Lake" (AMB-TEXT-010), loon calls over a lake.
+- **Audio texture on reload** — A reloaded song now plays its audio texture.
+- **Instruments on reload** — Restored from the song's own log; Ambient Piano no longer pins Stereo Piano onto later songs.
+- **Stem export Air effect** — Now matches playback.
+- **Audio interruption logging** — The log notes when another app or a disconnected device stops playback.
+- **Sleep timer** — Starts and cancels with playback.
+- **Chill breakdown bass** — The Acid Jazz rule's harmonic-drone bridge now follows a four-bar arc instead of repeating the root.
+- **Song sharing on iOS 26/27** — "Copy to Zudio" works again, and Zudio appears in the share sheet, via a Quick Look extension, an opaque `.zudio` type on iOS and a Share Extension. Reported to Apple as FB24777501.
+- **Regression tests** — `.zudio` document types and playback/export effect-chain parity.
 
 ---
 
 ## V 2.4 (Build 129)  Motorik Arcade
-- **Motorik Arcade** — New Motorik substyle inspired by the fast, bright, arpeggiated sound of classic arcade and early video game music (Tempest 2000, Contra, Sonic). Features 4-on-the-floor kick, mid-register bass, Lydian/Mixolydian modes, and new arpeggio-driven lead rules including Octave Bounce, Triad Climb, Arcade Arp, and Gate Arp. Motorik Arcade reuses a few rules and instruments from Motorik regular, but adds several unique instruments and rules. It has a mix of major and minor scales. 
-- Testing complete — Motorik substyle probabilities set to production values: Noir 21%, Arcade 19%, base Motorik 60%.
-- **Bug fix** — Opening a Zudio file from finder or from Messages while the app wasn't already running could launch with no window. Fixed.
-- Diagnostic logging for this bug is left in place but off by default. To re-enable: set `kAppOpenDebugLog = true` near the top of `ZudioApp.swift`, rebuild, then filter Console.app (or `log stream`) for subsystem `com.zudio.app`, category `AppOpen`. THis will log to zudio-log-live.txt.
+
+- **Motorik Arcade** — New Motorik substyle in the style of classic arcade music: four-on-the-floor kick, mid-register bass, Lydian/Mixolydian, and arpeggio leads (Octave Bounce, Triad Climb, Arcade Arp, Gate Arp). Motorik is 60% base, 21% Noir, 19% Arcade.
+- **Bug fix** — Opening a Zudio file while the app wasn't running could launch with no window. Diagnostic logging remains, off by default (`kAppOpenDebugLog` in `ZudioApp.swift`).
+
 ---
 
 ## V 2.3 (Build 128)  Audio engine crash fix
-- **New instruments** — Tonewheel Organ and Warm Pad added to Kosmic Bass instrument pool.
-- **Distortion effect** — New "Dist." effect chip on Motorik Bass and Rhythm tracks (replaces Low and Boost chips). Uses soft-clip saturation for a warm, gritty character. Applied automatically by default: Motorik Noir bass and rhythm each distorted ~75% of the time independently; regular Motorik bass distorted ~20% of the time. Note distortion is off for Acoustic Bass and Fuzz Guitar by default, as a matter of taste.
-- **Vibrato effect** — New "Vibrato" chip on Chill Lead 1, Lead 2 and Kosmic Lead 1, Lead 2. Applied probabilistically (~20% regular, 50% Kosmic Drift) and only for instruments where it is musically appropriate (e.g. flute, sax, trumpet, trombone on Chill; flute, oboe, sine wave, bassoon, vox on Kosmic). This replaces Boost and Comp effects.
-- **Air effect** — New "Air" chip on Motorik Lead 1 and Lead 2. A two-band EQ boost (presence at 4 kHz + high shelf at 8 kHz) that adds brightness, bite and openness to synth leads. Applied probabilistically on Lead 1: ~25% of regular Motorik songs, ~45% of Motorik Noir songs. The chip is also available manually on Lead 2.
-- **Probabilistic effects** — Several effects are now applied randomly on each new song generation to increase variety: Air on Motorik Lead 1 (~25% regular, ~45% Noir), Tremolo on Motorik Lead 1 for certain patches, Sweep on Kosmic Pads (~20%) and Motorik Pads (~15%), Tremolo on Kosmic Bass (~15%), Pan on Kosmic Texture (~15%), and Delay on Motorik Lead 2 (~20%). Kosmic Drift already had Sweep, Pan, and Tremolo always on; these additions bring the same textural variety to regular Kosmic.
-- **Style chip** — The Mood chip next to the song title on Mac and iPad is replaced with the style or substyle (e.g. "Motorik", "Chill Blues"), matching the iPhone display.
-- **iOS bug fixes** — Fixed a bug where regenerating an instrument track in a Motorik Noir song incorrectly changed the substyle to Motorik. Also removed a distracting "Generating…" flash in the iPhone player when regenerating a single track.
-- **Crash fix** — Fixed a rare Mac crash that could occur after extended playback (2+ hours). A legacy audio unit was fanning its output to two destinations simultaneously, which caused CoreAudio's render thread to enter infinite recursion and crash with a segfault. Fixed by routing through a native pass-through node instead.
+
+- **New instruments** — Tonewheel Organ and Warm Pad on Kosmic Bass.
+- **Distortion effect** — "Dist." chip on Motorik Bass and Rhythm; on by default for ~75% of Noir and ~20% of regular Motorik bass.
+- **Vibrato effect** — On Chill and Kosmic leads, applied to suitable instruments (~20% of songs, 50% in Kosmic Drift).
+- **Air effect** — Presence and high-shelf boost on Motorik leads (~25% regular, ~45% Noir on Lead 1).
+- **Probabilistic effects** — Sweep, tremolo, pan and delay applied randomly on several Kosmic and Motorik tracks.
+- **Style chip** — Mac and iPad show the style or substyle next to the title.
+- **iOS fixes** — Regenerating a Noir track no longer changes the substyle; no "Generating…" flash.
+- **Crash fix** — Rare Mac crash after 2+ hours of playback.
 
 ---
 
 ## V 2.2 (Build 126)  Optional stem export + new icon + new instruments
-- **Audio export** — When exporting on the Mac the user can select an option to export separate track stems for bass, drums, leads and so on with full EQ and reverb
-- **New instruments** — Guitar Fdbk added to Motorik Noir Texture; Fantasia 2 added to Kosmic Pads; Kalimba added to Ambient Rhythm
-- **New app icon** — Redesigned icon replaces "Z!" with a periodic-table style "Zu"
+
+- **Stem export** — Mac export can write separate track stems with full EQ and reverb.
+- **New instruments** — Guitar Fdbk (Motorik Noir Texture), Fantasia 2 (Kosmic Pads), Kalimba (Ambient Rhythm).
+- **New app icon** — Periodic-table style "Zu".
 
 ---
 
-## V 2.1 (Build 125)  Substyle shown in song list 
-- **Song list shows substyle** — The saved song list now displays the substyle name where applicable (e.g. "Ambient Piano", "Chill Blues", "Motorik Noir", "Kosmic Drift") instead of just the base style.
-- **iOS Save Song fix** — Fixed a bug where Save Song on iPhone and iPad did not export the MIDI file.
-- **New instruments** — Shakuhachi added to Ambient Lead 1; Tonewheel organ added to Chill Rhythm; Pulse Bass added to Kosmic Bass; Fuzz Guitar now available in regular Motorik as well as Motorik Noir.
+## V 2.1 (Build 125)  Substyle shown in song list
 
+- **Song list shows substyle** — e.g. "Chill Blues", "Motorik Noir".
+- **iOS Save Song fix** — Now exports the MIDI file.
+- **New instruments** — Shakuhachi (Ambient Lead 1), Tonewheel (Chill Rhythm), Pulse Bass (Kosmic Bass); Fuzz Guitar in regular Motorik.
 
 ---
 
 ## V 2.0 (Build 124)  Reduced CPU by 50% with reverb bus
-- **Reverb bus architecture** — Replaced 7 independent per-track `AVAudioUnitReverb` instances with 2 shared reverb buses for playback: a large bus (Cathedral, Large Room) and a small bus (Medium Hall). Each track sends its post-EQ signal to the appropriate bus; the dry signal travels directly to the main mixer. Result: **over 50% reduction in CPU load**. Playback without the visualizer now runs under 10% CPU; with the visualizer generally under 20%, compared to over 35% before. 
-- **Higher fidelity M4A audio export** — M4A audio export continues to use per-track reverbs with the original presets for full audio fidelity.  The offline audio export now simulates all track effects including auto-pan, tremolo, and sweep filter, which are critical for Kosmic Drift and Ambient styles. 
+
+- **Reverb buses** — Two shared reverb buses replace seven per-track reverbs, more than halving CPU load.
+- **M4A export** — Keeps per-track reverbs and now renders auto-pan, tremolo and sweep.
 
 ---
 
 ## V 1.7 (Build 123)  Kosmic Drift
 
-- **Kosmic Drift** — New Kosmic sub-style appearing in ~50% of Kosmic songs. Inspired by Boards of Canada, Portishead, and Sigur Ros. Slower tempo (70–90 BPM), sparse and meditative. Features three new drum rules (Loping Groove, Half-Time Lope, Dreamscape Float), four new bass rules, three new lead rules (Tycho Phrase, Drift Memory, Sigur Ros late entry float), and five new rhythm rules (Chord Tremolo, Slow Chord Pulse, Four-Bar Chord Hold, Chromatic Tremolo, Downbeat Chord) all drawn from MIDI analysis of reference tracks. A Dreamscape variant (~10% of Drift songs) produces the most extreme spaciousness.
-- **Expanded Kosmic instrument pools** — Kosmic Pads gains Halo Pad and Bowed Glass for warmer choices. Kosmic Texture gains Solar Wind and FX Echoes for added atmospheric depth. Drift Lead 1 uses Warm Pad, Sine Wave, Bottle Blow, and Shenai. Drift Rhythm uses Moog, New Age Pad, Synth Mallet, Synth Chime, and Mystery Pad. Tremolo added to Kosmic Bass effects chip, replacing Low Filter.
-- **Kosmic bass improvements** — KOS-BASS-001 Berlin School drone gains breathing gaps, duration variety and colour notes to make it a slow-evolving drone. The dual-bass layer (KOS-BASS-007 tremolo) now suppresses when the primary bass is on a sustained major-7th note to avoid semitone clashes.
-- **Chill instrument selection simplified** — Removed incorrect mood-weighted Lead 1 and Lead 2 instrument selection.
-- **Chill horn harmony in regular Chill** — The second-horn harmony previously  only in Chill Blues now appears in ~20% of regular Chill songs. Harmony is diatonic (a third or sixth below) or unison.
-- **Generation log improvements** — Shortened and cleaned up descriptions for clarity and consistency.
+- **Kosmic Drift** — New Kosmic substyle (~50% of Kosmic songs), after Boards of Canada, Portishead and Sigur Rós: 70–90 BPM, sparse, with new drum, bass, lead and rhythm rules.
+- **Kosmic instruments** — New pads, textures, Drift leads and Drift rhythm voices; Tremolo replaces Low Filter on Kosmic Bass.
+- **Kosmic bass** — Berlin School drone breathes and varies; the tremolo bass layer avoids semitone clashes.
+- **Chill** — Lead instruments no longer mood-weighted; second-horn harmony in ~20% of regular Chill songs.
+- **Generation log** — Shorter descriptions.
 
 ---
 
 ## V 1.6 (Build 122)  Motorik Noir + improved gestures
 
-- **Motorik Noir** — New dark sub-style appearing in ~30% of Motorik songs. Slower tempo (110–128 BPM), always minor mode. Inspired by Public Image Ltd, Joy Division etc.  Has deep bass rules (Albatross Pulse, Annalisa Riff, Wobble Theme), inverted drum grooves (Albatross Grid, Annalisa March), sparse pads, Cold Chord texture lead, and power-chord Chord Chug rhythm. Fills are rare and minimal.
-- **Expanded Motorik instruments** — Motorik Rhythm pool expanded from 3 to 8 instruments: Crunch Guitar, Doctor Solo, Acoustic Bass, Pick Bass, and Charang added alongside the existing guitars and synth bass. Machine Kit added to Motorik Drums. Techno Bass added to Motorik Bass. Motorik Lead 1 gains two new voices: Synth Lead and Saw Stack. Kosmic Rhythm gains Harpsi Pad.
-- **Swipe up / swipe down** — New visualizer gestures on all platforms: swipe up increases tempo by 5 BPM, swipe down decreases by 5 BPM (clamped 20–200). On iPhone/iPad uses UISwipeGestureRecognizer; on Mac uses vertical trackpad scroll (dominant-axis logic prevents conflict with horizontal swipes).
-- **Orb click regenerates instrument and track** — Clicking or tapping an orb, swiping or pinching now regenerates both the instrument and the MIDI track, matching the lightning bolt button in the Tracks view.
-- **Evolve tempo clamping fix** — Minor bug fixed to clamp tempo within the proper range for each style when playing in Evolve mode.
-- **Kosmic intro effects fix** — Fixed a bug where incorrect reverb effects were applied during the Kosmic intro and outro.
-- **Bass/drum sync improvements** — Fixed off-beat note placement in CHL-BASS-008 (Acid Jazz), KOS-BASS-009, MOT-BASS-003 (Crawling Walk) where primary bass notes were landing on weak 16th-note positions causing rhythmic misalignment.
-- **Audio export respects Mute and Solo** — Exporting audio now respects  Mute and Solo track settings. Muted tracks are silent in the export matching what the user hears during playback.
-- **Evolve mode Next Track fix** — Fixed a timing bug where pressing Next Track while Evolve mode was mid-evolution could cause it to alternate between two history songs instead of generating a new one.
-- **First-best rules tightened** — The curated "first best" rules (which select the most representative groove for each style) now only fire on a true clean slate: the first time the user runs Zudio or after a full reset. Every session after the first uses a full random selection.
-- **Smoother track view animation** — Playhead position now computed from wall-clock time rather than dispatch callbacks, eliminating lag during playback.
-
+- **Motorik Noir** — New dark Motorik substyle (~30%): 110–128 BPM, always minor, after Public Image Ltd and Joy Division.
+- **Motorik instruments** — Rhythm pool grows to 8; Machine Kit, Techno Bass, Synth Lead and Saw Stack added; Harpsi Pad on Kosmic Rhythm.
+- **Swipe up / down** — Changes tempo by 5 BPM on all platforms.
+- **Orb gestures** — Regenerate both instrument and track.
+- **Fixes** — Evolve tempo clamping, Kosmic intro effects, bass/drum sync, export respects Mute and Solo, Evolve Next Track.
+- **First-best rules** — Only on a true first run or after a reset.
+- **Smoother playhead** — Driven by wall-clock time.
 
 ---
 
 ## V 1.5.1 (Build 121)  Minor improvements
 
-- **Chill Blues lead** — CHL-LD1-004 blues lead now includes occasional fast runs and varied note lengths for a more realistic horn feel. CHL-LD1-002 short punch lead flows more smoothly with less halting silence and better phrase continuity.
+- **Chill Blues lead** — More varied runs and note lengths; Short Punch flows better.
 
 ---
 
 ## V 1.5.1 (Build 120)  Bug fix
 
-- **Audio export fix** — Save as Audio was broken due to a missing soundfont reference; fixed.
+- **Audio export fix** — Save as Audio restored.
 
 ---
 
 ## V 1.5 (Build 119)  Ambient Piano and new instruments
 
-- **Ambient Piano** — New Ambient sub-style (work in progress). Appears in roughly 20% of Ambient songs. Generates a solo piano arrangement with optional pad accompaniment, piano-specific phrasing rules, smaller room reverb, and no delay on the lead voice.
-- **New Ambient rhythm instruments** — Church Bells, Windchime, and Tinker Bell added to the Ambient Rhythm instrument pool.
-- **Expanded Kosmic and Motorik instruments** — New synth bass options (Synth Bass 3, Synth Bass 4, Mean Saw Bass) added to Kosmic and Motorik bass pools; Saw Lead 3 added to Motorik Lead 1; Night Vision added to Motorik Lead 2.
-- **SC55 Stereo piano** — After experimenting with several external SF2 piano soundfonts (Florestan, SC55 variants, Velocity Grand, Yamaha PSR), SC55 Stereo from the Roland SC55 soundfont emerged as the best option: more dynamic and natural-sounding than the GeneralUser GS Grand Piano. Now used in Ambient, Ambient Piano and Chill.
-- **New drum kits** — Jazz Drums added to the Chill drum pool; Dance Drums added to the Motorik drum pool.
-**Custom Zudio.sf2** — Replaced the bundled GeneralUser GS soundfont with a trimmed custom build. 115 unused presets were removed — including the piano/brass family cluster, Violin, Pipe Organ, accordion, woodwinds and all sound-effect programs reducing the size from **29.8 MB to 20.9 MB**, a saving of **(30%)** which makes the Zudio app 9MB smaller.
+- **Ambient Piano** — New Ambient substyle (~20%): solo piano with optional pads.
+- **New instruments** — Church Bells, Windchime and Tinker Bell (Ambient Rhythm); new synth basses in Kosmic and Motorik; Saw Lead 3 and Night Vision in Motorik.
+- **SC55 Stereo piano** — Used in Ambient, Ambient Piano and Chill.
+- **New drum kits** — Jazz Drums (Chill), Dance Drums (Motorik).
+- **Custom Zudio.sf2** — Trimmed GeneralUser GS from 29.8 MB to 20.9 MB.
 
 ---
 
 ## V 1.4 (Build 118)  New Chill Blues
 
-- **Chill Blues** — A new variation of the Chill style, appearing in roughly 1 in 5 Chill songs. Chill Blues generates a 16-bar blues form (I–IV–V) in a laid-back jazz-blues idiom: brushed or neo-soul drums, warm horns and reeds (tenor sax, clarinet, muted trumpet), sparse pads, and a soloist that phrases across the 16-bar form with blues-scale inflections and turnaround licks. Delay is removed from the lead voices for a drier, more authentic tone.
-- **Chill Blues horn harmony** — In 25% of Chill Blues songs, a second horn joins Lead 1 in harmony or unison for up to two phrases during the second and final passes of the 16-bar form, evoking the call-and-response texture of a small jazz-blues ensemble.
-- **Jazzy blues lead (CHL-LD1-009)** — A new Chill Blues lead rule with jazz phrasing idioms: turn figures, riff cells, chromatic approach notes, and short rapid-fire note bursts. Available in both Chill Blues (35% of songs) and regular Chill (8% of songs) for a jazz-inflected edge.
-- **Chill rhythm variety** — CHL-RHY-001 (St Germain) and CHL-RHY-003 (Bosa Moon) now introduce subtle variations after the first 16 bars of a section, keeping long songs from feeling static.
-- **Trumpet register fix** — Trumpet and muted trumpet lead voices now floor at Bb3, avoiding unnatural low-register notes.
-- **Performance improvements** — Reduced main-thread CPU load: Canvas playhead views  update at display rate rather than step rate; audio waveform load is off the main thread.
-- **Visualizer gestures regenerate tracks** — Tap/click on an orb, swipe, pinch, and double-tap/double-click on empty canvas now fully regenerate the track (new rule + new MIDI events), not just the instrument patch.
-- **iOS 17 reverb bug fix** — Fixed a bug on iOS 17 where turning off the Reverb effect on any track would silence that track entirely. Affects all styles.
+- **Chill Blues** — New Chill form (~1 in 5): a 16-bar blues with brushed drums, horns and reeds, sparse pads and a blues soloist.
+- **Chill Blues horn harmony** — A second horn in 25% of songs.
+- **Jazzy blues lead (CHL-LD1-009)** — In Chill Blues and occasionally regular Chill.
+- **Chill rhythm variety** — St Germain and Bosa Moon vary after 16 bars.
+- **Trumpet register** — Floors at Bb3.
+- **Performance** — Lower main-thread CPU.
+- **Visualizer gestures** — Fully regenerate the track.
+- **iOS 17 fix** — Turning off Reverb no longer silences a track.
 
 ---
 
 ## V 1.3 (Build 117)  Bug fixes
 
-- **iPhone lock screen transport sync fix** — iOS Lock screen play/pause button now correctly reflects Zudio's playback state at all times.
-- **Kosmic audio export fix** — Fixed a bug where Kosmic songs did not export properly on iOS.
+- **Lock screen** — Play/pause reflects playback state.
+- **Kosmic export on iOS** — Fixed.
 
 ---
 
 ## V 1.1 (Build 116)  Fast audio export and musical improvements
 
-- **Fast audio export** — Now uses an offline render 20–40× faster (about 15 sec) instead of real-time capture. On iOS, a share sheet appears so the file can be saved or shared.
-- **New Ambient bass rules** — ECM pluck, Octave Double Slow Pendulum.
-- **Ambient secondary lead** — New descending phrase form (AMB-LEAD-006).
-- **More melodic Chill solos** — Chill lead solos use recurring themes with a free-form middle.
-- **New Chill pad rules** — Moby Anchor, Open Fifth Hold, Slow Chord Build, String Hold.
-- **Chill rhythm variety** — More variation in Chill rhythm tracks.
-- **Chill secondary lead** — New Chill secondary lead form.
-- **Chill lead balance** — Decreased trumpet frequency in Chill lead selection.
-- **Chill audio texture bug fix** — Minor fix to texture playback variation.
-- **More melodic Kosmic leads** — Pentatonic Drift and TD Skip Sequence are improved.
-- **Kosmic pads variations** — Kosmic Quartal Stack pads has more variation.
-- **Kosmic pads variations** — Kosmic Vangelis Swell pads has more variation.
-- **Kosmic driving bass** — More evolving Kosmic driving bass sequencer.
-- **808 kit drum fills** — Improved Kosmic and Motorik tom fills for 808 kit.
-- **Motorik drum variety** — More variation in Motorik drum tracks.
+- **Fast audio export** — Offline render, 20–40× faster; share sheet on iOS.
+- **Ambient** — New bass rules and a descending secondary lead.
+- **Chill** — More melodic solos, four new pad rules, more rhythm variety, a new secondary lead, less trumpet.
+- **Kosmic** — Improved leads, pad variation and driving bass.
+- **Drums** — Better 808 fills; more Motorik variety.
 
 ---
 
 ## 1.02 (Build 115)  App Store fixes
 
-- **Mac App Store fix** — Export Audio and Save Song now use NSSavePanel instead of writing directly to ~/Downloads. Single panel with Full Song / 60-sec Sample radio buttons replaces the old two-dialog flow.
-- **Keyboard fix** — Arrow keys and other shortcuts no longer fire in Zudio while a save/export dialog is open.
-- **Chill outro coordination, iPad BPM selector, lock screen and audio texture bug fixes.**
+- **Mac App Store** — Save panels instead of writing to ~/Downloads.
+- **Keyboard** — Shortcuts no longer fire while a dialog is open.
+- **Fixes** — Chill outro, iPad BPM selector, lock screen and audio texture.
 
 ---
 
 ## 1.01 (Build 113)  Minor musical improvements and bug fixes
 
-- iPhone save bug fix, instrument override persistence, rain/wind audio texture tracks for Ambient, Chill groove pocket breakdown and evolve mode track addition.
+- iPhone save fix, instrument override persistence, rain/wind textures for Ambient, Chill groove pocket breakdown, evolve mode track addition.

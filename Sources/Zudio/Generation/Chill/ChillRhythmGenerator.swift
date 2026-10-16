@@ -32,8 +32,8 @@ struct ChillRhythmGenerator {
             modeB = pickDifferentCompingMode(from: modeA, allCandidates: Self.allBluesCompingModes,
                                               picker: pickBluesCompingMode, rng: &rng)
         } else if beatStyle.isSoho {
-            // Chill Soho: pools follow the groove (see "Implementation contract" in
-            // docs/chill-soho-plan.md). Latin has two modes, so A and B always play both.
+            // Chill Soho: pools follow the groove (see Rhythm in docs/chill-soho-plan.md).
+            // A and B always take different modes.
             let latin  = beatStyle == .sohoLatin
             let picker = latin ? pickSohoLatinCompingMode : pickSohoSoulCompingMode
             modeA = picker(&rng)
@@ -390,7 +390,29 @@ struct ChillRhythmGenerator {
                 let base    = bar * 16
                 let sectionLen = section?.lengthBars ?? 4
 
-                if breakdownStyle == .sohoRemix {
+                if breakdownStyle == .sohoDuo {
+                    // Duo (Chill Soho): the comp is half the section, so it plays every bar — no
+                    // rests, dropouts or sparse shapes — and steps forward a little in the mix.
+                    // Chordal comp's rootless voicings leave the low end to the bass; a song whose
+                    // A section runs the single-note line keeps it, which makes the duo two lines
+                    // in counterpoint. Root-and-chord eighths is never used here: its own low root
+                    // would sit on top of the bass.
+                    let duo: [MIDIEvent]
+                    if modeA == .singleNoteLine {
+                        duo = singleNoteLine(base: base, chord: chord, bar: bar,
+                                             forceSparse: false, rng: &rng)
+                    } else {
+                        let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                        duo = chordalComp(base: base, voicing: voicing, bar: bar, clave: clave,
+                                          forceSparse: false, rng: &rng)
+                    }
+                    events += duo.map {
+                        MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
+                                  velocity: UInt8(Swift.min(100, Int($0.velocity) + 8)),
+                                  durationSteps: $0.durationSteps)
+                    }
+                    continue
+                } else if breakdownStyle == .sohoRemix {
                     // Remix Break (Chill Soho): Rhythm reduced to short offbeat stabs — the house
                     // offbeat chord on 2, 6, 10 and 14 — and on the last bar it joins the band's
                     // unison hits on 0 and 8.

@@ -85,7 +85,7 @@ struct ChillDrumGenerator {
         let overlay: Bool
     }
 
-    /// Pools from the plan's implementation contract. Latin: 009 40%, 010 30%, 011 30%.
+    /// Pools as in docs/chill-soho-plan.md (Drums). Latin: 009 40%, 010 30%, 011 30%.
     /// Soul: 012 55%, 013 25%, reused 003 Brush Kit 20%. Overlay: 85% Latin, 40% Soul — measured
     /// Latin percussion share runs 25–55% even in Soul-pool records (Avalon 46%, Your Love Is King 25%).
     static func sohoDrumPlan(beatStyle: ChillBeatStyle, rng: inout SeededRNG) -> SohoDrumPlan {
@@ -333,6 +333,29 @@ struct ChillDrumGenerator {
                         hit(step, note, rng.velocity(66, 14), base)
                     }
                     hit(14, cabasa, rng.velocity(50, 8), base)
+                    crashNextBar = true
+                }
+                continue
+            }
+
+            // Duo: the kit leaves Rhythm and Bass alone, keeping one soft timekeeper so the two
+            // never drift — the shaker where the song has one, closed hats otherwise. No kick: its
+            // absence is what makes it a duo. The way out is a soft snare pickup on beat 4, the
+            // corpus's lightest fill, and a crash back into the groove.
+            if label == .bridge && breakdownStyle == .sohoDuo {
+                let bdBar  = bar - (section?.startBar ?? bar)
+                let isLast = bdBar == (section?.lengthBars ?? 8) - 1
+                let pulse  = isLast ? 12 : 16
+                if latin || plan.overlay {
+                    for step in stride(from: 0, to: pulse, by: 2) {
+                        hit(step, shaker, step % 4 == 0 ? rng.velocity(34, 6) : rng.velocity(26, 6), base)
+                    }
+                } else {
+                    for step in stride(from: 0, to: pulse, by: 4) { hit(step, hat, rng.velocity(34, 8), base) }
+                }
+                if isLast {
+                    hit(12, snare, rng.velocity(52, 8), base)
+                    hit(14, snare, rng.velocity(62, 8), base)
                     crashNextBar = true
                 }
                 continue
@@ -768,7 +791,7 @@ struct ChillDrumGenerator {
                         let vel = UInt8(30 + rng.nextInt(upperBound: 15))
                         events.append(MIDIEvent(stepIndex: base + 2, note: hat, velocity: vel, durationSteps: 1))
                     }
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     // Full groove continues throughout; fills on every odd bar + always on last bar.
                     // Kick: beat 1 always; beat 3 at 60% (slightly higher than normal to push the pocket)
                     events.append(MIDIEvent(stepIndex: base, note: kick,
@@ -920,7 +943,7 @@ struct ChillDrumGenerator {
                         let vel = UInt8(40 + rng.nextInt(upperBound: 20))
                         events.append(MIDIEvent(stepIndex: base + 2, note: hat16, velocity: vel, durationSteps: 1))
                     }
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     // Full groove + fills every odd bar and last bar
                     events.append(MIDIEvent(stepIndex: base, note: kick, velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
                     if rng.nextDouble() < 0.60 {
@@ -1127,7 +1150,7 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base + 8, note: snare, velocity: UInt8(42 + rng.nextInt(upperBound: 14)), durationSteps: 1))
                         }
                     }
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     // Full four-on-the-floor groove + fills every odd bar and last bar
                     for step in [0, 4, 8, 12] {
                         events.append(MIDIEvent(stepIndex: base + step, note: kick, velocity: UInt8(70 + rng.nextInt(upperBound: 16)), durationSteps: 1))
@@ -1313,6 +1336,17 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base, note: ride, velocity: vel, durationSteps: 1))
                         }
                     }
+                case .sohoDuo:
+                    // Chill Soho Duo under the reused Brush Kit: the ride alone, soft quarters,
+                    // then a brushed pickup on beat 4 of the last bar into the return.
+                    for step in [0, 4, 8, 12] where !isLastBDBar || step < 12 {
+                        events.append(MIDIEvent(stepIndex: base + step, note: ride,
+                                                velocity: UInt8(30 + rng.nextInt(upperBound: 12)), durationSteps: 1))
+                    }
+                    if isLastBDBar {
+                        events.append(MIDIEvent(stepIndex: base + 12, note: snare, velocity: UInt8(50 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+                        events.append(MIDIEvent(stepIndex: base + 14, note: snare, velocity: UInt8(60 + rng.nextInt(upperBound: 10)), durationSteps: 1))
+                    }
                 case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
                     // Quarter-note ride groove + snare brush 2+4 + kick on 1 (and 3 at 40%) + fills
                     for step in [0, 4, 8, 12] {
@@ -1476,7 +1510,7 @@ struct ChillDrumGenerator {
                             events.append(MIDIEvent(stepIndex: base + step, note: tamb, velocity: vel, durationSteps: 1))
                         }
                     }
-                case .groovePocket, .sohoRemix:   // remix: Soho-only, unreachable here
+                case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     // Full hip-hop groove: kick 1+3, snare 2+4, 8th-note hat, 16th tambourine + fills
                     events.append(MIDIEvent(stepIndex: base,      note: kick,  velocity: UInt8(72 + rng.nextInt(upperBound: 16)), durationSteps: 1))
                     events.append(MIDIEvent(stepIndex: base + 8,  note: kick,  velocity: UInt8(65 + rng.nextInt(upperBound: 16)), durationSteps: 1))

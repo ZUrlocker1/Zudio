@@ -409,6 +409,12 @@ enum ChillBreakdownStyle: String, Codable, Sendable {
     /// not a genre switch. Eligible only when the Latin percussion overlay is on, tempo > 105, and
     /// the drum rule is not Ballad Half-Time or the reused Brush Kit. See docs/chill-soho-plan.md.
     case sohoRemix
+    /// Chill Soho only — the Duo. 8 or 12 bars where the band leaves Rhythm and Bass alone to
+    /// talk: the bass keeps its own groove, the comp plays rootless voicings through every bar,
+    /// the song's cycle continues at two bars a chord, and the kit drops to one soft timekeeper
+    /// (shaker under a Latin groove, closed hats under Soul, ride under the Brush Kit). Pads and
+    /// leads sit out; the horns reply sparingly. See docs/chill-soho-plan.md.
+    case sohoDuo
 }
 
 // MARK: - Percussion style (Kosmic + future Ambient)

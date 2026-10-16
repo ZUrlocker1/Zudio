@@ -71,6 +71,10 @@ struct ChillStructureGenerator {
             // Chill Soho Remix Break. 12 or 16 bars read as one fixed length by ear, so the break
             // is now 6, 8 or 12 (Zack, 2026-10-11) — a short one is a lift, a long one a section.
             breakdownBars = [6, 8, 12][rng.weightedPick([0.30, 0.40, 0.30])]
+        case .sohoDuo:
+            // Chill Soho Duo. Longer than bass ostinato's four: two players trading takes time to
+            // establish, and at two bars a chord eight bars is only four changes.
+            breakdownBars = rng.nextDouble() < 0.70 ? 8 : 12
         }
         let grooveTotal   = Swift.max(20, total - introBars - outroBars - breakdownBars)
         // Split groove total across A and B; B slightly longer (more active)

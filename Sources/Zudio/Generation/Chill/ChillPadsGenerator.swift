@@ -718,7 +718,8 @@ struct ChillPadsGenerator {
     private static func breakdownPad(frame: GlobalMusicalFrame, structure: SongStructure,
                                       breakdownStyle: ChillBreakdownStyle,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
-        guard breakdownStyle != .bassOstinato else { return [] }
+        // The Duo is Rhythm and Bass alone; a pad under it would make it a trio.
+        guard breakdownStyle != .bassOstinato && breakdownStyle != .sohoDuo else { return [] }
         var events: [MIDIEvent] = []
         let scalePCs  = frame.scalePCs
         let snapTable = makeSnapTable(scalePCs)
@@ -769,7 +770,7 @@ struct ChillPadsGenerator {
                         }
                     }
                 }
-            case .bassOstinato:
+            case .bassOstinato, .sohoDuo:
                 break  // handled by guard above
             case .harmonicDrone:
                 // Whisper sustain renewed every 4 bars — barely audible harmonic warmth

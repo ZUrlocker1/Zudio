@@ -73,6 +73,7 @@
 		AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
 		AA000000000000000000063 /* ChillBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000063 /* ChillBassGenerator.swift */; };
 		AA000000000000000000064 /* ChillPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000064 /* ChillPadsGenerator.swift */; };
+		AA0000000000000000000C9 /* ChillBassSlides.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C9 /* ChillBassSlides.swift */; };
 		AA0000000000000000000C1 /* ChillSohoTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1 /* ChillSohoTextureGenerator.swift */; };
 		AA0000000000000000000C2 /* ChillSohoLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C2 /* ChillSohoLeadGenerator.swift */; };
 		AA000000000000000000065 /* ChillLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000065 /* ChillLeadGenerator.swift */; };
@@ -167,6 +168,7 @@
 		IS000000000000000000062 /* ChillDrumGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000062 /* ChillDrumGenerator.swift */; };
 		IS000000000000000000063 /* ChillBassGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000063 /* ChillBassGenerator.swift */; };
 		IS000000000000000000064 /* ChillPadsGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000064 /* ChillPadsGenerator.swift */; };
+		IS0000000000000000000C9 /* ChillBassSlides.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C9 /* ChillBassSlides.swift */; };
 		IS0000000000000000000C1 /* ChillSohoTextureGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1 /* ChillSohoTextureGenerator.swift */; };
 		IS0000000000000000000C2 /* ChillSohoLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C2 /* ChillSohoLeadGenerator.swift */; };
 		IS000000000000000000065 /* ChillLeadGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000065 /* ChillLeadGenerator.swift */; };
@@ -307,6 +309,7 @@
 		BB000000000000000000062 /* ChillDrumGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillDrumGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000063 /* ChillBassGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillBassGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000064 /* ChillPadsGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillPadsGenerator.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C9 /* ChillBassSlides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillBassSlides.swift; sourceTree = "<group>"; };
 		BB0000000000000000000C1 /* ChillSohoTextureGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillSohoTextureGenerator.swift; sourceTree = "<group>"; };
 		BB0000000000000000000C2 /* ChillSohoLeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillSohoLeadGenerator.swift; sourceTree = "<group>"; };
 		BB000000000000000000065 /* ChillLeadGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChillLeadGenerator.swift; sourceTree = "<group>"; };
@@ -590,6 +593,7 @@
 				BB000000000000000000062 /* ChillDrumGenerator.swift */,
 				BB000000000000000000063 /* ChillBassGenerator.swift */,
 				BB000000000000000000064 /* ChillPadsGenerator.swift */,
+				BB0000000000000000000C9 /* ChillBassSlides.swift */,
 				BB0000000000000000000C1 /* ChillSohoTextureGenerator.swift */,
 				BB0000000000000000000C2 /* ChillSohoLeadGenerator.swift */,
 				BB000000000000000000065 /* ChillLeadGenerator.swift */,
@@ -949,6 +953,7 @@
 				AA000000000000000000062 /* ChillDrumGenerator.swift in Sources */,
 				AA000000000000000000063 /* ChillBassGenerator.swift in Sources */,
 				AA000000000000000000064 /* ChillPadsGenerator.swift in Sources */,
+				AA0000000000000000000C9 /* ChillBassSlides.swift in Sources */,
 				AA0000000000000000000C1 /* ChillSohoTextureGenerator.swift in Sources */,
 				AA0000000000000000000C2 /* ChillSohoLeadGenerator.swift in Sources */,
 				AA000000000000000000065 /* ChillLeadGenerator.swift in Sources */,
@@ -1050,6 +1055,7 @@
 				IS000000000000000000062 /* ChillDrumGenerator.swift in Sources */,
 				IS000000000000000000063 /* ChillBassGenerator.swift in Sources */,
 				IS000000000000000000064 /* ChillPadsGenerator.swift in Sources */,
+				IS0000000000000000000C9 /* ChillBassSlides.swift in Sources */,
 				IS0000000000000000000C1 /* ChillSohoTextureGenerator.swift in Sources */,
 				IS0000000000000000000C2 /* ChillSohoLeadGenerator.swift in Sources */,
 				IS000000000000000000065 /* ChillLeadGenerator.swift in Sources */,

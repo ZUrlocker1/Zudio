@@ -165,7 +165,7 @@ struct ChillLeadGenerator {
             // Breakdown behavior depends on style
             if label == .bridge {
                 switch breakdownStyle {
-                case .bassOstinato, .sohoRemix:   // remix: Lead 1 rests
+                case .bassOstinato, .sohoRemix, .sohoDuo:   // remix: Lead 1 rests; duo: Rhythm and Bass alone
                     // Silent — bass carries the groove alone
                     bar += 1
                     continue
@@ -1350,7 +1350,7 @@ struct ChillLeadGenerator {
             // Breakdown: behavior depends on style
             if label == .bridge {
                 switch breakdownStyle {
-                case .bassOstinato, .sohoRemix:   // remix: Lead 1 rests
+                case .bassOstinato, .sohoRemix, .sohoDuo:   // remix: Lead 1 rests; duo: Rhythm and Bass alone
                     // Silent — bass carries the groove alone
                     bar += 1; continue
                 case .stopTime:

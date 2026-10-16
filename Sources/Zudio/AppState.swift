@@ -585,11 +585,13 @@ final class AppState: ObservableObject {
         // The bank-8 Synth Brass 3/4 were tried there too and rejected like the bank-0 pair, so
         // no synth brass belongs here. The saxes stay out: they are Lead 2's voices.
         // Celesta, Glockenspiel, Solo Vox, Halo Pad and then Crystal all came out on
-        // 2026-10-12. Vibraphone keeps its place and Xylophone joins it as the bell colour.
+        // 2026-10-12. Vibraphone keeps its place as the bell colour. Xylophone joined it, then came
+        // out on 2026-10-15: it never sounded like much, and it is not musical here unless it is
+        // the lead (Zack). Its 10% went to Vibraphone.
         // Nothing in the pool sustains now except the brass, so a Sustained Halo song that draws
         // a mallet gets a note that rings and decays inside its written length rather than
         // holding — brass is 70% of picks, so that is the minority case.
-        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return ["Trumpet","Trombone","Muted Trumpet","Vibraphone","Xylophone"] }
+        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return ["Trumpet","Trombone","Muted Trumpet","Vibraphone"] }
         // Chill Soho Lead 1: base Chill's five plus Flute, which is in 4 of the 14 corpus files as
         // the voice standing in for the singer. The first five keep base Chill's order so an
         // index carried over from another Chill song still means the same instrument.
@@ -687,7 +689,7 @@ final class AppState: ObservableObject {
         // Chill Soho MIDI texture — names and the reasons are in instrumentPoolNames.
         // Trombone replaced French Horns, which did not work for the punctuation (Zack,
         // 2026-10-12). Brass Section (61) is not in Zudio.sf2 and would play silent.
-        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 57, 59, 11, 13] }
+        if isChillSoho && style == .chill && trackIndex == kTrackTexture { return [56, 57, 59, 11] }
         // All Kosmic programs are in the base .kosmic cases below (Regular + Drift-exclusive combined).
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71, 73, 64, 74]
@@ -779,9 +781,6 @@ final class AppState: ObservableObject {
             // 2026-10-12).
             // Cut again to 60 on 2026-10-13: at 75 the mallets still rang out over the horns.
             case (kTrackTexture, .chill,   "Vibraphone"):    return 60
-            // Xylophone is drier and brighter still than the vibraphone, but it is shorter and
-            // does not ring, so it keeps the lighter cut rather than following the vibraphone down.
-            case (kTrackTexture, .chill,   "Xylophone"):     return 75
             // Open trumpet is the loudest thing in the Soho texture pool — brighter than the
             // muted trumpet and higher than the trombone it shares the brass slots with (Zack,
             // 2026-10-13). A lighter cut than the mallets take: it is the pool's main voice at
@@ -2205,12 +2204,12 @@ final class AppState: ObservableObject {
         let isSoho  = state?.chillSohoVariation == true
         switch trackIndex {
         case kTrackTexture where isSoho:
-            // [0=Trumpet, 1=Trombone, 2=Muted Trumpet, 3=Vibraphone, 4=Xylophone] — brass leads
-            // at 70% of picks, as a horn section is the idiomatic voice for both the stabs and
-            // the halo; the two mallets are colour.
+            // [0=Trumpet, 1=Trombone, 2=Muted Trumpet, 3=Vibraphone] — brass leads at 70% of
+            // picks, as a horn section is the idiomatic voice for both the stabs and the halo;
+            // Vibraphone is the colour, with Xylophone's 10% since it left (2026-10-15).
             // Filtered by poolCount: a caller that sized the pool without isChillSoho would get
             // the 7-entry audio list, so an index past its end must not be returned.
-            return [0, 0, 0, 1, 1, 2, 2, 3, 3, 4].filter { $0 < poolCount }
+            return [0, 0, 0, 1, 1, 2, 2, 3, 3, 3].filter { $0 < poolCount }
         case kTrackBass where isSoho:
             // Chill Soho bass: [0=Fretless, 1=Acoustic, 2=Elec Bass]. Elec Bass is in the mix but
             // less often than the other two — 25% against base Chill's even 33% (Zack,
@@ -3791,6 +3790,10 @@ final class AppState: ObservableObject {
         // 4 Hz / 0.32 setting instead of the organ's 8 Hz / 0.40. Keyed on the GM guitar family,
         // so any guitar added to any Chill rhythm pool gets it without another edit.
         if PlaybackEngine.isGuitarProgram(progs[idx]) { return true }
+        // Chill Soho's Rhodes takes it too: the slow stereo-style shimmer is the sound of the
+        // Sade records' electric piano, so in Soho it is always on (Zack, 2026-10-15). Base Chill
+        // and Blues Rhodes are unchanged.
+        if state?.chillSohoVariation == true && names[idx] == "Rhodes" { return true }
         let eligible: Set<String> = blues ? ["B3 Organ", "Perc Organ", "Rock Organ"]
                                           : ["B3 Organ", "Tonewheel"]
         guard eligible.contains(names[idx]) else { return false }

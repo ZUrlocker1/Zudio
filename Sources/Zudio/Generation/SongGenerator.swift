@@ -98,7 +98,7 @@ struct SongGenerator {
                                    useBrushKit: useBrushKit,
                                    forceAmbientPianoRule: forceAmbientPianoRule)
         case .chill:
-            return generateChill(skipGrooveFixup: skipGrooveFixup,
+            return ChillBassSlides.annotated(generateChill(skipGrooveFixup: skipGrooveFixup,
                                  seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                  moodOverride: moodOverride,
                                  forceBassRuleID: forceBassRuleID,
@@ -108,7 +108,7 @@ struct SongGenerator {
                                  forceRhythmRuleID: forceArpRuleID,
                                  forceTexRuleID: forceTexRuleID,
                                  forceBluesVariation: forceBluesVariation,
-                                 forceSohoVariation: forceSohoVariation)
+                                 forceSohoVariation: forceSohoVariation))
         }
     }
 
@@ -1939,6 +1939,8 @@ struct SongGenerator {
             updated = updated.withAmbientAudioTexture(regenAmbientAudioTexture, offset: regenAmbientAudioOffset)
         }
         updated.trackOverrides[trackIndex] = newTrackSeed
+        // A regenerated bass has its own slides; re-mark them in the log.
+        if trackIndex == kTrackBass && isChill { updated = ChillBassSlides.annotated(updated) }
         return updated
     }
 
@@ -3311,6 +3313,7 @@ struct SongGenerator {
                     case .harmonicDrone: styleLabel = "harmonic drone"
                     case .groovePocket:  styleLabel = "groove pocket"
                     case .sohoRemix:     styleLabel = "remix break"
+                    case .sohoDuo:       styleLabel = "duo"
                     }
                     fireBar(bar, tag: "Breakdown", desc: "\(section.lengthBars) bars — \(styleLabel)")
                 } else {
@@ -3762,6 +3765,7 @@ struct SongGenerator {
             let soho = buildSohoChordPlan(frame: frame, structure: baseStructure,
                                           remix: chillBreakdownStyle == .sohoRemix,
                                           drone: chillBreakdownStyle == .harmonicDrone,
+                                          duo: chillBreakdownStyle == .sohoDuo,
                                           rng: &cycleRNG)
             sohoCycleLabel = soho.label
             sohoHasTurnaround = soho.turnaround
@@ -4295,9 +4299,12 @@ struct SongGenerator {
         // (Zack, 2026-10-11). Bass ostinato leads because Soho's bass rules carry a break on
         // their own; harmonic drone stays because the Soho texture now answers it with horns;
         // groove pocket stays at Zack's call, with the kit keeping its groove through it.
+        // The Duo (2026-10-15) took its 25% mostly from bass ostinato, the break it is closest
+        // to — both expose the bass — so the two together still lead at 60%.
         let x = r.nextDouble()
-        if x < 0.45 { return .bassOstinato }
-        if x < 0.75 { return .groovePocket }
+        if x < 0.35 { return .bassOstinato }
+        if x < 0.60 { return .sohoDuo }
+        if x < 0.82 { return .groovePocket }
         return .harmonicDrone
     }
 
@@ -4635,7 +4642,7 @@ struct SongGenerator {
     }
 
     private static func buildSohoChordPlan(frame: GlobalMusicalFrame, structure: SongStructure,
-                                           remix: Bool = false, drone: Bool = false,
+                                           remix: Bool = false, drone: Bool = false, duo: Bool = false,
                                            rng: inout SeededRNG)
     -> (windows: [ChordWindow], label: String, turnaround: Bool) {
         let key = frame.key, mode = frame.mode
@@ -4705,10 +4712,11 @@ struct SongGenerator {
         for section in structure.sections {
             let s = section.startBar, e = s + section.lengthBars
             switch section.label {
-            case .bridge where remix:
+            case .bridge where remix || duo:
                 // Remix Break: the song's own cycle carries on at two bars per chord. Twelve to
                 // sixteen bars on one unresolved sus4 would stall; EBTG's "Missing" remix keeps its
-                // chord cycle through the house section.
+                // chord cycle through the house section. The Duo takes the same: a comp with one
+                // held chord for eight bars has nothing to say to the bass.
                 var i = 0
                 var bar = s
                 while bar < e {
@@ -4910,6 +4918,7 @@ struct SongGenerator {
         case .harmonicDrone: breakdownLabel = "harmonic drone"
         case .groovePocket:  breakdownLabel = "groove pocket"
         case .sohoRemix:     breakdownLabel = "remix break"
+        case .sohoDuo:       breakdownLabel = "duo"
         }
         let hasHarmony = lead2Rules.contains { $0.hasPrefix("CHL-LD2-HARM-") || $0.hasPrefix("CHL-LD2-UNIS-") }
         let harmonyTag = hasHarmony ? " - harmony" : ""

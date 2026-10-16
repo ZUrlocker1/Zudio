@@ -123,9 +123,15 @@ enum OfflineExport {
         }
 
         let sps = 60.0 / Double(state.frame.tempo) / 4.0
+        // Bass slides, as playback plays them (PlaybackEngine.startBassSlide) and suppressed in
+        // the same case: the bass has the Vibrato effect on.
+        let bassVibrato = kTrackBass < snapshots.count && snapshots[kTrackBass].vibratoEnabled
+        let bassSlides  = bassVibrato ? [:] : ChillBassSlides.slides(for: state)
         let eventLists: [[SampleEvent]] = samplers.map { item in
             buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps)
-        }
+                + (item.trackIdx == kTrackBass
+                    ? slideEvents(bassSlides, sampleRate: sampleRate, sps: sps) : [])
+        }.map { $0.sorted { $0.pos < $1.pos } }
         var evtIdxs = [Int](repeating: 0, count: samplers.count)
 
         let totalSamples = Int64(Double(state.frame.totalBars * 16) * sampleRate * sps)
@@ -787,6 +793,29 @@ enum OfflineExport {
             evts.append(SampleEvent(pos: off, status: 0x80, note: e.note, vel: 0))
         }
         return evts.sorted { $0.pos < $1.pos }
+    }
+
+    /// Pitch-bend events for each bass slide: off pitch one sample before the note starts, then a
+    /// glide to centre in 4 ms steps on ChillBassSlides.remaining, as PlaybackEngine plays it.
+    /// SampleEvent's `note` and `vel` carry the bend's low and high seven bits.
+    private static func slideEvents(_ slides: [Int: BassSlide],
+                                    sampleRate: Double, sps: Double) -> [SampleEvent] {
+        var evts = [SampleEvent]()
+        func bend(_ pos: Int64, _ semis: Double) {
+            let v = ChillBassSlides.bendValue(semitones: semis)
+            evts.append(SampleEvent(pos: max(0, pos), status: 0xE0, note: UInt8(v & 0x7F), vel: UInt8(v >> 7)))
+        }
+        for (step, slide) in slides {
+            let on    = Int64(Double(step) * sampleRate * sps)
+            let from  = Double(slide.fromSemitones)
+            let ticks = max(4, Int(slide.glideSteps * sps / 0.004))
+            bend(on - 1, from)
+            for k in 1...ticks {
+                let t = Double(k) / Double(ticks)
+                bend(on + Int64(slide.glideSteps * sps * sampleRate * t), from * ChillBassSlides.remaining(t))
+            }
+        }
+        return evts
     }
 
     @inline(__always)

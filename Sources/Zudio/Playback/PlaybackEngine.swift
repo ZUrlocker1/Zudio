@@ -247,6 +247,13 @@ final class PlaybackEngine: ObservableObject {
     // Built alongside stepEventMap; fired directly in onStep — eliminates asyncAfter allocs.
     nonisolated(unsafe) private var noteOffMap: [Int: [(Int, UInt8)]] = [:]
 
+    // Bass slides (ChillBassSlides): keyed by the step of the note slid into, built alongside
+    // stepEventMap with the seconds-per-step the glide is timed in. Suppressed while the bass has
+    // the Vibrato effect on, which drives the same pitch-bend wheel every frame.
+    nonisolated(unsafe) private var bassSlideMap: [Int: BassSlide] = [:]
+    nonisolated(unsafe) private var bassSlideSecondsPerStep: Double = 0.1
+    nonisolated(unsafe) private var bassSlidesSuppressed = false
+
     // Export tap state — allows cancelExport() to stop capture from outside the tap closure.
     // @unchecked Sendable: written on main actor, read/written from audio thread; done flag is
     // set once and only grows monotonically — no torn reads possible.
@@ -467,9 +474,12 @@ final class PlaybackEngine: ObservableObject {
         // Sync to stepTimerQueue so the assignment can't race with an in-flight onStep read.
         // The timer fires on stepTimerQueue (serial), so this sync waits for any running
         // tick to finish before writing, and blocks the timer until both writes are done.
+        let slides = ChillBassSlides.slides(for: state)
         stepTimerQueue.sync {
             stepEventMap = map
             noteOffMap   = offMap
+            bassSlideMap = slides
+            bassSlideSecondsPerStep = state.frame.secondsPerStep
         }
     }
 
@@ -761,6 +771,9 @@ final class PlaybackEngine: ObservableObject {
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 65 / 100))
             } else {
                 fireVelocity = ev.velocity
+            }
+            if trackIndex == kTrackBass, !bassSlidesSuppressed, let slide = bassSlideMap[step] {
+                startBassSlide(slide, channel: channel, schedulerID: schedulerID)
             }
             samplers[trackIndex].startNote(fireNote, withVelocity: fireVelocity, onChannel: channel)
         }
@@ -1868,6 +1881,31 @@ final class PlaybackEngine: ObservableObject {
 
     }
 
+    // MARK: - Bass slides
+
+    /// Bends the bass off pitch before its note starts, then glides it to pitch over the slide's
+    /// length on the curve ChillBassSlides.remaining gives. Runs on stepTimerQueue, where the note itself is fired, so the first bend always
+    /// precedes the note-on. A stop or seek mid-glide sends the wheel straight back to centre,
+    /// so the next note is never left out of tune.
+    nonisolated private func startBassSlide(_ slide: BassSlide, channel: UInt8, schedulerID: Int) {
+        let sampler = samplers[kTrackBass]
+        let from    = Double(slide.fromSemitones)
+        func send(_ semis: Double) {
+            let v = ChillBassSlides.bendValue(semitones: semis)
+            sampler.sendMIDIEvent(0xE0 | channel, data1: UInt8(v & 0x7F), data2: UInt8(v >> 7))
+        }
+        send(from)
+        let seconds = slide.glideSteps * bassSlideSecondsPerStep
+        let ticks   = Swift.max(4, Int(seconds / 0.008))
+        for k in 1...ticks {
+            stepTimerQueue.asyncAfter(deadline: .now() + seconds * Double(k) / Double(ticks)) { [weak self] in
+                guard let self else { return }
+                let t = self.currentSchedulerID == schedulerID ? Double(k) / Double(ticks) : 1.0
+                send(from * ChillBassSlides.remaining(t))
+            }
+        }
+    }
+
     // MARK: - Tremolo LFO
 
     /// True for any guitar patch. GM reserves programs 24–31 for the guitar family, and Zudio
@@ -1877,13 +1915,20 @@ final class PlaybackEngine: ObservableObject {
         (24...31).contains(program % 1000)
     }
 
+    /// True for the Rhodes (GM 4, Electric Piano 1). A Rhodes tremolo is the amp's, slow and
+    /// shallow like a guitar's, not an organ's Leslie.
+    nonisolated static func isRhodesProgram(_ program: Int) -> Bool {
+        program % 1000 == 4
+    }
+
 
     private func startTremolo(forTrack i: Int) {
         if (ambientMode || chillPadsMode) && i == kTrackPads {
             tremPhaseInc[i]   = 0.047124   // 2π × 0.15 Hz / 20 fps — one swell per ~6.5 seconds (runs at 20fps via lfoTick guard)
             tremDepth[i]      = 0.38       // 38% depth: volume swells 1.0 → 0.24, clearly audible
             tremBaseVolume[i] = 1.0
-        } else if Self.isGuitarProgram(loadedProgram(forTrack: i)) {
+        } else if Self.isGuitarProgram(loadedProgram(forTrack: i))
+                    || Self.isRhodesProgram(loadedProgram(forTrack: i)) {
             // A guitar is not a Leslie cabinet. 8 Hz at 40% is the organ setting and reads as a
             // fast heavy wobble on a plucked string; an early Fender amp's tremolo sat around
             // 3 Hz and much shallower (Zack, 2026-10-13). Keyed on the GM program family, so any
@@ -1891,6 +1936,7 @@ final class PlaybackEngine: ObservableObject {
             // Volume swings from full down to (1 - 2 × depth): 0.32 dips to 36%, clearly audible
             // but well short of the organ's 0.40, which drops to 20% and nearly disappears.
             // 3 Hz at 0.20 only dipped to 60% and was too subtle (Zack, 2026-10-13).
+            // A Rhodes takes the same setting: its tremolo is the Suitcase amp's, not a Leslie's.
             tremPhaseInc[i]   = 0.4189     // 2π × 4 Hz / 60 fps
             tremDepth[i]      = 0.32
             tremBaseVolume[i] = 1.0
@@ -1923,6 +1969,7 @@ final class PlaybackEngine: ObservableObject {
     // MARK: - Vibrato LFO
 
     private func startVibrato(forTrack i: Int) {
+        if i == kTrackBass { stepTimerQueue.sync { bassSlidesSuppressed = true } }
         vibPhaseInc[i] = 0.5760   // 2π × 5.5 Hz / 60 fps
         vibDepth[i]    = 12.0     // ±12 cents
         vibEnabled[i]  = true
@@ -1932,6 +1979,7 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func stopVibrato(forTrack i: Int) {
+        if i == kTrackBass { stepTimerQueue.sync { bassSlidesSuppressed = false } }
         vibEnabled[i] = false
         vibPhase[i]   = 0.0
         let ch = kTrackMIDIChannels[i]
