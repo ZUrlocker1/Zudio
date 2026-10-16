@@ -27,8 +27,9 @@ struct ChillLeadGenerator {
         returns reportReturns: ((Set<Int>) -> Void)? = nil
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>,
           hookTreatments: String?) {
-        // Chill Soho has its own three rules (ChillSohoLeadGenerator.swift) and never reaches the
-        // St Germain staccato roll below.
+        // Chill Soho has its own three rules (ChillSohoLeadGenerator.swift). The two base rules it
+        // reuses come back through here forced, so the St Germain staccato roll below still draws,
+        // at probability 0.
         if sohoVariation {
             return sohoLead1(frame: frame, structure: structure, leadInstrument: leadInstrument,
                              breakdownStyle: breakdownStyle, forceRuleID: forceRuleID,
@@ -98,6 +99,28 @@ struct ChillLeadGenerator {
         let pentatonic  = pentatonicNotes(frame: frame)
         let blueNote    = blueNotePC(frame: frame)
         let (regLow, regHigh) = register(for: leadInstrument)
+        // Stop-time solo bars draw from the scale in the lead's register, deduplicated.
+        let stopPool = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
+            .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
+
+        // A freshly built phrase: the blue-note draw (Blues raises it from 15% to 50%), then the
+        // phrase itself, aware of the chord it ends on and, in Blues, the one it starts on.
+        func freshPhrase(bar: Int, bars: Int, label: SectionLabel) -> [MIDIEvent] {
+            let phraseBluePc = rng.nextDouble() < (bluesVariation ? 0.50 : 0.15) ? blueNote : nil
+            let phraseEndChord   = structure.chordWindow(atBar: bar + bars - 1)
+            let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
+            return buildPhrase(frame: frame, bar: bar, bars: bars,
+                               leadInstrument: leadInstrument,
+                               pentatonic: pentatonic, scale: scale,
+                               blueNotePC: phraseBluePc,
+                               regLow: regLow, regHigh: regHigh,
+                               section: label, phraseEndChord: phraseEndChord,
+                               phraseStartChord: phraseStartChord,
+                               useJazzIdioms: useJazzIdioms,
+                               useBluesRuns: useBluesRuns,
+                               isShortPunch: isShortPunch,
+                               isSparseMelodic: isSparseMelodic, rng: &rng)
+        }
 
         // Pre-compute handoff windows: 1–2 blocks of 4–6 bars in groove sections where LD1
         // is forced silent so LD2 can take over. Placed in the middle portion of each section
@@ -129,8 +152,10 @@ struct ChillLeadGenerator {
         // Zone-based phrase repetition for all melodic Chill lead rules except CHL-LD1-005
         // (St Germain staccato burst, which has its own active-period architecture).
         // First 2 phrases in groove-A are stored as seeds; replayed once each in the
-        // opening, then freely developed, then recalled in the final 40% with a
-        // last-note flip so the ending sounds like a familiar motif with a fresh tail.
+        // opening, then freely developed with occasional mid-song returns (below), then
+        // recalled in the final 40% with a last-note flip so the ending sounds like a familiar
+        // motif with a fresh tail. In Blues a return that comes due off the I chord is held as
+        // a pending recall and played, flipped, at the next I-chord bar.
         let useZoneRepeat = (ruleID != "CHL-LD1-005")
         var seedPhrases:       [[MIDIEvent]] = []
         var seedPhraseLengths: [Int]         = []
@@ -197,8 +222,6 @@ struct ChillLeadGenerator {
                     // Cap total solo bars at 4 or 6 — leave later odd bars silent for space
                     guard stopTimeSoloBarsUsed < stopTimeSoloMax else { bar += 1; continue }
                     // Odd bar: lead gets 1 bar to play freely
-                    let stopPool = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
-                        .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
                     if !stopPool.isEmpty {
                         let noteCount = 3 + rng.nextInt(upperBound: 3)
                         let base = bar * 16
@@ -318,8 +341,7 @@ struct ChillLeadGenerator {
 
             // Blues form: clamp phrase to not cross a chord-change seam (IVm7 pos 8, V7 pos 12, turnaround pos 15)
             if bluesVariation && bluesFormPos >= 0 {
-                let nextSeam = [8, 12, 15].first { $0 > bluesFormPos } ?? 16
-                actualPhraseLen = Swift.min(actualPhraseLen, nextSeam - bluesFormPos)
+                actualPhraseLen = Swift.min(actualPhraseLen, bluesNextSeam(after: bluesFormPos) - bluesFormPos)
             }
 
             // Zone-based repetition: seed collection → opening replay → free development → recap
@@ -328,22 +350,7 @@ struct ChillLeadGenerator {
 
                 if seedPhrases.count < 2 {
                     // Seed zone: generate normally and store as relative-indexed motif.
-                    // Blues increases blue-note probability from 15% to 50%.
-                    let bluePcProb = bluesVariation ? 0.50 : 0.15
-                    let phraseBluePc = rng.nextDouble() < bluePcProb ? blueNote : nil
-                    let phraseEndChord   = structure.chordWindow(atBar: bar + actualPhraseLen - 1)
-                    let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
-                    let phraseNotes = buildPhrase(frame: frame, bar: bar, bars: actualPhraseLen,
-                                                   leadInstrument: leadInstrument,
-                                                   pentatonic: pentatonic, scale: scale,
-                                                   blueNotePC: phraseBluePc,
-                                                   regLow: regLow, regHigh: regHigh,
-                                                   section: label, phraseEndChord: phraseEndChord,
-                                                   phraseStartChord: phraseStartChord,
-                                                   useJazzIdioms: useJazzIdioms,
-                                                   useBluesRuns: useBluesRuns,
-                                                   isShortPunch: isShortPunch,
-                                                   isSparseMelodic: isSparseMelodic, rng: &rng)
+                    let phraseNotes = freshPhrase(bar: bar, bars: actualPhraseLen, label: label)
                     events += phraseNotes
                     phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
                     let offset = bar * 16
@@ -360,7 +367,11 @@ struct ChillLeadGenerator {
                 }
 
                 let canRecap = bar >= recapStartBar && rng.nextDouble() < 0.55
-                let matching = seedPhrases.indices.filter { i in
+                // The seeds that fit this bar's chords, worked out only where a mid-song return
+                // could otherwise happen. The 0.35 draw is made only when one fits.
+                let midOpen = !canReplayOpening && seedPhrases.count == 2 && bar < recapStartBar
+                    && bar >= lastReturnBar + 8
+                let matching = !midOpen ? [] : seedPhrases.indices.filter { i in
                     seedPhrases[i].allSatisfy { e in
                         guard e.durationSteps >= 3,
                               let w = structure.chordWindow(atBar: bar + e.stepIndex / 16) else { return true }
@@ -368,8 +379,7 @@ struct ChillLeadGenerator {
                         return w.chordTones.contains(pc) || w.scaleTensions.contains(pc)
                     }
                 }
-                let canMid = !canReplayOpening && seedPhrases.count == 2 && bar < recapStartBar
-                    && bar >= lastReturnBar + 8 && !matching.isEmpty && rng.nextDouble() < 0.35
+                let canMid = midOpen && !matching.isEmpty && rng.nextDouble() < 0.35
                 // Blues: seeds were generated over the I chord; don't replay them over IV/V bars.
                 // Fall through to normal phrase generation (chord-aware bodyPool) instead, and
                 // hold the recall for the next I-chord bar.
@@ -384,8 +394,7 @@ struct ChillLeadGenerator {
                     // Blues: don't replay if the seed would cross a chord-change seam.
                     let bluesSeamOK: Bool
                     if bluesVariation && bluesFormPos >= 0 {
-                        let nextSeam = [8, 12, 15].first { $0 > bluesFormPos } ?? 16
-                        bluesSeamOK = bluesFormPos + seedLen <= nextSeam
+                        bluesSeamOK = bluesFormPos + seedLen <= bluesNextSeam(after: bluesFormPos)
                     } else {
                         bluesSeamOK = true
                     }
@@ -395,7 +404,8 @@ struct ChillLeadGenerator {
                             MIDIEvent(stepIndex: $0.stepIndex + base, note: $0.note,
                                       velocity: $0.velocity, durationSteps: $0.durationSteps)
                         }
-                        // Opening and mid-song: 50% flip (jazz idioms: always); recap: always flip
+                        // Opening and mid-song: 50% flip (jazz idioms: always); recap and a due
+                        // Blues pending recall: always flip
                         if canRecap || duePending || useJazzIdioms || rng.nextDouble() < 0.50 {
                             replayedNotes = applyLastNoteFlip(replayedNotes, scale: scale,
                                                                regLow: regLow, regHigh: regHigh)
@@ -422,26 +432,7 @@ struct ChillLeadGenerator {
             }
 
             // Normal phrase generation (free development zone, or replay fallback).
-            // Blues raises blue-note probability from 15% to 50%.
-            let bluePcProb2 = bluesVariation ? 0.50 : 0.15
-            let phraseBluePc = rng.nextDouble() < bluePcProb2 ? blueNote : nil
-            let phraseEndChord   = structure.chordWindow(atBar: bar + actualPhraseLen - 1)
-            let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
-            let phraseNotes = buildPhrase(
-                frame: frame, bar: bar, bars: actualPhraseLen,
-                leadInstrument: leadInstrument,
-                pentatonic: pentatonic, scale: scale,
-                blueNotePC: phraseBluePc,
-                regLow: regLow, regHigh: regHigh,
-                section: label,
-                phraseEndChord: phraseEndChord,
-                phraseStartChord: phraseStartChord,
-                useJazzIdioms: useJazzIdioms,
-                useBluesRuns: useBluesRuns,
-                isShortPunch: isShortPunch,
-                isSparseMelodic: isSparseMelodic,
-                rng: &rng
-            )
+            let phraseNotes = freshPhrase(bar: bar, bars: actualPhraseLen, label: label)
             events += phraseNotes
             phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
             bluesLeadHasPlayed = true
@@ -573,8 +564,7 @@ struct ChillLeadGenerator {
             if bluesVariation {
                 let ld2FormPos = bluesFormPosition(bar: bar, label: label, bStart: ld2_bSectionStart, aStart: ld2_aSectionStart)
                 if ld2FormPos >= 0 {
-                    let nextSeam = [8, 12, 15].first { $0 > ld2FormPos } ?? 16
-                    phraseLen = Swift.min(phraseLen, nextSeam - ld2FormPos)
+                    phraseLen = Swift.min(phraseLen, bluesNextSeam(after: ld2FormPos) - ld2FormPos)
                 }
             }
             guard phraseLen > 0 else { bar += 1; continue }
@@ -599,6 +589,12 @@ struct ChillLeadGenerator {
             bar += phraseLen + 1  // mandatory 1-bar rest after each phrase (CHL-RULE-06 breathing room)
         }
         return (sohoVariation ? capNotesPerBar(events, 2) : events, inst2)
+    }
+
+    /// The next chord-change seam of the 16-bar Blues form after `pos`: IVm7 at 8, V7 at 12, the
+    /// turnaround at 15, else the end of the form.
+    private static func bluesNextSeam(after pos: Int) -> Int {
+        [8, 12, 15].first { $0 > pos } ?? 16
     }
 
     /// Keeps the first `cap` notes of each bar. Chill Soho's Lead 2 measures 1.3–2.0 notes/bar,
