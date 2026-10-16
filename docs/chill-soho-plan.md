@@ -475,7 +475,9 @@ start together. On a displaced song, half the statements land an eighth either s
 offset. The cell bank and opening rhythms are weighted properly here, unlike `010`.
 
 **Reused:** `004` Blues lead and `001` Long phrase run base Chill's code, then take Soho's rest
-windows, stretch cap and Remix pickup. St Germain staccato (`005`) never plays here.
+windows, stretch cap and Remix pickup. A rest window that would land on a replayed seed moves to
+just after it, so the seeds still come back about six times a song. St Germain staccato (`005`)
+never plays here.
 
 **Registers are per instrument** (`ChillLeadGenerator.register(for:)`), not per track — a tenor
 sax tops out at 72 where Lead 1's general ceiling is 79. The harmonic filter's octave lift uses
@@ -629,6 +631,12 @@ tone is light, continuing base Chill's wry register.
 - **Harmonic filter (all styles):** when a lead sits within four semitones of the pads, Pass B
   lifts a figure an octave whole — notes less than a bar apart — if any of it dips below the
   pads' median and all of it fits the register, so a figure never splits across octaves
+- **Log — "Lead 1 return to form":** marked on each bar where a Chill lead comes back to its
+  original form: `010`'s hook returning exactly, an Avalon episode led by the opening hook in its
+  original form (after the song's first), or a base Chill seed coming back after the two opening
+  replays (changed at most in its last note or a note length). Not marked where the bar already says "Lead 1 steps back", or where a later
+  pass removed the notes. Re-marked when Lead 1 is regenerated. Recorded without drawing from
+  the RNG, so no note changes
 - **Instruments on replay:** a song is written to the persisted history only after its
   instruments are final, and replaying one re-pins the Chill leads to what the generator chose
 

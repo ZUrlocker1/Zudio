@@ -70,10 +70,14 @@ extension ChillLeadGenerator {
         breakdownStyle: ChillBreakdownStyle,
         forceRuleID: String?,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        reportReturns: ((Set<Int>) -> Void)? = nil
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>,
           hookTreatments: String?) {
         var hookTreatments: String? = nil
+        // Bars where the lead comes back to its original form, for the log. Recorded only.
+        var formReturns = Set<Int>()
+        defer { reportReturns?(formReturns) }
         let ruleID: String
         if let forced = forceRuleID, sohoLead1Rules.contains(forced) {
             ruleID = forced
@@ -88,7 +92,8 @@ extension ChillLeadGenerator {
         }
         if sohoReusedLead1Rules.contains(ruleID) {
             let r = reusedLead1(ruleID, frame: frame, structure: structure, leadInstrument: leadInstrument,
-                                breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs)
+                                breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs,
+                                formReturns: &formReturns)
             return (r.events, r.phraseOnsets, r.handoffBars, nil)   // not an Avalon Hook
         }
         usedRuleIDs.insert(ruleID)
@@ -147,12 +152,13 @@ extension ChillLeadGenerator {
                           open: open, remixReturns: remixReturns,
                           events: &events, onsets: &onsets, rng: &rng)
         case "CHL-LD1-012":
-            tightHook(treatmentNote: &hookTreatments,
+            tightHook(treatmentNote: &hookTreatments, formReturns: &formReturns,
                       frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
                       open: open, remixReturns: remixReturns,
                       events: &events, onsets: &onsets, rng: &rng)
         default:
-            counterLine(frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
+            counterLine(formReturns: &formReturns,
+                        frame: frame, structure: structure, pool: pool, firstPlayable: firstPlayable,
                         open: open, remixReturns: remixReturns,
                         events: &events, onsets: &onsets, rng: &rng)
         }
@@ -179,19 +185,26 @@ extension ChillLeadGenerator {
     private static func reusedLead1(
         _ ruleID: String, frame: GlobalMusicalFrame, structure: SongStructure,
         leadInstrument: ChillLeadInstrument, breakdownStyle: ChillBreakdownStyle,
-        rng: inout SeededRNG, usedRuleIDs: inout Set<String>
+        rng: inout SeededRNG, usedRuleIDs: inout Set<String>, formReturns: inout Set<Int>
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>) {
+        var replays = Set<Int>(), returns = Set<Int>()
+        defer { formReturns = returns }
         let (base, _, handoff, _) = generateLead1(
             frame: frame, structure: structure, leadInstrument: leadInstrument,
             beatStyle: .electronic,   // only consulted by the St Germain staccato roll, which forcing skips
             breakdownStyle: breakdownStyle, forceRuleID: ruleID,
-            rng: &rng, usedRuleIDs: &usedRuleIDs)
+            rng: &rng, usedRuleIDs: &usedRuleIDs, replayBars: { replays = $0 },
+            returns: { returns = $0 })
 
         let remixReturns: [Int] = breakdownStyle == .sohoRemix
             ? structure.sections.filter { $0.label == .bridge }.map(\.endBar).filter { $0 < frame.totalBars - 2 }
             : []
         let firstGroove = structure.sections.first { $0.label == .A }?.startBar ?? 0
         var rest = LeadGenerator.buildRestBars(entryBar: firstGroove, totalBars: frame.totalBars, rng: &rng)
+        // A rest window that lands on a replayed seed would delete the return, which is why these
+        // rules averaged two returns a song (Zack, 2026-10-16). Such a window moves to just after
+        // the replay, keeping its length, or loses only the overlapping bars if it cannot.
+        rest = keepingReplays(rest, replays: replays, totalBars: frame.totalBars)
         for bar in remixReturns { rest.remove(bar) }
         // Leave the remix return's first six steps to the landing note.
         let landing = Set(remixReturns.flatMap { ($0 * 16)..<($0 * 16 + 6) })
@@ -219,6 +232,31 @@ extension ChillLeadGenerator {
         return (events, onsets, handoff)
     }
 
+    /// `rest` with each window (a run of consecutive bars) that overlaps `replays` moved to start
+    /// after the replay it hit, when the moved window is clear of every replay and inside the
+    /// song; otherwise only its overlapping bars are dropped.
+    private static func keepingReplays(_ rest: Set<Int>, replays: Set<Int>, totalBars: Int) -> Set<Int> {
+        guard !replays.isEmpty else { return rest }
+        var windows: [[Int]] = []
+        for bar in rest.sorted() {
+            if let last = windows.last?.last, bar == last + 1 { windows[windows.count - 1].append(bar) }
+            else { windows.append([bar]) }
+        }
+        var out = Set<Int>()
+        for w in windows {
+            guard let hit = w.first(where: replays.contains) else { out.formUnion(w); continue }
+            var end = hit
+            while replays.contains(end + 1) { end += 1 }
+            let moved = (end + 1)..<(end + 1 + w.count)
+            if moved.upperBound <= totalBars - 2 && !moved.contains(where: replays.contains) {
+                out.formUnion(moved)
+            } else {
+                out.formUnion(w.filter { !replays.contains($0) })
+            }
+        }
+        return out
+    }
+
     // MARK: - CHL-LD1-010 Soho Counter-Line
 
     /// Sung-melody phrases answering an implied vocal: 8–13 notes in eighths with a longer note
@@ -233,7 +271,8 @@ extension ChillLeadGenerator {
     /// the rhythm moved 19%, a pitch changed by a scale step 13%; and a quarter of them start on
     /// another chord tone. Chosen by ear over versions with fewer returns and a wider-ranging line,
     /// which wandered and lost the hook (Zack, 2026-10-16).
-    private static func counterLine(frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
+    private static func counterLine(formReturns: inout Set<Int>,
+                                    frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                     firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
                                     events: inout [MIDIEvent], onsets: inout [(startBar: Int, endBar: Int)],
                                     rng: inout SeededRNG) {
@@ -260,7 +299,9 @@ extension ChillLeadGenerator {
                 phrase = h.phrase
                 if !remixReturns.contains(bar) { offset = h.offset }
                 start = anchor(near: h.pitch, bar: bar, structure: structure, frame: frame, pool: pool)
-                if rng.nextDouble() >= 0.50 {
+                let exact = rng.nextDouble() < 0.50
+                if exact { formReturns.insert(bar) }
+                if !exact {
                     (phrase, changePitch) = varied(h.phrase, rng: &rng)
                     if rng.nextDouble() < 0.25 {
                         let tones = structure.chordWindow(atBar: bar)?.chordTones ?? []
@@ -422,7 +463,7 @@ extension ChillLeadGenerator {
     /// then a bar or two off. Measured from Avalon: it recurs and varies rather than developing.
     /// About 30% of hooks close on their first pitch; closure belongs to this rule alone, so a
     /// closed hook mutates with the interval-preserving trade Motorik Europe's `varyCell` uses.
-    private static func tightHook(treatmentNote: inout String?,
+    private static func tightHook(treatmentNote: inout String?, formReturns: inout Set<Int>,
                                   frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                   firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
                                   events: inout [MIDIEvent], onsets: inout [(startBar: Int, endBar: Int)],
@@ -510,6 +551,7 @@ extension ChillLeadGenerator {
         // Avalon and most of the corpus come home to their first figure.
         let lastOpen = (firstPlayable..<frame.totalBars).last(where: open) ?? firstPlayable
         var recapped = false
+        var firstEpisodeBar = -1
         // Where statements start. Every statement used to be anchored on one note a third of the
         // way up the range — C5 for a flute in F — so 27 of 30 figures in Late Americano began on
         // it and four pitches made up 94% of the song (Zack, 2026-10-16). The B section's home is
@@ -661,6 +703,13 @@ extension ChillLeadGenerator {
                 bar += span > 1 ? span : (everyOther ? 2 : 1)
             }
             if stated > 0 { onsets.append((startBar: episodeStart, endBar: bar)) }
+            // An episode led by the opening hook in its original form is a return to form —
+            // every one after the first episode of the song.
+            if stated > 0, pick == 0, firstEpisodeBar >= 0,
+               hook.intervals == originals[0].intervals, hook.durs == originals[0].durs {
+                formReturns.insert(episodeStart)
+            }
+            if firstEpisodeBar < 0 && stated > 0 { firstEpisodeBar = episodeStart }
             // A mutated hook that has had its episodes goes back to its original form.
             for i in 0..<3 where mutatedEpisodesLeft[i] > 0 && (i == pick || i == other) {
                 mutatedEpisodesLeft[i] -= 1

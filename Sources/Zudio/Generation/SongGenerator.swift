@@ -1578,6 +1578,7 @@ struct SongGenerator {
         var usedRules: Set<String> = []
 
         var events: [MIDIEvent]
+        var chillLead1Returns: Set<Int>? = nil   // Chill Lead 1 regenerated: its returns to form
         let isKosmic  = songState.style == .kosmic
         let isAmbient = songState.style == .ambient
         let isChill    = songState.style == .chill
@@ -1734,7 +1735,7 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
-                    rng: &rng, usedRuleIDs: &usedRules)
+                    rng: &rng, usedRuleIDs: &usedRules, returns: { chillLead1Returns = $0 })
             } else {
                 (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
@@ -1941,7 +1942,32 @@ struct SongGenerator {
         updated.trackOverrides[trackIndex] = newTrackSeed
         // A regenerated bass has its own slides; re-mark them in the log.
         if trackIndex == kTrackBass && isChill { updated = ChillBassSlides.annotated(updated) }
+        // A regenerated Chill Lead 1 has its own returns to form; re-mark them.
+        if let returns = chillLead1Returns {
+            var notes = updated.stepAnnotations
+            markReturnsToForm(&notes, returns: returns, lead1: updated.trackEvents[kTrackLead1])
+            updated = updated.replacingEvents(updated.trackEvents[kTrackLead1], forTrack: kTrackLead1,
+                                              appendingLog: [], replacingStepAnnotations: notes)
+        }
         return updated
+    }
+
+    /// "Lead 1 return to form" on each bar where a Chill lead comes back to its original form —
+    /// `010`'s hook or Avalon's opening hook exactly, or a base Chill seed — replacing any from
+    /// before a regenerate. Skipped where the lead no longer sounds in that bar (a later pass
+    /// removed the notes) or where the bar already says "Lead 1 steps back".
+    static func markReturnsToForm(_ notes: inout [Int: [GenerationLogEntry]], returns: Set<Int>,
+                                  lead1: [MIDIEvent]) {
+        for key in notes.keys {
+            notes[key]?.removeAll { $0.tag == "Lead 1" && $0.description == "return to form" }
+            if notes[key]?.isEmpty == true { notes.removeValue(forKey: key) }
+        }
+        let sounding = Set(lead1.map { $0.stepIndex / 16 })
+        for bar in returns.sorted() where sounding.contains(bar) {
+            let key = bar * 16
+            if notes[key]?.contains(where: { $0.tag == "Lead 1" && $0.description == "steps back" }) == true { continue }
+            notes[key, default: []].append(GenerationLogEntry(tag: "Lead 1", description: "return to form"))
+        }
     }
 
     /// Route a ruleID to the correct description function by trackIndex.
@@ -3820,11 +3846,12 @@ struct SongGenerator {
 
         // Step 6 — Lead 1 (primary solo) and Lead 2 (call-and-response)
         var lead1Rules: Set<String> = []
+        var lead1Returns = Set<Int>()
         let (lead1Events, lead1Onsets, lead1HandoffBars, hookTreatments) = ChillLeadGenerator.generateLead1(
             frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation, forceRuleID: forceLeadRuleID,
-            rng: &lead1RNG, usedRuleIDs: &lead1Rules
+            rng: &lead1RNG, usedRuleIDs: &lead1Rules, returns: { lead1Returns = $0 }
         )
         trackEvents[kTrackLead1] = lead1Events
 
@@ -4232,6 +4259,7 @@ struct SongGenerator {
         if let fa = finaleStepAnnotation {
             stepAnnotations[fa.bar * 16, default: []].append(GenerationLogEntry(tag: "", description: harmonyDesc(fa)))
         }
+        markReturnsToForm(&stepAnnotations, returns: lead1Returns, lead1: trackEvents[kTrackLead1])
 
         var forced: [String: String] = [:]
         if let r = forceBassRuleID   { forced["Bass"]   = r }

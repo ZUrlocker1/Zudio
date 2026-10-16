@@ -22,7 +22,9 @@ struct ChillLeadGenerator {
         sohoVariation: Bool = false,
         forceRuleID: String? = nil,
         rng: inout SeededRNG,
-        usedRuleIDs: inout Set<String>
+        usedRuleIDs: inout Set<String>,
+        replayBars reportReplayBars: ((Set<Int>) -> Void)? = nil,
+        returns reportReturns: ((Set<Int>) -> Void)? = nil
     ) -> (events: [MIDIEvent], phraseOnsets: [(startBar: Int, endBar: Int)], handoffBars: Set<Int>,
           hookTreatments: String?) {
         // Chill Soho has its own three rules (ChillSohoLeadGenerator.swift) and never reaches the
@@ -30,7 +32,7 @@ struct ChillLeadGenerator {
         if sohoVariation {
             return sohoLead1(frame: frame, structure: structure, leadInstrument: leadInstrument,
                              breakdownStyle: breakdownStyle, forceRuleID: forceRuleID,
-                             rng: &rng, usedRuleIDs: &usedRuleIDs)
+                             rng: &rng, usedRuleIDs: &usedRuleIDs, reportReturns: reportReturns)
         }
         // CHL-LD1-005: St Germain staccato style — suppressed in blues (blues needs sustained phrases).
         let forceNonStaccato = bluesVariation || (forceRuleID != nil && forceRuleID != "CHL-LD1-005")
@@ -134,6 +136,21 @@ struct ChillLeadGenerator {
         var seedPhraseLengths: [Int]         = []
         var openingReplaysDone = 0
         let recapStartBar = (frame.totalBars * 3) / 5   // 60% — shorter free zone, longer recap
+        // The free zone used to have no returns at all, so a solo could go 40–50 bars without its
+        // opening idea (Zack, 2026-10-16). About one phrase in three there is now a seed, at least
+        // eight bars after the last return, and only where it fits: seeds replay at their own
+        // pitches, so each held note (three steps or longer) must be a chord tone or a colour
+        // tone of the bar it lands on.
+        var lastReturnBar  = Int.min / 2
+        var replayBars     = Set<Int>()
+        // Bars where a seed comes back after the opening replays — the log's "Lead 1 return to
+        // form". A return here changes at most its last note or a note length, so to the ear it is
+        // the opening phrase coming back. Recorded only; nothing here draws from the RNG.
+        var formReturns    = Set<Int>()
+        // Blues replays seeds only over the I chord. A recall that comes due anywhere else waits
+        // for the next I-chord bar instead of being dropped, so the song still comes home to its
+        // opening lick. One waits at a time.
+        var pendingRecall  = false
 
         // Blues form: section anchors for posInForm tracking (same approach as drums/bass/pads)
         let (bSectionStart, aSectionStart) = bluesVariation ? bluesSectionAnchors(structure: structure) : (-1, -1)
@@ -335,6 +352,7 @@ struct ChillLeadGenerator {
                                   velocity: $0.velocity, durationSteps: $0.durationSteps)
                     })
                     seedPhraseLengths.append(actualPhraseLen)
+                    lastReturnBar = bar
                     bluesLeadHasPlayed = true
                     bar += actualPhraseLen
                     bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
@@ -342,11 +360,25 @@ struct ChillLeadGenerator {
                 }
 
                 let canRecap = bar >= recapStartBar && rng.nextDouble() < 0.55
+                let matching = seedPhrases.indices.filter { i in
+                    seedPhrases[i].allSatisfy { e in
+                        guard e.durationSteps >= 3,
+                              let w = structure.chordWindow(atBar: bar + e.stepIndex / 16) else { return true }
+                        let pc = Int(e.note) % 12
+                        return w.chordTones.contains(pc) || w.scaleTensions.contains(pc)
+                    }
+                }
+                let canMid = !canReplayOpening && seedPhrases.count == 2 && bar < recapStartBar
+                    && bar >= lastReturnBar + 8 && !matching.isEmpty && rng.nextDouble() < 0.35
                 // Blues: seeds were generated over the I chord; don't replay them over IV/V bars.
-                // Fall through to normal phrase generation (chord-aware bodyPool) instead.
+                // Fall through to normal phrase generation (chord-aware bodyPool) instead, and
+                // hold the recall for the next I-chord bar.
                 let bluesReplayOK = !bluesVariation || bluesFormPos < 8
-                if (canReplayOpening || canRecap) && bluesReplayOK {
+                if bluesVariation && !bluesReplayOK && (canRecap || canMid) { pendingRecall = true }
+                let duePending = pendingRecall && bluesReplayOK
+                if (canReplayOpening || canRecap || canMid || duePending) && bluesReplayOK {
                     let seedIdx = canReplayOpening ? (openingReplaysDone % seedPhrases.count)
+                                : (canMid && !canRecap && !duePending) ? matching[rng.nextInt(upperBound: matching.count)]
                                                    : rng.nextInt(upperBound: seedPhrases.count)
                     let seedLen = seedPhraseLengths[seedIdx]
                     // Blues: don't replay if the seed would cross a chord-change seam.
@@ -363,8 +395,8 @@ struct ChillLeadGenerator {
                             MIDIEvent(stepIndex: $0.stepIndex + base, note: $0.note,
                                       velocity: $0.velocity, durationSteps: $0.durationSteps)
                         }
-                        // Opening: 50% flip (jazz idioms: always); recap: always flip
-                        if canRecap || useJazzIdioms || rng.nextDouble() < 0.50 {
+                        // Opening and mid-song: 50% flip (jazz idioms: always); recap: always flip
+                        if canRecap || duePending || useJazzIdioms || rng.nextDouble() < 0.50 {
                             replayedNotes = applyLastNoteFlip(replayedNotes, scale: scale,
                                                                regLow: regLow, regHigh: regHigh)
                         }
@@ -372,9 +404,13 @@ struct ChillLeadGenerator {
                         if useJazzIdioms || rng.nextDouble() < 0.50 {
                             replayedNotes = applyLastNoteDuration(replayedNotes, rng: &rng)
                         }
+                        if !canReplayOpening { formReturns.insert(bar) }
                         events += replayedNotes
                         phraseOnsets.append((startBar: bar, endBar: bar + seedLen))
                         if canReplayOpening { openingReplaysDone += 1 }
+                        if canRecap || duePending { pendingRecall = false }
+                        lastReturnBar = bar
+                        replayBars.formUnion(bar..<(bar + seedLen))
                         bluesLeadHasPlayed = true
                         bar += seedLen
                         bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
@@ -416,6 +452,8 @@ struct ChillLeadGenerator {
             let extraRest = (label == .B || (bluesVariation && isShortPunch)) ? 0 : rng.nextInt(upperBound: 2)
             bar += 1 + extraRest
         }
+        reportReplayBars?(replayBars)
+        reportReturns?(formReturns)
         return (events, phraseOnsets, handoffBarSet, nil)   // Avalon Hook is Soho-only
     }
 

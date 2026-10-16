@@ -17,6 +17,8 @@
 - **Soho Rhodes tremolo** — Rhodes in Chill Soho plays with the slow amp tremolo by default, as the guitars do. Any Rhodes with tremolo switched on now uses that slow setting rather than the organ's fast Leslie.
 - **Chill mix** — Lead 1, Lead 2 and Drums are drier in all Chill forms; Lead 2 and texture vibraphone are quieter.
 - **Instruments stay inside their style** — One rule, for every style and play mode, now replaces an instrument carried over from the previous song that the new song's style never uses. Regular Motorik no longer gets Arcade's Metal Pad, Ice Rain or Mystery Pad. Chill songs in Endless and Evolve play their leads on the right instrument.
+- **Chill and Blues solos come back to their opening phrases** — Through the middle of a song the lead now returns to its opening phrases now and then, where they fit the chord, so a solo has a theme rather than a long free stretch. Blues waits for the I chord to bring its opening lick back, and Chill Soho's two reused lead rules keep their returns clear of their rests.
+- **"Lead 1 return to form" in the log** — Marks the bars where a Chill solo comes back to its opening phrase or hook in its original form.
 - **Leads keep their shape above the pads** — When a lead is lifted an octave to clear the pads, the whole figure moves, so a step down no longer turns into a seventh up halfway through a phrase. All styles.
 - **Soho chord cycles** — The B section's chord cycle is now drawn at its intended odds; one cycle had been taking far more than its share.
 - **Flute and recorder on iPhone** — Songs replayed from the Songs list or with ⏮/⏭ played a flute or recorder lead as a saxophone. Replays now use the lead the song was written for, and songs already in the list are corrected.

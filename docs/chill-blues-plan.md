@@ -362,6 +362,12 @@ Chill Blues.
 - CHL-LD1-002 (Short Punch) — 25%. Derived from Miles Davis *All Blues*. Syncopated off-beat hits in the lower register are textbook slow blues phrasing.
 - CHL-LD1-003 (DJ Cam Dyad) — 20%. Jazz-blues crossover feel at slow tempo. Works without modification.
 - CHL-LD1-001 (St Germain Long Phrase) — 0%. Excluded. The flowing, resolved European jazz flute phrasing is wrong for blues character.
+
+**Returning phrases.** Blues leads use base Chill's seed replay (see the Lead 1 section of the
+Chill plan), with one rule of their own: seeds are replayed only over the I chord, in the first
+half of the 16-bar form, and never across a chord change. A recall that comes due elsewhere waits
+for the next I-chord bar rather than being dropped, one at a time, so most songs come back to
+their opening lick near the end (84% within the last 16 bars).
 - CHL-LD1-005 (St Germain Staccato Burst) — 0%. Excluded. Club/house feel; also already excluded by St Germain beat style incompatibility.
 
 **Lead 1 — scale for Chill Blues solos:**

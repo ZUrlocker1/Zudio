@@ -1782,6 +1782,14 @@ One rule selected per song at frame generation. Lead instrument (flute / trumpet
 / saxophone) is assigned at frame level; the rule shapes phrasing character within that
 instrument's idiom.
 
+**Returning phrases (every melodic rule except `005`).** The first two phrases of the groove are
+the song's seeds. Each is replayed once near the start; through the middle of the song about one
+phrase in three is a seed again, at least eight bars after the last return, and only where it
+fits — each of its held notes a chord tone or colour tone of the bar it lands on, since seeds
+replay at their own pitches; from 60% of the way through, recalls take over with a changed last
+note. A song brings its seeds back about six times, and the longest stretch without one is about
+23 bars. Chill Blues and Chill Soho's reused rules share this code.
+
 **CHL-LD1-001 — St Germain Long Phrase** (Bright/Free moods, 25%)
 4-bar phrase structure: bar 1 has 3–4 notes on strong beats, pentatonic degrees, duration
 1.5–2 beats each; bar 2 continues as a question phrase, ending on the 2nd or 6th scale
