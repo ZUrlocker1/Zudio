@@ -28,6 +28,28 @@ import Testing
 
 @Suite struct ChillLeadRegisterTests {
 
+    /// A regenerated Chill lead gets the passes a generated one does: it stays inside its
+    /// instrument's register and out of bar 0 when the song has no intro. Regeneration once
+    /// skipped the harmonic filter, the fold and the bar-0 rule (found 2026-10-16).
+    @Test func regeneratedLeadsGetTheSamePasses() {
+        var checked = 0
+        for seed in UInt64(1)...120 {
+            let s = SongGenerator.generate(seed: seed, style: .chill)
+            let noIntro = !s.structure.sections.contains { $0.label == .intro && $0.lengthBars > 0 }
+            for (track, inst) in [(kTrackLead1, s.chillLeadInstrument), (kTrackLead2, s.chillLead2Instrument)] {
+                let r = SongGenerator.regenerateTrack(track, songState: s, overrideSeed: seed &+ 99)
+                let (low, high) = ChillLeadGenerator.register(for: inst)
+                for e in r.trackEvents[track] {
+                    #expect(Int(e.note) >= low && Int(e.note) <= high,
+                            "seed \(seed) track \(track): note \(e.note) outside \(low)-\(high)")
+                    if noIntro { #expect(e.stepIndex >= 16, "seed \(seed) track \(track): bar 0 with no intro") }
+                }
+                checked += 1
+            }
+        }
+        #expect(checked > 0)
+    }
+
     @Test func everyChillLeadNoteIsInsideItsInstrumentRegister() {
         var checked = 0
         var worst: (inst: String, note: Int, low: Int, high: Int)? = nil

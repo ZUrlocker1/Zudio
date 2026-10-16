@@ -35,16 +35,32 @@ struct HarmonicFilter {
         registerOverrides: [Int: RegisterBounds] = [:]
     ) -> [[MIDIEvent]] {
         var events = trackEvents
-
-        // Pass A — remove out-of-scale Lead notes on strong beats.
-        // LD1-012 (Chromatic Descent) intentionally uses chromatic passing tones that
-        // fall in avoidTones; skip Pass A for Lead 1 when that rule is active.
-        let lead1Tracks: [Int] = skipLead1ClashFilter ? [] : [kTrackLead1]
-        for track in lead1Tracks + [kTrackLead2] {
-            events[track] = removeStrongBeatClashes(events[track], structure: structure)
+        // Each lead is filtered on its own (Passes A, B and C below, in `filterLead`), reading the
+        // pads' pitches before Pass C touches the pads' velocities — so a regenerated lead can be
+        // put through exactly the same passes without running them over the other tracks again.
+        for track in [kTrackLead1, kTrackLead2] {
+            events[track] = filterLead(events[track], track: track, pads: events[kTrackPads],
+                                       frame: frame, structure: structure,
+                                       skipClashFilter: track == kTrackLead1 && skipLead1ClashFilter,
+                                       bounds: registerOverrides[track] ?? kRegisterBounds[track]
+                                             ?? RegisterBounds(low: 55, high: 88))
         }
+        for track in [kTrackPads, kTrackRhythm, kTrackTexture] {
+            events[track] = velocityArc(events[track], frame: frame, structure: structure)
+        }
+        return events
+    }
 
-        // Pass B — push Leads above the Pad median in each 8-bar window
+    /// The harmonic filter for one lead track, as `apply` runs it:
+    /// Pass A — remove out-of-scale notes on strong beats (unless `skipClashFilter`; LD1-012
+    /// Chromatic Descent uses chromatic passing tones on purpose);
+    /// Pass B — push the lead above the pads' median in each 8-bar window;
+    /// Pass C — the song's velocity arc.
+    static func filterLead(_ lead: [MIDIEvent], track: Int, pads: [MIDIEvent],
+                           frame: GlobalMusicalFrame, structure: SongStructure,
+                           skipClashFilter: Bool = false, bounds: RegisterBounds) -> [MIDIEvent] {
+        var events = skipClashFilter ? lead : removeStrongBeatClashes(lead, structure: structure)
+
         let windowBars  = 8
         let totalWindows = (frame.totalBars + windowBars - 1) / windowBars
         for w in 0..<totalWindows {
@@ -52,43 +68,28 @@ struct HarmonicFilter {
             let endBar    = min(startBar + windowBars, frame.totalBars)
             let startStep = startBar * 16
             let endStep   = endBar   * 16
-
-            guard let padMedian = medianPitch(events[kTrackPads],
-                                              startStep: startStep, endStep: endStep)
+            guard let padMedian = medianPitch(pads, startStep: startStep, endStep: endStep),
+                  let leadMedian = medianPitch(events, startStep: startStep, endStep: endStep),
+                  leadMedian < padMedian + 4
             else { continue }
-
-            for track in [kTrackLead1, kTrackLead2] {
-                guard let leadMedian = medianPitch(events[track],
-                                                   startStep: startStep, endStep: endStep),
-                      leadMedian < padMedian + 4
-                else { continue }
-
-                let bounds = registerOverrides[track] ?? kRegisterBounds[track]
-                           ?? RegisterBounds(low: 55, high: 88)
-                events[track] = pushLeadAbovePads(
-                    events[track], startStep: startStep, endStep: endStep,
-                    padMedian: padMedian, bounds: bounds
-                )
-            }
+            events = pushLeadAbovePads(events, startStep: startStep, endStep: endStep,
+                                       padMedian: padMedian, bounds: bounds)
         }
+        return velocityArc(events, frame: frame, structure: structure)
+    }
 
-        // Pass C — velocity arc (melodic tracks only; Bass and Drums exempt)
+    /// Pass C — the velocity arc for one melodic track (Bass and Drums are exempt).
+    private static func velocityArc(_ track: [MIDIEvent], frame: GlobalMusicalFrame,
+                                    structure: SongStructure) -> [MIDIEvent] {
         let bodyStart = structure.bodySections.map { $0.startBar }.min() ?? 0
         let bodyEnd   = structure.bodySections.map { $0.endBar   }.max() ?? frame.totalBars
-
-        let arcTracks = [kTrackLead1, kTrackLead2, kTrackPads, kTrackRhythm, kTrackTexture]
-        for track in arcTracks {
-            events[track] = events[track].map { ev in
-                let bar  = ev.stepIndex / 16
-                let mult = arcMultiplier(bar: bar, frame: frame, structure: structure,
-                                         bodyStart: bodyStart, bodyEnd: bodyEnd)
-                let newV = UInt8(clamped(Int((Double(ev.velocity) * mult).rounded()), low: 20, high: 115))
-                return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                 velocity: newV, durationSteps: ev.durationSteps)
-            }
+        return track.map { ev in
+            let mult = arcMultiplier(bar: ev.stepIndex / 16, frame: frame, structure: structure,
+                                     bodyStart: bodyStart, bodyEnd: bodyEnd)
+            let newV = UInt8(clamped(Int((Double(ev.velocity) * mult).rounded()), low: 20, high: 115))
+            return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                             velocity: newV, durationSteps: ev.durationSteps)
         }
-
-        return events
     }
 
     // MARK: - Pass A: Harmonic Clash Guard

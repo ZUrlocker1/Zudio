@@ -298,6 +298,11 @@ final class AppState: ObservableObject {
         }
 
         /// Decodes `instrumentOverrides` (String keys) back to `[Int: Int]`.
+        var decodedTrackOverrides: [Int: UInt64] {
+            Dictionary(uniqueKeysWithValues: trackOverrides.compactMap { k, v -> (Int, UInt64)? in
+                guard let i = Int(k) else { return nil }; return (i, v) })
+        }
+
         var decodedInstrumentOverrides: [Int: Int] {
             guard let ovr = instrumentOverrides else { return [:] }
             return Dictionary(uniqueKeysWithValues: ovr.compactMap { k, v -> (Int, Int)? in
@@ -333,6 +338,66 @@ final class AppState: ObservableObject {
         savePersistedHistory()
     }
 
+    /// Rebuilds a saved song from its seed: the generator with every recorded forced setting,
+    /// then the per-track regenerations in order. The one place a saved song is replayed — the
+    /// Songs list, the startup preload and a .zudio file all come here. They used to carry
+    /// their own copies, and the two history paths left out the percussion style and bridge
+    /// that the file path passed (found 2026-10-16).
+    nonisolated static func regenerateSong(seed: UInt64, keyOverride: String?, tempoOverride: Int?,
+                                           moodOverride: Mood?, style: MusicStyle,
+                                           forced: [String: String], trackOverrides: [Int: UInt64],
+                                           forceBlues: Bool = false, forceSoho: Bool = false) -> SongState {
+        var state = SongGenerator.generate(
+            seed:                 seed,
+            keyOverride:          keyOverride,
+            tempoOverride:        tempoOverride,
+            moodOverride:         moodOverride,
+            style:                style,
+            forceBassRuleID:      forced["Bass"],
+            forceDrumRuleID:      forced["Drums"],
+            forceArpRuleID:       forced["Rhythm"],
+            forcePadsRuleID:      forced["Pads"],
+            forceLeadRuleID:      forced["Lead"],
+            forceTexRuleID:       forced["Tex"],
+            forcePercussionStyle: forced["PercStyle"].flatMap { PercussionStyle(rawValue: $0) },
+            forceBridge:          forced["Bridge"] == "true",
+            useBrushKit:          forced["BrushKit"] == "true",
+            forceBluesVariation:  forceBlues,
+            forceSohoVariation:   forceSoho,
+            forceAmbientPianoRule: forced["Piano"]
+        )
+        for idx in trackOverrides.keys.sorted() {
+            state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOverrides[idx])
+        }
+        return state
+    }
+
+    /// The instruments for a song just loaded, after `instrumentOverrides` holds what was saved:
+    /// the Chill leads pinned to what the generator chose, the snapshot that "reset effects"
+    /// restores, Ambient Piano's Lead 1, Lead 2's mirror and the session cache. Every load path
+    /// runs this; the .zudio path used to skip it and saved the song with its leads unpinned.
+    private func applyLoadedInstruments(for state: SongState) {
+        syncGeneratedInstruments(for: state)
+        songInstrumentOverrides = instrumentOverrides
+        applyAmbientPianoInstrument(for: state)
+        restoreLead2Mirror()
+        applyLead2Mirror(for: state)
+        sessionInstrumentOverrides[state.globalSeed] = instrumentOverrides
+    }
+
+    /// The playback engine's per-style switches for `state`: Kosmic and Motorik fades, the Chill
+    /// fade-in on a song that opens already playing, and the Ambient and Chill effect setups.
+    /// `finishLoadingSong` used to switch the Chill fade off, and the history path never set
+    /// it, so Endless, ⏮ and Songs-list reloads lost the fade (found 2026-10-16).
+    private func configurePlaybackStyle(for state: SongState) {
+        playback.kosmicStyle  = state.style == .kosmic
+        playback.motorikStyle = state.style == .motorik
+        playback.chillFade    = state.style == .chill && {
+            if case .alreadyPlaying = state.structure.introStyle { return true }
+            return false
+        }()
+    }
+
     /// Called at startup: regenerates all persisted songs in the background and caches them as
     /// SongState objects in generationHistory. This makes navigation via ⏮/⏭ and song list taps
     /// instant (fast path in loadFromPersistedSong) without blocking the UI thread.
@@ -342,25 +407,10 @@ final class AppState: ObservableObject {
         Task.detached(priority: .background) { [weak self, songs] in
             guard let self else { return }
             for song in songs {
-                let trackOvr = Dictionary(uniqueKeysWithValues:
-                    song.trackOverrides.compactMap { k, v -> (Int, UInt64)? in
-                        guard let i = Int(k) else { return nil }; return (i, v) })
-                var state = SongGenerator.generate(
-                    seed:            song.seed,
-                    keyOverride:     song.keyOverride,
-                    tempoOverride:   song.tempoOverride,
-                    moodOverride:    song.moodOverride,
-                    style:           song.style,
-                    forceBassRuleID: song.forcedRules["Bass"],
-                    forceDrumRuleID: song.forcedRules["Drums"],
-                    forceArpRuleID:  song.forcedRules["Rhythm"],
-                    forcePadsRuleID: song.forcedRules["Pads"],
-                    forceLeadRuleID: song.forcedRules["Lead"],
-                    forceTexRuleID:  song.forcedRules["Tex"]
-                )
-                for idx in trackOvr.keys.sorted() {
-                    state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOvr[idx])
-                }
+                let state = Self.regenerateSong(seed: song.seed, keyOverride: song.keyOverride,
+                                                tempoOverride: song.tempoOverride, moodOverride: song.moodOverride,
+                                                style: song.style, forced: song.forcedRules,
+                                                trackOverrides: song.decodedTrackOverrides)
                 var finalState = state
                 finalState.title = song.title   // preserve the title from when the song was generated
                 await MainActor.run {
@@ -2984,9 +3034,7 @@ final class AppState: ObservableObject {
         soloState = Array(repeating: false, count: kTrackCount)
         playback.muteState = muteState
         playback.soloState = soloState
-        playback.kosmicStyle  = state.style == .kosmic
-        playback.motorikStyle = state.style == .motorik
-        playback.chillFade    = false
+        configurePlaybackStyle(for: state)
         // load() must come before setAmbientMode/setChillMode so PlaybackEngine.songState
         // is current when those methods check state fields like chillBluesVariation.
         playback.load(state)
@@ -3251,26 +3299,10 @@ final class AppState: ObservableObject {
         let loadedInstOverrides = loadedInstrumentOverrides
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            var state = SongGenerator.generate(
-                seed:             seed,
-                keyOverride:      loadKey,
-                tempoOverride:    loadTempo,
-                moodOverride:     loadMood,
-                style:            style,
-                forceBassRuleID:  loadForced["Bass"],
-                forceDrumRuleID:  loadForced["Drums"],
-                forceArpRuleID:   loadForced["Rhythm"],
-                forcePadsRuleID:  loadForced["Pads"],
-                forceLeadRuleID:  loadForced["Lead"],
-                forceTexRuleID:   loadForced["Tex"],
-                forcePercussionStyle: loadForced["PercStyle"].flatMap { PercussionStyle(rawValue: $0) },
-                forceBridge:      loadForced["Bridge"] == "true",
-                forceBluesVariation: loadBlues,
-                forceSohoVariation: loadSoho
-            )
-            for trackIdx in overrides.keys.sorted() {
-                state = SongGenerator.regenerateTrack(trackIdx, songState: state, overrideSeed: overrides[trackIdx])
-            }
+            var state = Self.regenerateSong(seed: seed, keyOverride: loadKey, tempoOverride: loadTempo,
+                                            moodOverride: loadMood, style: style, forced: loadForced,
+                                            trackOverrides: overrides,
+                                            forceBlues: loadBlues, forceSoho: loadSoho)
             await MainActor.run {
                 self.selectedStyle    = style
                 self.keyOverride      = loadKey
@@ -3285,14 +3317,7 @@ final class AppState: ObservableObject {
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
                 self.instrumentOverrides = loadedInstOverrides
-                // Chill/Ambient audio texture — restore picker index from song state.
-                if style == .chill && !state.chillSohoVariation {   // Soho texture is MIDI
-                    self.instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
-                }
-                if style == .ambient, let audioTex = state.ambientAudioTexture {
-                    let prog = Self.ambientAudioProgram(forFilename: audioTex)
-                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
-                }
+                self.applyLoadedInstruments(for: state)   // texture positions included
                 self.appendPersistedSong(from: state)   // after the instruments, as in generateNew
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
@@ -3310,12 +3335,7 @@ final class AppState: ObservableObject {
                 self.appendToLog(batch)
                 let wasPlaying = self.playback.isPlaying
                 self.playback.stop()
-                self.playback.kosmicStyle  = style == .kosmic
-                self.playback.motorikStyle = style == .motorik
-                self.playback.chillFade = style == .chill && {
-                    if case .alreadyPlaying = state.structure.introStyle { return true }
-                    return false
-                }()
+                self.configurePlaybackStyle(for: state)
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
                 self.playback.setAmbientMode(style == .ambient)
@@ -3987,13 +4007,6 @@ final class AppState: ObservableObject {
             // why "L1:61001" (Ambient index 0, Stereo Piano) went unnoticed for so long, so
             // say it out loud in the log rather than quietly substituting instruments.
             instrumentOverrides = Self.instrumentOverridesFromLog(state)
-            if state.style == .chill && !state.chillSohoVariation {   // Soho texture is MIDI
-                instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
-            }
-            if state.style == .ambient, let audioTex = state.ambientAudioTexture {
-                let prog = Self.ambientAudioProgram(forFilename: audioTex)
-                instrumentOverrides[kTrackTexture] = Int(prog) - 231
-            }
             if instrumentOverrides.filter({ $0.key != kTrackTexture }).isEmpty {
                 appendToLog([GenerationLogEntry(
                     tag: "Warning",
@@ -4003,18 +4016,13 @@ final class AppState: ObservableObject {
         }
         // Chill's leads are chosen by the generator, and their phrasing is written for that
         // instrument: pin the patch to it, whatever the history saved. Entries persisted before
-        // 2026-10-16 hold the previous song's Lead 1, usually a sax.
-        syncGeneratedInstruments(for: state)
-        songInstrumentOverrides = instrumentOverrides
-        applyAmbientPianoInstrument(for: state)
-        restoreLead2Mirror()
-        applyLead2Mirror(for: state)
+        // 2026-10-16 hold the previous song's Lead 1, usually a sax. Texture positions too.
+        applyLoadedInstruments(for: state)
         muteState = Array(repeating: false, count: kTrackCount)
         soloState = Array(repeating: false, count: kTrackCount)
         playback.muteState    = muteState
         playback.soloState    = soloState
-        playback.kosmicStyle  = state.style == .kosmic
-        playback.motorikStyle = state.style == .motorik
+        configurePlaybackStyle(for: state)
         playback.load(state)
         playback.seek(toStep: 0)
         playback.setAmbientMode(state.style == .ambient)
@@ -4053,27 +4061,12 @@ final class AppState: ObservableObject {
         let thenPlay = forcePlay || playback.isPlaying   // capture before stop()
         stop()
         isGenerating = true
-        let trackOvr = Dictionary(uniqueKeysWithValues:
-            song.trackOverrides.compactMap { k, v -> (Int, UInt64)? in
-                guard let i = Int(k) else { return nil }; return (i, v) })
-        Task.detached(priority: .userInitiated) { [weak self, song, trackOvr, thenPlay] in
+        Task.detached(priority: .userInitiated) { [weak self, song, thenPlay] in
             guard let self else { return }
-            var state = SongGenerator.generate(
-                seed:            song.seed,
-                keyOverride:     song.keyOverride,
-                tempoOverride:   song.tempoOverride,
-                moodOverride:    song.moodOverride,
-                style:           song.style,
-                forceBassRuleID: song.forcedRules["Bass"],
-                forceDrumRuleID: song.forcedRules["Drums"],
-                forceArpRuleID:  song.forcedRules["Rhythm"],
-                forcePadsRuleID: song.forcedRules["Pads"],
-                forceLeadRuleID: song.forcedRules["Lead"],
-                forceTexRuleID:  song.forcedRules["Tex"]
-            )
-            for idx in trackOvr.keys.sorted() {
-                state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOvr[idx])
-            }
+            var state = Self.regenerateSong(seed: song.seed, keyOverride: song.keyOverride,
+                                            tempoOverride: song.tempoOverride, moodOverride: song.moodOverride,
+                                            style: song.style, forced: song.forcedRules,
+                                            trackOverrides: song.decodedTrackOverrides)
             await MainActor.run {
                 state.title = song.title   // preserve the title from when the song was generated
                 self.isGenerating  = false
@@ -4087,25 +4080,9 @@ final class AppState: ObservableObject {
                 self.instrumentOverrides = song.decodedInstrumentOverrides.isEmpty
                     ? Self.instrumentOverridesFromLog(state)
                     : song.decodedInstrumentOverrides
-                // Re-derive the Chill texture position when it is missing, or when it was saved under
-                // the old `prog - 240` numbering: Another pub (11) and Vinyl crackle (10) fall outside
-                // the 7-entry pool, so they can only be old values. Soho's texture is MIDI.
-                let chillTexPool = Self.instrumentPoolPrograms(trackIndex: kTrackTexture, style: .chill).count
-                let savedTex     = self.instrumentOverrides[kTrackTexture]
-                if song.style == .chill && !state.chillSohoVariation
-                    && (savedTex == nil || savedTex! >= chillTexPool) {
-                    self.instrumentOverrides[kTrackTexture] = Self.chillTexturePoolIndex(forFilename: state.chillAudioTexture)
-                }
-                if song.style == .ambient, let audioTex = state.ambientAudioTexture,
-                   self.instrumentOverrides[kTrackTexture] == nil {
-                    let prog = Self.ambientAudioProgram(forFilename: audioTex)
-                    self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
-                }
-                self.syncGeneratedInstruments(for: state)   // see loadFromGenerationHistory
-                self.songInstrumentOverrides = self.instrumentOverrides
-                self.applyAmbientPianoInstrument(for: state)
-                self.restoreLead2Mirror()
-                self.applyLead2Mirror(for: state)
+                // The Chill and Ambient texture positions are re-derived from the song by
+                // applyLoadedInstruments, which also repairs ones saved under old numbering.
+                self.applyLoadedInstruments(for: state)
                 self.appendGenerationLog(state.generationLog)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
                 if self.playMode == .evolve { self.tearDownEvolve(); self.startEvolveMode(from: state) }

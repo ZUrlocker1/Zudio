@@ -1110,6 +1110,7 @@ struct SongGenerator {
             var forced: [String: String] = [:]
             if let r = forceAmbientPianoRule { forced["Piano"] = r }
             if let p = forcePercussionStyle  { forced["PercStyle"] = p.rawValue }
+            if useBrushKit                   { forced["BrushKit"] = "true" }   // see below
             return SongState(
                 frame: frame, structure: structure, tonalMap: tonalMap,
                 trackEvents: trackEvents, globalSeed: seed, trackOverrides: [:],
@@ -1549,6 +1550,9 @@ struct SongGenerator {
         if let r = forceLeadRuleID  { forced["Lead"]   = r }
         if let r = forceTexRuleID   { forced["Tex"]    = r }
         if let p = forcePercussionStyle { forced["PercStyle"] = p.rawValue }
+        // The Brush Kit is chosen before generation from the drum picker, and changes the drums.
+        // Not recorded, every replay of a Brush Kit song played the standard kit (2026-10-16).
+        if useBrushKit { forced["BrushKit"] = "true" }
 
         return SongState(
             frame: frame, structure: structure, tonalMap: tonalMap,
@@ -1869,6 +1873,7 @@ struct SongGenerator {
         // when an absent bass or drum track is added to an evolve pass.
         var grooveFixupRegen: String? = nil
         if isChill, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
+            events = chillLeadSkippingBarZero(events, structure: songState.structure)
             let grooveBars = Set(songState.structure.sections
                 .filter { $0.label == .A || $0.label == .B }
                 .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
@@ -1884,6 +1889,16 @@ struct SongGenerator {
                 let l2   = trackIndex == kTrackLead1 ? "N/A" : mine
                 grooveFixupRegen = n == 0 ? "No changes!" : "L1: \(l1), L2: \(l2) fixes"
             }
+            // Then the harmonic filter and the register fold, as a generated song's leads get.
+            // Without them a regenerated lead skipped the clash guard, the lift above the pads
+            // and the velocity arc (found 2026-10-16).
+            let bounds = chillLeadRegister(trackIndex == kTrackLead1 ? songState.chillLeadInstrument
+                                                                     : songState.chillLead2Instrument)
+            events = HarmonicFilter.filterLead(events, track: trackIndex,
+                                               pads: songState.trackEvents[kTrackPads],
+                                               frame: songState.frame, structure: songState.structure,
+                                               bounds: bounds)
+            events = foldedIntoRegister(events, bounds)
         }
 
         // Build regen log entries for the status box
@@ -1951,6 +1966,28 @@ struct SongGenerator {
                                               appendingLog: [], replacingStepAnnotations: notes)
         }
         return updated
+    }
+
+    /// A Chill lead with bar 0 removed when the song has no intro — see generateChill.
+    static func chillLeadSkippingBarZero(_ events: [MIDIEvent], structure: SongStructure) -> [MIDIEvent] {
+        let hasIntroBars = structure.sections.contains { $0.label == .intro && $0.lengthBars > 0 }
+        return hasIntroBars ? events : events.filter { $0.stepIndex >= 16 }
+    }
+
+    /// A Chill lead instrument's register as the harmonic filter and the fold take it.
+    static func chillLeadRegister(_ instrument: ChillLeadInstrument) -> RegisterBounds {
+        let r = ChillLeadGenerator.register(for: instrument)
+        return RegisterBounds(low: r.low, high: r.high)
+    }
+
+    /// `events` with any note outside `bounds` folded back in by octaves.
+    static func foldedIntoRegister(_ events: [MIDIEvent], _ bounds: RegisterBounds) -> [MIDIEvent] {
+        events.map { e in
+            let folded = bounds.fold(Int(e.note))
+            guard folded != Int(e.note) else { return e }
+            return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(folded),
+                             velocity: e.velocity, durationSteps: e.durationSteps)
+        }
     }
 
     /// "Lead 1 return to form" on each bar where a Chill lead comes back to its original form —
@@ -3985,11 +4022,8 @@ struct SongGenerator {
         //
         // Chill only. Ambient reaches its first bar with no intro in 40% of songs and a lead
         // already sounding in most of those — drifting in with no runway is what that style is.
-        let hasIntroBars = structure.sections.contains { $0.label == .intro && $0.lengthBars > 0 }
-        if !hasIntroBars {
-            for lead in [kTrackLead1, kTrackLead2] {
-                trackEvents[lead] = trackEvents[lead].filter { $0.stepIndex >= 16 }
-            }
+        for lead in [kTrackLead1, kTrackLead2] {
+            trackEvents[lead] = chillLeadSkippingBarZero(trackEvents[lead], structure: structure)
         }
 
         // Groove fixup — pull the leads onto the groove. See fixupLeadsToGroove.
@@ -4126,14 +4160,8 @@ struct SongGenerator {
         // Post-processing: harmonic filter
         // The leads' instrument registers beat the per-track ones — see RegisterBounds.
         let leadRegisters: [Int: RegisterBounds] = [
-            kTrackLead1: {
-                let r = ChillLeadGenerator.register(for: chillLeadInstrument)
-                return RegisterBounds(low: r.low, high: r.high)
-            }(),
-            kTrackLead2: {
-                let r = ChillLeadGenerator.register(for: chillLead2Instrument)
-                return RegisterBounds(low: r.low, high: r.high)
-            }(),
+            kTrackLead1: chillLeadRegister(chillLeadInstrument),
+            kTrackLead2: chillLeadRegister(chillLead2Instrument),
         ]
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame,
                                            structure: structure,
@@ -4143,12 +4171,7 @@ struct SongGenerator {
         // note would otherwise break the register silently, and the symptom — a sax playing above
         // its own ceiling — is hard to recognise as a bug. ChillLeadRegisterTests pins it.
         for (track, bounds) in leadRegisters {
-            trackEvents[track] = trackEvents[track].map { e in
-                let folded = bounds.fold(Int(e.note))
-                guard folded != Int(e.note) else { return e }
-                return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(folded),
-                                 velocity: e.velocity, durationSteps: e.durationSteps)
-            }
+            trackEvents[track] = foldedIntoRegister(trackEvents[track], bounds)
         }
 
         // Post-processing: drum fills + cymbal variation.
@@ -4269,6 +4292,9 @@ struct SongGenerator {
         // Only persist lead rule if it belongs to Chill — discard stale Motorik/Kosmic IDs
         if let r = forceLeadRuleID, r.hasPrefix("CHL-") { forced["Lead"] = r }
         if let r = forceRhythmRuleID { forced["Rhythm"] = r }
+        // The first Chill song forces its audio texture, and a forced texture skips a draw. Not
+        // recorded, a replay took that draw and the rest of the song shifted (found 2026-10-16).
+        if let r = forceTexRuleID    { forced["Tex"]    = r }
 
         return SongState(
             frame: frame, structure: structure, tonalMap: tonalMap,

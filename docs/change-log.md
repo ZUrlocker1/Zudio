@@ -20,6 +20,10 @@
 - **Chill and Blues solos come back to their opening phrases** — Through the middle of a song the lead now returns to its opening phrases now and then, where they fit the chord, so a solo has a theme rather than a long free stretch. Blues waits for the I chord to bring its opening lick back, and Chill Soho's two reused lead rules keep their returns clear of their rests.
 - **"Lead 1 return to form" in the log** — Marks the bars where a Chill solo comes back to its opening phrase or hook in its original form.
 - **Leads keep their shape above the pads** — When a lead is lifted an octave to clear the pads, the whole figure moves, so a step down no longer turns into a seventh up halfway through a phrase, including figures that run across the eight-bar windows the check works in. All styles.
+- **Regenerated Chill leads get the full polish** — A regenerated Lead 1 or Lead 2 now goes through the same clean-up as a generated one: the clash guard, the lift above the pads, the song's dynamic arc, the instrument's range and the empty first bar on songs with no intro.
+- **Saved songs replay exactly** — The first song of each style, Ambient songs on the Brush Kit, and Kosmic and Ambient songs reloaded from the Songs list now come back note for note. All three reload routes (Songs list, startup, .zudio file) share one replay.
+- **Opening a .zudio file sets up its instruments fully** — The Chill leads, Ambient Piano and the Lead 2 mirror are set as on every other route before the song is saved to the Songs list.
+- **Chill fade-in on reloads** — A Chill song that opens mid-groove fades in on Endless transitions, ⏮/⏭ and Songs-list taps, as it does when generated.
 - **Arcade and Europe songs stay themselves** — Regenerating any track of a Motorik Arcade or Motorik Europe song, or reloading one from the Songs list, no longer turns it into plain Motorik.
 - **Soho drum regenerate** — Regenerating the drums of a Chill Soho song with a Remix Break no longer picks a kit that can't play the break.
 - **Soho Lead 1 randomise** — Picking a random Lead 1 in Chill Soho now uses the same odds as a generated song.

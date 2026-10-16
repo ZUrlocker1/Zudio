@@ -646,6 +646,13 @@ tone is light, continuing base Chill's wry register.
   the RNG, so no note changes
 - **Instruments on replay:** a song is written to the persisted history only after its
   instruments are final, and replaying one re-pins the Chill leads to what the generator chose
+- **Load paths (AppState):** `regenerateSong` is the one replay of a saved song (Songs list,
+  startup preload, .zudio file), passing every recorded forced setting; `applyLoadedInstruments`
+  and `configurePlaybackStyle` are the instrument and playback set-up every load runs. A forced
+  texture (Chill's first song) and Ambient's Brush Kit are recorded in `forcedRules` so a replay
+  sees them. `ReplayFidelityTests` pins replay note for note
+- **Regenerated leads:** `HarmonicFilter.filterLead` and SongGenerator's
+  `chillLeadSkippingBarZero` / `foldedIntoRegister` are shared by generation and regeneration
 
 ---
 
