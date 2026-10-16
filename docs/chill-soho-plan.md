@@ -120,7 +120,7 @@ What each record contributed:
 ## How it differs from base Chill and Chill Blues
 
 - **Rhythm section** — base Chill has no Latin drum rule. Soho adds five drum rules plus a Latin
-  percussion layer, and reuses only base Chill's `003` on the soul half
+  percussion layer, and reuses only base Chill's `CHL-DRUM-003` on the soul half
 - **Form** — a short non-modulating cycle with a separate B cycle and a played turnaround,
   against base Chill's moving chord plans and Blues's 16-bar form
 - **Tempo** — 84–128 in one band
@@ -138,8 +138,8 @@ introduction. The ideal first song:
 - **A Latin groove in drums and bass** — Bossa clave, Soft samba or Latin sway on the kit, with
   a Latin bass line (Bossa root-fifth, Rumba, Syncopated or their major-key partners) — **or** a
   Soul groove with **Best Melodic bass (`CHL-BASS-014`)**, the fretless line, which also brings the
-  bass slides (Zack, 2026-10-16). `014` is in the Soul pool only, so it never pairs with a Latin
-  kit. The curated seeds are all Latin today; add `014` ones when the seeds are next refreshed
+  bass slides (Zack, 2026-10-16). `CHL-BASS-014` is in the Soul pool only, so it never pairs with a Latin
+  kit. The curated seeds are all Latin today; add `CHL-BASS-014` ones when the seeds are next refreshed
 - **Operator (`CHL-LD1-010`) on Lead 1, played on flute**, with **vibraphone on Lead 2**
   answering it
 - **A breakdown**: the Remix Break, the Duo or the bass ostinato — the Soho-only breaks first
@@ -236,7 +236,7 @@ Todd Terry kept the percussion and swapped the kit, which is why the break is th
 on while the kit underneath changes.
 
 - Eligible only when the Latin percussion overlay is on, tempo is above 105 and the drum rule is
-  not Ballad Half-Time (`013`) or `003`; fires in 33% of eligible songs, about one Soho song in
+  not Ballad Half-Time (`CHL-DRUM-013`) or `CHL-DRUM-003`; fires in 33% of eligible songs, about one Soho song in
   fourteen
 - 6, 8 or 12 bars; the song's own cycle continues at two bars a chord
 - Backbeat voice drawn per song: handclap 45%, tambourine 30%, side stick 25%
@@ -252,8 +252,8 @@ on while the kit underneath changes.
   forward; under Soul the rule holds and takes handclaps
 - **Duo** (`.sohoDuo`, added 2026-10-15) — 8 bars (70%) or 12, Rhythm and Bass alone. The bass
   keeps its own groove; the comp plays every bar with no rests or dropouts, 8 velocity up, as
-  chordal comp (`007`) — rootless, leaving the low end to the bass — or as the single-note line
-  (`008`) when that is the song's A rule, making the duo two lines in counterpoint. Root-and-chord
+  chordal comp (`CHL-RHY-007`) — rootless, leaving the low end to the bass — or as the single-note line
+  (`CHL-RHY-008`) when that is the song's A rule, making the duo two lines in counterpoint. Root-and-chord
   eighths is never used, since its low root sits on the bass. The song's A cycle continues at two
   bars a chord, as in the Remix Break. The kit keeps one soft timekeeper and no kick: shaker
   eighths when the song is Latin or has the percussion overlay, closed-hat quarters otherwise,
@@ -275,31 +275,31 @@ Chill's numbering; reused base Chill rules keep their IDs.
 
 ### Drums
 
-- **Latin pool:** `CHL-DRUM-009` Bossa clave 40%, `010` Soft samba 30%, `011` Latin sway 30%
-- **Soul pool:** `CHL-DRUM-012` Soft soul backbeat 55%, `013` Ballad half-time 25%, base Chill's
-  `003` Jazz quarter-note pulse 20%
+- **Latin pool:** `CHL-DRUM-009` Bossa clave 40%, `CHL-DRUM-010` Soft samba 30%, `CHL-DRUM-011` Latin sway 30%
+- **Soul pool:** `CHL-DRUM-012` Soft soul backbeat 55%, `CHL-DRUM-013` Ballad half-time 25%, base Chill's
+  `CHL-DRUM-003` Jazz quarter-note pulse 20%
 
-**`009` Bossa clave** — the EBTG end. Rim click carries a two-bar clave (steps 0, 6, 12 and 20,
+**`CHL-DRUM-009` Bossa clave** — the EBTG end. Rim click carries a two-bar clave (steps 0, 6, 12 and 20,
 26); closed hats run steady eighths, alternating strong and weak; the kick plays 0, 6, 8 plus 14
 in about 60% of bars — the measured *Smooth Operator* kick, not the textbook tresillo. No snare.
 
-**`010` Soft samba** — the Matt Bianco end. Continuous soft shaker sixteenths drive it; the surdo
+**`CHL-DRUM-010` Soft samba** — the Matt Bianco end. Continuous soft shaker sixteenths drive it; the surdo
 weight falls on step 8 with step 0 lighter; rim on 4 and 12; hats on the offbeat eighths.
 
-**`011` Latin sway** — the Sade end, half-time and conga-led, the quietest drum rule in Chill.
+**`CHL-DRUM-011` Latin sway** — the Sade end, half-time and conga-led, the quietest drum rule in Chill.
 Conga on 0, 3, 6, 10, 13; rim on 8 only; sparse hats; kick on 0 and on 11 in alternate bars. It
 leaves the bass exposed.
 
-**`012` Soft soul backbeat** — *More Than This* and *You're the Best Thing*, which agree on
+**`CHL-DRUM-012` Soft soul backbeat** — *More Than This* and *You're the Best Thing*, which agree on
 everything except the hat. Rim click (preferred) or snare on 4 and 12; kick on 0 plus 8, or a
 push from 7 into 8; hats in eighths (*You're the Best Thing*) or quarters (*More Than This*),
 50/50. Flat, low hat velocity and **no ghost notes** — what separates it from base Chill's
-neo-soul `002`.
+neo-soul `CHL-DRUM-002`.
 
-**`013` Ballad half-time** — the sparsest rule. Snare or rim on beat 3 only, kick on 0 and on 6
+**`CHL-DRUM-013` Ballad half-time** — the sparsest rule. Snare or rim on beat 3 only, kick on 0 and on 6
 in alternate bars, hats on 0 and 8 or absent; a single pickup into step 8 in a quarter of bars.
 
-**`003` Jazz quarter-note pulse** (reused) — ride quarters with brush snare on 2 and 4 and
+**`CHL-DRUM-003` Jazz quarter-note pulse** (reused) — ride quarters with brush snare on 2 and 4 and
 minimal kick: restrained and brush-voiced, the soul half's third colour.
 
 **`CHL-DRUM-014` Latin percussion** — conga, bongo, shaker and cabasa layered over whichever rule
@@ -321,37 +321,37 @@ Every corpus bass hits step 0 hardest, with step 6 (the "and" of two) and step 1
 next, and repeated pitches are the commonest interval — these basses drive by rhythm and
 repetition. They split by leap content and sustain, which is what separates the rules.
 
-- **Latin, minor:** `CHL-BASS-013` Bossa root-fifth 35%, `012` Rumba bass 25%, `015` Syncopated
-  pocket 20%, `016` Samba pickup 20%
-- **Latin, major:** `013` 35%, `015` 35%, `016` 30% (Rumba is minor-only)
-- **Soul:** `CHL-BASS-014` Best melodic bass 23.5%, `017` Stylish root pedal walk 23.5%, `015`
-  23%, and base Chill's `002` Syncopated groove 15%, `004` Air ostinato 10%, `001` Moby root
+- **Latin, minor:** `CHL-BASS-013` Bossa root-fifth 35%, `CHL-BASS-012` Rumba bass 25%, `CHL-BASS-015` Syncopated
+  pocket 20%, `CHL-BASS-016` Samba pickup 20%
+- **Latin, major:** `CHL-BASS-013` 35%, `CHL-BASS-015` 35%, `CHL-BASS-016` 30% (Rumba is minor-only)
+- **Soul:** `CHL-BASS-014` Best melodic bass 23.5%, `CHL-BASS-017` Stylish root pedal walk 23.5%, `CHL-BASS-015`
+  23%, and base Chill's `CHL-BASS-002` Syncopated groove 15%, `CHL-BASS-004` Air ostinato 10%, `CHL-BASS-001` Moby root
   sustain 5%
-- **Breakdowns:** `005` Breakdown root drone
+- **Breakdowns:** `CHL-BASS-005` Breakdown root drone
 
-**`013` Bossa root-fifth** — *Smooth Operator*. 4–6 short notes a bar (2–3 steps — detached, not
+**`CHL-BASS-013` Bossa root-fifth** — *Smooth Operator*. 4–6 short notes a bar (2–3 steps — detached, not
 ringing) on 0, 6, 8, 14 with 10 and 12 secondary, root–fifth leaps, octave drops on chord changes.
 
-**`014` Best melodic bass** — the fretless track of *You're the Best Thing*. Sparse and sustained:
+**`CHL-BASS-014` Best melodic bass** — the fretless track of *You're the Best Thing*. Sparse and sustained:
 about 3 notes a bar held a quarter note or more, on step 0 and then 12–15, almost nothing on
-step 6, monophonic. Defined by space, the opposite of `013`.
+step 6, monophonic. Defined by space, the opposite of `CHL-BASS-013`.
 
-**`015` Syncopated pocket** — *Black Cow*, Chuck Rainey's playing: attacks on 0, 3, 6 with 11
+**`CHL-BASS-015` Syncopated pocket** — *Black Cow*, Chuck Rainey's playing: attacks on 0, 3, 6 with 11
 and 15, the one corpus bass that plays off the sixteenth grid.
 
-**`016` Samba pickup** — *Half a Minute*, which plays this figure in 96% of its bars. The beat-1
+**`CHL-BASS-016` Samba pickup** — *Half a Minute*, which plays this figure in 96% of its bars. The beat-1
 root repeats on the sixteenth before beat 2 and lands on the fifth; the same pickup leads into
 beat 4; about seven short notes a bar. Three variants rotate every 12–18 bars.
 
-**`017` Stylish root pedal walk** — *My Ever Changing Moods*. The first half-bar pedals the root
+**`CHL-BASS-017` Stylish root pedal walk** — *My Ever Changing Moods*. The first half-bar pedals the root
 in eighths, the second walks away from it; 36% repeated pitches are the engine of the figure.
 
-**`012` Rumba bass** (shared with Chill Blues) — root, minor 3rd, 5th, 6th and a tail on 0, 6,
+**`CHL-BASS-012` Rumba bass** (shared with Chill Blues) — root, minor 3rd, 5th, 6th and a tail on 0, 6,
 10, 12, 14. The pattern is genuinely Latin; its one blues-coded moment, a ♭7 for the 6th, is
 forced off in Soho.
 
-**Reused from base Chill, soul half only:** `002` Syncopated groove (a soul pocket under the
-backbeat), `004` Air ostinato (a four-bar figure that reads as hypnotic over a vamp), `001` Moby
+**Reused from base Chill, soul half only:** `CHL-BASS-002` Syncopated groove (a soul pocket under the
+backbeat), `CHL-BASS-004` Air ostinato (a four-bar figure that reads as hypnotic over a vamp), `CHL-BASS-001` Moby
 root sustain (a sustained root under the half-time snare). The three are capped at 30% between
 them.
 
@@ -367,7 +367,7 @@ same nor all different. The pedal holds one note in one octave (40–52); a peda
 the line note beside it is dropped, and the line itself is never moved. `sohoTurnaroundPalette`
 and `sohoTurnaroundStyle` are pure functions, so the generator and the log agree.
 
-**Slides** (`ChillBassSlides`, prototype 2026-10-15) — Best Melodic Bass (`014`) songs only, any
+**Slides** (`ChillBassSlides`, prototype 2026-10-15) — Best Melodic Bass (`CHL-BASS-014`) songs only, any
 bass instrument. Every bass bend in the corpus is a slide up into a note, a whole step (most) or a
 half step, over one to two sixteenths: a slide along one string. Holding Back the Years' fretless
 slides about once per 8 bars, always on the same note of its figure. The slides are pitch bend over
@@ -383,10 +383,10 @@ function.
   quarter of the glide, then moves steadily. Only after a move of a half step to a fourth — after a
   wider leap or into a repeated note it is heard as a bend. The first version (a sixteenth and a
   half, leaving at once, always from below, up to three quarters of the note) sounded like bends
-- **Scope is settled** (Zack, 2026-10-15): slides stay on these two rules only — Soho `014` and
-  Blues `009` — as a rare touch. They took more tuning than expected, so they are not being spread
+- **Scope is settled** (Zack, 2026-10-15): slides stay on these two rules only — Soho `CHL-BASS-014` and
+  Blues `CHL-BASS-009` — as a rare touch. They took more tuning than expected, so they are not being spread
   to other bass rules, and bass vibrato is not being pursued
-- **Chill Blues**, on the B.B. King pickup riff (`009`) only: a half-step slide over a sixteenth
+- **Chill Blues**, on the B.B. King pickup riff (`CHL-BASS-009`) only: a half-step slide over a sixteenth
   and a half into the root at the top of every form, where the turnaround ends on the b7 below it.
   Every form, so it belongs to the riff — one that came and went sounded arbitrary in a form this
   repetitive, and a whole step over most of a beat sounded artificial. Zack slides into the IV and
@@ -400,29 +400,29 @@ function.
 Two measured families, separated by voicing size rather than density: chordal comps of 2–3
 notes and monophonic lines.
 
-- **Latin:** `CHL-RHY-007` Chordal comp 40%, `009` Root-and-chord eighths 30%, `008` Single-note
+- **Latin:** `CHL-RHY-007` Chordal comp 40%, `CHL-RHY-009` Root-and-chord eighths 30%, `CHL-RHY-008` Single-note
   line 30%
-- **Soul:** `007` 25%, `008` 25%, `009` 20%, and base Chill's `005` Chord hold 15%, `006` Downbeat
+- **Soul:** `CHL-RHY-007` 25%, `CHL-RHY-008` 25%, `CHL-RHY-009` 20%, and base Chill's `CHL-RHY-005` Chord hold 15%, `CHL-RHY-006` Downbeat
   pulse 15%
 
 A and B always take different rules.
 
-**`007` Chordal comp** — *Black Cow*, *Your Love Is King*, *Holding Back the Years*, *Smooth
+**`CHL-RHY-007` Chordal comp** — *Black Cow*, *Your Love Is King*, *Holding Back the Years*, *Smooth
 Operator*. Rootless 2–3 note voicings on steps 0, 6 and 12 (the two-bar answer on 20, 26),
 short and soft. In both pools, since most of its sources are soul records.
 
-**`008` Single-note line** — *Avalon*, *More Than This*. A continuous monophonic line, 4.5–9
+**`CHL-RHY-008` Single-note line** — *Avalon*, *More Than This*. A continuous monophonic line, 4.5–9
 notes a bar, narrow range and very short notes; dense but quiet, controlled by velocity rather
 than note count.
 
-**`009` Root-and-chord eighths** — the *Do It Again* piano and the guitars of *Each and Every
+**`CHL-RHY-009` Root-and-chord eighths** — the *Do It Again* piano and the guitars of *Each and Every
 One* and *Missing*. A low root on beat 1 with its octave on the "and" of 2 and on beat 4,
 answered by 2–3 note chord fragments on the other eighths so the downbeat rings. Three variants
 rotate every 8–12 bars and the fragment shape changes on every hit. Root at MIDI 48–59, above
 the bass.
 
-**Reused:** `005` Chord hold and `006` Downbeat pulse — plain shell chords on beats 1 and 3,
-which is exactly the comping on *More Than This*. Base Chill's Bosa Moon (`003`) is excluded: it
+**Reused:** `CHL-RHY-005` Chord hold and `CHL-RHY-006` Downbeat pulse — plain shell chords on beats 1 and 3,
+which is exactly the comping on *More Than This*. Base Chill's Bosa Moon (`CHL-RHY-003`) is excluded: it
 is named after Bosa in Sardinia, not bossa nova, and its even arpeggio would fight the clave.
 
 **Silence is the strongest variation.** Long dropouts of 8, 12 or 16 bars (one per ~32 groove
@@ -441,7 +441,7 @@ pitch — so Motorik Europe's closed-cell machinery is not used.
 - base Chill's `CHL-LD1-001` Long phrase 15%
 - `CHL-LD1-011` Sustained tone 15%
 
-**`010` Operator** — *Smooth Operator*, *Cherish the Day*, *Black Cow*; named for the first, which most of its measurements come from (called Soho Counter-Line until 2026-10-16). Flowing phrases
+**`CHL-LD1-010` Operator** — *Smooth Operator*, *Cherish the Day*, *Black Cow*; named for the first, which most of its measurements come from (called Soho Counter-Line until 2026-10-16). Flowing phrases
 of about 8 notes in eighths and sixteenths, mostly stepwise, with rests of about a bar and a
 half. Built from `counterLineCells`, the sax and flute figures at full weight — ascending thirds
 and tones such as `[+3, +2, +2]`, neighbour-tone turns, descending answers — with a leap at most
@@ -462,13 +462,13 @@ This is deliberate: the shared opening turn and repeated notes are what tie the 
 the hook and make the line sound like one song. With the bank properly weighted the line wandered,
 and the hook stopped standing out (Zack, by ear, 2026-10-16). See `counterLinePhrase`.
 
-**`011` Sustained tone** — *More Than This*, whose sax plays 13 notes in a whole song. Each phrase
+**`CHL-LD1-011` Sustained tone** — *More Than This*, whose sax plays 13 notes in a whole song. Each phrase
 is a short figure with one held note of 1–2.5 bars (weighted 22/32/28/18), the held note last
 65% of the time and first 35%. Measured from every corpus phrase holding three beats or more,
 the notes beside it are short, close (unison, a tone, a minor third) and two steps apart. A held
 tone alone reads as a stall, so every phrase has its figure.
 
-**`012` Avalon** — *Avalon*'s lead plays 13 phrases on three recurring contours, weighted 7/3/2:
+**`CHL-LD1-012` Avalon** — *Avalon*'s lead plays 13 phrases on three recurring contours, weighted 7/3/2:
 a dominant figure and two foils. So each song has three hooks, weighted 55/25/20, differing in
 note count and rhythm, drawn from `counterLineCells` (Avalon's hook is a flute line). Episodes
 alternate them — `A B A` reads as a call and its answer where `A A A` reads as a copy — and the
@@ -495,11 +495,11 @@ Each episode starts on one of the chord tones nearest its section's home — a t
 the range in the A section, a third or a fifth higher in B — kept far enough from the edges for
 the hooks' reach, and every statement in the episode anchors near it, so a call and its answer
 start together. On a displaced song, half the statements land an eighth either side of the song's
-offset. The cell bank and opening rhythms are weighted properly here, unlike `010`.
+offset. The cell bank and opening rhythms are weighted properly here, unlike `CHL-LD1-010`.
 
-**Reused:** `004` Blues lead and `001` Long phrase run base Chill's code, then take Soho's rest
+**Reused:** `CHL-LD1-004` Blues lead and `CHL-LD1-001` Long phrase run base Chill's code, then take Soho's rest
 windows, stretch cap and Remix pickup. A rest window that would land on a replayed seed moves to
-just after it, so the seeds still come back about six times a song. St Germain staccato (`005`)
+just after it, so the seeds still come back about six times a song. St Germain staccato (`CHL-LD1-005`)
 never plays here.
 
 **Registers are per instrument** (`ChillLeadGenerator.register(for:)`), not per track — a tenor
@@ -522,15 +522,15 @@ A sax that replies to everything stops sounding like a reply.
 
 Pads measure one or two onsets a bar — mostly step 0 alone, held — with true voicings of 2–5
 notes. Two of nine records have no pad at all (the Steely Dan ones, where horns and electric
-piano do the job), which sets the weight of `000`.
+piano do the job), which sets the weight of `CHL-PAD-000`.
 
 - `CHL-PAD-000` No pads 20% — no pad notes anywhere in the song
 - `CHL-PAD-007` Soho chord hold 20% — one 3–5 note chord a bar, anticipating onto step 15 in 15%
   of bars as *Your Love Is King* does, with a second onset on step 8 in about a quarter of bars
 - `CHL-PAD-008` Half-bar pad 20% — *Smooth Operator*: 2–3 note chords on steps 0 and 8, each half
   a bar, which keeps a slow vamp moving against a clave
-- base Chill's `001` Chord sustain 13%, `005` Slow chord build 11%, `006` String hold 7%, `002`
-  Staggered entry 5%, `004` Open fifth hold 4%. Moby anchor (`003`) is excluded
+- base Chill's `CHL-PAD-001` Chord sustain 13%, `CHL-PAD-005` Slow chord build 11%, `CHL-PAD-006` String hold 7%, `CHL-PAD-002`
+  Staggered entry 5%, `CHL-PAD-004` Open fifth hold 4%. Moby anchor (`CHL-PAD-003`) is excluded
 
 Chill's pad rest windows then thin whatever plays, so pads have long absences. Held chords are
 capped so the next attack is not cut off by the pad fade.
@@ -650,7 +650,7 @@ tone is light, continuing base Chill's wry register.
   `Turnaround` with the treatment (`walking quarters`) on the bar the bass treatment plays; one Groove fixup row
 - **Weighted picks:** `SeededRNG.weightedPick` expects weights that sum to 1. Picks over raw
   corpus counts go through `weightedIndex`, which normalises them; the one deliberate exception
-  is Operator (see `010`)
+  is Operator (see `CHL-LD1-010`)
 - **Harmonic filter (all styles):** when a lead sits within four semitones of the pads, Pass B
   lifts a figure an octave whole — notes less than a bar apart, found across the whole track and
   decided by the window it starts in — if any of it dips below the pads' median and all of it
@@ -662,7 +662,7 @@ tone is light, continuing base Chill's wry register.
   breakdown pick uses
 - **Lead 1 randomise:** reads `ChillMusicalFrameGenerator.sohoLeadWeights`, the generator's table
 - **Log — "Lead 1 return to form":** marked on each bar where a Chill lead comes back to its
-  original form: `010`'s hook returning exactly, an Avalon episode led by the opening hook in its
+  original form: `CHL-LD1-010`'s hook returning exactly, an Avalon episode led by the opening hook in its
   original form (after the song's first), or a base Chill seed coming back after the two opening
   replays (changed at most in its last note or a note length). Not marked where the bar already says "Lead 1 steps back", or where a later
   pass removed the notes. Re-marked when Lead 1 is regenerated. Recorded without drawing from
