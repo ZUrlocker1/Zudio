@@ -421,8 +421,8 @@ import Foundation
 
     // MARK: - Step 3: full drum and bass pools, percussion overlay
 
-    private static let latinDrums: Set<String> = ["CHL-DRUM-009", "CHL-DRUM-010", "CHL-DRUM-011"]
-    private static let soulDrums:  Set<String> = ["CHL-DRUM-012", "CHL-DRUM-013", "CHL-DRUM-003"]
+    private static let latinDrums = ChillDrumGenerator.latinRules
+    private static let soulDrums  = ChillDrumGenerator.soulRules
 
     /// Each groove draws only from its own drum pool, and every rule in each pool appears.
     @Test func drumRulesComeFromTheGroovesPool() {

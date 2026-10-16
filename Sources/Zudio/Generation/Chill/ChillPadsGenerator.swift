@@ -13,6 +13,22 @@ import Foundation
 
 struct ChillPadsGenerator {
 
+    private typealias PadBuilder = (GlobalMusicalFrame, SongStructure, inout SeededRNG) -> [MIDIEvent]
+
+    /// The Soho pad pool, as cumulative thresholds on one roll; the last entry takes whatever the
+    /// others leave. A nil builder is 000 Absent.
+    /// 000 20 · 007 20 · 008 20 · 001 13 · 005 11 · 006 7 · 002 5 · 004 4
+    private static let sohoPadPool: [(ruleID: String, below: Double, build: PadBuilder?)] = [
+        ("CHL-PAD-000", 0.20, nil),
+        ("CHL-PAD-007", 0.40, sohoChordHold),
+        ("CHL-PAD-008", 0.60, halfBarPad),
+        ("CHL-PAD-001", 0.73, chordSustain),
+        ("CHL-PAD-005", 0.84, slowChordBuild),
+        ("CHL-PAD-006", 0.91, portisheadStrings),
+        ("CHL-PAD-002", 0.96, staggeredEntry),
+        ("CHL-PAD-004", 1.00, openFifthHold),
+    ]
+
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
@@ -30,32 +46,10 @@ struct ChillPadsGenerator {
             // Levelled 2026-10-15 (Zack): Soho Chord Hold was 30% and carried too many songs,
             // so it and Half-Bar Pad now share 20% each and the freed weight lifts every one of
             // the rarer rules rather than concentrating anywhere.
-            // 000 20 · 007 20 · 008 20 · 001 13 · 005 11 · 006 7 · 002 5 · 004 4
-            if roll < 0.20 {
-                usedRuleIDs.insert("CHL-PAD-000")
-                return []
-            } else if roll < 0.40 {
-                usedRuleIDs.insert("CHL-PAD-007")
-                events = sohoChordHold(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.60 {
-                usedRuleIDs.insert("CHL-PAD-008")
-                events = halfBarPad(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.73 {
-                usedRuleIDs.insert("CHL-PAD-001")
-                events = chordSustain(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.84 {
-                usedRuleIDs.insert("CHL-PAD-005")
-                events = slowChordBuild(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.91 {
-                usedRuleIDs.insert("CHL-PAD-006")
-                events = portisheadStrings(frame: frame, structure: structure, rng: &rng)
-            } else if roll < 0.96 {
-                usedRuleIDs.insert("CHL-PAD-002")
-                events = staggeredEntry(frame: frame, structure: structure, rng: &rng)
-            } else {
-                usedRuleIDs.insert("CHL-PAD-004")
-                events = openFifthHold(frame: frame, structure: structure, rng: &rng)
-            }
+            let pick = sohoPadPool.dropLast().first { roll < $0.below } ?? sohoPadPool[sohoPadPool.count - 1]
+            usedRuleIDs.insert(pick.ruleID)
+            guard let build = pick.build else { return [] }
+            events = build(frame, structure, &rng)
         } else if bluesVariation {
             // Blues: CHL-PAD-004 (open fifth hold) — full B section.
             // First 16-bar cycle: pads throughout. Subsequent cycles: Im7 section (first 8 bars

@@ -86,14 +86,21 @@ struct ChillDrumGenerator {
     }
 
     /// Pools as in docs/chill-soho-plan.md (Drums). Latin: 009 40%, 010 30%, 011 30%.
-    /// Soul: 012 55%, 013 25%, reused 003 Brush Kit 20%. Overlay: 85% Latin, 40% Soul — measured
-    /// Latin percussion share runs 25–55% even in Soul-pool records (Avalon 46%, Your Love Is King 25%).
+    /// Soul: 012 55%, 013 25%, reused 003 Brush Kit 20%. Order is draw order.
+    static let latinPool: [(rule: String, weight: Double)] =
+        [("CHL-DRUM-009", 0.40), ("CHL-DRUM-010", 0.30), ("CHL-DRUM-011", 0.30)]
+    static let soulPool: [(rule: String, weight: Double)] =
+        [("CHL-DRUM-012", 0.55), ("CHL-DRUM-013", 0.25), ("CHL-DRUM-003", 0.20)]
+    static let latinRules = Set(latinPool.map(\.rule))
+    static let soulRules  = Set(soulPool.map(\.rule))
+    static func isLatinRule(_ ruleID: String) -> Bool { latinRules.contains(ruleID) }
+
+    /// Overlay: 85% Latin, 40% Soul — measured Latin percussion share runs 25–55% even in
+    /// Soul-pool records (Avalon 46%, Your Love Is King 25%).
     static func sohoDrumPlan(beatStyle: ChillBeatStyle, rng: inout SeededRNG) -> SohoDrumPlan {
         let latin = beatStyle == .sohoLatin
-        let pool: [(String, Double)] = latin
-            ? [("CHL-DRUM-009", 0.40), ("CHL-DRUM-010", 0.30), ("CHL-DRUM-011", 0.30)]
-            : [("CHL-DRUM-012", 0.55), ("CHL-DRUM-013", 0.25), ("CHL-DRUM-003", 0.20)]
-        let rule = pool[rng.weightedPick(pool.map { $0.1 })].0
+        let pool  = latin ? latinPool : soulPool
+        let rule  = pool[rng.weightedPick(pool.map(\.weight))].rule
         let overlay = rng.nextDouble() < (latin ? 0.85 : 0.40)
         return SohoDrumPlan(ruleID: rule, overlay: overlay)
     }
@@ -103,8 +110,6 @@ struct ChillDrumGenerator {
     static func sohoDrumPlan(beatStyle: ChillBeatStyle, seed: UInt64, forceRuleID: String? = nil) -> SohoDrumPlan {
         var r = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 94))
         let plan = sohoDrumPlan(beatStyle: beatStyle, rng: &r)
-        let latinRules: Set<String> = ["CHL-DRUM-009", "CHL-DRUM-010", "CHL-DRUM-011"]
-        let soulRules:  Set<String> = ["CHL-DRUM-012", "CHL-DRUM-013", "CHL-DRUM-003"]
         if let f = forceRuleID, (beatStyle == .sohoLatin ? latinRules : soulRules).contains(f) {
             return SohoDrumPlan(ruleID: f, overlay: plan.overlay)
         }
@@ -161,8 +166,8 @@ struct ChillDrumGenerator {
     /// this track, so the shaker comes back with a cymbal and a horn stab behind it rather than
     /// simply resuming.
     private static func sohoShakerRests(frame: GlobalMusicalFrame, structure: SongStructure,
+                                        turns: Set<Int>,
                                         rng: inout SeededRNG) -> (rests: Set<Int>, returns: Set<Int>) {
-        let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
         var rests = turns
         var returns = Set<Int>()
 
@@ -216,7 +221,7 @@ struct ChillDrumGenerator {
                                   plan: SohoDrumPlan, breakdownStyle: ChillBreakdownStyle,
                                   rng: inout SeededRNG) -> [MIDIEvent] {
         let rule  = plan.ruleID
-        let latin = ["CHL-DRUM-009", "CHL-DRUM-010", "CHL-DRUM-011"].contains(rule)
+        let latin = isLatinRule(rule)
         let kick  = GMDrum.kick.rawValue
         let rim   = GMDrum.sidestick.rawValue   // the backbeat voice; a struck snare is too hard
         let snare = GMDrum.snare.rawValue       // fills only
@@ -240,11 +245,12 @@ struct ChillDrumGenerator {
             ? [GMDrum.clap.rawValue, GMDrum.tambourine.rawValue, GMDrum.sidestick.rawValue][
                 rng.weightedPick([0.45, 0.30, 0.25])]
             : GMDrum.clap.rawValue
-        let (shakerRests, shakerReturns) = sohoShakerRests(frame: frame, structure: structure, rng: &rng)
+        let turnarounds = ChillStructureGenerator.sohoTurnarounds(frame: frame, structure: structure)
+        let (shakerRests, shakerReturns) = sohoShakerRests(frame: frame, structure: structure,
+                                                           turns: turnarounds.bars, rng: &rng)
         // The last bar of each turnaround takes a fill back to the top — the shaker is already
         // resting there, so there is room for one.
-        let turnarounds = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
-        let turnaroundExit = turnarounds.filter { !turnarounds.contains($0 + 1) }
+        let turnaroundExit = Set(turnarounds.exits)
         // The way into the break answers the way out of it: the band stops after beat 2 and hits
         // beats 3 and 4 together, then a crash lands on the break's downbeat (Zack, 2026-10-11).
         // Bass and rhythm hit the same two steps, and CHL-TEXT-002's horns double them for free,
@@ -263,6 +269,19 @@ struct ChillDrumGenerator {
         var crashNextBar = false
         func hit(_ step: Int, _ note: UInt8, _ vel: UInt8, _ base: Int) {
             events.append(MIDIEvent(stepIndex: base + step, note: note, velocity: vel, durationSteps: 1))
+        }
+        /// Drops everything written since `mark` from step `step` of the bar on.
+        func trim(from mark: Int, base: Int, below step: Int) {
+            let kept = Array(events[mark...]).filter { $0.stepIndex - base < step }
+            events.removeSubrange(mark...)
+            events.append(contentsOf: kept)
+        }
+        /// The Latin flourish on beat 4: mute, open, open, low conga, with a cabasa on step 14.
+        func congaFlourish(_ base: Int, conga: Int, cabasa cabasaVel: Int) {
+            for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)] as [(Int, UInt8)] {
+                hit(step, note, rng.velocity(conga, 14), base)
+            }
+            hit(14, cabasa, rng.velocity(cabasaVel, 8), base)
         }
 
         for bar in 0..<frame.totalBars {
@@ -294,7 +313,7 @@ struct ChillDrumGenerator {
                 for step in 0..<16 { hit(step, shaker, step % 2 == 0 ? rng.velocity(42, 8) : rng.velocity(32, 7), base) }
                 if isLast {
                     if remixExitStabs {
-                        for step in [0, 8] {
+                        for step in ChillStructureGenerator.remixExitHitSteps {
                             hit(step, kick, rng.velocity(88, 10), base); hit(step, snare, rng.velocity(80, 10), base)
                             hit(step, crash, rng.velocity(84, 10), base)
                         }
@@ -345,10 +364,7 @@ struct ChillDrumGenerator {
                     }
                 }
                 if isLast {
-                    for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)] as [(Int, UInt8)] {
-                        hit(step, note, rng.velocity(66, 14), base)
-                    }
-                    hit(14, cabasa, rng.velocity(50, 8), base)
+                    congaFlourish(base, conga: 66, cabasa: 50)
                     crashNextBar = true
                 }
                 continue
@@ -457,9 +473,7 @@ struct ChillDrumGenerator {
                 if isLastIntro {
                     // Leave the last beat to the fill, then crash onto the groove. No Soho song
                     // marked that arrival at all, so the density simply trebled without warning.
-                    let kept = Array(events[mark...]).filter { $0.stepIndex - base < 12 }
-                    events.removeSubrange(mark...)
-                    events.append(contentsOf: kept)
+                    trim(from: mark, base: base, below: 12)
                     events += stopTimeFill(barStart: base, option: fillOpt,
                                            kick: kick, snare: snare, hat: hat, rng: &rng)
                     crashNextBar = true
@@ -551,10 +565,8 @@ struct ChillDrumGenerator {
                 // Everything from beat 3 on goes, so the stop is a real stop: `cut` alone does not
                 // do it, because a few rules place hits without consulting it (011's step-11 kick,
                 // the rim on 8).
-                let kept = Array(events[mark...]).filter { $0.stepIndex - base < 8 }
-                events.removeSubrange(mark...)
-                events.append(contentsOf: kept)
-                for step in [8, 12] {
+                trim(from: mark, base: base, below: 8)
+                for step in ChillStructureGenerator.remixEntryHitSteps {
                     hit(step, kick, rng.velocity(88, 10), base); hit(step, snare, rng.velocity(80, 10), base)
                     hit(step, crash, rng.velocity(84, 10), base)
                 }
@@ -568,7 +580,9 @@ struct ChillDrumGenerator {
             // A turnaround fill, unless this bar is already a section end with its own fill.
             // Not every time: at every turnaround it becomes part of the furniture.
             if turnaroundExit.contains(bar) && !isSectionEnd && rng.nextDouble() < 0.60 {
-                events.removeAll { $0.stepIndex >= base + 12 && $0.stepIndex < base + 16 }
+                // Only this bar's groove can reach beat 4: everything before `mark` is earlier
+                // bars, or this bar's downbeat crash.
+                trim(from: mark, base: base, below: 12)
                 if latin {
                     for (step, note) in [(12, muteConga), (13, openConga), (14, openConga), (15, hiBongo)] as [(Int, UInt8)] {
                         hit(step, note, rng.velocity(58, 14), base)
@@ -587,9 +601,7 @@ struct ChillDrumGenerator {
                 // bars). Otherwise the snare pickup. Either way a crash lands on the next downbeat,
                 // which is where CHL-TEXT-002's horn stabs read their accents from.
                 if latin && rng.nextDouble() < 0.5 {
-                    let flourish: [(Int, UInt8)] = [(12, muteConga), (13, openConga), (14, openConga), (15, lowConga)]
-                    for (step, note) in flourish { hit(step, note, rng.velocity(60, 14), base) }
-                    hit(14, cabasa, rng.velocity(48, 8), base)
+                    congaFlourish(base, conga: 60, cabasa: 48)
                 } else {
                     hit(13, snare, rng.velocity(54, 8), base); hit(14, snare, rng.velocity(62, 8), base); hit(15, snare, rng.velocity(70, 8), base)
                 }

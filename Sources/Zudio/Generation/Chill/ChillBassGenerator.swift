@@ -624,10 +624,10 @@ struct ChillBassGenerator {
 
     /// Chill Soho bass. See docs/chill-soho-plan.md, "Bass" and "Variation and space".
     ///
-    /// CHL-BASS-013 (Latin) and CHL-BASS-014 (Soul) share the scaffolding and differ in the bar.
-    /// Both EVOLVE every 12–18 bars rather than repeating one figure for the whole song: the
-    /// records repeat more than this, but they have a vocal carrying the listener and these
-    /// generations do not.
+    /// Every rule in both pools shares the scaffolding — cold edges, intro, breakdowns, the Remix
+    /// Break and the turnarounds — and differs only in the bar. All of them EVOLVE every 12–18
+    /// bars rather than repeating one figure for the whole song: the records repeat more than
+    /// this, but they have a vocal carrying the listener and these generations do not.
     ///
     /// Pitch assignment is not in the plan's measurements — they fixed rhythm, density and
     /// duration but not which step plays which note — so it is chosen here from the measured
@@ -677,29 +677,21 @@ struct ChillBassGenerator {
 
         let remixEntry = ChillStructureGenerator.remixEntryBars(structure: structure,
                                                                 breakdownStyle: breakdownStyle)
-        // The last bar of each four-bar turnaround — the bar that leads back to the top. Until
-        // now no track acknowledged a turnaround at all; the chords changed and the band played
-        // on regardless (Zack, 2026-10-12).
         // The last TWO bars of each turnaround, which the bass plays as a turnaround rather than
-        // as the groove over different chords. Two rather than four: a turnaround fires every 16
-        // bars in most songs, and four bars of broken groove would be a quarter of the song.
-        let turnarounds = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
-        let turnaroundExit = turnarounds.filter { !turnarounds.contains($0 + 1) }
-        let turnaroundTreated = Set(turnaroundExit.flatMap { [$0 - 1, $0] }).intersection(turnarounds)
-        // Each turnaround gets its own treatment, keyed by its position in the song.
-        let turnaroundStyles = Dictionary(uniqueKeysWithValues:
-            turnaroundExit.sorted().enumerated().map { i, exit in
-                (exit, ChillStructureGenerator.sohoTurnaroundStyle(frame: frame, structure: structure,
-                                                                  index: i))
-            })
-        let scalePCs = Set(scalePitchClasses(frame: frame))
+        // as the groove over different chords — until this, no track acknowledged a turnaround
+        // and the band played on regardless (Zack, 2026-10-12). Two rather than four: a
+        // turnaround fires every 16 bars in most songs, and four bars of broken groove would be
+        // a quarter of the song. Each turnaround gets its own treatment, keyed by its last bar.
+        let turnarounds = ChillStructureGenerator.sohoTurnarounds(frame: frame, structure: structure)
+        let turnaroundTreated = Set(turnarounds.exits.flatMap { [$0 - 1, $0] }).intersection(turnarounds.bars)
+        let scale    = scalePitchClasses(frame: frame)   // loop-invariant
+        let scalePCs = Set(scale)
         // Scale notes inside clampBass's 40–52 window. 014 and 015 walk this ladder and reflect at
         // the ends; folding by octave would turn a step into a ninth-wide jump.
         let ladder = (40...52).filter { scalePCs.contains($0 % 12) }
 
         var events: [MIDIEvent] = []
 
-        let scale = scalePitchClasses(frame: frame)   // loop-invariant
         for bar in 0..<frame.totalBars {
             let section   = structure.section(atBar: bar)
             let label     = section?.label ?? .A
@@ -723,7 +715,7 @@ struct ChillBassGenerator {
             // The bar leading into the Remix Break: the band stops after beat 2 and hits beats 3
             // and 4 in unison, answering the figure that leads out of the break.
             if remixEntry.contains(bar) {
-                for step in [8, 12] {
+                for step in ChillStructureGenerator.remixEntryHitSteps {
                     events.append(MIDIEvent(stepIndex: base + step, note: UInt8(root),
                                             velocity: rng.velocity(86, 8), durationSteps: 2))
                 }
@@ -739,7 +731,7 @@ struct ChillBassGenerator {
                 let low  = root - 12 >= 28 ? root - 12 : root
                 let high = low + 12
                 if bdBar == (section?.lengthBars ?? 12) - 1 {
-                    for step in [0, 8] {
+                    for step in ChillStructureGenerator.remixExitHitSteps {
                         events.append(MIDIEvent(stepIndex: base + step, note: UInt8(low), velocity: rng.velocity(86, 8), durationSteps: 2))
                     }
                     continue
@@ -788,7 +780,7 @@ struct ChillBassGenerator {
                     }
                     continue
                 }
-                // From the fourth layer, fall through to the song's own rule.
+                // From `figureFrom` on, fall through to the song's own rule.
             }
 
             let mark = events.count
@@ -823,10 +815,9 @@ struct ChillBassGenerator {
                 // right for Blues' minor chords but outside the scale over Soho's major bVII and
                 // the turnaround chords. Snap those two to the scale; the root, fifth and the
                 // deliberate chromatic approach on step 14 are left alone.
-                let scalePCSet = Set(scale)
                 events += cell.map { ev in
                     let pos = ev.stepIndex - base
-                    guard pos == 6 || pos == 12, !scalePCSet.contains(Int(ev.note) % 12) else { return ev }
+                    guard pos == 6 || pos == 12, !scalePCs.contains(Int(ev.note) % 12) else { return ev }
                     return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(snapToScale(Int(ev.note), scale: scale)),
                                      velocity: ev.velocity, durationSteps: ev.durationSteps)
                 }
@@ -848,12 +839,11 @@ struct ChillBassGenerator {
             }
 
             if turnaroundTreated.contains(bar) {
-                let isExit = turnaroundExit.contains(bar)
-                let turnaroundStyle = turnaroundStyles[isExit ? bar : bar + 1]
-                    ?? ChillStructureGenerator.sohoTurnaroundOriginal
+                let isExit = turnarounds.exits.contains(bar)
+                let treatment = turnarounds.treatments[isExit ? bar : bar + 1] ?? .original
                 // The original form leaves the bar as the rules wrote it: the groove rides
                 // straight through the chord detour.
-                if turnaroundStyle != ChillStructureGenerator.sohoTurnaroundOriginal {
+                if treatment != .original {
                     // Where the phrase restarts, two or one bars ahead depending which of the pair
                     // this is. The descending line aims at it across both bars.
                     let landingBar = isExit ? bar + 1 : bar + 2
@@ -861,23 +851,23 @@ struct ChillBassGenerator {
                         frame: frame,
                         chord: structure.chordWindow(atBar: landingBar)))
                     events.removeSubrange(mark...)
-                    // The figure's pedal roots, in bar order. Style 3 holds one note under all
-                    // four pairs, so it passes only the turnaround's first bar's root and does
-                    // not re-root when the chord changes; style 4 passes both bars' roots and
-                    // does. Both are listed so the line can be positioned clear of either.
+                    // The figure's pedal roots, in bar order. Root pedal descent holds one note
+                    // under all four pairs, so it passes only the turnaround's first bar's root
+                    // and does not re-root when the chord changes; pedal descent passes both
+                    // bars' roots and does.
                     let firstBar = isExit ? bar - 1 : bar
                     func rootOf(_ b: Int) -> Int {
                         chordRootNote(frame: frame,
                                       chord: structure.chordWindow(atBar: b))
                     }
                     let pedalRoots: [Int]
-                    switch turnaroundStyle {
-                    case 3:  pedalRoots = [rootOf(firstBar)]
-                    case 4:  pedalRoots = [rootOf(firstBar), rootOf(firstBar + 1)]
-                    default: pedalRoots = []
+                    switch treatment {
+                    case .rootPedalDescent: pedalRoots = [rootOf(firstBar)]
+                    case .pedalDescent:     pedalRoots = [rootOf(firstBar), rootOf(firstBar + 1)]
+                    default:                pedalRoots = []
                     }
                     events += turnaroundBassBar(base: base, root: root, nextRoot: nextRoot,
-                                                landing: landing, style: turnaroundStyle,
+                                                landing: landing, treatment: treatment,
                                                 isExit: isExit, ladder: ladder,
                                                 pedalRoots: pedalRoots, rng: &rng)
                 }
@@ -886,8 +876,9 @@ struct ChillBassGenerator {
         return events
     }
 
-    /// How the bass plays a turnaround. Three treatments, one per song, each covering the
-    /// turnaround's last two bars.
+    /// How the bass plays a turnaround. Five treatments, two or three per song (see
+    /// `ChillStructureGenerator.sohoTurnaroundPalette`), each covering the turnaround's last two
+    /// bars; a sixth, the original form, leaves the groove alone and never reaches here.
     ///
     /// The first version of this re-pitched the bar the rule had already written, keeping its
     /// rhythm and velocities. It was faithful to the groove and that was the problem: three
@@ -901,8 +892,11 @@ struct ChillBassGenerator {
     ///   next chord. *Sparser* than the groove, so the turnaround reads as a clearing
     /// - **2 descending line** — one scalar descent across both bars, two notes a bar, arriving a
     ///   step above the chord the phrase restarts on
+    /// - **3 root pedal descent** — the same line over one root held through the chord change
+    /// - **4 pedal descent** — the same line over each bar's own root, re-rooting mid-figure
     private static func turnaroundBassBar(base: Int, root: Int, nextRoot: Int, landing: Int,
-                                          style: Int, isExit: Bool, ladder: [Int],
+                                          treatment: ChillStructureGenerator.SohoTurnaroundTreatment,
+                                          isExit: Bool, ladder: [Int],
                                           pedalRoots: [Int], rng: inout SeededRNG) -> [MIDIEvent] {
         guard !ladder.isEmpty else {
             return [MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 80, durationSteps: 4)]
@@ -915,23 +909,21 @@ struct ChillBassGenerator {
         }
         /// A semitone into the target, from below where the register allows.
         func leadingTone(into target: Int) -> Int { target - 1 >= 33 ? target - 1 : target + 1 }
+        /// The ladder note at `i`, clamped to its ends.
+        func at(_ i: Int) -> Int { ladder[Swift.max(0, Swift.min(ladder.count - 1, i))] }
 
-        switch style {
-        case 1:
-            // Root and approach.
+        switch treatment {
+        case .rootAndApproach:
             var out = [note(0, root, rng.velocity(84, 8), 12)]
-            let approach = isExit ? leadingTone(into: nextRoot)
-                                  : ladder[Swift.max(0, Swift.min(ladder.count - 1, index(nextRoot) - 1))]
+            let approach = isExit ? leadingTone(into: nextRoot) : at(index(nextRoot) - 1)
             out.append(note(13, root, rng.velocity(62, 8), 1))
             out.append(note(14, approach, rng.velocity(74, 10), 2))
             return out
 
-        case 2, 3, 4:
+        case .descending, .rootPedalDescent, .pedalDescent:
             // Descending line, aimed at the landing across both bars: the four notes sit at
-            // landing+4, +3 (first bar) and +2, +1 (second), by scale step.
-            //   2 descending          — the line alone
-            //   3 root pedal descent  — one root under all four pairs, held through the chord change
-            //   4 pedal descent       — the bar's own root, so the pedal re-roots mid-figure
+            // landing+4, +3 (first bar) and +2, +1 (second), by scale step. The two pedal forms
+            // add a root under each pair (see the doc above).
             var base0 = index(landing)
             // Where the landing sits near the top of the 40–52 window there is no room for four
             // steps above it, and clamping each step to the top of the ladder repeated one note
@@ -952,13 +944,11 @@ struct ChillBassGenerator {
             // the chord the phrase restarts on, and lifting the line pushed it away. Clashes are
             // handled in the figure below, by dropping the offending pedal instead.
 
-            // Style 3 passes one root and uses it in both bars; style 4 passes both.
+            // Root pedal descent passes one root and uses it in both bars; pedal descent passes both.
             let pedalNote = pedalNotes.isEmpty ? 0 : pedalNotes[isExit ? pedalNotes.count - 1 : 0]
             // All four of the figure's line notes, highest first, so each bar can see the note
             // the previous bar left on. The exit bar plays the last two.
-            let lineAll = (1...4).reversed().map {
-                ladder[Swift.max(0, Swift.min(ladder.count - 1, base0 + $0))]
-            }
+            let lineAll = (1...4).reversed().map { at(base0 + $0) }
             return zip([0, 8], isExit ? [2, 3] : [0, 1]).flatMap { step, k -> [MIDIEvent] in
                 let line = lineAll[k]
                 let vel = rng.velocity(step == 0 ? 80 : 72, 9)
@@ -980,11 +970,11 @@ struct ChillBassGenerator {
                         note(step + 2, line, vel, 6)]
             }
 
-        default:
+        case .walkingQuarters, .original:
             // Walking quarters: root, two steps toward the next chord, chromatic leading tone.
+            // The original form never reaches here; it shares the default branch it always had.
             let lead = leadingTone(into: nextRoot)
             let a = index(root), b = index(lead)
-            func at(_ i: Int) -> Int { ladder[Swift.max(0, Swift.min(ladder.count - 1, i))] }
             let mid1: Int, mid2: Int
             if abs(b - a) >= 3 {
                 // Far enough to walk straight there.

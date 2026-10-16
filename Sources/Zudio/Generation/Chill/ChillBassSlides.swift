@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Zack Urlocker
 //
 // A slide is a pitch-bend gesture laid over a note that is already in the bass track: the note
-// starts one or two semitones flat and glides up to pitch. Nothing in the notes changes, so the
+// starts a half or whole step away and glides to pitch — up from below when the line rises into
+// it, down from above when it falls (Blues slides only up). Nothing in the notes changes, so the
 // MIDI lane, the fingerprints and every saved song are exactly as they were; playback and export
 // both read the slides from this pure function of the finished song.
 //
@@ -11,12 +12,13 @@
 // over one to two sixteenths — a slide on one string, which is all a bass player can do between
 // two notes. How often varies widely: Holding Back the Years' fretless about one per 8 bars,
 // always on the same note of its figure; Black Cow 1.3 per 8 bars, also tied to the riff; Smooth
-// Operator twice in 144 bars; Your Love Is King once in 86.
+// Operator twice in 144 bars; Your Love Is King once in 86. The slide down from above is Zudio's
+// own: sliding up into a note the line falls to read as a bend (Zack, 2026-10-15).
 //
 // Scope, for the first listen (Zack, 2026-10-15): Chill Soho songs on CHL-BASS-014 Best Melodic
 // Bass, the fretless rule, and the root that lands after each of their turnarounds; and Chill
-// Blues songs on CHL-BASS-009, the B.B. King pickup riff, into the IV and V. Independent of the
-// instrument — any bass can slide.
+// Blues songs on CHL-BASS-009, the B.B. King pickup riff, into the root at the top of every form
+// (see below for why not the IV and V). Independent of the instrument — any bass can slide.
 
 import Foundation
 
@@ -90,8 +92,8 @@ enum ChillBassSlides {
         }
 
         // The root after each turnaround slides in half the time, so the return is audible.
-        let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: state.frame, structure: state.structure)
-        let landings = Set(turns.filter { !turns.contains($0 + 1) }.map { ($0 + 1) * 16 })
+        let landings = Set(ChillStructureGenerator.sohoTurnarounds(frame: state.frame, structure: state.structure)
+                               .exits.map { ($0 + 1) * 16 })
         // Slides stay at least four bars apart: two in neighbouring bars read as a habit, not a
         // gesture (Zack, 2026-10-15). Landings are placed first and take priority.
         func clear(_ bar: Int) -> Bool { !slides.keys.contains { abs($0 / 16 - bar) < 4 } }

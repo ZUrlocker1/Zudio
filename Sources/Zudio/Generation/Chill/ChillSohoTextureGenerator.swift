@@ -7,8 +7,8 @@
 //   CHL-TEXT-001 Sustained Halo     — a handful of long, high notes across the whole song
 //   CHL-TEXT-002 Punctuation Stabs  — short chord stabs on the section boundaries
 //
-// Whichever rule is running, the horns also answer the harmonic-drone and groove-pocket
-// breakdowns: neither has a voice of its own, and the silence there made both sound like base
+// Whichever rule is running, the horns also answer the harmonic-drone, groove-pocket and Duo
+// breakdowns: none has a voice of its own, and the silence there made them sound like base
 // Chill's. See breakdownAnswer.
 //
 // Both were measured from the parts in the corpus that fire rarely and are remembered anyway:
@@ -37,11 +37,11 @@ struct ChillSohoTextureGenerator {
         var events = useStabs
             ? punctuationStabs(frame: frame, structure: structure, crashes: crashes,
                                voicing: voicing, rng: &rng)
-            : sustainedHalo(frame: frame, structure: structure, crashes: crashes,
-                            breakdownStyle: breakdownStyle, rng: &rng)
-        // The horns answer a harmonic drone whichever rule is running. Without them the drone is
-        // the one Soho break with no voice at all — bass and pads hold, drums tick, and the rhythm
-        // part and both leads are out — which is why it sounded like base Chill (Zack, 2026-10-11).
+            : sustainedHalo(frame: frame, structure: structure, crashes: crashes, rng: &rng)
+        // The horns answer a harmonic drone, a groove pocket or a Duo whichever rule is running.
+        // Without them the drone is the one Soho break with no voice at all — bass and pads hold,
+        // drums tick, and the rhythm part and both leads are out — which is why it sounded like
+        // base Chill (Zack, 2026-10-11).
         if [.harmonicDrone, .groovePocket, .sohoDuo].contains(breakdownStyle) {
             events += breakdownAnswer(structure: structure, style: breakdownStyle,
                                       taken: Set(events.map(\.stepIndex)), rng: &rng)
@@ -72,9 +72,8 @@ struct ChillSohoTextureGenerator {
     private static func turnaroundStabs(frame: GlobalMusicalFrame, structure: SongStructure,
                                         taken: Set<Int>, voicing: StabVoicing,
                                         rng: inout SeededRNG) -> [MIDIEvent] {
-        let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
         var events: [MIDIEvent] = []
-        for bar in turns.sorted() where !turns.contains(bar - 1) {
+        for bar in ChillStructureGenerator.sohoTurnarounds(frame: frame, structure: structure).starts {
             // Never struck on a step the stabs or the halo already sound on: two figures at one
             // instant with different lengths is the staggered chord this track avoids.
             guard !taken.contains(bar * 16) else { continue }
@@ -112,11 +111,10 @@ struct ChillSohoTextureGenerator {
     /// - **Groove pocket**: nothing until the last three bars, then a rising figure — one hit,
     ///   two, then three — doubling the escalation the rhythm part already plays there, so the
     ///   section winds up into the groove instead of merely stopping
-    ///
     /// - **Duo**: a soft held two-note chord every four bars from the third, and a stab with the
     ///   snare pickup on the last bar's fourth beat
     ///
-    /// Designed rather than measured: no reference song has a section of either kind to measure.
+    /// Designed rather than measured: no reference song has a section of any of these kinds.
     private static func breakdownAnswer(structure: SongStructure, style: ChillBreakdownStyle,
                                         taken: Set<Int>, rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
@@ -244,18 +242,17 @@ struct ChillSohoTextureGenerator {
 
     // MARK: - Shared
 
-    /// Bars whose downbeat carries a crash in the drum track: the return from a section-end
-    /// fill, the return from a breakdown, and the cold-stop final hit.
+    /// Where the kit crashes, read once from the finished drum track: the return from a
+    /// section-end fill, the return from a breakdown, and the cold-stop final hit.
+    ///
+    /// `steps` is every step carrying a crash — including the Remix Break exit, whose unison
+    /// stabs fall on steps 0 AND 8 of its last bar — and `bars` is the bars whose downbeat
+    /// carries one. Both exclude step 0 of the song.
     ///
     /// Read from the generated drums rather than recomputed, so the stabs land with the kit by
     /// construction — two independent random streams never have to agree. The plan proposed a
     /// shared `sohoAccentSteps(forBar:)` helper for this; reading the drum track is stricter,
     /// because the two can never drift apart.
-    /// Where the kit crashes, read once from the finished drum track.
-    ///
-    /// `steps` is every step carrying a crash — including the Remix Break exit, whose unison
-    /// stabs fall on steps 0 AND 8 of its last bar — and `bars` is the bars whose downbeat
-    /// carries one. Both exclude step 0 of the song.
     ///
     /// Built in a single pass and handed to the rules, which previously each re-scanned the
     /// whole drum track: up to three scans of a median 1,601 drum events per song (2026-10-14).
@@ -408,7 +405,7 @@ struct ChillSohoTextureGenerator {
     /// Placed where an arrangement would reach for colour: the start of each groove section,
     /// the breakdown, and the returns marked by the drum crashes.
     private static func sustainedHalo(frame: GlobalMusicalFrame, structure: SongStructure,
-                                      crashes: CrashPoints, breakdownStyle: ChillBreakdownStyle,
+                                      crashes: CrashPoints,
                                       rng: inout SeededRNG) -> [MIDIEvent] {
         var candidates = Set<Int>(crashes.bars)
         for section in structure.sections {

@@ -240,30 +240,36 @@ struct ChillRhythmGenerator {
         .bosaMoonArpeggiated, .acidJazzStab, .chordHold, .downbeatPulse]
     private static let allBluesCompingModes: [CompingMode] = [.mobyBackbeat, .stGermainSyncopated,
         .chordHold, .downbeatPulse]
-    private static let allSohoLatinModes: [CompingMode] = [.chordalComp, .rootAndChordEighths, .singleNoteLine]
-    private static let allSohoSoulModes:  [CompingMode] = [.chordalComp, .singleNoteLine,
-        .chordHold, .downbeatPulse, .rootAndChordEighths]
+    private static let allSohoLatinModes = sohoLatinModes.map(\.mode)
+    private static let allSohoSoulModes  = sohoSoulModes.map(\.mode)
 
     /// Chill Soho, Latin pool: CHL-RHY-007 40%, CHL-RHY-009 30%, CHL-RHY-008 30%.
-    /// Levelled from 45/30/25 at Zack's call (2026-10-15).
-    private static func pickSohoLatinCompingMode(rng: inout SeededRNG) -> CompingMode {
-        let roll = rng.nextDouble()
-        if roll < 0.40 { return .chordalComp }
-        if roll < 0.70 { return .rootAndChordEighths }
-        return .singleNoteLine
-    }
+    /// Levelled from 45/30/25 at Zack's call (2026-10-15). Cumulative thresholds; the last
+    /// entry takes whatever the others leave.
+    private static let sohoLatinModes: [(mode: CompingMode, below: Double)] =
+        [(.chordalComp, 0.40), (.rootAndChordEighths, 0.70), (.singleNoteLine, 1.0)]
 
     /// Chill Soho, Soul pool: CHL-RHY-007 25%, CHL-RHY-008 25%, the reused Chord Hold and
     /// Downbeat Pulse at 15% each, and CHL-RHY-009 at 20%. 009 was 10% (both EBTG sources are
     /// non-Latin) and was raised at Zack's call (2026-10-15), from 007 and 008 equally.
     /// Bosa Moon (not a bossa) and the Moby backbeat stay excluded.
-    private static func pickSohoSoulCompingMode(rng: inout SeededRNG) -> CompingMode {
+    private static let sohoSoulModes: [(mode: CompingMode, below: Double)] =
+        [(.chordalComp, 0.25), (.singleNoteLine, 0.50), (.chordHold, 0.65),
+         (.downbeatPulse, 0.80), (.rootAndChordEighths, 1.0)]
+
+    /// One roll against a cumulative threshold table.
+    private static func pickSohoCompingMode(_ table: [(mode: CompingMode, below: Double)],
+                                            rng: inout SeededRNG) -> CompingMode {
         let roll = rng.nextDouble()
-        if roll < 0.25 { return .chordalComp }
-        if roll < 0.50 { return .singleNoteLine }
-        if roll < 0.65 { return .chordHold }
-        if roll < 0.80 { return .downbeatPulse }
-        return .rootAndChordEighths
+        return table.dropLast().first { roll < $0.below }?.mode ?? table[table.count - 1].mode
+    }
+
+    private static func pickSohoLatinCompingMode(rng: inout SeededRNG) -> CompingMode {
+        pickSohoCompingMode(sohoLatinModes, rng: &rng)
+    }
+
+    private static func pickSohoSoulCompingMode(rng: inout SeededRNG) -> CompingMode {
+        pickSohoCompingMode(sohoSoulModes, rng: &rng)
     }
 
     /// Weights (2026 flattening): this pool used to have separate weight tables for Deep/Dream
@@ -418,7 +424,7 @@ struct ChillRhythmGenerator {
                     // unison hits on 0 and 8.
                     let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
                     let isLast  = breakdownBar == sectionLen - 1
-                    for step in (isLast ? [0, 8] : [2, 6, 10, 14]) {
+                    for step in (isLast ? ChillStructureGenerator.remixExitHitSteps : [2, 6, 10, 14]) {
                         let vel = UInt8((isLast ? 70 : 48) + rng.nextInt(upperBound: 12))
                         for note in voicing {
                             events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
@@ -487,7 +493,7 @@ struct ChillRhythmGenerator {
                 let chord   = structure.chordWindow(atBar: bar)
                 let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
                 let base    = bar * 16
-                for step in [8, 12] {
+                for step in ChillStructureGenerator.remixEntryHitSteps {
                     let vel = UInt8(76 + rng.nextInt(upperBound: 12))
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),

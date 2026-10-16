@@ -3306,20 +3306,15 @@ struct SongGenerator {
         // only breaks from it over the last two. Marking the chord change read two bars early
         // against the ear (Zack, 2026-10-12). This mirrors ChillBassGenerator's turnaroundTreated.
         if sohoVariation {
-            let turns = ChillStructureGenerator.sohoTurnaroundBars(frame: frame, structure: structure)
-            let exits = turns.filter { !turns.contains($0 + 1) }.sorted()
-            for (i, exit) in exits.enumerated() {
-                let style = ChillStructureGenerator.sohoTurnaroundStyle(frame: frame,
-                                                                        structure: structure,
-                                                                        index: i)
-                let name = ChillStructureGenerator.sohoTurnaroundStyleName(style)
+            let turns = ChillStructureGenerator.sohoTurnarounds(frame: frame, structure: structure)
+            for exit in turns.exits {
+                let treatment = turns.treatments[exit] ?? .original
                 // A treated turnaround is heard where the bass breaks its groove, over the last
                 // two bars. An original-form one has no bass figure to hear, so it is marked
                 // where its chords turn — the only cue there is.
-                let detour = turns.filter { $0 <= exit && !turns.contains($0 - 1) }.max() ?? exit
-                let bar = style == ChillStructureGenerator.sohoTurnaroundOriginal
-                    ? detour : max(detour, exit - 1)
-                fireBar(bar, tag: "Turnaround", desc: name)
+                let detour = turns.starts.filter { $0 <= exit }.max() ?? exit
+                let bar = treatment == .original ? detour : max(detour, exit - 1)
+                fireBar(bar, tag: "Turnaround", desc: treatment.name)
             }
         } else if bluesVariation {
             // The 16-bar blues cycle turns around on its V7, at cycle bar 12.
