@@ -10,9 +10,9 @@
 //
 // Pass B — Register separation (Lead 1, Lead 2 above Pads):
 //   Per 8-bar window, if the Lead median pitch sits within 4 semitones of the
-//   Pad median, Lead notes below the Pad median are transposed up one octave,
-//   clamped to the track's registered bounds. Keeps Leads audible above the
-//   harmonic bed without silencing them.
+//   Pad median, Lead figures that dip below the Pad median are transposed up one
+//   octave whole, if the whole figure fits the track's registered bounds. Keeps
+//   Leads audible above the harmonic bed without silencing them.
 //
 // Pass C — Velocity arc shaping (Lead 1, Lead 2, Pads, Rhythm, Texture):
 //   A song-wide dynamic arc multiplier is applied: intro 0.75×, body opening
@@ -142,19 +142,37 @@ struct HarmonicFilter {
             : pitches[mid]
     }
 
-    /// Transposes Lead notes that sit below `padMedian` up one octave, within bounds.
+    /// Transposes Lead figures that dip below `padMedian` up one octave, within bounds. A figure
+    /// is a run of notes with less than a bar's gap between them — a phrase, or an Avalon Hook
+    /// episode of call and answer — and it moves whole or not at all. Moving single notes split figures across octaves: C5 B♭4 B♭4 became C5 B♭5
+    /// B♭5, a step down turned into a seventh up, in 10 of Late Americano's 30 figures (Zack,
+    /// 2026-10-16).
     private static func pushLeadAbovePads(
         _ events: [MIDIEvent], startStep: Int, endStep: Int,
         padMedian: Double, bounds: RegisterBounds
     ) -> [MIDIEvent] {
-        events.map { ev in
-            guard ev.stepIndex >= startStep && ev.stepIndex < endStep else { return ev }
-            guard Double(ev.note) < padMedian else { return ev }
-            let transposed = Int(ev.note) + 12
-            guard transposed <= bounds.high else { return ev }
-            return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(transposed),
-                             velocity: ev.velocity, durationSteps: ev.durationSteps)
+        let inWindow = events.indices.filter { events[$0].stepIndex >= startStep && events[$0].stepIndex < endStep }
+            .sorted { events[$0].stepIndex < events[$1].stepIndex }
+        var figures: [[Int]] = []
+        for i in inWindow {
+            if let prev = figures.last?.last,
+               events[i].stepIndex - (events[prev].stepIndex + events[prev].durationSteps) < 16 {
+                figures[figures.count - 1].append(i)
+            } else {
+                figures.append([i])
+            }
         }
+        var out = events
+        for figure in figures {
+            guard figure.contains(where: { Double(events[$0].note) < padMedian }),
+                  figure.allSatisfy({ Int(events[$0].note) + 12 <= bounds.high }) else { continue }
+            for i in figure {
+                let ev = events[i]
+                out[i] = MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(Int(ev.note) + 12),
+                                   velocity: ev.velocity, durationSteps: ev.durationSteps)
+            }
+        }
+        return out
     }
 
     // MARK: - Pass C: Velocity Arc

@@ -425,6 +425,20 @@ and tones such as `[+3, +2, +2]`, neighbour-tone turns, descending answers — w
 cell boundaries, since leaps of a fourth or more are 17–20% of measured intervals. Phrase start
 offsets and rest lengths vary per phrase.
 
+The first phrase is the song's hook. It returns in about 35% of later phrases, never within six
+bars of its last statement — seven to nine recognisable statements in a 110-bar song. Half the
+returns are the hook itself: its rhythm, its place in the bar, its first pitch when that is in the
+chord. The other half are one change from it, weighted as the corpus vocals vary a returning
+figure — a note added 40%, dropped 28%, the rhythm moved 19%, a pitch moved a scale step 13% —
+and a quarter of those start on another chord tone. A phrase the scale snap brings back to its
+first pitch has its last note moved a step on.
+
+The rule's cell and opening-rhythm picks pass raw counts to `weightedPick`, so every phrase is
+built from `[0, 0, -2]` turned to follow the contour and opens on three eighths and a quarter.
+This is deliberate: the shared opening turn and repeated notes are what tie the fresh phrases to
+the hook and make the line sound like one song. With the bank properly weighted the line wandered,
+and the hook stopped standing out (Zack, by ear, 2026-10-16). See `counterLinePhrase`.
+
 **`011` Sustained tone** — *More Than This*, whose sax plays 13 notes in a whole song. Each phrase
 is a short figure with one held note of 1–2.5 bars (weighted 22/32/28/18), the held note last
 65% of the time and first 35%. Measured from every corpus phrase holding three beats or more,
@@ -448,6 +462,17 @@ applied to all its hooks, giving fifteen song characters:
 About one figure in seven runs on with 2–3 extra notes, and a figure may end on a held chord tone
 of a half, dotted half or whole bar (55% at phrase ends, 25% mid-phrase), ringing through a chord
 change only on a common tone. The log reads, for example, `Avalon displace lengthen`.
+
+Hooks come home. A mutation — one hook at a time, every 24–32 bars — is a variation on that
+hook's original form: it plays for one or two episodes, then the original returns. The last
+episode that can start leads with the opening hook in its original form, as Avalon and most of
+the corpus end on their first figure.
+
+Each episode starts on one of the chord tones nearest its section's home — a third of the way up
+the range in the A section, a third or a fifth higher in B — kept far enough from the edges for
+the hooks' reach, and every statement in the episode anchors near it, so a call and its answer
+start together. On a displaced song, half the statements land an eighth either side of the song's
+offset. The cell bank and opening rhythms are weighted properly here, unlike `010`.
 
 **Reused:** `004` Blues lead and `001` Long phrase run base Chill's code, then take Soho's rest
 windows, stretch cap and Remix pickup. St Germain staccato (`005`) never plays here.
@@ -548,11 +573,12 @@ Chill's and Blues's is audio files.
 - **Drums** — Brush Kit and Jazz Drums, 50/50. Never the 808
 - **Bass** — Fretless 37.5%, Acoustic 37.5%, Elec Bass 25%. Fretless is the sound of the genre.
   Elec Bass takes the Low effect and plays at engine volume 0.40
-- **Rhythm** — Rhodes, Stereo Piano, Nylon Guitar, Jazz Guitar and Funk Guitar, 20% each. Guitar
+- **Rhythm** — Rhodes, Stereo Piano, Nylon Guitar, Jazz Guitar and Funk Guitar, 20% each. Stereo
+  Piano plays through a 1.4× rhythm boost in every Chill form (it was 2.0, too loud). Guitar
   is the corpus's dominant comping voice (Jazz Guitar in 8 of the 14 records, Clean Guitar in 7).
   Every guitar plays with a 4 Hz, 0.32-depth amp tremolo on by default, not the organ's Leslie;
   so does the Rhodes in Soho (2026-10-15), and any Rhodes with tremolo on uses that setting.
-  Jazz Guitar is lifted with CC7 127 and a 1.5× rhythm boost. Jazz and Funk Guitar were copied
+  Jazz Guitar is lifted with CC7 127 and a 1.5× rhythm boost; Funk Guitar is trimmed to CC7 80. Jazz and Funk Guitar were copied
   into `Zudio.sf2` from GeneralUser GS 2.0.3 with `tools/sf2_copy_presets.py`
 - **Lead 1** — Tenor Sax 25%, Alto Sax 25%, Flute 24%, Soprano Sax 13%, Recorder 13%. Tenor is in
   6 corpus files, alto and flute in 4 each, the flute standing in for the singer. Chosen in
@@ -591,28 +617,35 @@ tone is light, continuing base Chill's wry register.
   `ChillLeadGenerator` (Lead 2, registers), `ChillPadsGenerator`, `ChillSohoTextureGenerator`,
   `ChillTitleGenerator`, `SongGenerator` (chord plan, breakdown choice, groove fixup, rule
   names), `AppState` (pools, odds, sanitiser, effect defaults)
-- **Nothing in Motorik, Kosmic or Ambient changes**, and base Chill and Blues reproduce their
-  songs, apart from the two deliberate all-Chill changes: the groove fixup and Shadow Hold's
-  companion note
+- **Nothing else in Motorik, Kosmic or Ambient changes** beyond the harmonic filter's whole-figure
+  lift, and base Chill and Blues reproduce their songs apart from the deliberate all-Chill
+  changes: the groove fixup, Shadow Hold's companion note and the quieter Stereo Piano
 - **Log:** the Chords line gives key, mode and A cycle (`Ab Aeolian Im7 – Vm7`); the Form line
   groove, sections and breakdown (`Soul groove - A/B - bass ostinato 4`); turnarounds are marked
   `Turnaround` with the treatment (`walking quarters`) on the bar the bass treatment plays; one Groove fixup row
+- **Weighted picks:** `SeededRNG.weightedPick` expects weights that sum to 1. Picks over raw
+  corpus counts go through `weightedIndex`, which normalises them; the one deliberate exception
+  is Counter-Line (see `010`)
+- **Harmonic filter (all styles):** when a lead sits within four semitones of the pads, Pass B
+  lifts a figure an octave whole — notes less than a bar apart — if any of it dips below the
+  pads' median and all of it fits the register, so a figure never splits across octaves
+- **Instruments on replay:** a song is written to the persisted history only after its
+  instruments are final, and replaying one re-pins the Chill leads to what the generator chose
 
 ---
 
-## Open items — for 2026-10-16
+## Open items
 
 - **Behind-the-beat feel.** Nothing in Chill shifts notes off the grid; everything lands exactly
   on its sixteenth. The Sade and Style Council sound depends on the rim and bass sitting a few
   milliseconds late with the hats on time. Proposal: a small per-track delay for Soho only — rim and
-  snare +10–20 ms, bass +5–10 ms — which adds "relaxed" without changing a note. Likely the biggest
-  single improvement to the sound
-- **A returning melody.** Only Avalon (`012`) repeats its figures; the other Lead 1 rules write new
-  phrases throughout. The records are memorable because the vocal hook returns at the same point in
-  each cycle. Proposal: draw a 2–4 bar melody once per song and bring it back near the start of each
-  16-bar phrase with small changes, Lead 1 playing freely around it. The biggest musical gap
-- Also floated, not yet taken up: a two-peak tempo draw (the corpus clusters at 80–88 and 121–130,
-  but Soho's tempo peaks at 100, in the gap) and a Soho-specific ending
+  snare +10–20 ms, bass +5–10 ms — which adds "relaxed" without changing a note
+- **A Soho-specific ending**, floated, not taken up
+- **Replay without the forced substyle.** Regenerating a saved song from history does not pass
+  whether Soho or Blues was forced, so a forced song can come back as another form
+- **Motorik base rhythm weights** sum to 1.02 — a negligible bias toward the earlier patterns
+- **Fingerprint baseline** needs re-pinning: every Soho song, and the songs in every style whose
+  leads the harmonic filter now lifts whole, differ from it deliberately
 
 ## Verification
 

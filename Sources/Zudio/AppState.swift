@@ -763,6 +763,8 @@ final class AppState: ObservableObject {
             // Chill audition guitar (Zack, 2026-10-15): Jazz sat under the rest of the rhythm
             // pool. 127 is the CC7 ceiling; the rest of its lift is PlaybackEngine's rhythm boost.
             case (kTrackRhythm,  .chill,   "Jazz Guitar"):   return 127
+            // Funk Guitar sat on top of the rest of the band (Zack, 2026-10-15). 80 is about 4 dB down.
+            case (kTrackRhythm,  .chill,   "Funk Guitar"):   return 80
             // Bowed Glass is a soft patch and sat under the rest of the Chill pad pool. 115 was
             // still too quiet, so it now takes the CC7 ceiling (Zack, 2026-10-13). Nothing more
             // is available through channel volume; a further lift would need
@@ -1421,7 +1423,6 @@ final class AppState: ObservableObject {
                 self.songState    = state
                 self.generationHistory.append(state)
                 if self.generationHistory.count > Self.kPersistedHistoryMax { self.generationHistory.removeFirst() }
-                self.appendPersistedSong(from: state)
                 self.isGenerating = false
                 self.visibleBarOffset = 0
                 self.lastEmittedStep  = -1
@@ -1460,6 +1461,10 @@ final class AppState: ObservableObject {
                 // Snapshot the final overrides — resetEffectsToDefaults() restores from here.
                 self.songInstrumentOverrides = self.instrumentOverrides
                 self.sessionInstrumentOverrides[state.globalSeed] = self.instrumentOverrides
+                // Persisted only now that the instruments are final. Saved before them, the entry
+                // carried the previous song's instruments, and a song replayed from the Songs list
+                // after a relaunch played Lead 1 on that song's sax (Zack, 2026-10-16).
+                self.appendPersistedSong(from: state)
                 self.saveLastUsedInstruments(style: style)
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
@@ -3271,7 +3276,6 @@ final class AppState: ObservableObject {
                 if !loadTitle.isEmpty { state.title = loadTitle }
                 self.songState        = state
                 self.savedSongSeed    = state.globalSeed  // loaded from file → mark as saved
-                self.appendPersistedSong(from: state)
                 self.generationHistory.append(state)
                 if self.generationHistory.count > Self.kPersistedHistoryMax { self.generationHistory.removeFirst() }
                 self.isGenerating     = false
@@ -3286,6 +3290,7 @@ final class AppState: ObservableObject {
                     let prog = Self.ambientAudioProgram(forFilename: audioTex)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
                 }
+                self.appendPersistedSong(from: state)   // after the instruments, as in generateNew
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
                 self.muteState = Array(repeating: false, count: kTrackCount)
@@ -3993,6 +3998,10 @@ final class AppState: ObservableObject {
                     isTitle: false)])
             }
         }
+        // Chill's leads are chosen by the generator, and their phrasing is written for that
+        // instrument: pin the patch to it, whatever the history saved. Entries persisted before
+        // 2026-10-16 hold the previous song's Lead 1, usually a sax.
+        syncGeneratedInstruments(for: state)
         songInstrumentOverrides = instrumentOverrides
         applyAmbientPianoInstrument(for: state)
         restoreLead2Mirror()
@@ -4089,6 +4098,7 @@ final class AppState: ObservableObject {
                     let prog = Self.ambientAudioProgram(forFilename: audioTex)
                     self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
                 }
+                self.syncGeneratedInstruments(for: state)   // see loadFromGenerationHistory
                 self.songInstrumentOverrides = self.instrumentOverrides
                 self.applyAmbientPianoInstrument(for: state)
                 self.restoreLead2Mirror()

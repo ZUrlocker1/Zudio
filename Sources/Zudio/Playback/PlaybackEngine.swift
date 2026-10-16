@@ -1293,7 +1293,9 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm {
                 // Stereo Piano needs boost. Jazz Guitar sat under the rest of the Chill rhythm pool
                 // even at CC7 127 (Zack, 2026-10-15); 1.5 is about +3.5 dB. All others unity.
-                let mult: Float = program == 61001 ? 2.0
+                // Stereo Piano cut from 2.0 to 1.4 (about -3 dB) on 2026-10-15 (Zack): too loud
+                // in Chill. Applies to every Chill form — there was no per-substyle level.
+                let mult: Float = program == 61001 ? 1.4
                                 : (program == 26 && chillPadsMode) ? 1.5 : 1.0
                 boostBaseMultiplier[kTrackRhythm] = mult
                 boosts[kTrackRhythm].outputVolume = mult * (boostEffectEnabled[kTrackRhythm] ? 1.7 : 1.0)

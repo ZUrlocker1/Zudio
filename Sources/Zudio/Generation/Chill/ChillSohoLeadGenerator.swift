@@ -16,8 +16,8 @@
 //
 // The records repeat more than Zudio should — they have a vocal, lyrics and a radio form to carry
 // the listener. So the parts are measured from the records but vary on Zudio's own schedule:
-// rest windows (one per ~22 bars, 4–8 bars each), no unbroken stretch over 14–16 bars, and the
-// remembered phrase mutates every 8–12 bars.
+// rest windows (one per ~22 bars, 4–8 bars each), no unbroken stretch over 14–16 bars, and a
+// hook that returns, exactly or with one change, rather than on every phrase.
 
 import Foundation
 
@@ -42,10 +42,6 @@ extension ChillLeadGenerator {
     private static let saxCells: [(cell: [Int], weight: Double)] = [
         ([3, 2, 2], 29), ([2, 3, 2], 24), ([2, 2, 1], 22), ([-3, -2, 2], 18), ([1, -3, -2], 17),
     ]
-
-    /// The default bank: vocal-led, with the sax cells at a third of their counts. Avalon Hook
-    /// uses it, and its repeated pitches are what make that rule sound sung.
-    private static let cellBank = vocalCells + saxCells.map { (cell: $0.cell, weight: $0.weight / 3) }
 
     /// Counter-Line's bank gives the sax cells their full weight. Measured, this rule comes from
     /// the reed and flute lines as much as the vocals — Smooth Operator, Black Cow — and those
@@ -225,19 +221,25 @@ extension ChillLeadGenerator {
 
     // MARK: - CHL-LD1-010 Soho Counter-Line
 
-    /// Sung-melody phrases answering an implied vocal: 6–11 notes in eighths with a longer note
+    /// Sung-melody phrases answering an implied vocal: 8–13 notes in eighths with a longer note
     /// to end, rests of about a bar and a half between them, and phrases that land somewhere new
     /// rather than closing (0 of 22 close in Smooth Operator).
     ///
-    /// The first phrase is remembered and comes back in about 40% of later phrases, mutating
-    /// slightly every 8–12 bars so it is recognisable but never identical.
+    /// The first phrase is the song's hook. It comes back in about 35% of later phrases, never
+    /// within six bars of its last statement (the corpus vocals median 7–8 bars between returns).
+    /// Half of the returns are the original itself — same rhythm, same place in the bar, same
+    /// starting pitch where the chord allows. The other half are one change away from the
+    /// original, weighted as the corpus vocals vary theirs: a note added 40%, a note dropped 28%,
+    /// the rhythm moved 19%, a pitch changed by a scale step 13%; and a quarter of them start on
+    /// another chord tone. Chosen by ear over versions with fewer returns and a wider-ranging line,
+    /// which wandered and lost the hook (Zack, 2026-10-16).
     private static func counterLine(frame: GlobalMusicalFrame, structure: SongStructure, pool: [Int],
                                     firstPlayable: Int, open: (Int) -> Bool, remixReturns: [Int],
                                     events: inout [MIDIEvent], onsets: inout [(startBar: Int, endBar: Int)],
                                     rng: inout SeededRNG) {
-        var motif: SohoPhrase? = nil
+        var hook: (phrase: SohoPhrase, offset: Int, pitch: Int)? = nil
+        var lastHookBar = 0
         var contour = rng.nextInt(upperBound: 3)
-        var nextMutation = 0
         var lastPitch = pool[pool.count / 3]
         var bar = firstPlayable + rng.nextInt(upperBound: 2)
 
@@ -247,27 +249,50 @@ extension ChillLeadGenerator {
 
             var span = 0
             while span < 4 && open(bar + span) { span += 1 }
-            let offset = remixReturns.contains(bar) ? 8 : [0, 2, 4, 8][rng.weightedPick([0.35, 0.30, 0.15, 0.20])]
+            var offset = remixReturns.contains(bar) ? 8 : [0, 2, 4, 8][rng.weightedPick([0.35, 0.30, 0.15, 0.20])]
 
-            let phrase: SohoPhrase
-            if var m = motif, rng.nextDouble() < 0.35 {
-                if bar >= nextMutation {
-                    m = mutateOpen(m, rng: &rng)
-                    motif = m
-                    nextMutation = bar + 8 + rng.nextInt(upperBound: 5)
+            var phrase: SohoPhrase
+            var start = anchor(near: lastPitch, bar: bar, structure: structure, frame: frame, pool: pool)
+            var changePitch = false
+            if let h = hook, bar >= lastHookBar + 6, rng.nextDouble() < 0.35 {
+                // Where the hook was first heard in the bar, from its first pitch if that is in
+                // the chord, else the chord tone nearest it.
+                phrase = h.phrase
+                if !remixReturns.contains(bar) { offset = h.offset }
+                start = anchor(near: h.pitch, bar: bar, structure: structure, frame: frame, pool: pool)
+                if rng.nextDouble() >= 0.50 {
+                    (phrase, changePitch) = varied(h.phrase, rng: &rng)
+                    if rng.nextDouble() < 0.25 {
+                        let tones = structure.chordWindow(atBar: bar)?.chordTones ?? []
+                        let others = pool.filter { tones.contains($0 % 12) && $0 != start }
+                        if let other = others.min(by: { abs($0 - start) < abs($1 - start) }) { start = other }
+                    }
                 }
-                phrase = m
+                lastHookBar = bar
             } else {
                 // A fresh phrase travels: up, down, or up then back. Successive phrases take
                 // different shapes, which is what stops the rule circling one figure.
                 contour = (contour + 1 + rng.nextInt(upperBound: 2)) % 3
                 phrase = counterLinePhrase(contour: contour, rng: &rng)
-                if motif == nil { motif = phrase; nextMutation = bar + 8 + rng.nextInt(upperBound: 5) }
+                if hook == nil {
+                    hook = (phrase, offset, start)
+                    lastHookBar = bar
+                }
             }
 
-            let start = anchor(near: lastPitch, bar: bar, structure: structure, frame: frame, pool: pool)
-            let notes = realise(phrase, at: bar * 16 + offset, from: start, limit: (bar + span) * 16,
+            var notes = realise(phrase, at: bar * 16 + offset, from: start, limit: (bar + span) * 16,
                                 pool: pool, vel: velocity(at: bar, structure: structure), rng: &rng)
+            if changePitch && notes.count >= 3 {
+                // One interior note a scale step up or down, so the change is heard.
+                let j = 1 + rng.nextInt(upperBound: notes.count - 2)
+                notes[j] = stepped(notes[j], up: rng.nextDouble() < 0.5, pool: pool)
+            }
+            // A phrase that the scale snap brought back to its first pitch has its last note
+            // moved a scale step on, in the direction the line was going.
+            if notes.count >= 2, notes[notes.count - 1].note == notes[0].note {
+                let n = notes.count
+                notes[n - 1] = stepped(notes[n - 1], up: notes[n - 2].note < notes[n - 1].note, pool: pool)
+            }
             guard let last = notes.last else { bar += 1; continue }
             events += notes
             lastPitch = Int(last.note)
@@ -287,11 +312,17 @@ extension ChillLeadGenerator {
     /// corpus separates them — Counter-Line's compass measures 19–29 semitones against the hook's
     /// 10 — and leaps of a fourth or more are 17–20% of its intervals, which the cell bank alone,
     /// none of whose steps exceed 3 semitones, could never produce.
+    ///
+    /// Its cell and opening-rhythm picks pass raw counts to `weightedPick`, which expects weights
+    /// summing to 1, so they always take the first entry: every cell is `[0, 0, -2]` (turned to
+    /// follow the contour) and every phrase opens on three eighths and a quarter. That is a bug,
+    /// kept on purpose: Zack chose this version by ear, and its one cell is much of why the line
+    /// holds together. Picking the bank properly (`pickCell`) made the line wander (2026-10-16).
     private static func counterLinePhrase(contour: Int, rng: inout SeededRNG) -> SohoPhrase {
         let n = 8 + rng.nextInt(upperBound: 6)                       // 8–13 notes
         var intervals: [Int] = []
         while intervals.count < n - 1 {
-            var cell = pickCell(from: counterLineCells, rng: &rng)
+            var cell = counterLineCells[rng.weightedPick(counterLineCells.map(\.weight))].cell
             // Turn the cell to follow the contour: rising in the first half of an arch, falling
             // in the second. A cell of repeated pitches is unaffected, which keeps the repeats.
             let rising = contour == 0 || (contour == 2 && intervals.count * 2 < n)
@@ -327,30 +358,62 @@ extension ChillLeadGenerator {
         if n >= 9 && rng.nextDouble() < 0.35 {
             durs[(n * 2) / 3] += 2 + rng.nextInt(upperBound: 3)
         }
-        return madeToMove(SohoPhrase(intervals: intervals, durs: durs))
+        return madeToMove(SohoPhrase(intervals: intervals, durs: durs), )
     }
 
-    /// One small change: an interval nudged by a step, or a quarter and an eighth swapped. The
-    /// last note keeps its length so the phrase still ends on the longer note, and the result is
-    /// kept open-ended.
-    private static func mutateOpen(_ p: SohoPhrase, rng: inout SeededRNG) -> SohoPhrase {
+    /// The hook with one change, weighted as the corpus vocals vary a returning figure: a note
+    /// added (40%) — a neighbour or passing note splitting a note in two; a note dropped (28%);
+    /// the rhythm moved (19%) — two unequal note lengths swapped; or a pitch changed (13%), which
+    /// is applied once the figure is on the scale, since an interval nudge in semitones is mostly
+    /// absorbed by the snap. An add, drop or rhythm change that the figure cannot take falls back
+    /// to the pitch change. The last note keeps its length, so the figure still ends long.
+    private static func varied(_ p: SohoPhrase, rng: inout SeededRNG) -> (SohoPhrase, changePitch: Bool) {
         var m = p
-        if rng.nextDouble() < 0.65, !m.intervals.isEmpty {
-            let i = rng.nextInt(upperBound: m.intervals.count)
-            m.intervals[i] += (rng.nextDouble() < 0.5 ? 1 : -1) * (rng.nextDouble() < 0.6 ? 2 : 1)
-            m.intervals = keepOpen(m.intervals)
-        } else if m.durs.count >= 3 {
-            let i = rng.nextInt(upperBound: m.durs.count - 2)
+        let n = m.durs.count
+        switch rng.weightedPick([0.40, 0.28, 0.19, 0.13]) {
+        case 0:
+            let splittable = (0..<(n - 1)).filter { m.durs[$0] >= 2 }
+            guard !splittable.isEmpty else { return (p, true) }
+            let i = splittable[rng.nextInt(upperBound: splittable.count)]
+            let d = m.durs[i]
+            m.durs[i] = d / 2
+            m.durs.insert(d - d / 2, at: i + 1)
+            let a = m.intervals[i]
+            let step = abs(a) >= 3 ? (a > 0 ? 2 : -2) : (rng.nextDouble() < 0.5 ? 2 : -2)
+            m.intervals[i] = step
+            m.intervals.insert(a - step, at: i + 1)
+        case 1:
+            guard n >= 4 else { return (p, true) }
+            let j = 1 + rng.nextInt(upperBound: n - 2)
+            m.durs[j - 1] += m.durs[j]
+            m.durs.remove(at: j)
+            m.intervals[j - 1] += m.intervals[j]
+            m.intervals.remove(at: j)
+        case 2:
+            let swappable = (0..<Swift.max(0, n - 2)).filter { m.durs[$0] != m.durs[$0 + 1] }
+            guard !swappable.isEmpty else { return (p, true) }
+            let i = swappable[rng.nextInt(upperBound: swappable.count)]
             m.durs.swapAt(i, i + 1)
+        default:
+            return (p, true)
         }
-        return m
+        return (m, false)
     }
 
-    /// Counter-Line and Sustained Tone phrases never return to their first pitch.
+    /// Counter-Line phrases never return to their first pitch, counted in semitones. The scale
+    /// snap can still close one, which `counterLine` catches once the notes are placed.
     private static func keepOpen(_ intervals: [Int]) -> [Int] {
         guard var last = intervals.last, intervals.reduce(0, +) == 0 else { return intervals }
         last += last >= 0 ? 2 : -2
         return Array(intervals.dropLast()) + [last]
+    }
+
+    /// `e` moved one note of `pool` up or down, turning back at the edge of the pool.
+    private static func stepped(_ e: MIDIEvent, up: Bool, pool: [Int]) -> MIDIEvent {
+        guard let idx = pool.firstIndex(of: Int(e.note)) else { return e }
+        let moved = up ? (idx + 1 < pool.count ? idx + 1 : idx - 1) : (idx > 0 ? idx - 1 : idx + 1)
+        return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(pool[moved]),
+                         velocity: e.velocity, durationSteps: e.durationSteps)
     }
 
     // MARK: - CHL-LD1-012 Avalon Hook
@@ -437,7 +500,33 @@ extension ChillLeadGenerator {
 
         var nextMutation = firstPlayable + 24 + rng.nextInt(upperBound: 9)
         var lastHook = -1, lastOther = -1
-        let home = pool[pool.count / 3]
+        // The hooks as first drawn. A mutation is a variation on one of these, not a new hook: it
+        // plays for one or two episodes and then the original comes back. Mutations used to be
+        // permanent, and in Late Americano the opening hook was rewritten at bar 60 and never
+        // heard in its own shape again (Zack, 2026-10-16).
+        let originals = [hook, hookB, hookC]
+        var mutatedEpisodesLeft = [0, 0, 0]
+        // The last episode that can start leads with the opening hook in its original form, as
+        // Avalon and most of the corpus come home to their first figure.
+        let lastOpen = (firstPlayable..<frame.totalBars).last(where: open) ?? firstPlayable
+        var recapped = false
+        // Where statements start. Every statement used to be anchored on one note a third of the
+        // way up the range — C5 for a flute in F — so 27 of 30 figures in Late Americano began on
+        // it and four pitches made up 94% of the song (Zack, 2026-10-16). The B section's home is
+        // now a third or a fifth higher, and each episode starts on one of the chord tones
+        // nearest the home rather than always the nearest.
+        let homeIdx = pool.count / 3
+        let bLift = [2, 4][rng.nextInt(upperBound: 2)]               // scale steps: a third or a fifth
+        // How far the hooks climb above and fall below their first note, in semitones, with two
+        // steps' grace for variants and run-ons.
+        let reach: (up: Int, down: Int) = {
+            var up = 0, down = 0
+            for h in [hook, hookB, hookC] {
+                var at = 0
+                for iv in h.intervals { at += iv; up = Swift.max(up, at); down = Swift.max(down, -at) }
+            }
+            return (up + 2, down + 2)
+        }()
         let length = hook.durs.reduce(0, +)
         // Displacement moves the figures off the downbeat, onto even sixteenths only: the groove
         // fixup pulls a lead note off an unplayed odd sixteenth, so displacing onto one would be
@@ -457,13 +546,19 @@ extension ChillLeadGenerator {
             // 2026-10-13). Avalon holds its contours all the way through and varies the rhythm.
             // So: one hook at a time, and rarely — a long song gets three or four in total.
             if bar >= nextMutation {
-                switch rng.nextInt(upperBound: 3) {
-                case 0:  hook  = closed ? tradeIntervals(hook,  rng: &rng) : nudgeWithinCompass(hook,  rng: &rng)
-                case 1:  hookB = closed ? tradeIntervals(hookB, rng: &rng) : nudgeWithinCompass(hookB, rng: &rng)
-                default: hookC = closed ? tradeIntervals(hookC, rng: &rng) : nudgeWithinCompass(hookC, rng: &rng)
+                let which = rng.nextInt(upperBound: 3)
+                let o = originals[which]
+                let m = closed ? tradeIntervals(o, rng: &rng) : nudgeWithinCompass(o, rng: &rng)
+                switch which {
+                case 0:  hook  = m
+                case 1:  hookB = m
+                default: hookC = m
                 }
+                mutatedEpisodesLeft[which] = 1 + rng.nextInt(upperBound: 2)
                 nextMutation = bar + 24 + rng.nextInt(upperBound: 9)
             }
+            let recap = !recapped && bar >= lastOpen - 12
+            if recap { hook = originals[0]; hookB = originals[1]; hookC = originals[2]; recapped = true }
 
             // Three hooks, weighted as Avalon weights its own: 7 / 3 / 2. Drawing freely stacked
             // up runs of eight identical statements, so a hook that just played is given one
@@ -472,7 +567,9 @@ extension ChillLeadGenerator {
             // Which hook leads this episode. After an A B A the natural next move is B A B, so the
             // hook that answered last time usually leads this time (Zack, 2026-10-13).
             var pick: Int
-            if lastOther >= 0, rng.nextDouble() < 0.60 {
+            if recap {
+                pick = 0
+            } else if lastOther >= 0, rng.nextDouble() < 0.60 {
                 pick = lastOther
             } else {
                 pick = rng.weightedPick([0.55, 0.25, 0.20])
@@ -502,6 +599,18 @@ extension ChillLeadGenerator {
             }
             let everyOther = rng.nextDouble() < 0.30
             let episodeStart = bar
+            // The episode's starting note: one of the chord tones nearest the section's home,
+            // chosen once so a call and its answer start together; each statement then anchors
+            // on the chord tone nearest it.
+            let home = pool[Swift.min(pool.count - 1,
+                                      homeIdx + (structure.section(atBar: bar)?.label == .B ? bLift : 0))]
+            let tones = structure.chordWindow(atBar: bar)?.chordTones ?? []
+            // Only where the hooks fit: started too near the top, `realise` turns a figure's
+            // climb back down and it runs a whole twelfth below (Zack, 2026-10-16).
+            let near = pool.filter { tones.contains($0 % 12) && abs($0 - home) <= 5
+                                     && $0 + reach.up <= pool[pool.count - 1] && $0 - reach.down >= pool[0] }
+                .sorted { abs($0 - home) < abs($1 - home) }
+            let episodePitch = near.isEmpty ? home : near[Swift.min(near.count - 1, rng.weightedPick([0.50, 0.30, 0.20]))]
             var stated = 0
             while stated < plan.count, bar < frame.totalBars, open(bar) {
                 var figure = hooks[plan[stated] == 0 ? pick : other]
@@ -515,8 +624,11 @@ extension ChillLeadGenerator {
                 if stated > 0, rng.nextDouble() < 0.20, let lastIv = figure.intervals.last {
                     figure.intervals[figure.intervals.count - 1] = lastIv + (lastIv >= 0 ? -2 : 2)
                 }
-                let offset = remixReturns.contains(bar) ? 8 : preferred
-                let start = anchor(near: home, bar: bar, structure: structure, frame: frame, pool: pool)
+                // A displaced song moves every statement by the same amount, which put all thirty
+                // on one beat; half of them now land an eighth either side of it.
+                let shift = treatments.contains(.displaced) ? [-2, 0, 2][rng.weightedPick([0.25, 0.50, 0.25])] : 0
+                let offset = remixReturns.contains(bar) ? 8 : preferred + shift
+                let start = anchor(near: episodePitch, bar: bar, structure: structure, frame: frame, pool: pool)
                 // About as often as a figure gets its last note held, one instead runs on with
                 // two or three more notes. The continuation is built from the figure's own moves,
                 // mirrored, so it reads as the same idea carrying on rather than a new one
@@ -549,6 +661,17 @@ extension ChillLeadGenerator {
                 bar += span > 1 ? span : (everyOther ? 2 : 1)
             }
             if stated > 0 { onsets.append((startBar: episodeStart, endBar: bar)) }
+            // A mutated hook that has had its episodes goes back to its original form.
+            for i in 0..<3 where mutatedEpisodesLeft[i] > 0 && (i == pick || i == other) {
+                mutatedEpisodesLeft[i] -= 1
+                if mutatedEpisodesLeft[i] == 0 {
+                    switch i {
+                    case 0:  hook  = originals[0]
+                    case 1:  hookB = originals[1]
+                    default: hookC = originals[2]
+                    }
+                }
+            }
             bar += 1 + rng.nextInt(upperBound: 2)                    // a bar or two off
         }
         events = holdSomeFigureEndings(events, structure: structure, rng: &rng)
@@ -641,7 +764,7 @@ extension ChillLeadGenerator {
     }
 
     /// Hooks are drawn from `counterLineCells`, the bank that gives the reed and flute cells their
-    /// full weight, not the vocal-weighted `cellBank`. Avalon's hook — the figure this rule is
+    /// full weight, not the vocal-weighted bank it once shared with Counter-Line. Avalon's hook — the figure this rule is
     /// measured from — is a flute line, and on the vocal-weighted bank the hook came out as
     /// repeated pitches: a statement like `0, 0, -2` stutters one note rather than playing a
     /// figure (Zack, 2026-10-13). The same comment on `counterLineCells` records that bank
@@ -805,7 +928,7 @@ extension ChillLeadGenerator {
             if compass(c) <= 10 && c.allSatisfy({ abs($0) <= 7 }) { intervals = c; break }
         }
         intervals = Array(intervals.prefix(n - 1))
-        var durs = Array(openingRhythms[rng.weightedPick(openingRhythms.map(\.weight))].durs.prefix(n))
+        var durs = Array(openingRhythms[weightedIndex(openingRhythms.map(\.weight), rng: &rng)].durs.prefix(n))
         while durs.count < n { durs.append(2) }
         durs[n - 1] = 4
         return madeToMove(SohoPhrase(intervals: intervals, durs: durs))
@@ -1007,13 +1130,19 @@ extension ChillLeadGenerator {
 
     // MARK: - Shared
 
-    private static func pickCell(from bank: [(cell: [Int], weight: Double)],
-                                 rng: inout SeededRNG) -> [Int] {
-        bank[rng.weightedPick(bank.map(\.weight))].cell
+    /// A weighted pick over raw counts. `SeededRNG.weightedPick` expects weights that sum to 1;
+    /// handed the cell banks' corpus counts (30, 25, 24…) it returned the first entry every time,
+    /// so until 2026-10-16 Avalon Hook drew only `[0, 0, -2]` and opened every phrase on three
+    /// eighths and a quarter. Counter-Line keeps that behaviour on purpose; see
+    /// `counterLinePhrase`.
+    private static func weightedIndex(_ counts: [Double], rng: inout SeededRNG) -> Int {
+        let total = counts.reduce(0, +)
+        return rng.weightedPick(counts.map { $0 / total })
     }
 
-    private static func pickCell(rng: inout SeededRNG) -> [Int] {
-        pickCell(from: cellBank, rng: &rng)
+    private static func pickCell(from bank: [(cell: [Int], weight: Double)],
+                                 rng: inout SeededRNG) -> [Int] {
+        bank[weightedIndex(bank.map(\.weight), rng: &rng)].cell
     }
 
     private static func velocity(at bar: Int, structure: SongStructure) -> Int {

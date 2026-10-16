@@ -4667,8 +4667,12 @@ struct SongGenerator {
         let cycle = pick.chords
         // The B section gets its own cycle from the same pool, so the two halves of the song
         // move differently — one vamp for 60–100 bars was the substyle's weakest point.
+        // Renormalised: `weightedPick` expects weights summing to 1, and without the A cycle's
+        // share the leftover fell to the last cycle in the list (Do It Again took 65% of minor B
+        // sections after Smooth Operator, not 42%; fixed 2026-10-16).
         let others = pool.filter { $0.name != pick.name }
-        let bCycle = others[rng.weightedPick(others.map { $0.weight })].chords
+        let othersTotal = others.reduce(0) { $0 + $1.weight }
+        let bCycle = others[rng.weightedPick(others.map { $0.weight / othersTotal })].chords
         let hasB = structure.sections.contains { $0.label == .B }
 
         // Turnaround: four bars of chord detour inside the groove — two chords stepping up and

@@ -835,7 +835,10 @@ import Foundation
                                    by: { $0.stepIndex / 16 })
             for (bar, notes) in byBar {
                 let ps = notes.map { Int($0.note) }
-                #expect(ps.max()! - ps.min()! <= 12, "bar \(bar) spans \(ps.max()! - ps.min()!) semitones")
+                // A tenth (15), as the rule is written. This pinned an octave until 2026-10-16, which
+                // only held because the harmonic filter folded a wide hook's low notes up an octave —
+                // the split that turned a step down into a seventh up. Figures now move whole.
+                #expect(ps.max()! - ps.min()! <= 15, "bar \(bar) spans \(ps.max()! - ps.min()!) semitones")
                 #expect(notes.count <= 12, "bar \(bar) carries \(notes.count) notes")
             }
         }

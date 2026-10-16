@@ -4,7 +4,8 @@
 
 - **New Chill Soho substyle** — A third Chill form modelled on early-80s British sophisticated pop: Sade, Everything but the Girl, The Style Council, Simply Red, Roxy Music, Matt Bianco. Twenty-one new rules measured from MIDI of those records: bossa, samba, Latin sway and soul grooves with hand percussion; 6th, 7th and 9th chords with a separate B-section cycle and a four-bar turnaround the band plays; horn stabs and halos on a MIDI Texture track; sax-led leads built from vocal-line figures; and a house-style Remix Break. Soho song titles.
 - **Guitar-led Soho rhythm** — Jazz and Funk Guitar added to the soundfont. Soho Rhythm is Rhodes, Stereo Piano, Nylon, Jazz and Funk Guitar at 20% each; guitars play with a slow amp tremolo by default. The unused SFX drum kit is gone; the soundfont is 21.2 MB.
-- **Avalon lead** — The hook rule now draws far more varied figures, and each song applies one or two treatments to them — displace, lengthen, invert, reverse or extend. Figures sometimes run on or end on a held note. The log names the treatments.
+- **Avalon lead** — The hook rule now draws far more varied figures, and each song applies one or two treatments to them — displace, lengthen, invert, reverse or extend. Figures sometimes run on or end on a held note. The log names the treatments. A varied hook returns to its original form after an episode or two, and the song ends on its opening hook. Episodes start on different chord tones, higher in the B section, and displaced songs no longer put every figure on the same beat.
+- **Soho counter-line hook** — The counter-line's opening phrase is the song's hook: it returns about once every three phrases, at least six bars apart, half the time as it was and otherwise with one note added, dropped or moved, or starting on another chord tone. Phrases no longer end on the note they began on.
 - **Groove fixup** — On every Chill song, lead notes stranded on weak sixteenths the band doesn't play are moved onto the beat, and one-sixteenth gaps inside a phrase are closed, so solos sit with the band and flow. Regenerating a lead does the same. The log reports how many notes changed.
 - **Groove fixup toggle (Mac, temporary)** — ⌘J / ⌃G or **File ▸ Groove Fixup (test)** switches the current song between raw and fixed leads for comparison.
 - **Leads stay in their register** — Chill leads now stay inside each instrument's own range; saxes no longer reach screechy altissimo notes.
@@ -16,6 +17,10 @@
 - **Soho Rhodes tremolo** — Rhodes in Chill Soho plays with the slow amp tremolo by default, as the guitars do. Any Rhodes with tremolo switched on now uses that slow setting rather than the organ's fast Leslie.
 - **Chill mix** — Lead 1, Lead 2 and Drums are drier in all Chill forms; Lead 2 and texture vibraphone are quieter.
 - **Instruments stay inside their style** — One rule, for every style and play mode, now replaces an instrument carried over from the previous song that the new song's style never uses. Regular Motorik no longer gets Arcade's Metal Pad, Ice Rain or Mystery Pad. Chill songs in Endless and Evolve play their leads on the right instrument.
+- **Leads keep their shape above the pads** — When a lead is lifted an octave to clear the pads, the whole figure moves, so a step down no longer turns into a seventh up halfway through a phrase. All styles.
+- **Soho chord cycles** — The B section's chord cycle is now drawn at its intended odds; one cycle had been taking far more than its share.
+- **Flute and recorder on iPhone** — Songs replayed from the Songs list or with ⏮/⏭ played a flute or recorder lead as a saxophone. Replays now use the lead the song was written for, and songs already in the list are corrected.
+- **Chill piano** — Stereo Piano on Chill Rhythm is about 3 dB quieter.
 - **Muting an audio texture works** — Muting Texture now silences audio-loop textures (Chill, Chill Blues, Ambient) on every platform, and exports leave them out.
 
 ## V 2.6 (Build 131)  Motorik Europe, reverb restored
