@@ -56,7 +56,8 @@ import Testing
             #expect(r.nextDouble() < 0.25, "seed \(seed) is not Soho under the release mix")
             let s = SongGenerator.generate(seed: seed, style: .chill)
             #expect(s.chillSohoVariation && s.chillBeatStyle == .sohoLatin, "seed \(seed) groove")
-            #expect(s.chillLeadInstrument == .flute, "seed \(seed) lead \(s.chillLeadInstrument)")
+            #expect(s.chillLeadInstrument == .flute && s.chillLead2Instrument == .vibraphone,
+                    "seed \(seed) leads \(s.chillLeadInstrument) / \(s.chillLead2Instrument)")
             #expect(s.generationLog.contains { $0.tag == "CHL-LD1-010" }, "seed \(seed) lead rule")
             #expect([.sohoRemix, .sohoDuo, .bassOstinato].contains(s.chillBreakdownStyle)
                     && s.structure.sections.contains { $0.label == .bridge }, "seed \(seed) breakdown")

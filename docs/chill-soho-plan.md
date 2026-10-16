@@ -648,7 +648,7 @@ tone is light, continuing base Chill's wry register.
   instruments are final, and replaying one re-pins the Chill leads to what the generator chose
 - **Best first Soho song:** the first Chill Soho song (no Soho song in the history, nothing
   overridden) is swapped for one of `AppState.firstSohoSeeds` — twelve seeds whose natural song
-  has a Latin groove, Operator on flute, a Remix Break, Duo or bass-ostinato breakdown and the
+  has a Latin groove, Operator on flute, vibraphone on Lead 2, a Remix Break, Duo or bass-ostinato breakdown and the
   hook coming home three or more times, chosen to be Soho under the release activation mix too.
   Natural seeds rather than forced settings, so replay needs nothing recorded.
   `firstSohoSeedsStillQualify` fails if a generator change breaks one; re-run the search then

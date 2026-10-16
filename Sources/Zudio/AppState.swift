@@ -567,16 +567,16 @@ final class AppState: ObservableObject {
     private var hasHadSohoSong = false
 
     /// Seeds whose natural song is the best first Chill Soho song: a Latin groove in drums and
-    /// bass, Operator (CHL-LD1-010) on flute, and a breakdown — the Remix Break, the Duo or the
+    /// bass, Operator (CHL-LD1-010) on flute with vibraphone on Lead 2, and a breakdown — the Remix Break, the Duo or the
     /// bass ostinato — with the hook coming home three to six times. Natural rather than forced,
     /// so the song replays exactly with no forced settings, and each one is Soho under the
     /// release activation mix as well as today's test mix. ReplayFidelityTests'
     /// `firstSohoSeedsStillQualify` fails if a generator change stops any of them qualifying —
     /// re-run the search then (chosen 2026-10-16).
     nonisolated static let firstSohoSeeds: [UInt64] = [
-        2070, 4819, 6165,               // Remix Break
-        727, 974, 4673, 4460, 5825,     // Duo
-        744, 3630, 5341, 4235,          // bass ostinato
+        17597, 48059, 54933, 48701,     // Remix Break
+        34075, 36568, 63372, 13012,     // Duo
+        16015, 41529, 65086, 32350,     // bass ostinato
     ]
 
     /// `state`, or the curated first Soho song in its place when `state` is the first Chill Soho
