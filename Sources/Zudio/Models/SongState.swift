@@ -318,6 +318,7 @@ struct SongState: Sendable {
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: texture, chillAudioTextureOffset: chillAudioTextureOffset,
+                  ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
                   keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
@@ -389,6 +390,7 @@ struct SongState: Sendable {
             chillLead2Instrument: chillLead2Instrument,
             chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
             chillBluesVariation: chillBluesVariation, chillSohoVariation: chillSohoVariation, motorikNoirVariation: motorikNoirVariation,
+            motorikArcadeVariation: motorikArcadeVariation, motorikSync: motorikSync,
             motorikBassDistortion: motorikBassDistortion,
             motorikNoirBassDistortion: motorikNoirBassDistortion,
             motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,

@@ -819,6 +819,28 @@ import Foundation
                 "only \(multiNote)/\(phrases) phrases have more than one note")
     }
 
+    /// Regenerating the drums of a Remix Break song never lands on a rule that cannot play the
+    /// break (Ballad Half-Time, the reused Brush Kit). A free redraw once could (2026-10-16).
+    @Test func drumRegenKeepsRemixPlayable() {
+        var checked = 0
+        // Soul grooves hold both ineligible rules, and only about one Soho song in eighty is a
+        // Soul Remix Break, so this looks further than `sohoSongs()`.
+        let songs = (UInt64(1)...1500).map { SongGenerator.generate(seed: $0, style: .chill) }
+            .filter { $0.chillSohoVariation && $0.chillBreakdownStyle == .sohoRemix && $0.chillBeatStyle == .sohoSoul }
+        for s in songs {
+            for k in UInt64(1)...20 {
+                let r = SongGenerator.regenerateTrack(kTrackDrums, songState: s, overrideSeed: s.globalSeed &+ k)
+                // The regen's own entries follow its marker: the drum rule, then the percussion
+                // overlay (CHL-DRUM-014), which is not a groove rule.
+                let regen = r.generationLog.suffix(from: (r.generationLog.lastIndex { $0.tag == "⚡ REGEN" } ?? 0))
+                let rule = regen.first { $0.tag.hasPrefix("CHL-DRUM-") && $0.tag != "CHL-DRUM-014" }?.tag ?? ""
+                #expect(!ChillDrumGenerator.remixIneligibleRules.contains(rule), "seed \(s.globalSeed) regen \(k): \(rule)")
+                checked += 1
+            }
+        }
+        #expect(checked > 0)
+    }
+
     /// Avalon Hook: each bar's figure stays inside about a tenth, and no bar turns into a run.
     ///
     /// The per-song treatments (2026-10-14) deliberately break the original 3–6 note figure:

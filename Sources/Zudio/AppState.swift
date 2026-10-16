@@ -2250,10 +2250,13 @@ final class AppState: ObservableObject {
         //   [0=Muted Trumpet, 1=Tenor Sax, 2=Alto Sax, 3=Trumpet, 4=Clarinet, 5=Flute,
         //    6=Soprano Sax, 7=Recorder]
         case kTrackLead1 where isSoho:
-            // Tenor Sax 30%, Alto Sax 22%, Flute 22%, Soprano Sax 13%, Recorder 13%. Mirrors
-            // ChillMusicalFrameGenerator.pickLeadInstrumentSoho — that is what picks Lead 1 for a
-            // generated song, this is what a manual randomise may pick, and the two must agree.
-            return [1,1,1,1,1,1,1, 2,2,2,2,2, 5,5,5,5,5, 6,6,6, 7,7,7].filter { $0 < poolCount }
+            // The generator's own weights (ChillMusicalFrameGenerator.sohoLeadWeights), one entry
+            // per percent, so a manual randomise picks as a generated song does.
+            let programs = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill, isChillSoho: true)
+            return ChillMusicalFrameGenerator.sohoLeadWeights.flatMap { entry -> [Int] in
+                guard let idx = programs.firstIndex(of: Int(entry.instrument.gmProgram)) else { return [] }
+                return Array(repeating: idx, count: Int((entry.weight * 100).rounded()))
+            }.filter { $0 < poolCount }
         case kTrackLead1 where isBlues:
             // Tenor Sax, Alto Sax, Trumpet, Clarinet — evenly, as pickLeadInstrumentBlues does.
             return [1, 2, 3, 4].filter { $0 < poolCount }

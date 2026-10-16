@@ -629,8 +629,15 @@ tone is light, continuing base Chill's wry register.
   corpus counts go through `weightedIndex`, which normalises them; the one deliberate exception
   is Counter-Line (see `010`)
 - **Harmonic filter (all styles):** when a lead sits within four semitones of the pads, Pass B
-  lifts a figure an octave whole — notes less than a bar apart — if any of it dips below the
-  pads' median and all of it fits the register, so a figure never splits across octaves
+  lifts a figure an octave whole — notes less than a bar apart, found across the whole track and
+  decided by the window it starts in — if any of it dips below the pads' median and all of it
+  fits the register, so a figure never splits across octaves
+- **Copy methods:** `SongStateCopyTests` compares every field before and after each SongState
+  copy method by reflection, so a field a copy forgets fails the suite
+- **Drum regen:** on a Remix Break song a regenerated drum rule is redrawn away from
+  `ChillDrumGenerator.remixIneligibleRules` (Ballad Half-Time, Brush Kit), the same set the
+  breakdown pick uses
+- **Lead 1 randomise:** reads `ChillMusicalFrameGenerator.sohoLeadWeights`, the generator's table
 - **Log — "Lead 1 return to form":** marked on each bar where a Chill lead comes back to its
   original form: `010`'s hook returning exactly, an Avalon episode led by the opening hook in its
   original form (after the song's first), or a base Chill seed coming back after the two opening

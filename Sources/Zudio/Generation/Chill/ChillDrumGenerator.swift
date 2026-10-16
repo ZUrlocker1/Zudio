@@ -111,12 +111,28 @@ struct ChillDrumGenerator {
         return plan
     }
 
+    /// Drum rules that cannot play under a Remix Break: Ballad Half-Time is too sparse for it, and
+    /// the reused Brush Kit renders base Chill's breakdowns. `pickSohoBreakdownStyle` keeps the
+    /// Remix Break away from songs on these, and a drum regen must not bring one back.
+    static let remixIneligibleRules: Set<String> = ["CHL-DRUM-013", "CHL-DRUM-003"]
+
     /// Plan for regenerating the drum track: a fresh rule from the groove's pool, but the song's
     /// ORIGINAL percussion overlay decision. The breakdown style was picked against that decision —
-    /// the Remix Break needs the overlay — so a regen must not silently switch it off.
-    static func sohoRegenPlan(beatStyle: ChillBeatStyle, seed: UInt64, rng: inout SeededRNG) -> SohoDrumPlan {
+    /// the Remix Break needs the overlay — so a regen must not silently switch it off. On a Remix
+    /// Break song the fresh rule is redrawn until it can play the break (a few tries, then the
+    /// song's own rule): drawn freely, a regen could put the Brush Kit's ride groove under it.
+    static func sohoRegenPlan(beatStyle: ChillBeatStyle, breakdownStyle: ChillBreakdownStyle,
+                              seed: UInt64, rng: inout SeededRNG) -> SohoDrumPlan {
         let original = sohoDrumPlan(beatStyle: beatStyle, seed: seed)
-        let fresh    = sohoDrumPlan(beatStyle: beatStyle, rng: &rng)
+        var fresh    = sohoDrumPlan(beatStyle: beatStyle, rng: &rng)
+        if breakdownStyle == .sohoRemix {
+            var tries = 0
+            while remixIneligibleRules.contains(fresh.ruleID) && tries < 8 {
+                fresh = sohoDrumPlan(beatStyle: beatStyle, rng: &rng)
+                tries += 1
+            }
+            if remixIneligibleRules.contains(fresh.ruleID) { fresh = original }
+        }
         return SohoDrumPlan(ruleID: fresh.ruleID, overlay: original.overlay)
     }
 

@@ -1621,6 +1621,7 @@ struct SongGenerator {
                 var ignoredFills: [Int] = []
                 let regenSohoPlan: ChillDrumGenerator.SohoDrumPlan? = songState.chillSohoVariation
                     ? ChillDrumGenerator.sohoRegenPlan(beatStyle: songState.chillBeatStyle,
+                                                       breakdownStyle: songState.chillBreakdownStyle,
                                                        seed: songState.globalSeed, rng: &rng)
                     : nil
                 events = ChillDrumGenerator.generate(
@@ -4320,7 +4321,7 @@ struct SongGenerator {
                                                tempo: Int, seed: UInt64) -> ChillBreakdownStyle {
         var r = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 95))
         let eligible = drumPlan.overlay && tempo > 105
-            && !["CHL-DRUM-013", "CHL-DRUM-003"].contains(drumPlan.ruleID)
+            && !ChillDrumGenerator.remixIneligibleRules.contains(drumPlan.ruleID)
         let remixRoll = r.nextDouble()            // drawn either way, so the pick below is stable
         if eligible && remixRoll < sohoRemixShareOfEligible { return .sohoRemix }
         // Stop-time is out: it is base Chill's own gesture and made a Soho break sound like one

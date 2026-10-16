@@ -175,11 +175,14 @@ struct ChillMusicalFrameGenerator {
     /// the 14 files, and for 154 notes. **Soprano Sax and Recorder are on trial** in its place:
     /// Recorder is in 1 file for 313 notes, Soprano Sax in none, so this is the first Soho pool
     /// chosen partly against the measurement rather than from it.
-    /// Mirrored by the `isChillSoho` branch of `instrumentPoolNames` and by
-    /// `instrumentPickPoolStatic`; all three must stay in step.
+    /// `AppState.instrumentPickPoolStatic` reads this table for a manual randomise, so the two
+    /// cannot drift: it once kept the old 30/22/22 after this was levelled (found 2026-10-16).
+    static let sohoLeadWeights: [(instrument: ChillLeadInstrument, weight: Double)] = [
+        (.tenorSax, 0.25), (.saxophone, 0.25), (.flute, 0.24), (.sopranoSax, 0.13), (.recorder, 0.13),
+    ]
+
     private static func pickLeadInstrumentSoho(rng: inout SeededRNG) -> ChillLeadInstrument {
-        let insts: [ChillLeadInstrument] = [.tenorSax, .saxophone, .flute, .sopranoSax, .recorder]
-        return insts[rng.weightedPick([0.25, 0.25, 0.24, 0.13, 0.13])]
+        sohoLeadWeights[rng.weightedPick(sohoLeadWeights.map(\.weight))].instrument
     }
 
     /// Chill Soho: Latin 55% / Soul 45%, matching the reference set. The drum, bass and rhythm
