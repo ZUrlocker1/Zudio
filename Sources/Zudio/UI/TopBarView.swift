@@ -666,7 +666,7 @@ struct TopBarView: View {
                     Button { showAbout = true } label: { Text("About").frame(width: kHelpButtonWidth) }
                     Button { showSleepPicker = true } label: { Text("Sleep").frame(width: kHelpButtonWidth) }
                     Button {
-                        guard let song = appState.songState else { return }
+                        guard let song = appState.songStateForSaving() else { return }
                         PhonePlayerView.presentShare(song: song)
                     } label: { Text("Share").frame(width: kHelpButtonWidth) }
                     .disabled(appState.songState == nil)

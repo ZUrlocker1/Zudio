@@ -882,7 +882,7 @@ struct ContentView: View {
 
     private var iPadCanvasGestureLayer: some View {
         CanvasGestureView       (
-            notes: appState.playback.activeVisualizerNotes,
+            feed: appState.playback.visualizerFeed,
             onTapOrb:         { orbTrack in iPadHandleTapOrb(orbTrack) },
             onDoubleTapOrb:   { orbTrack in iPadHandleDoubleTapOrb(orbTrack) },
             onLongPressOrb:   { orbTrack in iPadHandleLongPressOrb(orbTrack) },

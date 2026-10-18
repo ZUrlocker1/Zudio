@@ -39,7 +39,12 @@ struct ChillMusicalFrameGenerator {
         let key  = keyOverride  ?? pickKey(rng: &rng)
 
         // Blues Chill activation: 20% of Chill songs.
-        let bluesVariation = forceBluesVariation || rng.nextDouble() < 0.20
+        // The roll is always drawn, forced or not. `force || rng.nextDouble()` short-circuited, so a
+        // forced .zudio reload of a Blues song made one fewer main-stream draw than the original
+        // and every later draw (lead, beat, tempo, length) shifted. Generation never forces Blues,
+        // so drawing unconditionally changes no newly generated song.
+        let bluesRoll = rng.nextDouble()
+        let bluesVariation = forceBluesVariation || bluesRoll < 0.20
 
         // Chill Soho activation. `sohoRoll` comes from a DERIVED stream in the caller and is
         // never drawn from `rng`, so base Chill and Blues make exactly the same main-stream draws

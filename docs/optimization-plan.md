@@ -95,5 +95,42 @@ let hasIntroNotes = state.trackEvents[i].contains { $0.stepIndex < introEndStep 
 
 Replace `events.filter { ... }.count` with a loop variable, avoiding temporary array allocation.
 
+## Second pass (2026-10-18): playback, UI and idle cost
+
+Generation, Chill Soho included, was reviewed and found cheap (single pass per bar, no whole-track retry loops); nothing changed there. The remaining cost was main-thread work during playback and audio processing left running on silence.
+
+### Done
+
+- **Visualizer notes moved to their own object.** `activeVisualizerNotes` was published by PlaybackEngine on nearly every step (drum hits included; a Chill step outlasts the 83 ms flush gate), re-rendering every view observing playback: the whole iPhone player and all MIDI lanes. It now lives in `VisualizerFeed`, observed only by VisualizerView; the touch gesture layers read it at hit-test time.
+- **Shared LFO timer runs only while playing.** Stop and song end cancel it; play, switchToPass and loadAndPlay restart it if an effect is on. Before, a stopped Chill song (Pads sweep and tremolo always on) woke the main thread 62 times a second. The iPhone gesture sweep now stops the timer when it finishes.
+- **Texture player engine pauses when idle (Mac only).** Its second AVAudioEngine, reverb and EQ ran on silence for every Soho, Motorik and Kosmic song and whenever stopped.
+- **Texture reverb chip bypasses the reverb** instead of only zeroing its mix.
+- **DAW scroll assigns only on change.** At the song end the clamped offset was reassigned every step, re-rendering the whole app.
+- **Visualizer drains after stop.** The orb list was pruned only in onStep, so the 12 fps redraw ran indefinitely after Stop.
+
+- **Shared LFO timer at 48 ms when nothing needs 16 ms.** Only vibrato and fast tremolos (Rhythm guitar, Rhodes) update every 16 ms tick; slow Pads tremolo, sweep, pan and the iPhone gesture sweep update every third. With neither on, the timer runs at 48 ms and every tick does the 20fps work: identical updates, two thirds fewer wakeups. Re-timed on every tremolo or vibrato start and stop.
+
+Measured by Zack in Activity Monitor: a couple of points lower during playback, under 10% with no visualizer showing.
+
+### Save and reload bugs fixed alongside
+
+- ⚡ REGEN kept the old track seed and step annotations; a saved file or Songs entry rebuilt the old track.
+- An instrument changed after load never reached the saved file (the Instruments line was written only at load), and the .zudio load pinned the Chill leads back to the generator's choice. Save and share now rebuild the line from what is playing; the file load re-applies the saved leads.
+- Forcing Blues on a .zudio reload skipped one main-stream draw, so a Blues file reopened as a different song. The roll is now always drawn (generation never forces Blues, so no new song changed).
+- History reloads now replay the saved Chill substyle (force Soho, or forbid it for base Chill), so a change to the Soho share cannot turn a saved song into another substyle.
+
+Covered by Tests/ZudioTests/SaveReloadRoundTripTests.swift (each test fails on the old code). Fingerprints are identical to the previous commit in all four styles.
+
+### Fingerprint baseline drift (bisected 2026-10-18)
+
+tools/fingerprints/baseline.txt (pinned at 0dfb880) no longer matches Motorik, Kosmic or Ambient. Bisected: the change comes from e0e8b5f and d2645e7, both the deliberate all-style Harmonic filter change (lift whole figures above the pads, decided by the window a figure starts in). Every other generation change in those commits is Chill-only. e0e8b5f notes the baseline was not re-pinned. Re-pin once Zack accepts that released songs in those styles moved.
+
+### Not done (candidates)
+
+- Bypass the large reverb bus in Chill and Motorik, which send nothing to it.
+- Cache decoded texture files (removes a main-thread stall at song change).
+- Per-bar AppState re-render, status log incremental rebuild, one shared playhead overlay.
+- Beat Fixup is applied at render-buffer granularity live (0 to about 23 ms on iOS) but sample-accurately in export; a sound decision, not an optimization.
+
 ---
 Copyright (c) 2026 Zack Urlocker

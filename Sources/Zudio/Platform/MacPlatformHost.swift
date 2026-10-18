@@ -169,7 +169,7 @@ final class MacPlatformHost: ZudioPlatformHost {
     // MARK: - Keyboard dismissal
 
     func dismissKeyboard() {
-        NSApp.keyWindow?.makeFirstResponder(nil)
+        NSApp?.keyWindow?.makeFirstResponder(nil)   // NSApp is nil under the test runner
     }
 }
 #endif

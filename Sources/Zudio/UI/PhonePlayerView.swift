@@ -632,7 +632,7 @@ struct PhonePlayerView: View {
 
                 Button {
                     hapticImpactLight.toggle()
-                    guard let song = appState.songState else { return }
+                    guard let song = appState.songStateForSaving() else { return }
                     PhonePlayerView.presentShare(song: song)
                 } label: {
                     Label("Share", systemImage: "square.and.arrow.up")
@@ -719,7 +719,7 @@ struct PhonePlayerView: View {
 
     private var canvasGestureLayer: some View {
         CanvasGestureView(
-            notes: playback.activeVisualizerNotes,
+            feed: playback.visualizerFeed,
             onTapOrb:         { orbTrack in handleTapOrb(orbTrack) },
             onDoubleTapOrb:   { orbTrack in handleDoubleTapOrb(orbTrack) },
             onLongPressOrb:   { orbTrack in handleLongPressOrb(orbTrack) },
@@ -925,7 +925,8 @@ struct PhoneInfoView: View {
 // MARK: - Canvas gesture recognizer (UIViewRepresentable)
 
 struct CanvasGestureView: UIViewRepresentable {
-    var notes: [VisualizerNote]
+    // Read at hit-test time so taps see the live orbs; the host view no longer re-renders per step.
+    let feed: VisualizerFeed
     var onTapOrb:          (Int) -> Void
     var onDoubleTapOrb:    (Int) -> Void
     var onLongPressOrb:    (Int) -> Void
@@ -987,7 +988,7 @@ struct CanvasGestureView: UIViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator: NSObject {
+    @MainActor final class Coordinator: NSObject {
         var parent: CanvasGestureView
 
         init(parent: CanvasGestureView) { self.parent = parent }
@@ -997,7 +998,7 @@ struct CanvasGestureView: UIViewRepresentable {
         private func hitOrb(at point: CGPoint, in view: UIView) -> Int? {
             let size = CGSize(width: view.bounds.width, height: view.bounds.height)
             let now  = Date()
-            for orb in parent.notes.reversed() {
+            for orb in parent.feed.notes.reversed() {
                 let age      = now.timeIntervalSince(orb.birthDate)
                 let lifetime = orbLifetime(orb)
                 guard age < lifetime else { continue }

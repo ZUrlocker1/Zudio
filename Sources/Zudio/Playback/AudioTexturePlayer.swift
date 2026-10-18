@@ -60,7 +60,17 @@ final class AudioTexturePlayer {
             self.isFadingOut = false
             self.playerNode.stop()
             self.stopPan()
+            self.pauseEngineWhenIdle()
         }
+    }
+
+    /// Pauses this player's own engine while no texture plays, so its IO cycle, reverb and EQ
+    /// stop processing silence (every Soho, Motorik and Kosmic song, and whenever stopped).
+    /// startFile restarts it. Mac only for now: iOS manages this engine with the audio session.
+    private func pauseEngineWhenIdle() {
+        #if os(macOS)
+        if engine.isRunning { engine.pause() }
+        #endif
     }
 
     #if os(iOS)
@@ -122,6 +132,8 @@ final class AudioTexturePlayer {
             eqNode.bands[0].bypass = !enabled
         case .reverb, .space:
             reverbNode.wetDryMix = enabled ? 22 : 0
+            // A zero mix still runs the reverb DSP; bypass it too. Export reads wetDryMix.
+            reverbNode.auAudioUnit.shouldBypassEffect = !enabled
         default:
             break
         }
@@ -376,6 +388,7 @@ final class AudioTexturePlayer {
         currentFilename = nil
         stopPan()
         playerNode.stop()
+        pauseEngineWhenIdle()
     }
 
     private func cancelFade() {

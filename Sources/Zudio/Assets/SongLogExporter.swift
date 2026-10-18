@@ -83,9 +83,8 @@ struct SongLogExporter {
         if let k = song.keyOverride   { lines.append(col("Key Override:",   16) + k) }
         if let t = song.tempoOverride { lines.append(col("Tempo Override:", 16) + "\(t)") }
         if let m = song.moodOverride  { lines.append(col("Mood Override:",  16) + m.rawValue) }
-        // Blues Variation is rolled via a forceBluesVariation || rng.nextDouble() short-circuit —
-        // if not captured here and replayed on load, reloading skips that roll entirely, shifting
-        // every subsequent random draw and silently losing the blues identity (~80% of the time).
+        // Blues reproduces from the seed alone; the roll is always drawn, so forcing it on load
+        // cannot shift any other draw. Written so the substyle is explicit in the file.
         if song.chillBluesVariation   { lines.append(col("Blues Variation:", 16) + "true") }
         // Soho is rolled on a derived stream, so it reproduces from the seed alone and forcing it
         // on load cannot shift any other draw. It is written anyway so that a saved Soho song

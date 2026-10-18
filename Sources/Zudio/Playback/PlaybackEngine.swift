@@ -6,6 +6,12 @@ import AVFoundation
 import AudioToolbox
 import Combine
 
+/// Visualizer orb notes, published separately from PlaybackEngine (see activeVisualizerNotes).
+@MainActor
+final class VisualizerFeed: ObservableObject {
+    @Published var notes: [VisualizerNote] = []
+}
+
 @MainActor
 final class PlaybackEngine: ObservableObject {
     // MARK: - State
@@ -24,7 +30,14 @@ final class PlaybackEngine: ObservableObject {
     // Plain var (not @Published): wallClockStep reads it as a fallback when stopped,
     // but nothing subscribes to it for rendering — TimelineView drives lane redraws now.
     var displayStep: Int = 0
-    @Published var activeVisualizerNotes: [VisualizerNote] = []
+    // Orb notes live in their own ObservableObject: they change on nearly every step (drum hits
+    // included), and publishing them from the engine re-rendered every view observing playback
+    // (the whole iPhone player, all MIDI lanes). Only VisualizerView observes the feed.
+    let visualizerFeed = VisualizerFeed()
+    var activeVisualizerNotes: [VisualizerNote] {
+        get { visualizerFeed.notes }
+        set { visualizerFeed.notes = newValue }
+    }
     // Buffer flushed into activeVisualizerNotes at most 12×/sec — collapses append+prune
     // into one @Published mutation per frame, reducing AppKit layout scans at step rate.
     private var pendingVisualizerNotes: [VisualizerNote] = []
@@ -173,6 +186,8 @@ final class PlaybackEngine: ObservableObject {
     // Fires at 60fps (16ms); tremolo updates every tick, sweep/pan every 3rd tick (~20fps).
     private var lfoTimer:     DispatchSourceTimer? = nil
     private var lfoTickCount: Int = 0
+    /// True while the shared LFO timer runs at 16 ms; false at 48 ms (see lfoNeedsFastRate).
+    private var lfoFastRate: Bool = true
     // Per-track pending instrument loads — used to coalesce rapid setProgram calls on macOS.
     private var programLoadWork: [Int: DispatchWorkItem] = [:]
     private var anyLFOActive: Bool = false   // precomputed; avoids 3 O(n) contains() at 60fps
@@ -524,6 +539,7 @@ final class PlaybackEngine: ObservableObject {
         #endif
         // Resume from current playhead position (currentStep already set correctly)
         isPlaying = true
+        resumeSharedLFO()
         currentSchedulerID += 1
         let schedulerID = currentSchedulerID
 
@@ -638,6 +654,8 @@ final class PlaybackEngine: ObservableObject {
         stopAmbientOutroFade()
         // Stop any active pan LFOs so phase state doesn't bleed into the next song.
         for i in 0..<kTrackCount where panEnabled[i] { stopPan(forTrack: i) }
+        stopSharedLFOIfIdle()   // no LFO wakeups while stopped (isPlaying is now false)
+        scheduleVisualizerDrain()
         // Clear reverb/delay buffers so tails don't bleed through when volume
         // is restored for the next song — applies to all styles.
         reverbBusLarge.reset(); reverbBusSmall.reset()
@@ -859,14 +877,17 @@ final class PlaybackEngine: ObservableObject {
             let flushNow = Date()
             if flushNow.timeIntervalSince(self.lastVisualizerFlush) >= (1.0 / 12.0) {
                 self.lastVisualizerFlush = flushNow
-                var notes = self.activeVisualizerNotes
-                if !self.pendingVisualizerNotes.isEmpty {
+                // Assign only when notes were added or pruned: every assignment re-renders the
+                // visualizer. A step (125-190 ms in Chill) outlasts the 83 ms gate, so this runs per step.
+                let isExpired = { (n: VisualizerNote) in flushNow.timeIntervalSince(n.birthDate) > n.orbLifetime + 0.5 }
+                if !self.pendingVisualizerNotes.isEmpty || self.activeVisualizerNotes.contains(where: isExpired) {
+                    var notes = self.activeVisualizerNotes
                     notes.append(contentsOf: self.pendingVisualizerNotes)
                     self.pendingVisualizerNotes.removeAll(keepingCapacity: true)
+                    notes.removeAll(where: isExpired)
+                    if notes.count > 80 { notes.removeFirst(notes.count - 80) }
+                    self.activeVisualizerNotes = notes  // single assignment = single objectWillChange
                 }
-                notes.removeAll { flushNow.timeIntervalSince($0.birthDate) > $0.orbLifetime + 0.5 }
-                if notes.count > 80 { notes.removeFirst(notes.count - 80) }
-                self.activeVisualizerNotes = notes  // single assignment = single objectWillChange
             }
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
             // Attack duration = min(500ms, noteDuration/3) so short notes still sound.
@@ -972,6 +993,8 @@ final class PlaybackEngine: ObservableObject {
             self.stopMotorikFades()
             self.stopAmbientNoteFades()
             self.stopAmbientOutroFade()
+            self.stopSharedLFOIfIdle()
+            self.scheduleVisualizerDrain()
             self.onSongEndNaturally?()
         }
     }
@@ -1052,6 +1075,7 @@ final class PlaybackEngine: ObservableObject {
         // Always restart — switchToPass is called mid-Evolve; onSongEnd sets isPlaying=false
         // before the callback fires, so we can't rely on that flag here.
         isPlaying = true
+        resumeSharedLFO()
         let sched = StepScheduler(engine: self, songState: passState,
                                   startStep: 0, schedulerID: currentSchedulerID)
         scheduler = sched
@@ -1080,6 +1104,7 @@ final class PlaybackEngine: ObservableObject {
         currentBar  = currentStep / 16
         currentSchedulerID += 1
         isPlaying = true
+        resumeSharedLFO()
         let sched = StepScheduler(engine: self, songState: state, startStep: currentStep,
                                   schedulerID: currentSchedulerID)
         scheduler = sched
@@ -1820,10 +1845,35 @@ final class PlaybackEngine: ObservableObject {
     // Slow tremolos (phaseInc < 0.1, e.g. Chill/Ambient pads at 0.15 Hz) update every 3rd tick (~20fps).
     // Sweep and pan always update every 3rd tick (~20fps).
     // One timer for all effects, on the main queue, regardless of how many are active.
+    // With no vibrato and no fast tremolo on, every 60fps-only tick did nothing, so the timer
+    // then runs at 48 ms and every tick is a 20fps tick: same updates, same phase steps, two
+    // thirds fewer main-thread wakeups (iPhone battery).
+
+    /// Vibrato and fast tremolos (Rhythm guitar, Rhodes) update every 16 ms tick; everything
+    /// else (slow tremolo, sweep, pan, the iPhone gesture sweep) only every third.
+    private func lfoNeedsFastRate() -> Bool {
+        if vibEnabled.contains(true) { return true }
+        for i in 0..<kTrackCount where tremEnabled[i] && tremPhaseInc[i] >= 0.1 { return true }
+        return false
+    }
+
+    /// Re-times the running timer when an effect change moves it between 16 ms and 48 ms.
+    private func updateSharedLFORate() {
+        guard let timer = lfoTimer else { return }
+        let fast = lfoNeedsFastRate()
+        guard fast != lfoFastRate else { return }
+        lfoFastRate  = fast
+        lfoTickCount = 0
+        let interval: DispatchTimeInterval = .milliseconds(fast ? 16 : 48)
+        timer.schedule(deadline: .now() + interval, repeating: interval, leeway: .milliseconds(2))
+    }
 
     private func startSharedLFO() {
-        guard lfoTimer == nil else { return }
+        // Runs only while playing (or during an iPhone gesture sweep, which must finish to
+        // restore its filters). Effects enabled while stopped start it from resumeSharedLFO().
+        guard lfoTimer == nil, isPlaying || globalSweepTicksRemaining > 0 else { return }
         lfoTickCount = 0
+        lfoFastRate  = lfoNeedsFastRate()
         // The timer fires on the main queue because lfoTick() is main-actor isolated and
         // touches main-actor state — the phase accumulators, and the sampler/boost nodes that
         // setEffect() and the mute/solo pass also write. Running it on a private queue
@@ -1834,7 +1884,7 @@ final class PlaybackEngine: ObservableObject {
         // assumeIsolated documents and checks that: if this timer is ever moved off the main
         // queue again it traps here rather than silently corrupting state.
         let src = DispatchSource.makeTimerSource(queue: .main)
-        src.schedule(deadline: .now(), repeating: .milliseconds(16), leeway: .milliseconds(2))
+        src.schedule(deadline: .now(), repeating: .milliseconds(lfoFastRate ? 16 : 48), leeway: .milliseconds(2))
         src.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.lfoTick() }
         }
@@ -1846,10 +1896,34 @@ final class PlaybackEngine: ObservableObject {
         let anyActive = tremEnabled.contains(true) || sweepEnabled.contains(true)
                      || panEnabled.contains(true) || vibEnabled.contains(true)
         anyLFOActive = anyActive
-        guard !anyActive else { return }
+        // Keep ticking while an effect is live during playback, or a gesture sweep is unfinished.
+        guard !(anyActive && isPlaying), globalSweepTicksRemaining == 0 else { return }
         lfoTimer?.cancel()
         lfoTimer     = nil
         lfoTickCount = 0
+    }
+
+    /// Notes are pruned only in onStep, so after a stop the orb list never empties and the
+    /// visualizer keeps redrawing at 12 fps indefinitely. Prune once after the last orb fades;
+    /// the empty list pauses VisualizerView's TimelineView. Harmless if playback has resumed.
+    private func scheduleVisualizerDrain() {
+        pendingVisualizerNotes.removeAll()
+        let now = Date()
+        guard let lastExpiry = activeVisualizerNotes.map({ $0.birthDate.timeIntervalSince(now) + $0.orbLifetime + 0.5 }).max()
+        else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, lastExpiry) + 0.1) { [weak self] in
+            guard let self else { return }
+            let t = Date()
+            let kept = self.activeVisualizerNotes.filter { t.timeIntervalSince($0.birthDate) <= $0.orbLifetime + 0.5 }
+            if kept.count != self.activeVisualizerNotes.count { self.activeVisualizerNotes = kept }
+        }
+    }
+
+    /// Restarts the shared LFO timer after playback starts if any effect is enabled.
+    private func resumeSharedLFO() {
+        anyLFOActive = tremEnabled.contains(true) || sweepEnabled.contains(true)
+                    || panEnabled.contains(true) || vibEnabled.contains(true)
+        if anyLFOActive { startSharedLFO() }
     }
 
     private func lfoTick() {
@@ -1861,7 +1935,7 @@ final class PlaybackEngine: ObservableObject {
         guard anyLFOActive || globalSweepTicksRemaining > 0 else { return }
 
         lfoTickCount += 1
-        let do20fps   = (lfoTickCount % 3 == 0)
+        let do20fps   = !lfoFastRate || (lfoTickCount % 3 == 0)   // at 48 ms every tick is one
         let anySolo   = anySoloActive
 
         // Tremolo — 60fps for fast tremolos (phaseInc ≥ 0.1), 20fps for slow swells (phaseInc < 0.1)
@@ -1924,6 +1998,7 @@ final class PlaybackEngine: ObservableObject {
                         AudioUnitSetParameter(sweepFilters[i].audioUnit, 0, kAudioUnitScope_Global, 0, 6000, 0)
                     }
                 }
+                stopSharedLFOIfIdle()
             }
         }
 
@@ -2011,6 +2086,7 @@ final class PlaybackEngine: ObservableObject {
         tremPhase[i]   = 0.0
         anyLFOActive   = true
         startSharedLFO()
+        updateSharedLFORate()
     }
 
     private func stopTremolo(forTrack i: Int) {
@@ -2019,6 +2095,7 @@ final class PlaybackEngine: ObservableObject {
         tremBaseVolume[i] = 1.0
         samplers[i].volume = trackBaseVolume[i]
         stopSharedLFOIfIdle()
+        updateSharedLFORate()
     }
 
     // MARK: - Vibrato LFO
@@ -2031,6 +2108,7 @@ final class PlaybackEngine: ObservableObject {
         vibPhase[i]    = 0.0
         anyLFOActive   = true
         startSharedLFO()
+        updateSharedLFORate()
     }
 
     private func stopVibrato(forTrack i: Int) {
@@ -2040,6 +2118,7 @@ final class PlaybackEngine: ObservableObject {
         let ch = kTrackMIDIChannels[i]
         samplers[i].sendMIDIEvent(0xE0 | ch, data1: 0x00, data2: 0x40)  // reset pitch bend to center
         stopSharedLFOIfIdle()
+        updateSharedLFORate()
     }
 
     // MARK: - Sweep LFO

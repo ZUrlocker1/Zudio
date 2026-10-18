@@ -258,7 +258,7 @@ final class AppState: ObservableObject {
         let tempoOverride:  Int?
         let moodOverride:   Mood?
         // [Int: UInt64] → [String: UInt64]: JSON requires String keys in dictionaries.
-        let trackOverrides: [String: UInt64]
+        var trackOverrides: [String: UInt64]
         // Instrument pool indices per track. Optional so old persisted data decodes as nil.
         let instrumentOverrides: [String: Int]?
         // Substyle display name (e.g. "Ambient Piano", "Chill Blues"). Optional so old persisted data decodes as nil.
@@ -296,6 +296,13 @@ final class AppState: ObservableObject {
                 Dictionary(uniqueKeysWithValues: instrumentOverrides.map { (String($0.key), $0.value) })
             substyleName            = state.displayStyleName
         }
+
+        // The saved Chill substyle, replayed on reload so a later change to the Soho share cannot
+        // turn a saved song into another substyle. Only an explicit saved name counts: songs from
+        // before substyleName existed are left to the seed.
+        var savedAsBlues:     Bool { style == .chill && substyleName == "Chill Blues" }
+        var savedAsSoho:      Bool { style == .chill && substyleName == "Chill Soho" }
+        var savedAsBaseChill: Bool { style == .chill && substyleName == "Chill" }
 
         /// Decodes `instrumentOverrides` (String keys) back to `[Int: Int]`.
         var decodedTrackOverrides: [Int: UInt64] {
@@ -346,7 +353,8 @@ final class AppState: ObservableObject {
     nonisolated static func regenerateSong(seed: UInt64, keyOverride: String?, tempoOverride: Int?,
                                            moodOverride: Mood?, style: MusicStyle,
                                            forced: [String: String], trackOverrides: [Int: UInt64],
-                                           forceBlues: Bool = false, forceSoho: Bool = false) -> SongState {
+                                           forceBlues: Bool = false, forceSoho: Bool = false,
+                                           forbidSoho: Bool = false) -> SongState {
         var state = SongGenerator.generate(
             seed:                 seed,
             keyOverride:          keyOverride,
@@ -364,6 +372,7 @@ final class AppState: ObservableObject {
             useBrushKit:          forced["BrushKit"] == "true",
             forceBluesVariation:  forceBlues,
             forceSohoVariation:   forceSoho,
+            forbidSohoVariation:  forbidSoho,
             forceAmbientPianoRule: forced["Piano"]
         )
         for idx in trackOverrides.keys.sorted() {
@@ -410,7 +419,9 @@ final class AppState: ObservableObject {
                 let state = Self.regenerateSong(seed: song.seed, keyOverride: song.keyOverride,
                                                 tempoOverride: song.tempoOverride, moodOverride: song.moodOverride,
                                                 style: song.style, forced: song.forcedRules,
-                                                trackOverrides: song.decodedTrackOverrides)
+                                                trackOverrides: song.decodedTrackOverrides,
+                                                forceBlues: song.savedAsBlues, forceSoho: song.savedAsSoho,
+                                                forbidSoho: song.savedAsBaseChill)
                 var finalState = state
                 finalState.title = song.title   // preserve the title from when the song was generated
                 await MainActor.run {
@@ -875,6 +886,60 @@ final class AppState: ObservableObject {
     /// Must be called right before playback.play() at each song-load site.
     /// TrackRowView.onChange(of: defaultsResetToken) fires on the NEXT SwiftUI render cycle
     /// (deferred), so without this call the first notes play with stale/default programs.
+    /// The "Instruments" log line from the programs actually loaded in the playback engine.
+    /// Format:  Instruments  L1:73  L2:11  Pd:95  Ry:4  Tx:49  Bs:35  Dr:40
+    private func instrumentsLogEntry(style: MusicStyle) -> GenerationLogEntry {
+        // Format:  Instruments  L1:73  L2:11  Pd:95  Ry:4  Tx:49  Bs:35  Dr:40
+        // Chill texture (240+) is an audio file, not a MIDI patch — shown as "audio".
+        // kTrackCount=8 (includes kTrackLeadSynth=7, Kosmic-only silent doubling layer).
+        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
+        var parts: [String] = []
+        for i in 0..<kTrackCount {
+            let p = playback.loadedProgram(forTrack: i)
+            // Chill audio textures are files, not MIDI patches — report by name, matching
+            // the Ambient branch below. Previously skipped entirely, so a Chill song's
+            // texture never appeared in the log at all.
+            if i == kTrackTexture && style == .chill && songState?.chillSohoVariation != true {
+                if let texFile = songState?.chillAudioTexture {
+                    parts.append("Tx:\(Self.chillTextureDisplayName(texFile))")
+                }
+                continue
+            }
+            // MUST come before the isTrackSilent() skip below. An Ambient audio texture has
+            // no MIDI events (the audio file replaces them), so isTrackSilent() reports it
+            // silent and the Tx: entry was never emitted — the log could not show which
+            // texture was playing, which made the Sept 2026 iPhone texture bug much harder
+            // to diagnose than it needed to be.
+            if i == kTrackTexture && style == .ambient,
+               let texFile = songState?.ambientAudioTexture {
+                parts.append("Tx:\(Self.ambientAudioDisplayName(texFile))")
+                continue
+            }
+            if let s = songState, SongLogExporter.isTrackSilent(i, song: s) { continue }
+            if p != 255 {   // omit tracks that weren't loaded (e.g. LeadSynth in non-Kosmic)
+                parts.append("\(shortNames[i]):\(p)")
+            }
+        }
+        return GenerationLogEntry(tag: "Instruments", description: parts.joined(separator: " "), isTitle: false)
+    }
+
+    /// The current song with its "Instruments" line rebuilt from what is playing now, for
+    /// saving and sharing. The line was written only when a song loaded, so an instrument
+    /// changed afterwards (⚡ REGEN, the picker, an orb gesture) was lost from the saved file
+    /// and the song reopened with its old instrument (The Walled Lake Option, 2026-10-18).
+    /// Replaced in place so the line keeps its position in the file's log.
+    func songStateForSaving() -> SongState? {
+        guard var song = songState else { return nil }
+        let entry = instrumentsLogEntry(style: song.style)
+        if let idx = song.generationLog.lastIndex(where: { $0.tag == "Instruments" }) {
+            song.generationLog[idx] = entry
+        } else {
+            song.generationLog.append(entry)
+        }
+        songState = song
+        return song
+    }
+
     private func applyCurrentInstrumentsToPlayback() {
         // iOS: loadSoundBankInstrument() must be called while the engine is stopped —
         // calling it while running appears to succeed but produces silence. Stop once,
@@ -935,38 +1000,7 @@ final class AppState: ObservableObject {
         #endif
 
         // Log the actual programs loaded so mismatches are immediately visible.
-        // Format:  Instruments  L1:73  L2:11  Pd:95  Ry:4  Tx:49  Bs:35  Dr:40
-        // Chill texture (240+) is an audio file, not a MIDI patch — shown as "audio".
-        // kTrackCount=8 (includes kTrackLeadSynth=7, Kosmic-only silent doubling layer).
-        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
-        var parts: [String] = []
-        for i in 0..<kTrackCount {
-            let p = playback.loadedProgram(forTrack: i)
-            // Chill audio textures are files, not MIDI patches — report by name, matching
-            // the Ambient branch below. Previously skipped entirely, so a Chill song's
-            // texture never appeared in the log at all.
-            if i == kTrackTexture && style == .chill && songState?.chillSohoVariation != true {
-                if let texFile = songState?.chillAudioTexture {
-                    parts.append("Tx:\(Self.chillTextureDisplayName(texFile))")
-                }
-                continue
-            }
-            // MUST come before the isTrackSilent() skip below. An Ambient audio texture has
-            // no MIDI events (the audio file replaces them), so isTrackSilent() reports it
-            // silent and the Tx: entry was never emitted — the log could not show which
-            // texture was playing, which made the Sept 2026 iPhone texture bug much harder
-            // to diagnose than it needed to be.
-            if i == kTrackTexture && style == .ambient,
-               let texFile = songState?.ambientAudioTexture {
-                parts.append("Tx:\(Self.ambientAudioDisplayName(texFile))")
-                continue
-            }
-            if let s = songState, SongLogExporter.isTrackSilent(i, song: s) { continue }
-            if p != 255 {   // omit tracks that weren't loaded (e.g. LeadSynth in non-Kosmic)
-                parts.append("\(shortNames[i]):\(p)")
-            }
-        }
-        let instrumentsEntry = GenerationLogEntry(tag: "Instruments", description: parts.joined(separator: " "), isTitle: false)
+        let instrumentsEntry = instrumentsLogEntry(style: style)
         appendToLog([instrumentsEntry])
         // Also store in songState.generationLog so SongLogExporter writes it to .zudio files.
         songState?.generationLog.removeAll { $0.tag == "Instruments" }
@@ -1374,7 +1408,10 @@ final class AppState: ObservableObject {
         let triggerStep = (visibleBarOffset + Int(Double(visibleBars) * 0.85)) * 16
         if step >= triggerStep {
             let newOffset = max(0, step / 16 - Int(Double(visibleBars) * 0.15))
-            visibleBarOffset = min(newOffset, max(0, totalBars - visibleBars))
+            let clamped   = min(newOffset, max(0, totalBars - visibleBars))
+            // Once clamped at the song end this stays true every step; @Published fires even for
+            // an unchanged value and re-renders the whole app, so assign only on a real change.
+            if clamped != visibleBarOffset { visibleBarOffset = clamped }
         }
     }
 
@@ -1670,7 +1707,21 @@ final class AppState: ObservableObject {
             } else {
                 newEvents = regen.trackEvents[trackIndex]
             }
-            var updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries)
+            // Carry the regen's step annotations (bass slides, variation bars, returns to form),
+            // spliced at the same point as the events in evolve.
+            let newAnnotations: [Int: [GenerationLogEntry]]
+            if let bodyEnd = evolveBodyEndStep {
+                newAnnotations = regen.stepAnnotations.filter { $0.key < bodyEnd }
+                    .merging(current.stepAnnotations.filter { $0.key >= bodyEnd }) { a, _ in a }
+            } else {
+                newAnnotations = regen.stepAnnotations
+            }
+            var updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries,
+                                                  replacingStepAnnotations: newAnnotations)
+            // Keep the regen's track seed. Without it a saved file or history entry replays the
+            // old seed and rebuilds the track as it was before ⚡REGEN, and bass slides (seeded
+            // from this override) play the old track's slides over the new bass.
+            updated.trackOverrides[trackIndex] = regen.trackOverrides[trackIndex]
             // For Ambient texture regen: carry the new audio texture choice (may differ from current).
             if trackIndex == kTrackTexture && current.style == .ambient {
                 updated = updated.withAmbientAudioTexture(regen.ambientAudioTexture,
@@ -1683,6 +1734,14 @@ final class AppState: ObservableObject {
                 // Keep generationHistory in sync for SongState tracking
                 if !self.generationHistory.isEmpty {
                     self.generationHistory[self.generationHistory.count - 1] = updated
+                }
+                // Record the new track seed in the Songs list so ⏮ and relaunch replay this
+                // version. Not in evolve: the playing state there is a splice of passes.
+                if evolveBodyEndStep == nil,
+                   let idx = self.persistedHistory.firstIndex(where: { $0.seed == updated.globalSeed }) {
+                    self.persistedHistory[idx].trackOverrides = Dictionary(uniqueKeysWithValues:
+                        updated.trackOverrides.map { (String($0.key), $0.value) })
+                    self.savePersistedHistory()
                 }
                 // Restart ambient audio texture if the regen changed it; sync picker index.
                 if trackIndex == kTrackTexture && updated.style == .ambient {
@@ -3162,7 +3221,7 @@ final class AppState: ObservableObject {
 
     /// Writes the current song to a temp .zudio file and returns its URL for sharing.
     func buildShareURL() -> URL? {
-        guard let song = songState else { return nil }
+        guard let song = songStateForSaving() else { return nil }
         return SongLogExporter.shareURL(for: song)
     }
 
@@ -3181,7 +3240,7 @@ final class AppState: ObservableObject {
 #endif
 
     func saveMIDI() {
-        guard let song = songState else { return }
+        guard let song = songStateForSaving() else { return }
         saveFlashCounter += 1
         #if os(macOS)
         guard let zudioURL = AudioFileExporter.presentSaveSongPanel(songName: song.title) else { return }
@@ -3339,7 +3398,9 @@ final class AppState: ObservableObject {
             var state = Self.regenerateSong(seed: seed, keyOverride: loadKey, tempoOverride: loadTempo,
                                             moodOverride: loadMood, style: style, forced: loadForced,
                                             trackOverrides: overrides,
-                                            forceBlues: loadBlues, forceSoho: loadSoho)
+                                            forceBlues: loadBlues, forceSoho: loadSoho,
+                                            // A Chill file without either line was saved as base Chill.
+                                            forbidSoho: style == .chill && !loadBlues && !loadSoho)
             await MainActor.run {
                 self.selectedStyle    = style
                 self.keyOverride      = loadKey
@@ -3355,6 +3416,15 @@ final class AppState: ObservableObject {
                 self.lastEmittedStep  = -1
                 self.instrumentOverrides = loadedInstOverrides
                 self.applyLoadedInstruments(for: state)   // texture positions included
+                // applyLoadedInstruments pins the Chill leads to the generator's instruments.
+                // A file records what was actually playing, so a lead changed before saving
+                // (⚡ REGEN, the picker) comes back as saved, not as first generated.
+                if style == .chill {
+                    for t in [kTrackLead1, kTrackLead2] {
+                        if let idx = loadedInstOverrides[t] { self.instrumentOverrides[t] = idx }
+                    }
+                    self.sessionInstrumentOverrides[state.globalSeed] = self.instrumentOverrides
+                }
                 self.appendPersistedSong(from: state)   // after the instruments, as in generateNew
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
@@ -4103,7 +4173,9 @@ final class AppState: ObservableObject {
             var state = Self.regenerateSong(seed: song.seed, keyOverride: song.keyOverride,
                                             tempoOverride: song.tempoOverride, moodOverride: song.moodOverride,
                                             style: song.style, forced: song.forcedRules,
-                                            trackOverrides: song.decodedTrackOverrides)
+                                            trackOverrides: song.decodedTrackOverrides,
+                                            forceBlues: song.savedAsBlues, forceSoho: song.savedAsSoho,
+                                            forbidSoho: song.savedAsBaseChill)
             await MainActor.run {
                 state.title = song.title   // preserve the title from when the song was generated
                 self.isGenerating  = false

@@ -6,6 +6,13 @@
 
 import SwiftUI
 
+/// Re-evaluates `content` whenever the visualizer feed publishes.
+private struct VisualizerFeedObserver<Content: View>: View {
+    @ObservedObject var feed: VisualizerFeed
+    @ViewBuilder var content: () -> Content
+    var body: some View { content() }
+}
+
 // Reusable per-frame storage — avoids heap allocations every 83ms.
 private final class OrbFrameCache {
     var hx       = [Double](repeating: 0.5,  count: kTrackCount)
@@ -42,6 +49,11 @@ struct VisualizerView: View {
     @State private var prevNudgeTempo: Int? = nil
 
     var body: some View {
+        // Re-render on orb note changes; PlaybackEngine no longer publishes them itself.
+        VisualizerFeedObserver(feed: playback.visualizerFeed) { visualizerBody }
+    }
+
+    @ViewBuilder private var visualizerBody: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 12,
                                 paused: !playback.isPlaying && playback.activeVisualizerNotes.isEmpty)) { tl in
             Canvas { ctx, size in

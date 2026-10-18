@@ -33,6 +33,7 @@ struct SongGenerator {
         useBrushKit:          Bool    = false,
         forceBluesVariation:  Bool    = false,
         forceSohoVariation:   Bool    = false,
+        forbidSohoVariation:  Bool    = false,
         forceAmbientPianoRule: String? = nil
     ) -> SongState {
         let globalSeed = UInt64.random(in: .min ... .max)
@@ -46,6 +47,7 @@ struct SongGenerator {
                         useBrushKit: useBrushKit,
                         forceBluesVariation: forceBluesVariation,
                         forceSohoVariation: forceSohoVariation,
+                        forbidSohoVariation: forbidSohoVariation,
                         forceAmbientPianoRule: forceAmbientPianoRule)
     }
 
@@ -67,6 +69,7 @@ struct SongGenerator {
         useBrushKit:          Bool    = false,
         forceBluesVariation:  Bool    = false,
         forceSohoVariation:   Bool    = false,
+        forbidSohoVariation:  Bool    = false,
         forceAmbientPianoRule: String? = nil
     ) -> SongState {
         switch style {
@@ -104,7 +107,8 @@ struct SongGenerator {
                                  forceRhythmRuleID: forceArpRuleID,
                                  forceTexRuleID: forceTexRuleID,
                                  forceBluesVariation: forceBluesVariation,
-                                 forceSohoVariation: forceSohoVariation))
+                                 forceSohoVariation: forceSohoVariation,
+                                 forbidSohoVariation: forbidSohoVariation))
         }
     }
 
@@ -3748,7 +3752,8 @@ struct SongGenerator {
         forceRhythmRuleID:  String? = nil,
         forceTexRuleID:     String? = nil,
         forceBluesVariation: Bool = false,
-        forceSohoVariation:  Bool = false
+        forceSohoVariation:  Bool = false,
+        forbidSohoVariation: Bool = false
     ) -> SongState {
         var rng = SeededRNG(seed: seed)
 
@@ -3758,7 +3763,9 @@ struct SongGenerator {
         // below is the cautionary example: `force || rng.nextDouble()` short-circuits, so a forced
         // reload consumes zero main-stream draws where the original consumed one.
         var sohoRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 90))
-        let sohoRoll = sohoRNG.nextDouble()
+        // A reload of a song saved as base Chill forbids Soho (roll 1.0 never activates it), so a
+        // later rise in the Soho share cannot turn it into a Soho song. Own stream: no other draw moves.
+        let sohoRoll = forbidSohoVariation ? 1.0 : sohoRNG.nextDouble()
 
         // Derive forced beat style and lead instrument from rule IDs (best-first-song / load path).
         // CHL-DRUM-004 = stGermain four-on-the-floor; forcing the beat style also biases
