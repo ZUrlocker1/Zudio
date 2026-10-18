@@ -33,6 +33,11 @@ final class AudioTexturePlayer {
     private var bypassEffects: Bool = false
     /// Tracks which effect mode was last configured so loadFactoryPreset is skipped when unchanged.
     private var lastEffectsMode: Bool? = nil
+    /// The most recently decoded texture, whole. Every start used to decode the file on the
+    /// main thread (every Play after Stop, every song with the same texture), and twice when
+    /// the offset was 0: once for the tail, once for the loop. One entry is the memory an
+    /// active texture already holds (up to about 15 MB), so it is safe on iOS too.
+    private var decodedLoop: (filename: String, buffer: AVAudioPCMBuffer)? = nil
 
     init() {
         setupEngine()
@@ -41,7 +46,9 @@ final class AudioTexturePlayer {
     // MARK: - Public
 
     /// Call when playback starts. `texture` is a filename (e.g. "light_rain.m4a") or nil for silence.
-    func start(style: MusicStyle, texture: String?, offsetSeconds: Int = 0) {
+    /// `offsetSeconds` is the position in the file to start from — the song's saved texture
+    /// offset plus the song time at the playhead (AppState.textureSeconds) — wrapped into the loop.
+    func start(style: MusicStyle, texture: String?, offsetSeconds: Double = 0) {
         guard (style == .chill || style == .ambient), let filename = texture else { stopImmediate(); return }
         bypassEffects = (style == .ambient)
         // Skip restart only if already playing this exact file at the same offset with no fade in progress.
@@ -83,7 +90,7 @@ final class AudioTexturePlayer {
     #endif
 
     /// Live swap to a different texture (e.g. user cycling picker): fast crossfade ≤500 ms.
-    func switchTexture(_ filename: String?, offsetSeconds: Int = 0) {
+    func switchTexture(_ filename: String?, offsetSeconds: Double = 0) {
         guard let filename else { stopImmediate(); return }
         isFadingOut = true
         fastFadeOut { [weak self] in
@@ -92,6 +99,13 @@ final class AudioTexturePlayer {
             self.playerNode.stop()
             self.startFile(filename: filename, fastFadeIn: true, offsetSeconds: offsetSeconds)
         }
+    }
+
+    /// Moves the playing texture to `seconds` in its file with a short crossfade, after a seek or
+    /// a tempo change, so it stays where the song (and the waveform lane) say it should be.
+    func reposition(toSeconds seconds: Double) {
+        guard let filename = currentFilename, playerNode.isPlaying, !isFadingOut else { return }
+        switchTexture(filename, offsetSeconds: seconds)
     }
 
     /// Whether the texture is silenced, by its own mute or by a solo on another track. The file
@@ -195,7 +209,7 @@ final class AudioTexturePlayer {
 
     // MARK: - File playback
 
-    private func startFile(filename: String, fastFadeIn: Bool = false, offsetSeconds: Int = 0) {
+    private func startFile(filename: String, fastFadeIn: Bool = false, offsetSeconds: Double = 0) {
         guard let url = textureURL(filename: filename) else { return }
         currentFilename = filename
         currentTargetVolume = volumeForTexture(filename)
@@ -225,31 +239,23 @@ final class AudioTexturePlayer {
         }
         if !engine.isRunning { try? engine.start() }
         do {
-            let file        = try AVAudioFile(forReading: url)
-            let sampleRate  = file.processingFormat.sampleRate
-            let totalFrames = AVAudioFrameCount(file.length)
+            // Full file for seamless looping from the start
+            let loopBuffer  = try loopBuffer(for: filename, url: url)
+            let sampleRate  = loopBuffer.format.sampleRate
+            let totalFrames = loopBuffer.frameLength
 
-            // Clamp offset to valid range (0 ... fileLength-1)
-            let rawOffset   = AVAudioFramePosition(Double(offsetSeconds) * sampleRate)
-            let offsetFrame = min(rawOffset, AVAudioFramePosition(totalFrames) - 1)
-
-            // Read tail: from offsetFrame to end of file (scheduled once, no loop)
-            file.framePosition = offsetFrame
-            let tailFrames = AVAudioFrameCount(Int64(totalFrames) - offsetFrame)
-            guard tailFrames > 0,
-                  let tailBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-                                                    frameCapacity: tailFrames) else { return }
-            try file.read(into: tailBuffer)
-
-            // Read full file for seamless looping from the start
-            file.framePosition = 0
-            guard let loopBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-                                                    frameCapacity: totalFrames) else { return }
-            try file.read(into: loopBuffer)
+            // Wrap into the loop: past the file's end the loop has come round again, which is
+            // also how the waveform lane draws it.
+            let rawOffset   = AVAudioFramePosition(max(0, offsetSeconds) * sampleRate)
+            let offsetFrame = totalFrames > 0 ? rawOffset % AVAudioFramePosition(totalFrames) : 0
 
             playerNode.volume = 0.0
-            // Play the tail once (offsetFrame → end), then loop the full file forever
-            playerNode.scheduleBuffer(tailBuffer, at: nil, completionHandler: nil)
+            // Play the tail once (offsetFrame → end), then loop the full file forever. At offset 0
+            // the tail is the whole file, so the loop alone plays the same thing.
+            if offsetFrame > 0 {
+                guard let tailBuffer = Self.tail(of: loopBuffer, from: AVAudioFrameCount(offsetFrame)) else { return }
+                playerNode.scheduleBuffer(tailBuffer, at: nil, completionHandler: nil)
+            }
             playerNode.scheduleBuffer(loopBuffer, at: nil, options: .loops, completionHandler: nil)
             playerNode.play()
             // A texture that starts muted, or while another track is soloed, stays silent until
@@ -259,6 +265,41 @@ final class AudioTexturePlayer {
             }
             startPan()
         } catch { }   // Unreadable file — silent fallback, no crash.
+    }
+
+    /// The whole texture decoded, from the cache when it is the same file as last time.
+    private func loopBuffer(for filename: String, url: URL) throws -> AVAudioPCMBuffer {
+        if let cached = decodedLoop, cached.filename == filename { return cached.buffer }
+        decodedLoop = nil   // release the previous file before decoding the next
+        let file = try AVAudioFile(forReading: url)
+        guard file.length > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                            frameCapacity: AVAudioFrameCount(file.length))
+        else { throw CocoaError(.fileReadCorruptFile) }
+        try file.read(into: buffer)
+        decodedLoop = (filename, buffer)
+        return buffer
+    }
+
+    /// A copy of `buffer` from `start` to its end: the once-through tail before the loop.
+    /// Copied from the decoded loop rather than decoded again from the file.
+    static func tail(of buffer: AVAudioPCMBuffer, from start: AVAudioFrameCount) -> AVAudioPCMBuffer? {
+        guard start < buffer.frameLength, let src = buffer.floatChannelData,
+              let tail = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength - start),
+              let dst = tail.floatChannelData else { return nil }
+        let frames = Int(buffer.frameLength - start)
+        if buffer.format.isInterleaved {
+            // One pointer holding every channel, frame by frame.
+            let channels = Int(buffer.format.channelCount)
+            dst[0].update(from: src[0] + Int(start) * channels, count: frames * channels)
+        } else {
+            // One pointer per channel — the format AVAudioFile decodes to.
+            for ch in 0..<Int(buffer.format.channelCount) {
+                dst[ch].update(from: src[ch] + Int(start), count: frames)
+            }
+        }
+        tail.frameLength = AVAudioFrameCount(frames)
+        return tail
     }
 
     /// Each play-through: randomly apply a subtle high-pass filter for tonal variety.

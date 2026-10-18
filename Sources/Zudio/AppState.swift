@@ -1257,6 +1257,7 @@ final class AppState: ObservableObject {
                       bpm != current.frame.tempo else { return }
                 self.playback.setTempo(bpm)
                 self.songState = self.playback.songState
+                self.syncTextureToPlayhead()   // same file time now falls at a different bar
             }
                 .store(in: &cancellables)
 
@@ -1668,7 +1669,7 @@ final class AppState: ObservableObject {
                     // Start ambient audio texture directly (Chill is handled via setProgram/switchTexture).
                     if state.style == .ambient, let texFile = state.ambientAudioTexture {
                         self.audioTexture.start(style: .ambient, texture: texFile,
-                                                offsetSeconds: state.ambientAudioTextureOffset)
+                                                offsetSeconds: self.textureSeconds(atStep: self.playback.currentStep, in: state))
                     }
                     self.incrementPlayCountAndRequestReviewIfNeeded()
                 }
@@ -1778,7 +1779,7 @@ final class AppState: ObservableObject {
                 // Restart ambient audio texture if the regen changed it; sync picker index.
                 if trackIndex == kTrackTexture && updated.style == .ambient {
                     self.audioTexture.start(style: .ambient, texture: updated.ambientAudioTexture,
-                                            offsetSeconds: updated.ambientAudioTextureOffset)
+                                            offsetSeconds: self.textureSeconds(atStep: self.playback.currentStep, in: updated))
                     if let audioTex = updated.ambientAudioTexture {
                         let prog = Self.ambientAudioProgram(forFilename: audioTex)
                         self.instrumentOverrides[kTrackTexture] = Int(prog) - 231
@@ -1820,8 +1821,8 @@ final class AppState: ObservableObject {
             }
             playback.play()
             let texFile   = selectedStyle == .ambient ? songState?.ambientAudioTexture : songState?.chillAudioTexture
-            let texOffset = selectedStyle == .ambient ? (songState?.ambientAudioTextureOffset ?? 0) : (songState?.chillAudioTextureOffset ?? 0)
-            audioTexture.start(style: selectedStyle, texture: texFile, offsetSeconds: texOffset)
+            audioTexture.start(style: selectedStyle, texture: texFile,
+                               offsetSeconds: textureSeconds(atStep: playback.currentStep))
         }
     }
 
@@ -1854,8 +1855,38 @@ final class AppState: ObservableObject {
 
     // MARK: - Seek
 
+    // MARK: - Audio texture follows the song
+
+    /// Where the audio texture should be when the playhead is at `step`: the song's saved
+    /// texture offset plus the song time to that step. AudioWaveformView draws the file on the
+    /// same terms, so following this keeps what plays and what the lane shows together.
+    ///
+    /// Before 2026-10-18 every start used the bare offset, as if at bar 1: Play mid-song, a
+    /// seek, a texture switch or a tempo change left the texture somewhere other than where the
+    /// lane drew it, so a loud stretch of the waveform could pass with nothing loud heard.
+    private func textureSeconds(atStep step: Int, in state: SongState? = nil) -> Double {
+        guard let s = state ?? songState else { return 0 }
+        let offset = s.style == .ambient ? s.ambientAudioTextureOffset : s.chillAudioTextureOffset
+        return Double(offset) + Double(step) * s.frame.secondsPerStep
+    }
+
+    private var textureSyncToken = 0
+
+    /// Moves a playing texture to the playhead after a seek or tempo change. Debounced, so a
+    /// drag across the lanes repositions once when it settles rather than on every move.
+    private func syncTextureToPlayhead() {
+        guard playback.isPlaying else { return }   // Play positions it itself
+        textureSyncToken += 1
+        let token = textureSyncToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self, token == self.textureSyncToken, self.playback.isPlaying else { return }
+            self.audioTexture.reposition(toSeconds: self.textureSeconds(atStep: self.playback.currentStep))
+        }
+    }
+
     func seekTo(step: Int) {
         playback.seek(toStep: step)
+        syncTextureToPlayhead()
         // Reset annotation pointer so seeks don't re-emit or skip annotations
         lastEmittedStep = step - 1
         // Only scroll the window if the target bar is outside the current visible range.
@@ -3234,8 +3265,8 @@ final class AppState: ObservableObject {
             prepareSleepTimerForPlayback()
             playback.play()
             let texFile2   = state.style == .ambient ? state.ambientAudioTexture : state.chillAudioTexture
-            let texOffset2 = state.style == .ambient ? state.ambientAudioTextureOffset : state.chillAudioTextureOffset
-            audioTexture.start(style: state.style, texture: texFile2, offsetSeconds: texOffset2)
+            audioTexture.start(style: state.style, texture: texFile2,
+                               offsetSeconds: textureSeconds(atStep: playback.currentStep, in: state))
         }
         platformHost?.dismissKeyboard()
     }
@@ -3279,6 +3310,7 @@ final class AppState: ObservableObject {
     /// enough to keep the playhead visible with a small margin.
     private func seekEdgeSensitive(toBar targetBar: Int) {
         playback.seek(toStep: targetBar * 16)
+        syncTextureToPlayhead()
 
         let totalBars  = songState?.frame.totalBars ?? 32
         let winStart   = visibleBarOffset
@@ -3717,7 +3749,7 @@ final class AppState: ObservableObject {
             let filename = Self.chillTextureFilename(forProgram: program)
             songState = songState?.withChillAudioTexture(filename)
             if playback.isPlaying {
-                audioTexture.switchTexture(filename, offsetSeconds: songState?.chillAudioTextureOffset ?? 0)
+                audioTexture.switchTexture(filename, offsetSeconds: textureSeconds(atStep: playback.currentStep))
             }
             return
         }
@@ -3727,7 +3759,8 @@ final class AppState: ObservableObject {
             let offset = songState?.ambientAudioTextureOffset ?? 0
             songState = songState?.withAmbientAudioTexture(filename, offset: offset)
             if playback.isPlaying {
-                audioTexture.start(style: .ambient, texture: filename, offsetSeconds: offset)
+                audioTexture.start(style: .ambient, texture: filename,
+                                   offsetSeconds: textureSeconds(atStep: playback.currentStep))
             }
             return
         }
@@ -4270,8 +4303,8 @@ final class AppState: ObservableObject {
             // reloading a song that was still in generationHistory played every MIDI track
             // but left the audio texture silent, while the log correctly reported it.
             let texFile   = state.style == .ambient ? state.ambientAudioTexture : state.chillAudioTexture
-            let texOffset = state.style == .ambient ? state.ambientAudioTextureOffset : state.chillAudioTextureOffset
-            audioTexture.start(style: state.style, texture: texFile, offsetSeconds: texOffset)
+            audioTexture.start(style: state.style, texture: texFile,
+                               offsetSeconds: textureSeconds(atStep: playback.currentStep, in: state))
         }
         if playMode == .evolve { tearDownEvolve(); startEvolveMode(from: state) }
     }

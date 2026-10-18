@@ -52,6 +52,25 @@ enum OfflineExport {
     )
     // MARK: - Public render entry point
 
+    /// The texture's saved start position in its file, in seconds. The song starts at bar 1,
+    /// so this is where live playback starts it too (AppState.textureSeconds at step 0).
+    private static func textureOffsetSeconds(_ state: SongState) -> Double {
+        Double(state.style == .ambient ? state.ambientAudioTextureOffset : state.chillAudioTextureOffset)
+    }
+
+    /// Schedules the texture as live playback does: the tail from the offset once, then the
+    /// whole file looping. Export used to loop from the file's start, ignoring the offset, so
+    /// an exported texture sat somewhere other than where playback and the lane put it.
+    private static func scheduleTexture(_ buf: AVAudioPCMBuffer, on player: AVAudioPlayerNode,
+                                        offsetSeconds: Double) {
+        let total = AVAudioFramePosition(buf.frameLength)
+        let start = total > 0 ? AVAudioFramePosition(offsetSeconds * buf.format.sampleRate) % total : 0
+        if start > 0, let tail = AudioTexturePlayer.tail(of: buf, from: AVAudioFrameCount(start)) {
+            player.scheduleBuffer(tail, at: nil, completionHandler: nil)
+        }
+        player.scheduleBuffer(buf, at: nil, options: .loops, completionHandler: nil)
+    }
+
     /// Two-phase render: dry AUSampler per track → per-track CAF → offline effects engine → M4A.
     /// - `snapshots`: effect settings captured from PlaybackEngine at export time.
     /// - `textureSnapshot`: current AudioTexturePlayer state (nil if no texture active).
@@ -423,9 +442,10 @@ enum OfflineExport {
             players[i].play()
         }
 
-        // Schedule looping texture buffer (volume already set above)
+        // Schedule looping texture buffer (volume already set above), from the song's saved
+        // texture offset as live playback and the waveform lane do.
         if let tp = texturePlayer, let buf = textureLoopBuf {
-            tp.scheduleBuffer(buf, at: nil, options: .loops, completionHandler: nil)
+            scheduleTexture(buf, on: tp, offsetSeconds: textureOffsetSeconds(state))
             tp.play()
         }
 
@@ -757,7 +777,7 @@ enum OfflineExport {
                 try texEngine.enableManualRenderingMode(.offline, format: avFormat,
                                                         maximumFrameCount: 4096)
                 try texEngine.start()
-                tPlayer.scheduleBuffer(texBuf, at: nil, options: .loops, completionHandler: nil)
+                scheduleTexture(texBuf, on: tPlayer, offsetSeconds: textureOffsetSeconds(state))
                 tPlayer.play()
 
                 let texFile = try AVAudioFile(

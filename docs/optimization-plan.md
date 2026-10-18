@@ -112,6 +112,8 @@ Generation, Chill Soho included, was reviewed and found cheap (single pass per b
 
 - **Reverb buses bypassed when nothing sends to them.** A 100%-wet bus reverb on silent input still ran its DSP: the large bus in every Chill and Motorik song, and either bus with all its chips off. A bus un-bypasses the moment a send goes live and bypasses 10 s after its last send goes quiet, so a tail is never cut. Hooked into applyReverbAmount, the one path every send level takes.
 
+- **Texture decode cached.** Every texture start decoded the whole file on the main thread (every Play after Stop), twice at offset 0. The last decoded file is kept (one entry, the memory an active texture already holds), the tail is copied from it, and at offset 0 the loop alone plays.
+
 Measured by Zack in Activity Monitor: a couple of points lower during playback, under 10% with no visualizer showing.
 
 ### Save and reload bugs fixed alongside
@@ -132,13 +134,18 @@ Covered by Tests/ZudioTests/SaveReloadRoundTripTests.swift (each test fails on t
 - **Leads in sync:** pass 1 regenerated Lead 2 against the anchor's Lead 1, so it filled the old Lead 1's gaps. Lead 2 now gets the new Lead 1. Share of Lead 2 notes in bars where Lead 1 plays, 40 songs each: Chill 24% generated, 42% evolve before, 29% after; Motorik 20%, 41%, 32%; Kosmic and Ambient unchanged (their Lead 2 does not place itself by Lead 1's bars). The rest of the gap is the hand-off bars that first generation passes and a regeneration cannot recover from events.
 - **Retries:** a regenerated track must now bring at least one new rule, not only new rules. Blues Lead 2 (CHL-LD2-001) and Blues Pads (CHL-PAD-004) have one rule each and skip the test; every Blues pass used to run all four regenerations on both. Chill Rhythm logs two rules and rarely got two new ones.
 
+### Audio texture follows the song (2026-10-18)
+
+The waveform lane draws the texture file as if it started at bar 1 at the song's saved offset and played straight through. Playback did not: Play always started at the bare offset (so resuming at bar 30 played the file's opening while the lane showed bar 30's stretch), seeks left the texture where it was, a picker switch started the new file at its offset, a tempo change moved every bar against the file, and export ignored the offset entirely. Loud stretches of the waveform could pass with nothing loud heard.
+
+Now one rule everywhere: the texture plays from offset + song time at the playhead (AppState.textureSeconds), wrapped into the loop, exactly as the lane draws it. Every start uses it; seeks (click, drag, two-bar steps) and tempo changes reposition with a short crossfade, debounced 0.25 s so a drag repositions once; export schedules the tail from the offset then the loop, sharing AudioTexturePlayer.tail with live playback. Peak drawing was checked and is fine: across all 14 textures at most 2 of 256 slices look loud by peak but are quiet by level.
+
 ### Fingerprint baseline drift (bisected 2026-10-18)
 
 tools/fingerprints/baseline.txt (pinned at 0dfb880) no longer matches Motorik, Kosmic or Ambient. Bisected: the change comes from e0e8b5f and d2645e7, both the deliberate all-style Harmonic filter change (lift whole figures above the pads, decided by the window a figure starts in). Every other generation change in those commits is Chill-only. e0e8b5f notes the baseline was not re-pinned. Re-pin once Zack accepts that released songs in those styles moved.
 
 ### Not done (candidates)
 
-- Cache decoded texture files (removes a main-thread stall at song change).
 - Per-bar AppState re-render, status log incremental rebuild, one shared playhead overlay.
 - Beat Fixup is applied at render-buffer granularity live (0 to about 23 ms on iOS) but sample-accurately in export; a sound decision, not an optimization.
 
