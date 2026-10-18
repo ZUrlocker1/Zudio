@@ -145,6 +145,12 @@ introduction. The ideal first song:
 - **A breakdown**: the Remix Break, the Duo or the bass ostinato — the Soho-only breaks first
 - **A hook that comes home** three or more times ("Lead 1 return to form" in the log)
 
+**A different approach from the other styles.** Motorik, Kosmic, Ambient and base Chill force rule
+IDs on a fresh random song (`bestBass`, `bestDrum` and the rest in `generateNew`). Soho uses curated
+seeds instead, because the generator cannot force the groove, Soho bass rule, Lead 1 or Lead 2
+instrument or breakdown, and adding those parameters would be more code and more replay risk than a
+list of seeds with a test. Forced rules were considered and rejected (Zack, 2026-10-17).
+
 Base Chill keeps its own first song (the St Germain groove). The Soho one plays the first time a
 Soho song would be generated — from Generate or in Endless — on a clean slate (no Soho song in
 the history) with no key, tempo or mood override. It is one of twelve curated seeds in
