@@ -19,8 +19,8 @@
 # filter change (whole figures lifted above the pads; e0e8b5f, d2645e7), bisected and accepted by
 # Zack. Chill moved with the Soho work since 10-15 and the 30/20/50 mix.
 #
-# NOTE: 70/15/15 is a TESTING mix for tuning Chill Soho and will be reverted before release.
-# Reverting it reclassifies seeds and will show a large Chill diff — expected, re-pin again then.
+# NOTE: the Chill mix is now 30/20/50 Soho/Blues/base (2026-10-18). Any later change to the
+# mix reclassifies seeds and shows a large Chill diff — expected; re-pin after checking it.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SP="${ROOT}/tools/fingerprints"
 cd "$ROOT" || exit 1
