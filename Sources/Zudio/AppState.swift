@@ -148,8 +148,7 @@ final class AppState: ObservableObject {
             switch playMode {
             case .song:
                 // Cancel pending pre-gen; song end callback is guarded and will no-op
-                nextSongState            = nil
-                isPreGenerating          = false
+                discardPreGeneratedSong()
                 shouldLogNextUpWhenReady = false
                 upNextLogged             = false
             case .evolve:
@@ -473,8 +472,15 @@ final class AppState: ObservableObject {
     // Incremented by stop() so any 500ms-delayed finishLoadingSong from a just-ended song
     // is cancelled when the user explicitly stops, preventing texture/music from restarting.
     private var endlessTransitionToken:   Int        = 0
-    // Incremented each time a new pre-gen is started; stale task completions that carry an old
-    // token are discarded so they can't overwrite nextSongState with the wrong style.
+    // Incremented each time a pre-gen starts, is discarded or is taken; a task completion that
+    // carries an old token is dropped, so an abandoned pre-gen can't land in nextSongState
+    // later with the wrong style. (This comment described a token that did not exist until
+    // 2026-10-18: two pre-gens could run and whichever finished last won.)
+    private var preGenToken:              Int        = 0
+    // The style-rotation state before the in-flight or ready pre-gen called decideNextStyle().
+    // Restored when that song is discarded unplayed, so an abandoned pre-gen doesn't move the
+    // Endless axis. Cleared when the song is taken for playback.
+    private var preGenAxisSnapshot: (index: Int, inStyle: Int, inPair: Int)? = nil
 
     // Set by onApproachingEnd so preGenerateNextSong() logs "Up next" when it finishes.
     // Kept false for silent pre-gen calls (generateNew, startEndlessSong).
@@ -494,7 +500,23 @@ final class AppState: ObservableObject {
     private var evolvePass1State:      SongState?  = nil
     private var evolvePass2State:      SongState?  = nil
     private var evolveNextSongState:       SongState?  = nil
-    private var evolveIsPreGenerating:     Bool        = false
+    // Separate in-flight flags: pass content and the next song used to share one, so starting
+    // pass 2 made preGenerateEvolveNextSong() return at once and the next song was never
+    // generated early.
+    private var evolvePassInFlight:        Bool        = false
+    private var evolveNextSongInFlight:    Bool        = false
+    // The pass (1 or 2) whose turn came before its content was ready: the in-flight build
+    // switches in when it lands, instead of a second identical build being started.
+    private var evolvePassPending:         Int?        = nil
+    // Set when the next song is due while its pre-generation is still running: it starts when
+    // that lands, instead of a second song being generated.
+    private var evolveNextSongPending:     Bool        = false
+    // Style the in-flight next song is being generated for (waited on only if still selected).
+    private var evolveNextSongPendingStyle: MusicStyle? = nil
+    // Bumped only by tearDownEvolve(). The next song belongs to the session, not to a phase, so
+    // its pre-generation checks this: evolvePhaseToken also moves at every pass switch, which
+    // used to discard a finished next song and leave its in-flight flag set.
+    private var evolveSessionToken:        Int         = 0
     private var evolveNextSongShouldLog:   Bool        = false  // set at 12-bar mark; tells preGen to log when ready
     private var evolveNextSongLogged:      Bool        = false  // prevents duplicate "Up next" at transition
     private var evolveInstrumentsChanged:  Bool        = false  // true if both evolve passes ran before song end
@@ -536,8 +558,7 @@ final class AppState: ObservableObject {
 
         // Reset Endless / Evolve mode state
         playMode             = .song
-        nextSongState        = nil
-        isPreGenerating      = false
+        discardPreGeneratedSong()
         songsInCurrentStyle  = 0
         songsInCurrentPair   = 0
         endlessStyleIndex    = 1
@@ -1561,8 +1582,7 @@ final class AppState: ObservableObject {
                 // discard stale pre-gen, and let preGenerateNextSong advance the counter.
                 if self.playMode == .endless {
                     self.selectedStyle   = style
-                    self.nextSongState   = nil
-                    self.isPreGenerating = false
+                    self.discardPreGeneratedSong()
                     self.preGenerateNextSong()
                 }
                 // Evolve: fresh generate resets evolution state and starts a new evolve session
@@ -1876,6 +1896,30 @@ final class AppState: ObservableObject {
 
     // MARK: - Endless mode helpers
 
+    /// Drops the pre-generated next song, or the one still being generated, and undoes its
+    /// style-rotation step. Every Endless path that throws the next song away comes here.
+    private func discardPreGeneratedSong() {
+        preGenToken    += 1
+        nextSongState   = nil
+        isPreGenerating = false
+        if let s = preGenAxisSnapshot {
+            endlessStyleIndex   = s.index
+            songsInCurrentStyle = s.inStyle
+            songsInCurrentPair  = s.inPair
+        }
+        preGenAxisSnapshot = nil
+    }
+
+    /// Takes the pre-generated next song for playback; its style-rotation step stands.
+    private func takePreGeneratedSong() -> SongState? {
+        guard let next = nextSongState else { return nil }
+        preGenToken       += 1
+        nextSongState      = nil
+        isPreGenerating    = false
+        preGenAxisSnapshot = nil
+        return next
+    }
+
     private func decideNextStyle() -> MusicStyle {
         let atLeft  = endlessStyleIndex == 0
         let atRight = endlessStyleIndex == endlessStyleAxis.count - 1
@@ -1932,13 +1976,16 @@ final class AppState: ObservableObject {
     private func preGenerateNextSong() {
         guard playMode == .endless, !isPreGenerating, nextSongState == nil else { return }
         isPreGenerating = true
+        preGenAxisSnapshot = (endlessStyleIndex, songsInCurrentStyle, songsInCurrentPair)
         let nextStyle = decideNextStyle()
         let hadSoho = hasHadSohoSong
+        preGenToken += 1
+        let token = preGenToken
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
             let state = Self.withFirstSohoSong(SongGenerator.generate(style: nextStyle), hadSoho: hadSoho)
             await MainActor.run {
-                guard self.playMode == .endless else { return }
+                guard self.playMode == .endless, self.preGenToken == token else { return }
                 if state.chillSohoVariation { self.hasHadSohoSong = true }
                 self.nextSongState   = state
                 self.isPreGenerating = false
@@ -1996,12 +2043,11 @@ final class AppState: ObservableObject {
 
     private func handleSongEndedNaturally() {
         guard playMode == .endless else { return }
-        if let next = nextSongState {
+        if let next = takePreGeneratedSong() {
             // "Up next" was already logged when pre-gen completed
-            nextSongState   = nil
-            isPreGenerating = false
             startEndlessSong(next)
         } else {
+            discardPreGeneratedSong()   // a pre-gen still running would land after its turn
             generateAndStartNextSong()
         }
     }
@@ -2500,8 +2546,7 @@ final class AppState: ObservableObject {
         selectedStyle                = state.style
         shouldLogNextUpWhenReady     = false   // reset — next pre-gen is silent until trigger fires
         upNextLogged                 = false
-        nextSongState   = nil
-        isPreGenerating = false
+        discardPreGeneratedSong()   // already taken or discarded by the caller; this clears any stray run
         preGenerateNextSong()   // silently pre-gen the song after next; starts during the gap
         // 500 ms silence between songs.
         // Capture token so if the user presses Stop during the gap, the transition is cancelled.
@@ -2558,11 +2603,10 @@ final class AppState: ObservableObject {
         guard playMode == .endless else { return }
         if stepForwardInGenerationHistory() { return }
         // At the most recent song — use pre-generated or generate new.
-        if let next = nextSongState {
-            nextSongState   = nil
-            isPreGenerating = false
+        if let next = takePreGeneratedSong() {
             startEndlessSong(next)
         } else {
+            discardPreGeneratedSong()   // a pre-gen still running would land after its turn
             generateAndStartNextSong()
         }
     }
@@ -2579,7 +2623,11 @@ final class AppState: ObservableObject {
         evolvePass1State      = nil
         evolvePass2State      = nil
         evolveNextSongState      = nil
-        evolveIsPreGenerating    = false
+        evolvePassInFlight       = false
+        evolveNextSongInFlight   = false
+        evolvePassPending        = nil
+        evolveNextSongPending    = false
+        evolveSessionToken      += 1
         evolveNextSongShouldLog  = false
         evolveNextSongLogged     = false
         evolveInstrumentsChanged = false
@@ -2679,24 +2727,41 @@ final class AppState: ObservableObject {
                                  velocity: $0.velocity, durationSteps: $0.durationSteps) }
         }
         var regenLog: [GenerationLogEntry] = []
+        // Lead 2 is written around Lead 1 (Chill fills Lead 1's gaps; Motorik answers it), and
+        // regenerateTrack reads Lead 1 from the state it is given. Pass 1 regenerates both, so
+        // once Lead 1 is done its new events go into the source for the tracks after it.
+        // Built against the anchor's Lead 1, Lead 2 played over the new one in 41-42% of its
+        // notes in Chill and Motorik, against 20-24% in a generated song (measured 2026-10-18).
+        var source = anchor
         for idx in freshTracks {
             let anchorHadContent = !anchor.trackEvents[idx].isEmpty
-            var regen      = SongGenerator.regenerateTrack(idx, songState: anchor, passBodyBars: passBars)
+            var regen      = SongGenerator.regenerateTrack(idx, songState: source, passBodyBars: passBars)
             var newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
-            // Retry until: (a) new rule differs from every rule used in the anchor AND
+            // Retry until: (a) the regen brings at least one rule the anchor did not use AND
             //              (b) there are body events (not just intro motif) within the pass window.
             //              Solo rules (MOT-LD1-007/008) are completely silent in body bars outside
             //              their solo window. passBodyBars constrains the solo to land within the
             //              pass window, but we still retry if only intro motif notes exist.
+            //
+            // (a) used to demand that EVERY rule be new. A track that logs two rules (Chill
+            // Rhythm's A and B comping modes) rarely managed that, and Blues Lead 2 (CHL-LD2-001)
+            // and Blues Pads (CHL-PAD-004) have a single rule, so no attempt could ever pass:
+            // every Blues pass ran all four full regenerations and kept the last. A fresh seed
+            // is the only change available on a fixed rule, so those skip (a).
+            let ruleIsFixed = anchor.chillBluesVariation && (idx == kTrackLead2 || idx == kTrackPads)
             var attempts = 1
             while attempts < 4 {
                 let newRuleIDs = Set(newEntries.map(\.tag).filter(isRuleID))
                 let eventsEmpty = anchorHadContent &&
                     !regen.trackEvents[idx].contains { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
-                if newRuleIDs.isDisjoint(with: anchorRuleIDs) && !eventsEmpty { break }
-                regen      = SongGenerator.regenerateTrack(idx, songState: anchor, passBodyBars: passBars)
+                let bringsNewRule = ruleIsFixed || newRuleIDs.isEmpty || !newRuleIDs.isSubset(of: anchorRuleIDs)
+                if bringsNewRule && !eventsEmpty { break }
+                regen      = SongGenerator.regenerateTrack(idx, songState: source, passBodyBars: passBars)
                 newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
                 attempts  += 1
+            }
+            if idx == kTrackLead1 {
+                source = source.replacingEvents(regen.trackEvents[kTrackLead1], forTrack: kTrackLead1)
             }
             events[idx] = regen.trackEvents[idx]
                 .filter { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
@@ -2798,7 +2863,7 @@ final class AppState: ObservableObject {
     }
 
     private func preGeneratePassContent(pass: Int) {
-        guard let anchor = evolveAnchorState, !evolveIsPreGenerating else { return }
+        guard let anchor = evolveAnchorState, !evolvePassInFlight else { return }
         var freshTracks: [Int]
         let passBars: Int
         switch pass {
@@ -2815,19 +2880,24 @@ final class AppState: ObservableObject {
         // Ambient piano: modal shift — same rule, different scale mode. No instrument swap.
         if anchor.isAmbientPiano {
             let targetMode = (pass == 1) ? anchor.frame.mode.complementaryMode : anchor.frame.mode
-            evolveIsPreGenerating = true
+            evolvePassInFlight = true
             let tokenAtStart = evolvePhaseToken   // stale-Task guard — see note below
+            let session      = evolveSessionToken
             Task.detached(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
                 let state = Self.buildAmbientModalShiftPass(anchor: anchor, mode: targetMode, passBars: passBars)
                 await MainActor.run {
-                    // If tearDownEvolve() fired since this Task was launched, evolvePhaseToken
-                    // has been incremented and this result belongs to a now-abandoned session.
-                    // Applying it would corrupt songState and cause Next-Track oscillation.
+                    // tearDownEvolve() clears the flag itself; any other discard must clear it
+                    // here, or no pass could ever be built again this session.
+                    guard self.evolveSessionToken == session else { return }
+                    self.evolvePassInFlight = false
+                    // If the phase moved since this Task was launched, this result belongs to a
+                    // now-abandoned phase. Applying it would corrupt songState and cause
+                    // Next-Track oscillation.
                     guard self.playMode == .evolve,
                           self.evolvePhaseToken == tokenAtStart else { return }
                     if pass == 1 { self.evolvePass1State = state } else { self.evolvePass2State = state }
-                    self.evolveIsPreGenerating = false
+                    if self.switchToPendingPass(pass, state) { return }
                     // Pass-2 only: update display immediately (12-bar early look-ahead)
                     if pass == 2, self.evolvePhase == .pass1,
                        let pass1 = self.evolvePass1State {
@@ -2846,16 +2916,19 @@ final class AppState: ObservableObject {
         // If bass or drums are absent from the anchor body, add them to freshTracks so the
         // evolve pass introduces them. Both passes do this so bass/drums persist through pass 2.
         freshTracks += absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
-        evolveIsPreGenerating = true
+        evolvePassInFlight = true
         let tokenAtStart = evolvePhaseToken   // stale-Task guard
+        let session      = evolveSessionToken
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let state = Self.buildPassState(anchor: anchor, freshTracks: freshTracks, passBars: passBars)
             await MainActor.run {
-                // Stale-Task guard: if tearDownEvolve() was called since this Task launched,
-                // the token has changed. Applying a stale result here would overwrite songState
-                // with an extended state built from the old anchor — causing Next-Track to
-                // oscillate between two history entries instead of generating a new song.
+                guard self.evolveSessionToken == session else { return }
+                self.evolvePassInFlight = false
+                // Stale-Task guard: if the phase moved since this Task launched, the token has
+                // changed. Applying a stale result here would overwrite songState with an
+                // extended state built from the old anchor — causing Next-Track to oscillate
+                // between two history entries instead of generating a new song.
                 guard self.playMode == .evolve,
                       self.evolvePhaseToken == tokenAtStart else { return }
                 if pass == 1 {
@@ -2863,7 +2936,7 @@ final class AppState: ObservableObject {
                 } else {
                     self.evolvePass2State = state
                 }
-                self.evolveIsPreGenerating = false
+                if self.switchToPendingPass(pass, state) { return }
                 // Pass-2 only: update display immediately (12-bar early look-ahead)
                 if pass == 2, self.evolvePhase == .pass1,
                    let pass1 = self.evolvePass1State {
@@ -2882,15 +2955,16 @@ final class AppState: ObservableObject {
     }
 
     private func preGenerateEvolveNextSong() {
-        guard let anchor = evolveAnchorState, !evolveIsPreGenerating,
+        guard let anchor = evolveAnchorState, !evolveNextSongInFlight,
               evolveNextSongState == nil else { return }
-        evolveIsPreGenerating = true
+        evolveNextSongInFlight = true
         let style        = selectedStyle   // use the currently selected style, not the anchor's
+        evolveNextSongPendingStyle = style
         let styleChanged = style != (anchor.style)
         // If style changed, generate fresh — no BPM, mood, key or scale from the previous song.
         let mood:  Mood? = styleChanged ? nil : evolveMoodAnchor
         let tempo: Int?  = styleChanged ? nil : evolveTempoAnchor
-        let tokenAtStart = evolvePhaseToken   // stale-Task guard
+        let session = evolveSessionToken   // stale-Task guard: the session, not the phase
         Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
             let newTempo: Int? = tempo.map { max(20, min(200, $0 + Int.random(in: -5...5))) }
@@ -2898,9 +2972,16 @@ final class AppState: ObservableObject {
                                                style: style)
             await MainActor.run {
                 guard self.playMode == .evolve,
-                      self.evolvePhaseToken == tokenAtStart else { return }
-                self.evolveNextSongState   = state
-                self.evolveIsPreGenerating = false
+                      self.evolveSessionToken == session else { return }
+                self.evolveNextSongInFlight = false
+                // The song is already due: start it now (transitionToEvolveNextSong waited).
+                if self.evolveNextSongPending {
+                    self.evolveNextSongPending = false
+                    self.evolveNextSongState   = state
+                    self.transitionToEvolveNextSong()
+                    return
+                }
+                self.evolveNextSongState    = state
                 if self.evolveNextSongShouldLog && !self.evolveNextSongLogged {
                     self.evolveNextSongShouldLog = false
                     self.evolveNextSongLogged    = true
@@ -2909,24 +2990,24 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// If `pass` was due before its content was ready, switches to it now. Returns true if it did.
+    private func switchToPendingPass(_ pass: Int, _ state: SongState) -> Bool {
+        guard evolvePassPending == pass else { return false }
+        evolvePassPending = nil
+        if pass == 1, evolvePhase == .original { doSwitchToEvolvePass1(state); return true }
+        if pass == 2, evolvePhase == .pass1    { doSwitchToEvolvePass2(state); return true }
+        return false
+    }
+
     private func handleEvolveOutroStart() {
         guard evolvePhase == .original else { return }
         if let pass1 = evolvePass1State {
             doSwitchToEvolvePass1(pass1)
         } else {
-            guard let anchor = evolveAnchorState else { return }
-            let passBars     = evolvePass1Bars
-            let absentTracks = absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
-                let state = Self.buildPassState(anchor: anchor,
-                                                freshTracks: [kTrackLead1, kTrackLead2] + absentTracks,
-                                                passBars: passBars)
-                await MainActor.run {
-                    guard self.playMode == .evolve, self.evolvePhase == .original else { return }
-                    self.doSwitchToEvolvePass1(state)
-                }
-            }
+            // Not ready: switch when the build lands. Starts it if none is in flight (a no-op if
+            // one is), rather than starting a second identical build alongside it.
+            evolvePassPending = 1
+            preGeneratePassContent(pass: 1)
         }
     }
 
@@ -3031,17 +3112,10 @@ final class AppState: ObservableObject {
             if let pass2 = evolvePass2State {
                 doSwitchToEvolvePass2(pass2)
             } else {
-                guard let anchor = evolveAnchorState else { return }
-                let passBars = evolvePass2Bars
-                Task.detached(priority: .userInitiated) { [weak self] in
-                    guard let self else { return }
-                    let state = Self.buildPassState(anchor: anchor, freshTracks: [kTrackPads, kTrackRhythm],
-                                                    passBars: passBars)
-                    await MainActor.run {
-                        guard self.playMode == .evolve, self.evolvePhase == .pass1 else { return }
-                        self.doSwitchToEvolvePass2(state)
-                    }
-                }
+                // Not ready: as for pass 1. This also keeps Ambient Piano on its modal-shift
+                // pass; the old fallback built a regular pads-and-rhythm pass for it.
+                evolvePassPending = 2
+                preGeneratePassContent(pass: 2)
             }
         case .pass2, .outro:
             transitionToEvolveNextSong()
@@ -3054,8 +3128,13 @@ final class AppState: ObservableObject {
         // Discard pre-generated next song if its style no longer matches the user's selection.
         if let next = evolveNextSongState, next.style != selectedStyle {
             evolveNextSongState  = nil
-            evolveIsPreGenerating = false
             evolveNextSongLogged  = false
+        }
+        // Still being generated for the right style: wait for it rather than generating another.
+        if evolveNextSongState == nil, evolveNextSongInFlight,
+           evolveNextSongPendingStyle == selectedStyle {
+            evolveNextSongPending = true
+            return
         }
         // Capture token now so the 500 ms asyncAfter closure can detect if the user navigated
         // away (via history tap or Next-Track-into-history) before the silence gap expires.

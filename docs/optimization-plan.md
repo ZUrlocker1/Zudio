@@ -124,6 +124,14 @@ Measured by Zack in Activity Monitor: a couple of points lower during playback, 
 
 Covered by Tests/ZudioTests/SaveReloadRoundTripTests.swift (each test fails on the old code). Fingerprints are identical to the previous commit in all four styles.
 
+### Endless and Evolve pre-generation (2026-10-18)
+
+- **Endless:** every path that throws the next song away goes through discardPreGeneratedSong(), which bumps a pre-gen token (stale runs are dropped on landing) and restores the style-rotation step the abandoned run took. Before, two pre-gens could run and whichever finished last won, possibly in the wrong style.
+- **Evolve flags:** pass content and the next song had one shared in-flight flag, so the next song was never generated early. Now separate. The next song checks a session token, not the phase token, which moves at every pass switch and used to drop a finished next song and leave its flag stuck.
+- **No duplicate builds:** when a pass (or the next song) is due before it is ready, the in-flight build switches in when it lands. Before, a second identical build was started and the first thrown away. The old pass fallback also built a regular pass for Ambient Piano instead of its modal shift.
+- **Leads in sync:** pass 1 regenerated Lead 2 against the anchor's Lead 1, so it filled the old Lead 1's gaps. Lead 2 now gets the new Lead 1. Share of Lead 2 notes in bars where Lead 1 plays, 40 songs each: Chill 24% generated, 42% evolve before, 29% after; Motorik 20%, 41%, 32%; Kosmic and Ambient unchanged (their Lead 2 does not place itself by Lead 1's bars). The rest of the gap is the hand-off bars that first generation passes and a regeneration cannot recover from events.
+- **Retries:** a regenerated track must now bring at least one new rule, not only new rules. Blues Lead 2 (CHL-LD2-001) and Blues Pads (CHL-PAD-004) have one rule each and skip the test; every Blues pass used to run all four regenerations on both. Chill Rhythm logs two rules and rarely got two new ones.
+
 ### Fingerprint baseline drift (bisected 2026-10-18)
 
 tools/fingerprints/baseline.txt (pinned at 0dfb880) no longer matches Motorik, Kosmic or Ambient. Bisected: the change comes from e0e8b5f and d2645e7, both the deliberate all-style Harmonic filter change (lift whole figures above the pads, decided by the window a figure starts in). Every other generation change in those commits is Chill-only. e0e8b5f notes the baseline was not re-pinned. Re-pin once Zack accepts that released songs in those styles moved.
