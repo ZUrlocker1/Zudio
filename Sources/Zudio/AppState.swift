@@ -260,7 +260,11 @@ final class AppState: ObservableObject {
         // [Int: UInt64] → [String: UInt64]: JSON requires String keys in dictionaries.
         var trackOverrides: [String: UInt64]
         // Instrument pool indices per track. Optional so old persisted data decodes as nil.
-        let instrumentOverrides: [String: Int]?
+        var instrumentOverrides: [String: Int]?
+        // Instruments changed by the user after load, by track. Applied after the Chill lead
+        // pin on reload, so a deliberate change survives while the pin still repairs entries
+        // saved with the wrong lead. Optional so older persisted data decodes as nil.
+        var manualInstruments: [String: Int]?
         // Substyle display name (e.g. "Ambient Piano", "Chill Blues"). Optional so old persisted data decodes as nil.
         var substyleName: String?
 
@@ -307,6 +311,12 @@ final class AppState: ObservableObject {
         /// Decodes `instrumentOverrides` (String keys) back to `[Int: Int]`.
         var decodedTrackOverrides: [Int: UInt64] {
             Dictionary(uniqueKeysWithValues: trackOverrides.compactMap { k, v -> (Int, UInt64)? in
+                guard let i = Int(k) else { return nil }; return (i, v) })
+        }
+
+        var decodedManualInstruments: [Int: Int] {
+            guard let m = manualInstruments else { return [:] }
+            return Dictionary(uniqueKeysWithValues: m.compactMap { k, v -> (Int, Int)? in
                 guard let i = Int(k) else { return nil }; return (i, v) })
         }
 
@@ -609,6 +619,8 @@ final class AppState: ObservableObject {
     /// Per-song instrument overrides keyed by globalSeed. Lets ⏮ navigation restore the
     /// exact instruments that were playing when the song was first generated this session.
     private var sessionInstrumentOverrides: [UInt64: [Int: Int]] = [:]
+    /// Instruments the user changed after load, per song seed (see PersistedSong.manualInstruments).
+    private var sessionManualInstruments: [UInt64: [Int: Int]] = [:]
     /// Last pool index used per (track, style) for no-repeat instruments.
     /// Keyed by trackIndex → style → poolIndex. Nil entry = no previous song in that style.
     private var lastUsedInstrumentIndex: [Int: [MusicStyle: Int]] = [:]
@@ -3649,7 +3661,38 @@ final class AppState: ObservableObject {
             let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
             let cc7 = poolIdx < cc7Values.count ? cc7Values[poolIdx] : 100
             playback.setChannelVolume(cc7, forTrack: trackIndex)
+            recordInstrument(poolIdx, forTrack: trackIndex, style: style)
         }
+    }
+
+    /// Records an instrument change against the current song, so ⏮ / ⏭ and the Songs list
+    /// bring back what was playing rather than what the song first loaded with. Every
+    /// instrument change (picker, ⚡, orb gestures, Evolve) reaches setProgram; the Mac picker
+    /// did not even update instrumentOverrides. Skipped when the style picker shows another
+    /// style than the loaded song, where the pool index would belong to the wrong pool.
+    private func recordInstrument(_ poolIdx: Int, forTrack trackIndex: Int, style: MusicStyle) {
+        guard let song = songState, song.style == style else { return }
+        if instrumentOverrides[trackIndex] != poolIdx { instrumentOverrides[trackIndex] = poolIdx }
+        sessionInstrumentOverrides[song.globalSeed] = instrumentOverrides
+        sessionManualInstruments[song.globalSeed, default: [:]][trackIndex] = poolIdx
+        guard let idx = persistedHistory.firstIndex(where: { $0.seed == song.globalSeed }) else { return }
+        let key = String(trackIndex)
+        guard persistedHistory[idx].manualInstruments?[key] != poolIdx else { return }
+        persistedHistory[idx].manualInstruments = (persistedHistory[idx].manualInstruments ?? [:])
+            .merging([key: poolIdx]) { _, new in new }
+        persistedHistory[idx].instrumentOverrides = Dictionary(uniqueKeysWithValues:
+            instrumentOverrides.map { (String($0.key), $0.value) })
+        savePersistedHistory()
+    }
+
+    /// Re-applies the user's instrument changes for `seed` after a reload has pinned the
+    /// song's generated instruments (applyLoadedInstruments).
+    private func applyManualInstruments(seed: UInt64) {
+        let manual = sessionManualInstruments[seed]
+            ?? persistedHistory.first(where: { $0.seed == seed })?.decodedManualInstruments ?? [:]
+        guard !manual.isEmpty else { return }
+        for (track, idx) in manual { instrumentOverrides[track] = idx }
+        sessionInstrumentOverrides[seed] = instrumentOverrides
     }
 
     /// Maps a Chill texture pseudo-program (240–250) to an M4A filename.
@@ -4125,6 +4168,7 @@ final class AppState: ObservableObject {
         // instrument: pin the patch to it, whatever the history saved. Entries persisted before
         // 2026-10-16 hold the previous song's Lead 1, usually a sax. Texture positions too.
         applyLoadedInstruments(for: state)
+        applyManualInstruments(seed: state.globalSeed)
         muteState = Array(repeating: false, count: kTrackCount)
         soloState = Array(repeating: false, count: kTrackCount)
         playback.muteState    = muteState
@@ -4192,6 +4236,7 @@ final class AppState: ObservableObject {
                 // The Chill and Ambient texture positions are re-derived from the song by
                 // applyLoadedInstruments, which also repairs ones saved under old numbering.
                 self.applyLoadedInstruments(for: state)
+                self.applyManualInstruments(seed: state.globalSeed)
                 self.appendGenerationLog(state.generationLog)
                 self.finishLoadingSong(state, thenPlay: thenPlay)
                 if self.playMode == .evolve { self.tearDownEvolve(); self.startEvolveMode(from: state) }

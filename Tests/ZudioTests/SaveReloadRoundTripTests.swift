@@ -11,6 +11,8 @@
 //     with its old Lead 1).
 //   • Forcing Blues on a .zudio reload skipped one main-stream draw, so a Blues file reopened
 //     as a different song.
+//   • An instrument change was not recorded against the song, so ⏮ / ⏭ brought back the
+//     instruments it first loaded with.
 //   • History reloads did not replay the saved Chill substyle, so a change to the Soho share
 //     could turn a saved song into another substyle.
 
@@ -100,6 +102,24 @@ import Foundation
         reopened.loadFromLogURL(midiURL.deletingPathExtension().appendingPathExtension("zudio"))
         try await waitUntilIdle(reopened)
         #expect(reopened.instrumentOverrides[kTrackLead1] == newIdx, "Lead 1 reopened with its old instrument")
+    }
+
+    /// An instrument changed with the picker (which calls only setProgram) is still there
+    /// after stepping to another song and back with ⏮ / ⏭.
+    @Test func changedLeadInstrumentSurvivesHistoryNavigation() async throws {
+        let app = AppState()
+        app.playMode = .song
+        let songA = SongGenerator.generate(seed: 11, style: .chill)
+        app.loadFromGenerationHistory(songA)
+        let pool = AppState.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill,
+                                                   isChillSoho: songA.chillSohoVariation)
+        try #require(pool.count > 1)
+        let newIdx = ((app.instrumentOverrides[kTrackLead1] ?? 0) + 1) % pool.count
+        app.setProgram(pool[newIdx], forTrack: kTrackLead1)
+
+        app.loadFromGenerationHistory(SongGenerator.generate(seed: 12, style: .chill))
+        app.loadFromGenerationHistory(songA)
+        #expect(app.instrumentOverrides[kTrackLead1] == newIdx, "Lead 1 came back as first loaded")
     }
 
     // MARK: - Substyle

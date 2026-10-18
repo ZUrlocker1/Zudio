@@ -94,6 +94,10 @@ final class PlaybackEngine: ObservableObject {
     // The amount of reverb per track, as the insert wetDryMix it reproduces. Offline export
     // builds real insert reverbs, so this is what it needs — no conversion at the boundary.
     private var perTrackReverbWet      = Array(repeating: Float(0),  count: kTrackCount)
+    /// Which bus each track's send feeds (setup wires all to small; connectSend moves them).
+    private var sendOnLargeBus         = Array(repeating: false, count: kTrackCount)
+    /// Coalesces the delayed bus-bypass checks scheduled by updateReverbBusBypass().
+    private var busBypassToken         = 0
     // Whether each track's reverb chip is currently on. The chip is the authority: the level
     // above says how much reverb to use WHEN it is on, and this says whether it is. Without
     // this, applyMuteState() would restore the level on every song load and the chip would
@@ -1536,6 +1540,36 @@ final class PlaybackEngine: ObservableObject {
                 .destination(forMixer: mixer, bus: AVAudioNodeBus(trackIndex))?
                 .volume = gains.dry
         }
+        updateReverbBusBypass()
+    }
+
+    /// Whether any track currently sends to each bus.
+    private func reverbBusLiveness() -> (large: Bool, small: Bool) {
+        var large = false, small = false
+        for i in 0..<reverbSendMixers.count where reverbSendMixers[i].outputVolume > 0 {
+            if i < sendOnLargeBus.count && sendOnLargeBus[i] { large = true } else { small = true }
+        }
+        return (large, small)
+    }
+
+    /// Bypasses a bus reverb no track sends to. A 100%-wet reverb on silent input still runs
+    /// its DSP every render cycle: the large bus in every Chill and Motorik song (both route
+    /// all sends to the small bus), and either bus when every chip routed to it is off.
+    /// A bus comes back the moment a send goes live; it is bypassed only after its last send
+    /// has been quiet for 10 s, so switching the last chip off lets the tail ring out.
+    private func updateReverbBusBypass() {
+        let live = reverbBusLiveness()
+        if live.large { reverbBusLarge.auAudioUnit.shouldBypassEffect = false }
+        if live.small { reverbBusSmall.auAudioUnit.shouldBypassEffect = false }
+        guard !(live.large && live.small) else { return }
+        busBypassToken += 1
+        let token = busBypassToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            guard let self, token == self.busBypassToken else { return }
+            let now = self.reverbBusLiveness()
+            if !now.large { self.reverbBusLarge.auAudioUnit.shouldBypassEffect = true }
+            if !now.small { self.reverbBusSmall.auAudioUnit.shouldBypassEffect = true }
+        }
     }
 
     /// Assigns a track's send mixer to a bus and sets its reverb amount, expressed as the
@@ -1546,6 +1580,7 @@ final class PlaybackEngine: ObservableObject {
         let busMixer = bus == .large ? reverbBusMixerLarge : reverbBusMixerSmall
         engine.disconnectNodeOutput(reverbSendMixers[trackIndex])
         engine.connect(reverbSendMixers[trackIndex], to: busMixer, format: nil)
+        if trackIndex < sendOnLargeBus.count { sendOnLargeBus[trackIndex] = (bus == .large) }
         perTrackReverbWet[trackIndex] = wetDryMix
         reverbEnabled[trackIndex] = false
         // Recorded, not applied. `wetDryMix` is how much reverb this track uses WHEN ITS CHIP

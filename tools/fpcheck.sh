@@ -15,6 +15,10 @@
 # forms, and Blues 20% -> 15% to make room for a 70/15/15 Soho/Blues/base split. Motorik, Kosmic
 # and Ambient were byte-identical through that change and remain pinned where they always were.
 #
+# Re-pinned 2026-10-18: Motorik, Kosmic and Ambient moved deliberately with the all-style Harmonic
+# filter change (whole figures lifted above the pads; e0e8b5f, d2645e7), bisected and accepted by
+# Zack. Chill moved with the Soho work since 10-15 and the 30/20/50 mix.
+#
 # NOTE: 70/15/15 is a TESTING mix for tuning Chill Soho and will be reverted before release.
 # Reverting it reclassifies seeds and will show a large Chill diff — expected, re-pin again then.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

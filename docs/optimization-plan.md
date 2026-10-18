@@ -110,6 +110,8 @@ Generation, Chill Soho included, was reviewed and found cheap (single pass per b
 
 - **Shared LFO timer at 48 ms when nothing needs 16 ms.** Only vibrato and fast tremolos (Rhythm guitar, Rhodes) update every 16 ms tick; slow Pads tremolo, sweep, pan and the iPhone gesture sweep update every third. With neither on, the timer runs at 48 ms and every tick does the 20fps work: identical updates, two thirds fewer wakeups. Re-timed on every tremolo or vibrato start and stop.
 
+- **Reverb buses bypassed when nothing sends to them.** A 100%-wet bus reverb on silent input still ran its DSP: the large bus in every Chill and Motorik song, and either bus with all its chips off. A bus un-bypasses the moment a send goes live and bypasses 10 s after its last send goes quiet, so a tail is never cut. Hooked into applyReverbAmount, the one path every send level takes.
+
 Measured by Zack in Activity Monitor: a couple of points lower during playback, under 10% with no visualizer showing.
 
 ### Save and reload bugs fixed alongside
@@ -117,6 +119,7 @@ Measured by Zack in Activity Monitor: a couple of points lower during playback, 
 - ⚡ REGEN kept the old track seed and step annotations; a saved file or Songs entry rebuilt the old track.
 - An instrument changed after load never reached the saved file (the Instruments line was written only at load), and the .zudio load pinned the Chill leads back to the generator's choice. Save and share now rebuild the line from what is playing; the file load re-applies the saved leads.
 - Forcing Blues on a .zudio reload skipped one main-stream draw, so a Blues file reopened as a different song. The roll is now always drawn (generation never forces Blues, so no new song changed).
+- Instrument changes are recorded against the song in AppState.setProgram (the one path every change takes; the Mac picker never updated instrumentOverrides). Kept as separate "manual" instruments and applied after the Chill lead pin, so ⏮ / ⏭ and the Songs list bring back a changed lead while the pin still repairs entries saved with the wrong one.
 - History reloads now replay the saved Chill substyle (force Soho, or forbid it for base Chill), so a change to the Soho share cannot turn a saved song into another substyle.
 
 Covered by Tests/ZudioTests/SaveReloadRoundTripTests.swift (each test fails on the old code). Fingerprints are identical to the previous commit in all four styles.
@@ -127,7 +130,6 @@ tools/fingerprints/baseline.txt (pinned at 0dfb880) no longer matches Motorik, K
 
 ### Not done (candidates)
 
-- Bypass the large reverb bus in Chill and Motorik, which send nothing to it.
 - Cache decoded texture files (removes a main-thread stall at song change).
 - Per-bar AppState re-render, status log incremental rebuild, one shared playhead overlay.
 - Beat Fixup is applied at render-buffer granularity live (0 to about 23 ms on iOS) but sample-accurately in export; a sound decision, not an optimization.
