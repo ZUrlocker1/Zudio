@@ -35,6 +35,10 @@
 - **Flute and recorder on iPhone** — Songs replayed from the Songs list or with ⏮/⏭ played a flute or recorder lead as a saxophone. Replays now use the lead the song was written for, and songs already in the list are corrected.
 - **Chill piano** — Stereo Piano on Chill Rhythm is about 3 dB quieter.
 - **Muting an audio texture works** — Muting Texture now silences audio-loop textures (Chill, Chill Blues, Ambient) on every platform, and exports leave them out.
+- **Lower CPU and battery use** — Playback no longer redraws the whole window on every beat, effect timers stop when playback stops and slow down when only slow effects are on, and idle reverbs and the idle texture player are switched off. On a Mac Zudio now typically uses 15–20% CPU, and 5–10% in the compact view with no visualizer.
+- **Audio textures follow the song** — Fixed a bug in audio textures: they restarted from the top on Play, a seek or a texture change, so the waveform did not match what was heard. Playback, the waveform and exported audio now line up.
+- **Saved songs keep your changes** — Fixed a bug where a regenerated track or a changed instrument was lost when a song was saved or reopened. Chill Blues files reopen exactly, and saved songs keep their Chill form when the mix changes.
+- **Endless and Evolve** — Fixed a bug where Endless could occasionally play a song in the wrong style. In Evolve, the two leads no longer play over each other as often.
 
 ## V 2.6 (Build 131)  Motorik Europe, reverb restored
 
