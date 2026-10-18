@@ -67,6 +67,7 @@ enum OfflineExport {
         textureSnapshot: AudioTexturePlayer.ExportSnapshot?,
         outputURL: URL,
         separateTracks: Bool = false,
+        beatFixupEnabled: Bool = true,
         onProgress: @escaping (Double) -> Void,
         isCancelled: @escaping () -> Bool
     ) throws -> (songSeconds: Double, elapsed: Double, trackURLs: [(trackIdx: Int, url: URL)]) {
@@ -127,10 +128,21 @@ enum OfflineExport {
         // the same case: the bass has the Vibrato effect on.
         let bassVibrato = kTrackBass < snapshots.count && snapshots[kTrackBass].vibratoEnabled
         let bassSlides  = bassVibrato ? [:] : ChillBassSlides.slides(for: state)
+        // Behind-the-beat feel (BeatFixup), as PlaybackEngine.beatDelay plays it: the bass and the
+        // drum backbeat notes sit late on a Chill Soho Soul song. Playback delays at fire time;
+        // here the same offset is added to the event position, so the export matches.
+        // Chill Pads per-note fade (PlaybackEngine, chillPadsMode): live, each pad note fades in
+        // and out on a boost node and its note-off is deferred until the fade ends. Reproduced
+        // here with a gain envelope (PadEnvelope) and the same deferred note-off.
+        let chillPads = state.style == .chill
+        let beat = (beatFixupEnabled && state.style == .chill)
+            ? BeatFixup.offsets(for: state.chillBeatStyle) : (bassMs: 0, backbeatMs: 0)
         let eventLists: [[SampleEvent]] = samplers.map { item in
-            buildEvents(state.trackEvents[item.trackIdx], sampleRate: sampleRate, sps: sps)
+            buildEvents(state.trackEvents[item.trackIdx], track: item.trackIdx, beat: beat,
+                        padsFade: chillPads, sampleRate: sampleRate, sps: sps)
                 + (item.trackIdx == kTrackBass
-                    ? slideEvents(bassSlides, sampleRate: sampleRate, sps: sps) : [])
+                    ? slideEvents(bassSlides, delaySamples: Int64(Double(beat.bassMs) / 1000 * sampleRate),
+                                  sampleRate: sampleRate, sps: sps) : [])
         }.map { $0.sorted { $0.pos < $1.pos } }
         var evtIdxs = [Int](repeating: 0, count: samplers.count)
 
@@ -434,6 +446,16 @@ enum OfflineExport {
         // LFO phase accumulators — one per track, updated each block.
         // Phases are advanced by exactly (2π × hz × blockFrames / sampleRate) per block,
         // giving accurate LFO simulation regardless of block size.
+        // Block size. Tremolo, vibrato and auto-pan are simulated by setting a node parameter once
+        // per block, so a block must be short against the LFO period. At 4096 frames (~90 ms) an
+        // 8 Hz organ tremolo (125 ms) was updated about 1.4 times per cycle and a 4 Hz guitar one
+        // about 2.7, which steps and aliases rather than swells. Playback updates at 60 fps, so
+        // blocks match that whenever a fast LFO is on; otherwise the long block is kept for speed.
+        let padsIdx   = chillPads ? samplers.firstIndex { $0.trackIdx == kTrackPads } : nil
+        var padEnv    = padsIdx != nil ? PadEnvelope(events: state.trackEvents[kTrackPads], sps: sps) : nil
+        let fastLFO   = padsIdx != nil || allSnaps.contains { ($0.tremoloEnabled && $0.tremoloHz > 1) || $0.vibratoEnabled
+                                            || ($0.panEnabled && $0.panHz > 1) }
+        let lfoBlock  = fastLFO ? Int64(sampleRate / 60) : 4096
         var sweepPhases   = [Double](repeating: 0, count: samplers.count)
         var tremoloPhases = [Double](repeating: 0, count: samplers.count)
         var panPhases     = [Double](repeating: 0, count: samplers.count)
@@ -441,7 +463,7 @@ enum OfflineExport {
 
         while phase2Done < phase2Total {
             if isCancelled() { throw CancellationError() }
-            let thisFrames = AVAudioFrameCount(min(4096, phase2Total - phase2Done))
+            let thisFrames = AVAudioFrameCount(min(lfoBlock, phase2Total - phase2Done))
             let dt = Double(thisFrames) / sampleRate   // elapsed seconds this block
 
             // Update LFO parameters before rendering so this block uses current LFO values.
@@ -468,6 +490,20 @@ enum OfflineExport {
                 if snap.vibratoEnabled {
                     vibratoPhases[i] += 2 * .pi * Double(snap.vibratoHz) * dt
                     vibratoNodes[i].pitch = snap.vibratoDepthCents * Float(sin(vibratoPhases[i]))
+                }
+
+                // Chill Pads: per-note fade, and the sweep restarts closed at each chord.
+                if i == padsIdx, padEnv != nil {
+                    let t0 = Double(phase2Done) / sampleRate
+                    let t1 = t0 + dt
+                    if snap.sweepEnabled, let on = padEnv!.lastOn(after: t0, through: t1) {
+                        sweepPhases[i] = -.pi / 2 + 2 * .pi * Double(snap.sweepHz) * (t1 - on)
+                        let cutoff = snap.sweepFloor + snap.sweepHalfRange * Float(1 + sin(sweepPhases[i]))
+                        AudioUnitSetParameter(sweepNodes[i].audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+                    }
+                    let trem = snap.tremoloEnabled
+                        ? Float(1.0 - Double(snap.tremoloDepth) * (1.0 + sin(tremoloPhases[i]))) : 1
+                    tremoloGains[i].outputVolume = max(0, snap.volume * trem * padEnv!.value(at: t0 + dt / 2))
                 }
             }
 
@@ -626,10 +662,15 @@ enum OfflineExport {
                 var panPhase:     Double = 0
                 var vibratoPhase: Double = 0
                 var phase3Done:   Int64  = 0
+                // Short blocks for a fast LFO, as in the mix render above.
+                var stemPadEnv = (chillPads && trackIdx == kTrackPads)
+                    ? PadEnvelope(events: state.trackEvents[kTrackPads], sps: sps) : nil
+                let stemBlock: Int64 = (stemPadEnv != nil || (snap.tremoloEnabled && snap.tremoloHz > 1) || snap.vibratoEnabled
+                                        || (snap.panEnabled && snap.panHz > 1)) ? Int64(sampleRate / 60) : 4096
 
                 while phase3Done < phase2Total {
                     if isCancelled() { throw CancellationError() }
-                    let thisFrames = AVAudioFrameCount(min(4096, phase2Total - phase3Done))
+                    let thisFrames = AVAudioFrameCount(min(stemBlock, phase2Total - phase3Done))
                     let dt = Double(thisFrames) / sampleRate
 
                     if snap.sweepEnabled {
@@ -649,6 +690,18 @@ enum OfflineExport {
                     if snap.vibratoEnabled {
                         vibratoPhase += 2 * .pi * Double(snap.vibratoHz) * dt
                         vibratoNode.pitch = snap.vibratoDepthCents * Float(sin(vibratoPhase))
+                    }
+                    if stemPadEnv != nil {
+                        let t0 = Double(phase3Done) / sampleRate
+                        let t1 = t0 + dt
+                        if snap.sweepEnabled, let on = stemPadEnv!.lastOn(after: t0, through: t1) {
+                            sweepPhase = -.pi / 2 + 2 * .pi * Double(snap.sweepHz) * (t1 - on)
+                            let cutoff = snap.sweepFloor + snap.sweepHalfRange * Float(1 + sin(sweepPhase))
+                            AudioUnitSetParameter(sweep.audioUnit, 0, kAudioUnitScope_Global, 0, cutoff, 0)
+                        }
+                        let trem = snap.tremoloEnabled
+                            ? Float(1.0 - Double(snap.tremoloDepth) * (1.0 + sin(tremoloPhase))) : 1
+                        tremoloGain.outputVolume = max(0, snap.volume * trem * stemPadEnv!.value(at: t0 + dt / 2))
                     }
 
                     let status = try trackEngine.renderOffline(thisFrames, to: trackBuf)
@@ -737,6 +790,58 @@ enum OfflineExport {
         return (songSecs, elapsed, trackURLs)
     }
 
+    // MARK: - Chill Pads fade envelope
+
+    /// The Chill Pads boost-node envelope, as PlaybackEngine animates it. The boost starts at 0;
+    /// a note-on ramps it linearly to 1 over `fadeSeconds`, a note-off ramps it from wherever it
+    /// is to 0 over the fade of the most recent note-on. Evaluated at increasing times only.
+    private struct PadEnvelope {
+        /// min(1 s, max(0.1 s, noteSeconds / 4)) — the live rule in PlaybackEngine.onStep.
+        static func fadeSeconds(durationSteps: Int, sps: Double) -> Double {
+            min(1.0, max(0.1, Double(durationSteps) * sps / 4.0))
+        }
+
+        private struct Change { let time: Double; let isOn: Bool; let fade: Double }
+        private var changes: [Change] = []
+        private var next = 0
+        private var rampStart = 0.0, rampFrom: Float = 0, rampTo: Float = 0, rampDur = 0.001
+        private var lastOnFade = 0.1
+        /// Times of every note-on, ascending — the sweep restarts at each.
+        let onTimes: [Double]
+
+        init(events: [MIDIEvent], sps: Double) {
+            var c: [Change] = []
+            for e in events {
+                let fade = Self.fadeSeconds(durationSteps: e.durationSteps, sps: sps)
+                c.append(Change(time: Double(e.stepIndex) * sps, isOn: true, fade: fade))
+                c.append(Change(time: Double(e.stepIndex + e.durationSteps) * sps, isOn: false, fade: fade))
+            }
+            // Note-ons before note-offs at the same instant, as the live loop runs them.
+            changes = c.sorted { $0.time != $1.time ? $0.time < $1.time : ($0.isOn && !$1.isOn) }
+            onTimes = Array(Set(c.filter { $0.isOn }.map { $0.time })).sorted()
+        }
+
+        private func current(at t: Double) -> Float {
+            rampFrom + Float(min(1.0, max(0.0, (t - rampStart) / rampDur))) * (rampTo - rampFrom)
+        }
+
+        mutating func value(at t: Double) -> Float {
+            while next < changes.count && changes[next].time <= t {
+                let c = changes[next]; next += 1
+                let from = current(at: c.time)
+                if c.isOn { lastOnFade = c.fade }
+                rampStart = c.time; rampFrom = from; rampTo = c.isOn ? 1 : 0
+                rampDur = max(0.001, c.isOn ? c.fade : lastOnFade)
+            }
+            return current(at: t)
+        }
+
+        /// The latest note-on in (from, to], or nil — the moment the sweep restarts.
+        func lastOn(after from: Double, through to: Double) -> Double? {
+            onTimes.last { $0 > from && $0 <= to }
+        }
+    }
+
     // MARK: - Helpers
 
     // externalPianoURL is defined in PlaybackEngine as a static func — delegates there.
@@ -782,13 +887,21 @@ enum OfflineExport {
         return au
     }
 
-    private static func buildEvents(_ trackEvents: [MIDIEvent],
+    private static func buildEvents(_ trackEvents: [MIDIEvent], track: Int,
+                                    beat: (bassMs: Int, backbeatMs: Int), padsFade: Bool,
                                     sampleRate: Double, sps: Double) -> [SampleEvent] {
         var evts = [SampleEvent]()
         evts.reserveCapacity(trackEvents.count * 2)
         for e in trackEvents {
-            let on  = Int64(Double(e.stepIndex)                   * sampleRate * sps)
-            let off = Int64(Double(e.stepIndex + e.durationSteps) * sampleRate * sps)
+            // Same rule as PlaybackEngine.beatDelay: the bass, and the drum backbeat notes only.
+            let delayMs = track == kTrackBass ? beat.bassMs
+                : (track == kTrackDrums && BeatFixup.backbeatNotes.contains(e.note)) ? beat.backbeatMs : 0
+            let late = Int64(Double(delayMs) / 1000 * sampleRate)
+            let on  = Int64(Double(e.stepIndex)                   * sampleRate * sps) + late
+            var off = Int64(Double(e.stepIndex + e.durationSteps) * sampleRate * sps) + late
+            if padsFade && track == kTrackPads {
+                off += Int64(PadEnvelope.fadeSeconds(durationSteps: e.durationSteps, sps: sps) * sampleRate)
+            }
             evts.append(SampleEvent(pos: on,  status: 0x90, note: e.note, vel: e.velocity))
             evts.append(SampleEvent(pos: off, status: 0x80, note: e.note, vel: 0))
         }
@@ -798,7 +911,7 @@ enum OfflineExport {
     /// Pitch-bend events for each bass slide: off pitch one sample before the note starts, then a
     /// glide to centre in 4 ms steps on ChillBassSlides.remaining, as PlaybackEngine plays it.
     /// SampleEvent's `note` and `vel` carry the bend's low and high seven bits.
-    private static func slideEvents(_ slides: [Int: BassSlide],
+    private static func slideEvents(_ slides: [Int: BassSlide], delaySamples: Int64,
                                     sampleRate: Double, sps: Double) -> [SampleEvent] {
         var evts = [SampleEvent]()
         func bend(_ pos: Int64, _ semis: Double) {
@@ -806,7 +919,7 @@ enum OfflineExport {
             evts.append(SampleEvent(pos: max(0, pos), status: 0xE0, note: UInt8(v & 0x7F), vel: UInt8(v >> 7)))
         }
         for (step, slide) in slides {
-            let on    = Int64(Double(step) * sampleRate * sps)
+            let on    = Int64(Double(step) * sampleRate * sps) + delaySamples
             let from  = Double(slide.fromSemitones)
             let ticks = max(4, Int(slide.glideSteps * sps / 0.004))
             bend(on - 1, from)

@@ -254,6 +254,15 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var bassSlideSecondsPerStep: Double = 0.1
     nonisolated(unsafe) private var bassSlidesSuppressed = false
 
+    // Behind-the-beat feel (BeatFixup): seconds the bass and the drum backbeat notes are held
+    // back from their grid step. Read in onStep on stepTimerQueue, written under
+    // stepTimerQueue.sync by applyBeatFixup. Zero except for a Chill Soho Soul song.
+    nonisolated(unsafe) private var beatBassDelay: Double = 0
+    nonisolated(unsafe) private var beatBackbeatDelay: Double = 0
+    private var beatFixupStyle: ChillBeatStyle? = nil
+    /// The Mac test switch (⌘J / ⌃G). On by default, so iPhone and iPad always get the feel.
+    private(set) var beatFixupEnabled = true
+
     // Export tap state — allows cancelExport() to stop capture from outside the tap closure.
     // @unchecked Sendable: written on main actor, read/written from audio thread; done flag is
     // set once and only grows monotonically — no torn reads possible.
@@ -481,6 +490,28 @@ final class PlaybackEngine: ObservableObject {
             bassSlideMap = slides
             bassSlideSecondsPerStep = state.frame.secondsPerStep
         }
+        beatFixupStyle = state.style == .chill ? state.chillBeatStyle : nil
+        applyBeatFixup()
+    }
+
+    func setBeatFixupEnabled(_ enabled: Bool) {
+        beatFixupEnabled = enabled
+        applyBeatFixup()
+    }
+
+    private func applyBeatFixup() {
+        let o = beatFixupEnabled ? beatFixupStyle.map(BeatFixup.offsets(for:)) : nil
+        stepTimerQueue.sync {
+            beatBassDelay     = Double(o?.bassMs ?? 0) / 1000
+            beatBackbeatDelay = Double(o?.backbeatMs ?? 0) / 1000
+        }
+    }
+
+    /// Seconds to hold a note back from its step: the bass, and the drum backbeat voices only.
+    nonisolated private func beatDelay(track: Int, note: UInt8) -> Double {
+        if track == kTrackBass { return beatBassDelay }
+        if track == kTrackDrums && BeatFixup.backbeatNotes.contains(note) { return beatBackbeatDelay }
+        return 0
     }
 
     func play() {
@@ -723,6 +754,17 @@ final class PlaybackEngine: ObservableObject {
         // (see main.async block below), so the audio has time to fade before the note cuts.
         for (trackIndex, note) in noteOffs {
             if chillPadsMode && trackIndex == kTrackPads { continue }
+            // A delayed note-on needs a note-off delayed by the same amount, so the gate keeps
+            // its length. Offs are submitted before ons, so at equal delay an off still lands
+            // ahead of a same-pitch on at that step.
+            let delay = beatDelay(track: trackIndex, note: note)
+            if delay > 0 {
+                stepTimerQueue.asyncAfter(deadline: .now() + delay) { [self] in
+                    guard currentSchedulerID == schedulerID else { return }
+                    samplers[trackIndex].stopNote(note, onChannel: gmChannel(trackIndex))
+                }
+                continue
+            }
             samplers[trackIndex].stopNote(note, onChannel: gmChannel(trackIndex))
         }
         // Fire note-ons — AVAudioUnitSampler.startNote() is thread-safe.
@@ -772,10 +814,21 @@ final class PlaybackEngine: ObservableObject {
             } else {
                 fireVelocity = ev.velocity
             }
-            if trackIndex == kTrackBass, !bassSlidesSuppressed, let slide = bassSlideMap[step] {
-                startBassSlide(slide, channel: channel, schedulerID: schedulerID)
+            func fire() {
+                if trackIndex == kTrackBass, !bassSlidesSuppressed, let slide = bassSlideMap[step] {
+                    startBassSlide(slide, channel: channel, schedulerID: schedulerID)
+                }
+                samplers[trackIndex].startNote(fireNote, withVelocity: fireVelocity, onChannel: channel)
             }
-            samplers[trackIndex].startNote(fireNote, withVelocity: fireVelocity, onChannel: channel)
+            let delay = beatDelay(track: trackIndex, note: ev.note)
+            if delay > 0 {
+                stepTimerQueue.asyncAfter(deadline: .now() + delay) { [self] in
+                    guard currentSchedulerID == schedulerID else { return }
+                    fire()
+                }
+            } else {
+                fire()
+            }
         }
         // Minimal main-actor hop: update @Published playhead and handle X-Files delay mute.
         // Ambient fade loops are skipped on silent steps (~75% of steps have no events).

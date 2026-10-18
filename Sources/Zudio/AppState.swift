@@ -572,11 +572,12 @@ final class AppState: ObservableObject {
     /// so the song replays exactly with no forced settings, and each one is Soho under the
     /// release activation mix as well as today's test mix. ReplayFidelityTests'
     /// `firstSohoSeedsStillQualify` fails if a generator change stops any of them qualifying —
-    /// re-run the search then (chosen 2026-10-16).
+    /// re-run the search then (chosen 2026-10-16; 34075 and 65086 replaced by 4673 and 9594 on
+    /// 2026-10-18, after the 20% Blues threshold turned those two into Blues songs).
     nonisolated static let firstSohoSeeds: [UInt64] = [
         17597, 48059, 54933, 48701,     // Remix Break
-        34075, 36568, 63372, 13012,     // Duo
-        16015, 41529, 65086, 32350,     // bass ostinato
+        4673, 36568, 63372, 13012,      // Duo
+        16015, 41529, 9594, 32350,      // bass ostinato
     ]
 
     /// `state`, or the curated first Soho song in its place when `state` is the first Chill Soho
@@ -4173,6 +4174,7 @@ final class AppState: ObservableObject {
             return
         }
         let rawSnapshots    = playback.effectSnapshots()
+        let beatFixupOn     = playback.beatFixupEnabled   // the ⌘J / ⌃G test switch, so export matches what is heard
         // Apply mute/solo: mirror PlaybackEngine.applyMuteState() so export
         // matches what the user hears during playback.
         let anySolo = soloState.contains(true)
@@ -4219,6 +4221,7 @@ final class AppState: ObservableObject {
                     textureSnapshot: textureSnapshot,
                     outputURL: url,
                     separateTracks: separateTracks,
+                    beatFixupEnabled: beatFixupOn,
                     onProgress: { p in
                         Task { @MainActor [weak self] in self?.audioExportProgress = p }
                     },

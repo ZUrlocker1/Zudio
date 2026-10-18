@@ -158,7 +158,8 @@ the history) with no key, tempo or mood override. It is one of twelve curated se
 meets the list above, so it replays exactly with no forced settings. They were chosen under a
 Soho roll below 0.25, so they stay Soho under any mix at least that generous.
 `firstSohoSeedsStillQualify` checks each against the list; when a generator or mix change breaks
-one, search for a replacement with the same criteria.
+one, search for a replacement with the same criteria. Refreshed 2026-10-18: seeds 34075 and
+65086 had become Blues songs when the Blues share rose to 20%, and were replaced by 4673 and 9594.
 
 ## Activation and the groove
 
@@ -166,8 +167,8 @@ one, search for a replacement with the same criteria.
   Every `withXxx()` copy method passes it explicitly
 - `displayStyleName` is `"Chill Soho"`; `.zudio` files write it on `Substyle:`, `Style:` stays
   `Chill`
-- **Share:** Blues 20% on the main stream, then `sohoShareOfNonBlues` (`60/80`) — **60% Soho /
-  20% Blues / 20% base** (Zack, 2026-10-16, replacing the 70/15/15 testing mix)
+- **Share:** Blues 20% on the main stream, then `sohoShareOfNonBlues` (`30/80`) — **30% Soho /
+  20% Blues / 50% base** (Zack, 2026-10-18; it was 60/20/20 on 2026-10-16 and 70/15/15 before)
 - **Groove**, once per song: `ChillBeatStyle.sohoLatin` 55%, `.sohoSoul` 45%
 - **Tempo:** 84–128 BPM, triangular with a peak at 100, independent of the groove
 - **Mode:** base Chill's weights — Dorian 40%, Aeolian 25%, Mixolydian 20%, Ionian 15%
@@ -593,6 +594,45 @@ or `No changes!`.
 
 ---
 
+## Behind-the-beat feel — Beat Fixup (Soul only)
+
+Added 2026-10-18. The Sade, Style Council and Simply Red pocket depends on the backbeat and the
+bass sitting a few milliseconds late while the kick and hats stay on the grid. Nothing in Chill
+had shifted a note off its sixteenth before this.
+
+**What it is.** A playback-time offset in `PlaybackEngine.onStep`, not a change to any note. The
+stored song, its seeds, its MIDI export and every rule are untouched, and the MIDI lanes show the
+same grid. The constants live in `BeatFixup.swift`.
+
+**Which songs.** Chill Soho **Soul** only. Latin (bossa, samba) is clave-driven and bright, and a
+late rim or bass there sounds sloppy, so its offsets are 0. Raising them in `BeatFixup.offsets`
+is a one-number edit if Latin is worth auditioning. Blues and base Chill are never delayed.
+
+**What is delayed.**
+- **Bass** — every note, by +10 ms (set 2026-10-18 after auditioning 8, 25 and 100). A bass slide starts late with its note
+- **Drum backbeat voices only** — by +20 ms: side stick (37, the Soul backbeat voice), snare (38),
+  clap (39) and snare 2 (40)
+- **Not delayed, deliberately** — the whole drum track is not shifted. Kick, hats, ride, shaker,
+  tambourine, toms and crashes stay on the grid, so the lateness is heard against them. Leads,
+  pads and rhythm also stay on the grid
+- Each delayed note-on has its note-off delayed by the same amount, so gate lengths are kept
+
+**Log.** Generation adds `Laid back  Soul bass +10 ms, rim/snare +20 ms` for a
+Soul song and no row for any other. Latin, Blues and base Chill songs have no row.
+
+**Mac test switch.** ⌘J and ⌃G (keystrokes only; the menu item was removed 2026-10-18) switch the delay off and on for
+the playing song, replacing the Groove Fixup test toggle. Every press logs a row (`off, notes on
+the grid`, or the offsets). The delay is on by default, so iPhone and iPad always have it. The
+switch is Mac only and is scaffolding (`BeatFixupTestMode.swift`).
+
+**Export.** Audio export (`OfflineExport`) adds the same offsets to the event positions, so the
+exported file matches playback, stems included. It follows the Mac test switch: switch the delay
+off and the export has none.
+
+**Known limits.** The delay is a dispatch timer on the step queue, so each delayed note carries a
+millisecond or two of its own jitter. A late bass is the likeliest place for the groove to loosen,
+which is why it gets the smaller offset. Research puts a human laid-back snare near 17 ms (Danielsen et al. 2015); nothing measured gives a bass figure. 100 ms was auditioned once as a sanity check and sounds like a drummer trying to catch up. Past about 30 ms a backbeat reads as sloppy, not relaxed.
+
 ## Instruments
 
 All three Chill forms share one instrument pool per track, so every picker lists the same
@@ -689,10 +729,8 @@ tone is light, continuing base Chill's wry register.
 
 ## Open items
 
-- **Behind-the-beat feel.** Nothing in Chill shifts notes off the grid; everything lands exactly
-  on its sixteenth. The Sade and Style Council sound depends on the rim and bass sitting a few
-  milliseconds late with the hats on time. Proposal: a small per-track delay for Soho only — rim and
-  snare +10–20 ms, bass +5–10 ms — which adds "relaxed" without changing a note
+- **Behind-the-beat feel** is built for Soul (see Beat Fixup above). Open: judge it by ear, and
+  decide whether Latin gets any offset
 - **A Soho-specific ending**, floated, not taken up
 - **Replay without the forced substyle.** Regenerating a saved song from history does not pass
   whether Soho or Blues was forced, so a forced song can come back as another form
@@ -708,5 +746,5 @@ tone is light, continuing base Chill's wry register.
 - `swift test --filter ChillSohoTests` is the behavioural suite; `ChillLeadRegisterTests`,
   `InstrumentPoolDriftTests` and `WeightedPickTests` pin the registers, pools and weights
 
-**Before a real release:** remove the ⌘J / ⌃G Groove Fixup test toggle
-(`GrooveFixupTestMode.swift`, its menu item and key monitor), and re-pin the fingerprint baseline.
+**Before a real release:** remove the ⌘J / ⌃G Beat Fixup test toggle
+(`BeatFixupTestMode.swift` and its key monitor block), and re-pin the fingerprint baseline.

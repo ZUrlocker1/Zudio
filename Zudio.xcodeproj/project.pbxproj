@@ -9,7 +9,8 @@
 /* Begin PBXBuildFile section */
 		AA000000000000000000001 /* ZudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* ZudioApp.swift */; };
 		AA000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000002 /* AppState.swift */; };
-		AA000000000000000000777 /* GrooveFixupTestMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000777 /* GrooveFixupTestMode.swift */; };
+		AA000000000000000000777 /* BeatFixupTestMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000777 /* BeatFixupTestMode.swift */; };
+		AA000000000000000000778 /* BeatFixup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000778 /* BeatFixup.swift */; };
 		AA000000000000000000003 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* Types.swift */; };
 		AA000000000000000000004 /* MIDIEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004 /* MIDIEvent.swift */; };
 		AA000000000000000000005 /* GlobalMusicalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000005 /* GlobalMusicalFrame.swift */; };
@@ -107,7 +108,8 @@
 		IR000000000000000000010 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000099 /* PrivacyInfo.xcprivacy */; };
 		IS000000000000000000001 /* ZudioApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000001 /* ZudioApp.swift */; };
 		IS000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000002 /* AppState.swift */; };
-		IS000000000000000000777 /* GrooveFixupTestMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000777 /* GrooveFixupTestMode.swift */; };
+		IS000000000000000000777 /* BeatFixupTestMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000777 /* BeatFixupTestMode.swift */; };
+		IS000000000000000000778 /* BeatFixup.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000778 /* BeatFixup.swift */; };
 		IS000000000000000000003 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000003 /* Types.swift */; };
 		IS000000000000000000004 /* MIDIEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000004 /* MIDIEvent.swift */; };
 		IS000000000000000000005 /* GlobalMusicalFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000005 /* GlobalMusicalFrame.swift */; };
@@ -242,7 +244,8 @@
 /* Begin PBXFileReference section */
 		BB000000000000000000001 /* ZudioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZudioApp.swift; sourceTree = "<group>"; };
 		BB000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		BB000000000000000000777 /* GrooveFixupTestMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrooveFixupTestMode.swift; sourceTree = "<group>"; };
+		BB000000000000000000777 /* BeatFixupTestMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatFixupTestMode.swift; sourceTree = "<group>"; };
+		BB000000000000000000778 /* BeatFixup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeatFixup.swift; sourceTree = "<group>"; };
 		BB000000000000000000003 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
 		BB000000000000000000004 /* MIDIEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIEvent.swift; sourceTree = "<group>"; };
 		BB000000000000000000005 /* GlobalMusicalFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalMusicalFrame.swift; sourceTree = "<group>"; };
@@ -515,7 +518,8 @@
 			children = (
 				BB000000000000000000001 /* ZudioApp.swift */,
 				BB000000000000000000002 /* AppState.swift */,
-				BB000000000000000000777 /* GrooveFixupTestMode.swift */,
+				BB000000000000000000777 /* BeatFixupTestMode.swift */,
+				BB000000000000000000778 /* BeatFixup.swift */,
 				BB000000000000000000020 /* Info.plist */,
 				BB000000000000000000099 /* PrivacyInfo.xcprivacy */,
 				BB000000000000000000100 /* Assets.xcassets */,
@@ -883,7 +887,8 @@
 			files = (
 				AA000000000000000000001 /* ZudioApp.swift in Sources */,
 				AA000000000000000000002 /* AppState.swift in Sources */,
-				AA000000000000000000777 /* GrooveFixupTestMode.swift in Sources */,
+				AA000000000000000000777 /* BeatFixupTestMode.swift in Sources */,
+				AA000000000000000000778 /* BeatFixup.swift in Sources */,
 				AA000000000000000000003 /* Types.swift in Sources */,
 				AA000000000000000000004 /* MIDIEvent.swift in Sources */,
 				AA000000000000000000005 /* GlobalMusicalFrame.swift in Sources */,
@@ -985,7 +990,8 @@
 				IS000000000000000000001 /* ZudioApp.swift in Sources */,
 				SH000000000000000000072 /* SharedSongInbox.swift in Sources */,
 				IS000000000000000000002 /* AppState.swift in Sources */,
-				IS000000000000000000777 /* GrooveFixupTestMode.swift in Sources */,
+				IS000000000000000000777 /* BeatFixupTestMode.swift in Sources */,
+				IS000000000000000000778 /* BeatFixup.swift in Sources */,
 				IS000000000000000000003 /* Types.swift in Sources */,
 				IS000000000000000000004 /* MIDIEvent.swift in Sources */,
 				IS000000000000000000005 /* GlobalMusicalFrame.swift in Sources */,

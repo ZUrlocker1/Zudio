@@ -67,11 +67,7 @@ struct SongGenerator {
         useBrushKit:          Bool    = false,
         forceBluesVariation:  Bool    = false,
         forceSohoVariation:   Bool    = false,
-        forceAmbientPianoRule: String? = nil,
-        // GROOVE FIXUP TEST MODE — lets ⌘J rebuild the same song with the groove passes off, so
-        // it can toggle a Latin song (which generation already fixed) back to its raw leads.
-        // Temporary; remove with the rest of the test mode.
-        skipGrooveFixup: Bool = false
+        forceAmbientPianoRule: String? = nil
     ) -> SongState {
         switch style {
         case .kosmic:
@@ -98,7 +94,7 @@ struct SongGenerator {
                                    useBrushKit: useBrushKit,
                                    forceAmbientPianoRule: forceAmbientPianoRule)
         case .chill:
-            return ChillBassSlides.annotated(generateChill(skipGrooveFixup: skipGrooveFixup,
+            return ChillBassSlides.annotated(generateChill(
                                  seed: seed, keyOverride: keyOverride, tempoOverride: tempoOverride,
                                  moodOverride: moodOverride,
                                  forceBassRuleID: forceBassRuleID,
@@ -3741,7 +3737,6 @@ struct SongGenerator {
     // MARK: - Chill generation path
 
     private static func generateChill(
-        skipGrooveFixup: Bool = false,
         seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
@@ -4026,11 +4021,8 @@ struct SongGenerator {
         // Runs for EVERY Chill song (2026-10-14, Zack), not just the Latin Soho grooves it was
         // built for. The two passes read the song's own drums and bass, so they adapt to
         // whatever the rhythm section is doing: nothing about them assumes a Latin pulse.
-        //
-        // `skipGrooveFixup` is only set by the ⌃G/⌘J test mode, which rebuilds the same song
-        // with the passes off so it can toggle between the raw and fixed leads.
         var grooveFixupSummary: String? = nil
-        if !skipGrooveFixup {
+        do {
             let grooveBars = Set(structure.sections.filter { $0.label == .A || $0.label == .B }
                                   .flatMap { $0.startBar..<($0.startBar + $0.lengthBars) })
             let pulse = grooveStepSupport(drums: trackEvents[kTrackDrums],
@@ -4234,6 +4226,9 @@ struct SongGenerator {
         }
         if let summary = grooveFixupSummary {
             log.append(GenerationLogEntry(tag: "Groove fixup", description: summary))
+        }
+        if let beat = BeatFixup.logDescription(for: chillBeatStyle) {
+            log.append(GenerationLogEntry(tag: "Laid back", description: beat))
         }
 
         let bluesIVVDesc: String = {

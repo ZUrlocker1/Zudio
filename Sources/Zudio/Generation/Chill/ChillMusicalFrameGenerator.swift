@@ -13,10 +13,10 @@ struct ChillMusicalFrameGenerator {
     /// Share of NON-Blues Chill songs that become Chill Soho. Blues takes 20% of Chill on the
     /// main stream, so Soho's overall share is 0.80 x this.
     ///
-    /// The mix is **60% Soho, 20% Blues, 20% base Chill** (Zack, 2026-10-16; it was a 70/15/15
-    /// testing mix), which makes this 60/80. Changing it changes which existing Chill seeds are
+    /// The mix is **30% Soho, 20% Blues, 50% base Chill** (Zack, 2026-10-18; 60/20/20 on
+    /// 2026-10-16, 70/15/15 before that), which makes this 30/80. Changing it changes which existing Chill seeds are
     /// Soho, but never their main-stream draws. See docs/chill-soho-plan.md.
-    static let sohoShareOfNonBlues: Double = 60.0 / 80.0
+    static let sohoShareOfNonBlues: Double = 30.0 / 80.0
 
     static func generate(
         rng: inout SeededRNG,
@@ -43,8 +43,8 @@ struct ChillMusicalFrameGenerator {
 
         // Chill Soho activation. `sohoRoll` comes from a DERIVED stream in the caller and is
         // never drawn from `rng`, so base Chill and Blues make exactly the same main-stream draws
-        // as they did before Soho existed. Blues keeps precedence: 20% Blues, then 60/80 of the
-        // remaining 80% = 60% Soho overall, leaving 20% base Chill.
+        // as they did before Soho existed. Blues keeps precedence: 20% Blues, then 30/80 of the
+        // remaining 80% = 30% Soho overall, leaving 50% base Chill.
         // The default of 1.0 means a caller that does not pass a roll never gets Soho.
         let sohoVariation = !bluesVariation && (forceSohoVariation || sohoRoll < sohoShareOfNonBlues)
 

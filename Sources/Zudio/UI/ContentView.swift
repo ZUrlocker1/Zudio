@@ -435,17 +435,19 @@ struct ContentView: View {
                 guard NSApp.modalWindow == nil else { return event }
                 let key  = event.charactersIgnoringModifiers ?? ""
                 let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
-                // GROOVE FIXUP TEST MODE — temporary; delete this block and
-                // Sources/Zudio/GrooveFixupTestMode.swift together. ⌃G toggles the fixup on
-                // Lead 1 and Lead 2 so the moved notes can be compared in the MIDI lanes.
+                // BEAT FIXUP TEST MODE — temporary; delete this block and
+                // Sources/Zudio/BeatFixupTestMode.swift together. ⌃G switches the behind-the-beat
+                // delay on and off for the playing song.
                 //
                 // Deliberately handled BEFORE the text-field guard below: ⌃G is not a text
                 // editing key, so trapping it with the BPM field focused costs nothing and
                 // the toggle works wherever focus happens to be. keyCode 5 is ANSI G —
                 // Control folds the character to a control code on some layouts, so the key
                 // code is the reliable test.
-                if mods == [.control], key.lowercased() == "g" || event.keyCode == 5 {
-                    appState.toggleGrooveFixupTestMode()
+                // ⌘J does the same (it was the menu item's shortcut before the menu item was removed).
+                if (mods == [.control] && (key.lowercased() == "g" || event.keyCode == 5))
+                    || (mods == [.command] && key.lowercased() == "j") {
+                    appState.toggleBeatFixupTestMode()
                     return nil   // consume
                 }
                 // Don't steal keys from focused text fields (e.g. BPM input)
