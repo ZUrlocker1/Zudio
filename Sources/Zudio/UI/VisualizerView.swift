@@ -175,7 +175,7 @@ struct VisualizerView: View {
 
     private func handleClickEmpty() {
         // Filter sweep — same as iPhone tap-empty
-        playback.triggerGlobalFilterSweep()
+        appState.triggerFilterSweep()
     }
 
     private func handleDoubleClickEmpty() {

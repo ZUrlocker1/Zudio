@@ -606,7 +606,17 @@ same grid. The constants live in `BeatFixup.swift`.
 
 **Which songs.** Chill Soho **Soul** only. Latin (bossa, samba) is clave-driven and bright, and a
 late rim or bass there sounds sloppy, so its offsets are 0. Raising them in `BeatFixup.offsets`
-is a one-number edit if Latin is worth auditioning. Blues and base Chill are never delayed.
+is a one-number edit if Latin is worth auditioning. Base Chill is never delayed.
+
+**Chill Blues (2026-10-19).** Blues songs take a smaller offset, bass +6 ms and backbeat +15 ms,
+for the whole song (Groove B included, so the feel does not change at a section line), but only
+on four bass patterns: CHL-BASS-009 Blues Pickup, 010 Quarter Pulse, 001 Root Sustain and 003
+Walking. Excluded: 012 Rumba (clave-driven, the same reason as Soho Latin), 011 Ascending Riff
+(built to lean forward) and 004 Air Ostinato (a steady locked loop). About 60% of Blues songs.
+The bass pattern is read from the song's rule IDs (`BeatFixup.bassRule`), so no field is stored.
+Groove B's CHL-DRUM-007 snare is already written a sixteenth late; 15 ms on top is a small
+nudge. Not yet judged by ear. If the sparse Groove A side-stick sounds dragged, drop to 10 ms.
+Pinned by `BluesBeatFixupTests`.
 
 **What is delayed.**
 - **Bass** — every note, by +10 ms (set 2026-10-18 after auditioning 8, 25 and 100). A bass slide starts late with its note
@@ -618,7 +628,8 @@ is a one-number edit if Latin is worth auditioning. Blues and base Chill are nev
 - Each delayed note-on has its note-off delayed by the same amount, so gate lengths are kept
 
 **Log.** Generation adds `Laid back  Soul bass +10 ms, rim/snare +20 ms` for a
-Soul song and no row for any other. Latin, Blues and base Chill songs have no row.
+Soul song, `Laid back  Blues bass +6 ms, rim/snare +15 ms` for an allowed Blues song and no
+row for any other. Latin, other Blues and base Chill songs have no row.
 
 **Mac test switch.** ⌘J and ⌃G (keystrokes only; the menu item was removed 2026-10-18) switch the delay off and on for
 the playing song, replacing the Groove Fixup test toggle. Every press logs a row (`off, notes on

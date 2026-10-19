@@ -38,10 +38,12 @@ Ambient  ←→  Chill  ←→  Kosmic  ←→  Motorik
 
 Movement is normally ±1 step, but the exact probabilities are **asymmetric per side** — tuned (2026) to hit a target style mix rather than a flat/symmetric split:
 
-- **Ambient**: ~68% → Chill, ~32% → Kosmic (two-step escape valve, breaks ping-pong traps)
-- **Chill**: ~92% → Ambient, ~8% → Kosmic (forward valve — occasional direct advance)
-- **Kosmic**: ~83% → Motorik, ~17% → Chill
-- **Motorik**: ~85% → Kosmic, ~15% → Chill (two-step escape valve, mirrors Ambient's)
+- **Ambient**: ~75% → Chill, ~25% → Kosmic (two-step escape valve, breaks ping-pong traps)
+- **Chill**: ~88% → Ambient, ~12% → Kosmic (forward valve — occasional direct advance)
+- **Kosmic**: ~90% → Motorik, ~10% → Chill
+- **Motorik**: ~60% → Kosmic, ~40% → Chill (two-step escape valve, mirrors Ambient's)
+
+**Retune 2026-10-19:** Chill (with Soho) became much stronger, so the mix moved from Ambient 19.5 / Chill 24 / Kosmic 32 / Motorik 24.5 to roughly 21 / 27 / 28 / 24, found by simulating the chain with a search over the four valves. Chill is now fed mostly by Motorik's larger escape valve (40%); Kosmic's own inward step shrank to 10%. A side effect is shorter Kosmic/Motorik streaks (median 6 songs, down from 9; worst case still 14). The paragraphs below describe the earlier tuning and its reasoning; the figures in them are superseded by the list above.
 
 **Matched escape valves:** an earlier version of this tuning gave Motorik no escape valve at all — it always stepped back to Kosmic. That hit an exact target percentage, but made Kosmic/Motorik a one-way trap only escapable via Kosmic's 17% roll: simulating the chain showed a median unbroken Kosmic/Motorik streak of 16 songs, with ~30% of streaks running 28+ songs. Restoring Motorik's valve roughly halves streak length (median ~9, ~11% running 28+ songs).
 
@@ -49,10 +51,10 @@ Movement is normally ±1 step, but the exact probabilities are **asymmetric per 
 
 This is a random walk, not a flat weight table, so the actual long-run frequency of each style is the *steady state* of that walk, not the numbers above directly. Simulating the underlying Markov chain (including the shift-timing rule and the pair-streak cap below) gives roughly:
 
-- Ambient: ~19.5%
-- Chill: ~24%
-- Kosmic: ~32%
-- Motorik: ~24.5%
+- Ambient: ~21%
+- Chill: ~27%
+- Kosmic: ~28%
+- Motorik: ~24%
 
 (Slightly off the pure-valve target of 21.6%/23.4%/30%/25% — the pair-streak cap below nudges these a little, since it occasionally forces a crossing the probabilities alone wouldn't have chosen. Tighter caps push the split further from the pure-valve target; this is an expected, deliberate trade-off for tighter worst-case bounds.)
 

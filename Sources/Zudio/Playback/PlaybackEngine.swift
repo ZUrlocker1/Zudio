@@ -275,10 +275,10 @@ final class PlaybackEngine: ObservableObject {
 
     // Behind-the-beat feel (BeatFixup): seconds the bass and the drum backbeat notes are held
     // back from their grid step. Read in onStep on stepTimerQueue, written under
-    // stepTimerQueue.sync by applyBeatFixup. Zero except for a Chill Soho Soul song.
+    // stepTimerQueue.sync by applyBeatFixup. Zero except for a Chill Soho Soul song or a Chill Blues song on an allowed bass.
     nonisolated(unsafe) private var beatBassDelay: Double = 0
     nonisolated(unsafe) private var beatBackbeatDelay: Double = 0
-    private var beatFixupStyle: ChillBeatStyle? = nil
+    private var beatFixupOffsets: (bassMs: Int, backbeatMs: Int)? = nil
     /// The Mac test switch (⌘J / ⌃G). On by default, so iPhone and iPad always get the feel.
     private(set) var beatFixupEnabled = true
 
@@ -509,7 +509,7 @@ final class PlaybackEngine: ObservableObject {
             bassSlideMap = slides
             bassSlideSecondsPerStep = state.frame.secondsPerStep
         }
-        beatFixupStyle = state.style == .chill ? state.chillBeatStyle : nil
+        beatFixupOffsets = BeatFixup.offsets(for: state)
         applyBeatFixup()
     }
 
@@ -519,7 +519,7 @@ final class PlaybackEngine: ObservableObject {
     }
 
     private func applyBeatFixup() {
-        let o = beatFixupEnabled ? beatFixupStyle.map(BeatFixup.offsets(for:)) : nil
+        let o = beatFixupEnabled ? beatFixupOffsets : nil
         stepTimerQueue.sync {
             beatBassDelay     = Double(o?.bassMs ?? 0) / 1000
             beatBackbeatDelay = Double(o?.backbeatMs ?? 0) / 1000
@@ -2186,6 +2186,8 @@ final class PlaybackEngine: ObservableObject {
     /// Re-triggerable — a second call restarts from fully open so the effect is always audible.
     /// Resonance is boosted to 15 dB during the sweep for a dramatic Moog-style wah character,
     /// then restored to the 3 dB static value when the sweep completes.
+    var isGlobalSweepRunning: Bool { globalSweepTicksRemaining > 0 }
+
     func triggerGlobalFilterSweep() {
         preGlobalSweepEnabled = sweepEnabled
         globalSweepPhase = .pi / 2    // start at maximum cutoff (6000 Hz — fully open)

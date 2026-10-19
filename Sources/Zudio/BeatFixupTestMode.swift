@@ -20,10 +20,10 @@ extension AppState {
         guard let song = songState else { logBeatFixup("no song loaded"); return }
         let enabled = !playback.beatFixupEnabled
         playback.setBeatFixupEnabled(enabled)
-        if let on = BeatFixup.logDescription(for: song.chillBeatStyle), song.style == .chill {
+        if let on = BeatFixup.logDescription(for: song) {
             logBeatFixup(enabled ? on : "off, notes on the grid")
         } else {
-            logBeatFixup(enabled ? "on, but this song takes no delay (Chill Soho Soul only)"
+            logBeatFixup(enabled ? "on, but this song takes no delay (Chill Soho Soul, or Chill Blues on an allowed bass, only)"
                                  : "off")
         }
     }

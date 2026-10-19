@@ -217,3 +217,66 @@ struct KosmicMusicalFrameGenerator {
         return Swift.max(8, (rawBars / 4) * 4)
     }
 }
+
+// MARK: - Automatic filter sweeps
+
+/// Which steps of a Kosmic song fire an automatic global filter sweep (the same sweep a tap on
+/// empty canvas triggers). 40% of regular Kosmic songs get 1-3 of them; Kosmic Drift gets none.
+///
+/// The schedule is derived from the seed and the section structure with its own SeededRNG, so it
+/// consumes nothing from the generator's stream and never changes a note. The same seed always
+/// gives the same sweeps, including after a reload from history or a .zudio file, so nothing is
+/// stored in SongState.
+///
+/// The sweep closes the filter over 3 seconds and then snaps it open, so each one starts
+/// tempo/5 steps before its boundary and the reopening lands on the boundary itself.
+enum KosmicAutoSweep {
+    static let songChance = 0.40
+    static let minSpacingBars = 32
+    /// Keeps sweeps off the intro and clear of the outro. The outro gap is also wider than the
+    /// 12-bar Evolve look-ahead, so the schedule is identical in the original and extended state.
+    static let introGuardBars = 8
+    static let outroGuardBars = 16
+
+    static func steps(for song: SongState) -> [Int] {
+        guard song.style == .kosmic, !song.isKosmicDrift else { return [] }
+        var rng = SeededRNG(seed: song.globalSeed ^ 0x5EE9_F11A_7E50_C0DE)
+        guard rng.nextDouble() < songChance else { return [] }
+        let wanted = 1 + Int(rng.next() % 3)
+
+        let structure = song.structure
+        let outroStart = structure.outroSection?.startBar ?? song.frame.totalBars
+        let first = (structure.introSection?.endBar ?? 0) + introGuardBars
+        let last = outroStart - outroGuardBars
+        guard last > first else { return [] }
+
+        // Section changes first (B, bridges, the A that follows them), then the 16-bar grid.
+        var boundaries: [Int] = []
+        var previous: SectionLabel? = nil
+        for s in structure.sections {
+            let isChange = s.label == .B || s.label.isBridge || s.label == .postRamp
+                || (s.label == .A && previous != nil && previous != .intro)
+            if isChange { boundaries.append(s.startBar) }
+            previous = s.label
+        }
+        let grid = Array(stride(from: 16, to: outroStart, by: 16))
+        var pool = shuffled(boundaries.filter { $0 >= first && $0 <= last }, rng: &rng)
+        pool += shuffled(grid.filter { $0 >= first && $0 <= last && !boundaries.contains($0) }, rng: &rng)
+
+        var chosen: [Int] = []
+        for bar in pool where chosen.count < wanted {
+            if chosen.allSatisfy({ abs($0 - bar) >= minSpacingBars }) { chosen.append(bar) }
+        }
+        let lead = Swift.max(1, song.frame.tempo / 5)
+        return chosen.sorted().map { Swift.max(0, $0 * 16 - lead) }
+    }
+
+    private static func shuffled(_ a: [Int], rng: inout SeededRNG) -> [Int] {
+        var out = a
+        guard out.count > 1 else { return out }
+        for i in stride(from: out.count - 1, to: 0, by: -1) {
+            out.swapAt(i, Int(rng.next() % UInt64(i + 1)))
+        }
+        return out
+    }
+}

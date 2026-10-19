@@ -4234,7 +4234,8 @@ struct SongGenerator {
         if let summary = grooveFixupSummary {
             log.append(GenerationLogEntry(tag: "Groove fixup", description: summary))
         }
-        if let beat = BeatFixup.logDescription(for: chillBeatStyle) {
+        if let beat = BeatFixup.logDescription(style: .chill, beatStyle: chillBeatStyle, blues: bluesVariation,
+                                               bassRule: BeatFixup.bassRule(in: bassRules.sorted())) {
             log.append(GenerationLogEntry(tag: "Laid back", description: beat))
         }
 

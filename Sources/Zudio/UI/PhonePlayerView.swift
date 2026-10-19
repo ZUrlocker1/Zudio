@@ -779,7 +779,7 @@ struct PhonePlayerView: View {
 
     private func handleTapEmpty() {
         // Filter sweep — same effect as two-finger gesture, but single tap on empty canvas
-        playback.triggerGlobalFilterSweep()
+        appState.triggerFilterSweep()
         hapticImpactMedium.toggle()
     }
 

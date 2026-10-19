@@ -1,4 +1,4 @@
-// BeatFixup.swift — the "behind the beat" feel for Chill Soho Soul grooves.
+// BeatFixup.swift — the "behind the beat" feel for Chill Soho Soul grooves and some Chill Blues.
 //
 // A playback-time offset, not a change to any note: the stored song, its seeds, its MIDI export
 // and every rule are untouched. onStep fires the bass, and the backbeat voices of the drum
@@ -29,10 +29,50 @@ enum BeatFixup {
         GMDrum.snare2.rawValue       // 40
     ]
 
-    /// Generation-log text, or nil when the groove takes no delay (every style but Soho Soul).
-    static func logDescription(for beatStyle: ChillBeatStyle) -> String? {
-        let o = offsets(for: beatStyle)
+    /// Chill Blues: a smaller offset than Soul, and only on the slow patient bass patterns, so the
+    /// late side-stick sits against a bass that is late with it. Whole song, Groove B included.
+    /// Added 2026-10-19. Not on CHL-BASS-012 Rumba (clave-driven, as Latin in Soho), CHL-BASS-011
+    /// Ascending Riff (built to lean forward) or CHL-BASS-004 Air Ostinato (a steady locked loop).
+    static let bluesOffsets: (bassMs: Int, backbeatMs: Int) = (bassMs: 6, backbeatMs: 15)
+    static let bluesBassRules: Set<String> = [
+        "CHL-BASS-009",   // Blues Pickup (B.B. King)
+        "CHL-BASS-010",   // Quarter Pulse
+        "CHL-BASS-001",   // Root Sustain
+        "CHL-BASS-003"    // Walking
+    ]
+
+    /// The song's bass rule from a list of rule IDs. CHL-BASS-005 is the breakdown bass, not the
+    /// song's pattern (same filter as ChillBassSlides).
+    static func bassRule<S: Sequence>(in ids: S) -> String? where S.Element == String {
+        ids.filter { $0.hasPrefix("CHL-BASS-") && $0 != "CHL-BASS-005" }.last
+    }
+
+    /// The offsets a song takes: Soho Soul, or Chill Blues on an allowed bass; zero for the rest.
+    static func offsets(for song: SongState) -> (bassMs: Int, backbeatMs: Int) {
+        offsets(style: song.style, beatStyle: song.chillBeatStyle, blues: song.chillBluesVariation,
+                bassRule: bassRule(in: song.generationLog.map(\.tag)))
+    }
+
+    static func offsets(style: MusicStyle, beatStyle: ChillBeatStyle, blues: Bool,
+                        bassRule: String?) -> (bassMs: Int, backbeatMs: Int) {
+        guard style == .chill else { return (bassMs: 0, backbeatMs: 0) }
+        if blues {
+            guard let rule = bassRule, bluesBassRules.contains(rule) else { return (bassMs: 0, backbeatMs: 0) }
+            return bluesOffsets
+        }
+        return offsets(for: beatStyle)
+    }
+
+    /// Generation-log text, or nil when the song takes no delay.
+    static func logDescription(for song: SongState) -> String? {
+        logDescription(style: song.style, beatStyle: song.chillBeatStyle, blues: song.chillBluesVariation,
+                       bassRule: bassRule(in: song.generationLog.map(\.tag)))
+    }
+
+    static func logDescription(style: MusicStyle, beatStyle: ChillBeatStyle, blues: Bool,
+                               bassRule: String?) -> String? {
+        let o = offsets(style: style, beatStyle: beatStyle, blues: blues, bassRule: bassRule)
         guard o.bassMs > 0 || o.backbeatMs > 0 else { return nil }
-        return "Soul bass +\(o.bassMs) ms, rim/snare +\(o.backbeatMs) ms"
+        return "\(blues ? "Blues" : "Soul") bass +\(o.bassMs) ms, rim/snare +\(o.backbeatMs) ms"
     }
 }

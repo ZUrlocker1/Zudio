@@ -155,7 +155,7 @@ enum OfflineExport {
         // here with a gain envelope (PadEnvelope) and the same deferred note-off.
         let chillPads = state.style == .chill
         let beat = (beatFixupEnabled && state.style == .chill)
-            ? BeatFixup.offsets(for: state.chillBeatStyle) : (bassMs: 0, backbeatMs: 0)
+            ? BeatFixup.offsets(for: state) : (bassMs: 0, backbeatMs: 0)
         let eventLists: [[SampleEvent]] = samplers.map { item in
             buildEvents(state.trackEvents[item.trackIdx], track: item.trackIdx, beat: beat,
                         padsFade: chillPads, sampleRate: sampleRate, sps: sps)

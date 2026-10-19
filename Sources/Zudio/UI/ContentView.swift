@@ -938,7 +938,7 @@ struct ContentView: View {
     }
 
     private func iPadHandleTapEmpty() {
-        appState.playback.triggerGlobalFilterSweep()
+        appState.triggerFilterSweep()
         iPadHapticImpactMedium.toggle()
     }
 

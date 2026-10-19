@@ -1100,6 +1100,7 @@ final class AppState: ObservableObject {
 
     @Published var livePlaybackFeed: [GenerationLogEntry] = []
     private var lastEmittedStep: Int = -1
+    private var autoSweepCache: (key: String, steps: Set<Int>) = ("", [])
 
     // MARK: - Playback engine
 
@@ -1411,11 +1412,55 @@ final class AppState: ObservableObject {
 
     // MARK: - Live annotation feed
 
+    /// Every step of the loaded song that fires a filter sweep: the Kosmic automatic ones (see
+    /// KosmicAutoSweep) plus, in Evolve on a Kosmic (not Drift) song, the start of pass 1 and
+    /// pass 2. All of it is a function of the song, so the sweep fires on every pass over its bar,
+    /// including after a rewind or a seek. Cached per song and Evolve phase.
+    private func autoSweepSteps() -> Set<Int> {
+        guard let song = songState else { return [] }
+        let key = autoSweepKey(song)
+        if autoSweepCache.key != key {
+            var steps = Set(KosmicAutoSweep.steps(for: song))
+            if playMode == .evolve, let anchor = evolveAnchorState,
+               anchor.style == .kosmic, !anchor.isKosmicDrift {
+                let pass1Start = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars)
+                switch evolvePhase {
+                case .pass1:
+                    steps.insert(pass1Start * 16)
+                case .pass2, .outro:
+                    steps.insert(pass1Start * 16)
+                    steps.insert((pass1Start + evolvePass1Bars) * 16)
+                case .inactive, .original: break
+                }
+            }
+            autoSweepCache = (key, steps)
+        }
+        return autoSweepCache.steps
+    }
+
+    private func autoSweepKey(_ song: SongState) -> String {
+        "\(song.globalSeed)-\(song.frame.totalBars)-\(playMode)-\(evolvePhaseToken)-\(evolvePass1Bars)"
+    }
+
+    /// Fires the global filter sweep (audio plus canvas flash) and logs it. Used by the tap-empty
+    /// gesture, the Kosmic automatic sweeps and the Evolve phase changes. A trigger that lands
+    /// while a sweep is still running restarts it but adds no second log line.
+    func triggerFilterSweep(bar: Int? = nil) {
+        let wasRunning = playback.isGlobalSweepRunning
+        playback.triggerGlobalFilterSweep()
+        guard playback.isPlaying, !wasRunning else { return }
+        let b = bar ?? (playback.currentBar + 1)
+        appendToLog([GenerationLogEntry(tag: String(format: "Bar %03d", b), description: "Filter sweep")])
+    }
+
     private func emitStepAnnotations(upTo step: Int) {
         guard step > lastEmittedStep,
               let annotations = songState?.stepAnnotations else { return }
         var newEntries: [GenerationLogEntry] = []
+        let sweepSteps = autoSweepSteps()
         for s in (lastEmittedStep + 1)...step {
+            // Only a sweep that is due now; a scrub that skips over one must not replay it.
+            if step - s <= 2, sweepSteps.contains(s) { triggerFilterSweep(bar: s / 16 + 1) }
             if let entries = annotations[s] {
                 let bar = s / 16 + 1
                 let barTag = String(format: "Bar %03d", bar)
@@ -1967,8 +2012,8 @@ final class AppState: ObservableObject {
             return endlessStyleAxis[endlessStyleIndex]
         }
         // Style-mix tuning: asymmetric per-side probabilities, chosen and verified by simulating
-        // the underlying Markov chain, to hit a target steady-state mix of roughly Ambient 21.6% /
-        // Chill 23.4% / Kosmic 30% / Motorik 25%. Ambient/Motorik each have a two-step "escape
+        // the underlying Markov chain, to hit a target steady-state mix of roughly Ambient 21% /
+        // Chill 27% / Kosmic 28% / Motorik 24% (retuned 2026-10-19: Chill is stronger with Soho). Ambient/Motorik each have a two-step "escape
         // valve" (a chance to jump past their neighbor straight to Kosmic/Chill) that bounds how
         // long the walk can get stuck oscillating within one pair of adjacent styles; the
         // pair-streak cap below is a hard backstop for the rare case where the valves alone aren't
@@ -1979,19 +2024,19 @@ final class AppState: ObservableObject {
         let sameStep: Int       // step that stays within the current pair
         let crossProbability: Double
         if atLeft {
-            // Ambient: ~68% → Chill (adjacent), ~32% → Kosmic (escape valve, breaks ping-pong traps).
-            crossStep = 2; sameStep = 1; crossProbability = 0.3188
+            // Ambient: ~75% → Chill (adjacent), ~25% → Kosmic (escape valve, breaks ping-pong traps).
+            crossStep = 2; sameStep = 1; crossProbability = 0.25
         } else if atRight {
-            // Motorik: ~85% → Kosmic (adjacent), ~15% → Chill (escape valve, breaks long
+            // Motorik: ~60% → Kosmic (adjacent), ~40% → Chill (escape valve, breaks long
             // Kosmic/Motorik-only streaks).
-            crossStep = -2; sameStep = -1; crossProbability = 0.15
+            crossStep = -2; sameStep = -1; crossProbability = 0.40
         } else if endlessStyleIndex < endlessStyleAxis.count / 2 {
-            // Chill: ~92% → Ambient (adjacent), ~8% → Kosmic (forward valve — occasional direct
+            // Chill: ~88% → Ambient (adjacent), ~12% → Kosmic (forward valve — occasional direct
             // advance, restoring some of the original design's two-way movement).
-            crossStep = 1; sameStep = -1; crossProbability = 0.08
+            crossStep = 1; sameStep = -1; crossProbability = 0.12
         } else {
-            // Kosmic: ~83% outward (toward Motorik, same pair), ~17% inward (toward Chill, crosses pair).
-            crossStep = -1; sameStep = 1; crossProbability = 1.0 - 0.8333
+            // Kosmic: ~90% outward (toward Motorik, same pair), ~10% inward (toward Chill, crosses pair).
+            crossStep = -1; sameStep = 1; crossProbability = 0.10
         }
         let pairStreakCap = currentPair == 0 ? 8 : 12   // smaller cap for Ambient+Chill
         let step = songsInCurrentPair >= pairStreakCap
