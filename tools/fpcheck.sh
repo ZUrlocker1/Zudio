@@ -19,6 +19,9 @@
 # filter change (whole figures lifted above the pads; e0e8b5f, d2645e7), bisected and accepted by
 # Zack. Chill moved with the Soho work since 10-15 and the 30/20/50 mix.
 #
+# Re-pinned 2026-10-19: Chill moved deliberately with the Blues blue-note lick (Blues only; base Chill no
+# longer injects a stray blue note, which also moved 10 Soho songs on the shared base lead rules) and the
+# Blues harmony gate (CHL-LD1-004/003 leads, no vibraphone Lead 2). Motorik, Kosmic and Ambient identical.
 # NOTE: the Chill mix is now 30/20/50 Soho/Blues/base (2026-10-18). Any later change to the
 # mix reclassifies seeds and shows a large Chill diff — expected; re-pin after checking it.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
