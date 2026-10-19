@@ -1800,7 +1800,7 @@ Evolution: Intro bars 1–4 = silent; Intro bars 5+ = 1 phrase only (vel 45–60
 1 phrase per 2–3 bars (rest compressed to 1 bar); Outro = 1 phrase every 6–8 bars,
 velocity declining, final phrase resolves to root.
 
-**CHL-LD1-002 — Short Punch** (Deep/Dream moods, 25%)
+**CHL-LD1-002 — Miles Punch** (formerly Short Punch) (Deep/Dream moods, 25%)
 2-bar phrase: bar 1 has 2–3 punchy notes at syncopated off-beat positions (steps 3, 7, or 11),
 duration 0.75–1 beat each; bar 2 is rest. Interval character: mostly steps (1–2 semitones)
 with one leap of 3–5 semitones at phrase peak. Range MIDI 55–75. Velocity 70–90. Staccato
@@ -1809,7 +1809,7 @@ Evolution: Intro = silent 4 bars, then 1 phrase (vel 50–65); Groove A = 1 phra
 (bar 1 active, bars 2–4 rest); Breakdown = silent; Groove B = 1 phrase per 2 bars (alternating
 active/rest bars); Outro = 1 phrase per 6 bars, velocity 55–70.
 
-**CHL-LD1-003 — DJ Cam Dyad** (all moods, 20%)
+**CHL-LD1-003 — Chet Sparse Melody** (formerly DJ Cam Dyad; single notes, not dyads; named for Chet Baker's spare lyrical style, not sourced from his recordings) (all moods, 20%)
 2–4 bar phrases mixing single-note lines and 2-note dyads (3rd + 7th struck simultaneously —
 vibraphone sustain makes dyads ring naturally). Density 3–5 notes per 2 bars. Interval
 character steps 60% / leaps 40%. Range MIDI 60–80. Velocity 65–80 even across phrase.

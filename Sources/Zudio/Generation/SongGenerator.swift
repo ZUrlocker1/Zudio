@@ -3955,8 +3955,12 @@ struct SongGenerator {
             }
         }
 
-        // Blues harmony/unison sections — 25% of blues songs.
-        // One roll decides if this song gets harmony. If yes, both windows always fire:
+        // Blues harmony/unison sections — about 15% of blues songs.
+        // Only for the longer, unhurried leads (CHL-LD1-004 Blues Lead, CHL-LD1-003 Chet Sparse Melody) and never
+        // when Lead 2 is a vibraphone: parallel 3rds on a busy jazz-idiom line sound cluttered, and
+        // a vibraphone doubling reads as an echo, not a second horn. A vibraphone Lead 2 plays its
+        // normal part. About 27% of blues songs are eligible (measured over 791), so a 0.55 roll lands near 15%.
+        // One roll decides if an eligible song gets harmony. If yes, both windows always fire:
         //   (1) second time through the 16-bar form, (2) finale = last pass (3+ passes only).
         // Each window: at most 2 phrases harmonized.
         if bluesVariation {
@@ -3964,11 +3968,13 @@ struct SongGenerator {
             let outroStart = structure.sections.first { $0.label == .outro }?.startBar ?? frame.totalBars
             let numPasses  = (outroStart - formStart) / 16
 
-            let harmonyProb: Double = 0.30
+            let harmonyProb: Double = 0.55
+            let harmonyEligible = (lead1Rules.contains("CHL-LD1-004") || lead1Rules.contains("CHL-LD1-003"))
+                && chillLead2Instrument != .vibraphone
             let harmonyStart = formStart + 16
             let harmonyEnd   = harmonyStart + 16
 
-            if harmonyEnd <= outroStart && lead2RNG.nextDouble() < harmonyProb {
+            if harmonyEnd <= outroStart && lead2RNG.nextDouble() < harmonyProb && harmonyEligible {
                 let useUnison     = lead2RNG.nextDouble() < 0.30
                 let intervalSteps = lead2RNG.nextDouble() < 0.70 ? 2 : 5
 
@@ -4216,6 +4222,13 @@ struct SongGenerator {
             chillProgFamily: chillProgFamily, chillLeadInstrument: chillLeadInstrument,
             chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle,
             chillSwingFeel: chillSwingFeel, bluesVariation: bluesVariation,
+            blueNoteName: bluesVariation ? {
+                // The blue note is the b5 of the key. It counts as "in the song" when Lead 1 plays
+                // it at least twice, so the log reports the scale the listener actually hears.
+                let pc = (frame.keySemitoneValue + 6) % 12
+                let heard = trackEvents[kTrackLead1].filter { Int($0.note) % 12 == pc }.count
+                return heard >= 2 ? ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"][pc] : nil
+            }() : nil,
             sohoVariation: sohoVariation, sohoCycleLabel: sohoCycleLabel,
             sohoHasTurnaround: sohoHasTurnaround,
             sohoTexRules: sohoTexRules,
@@ -4948,6 +4961,7 @@ struct SongGenerator {
         chillBreakdownStyle: ChillBreakdownStyle,
         chillSwingFeel: Bool,
         bluesVariation: Bool,
+        blueNoteName: String? = nil,   // non-nil when Lead 1 plays the b5; only presence is logged
         sohoVariation: Bool = false,
         sohoCycleLabel: String? = nil,
         sohoHasTurnaround: Bool = false,
@@ -5015,6 +5029,7 @@ struct SongGenerator {
             chordsLine = "\(keyMode) \(soho)"
         } else {
             chordsLine = chordsDescription(key: frame.key, mode: frame.mode, familyLabel: familyLabel)
+                + (blueNoteName.map { _ in " - blues scale" } ?? "")
         }
         log.append(GenerationLogEntry(tag: "Chords", description: chordsLine))
 
@@ -5120,8 +5135,8 @@ struct SongGenerator {
         case "CHL-PAD-006":  return "String hold"
         case "CHL-PAD-000":  return "No pads"
         case "CHL-LD1-001":  return "Long phrase"
-        case "CHL-LD1-002":  return "Short punch"
-        case "CHL-LD1-003":  return "Sparse melodic solo"
+        case "CHL-LD1-002":  return "Miles punch"
+        case "CHL-LD1-003":  return "Chet sparse melody"
         case "CHL-LD1-004":  return "Blues lead"
         case "CHL-LD1-005":  return "St Germain staccato burst"
         case "CHL-LD1-006":  return "Bright melodic solo"

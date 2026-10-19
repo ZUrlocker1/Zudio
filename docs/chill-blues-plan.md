@@ -360,8 +360,8 @@ Chill Blues.
 
 **Lead 1 — rule weights for Chill Blues:**
 - CHL-LD1-004 (Blues Lead) — 55%. Primary choice. Blues scale emphasis, descending phrases, saxophone idiom.
-- CHL-LD1-002 (Short Punch) — 25%. Derived from Miles Davis *All Blues*. Syncopated off-beat hits in the lower register are textbook slow blues phrasing.
-- CHL-LD1-003 (DJ Cam Dyad) — 20%. Jazz-blues crossover feel at slow tempo. Works without modification.
+- CHL-LD1-002 (Miles Punch) — 25%. Derived from Miles Davis *All Blues*. Syncopated off-beat hits in the lower register are textbook slow blues phrasing.
+- CHL-LD1-003 (Chet Sparse Melody) — 20%. Jazz-blues crossover feel at slow tempo. Works without modification.
 - CHL-LD1-001 (St Germain Long Phrase) — 0%. Excluded. The flowing, resolved European jazz flute phrasing is wrong for blues character.
 
 **Returning phrases.** Blues leads use base Chill's seed replay (see the Lead 1 section of the
@@ -377,6 +377,23 @@ used equally (50/50 per phrase or per song). The b5 blue note in the blues scale
 characteristic tension that distinguishes blues phrasing from generic minor playing. The
 existing CHL-LD1-004 rule already references the blues scale; the 50/50 weighting makes
 this explicit and ensures the blue note appears regularly rather than occasionally.
+
+**Blue note (2026-10-19).** The blue note is the b5 of the KEY, so its name changes with the key (Db
+in G, Gb in C, Ab in D) while the interval is always the same. It never sounded before: it was added to the
+pool at the wrong pitch (the b5 in only 1 song in 12) and then stripped as an out-of-mode "avoid tone".
+It is now a decision the soloist makes, Blues only (base Chill no longer injects it):
+- **Per song:** 60% of Blues songs have a soloist who uses it; the rest play plain Dorian.
+- **Per phrase:** in those songs about a third of phrases try for it, until one lands.
+- **Where it fits:** only as a passing tone between the 4th and the 5th (C and D in G, either
+  direction), a soft one- or two-step note taken from the end of the first note and landing off the beat,
+  and only over the I chord. A phrase with no such move plays without it: if it doesn't fit, it isn't played.
+- **A lick, not a stray note:** the first move that fits (say C to D) becomes the soloist's lick, and every
+  later phrase slides through the same move wherever it comes up. Seed phrases carry it, so replays and
+  returns repeat it.
+- **Measured (791 songs):** 38% of Blues songs play it at all, 29% play it at least twice (about 7.6% and 5.7% of all Chill songs); where it is
+  used it is about 3% of Lead 1 notes (median 3 notes per song, up to 18). 98% of blue notes are true passing tones.
+- **Log:** the Chords line adds " - blues scale" when Lead 1 plays it at least twice, e.g.
+  "G Dorian Minor blues - blues scale".
 
 **Lead 1 — instruments for Chill Blues:**
 The Lead 1 pool is Muted Trumpet (59), Alto Sax (65), Tenor Sax (66), Trumpet (56), and
@@ -406,6 +423,21 @@ Candidates to audition as potential additions:
 **Rhythm (Rhodes/Wurlitzer/B3 Organ):** Sparse chord comping already sounds like blues
 piano comping. No changes required. The Rhodes in particular sounds completely natural over
 a slow blues drum bed.
+
+**Lead 2 harmony (second horn).** A second horn joins Lead 1 in parallel 3rds (70%) or 6ths
+(30%), or in unison (30% of harmony songs), in the second pass of the form and again in the last
+pass when there are three or more. At most two phrases per window; about 15% of the shortest notes are
+dropped for looseness. It is limited to songs where it sounds good:
+- Lead 1 must be CHL-LD1-004 (Blues Lead) or CHL-LD1-003 (Chet Sparse Melody): the longer, unhurried lines.
+  CHL-LD1-009 (busy jazz idiom, 45% of notes under 3 steps) and CHL-LD1-002 (short punches) never get it.
+- Lead 2 must not be a vibraphone. A vibraphone doubling reads as an echo, not a section, so
+  it plays its normal Lead 2 part. Soprano sax and trombone are eligible; no horn is forced.
+- About 27% of Blues songs pass both tests (measured over 791 songs); a 0.55 roll gives
+  about 15% overall (13% at the earlier 0.48 trial).
+- Nearly all harmony lands on the I chord (91%) and stays inside Dorian, so chord clashes were not
+  the reason for the gate. The b5 blue note is almost never played (10 notes in 791 songs), so the
+  50/50 pentatonic/blues-scale split above is not happening in practice.
+- Regular Chill and Soho keep their own 20% harmony roll, unchanged.
 
 ---
 

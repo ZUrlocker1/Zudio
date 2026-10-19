@@ -31,6 +31,7 @@ The download is `2.7` (build 132), a **work-in-progress build** with Chill Soho 
 - **A laid-back soul groove** — on the soul songs the bass sits 10 ms and the drum backbeat (side stick, snare, clap) 20 ms behind the beat, with the kick and hats on the grid, the relaxed pocket of the Sade and Style Council records. Playback and exported audio both have it. Latin songs stay on the grid. Some Chill Blues songs (those on the pickup, quarter-pulse, root or walking bass) get a lighter version of it
 - **A Remix Break** — a short house-flavoured section mid-song, the band dropping into four-on-the-floor and hitting its way back out
 - **Guitar-led rhythm** — Nylon, Jazz and Funk guitar carry most of the comping, with Rhodes and piano
+- **Blue notes in Chill Blues** — in some songs the soloist slips a blue note between the 4th and 5th, rarely and over the home chord, and the log reports "blues scale"
 - **Lower CPU use** — on a Mac Zudio now typically uses 15–20% CPU, and 5–10% in the compact view with no visualizer
 - **Bug fixes** — audio textures, saved songs, and Endless and Evolve playback
 

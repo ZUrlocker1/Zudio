@@ -103,16 +103,25 @@ struct ChillLeadGenerator {
         let stopPool = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
             .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
 
-        // A freshly built phrase: the blue-note draw (Blues raises it from 15% to 50%), then the
-        // phrase itself, aware of the chord it ends on and, in Blues, the one it starts on.
+        // Blues: 60% of songs have a soloist who uses the blue note (the b5 of the key), the rest
+        // play plain Dorian. In those songs about a third of phrases try for it until the first lands, and only as a
+        // passing tone where it fits (see addBluePassingTones); a phrase with no fitting place
+        // plays without it. After that the same move gets the blue note every time it comes up,
+        // and the song's seed phrases carry it too, so it comes back as part of a lick.
+        let bluesSoloistUsesBlueNote = bluesVariation && rng.nextDouble() < 0.60
+        // The first time the blue note fits, that move (say C to D in G) becomes the soloist's lick:
+        // from then on every phrase slides through the same move wherever it comes up.
+        var blueNoteLick: (low: UInt8, high: UInt8)? = nil
+
+        // A freshly built phrase, aware of the chord it ends on and, in Blues, the one it starts on.
         func freshPhrase(bar: Int, bars: Int, label: SectionLabel) -> [MIDIEvent] {
-            let phraseBluePc = rng.nextDouble() < (bluesVariation ? 0.50 : 0.15) ? blueNote : nil
+            let blueRoll = rng.nextDouble()
             let phraseEndChord   = structure.chordWindow(atBar: bar + bars - 1)
             let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
-            return buildPhrase(frame: frame, bar: bar, bars: bars,
+            let phrase = buildPhrase(frame: frame, bar: bar, bars: bars,
                                leadInstrument: leadInstrument,
                                pentatonic: pentatonic, scale: scale,
-                               blueNotePC: phraseBluePc,
+                               blueNotePC: nil,
                                regLow: regLow, regHigh: regHigh,
                                section: label, phraseEndChord: phraseEndChord,
                                phraseStartChord: phraseStartChord,
@@ -120,6 +129,12 @@ struct ChillLeadGenerator {
                                useBluesRuns: useBluesRuns,
                                isShortPunch: isShortPunch,
                                isSparseMelodic: isSparseMelodic, rng: &rng)
+            guard bluesSoloistUsesBlueNote else { return phrase }
+            if blueNoteLick == nil && blueRoll >= 0.33 { return phrase }
+            let (withBlue, lick) = addBluePassingTones(phrase, frame: frame, structure: structure,
+                                                       onlyLick: blueNoteLick)
+            if blueNoteLick == nil { blueNoteLick = lick }
+            return withBlue
         }
 
         // Pre-compute handoff windows: 1–2 blocks of 4–6 bars in groove sections where LD1
@@ -769,7 +784,7 @@ struct ChillLeadGenerator {
         var scaleForPool = scale
         if let bluePC = blueNotePC {
             // Insert all octave instances of the blue note within the register
-            var bn = regLow + ((bluePC - (frame.keySemitoneValue % 12) + 12) % 12)
+            var bn = regLow + ((bluePC - (regLow % 12) + 12) % 12)   // first note at or above regLow with the blue pitch class
             while bn < regLow { bn += 12 }
             while bn <= regHigh { scaleForPool.append(bn); bn += 12 }
         }
@@ -780,9 +795,13 @@ struct ChillLeadGenerator {
         // Blues: strip avoid tones of the active chord from the body pool so body notes
         // don't clash over IV and V bars (e.g. B♮ over Gm7 = tritone against F).
         // orderedPool (full) is kept for phrase-ending chord-tone snapping below.
+        // The blue note (b5 of the key) is out of Dorian, so it counts as an avoid tone; it is kept
+        // over the I chord, where it is the b5 of the tonic's blues scale. Over IV and V it would
+        // sit a semitone above the chord root, so the strip stays.
         var bodyPool = orderedPool
         if let chord = phraseStartChord, !chord.avoidTones.isEmpty {
-            let filtered = orderedPool.filter { !chord.avoidTones.contains($0 % 12) }
+            let keepBlue = blueNotePC != nil && chord.chordRoot == "1"
+            let filtered = orderedPool.filter { !chord.avoidTones.contains($0 % 12) || (keepBlue && $0 % 12 == blueNotePC) }
             if filtered.count >= 3 { bodyPool = filtered }
         }
 
@@ -1224,6 +1243,44 @@ struct ChillLeadGenerator {
         return pentIntervals.flatMap { interval -> [Int] in
             [root + interval - 24, root + interval - 12, root + interval, root + interval + 12]
         }.filter { $0 >= 36 && $0 <= 96 }
+    }
+
+    /// Blues: puts the blue note (b5 of the key) between the 4th and the 5th, where a horn player
+    /// would slide through it: C to D in G becomes C, Db, D (or D, Db, C going down). The blue note
+    /// is a soft one- or two-step passing tone just before the target, off the beat, taken from the
+    /// end of the first note, and only over the I chord, where it is the b5 of the tonic's blues scale. Where
+    /// a pair has no room (first note too short to give up the time, wrong chord) the
+    /// phrase is left alone: if it doesn't fit, it isn't played.
+    private static func addBluePassingTones(_ phrase: [MIDIEvent], frame: GlobalMusicalFrame,
+                                            structure: SongStructure, onlyLick: (low: UInt8, high: UInt8)?)
+        -> (events: [MIDIEvent], lick: (low: UInt8, high: UInt8)?) {
+        let key = frame.keySemitoneValue
+        func degree(_ n: UInt8) -> Int { ((Int(n) - key) % 12 + 12) % 12 }
+        var notes = phrase.sorted { $0.stepIndex < $1.stepIndex }
+        var added: [MIDIEvent] = []
+        var lick: (low: UInt8, high: UInt8)? = nil
+        for i in 0..<Swift.max(0, notes.count - 1) {
+            let a = notes[i], b = notes[i + 1]
+            if let want = onlyLick, (Swift.min(a.note, b.note), Swift.max(a.note, b.note)) != (want.low, want.high) { continue }
+            // Two steps before a target on the beat, one step before an off-beat target: either way
+            // the blue note lands off the beat, a passing tone and never a stressed one.
+            let roomy = b.stepIndex % 4 == 0 && a.stepIndex + 4 <= b.stepIndex
+            let blueLen = roomy ? 2 : 1
+            let blueStep = b.stepIndex - blueLen
+            guard abs(Int(a.note) - Int(b.note)) == 2,
+                  [5, 7].contains(degree(a.note)), [5, 7].contains(degree(b.note)),
+                  blueStep % 4 != 0,
+                  a.stepIndex + 1 <= blueStep,
+                  a.stepIndex + a.durationSteps <= b.stepIndex,
+                  structure.chordWindow(atBar: blueStep / 16)?.chordRoot == "1",
+                  structure.chordWindow(atBar: b.stepIndex / 16)?.chordRoot == "1" else { continue }
+            notes[i] = MIDIEvent(stepIndex: a.stepIndex, note: a.note, velocity: a.velocity,
+                                 durationSteps: Swift.min(a.durationSteps, blueStep - a.stepIndex))
+            added.append(MIDIEvent(stepIndex: blueStep, note: UInt8(Swift.min(a.note, b.note) + 1),
+                                   velocity: UInt8(Swift.max(30, Int(a.velocity) - 8)), durationSteps: blueLen))
+            if lick == nil { lick = (Swift.min(a.note, b.note), Swift.max(a.note, b.note)) }
+        }
+        return ((notes + added).sorted { $0.stepIndex < $1.stepIndex }, lick)
     }
 
     private static func blueNotePC(frame: GlobalMusicalFrame) -> Int {
