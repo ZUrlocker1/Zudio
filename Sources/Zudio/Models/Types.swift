@@ -349,7 +349,7 @@ enum ChillProgressionFamily: String, Codable, Sendable {
 
 // MARK: - Chill lead instrument
 
-enum ChillLeadInstrument: String, Codable, Sendable {
+enum ChillLeadInstrument: String, Codable, Sendable, CaseIterable {
     case flute         // GM 73 — Lead 2 default
     case mutedTrumpet  // GM 59 — Deep/Dream primary
     case vibraphone    // GM 11 — Lead 2 default

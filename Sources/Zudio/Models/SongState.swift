@@ -324,7 +324,7 @@ struct SongState: Sendable {
     }
 
     /// Convenience initializer for synthetic pass/extended states: carries all style-specific
-    /// fields from an anchor, resetting trackOverrides to empty. The caller supplies only the
+    /// fields from an anchor, resetting trackOverrides to empty and ambientXFilesBlockRange to nil. The caller supplies only the
     /// structural fields that differ (frame, structure, trackEvents, generationLog, stepAnnotations).
     init(frame: GlobalMusicalFrame,
          structure: SongStructure,
@@ -359,7 +359,42 @@ struct SongState: Sendable {
                   chillAudioTexture: anchor.chillAudioTexture,
                   chillAudioTextureOffset: anchor.chillAudioTextureOffset,
                   ambientAudioTexture: anchor.ambientAudioTexture,
-                  ambientAudioTextureOffset: anchor.ambientAudioTextureOffset)
+                  ambientAudioTextureOffset: anchor.ambientAudioTextureOffset,
+                  // The forced rules and overrides are what a saved file needs to rebuild the
+                  // song from its seed. Without them a song saved mid-Evolve reopened as a
+                  // different song whenever it had been generated with any (2026-10-19).
+                  forcedRules: anchor.forcedRules,
+                  keyOverride: anchor.keyOverride, tempoOverride: anchor.tempoOverride,
+                  moodOverride: anchor.moodOverride)
+    }
+
+    /// A copy with the Chill lead instruments replaced. Evolve pass 1 regenerates the leads for
+    /// the instruments it is about to switch to: Chill leads are written for their instrument's
+    /// register and phrasing, so they must be generated for the patch that will play them.
+    func withChillLeadInstruments(_ lead1: ChillLeadInstrument, _ lead2: ChillLeadInstrument) -> SongState {
+        SongState(frame: frame, structure: structure, tonalMap: tonalMap,
+                  trackEvents: trackEvents, globalSeed: globalSeed,
+                  trackOverrides: trackOverrides, title: title, form: form, style: style,
+                  percussionStyle: percussionStyle, kosmicProgFamily: kosmicProgFamily,
+                  generationLog: generationLog, stepAnnotations: stepAnnotations,
+                  ambientProgFamily: ambientProgFamily, ambientLoopLengths: ambientLoopLengths,
+                  ambientXFilesBlockRange: ambientXFilesBlockRange,
+                  ambientUseBrushKit: ambientUseBrushKit,
+                  chillProgFamily: chillProgFamily, chillLeadInstrument: lead1,
+                  chillLead2Instrument: lead2,
+                  chillBeatStyle: chillBeatStyle, chillBreakdownStyle: chillBreakdownStyle, chillSwingFeel: chillSwingFeel,
+                  chillBluesVariation: chillBluesVariation, chillSohoVariation: chillSohoVariation, motorikNoirVariation: motorikNoirVariation,
+                  motorikArcadeVariation: motorikArcadeVariation,
+                  motorikSync: motorikSync,
+                  motorikBassDistortion: motorikBassDistortion,
+                  motorikNoirBassDistortion: motorikNoirBassDistortion,
+                  motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
+                  isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+                  isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
+                  chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
+                  ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
+                  forcedRules: forcedRules,
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
     }
 
     /// Returns a copy of this state with one track's events replaced.

@@ -1631,12 +1631,6 @@ final class AppState: ObservableObject {
                     self.discardPreGeneratedSong()
                     self.preGenerateNextSong()
                 }
-                // Evolve: fresh generate resets evolution state and starts a new evolve session
-                if self.playMode == .evolve {
-                    self.tearDownEvolve()
-                    self.startEvolveMode(from: state)
-                }
-
                 // Instrument randomization: first song per style uses all defaults (index 0).
                 // From the second song onwards, pick 2 random non-drums tracks and assign
                 // each a random non-default instrument, so users hear the instrument variety.
@@ -1698,6 +1692,14 @@ final class AppState: ObservableObject {
                 }()
                 self.playback.load(state)
                 self.playback.seek(toStep: 0)
+                // Evolve: fresh generate resets evolution state and starts a new evolve session.
+                // After the seek: startEvolveMode reads the playhead to see whether the song is
+                // already in its outro, and before it the playhead was still the previous song's.
+                // Generating late in a long song started the new one with no Evolve at all.
+                if self.playMode == .evolve {
+                    self.tearDownEvolve()
+                    self.startEvolveMode(from: state)
+                }
                 // Configure ambient mode before defaultsResetToken fires so setEffect
                 // uses the correct Ambient reverb/delay values from the start.
                 self.playback.setAmbientMode(self.selectedStyle == .ambient)
@@ -2710,25 +2712,31 @@ final class AppState: ObservableObject {
         evolvePhaseToken        += 1   // ensure scrollbar recreates even if next song has same totalBars
     }
 
-    /// Picks a different instrument for each fresh track and sends a program change immediately.
-    private func switchEvolveInstruments(freshTracks: [Int]) {
+    /// Switches each fresh track to a different instrument and sends a program change immediately.
+    /// Chill's leads take the instruments `pass` was generated for; every other track draws from
+    /// its substyle's own pick list.
+    ///
+    /// This drew from the whole style pool until 2026-10-19. Since the Chill pool became the
+    /// superset of all three forms (2026-10-13), that put Recorder, Flute and Synth Brass on the
+    /// leads of a Blues song, a Sweep Pad and a Jazz Guitar in its pass 2, and played leads
+    /// written for an alto sax's register on whatever patch was drawn.
+    private func switchEvolveInstruments(freshTracks: [Int], pass: SongState) {
         guard let anchor = evolveAnchorState else { return }
         let style = anchor.style
-        let isDrift = songState?.isKosmicDrift == true
-        let isSoho = songState?.chillSohoVariation == true
-        var rng = SystemRandomNumberGenerator()
+        let isSoho = anchor.chillSohoVariation
         var entries: [GenerationLogEntry] = []
         for trackIndex in freshTracks {
             let programs = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
             guard programs.count > 1 else { continue }
             let currentIdx = instrumentOverrides[trackIndex] ?? 0
-            var newIdx = currentIdx
-            var attempts = 0
-            repeat {
-                newIdx = Int.random(in: 0..<programs.count, using: &rng)
-                attempts += 1
-            } while newIdx == currentIdx && attempts < 16
-            guard newIdx != currentIdx else { continue }
+            let picked: Int?
+            if style == .chill && (trackIndex == kTrackLead1 || trackIndex == kTrackLead2) {
+                let inst = trackIndex == kTrackLead1 ? pass.chillLeadInstrument : pass.chillLead2Instrument
+                picked = programs.firstIndex(of: Int(inst.gmProgram))
+            } else {
+                picked = evolvePickIndex(trackIndex, in: anchor, excluding: [currentIdx])
+            }
+            guard let newIdx = picked, newIdx != currentIdx else { continue }
             instrumentOverrides[trackIndex] = newIdx
             setProgram(programs[newIdx], forTrack: trackIndex)
             let tName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
@@ -2741,6 +2749,39 @@ final class AppState: ObservableObject {
             appendToLog(entries)
             evolveInstrumentsChanged = true
         }
+    }
+
+    /// A random pool index for `trackIndex` from the substyle's own pick list for `song`, other
+    /// than those in `excluding`; nil when the list offers no other.
+    private func evolvePickIndex(_ trackIndex: Int, in song: SongState, excluding: Set<Int>) -> Int? {
+        let count = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: song.style,
+                                                isChillSoho: song.chillSohoVariation).count
+        guard count > 1 else { return nil }
+        return Self.instrumentPickPoolStatic(trackIndex: trackIndex, style: song.style,
+                                             poolCount: count, state: song)
+            .filter { !excluding.contains($0) }
+            .randomElement()
+    }
+
+    /// Chill only: the Lead 1 and Lead 2 instruments Evolve pass 1 will switch to, each from the
+    /// substyle's own pick list and different from the one playing now. Lead 2 never takes Lead
+    /// 1's instrument, as in generation. Chosen before the pass is built, so its leads are written
+    /// for these instruments.
+    private func evolveLeadInstruments(for anchor: SongState) -> (ChillLeadInstrument, ChillLeadInstrument)? {
+        guard anchor.style == .chill else { return nil }
+        let isSoho     = anchor.chillSohoVariation
+        let l1Programs = Self.instrumentPoolPrograms(trackIndex: kTrackLead1, style: .chill, isChillSoho: isSoho)
+        let l2Programs = Self.instrumentPoolPrograms(trackIndex: kTrackLead2, style: .chill, isChillSoho: isSoho)
+        func instrument(_ program: Int) -> ChillLeadInstrument? {
+            ChillLeadInstrument.allCases.first { Int($0.gmProgram) == program }
+        }
+        let l1 = evolvePickIndex(kTrackLead1, in: anchor, excluding: [instrumentOverrides[kTrackLead1] ?? 0])
+            .flatMap { instrument(l1Programs[$0]) } ?? anchor.chillLeadInstrument
+        var l2Excluded: Set<Int> = [instrumentOverrides[kTrackLead2] ?? 0]
+        if let i = l2Programs.firstIndex(of: Int(l1.gmProgram)) { l2Excluded.insert(i) }
+        let l2 = evolvePickIndex(kTrackLead2, in: anchor, excluding: l2Excluded)
+            .flatMap { instrument(l2Programs[$0]) } ?? anchor.chillLead2Instrument
+        return (l1, l2)
     }
 
     private func startEvolveMode(from song: SongState, lockMoodToSong: Bool = true) {
@@ -2783,7 +2824,10 @@ final class AppState: ObservableObject {
     // Builds a pass SongState from anchor events. freshTracks get regenerated content trimmed to
     // passBars; all other tracks copy the first passBars of anchor events. nonisolated so it can
     // be called safely from Task.detached without capturing `self`.
-    private nonisolated static func buildPassState(anchor: SongState, freshTracks: [Int], passBars: Int) -> SongState {
+    // leadInstruments (Chill pass 1): the instruments the leads are regenerated for, and which the
+    // returned state carries so the switch can apply them.
+    private nonisolated static func buildPassState(anchor: SongState, freshTracks: [Int], passBars: Int,
+                                                   leadInstruments: (ChillLeadInstrument, ChillLeadInstrument)? = nil) -> SongState {
         // Identifies tags that are rule IDs (e.g. "AMB-LEAD-003"), not prose labels like "Key" or "⚡ REGEN"
         func isRuleID(_ tag: String) -> Bool {
             !tag.isEmpty && tag.contains("-") &&
@@ -2808,7 +2852,8 @@ final class AppState: ObservableObject {
         // once Lead 1 is done its new events go into the source for the tracks after it.
         // Built against the anchor's Lead 1, Lead 2 played over the new one in 41-42% of its
         // notes in Chill and Motorik, against 20-24% in a generated song (measured 2026-10-18).
-        var source = anchor
+        var source = leadInstruments.map { anchor.withChillLeadInstruments($0.0, $0.1) } ?? anchor
+        var fullTracks = anchor.trackEvents   // whole-song events per track, regenerated ones swapped in
         for idx in freshTracks {
             let anchorHadContent = !anchor.trackEvents[idx].isEmpty
             var regen      = SongGenerator.regenerateTrack(idx, songState: source, passBodyBars: passBars)
@@ -2839,11 +2884,35 @@ final class AppState: ObservableObject {
             if idx == kTrackLead1 {
                 source = source.replacingEvents(regen.trackEvents[kTrackLead1], forTrack: kTrackLead1)
             }
+            fullTracks[idx] = regen.trackEvents[idx]
             events[idx] = regen.trackEvents[idx]
                 .filter { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
                 .map { MIDIEvent(stepIndex: $0.stepIndex - bodyStartStep, note: $0.note,
                                  velocity: $0.velocity, durationSteps: $0.durationSteps) }
             regenLog.append(contentsOf: newEntries)
+        }
+        // A song with no intro opens on a cold-start pickup: its first bar is drums alone (Blues:
+        // half a bar of silence, then a fill; Soho: a drum bar) and the band enters on the next
+        // downbeat. A pass copies the body from its first bar, so every pass replayed that pickup
+        // mid-song and the whole band dropped out for a half or a whole bar at both Evolve
+        // points (Zack, 2026-10-19). The pass takes that bar from one chord cycle later instead,
+        // where the band plays the same chord in full. The leads keep their own first bar: they
+        // are phrases, and a lead entering a bar in is natural.
+        if let cycle = pickupStandInOffset(anchor) {
+            let from = bodyStartStep + cycle * 16
+            for t in 0..<events.count where t != kTrackLead1 && t != kTrackLead2 && t < fullTracks.count {
+                let standIn = fullTracks[t]
+                    .filter { $0.stepIndex >= from && $0.stepIndex < from + 16 }
+                    .map { e -> MIDIEvent in
+                        let step = e.stepIndex - from
+                        // Clipped at the bar line, so a held note cannot overlap the next bar's
+                        // own notes; a same-pitch note-off there would cut them short.
+                        return MIDIEvent(stepIndex: step, note: e.note, velocity: e.velocity,
+                                         durationSteps: Swift.min(e.durationSteps, 16 - step))
+                    }
+                events[t] = (standIn + events[t].filter { $0.stepIndex >= 16 })
+                    .sorted { $0.stepIndex < $1.stepIndex }
+            }
         }
         let passFrame = anchor.frame.withTotalBars(passBars)
         let minStruct = SongStructure(sections: [], chordPlan: [],
@@ -2851,7 +2920,32 @@ final class AppState: ObservableObject {
                                       outroStyle: anchor.structure.outroStyle)
         return SongState(frame: passFrame, structure: minStruct,
                          trackEvents: events, generationLog: regenLog, stepAnnotations: [:],
-                         copyingStyleFieldsFrom: anchor)
+                         copyingStyleFieldsFrom: source)
+    }
+
+    /// For a song whose first bar is a cold-start pickup (no intro, so the pickup is the body's
+    /// first bar), how many bars later the same place in the chord cycle comes round: the bar an
+    /// Evolve pass plays in place of the pickup. nil for any other song.
+    ///
+    /// The cycle is the shortest multiple of 4 bars, up to half the first section, that the
+    /// section's chords repeat at: over the whole section if any length does (a 16-bar blues
+    /// gives 16, so the stand-in is the second chorus's first bar), otherwise over one cycle (a
+    /// Soho loop whose turnaround breaks the repeat late in the section). nil if neither holds,
+    /// and the pass keeps the pickup as before.
+    nonisolated static func pickupStandInOffset(_ song: SongState) -> Int? {
+        let s = song.structure
+        guard s.introSection == nil, case .coldStart = s.introStyle,
+              let first = s.sections.first, first.startBar == 0, first.lengthBars >= 8 else { return nil }
+        func chord(_ bar: Int) -> String? {
+            s.chordWindow(atBar: bar).map { "\($0.chordRoot) \($0.chordType.rawValue)" }
+        }
+        let n = first.lengthBars
+        // At most half the section, so the repeat is tested over at least one whole cycle.
+        let cycles = Array(stride(from: 4, through: n / 2, by: 4))
+        if let p = cycles.first(where: { p in (0..<(n - p)).allSatisfy { chord($0) == chord($0 + p) } }) {
+            return p
+        }
+        return cycles.first { p in (0..<p).allSatisfy { chord($0) == chord($0 + p) } }
     }
 
     // Builds an extended SongState by appending pass events (and optionally the original Outro)
@@ -2921,8 +3015,12 @@ final class AppState: ObservableObject {
         let minStruct  = SongStructure(sections: extSections, chordPlan: [],
                                        introStyle: anchor.structure.introStyle,
                                        outroStyle: anchor.structure.outroStyle)
+        // The anchor's log, not an empty one. Playback reads the song's bass rule from it, so
+        // with an empty log the Chill Blues behind-the-beat feel switched off at pass 1; and a
+        // song saved mid-Evolve was written with no title line and no rules (2026-10-19).
         return SongState(frame: extFrame, structure: minStruct,
-                         trackEvents: tracks, generationLog: [], stepAnnotations: extAnnotations,
+                         trackEvents: tracks, generationLog: anchor.generationLog,
+                         stepAnnotations: extAnnotations,
                          copyingStyleFieldsFrom: anchor)
     }
 
@@ -2992,12 +3090,15 @@ final class AppState: ObservableObject {
         // If bass or drums are absent from the anchor body, add them to freshTracks so the
         // evolve pass introduces them. Both passes do this so bass/drums persist through pass 2.
         freshTracks += absentBodyTracks(anchor, candidates: [kTrackBass, kTrackDrums])
+        // Chill pass 1: the lead instruments are chosen now, so the leads are written for them.
+        let leadInstruments = pass == 1 ? evolveLeadInstruments(for: anchor) : nil
         evolvePassInFlight = true
         let tokenAtStart = evolvePhaseToken   // stale-Task guard
         let session      = evolveSessionToken
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let state = Self.buildPassState(anchor: anchor, freshTracks: freshTracks, passBars: passBars)
+            let state = Self.buildPassState(anchor: anchor, freshTracks: freshTracks, passBars: passBars,
+                                            leadInstruments: leadInstruments)
             await MainActor.run {
                 guard self.evolveSessionToken == session else { return }
                 self.evolvePassInFlight = false
@@ -3100,6 +3201,11 @@ final class AppState: ObservableObject {
         songState        = extended
         lastEmittedStep  = outroStartBar * 16 - 1
         visibleBarOffset = max(0, outroStartBar - Int(Double(visibleBars) * 0.15))
+        // Restart playback before switching instruments. On iOS setProgram loads the patch
+        // synchronously on the main thread, and the pass waited behind both loads: the outro's
+        // cold-stop hit rang through the gap before the pass began (2026-10-19). The Mac defers
+        // its loads by 80 ms, so it already ran in this order in effect.
+        playback.loadAndPlay(state: extended, fromStep: outroStartBar * 16)
         if anchor.isAmbientPiano {
             let comp   = anchor.frame.mode.complementaryMode
             let barTag = String(format: "Bar %03d", outroStartBar + 1)
@@ -3107,10 +3213,9 @@ final class AppState: ObservableObject {
                 description: "Shifting to \(anchor.frame.key) \(comp.rawValue) (\(evolvePass1Bars) bars)",
                 isTitle: false)])
         } else {
-            switchEvolveInstruments(freshTracks: [kTrackLead1, kTrackLead2])
+            switchEvolveInstruments(freshTracks: [kTrackLead1, kTrackLead2], pass: pass1)
             appendToLog(pass1.generationLog)
         }
-        playback.loadAndPlay(state: extended, fromStep: outroStartBar * 16)
     }
 
     private func doSwitchToEvolvePass2(_ pass2: SongState) {
@@ -3129,16 +3234,18 @@ final class AppState: ObservableObject {
         songState        = extended
         lastEmittedStep  = pass2StartBar * 16 - 1
         visibleBarOffset = max(0, pass2StartBar - Int(Double(visibleBars) * 0.15))
+        // Restart first, then switch instruments — see doSwitchToEvolvePass1. Here the gap was
+        // pure silence: pass 1 has already ended, so nothing played until both loads finished.
+        playback.loadAndPlay(state: extended, fromStep: pass2StartBar * 16)
         if anchor.isAmbientPiano {
             let barTag = String(format: "Bar %03d", pass2StartBar + 1)
             appendToLog([GenerationLogEntry(tag: barTag,
                 description: "Back to \(anchor.frame.key) \(anchor.frame.mode.rawValue) (\(evolvePass2Bars) bars)",
                 isTitle: false)])
         } else {
-            switchEvolveInstruments(freshTracks: [kTrackPads, kTrackRhythm])
+            switchEvolveInstruments(freshTracks: [kTrackPads, kTrackRhythm], pass: pass2)
             appendToLog(pass2.generationLog)
         }
-        playback.loadAndPlay(state: extended, fromStep: pass2StartBar * 16)
     }
 
     private func handleEvolveApproachingEnd() {
@@ -3621,6 +3728,10 @@ final class AppState: ObservableObject {
                     self.prepareSleepTimerForPlayback()
                     self.playback.play()
                 }
+                // Evolve: start a session for this song, as every other load path does. This one
+                // left the previous song's session running, so at this song's outro Evolve
+                // switched to the previous song's pass 1 — its drums, bass and title (2026-10-19).
+                if self.playMode == .evolve { self.tearDownEvolve(); self.startEvolveMode(from: state) }
                 self.platformHost?.dismissKeyboard()
                 // If another file-open arrived while we were loading, load it now.
                 self.consumePendingLoad()

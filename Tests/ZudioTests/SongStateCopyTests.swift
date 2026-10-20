@@ -45,6 +45,16 @@ import Testing
                     "withAmbientAudioTexture, \(s.style)")
             #expect(Self.changed(s, s.withChillAudioTexture("x"), allowed: ["chillAudioTexture"]) == [],
                     "withChillAudioTexture, \(s.style)")
+            #expect(Self.changed(s, s.withChillLeadInstruments(.clarinet, .trombone),
+                                 allowed: ["chillLeadInstrument", "chillLead2Instrument"]) == [],
+                    "withChillLeadInstruments, \(s.style)")
+            // The Evolve pass and extended states. A song saved mid-Evolve is this state, so the
+            // forced rules and overrides it needs to rebuild from its seed must come across.
+            let synthetic = SongState(frame: s.frame, structure: s.structure, trackEvents: s.trackEvents,
+                                      generationLog: s.generationLog, stepAnnotations: s.stepAnnotations,
+                                      copyingStyleFieldsFrom: s)
+            #expect(Self.changed(s, synthetic, allowed: ["trackOverrides", "ambientXFilesBlockRange"]) == [],
+                    "copyingStyleFieldsFrom, \(s.style)")
         }
     }
 }
