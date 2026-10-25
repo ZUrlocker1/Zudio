@@ -4559,7 +4559,7 @@ final class AppState: ObservableObject {
             return
         }
         let rawSnapshots    = playback.effectSnapshots()
-        let beatFixupOn     = playback.beatFixupEnabled   // the ⌘J / ⌃G test switch, so export matches what is heard
+        let beatFixupOn     = playback.beatFixupEnabled   // so export matches what is heard
         // Apply mute/solo: mirror PlaybackEngine.applyMuteState() so export
         // matches what the user hears during playback.
         let anySolo = soloState.contains(true)

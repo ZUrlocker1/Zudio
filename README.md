@@ -35,7 +35,6 @@ The download is `2.7` (build 132), a **work-in-progress build** with Chill Soho 
 - **Lower CPU use** — on a Mac Zudio now typically uses 15–20% CPU, and 5–10% in the compact view with no visualizer
 - **Bug fixes** — audio textures, saved songs, and Endless and Evolve playback, including a dropout when Evolve changes phase on Chill Blues and Soho songs
 
-**In development — Mac only:** ⌘J and ⌃G (keystrokes only, no menu item) switch the behind-the-beat delay on and off for the playing Chill Soho Soul song, so it can be compared by ear. The bass and the drum backbeat (side stick, snare, clap) sit a few milliseconds late; nothing else moves. It is a testing aid rather than a feature, there is no equivalent gesture on iPhone or iPad (where the delay is always on), and it is expected to be removed once the feel has settled.
 
 Earlier releases are covered in the [change log](docs/change-log.md).
 

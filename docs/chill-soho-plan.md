@@ -631,14 +631,10 @@ Pinned by `BluesBeatFixupTests`.
 Soul song, `Laid back  Blues bass +6 ms, rim/snare +15 ms` for an allowed Blues song and no
 row for any other. Latin, other Blues and base Chill songs have no row.
 
-**Mac test switch.** ⌘J and ⌃G (keystrokes only; the menu item was removed 2026-10-18) switch the delay off and on for
-the playing song, replacing the Groove Fixup test toggle. Every press logs a row (`off, notes on
-the grid`, or the offsets). The delay is on by default, so iPhone and iPad always have it. The
-switch is Mac only and is scaffolding (`BeatFixupTestMode.swift`).
+**Test switch removed (2026-10-25).** The Mac-only ⌘J / ⌃G A/B toggle and `BeatFixupTestMode.swift` are gone. The delay is always on.
 
 **Export.** Audio export (`OfflineExport`) adds the same offsets to the event positions, so the
-exported file matches playback, stems included. It follows the Mac test switch: switch the delay
-off and the export has none.
+exported file matches playback, stems included. The delay is always on, so the export always has it.
 
 **Known limits.** The delay is a dispatch timer on the step queue, so each delayed note carries a
 millisecond or two of its own jitter. A late bass is the likeliest place for the groove to loosen,
@@ -757,5 +753,4 @@ tone is light, continuing base Chill's wry register.
 - `swift test --filter ChillSohoTests` is the behavioural suite; `ChillLeadRegisterTests`,
   `InstrumentPoolDriftTests` and `WeightedPickTests` pin the registers, pools and weights
 
-**Before a real release:** remove the ⌘J / ⌃G Beat Fixup test toggle
-(`BeatFixupTestMode.swift` and its key monitor block), and re-pin the fingerprint baseline.
+**Before a real release:** re-pin the fingerprint baseline.
