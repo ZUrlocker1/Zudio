@@ -19,7 +19,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 [Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.7-wip/Zudio-2.7.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-The download is `2.7` (build 132), a **work-in-progress build** with Chill Soho in it. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder. The last fully released version is [2.6](https://github.com/ZUrlocker1/Zudio/releases/download/v2.6/Zudio-2.6.dmg) (build 131).
+The download is `2.7` (build 132), with Chill Soho in it. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder. The last fully released version is [2.6](https://github.com/ZUrlocker1/Zudio/releases/download/v2.6/Zudio-2.6.dmg) (build 131).
 
 **What's in it — v2.7 Chill Soho:** A new Chill substyle modelled on the sophisti-pop records of Sade, Everything But The Girl, The Style Council, Simply Red and Roxy Music. Its rules were measured from MIDI transcriptions of those songs rather than described in prose, and almost nothing is shared with base Chill:
 
