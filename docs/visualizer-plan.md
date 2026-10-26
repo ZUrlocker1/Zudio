@@ -91,6 +91,7 @@ Pitch offsets y: high notes appear toward the top of the canvas, low notes towar
 
 - **Flash ring** — a white expanding ring drawn at a track's home position whenever an action is taken on it (mute, solo, regen). Expands 16→72 pt over 0.5 s. Driven by `appState.visualizerFlashEvents`.
 - **Canvas-wide white flash** — a gentle white overlay fades over 3 s when a global filter sweep fires. Driven by `playback.canvasFlashDate`.
+- **Red error flash** — a red overlay jumps to 55% opacity and fades over 0.5 s whenever an `ERROR` entry is logged. A SwiftUI overlay on `VisualizerView`, not part of the canvas, so it shows even when playback is stopped. Driven by `appState.errorFlashToken`, bumped in `appendToLog`. The log shows the `ERROR` tag in red.
 
 ---
 

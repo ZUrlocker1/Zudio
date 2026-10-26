@@ -243,6 +243,7 @@ struct StatusBoxView: View {
         let tagTitleColor  = NSColor.white
         let descColor      = NSColor(Color.white.opacity(0.85))
         let descTitleColor = NSColor(Color.yellow.opacity(0.95))
+        let errorColor     = NSColor(Color.red.opacity(0.95))
         #else
         let uiFont     = UIFont.monospacedSystemFont(ofSize: fontBody, weight: .regular)
         let uiFontBold = UIFont.monospacedSystemFont(ofSize: fontBody, weight: .bold)
@@ -250,6 +251,7 @@ struct StatusBoxView: View {
         let tagTitleColor  = UIColor.white
         let descColor      = UIColor(Color.white.opacity(0.85))
         let descTitleColor = UIColor(Color.yellow.opacity(0.95))
+        let errorColor     = UIColor(Color.red.opacity(0.95))
         #endif
 
         for (i, entry) in entries.enumerated() {
@@ -258,7 +260,7 @@ struct StatusBoxView: View {
 
             var tagAttr = AttributedString(tag)
             tagAttr.font = font
-            tagAttr.foregroundColor = entry.isTitle ? tagTitleColor : tagColor
+            tagAttr.foregroundColor = entry.isTitle ? tagTitleColor : (entry.tag == "ERROR" ? errorColor : tagColor)
 
             var descAttr = AttributedString(entry.description)
             descAttr.font = font

@@ -48,6 +48,8 @@ final class AppState: ObservableObject {
     // observes this instead of statusLog.count so onChange fires even when the
     // net count is unchanged (e.g. simultaneous append+trim).
     @Published var statusLogVersion: Int = 0
+    /// Bumped whenever an ERROR entry is logged; VisualizerView flashes red on each change.
+    @Published var errorFlashToken: Int = 0
 
     // Font size offset for the generation log — adjusted by +/- hotkeys.
     // 0 = default (12pt macOS, 12pt mini iOS, 14pt other iOS). Clamped to [-4, +8].
@@ -1010,7 +1012,7 @@ final class AppState: ObservableObject {
                 let name = trackIndex < trackNames.count ? trackNames[trackIndex] : "Track \(trackIndex)"
                 let loadedStr = loaded == 255 ? "none" : "\(loaded)"
                 warnings.append(GenerationLogEntry(
-                    tag: "Error",
+                    tag: "ERROR",
                     description: "\(name) instrument \(program) load failed (got \(loadedStr))",
                     isTitle: false))
             }
@@ -1100,6 +1102,8 @@ final class AppState: ObservableObject {
 
     @Published var livePlaybackFeed: [GenerationLogEntry] = []
     private var lastEmittedStep: Int = -1
+    private var lastSeekStep: Int = -1
+    private var lastSeekTime: Date = .distantPast
     private var autoSweepCache: (key: String, steps: Set<Int>) = ("", [])
 
     // MARK: - Playback engine
@@ -1318,6 +1322,10 @@ final class AppState: ObservableObject {
             guard let self else { return }
             self.appendToLog([GenerationLogEntry(tag: "ERROR", description: msg, isTitle: false)])
         }
+        // A start failure that the retry fixed: logged green so a recovery is visible.
+        playback.onEngineRecovered = { [weak self] msg in
+            self?.appendToLog([GenerationLogEntry(tag: "AUDIO", description: msg, isTitle: false)])
+        }
         // Log missing SF2 patches so stripped presets are visible in the generation log.
         playback.onMissingPatch = { [weak self] trackIndex, program in
             guard let self else { return }
@@ -1326,7 +1334,7 @@ final class AppState: ObservableObject {
             let programs = AppState.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isChillSoho: soho)
             let names    = AppState.instrumentPoolNames(trackIndex: trackIndex, style: style, isChillSoho: soho)
             let name     = zip(programs, names).first { $0.0 == program }.map(\.1) ?? "p\(program)"
-            self.appendToLog([GenerationLogEntry(tag: "Error",
+            self.appendToLog([GenerationLogEntry(tag: "ERROR",
                 description: "Missing MIDI patch \(program) \(name)", isTitle: false)])
         }
         // iOS audio interruption (another app takes focus) or headphones pulled.
@@ -1396,6 +1404,7 @@ final class AppState: ObservableObject {
             statusLog.removeFirst(statusLog.count - 400)
         }
         statusLogVersion += 1
+        if entries.contains(where: { $0.tag == "ERROR" }) { errorFlashToken += 1 }
     }
 
     /// Appends a blank separator (if the log isn't empty) followed by the generation log entries.
@@ -1932,6 +1941,14 @@ final class AppState: ObservableObject {
     }
 
     func seekTo(step: Int) {
+        // A slider drag calls this on every tick, often with the same step, and each call
+        // restarts the scheduler and logs the bar's lines again, so a repeat of the same step
+        // within a second is ignored. Dragging across bars still seeks (and buzzes) per bar.
+        let now = Date()
+        let isRepeat = step == lastSeekStep && now.timeIntervalSince(lastSeekTime) < 1.0
+        lastSeekStep = step
+        lastSeekTime = now
+        if isRepeat { return }
         playback.seek(toStep: step)
         syncTextureToPlayhead()
         // Reset annotation pointer so seeks don't re-emit or skip annotations

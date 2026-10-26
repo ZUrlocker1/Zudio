@@ -48,9 +48,19 @@ struct VisualizerView: View {
     @State private var tempoNudgeOffset: CGFloat = 0
     @State private var prevNudgeTempo: Int? = nil
 
+    // Red flash when an ERROR is logged — jumps to full and fades out.
+    @State private var errorFlashOpacity: Double = 0
+
     var body: some View {
         // Re-render on orb note changes; PlaybackEngine no longer publishes them itself.
         VisualizerFeedObserver(feed: playback.visualizerFeed) { visualizerBody }
+            .overlay {
+                Color.red.opacity(errorFlashOpacity).allowsHitTesting(false)
+            }
+            .onChangeCompat(of: appState.errorFlashToken) { (_: Int) in
+                errorFlashOpacity = 0.55
+                withAnimation(.easeOut(duration: 0.5)) { errorFlashOpacity = 0 }
+            }
     }
 
     @ViewBuilder private var visualizerBody: some View {

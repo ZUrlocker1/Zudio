@@ -193,7 +193,11 @@ try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, optio
 try AVAudioSession.sharedInstance().setActive(true)
 ```
 
-The session can be interrupted (phone call, Siri, etc.). `IOSPlatformHost` also sets up an observer for `AVAudioSession.interruptionNotification` to pause playback on interruption and resume when it ends. The macOS conformer (`MacPlatformHost`) is a no-op for this method.
+The session can be interrupted (phone call, Siri, another app, a Bluetooth headset taken by another device). `PlaybackEngine` observes `AVAudioSession.interruptionNotification`: on `.began` it stops the scheduler and logs `AUDIO  Stopped by another app`; on `.ended` it does nothing, and the next Play reactivates the session and restarts the engine. Route changes (headphones pulled or a new device) restart the engine. The macOS conformer (`MacPlatformHost`) is a no-op for this method.
+
+**Engine start failure.** `startEngine()` can fail with error -50 when the output route is still switching, for example a multipoint Bluetooth headset just handed to another device. It then stops the engine, waits 300 ms, reactivates the session and tries once more. A successful retry logs a green `AUDIO  Audio engine restarted after error -50`; a failed one logs a red `ERROR  Audio engine failed to start (error -50)` and flashes the visualizer red.
+
+**Slider scrubbing.** Each new bar crossed while dragging the iPhone progress slider cuts all notes and restarts the scheduler, so a drag across bars buzzes. A repeat seek to the same step within a second is ignored (`AppState.seekTo`), so the log is not repeated.
 
 ---
 

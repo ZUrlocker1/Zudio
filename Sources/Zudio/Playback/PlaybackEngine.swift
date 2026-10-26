@@ -213,6 +213,8 @@ final class PlaybackEngine: ObservableObject {
     var onAudioEngineRestarted: (() -> Void)? = nil
     // onEngineError: fired when engine.start() throws so AppState can log the failure.
     var onEngineError: ((String) -> Void)? = nil
+    // onEngineRecovered: fired when the first engine.start() failed but the retry worked.
+    var onEngineRecovered: ((String) -> Void)? = nil
     // onMissingPatch: fired when loadSoundBankInstrument fails (preset stripped from SF2).
     var onMissingPatch: ((Int, Int) -> Void)? = nil   // (trackIndex, program)
     // onAudioInterrupted: fired on iOS when another app takes audio focus (e.g. Apple Music starts)
@@ -2872,7 +2874,18 @@ final class PlaybackEngine: ObservableObject {
         #endif
         do { try engine.start() }
         catch {
-            let msg = "AVAudioEngine failed to start: \(error.localizedDescription)"
+            #if os(iOS)
+            // A route that is still switching (e.g. a multipoint headset just handed to another
+            // device) can fail the first start with -50. Retry once on a freshly reactivated session.
+            engine.stop()
+            Thread.sleep(forTimeInterval: 0.3)   // let the route settle; only runs after a failure
+            try? AVAudioSession.sharedInstance().setActive(true)
+            if (try? engine.start()) != nil {
+                onEngineRecovered?("Audio engine restarted after error \((error as NSError).code)")
+                return
+            }
+            #endif
+            let msg = "Audio engine failed to start (error \((error as NSError).code))"
             print(msg)
             onEngineError?(msg)
         }
