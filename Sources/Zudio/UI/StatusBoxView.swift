@@ -9,6 +9,10 @@ import SwiftUI
 
 struct StatusBoxView: View {
     @EnvironmentObject var appState: AppState
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Environment(\.verticalSizeClass)   private var vSizeClass
+    #endif
 
     /// Passed from ContentView so font size can adapt for iPad mini.
     var contentWidth: CGFloat = 0
@@ -175,7 +179,7 @@ struct StatusBoxView: View {
                 .simultaneousGesture(
                     MagnificationGesture()
                         .onChanged { scale in
-                            guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+                            guard !usesPadLayout(idiom: UIDevice.current.userInterfaceIdiom, h: hSizeClass, v: vSizeClass) else { return }
                             if !pinching {
                                 pinching = true
                                 pinchBaseOffset = appState.statusLogFontOffset
@@ -184,7 +188,7 @@ struct StatusBoxView: View {
                             appState.statusLogFontOffset = max(-4, min(8, pinchBaseOffset + delta))
                         }
                         .onEnded { _ in
-                            guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+                            guard !usesPadLayout(idiom: UIDevice.current.userInterfaceIdiom, h: hSizeClass, v: vSizeClass) else { return }
                             pinching = false
                             pinchBaseOffset = appState.statusLogFontOffset
                         }

@@ -95,10 +95,26 @@ private let kBPMFieldWidth: CGFloat            = 48
 private let kHelpButtonWidth: CGFloat          = 52
 #endif
 
+#if os(iOS)
+/// Below this width (iPad Split View, unfolded iPhone Duo portrait) the iOS top bar drops Mood and Key
+/// and moves Reset beside BPM. iPad mini portrait (about 744 pt) is unaffected.
+private let kNarrowTopBarWidth: CGFloat = 700
+
+/// Applies the narrow-mode type size and control size only when narrow; wide layouts inherit as before.
+private struct NarrowTopBarRowStyle: ViewModifier {
+    let narrow: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if narrow { content.font(.system(size: 12)).controlSize(.small) } else { content }
+    }
+}
+#endif
+
 struct TopBarView: View {
     /// Passed from ContentView so portrait/landscape/compact layout switches correctly.
     /// Defaults to 1200 so both macOS and iOS start in wide-layout mode before first render.
     var contentWidth: CGFloat = 1200
+    /// Short window (unfolded iPhone Duo landscape): smaller buttons and tighter column spacing.
+    var compactHeight: Bool = false
 
     @EnvironmentObject var appState: AppState
     @State private var showHelp  = false
@@ -116,6 +132,32 @@ struct TopBarView: View {
     // Tracks button press state for highlight; updated by MousePressTracker callbacks
     @State private var reverseIsDown = false
     @State private var forwardIsDown = false
+
+    #if os(iOS)
+    /// Help / About / Sleep / Share. A column at the right edge normally; a single row under BPM when narrow.
+    @ViewBuilder private func iOSHelpButtons(fixedWidth: Bool) -> some View {
+        Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: fixedWidth ? kHelpButtonWidth : nil) }
+        Button { showAbout = true } label: { Text("About").frame(width: fixedWidth ? kHelpButtonWidth : nil) }
+        Button { showSleepPicker = true } label: { Text("Sleep").frame(width: fixedWidth ? kHelpButtonWidth : nil) }
+        Button {
+            guard let song = appState.songStateForSaving() else { return }
+            PhonePlayerView.presentShare(song: song)
+        } label: { Text("Share").frame(width: fixedWidth ? kHelpButtonWidth : nil) }
+        .disabled(appState.songState == nil)
+    }
+
+    private var iOSResetButton: some View {
+        Button(action: { appState.resetTrackDefaults() }) {
+            Label {
+                (Text("R").underline() + Text("eset")).fontWeight(.semibold)
+            } icon: { Image(systemName: "arrow.counterclockwise") }
+            .frame(width: 80, alignment: .center)
+        }
+        .keyboardShortcut("r", modifiers: .command)
+        .help("Reset to clean state: clear song, restore defaults, re-detect audio (⌘R)")
+        .buttonStyle(.bordered)
+    }
+    #endif
 
     /// Shared BPM text binding used by both the iOS and macOS tempo fields.
     /// Empty string means Auto (nil override); valid integers are clamped to [20, 200].
@@ -416,7 +458,7 @@ struct TopBarView: View {
                 HStack(alignment: .center, spacing: kGenerateHStackSpacing) {
 
                     // Left column: three action buttons, all same width
-                    VStack(spacing: 6) {
+                    VStack(spacing: compactHeight ? 3 : 6) {
                         Button(action: { appState.generateNew(thenPlay: true) }) {
                             Label {
                                 (Text("G").underline() + Text("enerate"))
@@ -488,7 +530,7 @@ struct TopBarView: View {
                     // All 11-inch iPads in landscape (mini ≈1133pt, Air/Pro 11" ≈1180–1195pt):
                     // slim down buttons 4pt vertically so 7 MIDI track rows aren't clipped.
                     // 13-inch iPads (≈1366pt+) have enough vertical room and keep .regular.
-                    .environment(\.controlSize, (contentWidth >= 900 && contentWidth < 1220) ? .small : .regular)
+                    .environment(\.controlSize, (compactHeight || (contentWidth >= 900 && contentWidth < 1220)) ? .small : .regular)
                     #endif
 
                     // Right block — iOS: VStack (style+reset row, then mood/key/bpm row)
@@ -507,24 +549,21 @@ struct TopBarView: View {
                             .tint(Color.gray)
                             // iPad mini portrait (<800pt): 220pt with 10pt font so "Ambient" fits
                             // without truncation (11pt + default insets would overflow the segment).
-                            .font(.system(size: contentWidth < 800 ? 10 : 11))
-                            .frame(width: contentWidth < 800 ? 220 : 260)
+                            // Narrow (<700pt, Split View / Duo portrait): the block is only as wide as this
+                            // picker, so use 11pt and 250pt and show "Ambient" in full.
+                            .font(.system(size: contentWidth < kNarrowTopBarWidth ? 11 : (contentWidth < 800 ? 10 : 11)))
+                            .frame(width: contentWidth < kNarrowTopBarWidth ? 250 : (contentWidth < 800 ? 220 : 260))
                             .disabled(appState.playMode == .endless)
                             .opacity(appState.playMode == .endless ? 0.5 : 1.0)
 
-                            Button(action: { appState.resetTrackDefaults() }) {
-                                Label {
-                                    (Text("R").underline() + Text("eset")).fontWeight(.semibold)
-                                } icon: { Image(systemName: "arrow.counterclockwise") }
-                                .frame(width: 80, alignment: .center)
-                            }
-                            .keyboardShortcut("r", modifiers: .command)
-                            .help("Reset to clean state: clear song, restore defaults, re-detect audio (⌘R)")
-                            .buttonStyle(.bordered)
+                            if contentWidth >= kNarrowTopBarWidth { iOSResetButton }
                         }
 
-                        // Row 2: Mood / Key / BPM overrides in a single flat HStack
+                        // Row 2: Mood / Key / BPM overrides in a single flat HStack.
+                        // Narrow windows (iPad Split View, unfolded iPhone Duo portrait): Mood and Key
+                        // are dropped and Reset moves here beside BPM so the bar fits.
                         HStack(spacing: 8) {
+                            if contentWidth >= kNarrowTopBarWidth {
                             HStack(spacing: 0) {
                                 Text("Mood").font(.callout).foregroundStyle(.white.opacity(0.7)).fixedSize()
                                 Picker("Mood", selection: $appState.moodOverride) {
@@ -550,6 +589,7 @@ struct TopBarView: View {
                                 .frame(width: kKeyPickerWidth)
                                 .padding(.leading, -4)  // tighten: menu picker has ~8pt internal leading inset
                             }
+                            }
 
                             HStack(spacing: 6) {
                                 Text("BPM").foregroundStyle(.white).fixedSize()
@@ -563,6 +603,19 @@ struct TopBarView: View {
                                 ), in: 20...200)
                                 .labelsHidden()
                             }
+                            if contentWidth < kNarrowTopBarWidth { iOSResetButton }
+                        }
+                        // Narrow: rows 2 and 3 share one 12pt size and small controls, close to the 11pt style picker
+                        .modifier(NarrowTopBarRowStyle(narrow: contentWidth < kNarrowTopBarWidth))
+
+                        // Row 3 (narrow only): Help / About / Sleep / Share, in the space the right-edge column used
+                        if contentWidth < kNarrowTopBarWidth {
+                            HStack(spacing: 6) {
+                                iOSHelpButtons(fixedWidth: false)
+                            }
+                            .font(.system(size: 12))
+                            .controlSize(.small)
+                            .buttonStyle(.bordered)
                         }
                     }
                     .padding(.leading, 5)
@@ -661,31 +714,28 @@ struct TopBarView: View {
                     .padding(.trailing, 20)
                 }
                 #else
-                VStack(alignment: .trailing, spacing: 6) {
-                    Button { showHelp  = true } label: { (Text("H").underline() + Text("elp")).frame(width: kHelpButtonWidth) }
-                    Button { showAbout = true } label: { Text("About").frame(width: kHelpButtonWidth) }
-                    Button { showSleepPicker = true } label: { Text("Sleep").frame(width: kHelpButtonWidth) }
-                    Button {
-                        guard let song = appState.songStateForSaving() else { return }
-                        PhonePlayerView.presentShare(song: song)
-                    } label: { Text("Share").frame(width: kHelpButtonWidth) }
-                    .disabled(appState.songState == nil)
-                }
-                .font(.callout)
-                .controlSize(.small)
-                .padding(.top, -5)
-                .padding(.trailing, 8)
-                .buttonStyle(.bordered)
-                .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
-                    ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
-                        Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
-                            appState.setSleepTimer(dur)
-                        }
+                if contentWidth >= kNarrowTopBarWidth {
+                    VStack(alignment: .trailing, spacing: compactHeight ? 3 : 6) {
+                        iOSHelpButtons(fixedWidth: true)
                     }
+                    .font(.callout)
+                    .controlSize(.small)
+                    .padding(.top, -5)
+                    .padding(.trailing, 8)
+                    .buttonStyle(.bordered)
                 }
                 #endif
             }
             .padding(.horizontal, 2)
+            #if os(iOS)
+            .confirmationDialog("Sleep Timer", isPresented: $showSleepPicker, titleVisibility: .visible) {
+                ForEach(SleepTimerDuration.allCases, id: \.self) { dur in
+                    Button(dur == appState.sleepTimerDuration ? "\(dur.rawValue) ✓" : dur.rawValue) {
+                        appState.setSleepTimer(dur)
+                    }
+                }
+            }
+            #endif
             .background(Color(white: 0.15))
             .onAppear {
                 // Prevent BPM text field from stealing focus on launch so plain keyboard shortcuts work.

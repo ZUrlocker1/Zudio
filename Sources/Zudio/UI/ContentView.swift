@@ -3,8 +3,21 @@
 
 import SwiftUI
 
+#if os(iOS)
+/// iPad layout for every iPad, and for the unfolded iPhone Duo (regular in both size classes).
+/// No other iPhone is ever regular in both, so every existing iPhone keeps PhonePlayerView.
+func usesPadLayout(idiom: UIUserInterfaceIdiom,
+                   h: UserInterfaceSizeClass?, v: UserInterfaceSizeClass?) -> Bool {
+    idiom == .pad || (h == .regular && v == .regular)
+}
+#endif
+
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Environment(\.verticalSizeClass)   private var vSizeClass
+    #endif
 
     private let trackLabels = ["Lead 1", "Lead 2", "Pads", "Rhythm", "Texture", "Bass", "Drums"]
 
@@ -17,8 +30,9 @@ struct ContentView: View {
     // proposed new dimensions by the window system; .background/.overlay GeometryReaders
     // do not reliably re-evaluate on resize/rotation in SwiftUI.
     #if os(iOS)
-    @State private var contentWidth:  CGFloat = UIScreen.main.bounds.width
-    @State private var contentHeight: CGFloat = UIScreen.main.bounds.height
+    // Neutral initial values: UIScreen.main is ambiguous on a two-display device (iPhone Duo).
+    @State private var contentWidth:  CGFloat = 1024
+    @State private var contentHeight: CGFloat = 768
     #else
     @State private var contentWidth:  CGFloat = 1200  // actual value set by GeometryReader on first render
     @State private var contentHeight: CGFloat = 775   // actual value set by GeometryReader on first render
@@ -57,6 +71,13 @@ struct ContentView: View {
     private var isIPadMiniLandscape: Bool {
         contentWidth >= 1050 && contentWidth < 1150
     }
+
+    // Short window, by size and not by model: under 660pt tall there is no room for the generation log
+    // plus 7 full-height track rows, so the log is hidden and buttons, tab strip and rows are compacted.
+    // The layout height is safe-area adjusted: unfolded iPhone Duo landscape is 635pt, while iPad mini
+    // landscape is about 700pt (744pt screen minus insets) and stays untouched, as does every larger
+    // iPad. A future small iPad, Split View or Stage Manager window that short gets the same treatment.
+    private var isShortWindow: Bool { contentHeight < 660 }
     #endif
 
     // Brief flash feedback for the Generation Log +/- font-size buttons
@@ -103,7 +124,7 @@ struct ContentView: View {
 
     var body: some View {
         #if os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        if !usesPadLayout(idiom: UIDevice.current.userInterfaceIdiom, h: hSizeClass, v: vSizeClass) {
             PhonePlayerView()
                 .environmentObject(appState)
                 .environmentObject(appState.playback)
@@ -111,8 +132,8 @@ struct ContentView: View {
             // iPad — tab-based layout (Visuals · Log · Tracks · Songs)
             GeometryReader { geo in
                 iPadContent
-                    .onAppear      { contentWidth = geo.size.width }
-                    .onChange(of: geo.size) { size in contentWidth = size.width }
+                    .onAppear      { contentWidth = geo.size.width; contentHeight = geo.size.height }
+                    .onChange(of: geo.size) { size in contentWidth = size.width; contentHeight = size.height }
             }
             .modifier(ZudioHapticsModifier(
                 impactMedium: iPadHapticImpactMedium,
@@ -495,7 +516,7 @@ struct ContentView: View {
     /// Root content for iPad: TopBarView + song info + tab body + scrollbar + tab strip.
     @ViewBuilder private var iPadContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TopBarView(contentWidth: contentWidth)
+            TopBarView(contentWidth: contentWidth, compactHeight: isShortWindow)
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(3)
                 .zIndex(1)
@@ -613,7 +634,8 @@ struct ContentView: View {
                         barOffset: appState.visibleBarOffset,
                         showPlayheadHandle: trackIndex == 0,
                         onSeek: { step in appState.seekTo(step: step) },
-                        contentWidth: contentWidth
+                        contentWidth: contentWidth,
+                        rowHeight: isShortWindow ? 57 : 63
                     )
                 }
             }
@@ -658,8 +680,10 @@ struct ContentView: View {
                         .padding(16)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
                 } else if appState.songState == nil && trackRowsHeight >= 300 {
-                    Text("Press Generate or Play to create a song")
+                    // Two lines under 700pt so it fits inside the narrower MIDI lane
+                    Text(contentWidth < 700 ? "Press Generate or Play\nto create a song" : "Press Generate or Play to create a song")
                         .font(.callout)
+                        .multilineTextAlignment(.center)
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
             }
@@ -667,7 +691,7 @@ struct ContentView: View {
 
             // Hide the generation log on iPad mini landscape — not enough vertical room
             // to show all 7 track rows (441pt) plus the log without clipping the grid.
-            if !isIPadMiniLandscape {
+            if !isIPadMiniLandscape && !isShortWindow {
                 StatusBoxView(contentWidth: contentWidth, showHeader: true)
                     .layoutPriority(0)
             }
@@ -780,10 +804,7 @@ struct ContentView: View {
                     iPadVisualizerPaused = false
                 }
             } label: {
-                VStack(spacing: 2) {
-                    Image(systemName: "sparkles").font(.system(size: 14))
-                    Text("Visuals").font(.system(size: 10))
-                }
+                iPadTabLabel("Visuals", systemImage: "sparkles")
                 .frame(maxWidth: .infinity)
                 .foregroundStyle(
                     iPadTab == .visuals
@@ -796,8 +817,23 @@ struct ContentView: View {
             iPadTabButton("Tracks", systemImage: "slider.horizontal.3", tab: .tracks)
             iPadTabButton("Songs",  systemImage: "music.note.list",     tab: .songs)
         }
-        .frame(height: 36)
+        .frame(height: isShortWindow ? 28 : 36)
         .background(Color(white: 0.10))
+    }
+
+    /// Icon above label normally; icon beside label on the short Duo landscape window to save vertical space.
+    @ViewBuilder private func iPadTabLabel(_ label: String, systemImage: String) -> some View {
+        if isShortWindow {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage).font(.system(size: 14))
+                Text(label).font(.system(size: 11))
+            }
+        } else {
+            VStack(spacing: 2) {
+                Image(systemName: systemImage).font(.system(size: 14))
+                Text(label).font(.system(size: 10))
+            }
+        }
     }
 
     private func iPadTabButton(_ label: String, systemImage: String, tab: IPadTab) -> some View {
@@ -805,12 +841,9 @@ struct ContentView: View {
             iPadTab = tab
             if tab == .visuals { iPadVisualizerPaused = false }
         } label: {
-            VStack(spacing: 2) {
-                Image(systemName: systemImage).font(.system(size: 14))
-                Text(label).font(.system(size: 10))
-            }
-            .frame(maxWidth: .infinity)
-            .foregroundStyle(iPadTab == tab ? Color.white : Color(white: 0.5))
+            iPadTabLabel(label, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
+                .foregroundStyle(iPadTab == tab ? Color.white : Color(white: 0.5))
         }
         .buttonStyle(.plain)
     }

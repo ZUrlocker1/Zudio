@@ -17,11 +17,18 @@ This repository contains the macOS app source, implementation notes, and support
 
 **Watch a 5-minute demo (All styles):** [Zudio Demo](https://www.youtube.com/watch?v=WlyzVsseVH8) on YouTube
 
-[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.7/Zudio-2.7.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
+[Download for macOS](https://github.com/ZUrlocker1/Zudio/releases/download/v2.8/Zudio-2.8.dmg) &nbsp; [Available for iPhone, iPad](https://apps.apple.com/us/app/zudio-music/id6762574335)
 
-The download is `2.7` (build 132), with Chill Soho in it. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder. The last fully released version is [2.6](https://github.com/ZUrlocker1/Zudio/releases/download/v2.6/Zudio-2.6.dmg) (build 131).
+The download is `2.8` (build 133), with iPhone Duo support and Chill Soho in it. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder. The previous release is [2.7](https://github.com/ZUrlocker1/Zudio/releases/download/v2.7/Zudio-2.7.dmg) (build 132).
 
-**What's in it — v2.7 Chill Soho:** A new Chill substyle modelled on the sophisti-pop records of Sade, Everything But The Girl, The Style Council, Simply Red and Roxy Music. Its rules were measured from MIDI transcriptions of those songs rather than described in prose, and almost nothing is shared with base Chill:
+**What's new — v2.8 iPhone Duo:** Zudio now has a layout made for the iPhone Duo, the foldable iPhone. Tested on a real Duo. Folded, it is the iPhone player it always was. Unfolded, it is the iPad layout, opening on Visuals with the track view one tap away on the Tracks tab. Fold and unfold mid-song and playback carries on.
+
+- **Fits the unfolded screen in portrait** — the top bar drops Mood and Key, moves Reset beside BPM, and puts Help, About, Sleep and Share in a row under it, so every control is on screen and Ambient is spelled out in full. The track rows give the MIDI lane the room back
+- **Fits the unfolded screen in landscape** — the generation log steps aside on the Tracks tab, the buttons and tab strip are a little smaller, and the track rows are a little shorter, so all seven tracks are visible at once
+- **Chosen by window size, not by device** — the same compact layouts apply to iPad Split View, Slide Over and resizable windows, and to any future small iPad. Every current iPad and iPhone looks as it did
+- Details are in the [iPhone Duo plan](docs/iphone-duo-plan.md)
+
+**Also in this download — v2.7 Chill Soho:** A new Chill substyle modelled on the sophisti-pop records of Sade, Everything But The Girl, The Style Council, Simply Red and Roxy Music. Its rules were measured from MIDI transcriptions of those songs rather than described in prose, and almost nothing is shared with base Chill:
 
 - **Latin and soul grooves** — bossa, samba and half-time ballad patterns, with congas, bongos, shakers and surdo layered over the kit, and an intro that builds a layer at a time
 - **Jazz harmony** — 6th, 7th and 9th chords instead of triads, and a separate chord cycle for the B section. Each phrase ends on a four-bar turnaround that the whole band plays: the bass leads back to the top, the drums take a fill, the horns mark it and the shaker drops out. The bass has six ways of playing it, from a walking line to a root pedalled under a descending one, and a song draws two or three of them so its turnarounds are neither all alike nor all different
@@ -77,4 +84,5 @@ Earlier releases are covered in the [change log](docs/change-log.md).
 
 - [ios-ipad-plan.md](docs/ios-ipad-plan.md) — iOS and iPad port planning, design considerations, and architecture notes.
 - [ipad-layout-proposals.md](docs/ipad-layout-proposals.md) — iPad UI layout proposals and sketches.
+- [iphone-duo-plan.md](docs/iphone-duo-plan.md) — iPhone Duo support: folded and unfolded layouts, the narrow-window and short-window size gates, and what was tested on a real Duo. (Done)
 - [sample-library-plan.md](docs/sample-library-plan.md) — Research on upgraded sound banks (Fluid R3 and alternatives) for improved instrument quality.

@@ -1,6 +1,9 @@
 # iPhone Duo Plan
 
-Status: **planned for 2.8.** Not started. The Duo simulator is installed (Xcode 27.1) and the display sizes and size classes are measured; no code has been changed.
+Status: **implemented for 2.8 (version 2.8, build 133) and tested on a real iPhone Duo, where it worked
+great.** The layout switch, the narrow top bar and the short-window compaction are all in the code. See
+[Implemented in 2.8](#implemented-in-28) for exactly what changed and the size gates, and
+[Still open](#still-open-after-device-testing) for what has not been checked.
 
 iPhone Duo ships **2026-10-23**. Zudio will not be Duo-aware at launch, and that is the
 intended sequencing rather than a slip. See [ios-ipad-plan.md](ios-ipad-plan.md) for the
@@ -237,9 +240,9 @@ mini portrait, and 867 pt in landscape. Both need the ladder checked.
 
 ## Implementation spec
 
-Everything needed to build this, so it can be picked up cold. **Not started, and deliberately
-held until 2.7 (Chill Soho) has shipped**, so that a layout change cannot be confused with a
-generation change. No file below has been touched.
+The original spec, kept for the reasoning. **It has now been built**, with additions and
+changes recorded under [Implemented in 2.8](#implemented-in-28). Zack chose to go ahead before
+2.7 shipped, so the "held until 2.7" sequencing no longer applies.
 
 ### Edit list
 
@@ -332,6 +335,113 @@ branch is in.
 
 ---
 
+## Implemented in 2.8
+
+Version bumped to **2.8 (build 133)** in `Sources/Zudio/Info.plist` (Mac) and all six build
+configurations in `project.pbxproj`. The iOS target takes its version from the pbxproj, since
+`iOS-Info.plist` has no version keys.
+
+### The layout switch (as specced)
+
+- `usesPadLayout(idiom:h:v:)` in `ContentView.swift`: iPad layout when `idiom == .pad`, or when the
+  window is regular in both size classes. `ContentView.body` picks `PhonePlayerView` otherwise.
+- `StatusBoxView` pinch-to-resize guards use the same helper: on for iPhones and the folded Duo,
+  off for every iPad and the unfolded Duo.
+- `contentWidth` and `contentHeight` start at 1024 and 768 instead of `UIScreen.main.bounds`.
+- `iPadTab` and its persistence needed no change.
+
+### Narrow windows, under 700 pt wide
+
+Found on the Duo simulator: the top bar keeps its natural width, which was wider than the 669 pt
+unfolded portrait window. That pushed the whole screen to lay out too wide and be clipped, so the
+Songs tab, the track effect buttons and the right end of the scrollbar row were all cut off.
+Fixing the top bar fixes all of them. The gate is `kNarrowTopBarWidth = 700` in `TopBarView.swift`.
+
+- **Mood and Key are removed** below 700 pt (the existing iPad mini portrait layout already
+  fits at about 744 pt, so 700 leaves it alone).
+- **Reset moves** from beside the style picker to beside BPM.
+- **Help, About, Sleep and Share move** from a column at the right edge to a row under BPM and
+  Reset, in space that was empty. The Sleep dialog attaches to the whole bar so it works in both
+  placements.
+- **Style picker** is 250 pt wide at 11 pt so "Ambient" shows in full. iPad mini portrait keeps
+  220 pt at 10 pt.
+- **Rows two and three** (BPM and Reset, then the Help row) share a 12 pt font and small controls
+  through `NarrowTopBarRowStyle`, which does nothing above 700 pt.
+- **Reset stays 80 pt wide.** A 64 pt version wrapped to "Re-set" and looked worse. Reset may be
+  clipped slightly at the right edge at 669 pt, which Zack accepted.
+- **Track rows** (`TrackRowView.rightPanelWidth`) use natural chip width under 700 pt instead of
+  the fixed 232 pt panel used for iPad mini portrait, so the MIDI lane gets the room.
+- **Empty-state message** ("Press Generate or Play to create a song") wraps to two lines under
+  700 pt so it stays inside the narrower lane.
+
+### Short windows, under 660 pt tall
+
+Found on the Duo simulator in landscape: the window is 867 by 635 pt, so seven 63 pt track rows
+(441 pt) plus the top bar, log and tab strip do not fit and the top and bottom rows were clipped.
+The gate is `isShortWindow` in `ContentView.swift`: `contentHeight < 660`. All of the following
+apply together:
+
+- **Generation log hidden** on the Tracks tab (the same idea as the existing iPad mini landscape
+  rule).
+- **Action buttons** (Generate, Save, Load, Export) use small controls with 3 pt spacing, and the
+  Help column spacing drops from 6 to 3 pt. `TopBarView` takes a `compactHeight` parameter.
+- **Tab strip** is 28 pt instead of 36, with each icon beside its label instead of above it.
+- **Track rows** are 57 pt instead of 63. `TrackRowView` takes a `rowHeight` parameter that
+  defaults to 63. Seven rows at 57 pt is 399 pt. The row content needs about 53 pt, so there is
+  little room to go lower.
+
+### Size gates, not model gates
+
+The compaction is driven by window size so that future small iPads, Split View, Slide Over and
+Stage Manager windows get it too. The layout height is safe-area adjusted.
+
+- **Under 700 pt wide:** narrow top bar, natural-width effect chips, two-line empty message. Full
+  screen iPads start at about 744 pt (mini) and are unaffected. Split View and resizable windows
+  that narrow are affected.
+- **Under 660 pt tall:** log hidden, compact buttons, compact tab strip, 57 pt rows. Unfolded Duo
+  landscape is 635 pt. iPad mini landscape is about 700 pt after insets (744 pt screen) and stays
+  untouched, as does every larger iPad. The threshold is 660 and not 700 to keep a margin under
+  iPad mini landscape, whose real figure has not been measured.
+- **Still by model or layout choice:** `idiom == .pad` picks the iPad layout (so every iPad keeps
+  it, including in Split View), and the log pinch gesture follows that choice. The older iPad mini
+  landscape log rule (1050 to 1150 pt wide) is partly by model and was left alone.
+
+### Split View and orientations
+
+Verified in the project settings only, not at run time: all four iPad orientations are declared,
+`UIRequiresFullScreen` is absent, the device family is 1,2, and the app is a SwiftUI `WindowGroup`.
+Split View is therefore on in every orientation. The narrowest splits (about 320 to 375 pt) are
+still too narrow for the top bar, which needs roughly 600 pt. Sending very narrow iPad windows to
+`PhonePlayerView` was considered and rejected because iPads keep the iPad layout.
+
+### Tested on a real iPhone Duo
+
+Zack ran the build on an actual iPhone Duo and reported that it worked great, folded and unfolded.
+That covers the layout switch, the narrow portrait top bar, the compact landscape Tracks view, and
+Ambient showing in full in the style picker. Along the way the portrait top bar went through several
+rounds on the device: Reset back to 80 pt after the narrower version wrapped to "Re-set", the Help
+row kept under BPM, rows two and three unified at 12 pt, and the effect chips and MIDI lane
+re-proportioned. The landscape Tracks view then needed the log hidden, smaller buttons, a shorter
+tab strip and 57 pt rows to show all seven rows.
+
+### Still open after device testing
+
+- **Regression pass on existing devices.** Confirm nothing moved on iPad mini, Air and Pro in
+  portrait and landscape, iPad Split View, and iPhone in portrait and Pro Max landscape. The edits
+  are gated so they should not, but this has not been run. The Mac build was also not compiled
+  separately; its changes are limited to the version bump and two defaults that do not change its
+  layout.
+- **Fold behavior.** Fold and unfold mid-song, on each tab, and mid-export: the tab should survive,
+  playback should not glitch, and there should be no flicker through `PhonePlayerView`.
+- **Status bar overlap.** In landscape the system clock and Wi-Fi icon draw over Help and About.
+  The fix is a top inset on the top bar in that state. Not done.
+- **Empty bottom band.** The dark band under the tab strip is probably the home-indicator safe area
+  and was left alone.
+- **Simulator crash.** A `PosterBoard` crash on the Duo simulator is an iOS system process, not
+  Zudio. Erase that simulator device if it recurs.
+
+---
+
 ## Measured values and what is still open
 
 Two earlier questions are answered by the HIG:
@@ -367,11 +477,11 @@ every state. Window sizes are safe-area adjusted.
   not the 950 pt key chip. The opt-in track view is therefore a real tuning job in portrait and a
   minor one in landscape.
 
-### Still open
+### Still open (measurements)
 
-Everything left is unverified and is covered by the verification list under Implementation spec:
-fold-transition behaviour and tab survival, the outer display in landscape, and the audio route.
-The size classes and display sizes above are measured.
+The size classes and display sizes above are measured. What remains unchecked after the real-device
+test is listed under [Still open after device testing](#still-open-after-device-testing): the
+regression pass, fold behavior, the landscape status-bar overlap, and the audio route on a fold.
 
 ---
 

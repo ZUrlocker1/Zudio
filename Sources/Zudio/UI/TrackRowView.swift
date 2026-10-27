@@ -19,6 +19,8 @@ struct TrackRowView: View {
     var showPlayheadHandle: Bool = false
     var onSeek: ((Int) -> Void)? = nil
     var contentWidth: CGFloat = 900
+    /// Row height in points. 63 everywhere except the short unfolded-Duo landscape window.
+    var rowHeight: CGFloat = 63
 
     // Adaptive panel widths (iOS only).
     //
@@ -44,6 +46,9 @@ struct TrackRowView: View {
     // narrowing MIDI to 252pt (31% less than the 344pt natural-sizing result).
     // Nil for other sizes → natural chip sizing used instead.
     private var rightPanelWidth: CGFloat? {
+        // Under 700pt (Split View, unfolded iPhone Duo portrait): natural chip width, so the MIDI lane
+        // keeps the room the 232pt panel would waste as dead space.
+        if contentWidth < 700 { return nil }
         if contentWidth < 800 { return 232 }
         return nil
     }
@@ -201,7 +206,7 @@ struct TrackRowView: View {
                         offsetSeconds: appState.songState?.chillAudioTextureOffset ?? 0,
                         onSeek: onSeek
                     )
-                    .frame(height: 63)
+                    .frame(height: rowHeight)
                     .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
                 } else if trackIndex == kTrackTexture && activeStyle == .ambient && ambientTextureFile != nil {
                     AudioWaveformView(
@@ -213,7 +218,7 @@ struct TrackRowView: View {
                         offsetSeconds: appState.songState?.ambientAudioTextureOffset ?? 0,
                         onSeek: onSeek
                     )
-                    .frame(height: 63)
+                    .frame(height: rowHeight)
                     .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
                 } else {
                     MIDILaneView(
@@ -226,14 +231,14 @@ struct TrackRowView: View {
                         onSeek: onSeek,
                         showPlayheadHandle: showPlayheadHandle
                     )
-                    .frame(height: 63)
+                    .frame(height: rowHeight)
                     .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
                 }
             }
             // Right effects column — layout varies by platform and size class
             effectsColumn
         }
-        .frame(height: 63)
+        .frame(height: rowHeight)
         .padding(.horizontal, 8)
         .overlay(alignment: .bottom) {
             Rectangle()
