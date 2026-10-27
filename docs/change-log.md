@@ -1,6 +1,15 @@
 # Zudio Change Log
 
-## V 2.7 (Build 132) — in development, Chill Soho
+## V 2.8 (Build 133) — iPhone Duo
+
+- **iPhone Duo layout** — (2026-10-27) The foldable iPhone Duo now gets a layout made for it, tested on a real Duo. Folded, it runs the iPhone player unchanged. Unfolded, it runs the iPad layout, opening on Visuals with the track view one tap away on Tracks. Folding and unfolding mid-song leaves playback alone, and the unfolded tab is remembered. The choice is made by size class, with every iPad kept on the iPad layout by its idiom, so no existing iPhone or iPad changes.
+- **Narrow windows, under 700 pt wide** — The unfolded Duo in portrait is 669 pt wide, narrower than an iPad mini. The top bar had been forcing the whole screen wider than the window, which clipped the Songs tab, the track effect buttons and the scrollbar. Below 700 pt the top bar now drops Mood and Key, moves Reset beside BPM, and puts Help, About, Sleep and Share in a row under it. The style picker is wider so Ambient is spelled out in full, and the BPM, Reset and Help rows share one type size. The track effect chips use their natural width, so the MIDI lane keeps its room, and the empty-song message wraps to two lines.
+- **Short windows, under 660 pt tall** — The unfolded Duo in landscape is 635 pt tall, too short for seven track rows plus the generation log. In a window that short the log is hidden on the Tracks tab, the Generate, Save, Load and Export buttons are smaller, the tab strip is 28 pt with each icon beside its label, and track rows are 57 pt instead of 63, so all seven tracks show.
+- **Chosen by size, not by model** — Both layouts are triggered by window size, so iPad Split View, Slide Over, resizable windows and any future small iPad get them too. iPad mini landscape and every larger iPad are unchanged.
+- **Log pinch gesture** — Pinch-to-resize on the generation log stays on for iPhones and the folded Duo, and is off for iPads and the unfolded Duo, where the log behaves as on iPad.
+- **Version 2.8 (build 133)** — The Mac download is the v2.8 release. See [iphone-duo-plan.md](iphone-duo-plan.md) for the full plan and what was tested.
+
+## V 2.7 (Build 132) — Chill Soho
 
 - **New Chill Soho substyle** — A third Chill form modelled on early-80s British sophisticated pop: Sade, Everything but the Girl, The Style Council, Simply Red, Roxy Music, Matt Bianco. Twenty-one new rules measured from MIDI of those records: bossa, samba, Latin sway and soul grooves with hand percussion; 6th, 7th and 9th chords with a separate B-section cycle and a four-bar turnaround the band plays; horn stabs and halos on a MIDI Texture track; sax-led leads built from vocal-line figures; and a house-style Remix Break. Soho song titles.
 - **Guitar-led Soho rhythm** — Jazz and Funk Guitar added to the soundfont. Soho Rhythm is Rhodes, Stereo Piano, Nylon, Jazz and Funk Guitar at 20% each; guitars play with a slow amp tremolo by default. The unused SFX drum kit is gone; the soundfont is 21.2 MB.
