@@ -223,6 +223,8 @@ A significant proportion of iPad Pro/Air users use a hardware keyboard. Do not r
 
 iPadOS supports Split View and Slide Over — the app window can be as narrow as 320 pt. The compact-width layout must handle this. At 320 pt minimum viable functionality is: Generate + Play/Stop transport, track list with name + mute/solo (MIDI lane very narrow or hidden), status log hidden.
 
+**Tested in 2.8 (simulator only, October 2026).** Zudio 2.8 was run on the iPad simulator in Split View and in Stage Manager (free-floating, resizable windows) alongside other apps. It works: the iPad layout is kept at every width, and playback is unaffected. There is some clipping. Windows of about 700 to 740 pt wide get the full top bar, which needs about 744 pt, so BPM and the Help row run past the right edge. Windows under about 600 pt overflow the narrow top bar slightly (Reset and the Bars toggle clip). Stage Manager windows can also sit partly off-screen, which clips everything. Not yet tried on real iPad hardware, and the simulator crashed a few times while multitasking (SpringBoard and signal 9, which looks like the simulator and not Zudio). A possible fix is raising `kNarrowTopBarWidth` in `TopBarView.swift` from 700 to about 735. Deferred until real hardware is available.
+
 ---
 
 ## Haptic Feedback (iPhone)

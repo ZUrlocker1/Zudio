@@ -26,6 +26,7 @@ The download is `2.8` (build 133), with iPhone Duo support and Chill Soho in it.
 - **Fits the unfolded screen in portrait** — the top bar drops Mood and Key, moves Reset beside BPM, and puts Help, About, Sleep and Share in a row under it, so every control is on screen and Ambient is spelled out in full. The track rows give the MIDI lane the room back
 - **Fits the unfolded screen in landscape** — the generation log steps aside on the Tracks tab, the buttons and tab strip are a little smaller, and the track rows are a little shorter, so all seven tracks are visible at once
 - **Chosen by window size, not by device** — the same compact layouts apply to iPad Split View, Slide Over and resizable windows, and to any future small iPad. Every current iPad and iPhone looks as it did
+- **Multitasking on iPad** — tested on iPad simulators: Zudio runs alongside other apps in a smaller window, in Split View and in resizable floating windows. It works, with some clipping at certain widths
 - Details are in the [iPhone Duo plan](docs/iphone-duo-plan.md)
 
 **Also in this download — v2.7 Chill Soho:** A new Chill substyle modelled on the sophisti-pop records of Sade, Everything But The Girl, The Style Council, Simply Red and Roxy Music. Its rules were measured from MIDI transcriptions of those songs rather than described in prose, and almost nothing is shared with base Chill:
