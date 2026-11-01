@@ -1,6 +1,6 @@
 # iPhone Duo Plan
 
-Status: **implemented in 2.8 (build 133) and tested on a real iPhone Duo, where it worked great.**
+Status: **implemented in 2.8 (build 134) and tested on a real iPhone Duo, where it worked great.**
 The layout switch, the narrow top bar and the short-window compaction are all in the code. What has
 not been checked is listed under [Still open](#still-open). See [ios-ipad-plan.md](ios-ipad-plan.md)
 for the platform view inventory this builds on.
@@ -208,6 +208,6 @@ range and was not changed.
 
 ## Version
 
-**2.8 (build 133)** is set in `Sources/Zudio/Info.plist` (Mac) and all six build configurations in
+**2.8 (build 134)** is set in `Sources/Zudio/Info.plist` (Mac) and all six build configurations in
 `project.pbxproj`. The iOS target takes its version from the pbxproj, since `iOS-Info.plist` has no
 version keys. `check-duo.sh` in the repo root reports whether a Duo simulator is installed.

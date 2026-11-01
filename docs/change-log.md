@@ -1,6 +1,6 @@
 # Zudio Change Log
 
-## V 2.8 (Build 133) — iPhone Duo
+## V 2.8 (Build 134) — iPhone Duo
 
 - **iPhone Duo layout** — (2026-10-27) The foldable iPhone Duo now gets a layout made for it, tested on a real Duo. Folded, it runs the iPhone player unchanged. Unfolded, it runs the iPad layout, opening on Visuals with the track view one tap away on Tracks. Folding and unfolding mid-song leaves playback alone, and the unfolded tab is remembered. The choice is made by size class, with every iPad kept on the iPad layout by its idiom, so no existing iPhone or iPad changes.
 - **Narrow windows, under 700 pt wide** — The unfolded Duo in portrait is 669 pt wide, narrower than an iPad mini. The top bar had been forcing the whole screen wider than the window, which clipped the Songs tab, the track effect buttons and the scrollbar. Below 700 pt the top bar now drops Mood and Key, moves Reset beside BPM, and puts Help, About, Sleep and Share in a row under it. The style picker is wider so Ambient is spelled out in full, and the BPM, Reset and Help rows share one type size. The track effect chips use their natural width, so the MIDI lane keeps its room, and the empty-song message wraps to two lines.
@@ -10,7 +10,7 @@
 - **More flexible style selection in Endless** — (2026-10-31) The style picker stays active in Endless. Tapping a style sets the next song's style, then Endless picks styles automatically again.
 - **Audio engine rebuild** — (2026-10-31) An engine start that failed again after the 300 ms retry had survived Reset and needed a full quit. A third attempt now resets the engine and reconnects its output with the current hardware format first, logging `AUDIO  Audio engine rebuilt after error -50` when that works. If it still fails, a line with the session's sample rate, output and activation result comes before the red ERROR, and the message is shorter: `Audio engine fail (-50)`.
 - **Shorter disconnect message** — (2026-11-01) When the audio output goes away, such as Bluetooth headphones switching off, the log now reads `AUDIO  Stopped, disconnected`.
-- **Version 2.8 (build 133)** — The Mac download is the v2.8 release. See [iphone-duo-plan.md](iphone-duo-plan.md) for the full plan and what was tested.
+- **Version 2.8 (build 134)** — The Mac download is the v2.8 release. See [iphone-duo-plan.md](iphone-duo-plan.md) for the full plan and what was tested.
 
 ## V 2.7 (Build 132) — Chill Soho
 
