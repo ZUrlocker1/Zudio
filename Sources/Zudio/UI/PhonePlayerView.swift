@@ -375,18 +375,16 @@ struct PhonePlayerView: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6)
             .strokeBorder(Color(white: 0.4, opacity: 0.5), lineWidth: 0.5))
-        .disabled(appState.playMode == .endless)
-        .opacity(appState.playMode == .endless ? 0.5 : 1.0)
     }
 
     private func styleButton(_ style: MusicStyle, label: String) -> some View {
         Button {
-            appState.selectedStyle = style
+            appState.chooseStyle(style)
             hapticImpactLight.toggle()
         } label: {
             Text(label)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(appState.selectedStyle == style ? kActiveModeBlue : .clear)
+                .background(appState.styleShown == style ? kActiveModeBlue : .clear)
                 .foregroundStyle(.white)
                 .contentShape(Rectangle())
         }

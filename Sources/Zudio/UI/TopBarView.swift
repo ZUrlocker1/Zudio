@@ -539,7 +539,8 @@ struct TopBarView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         // Row 1: style segmented picker fills available width; Reset at trailing end
                         HStack(spacing: 8) {
-                            Picker("", selection: $appState.selectedStyle) {
+                            Picker("", selection: Binding(get: { appState.styleShown },
+                                                         set: { appState.chooseStyle($0) })) {
                                 (Text("A").underline() + Text("mbient")).tag(MusicStyle.ambient)
                                 (Text("C").underline() + Text("hill")).tag(MusicStyle.chill)
                                 (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
@@ -553,8 +554,6 @@ struct TopBarView: View {
                             // picker, so use 11pt and 250pt and show "Ambient" in full.
                             .font(.system(size: contentWidth < kNarrowTopBarWidth ? 11 : (contentWidth < 800 ? 10 : 11)))
                             .frame(width: contentWidth < kNarrowTopBarWidth ? 250 : (contentWidth < 800 ? 220 : 260))
-                            .disabled(appState.playMode == .endless)
-                            .opacity(appState.playMode == .endless ? 0.5 : 1.0)
 
                             if contentWidth >= kNarrowTopBarWidth { iOSResetButton }
                         }
@@ -624,7 +623,8 @@ struct TopBarView: View {
 
                         // Left column: style picker + reset
                         VStack(alignment: .center, spacing: 6) {
-                            Picker("", selection: $appState.selectedStyle) {
+                            Picker("", selection: Binding(get: { appState.styleShown },
+                                                         set: { appState.chooseStyle($0) })) {
                                 (Text("A").underline() + Text("mbient")).tag(MusicStyle.ambient)
                                 (Text("C").underline() + Text("hill")).tag(MusicStyle.chill)
                                 (Text("K").underline() + Text("osmic")).tag(MusicStyle.kosmic)
@@ -634,8 +634,6 @@ struct TopBarView: View {
                             .tint(Color.gray)
                             .font(.system(size: 11))
                             .frame(width: kStylePickerWidth)
-                            .disabled(appState.playMode == .endless)
-                            .opacity(appState.playMode == .endless ? 0.5 : 1.0)
 
                             Button(action: { appState.resetTrackDefaults() }) {
                                 Label {
@@ -881,13 +879,13 @@ private struct LogoAreaView: View {
 
     @ViewBuilder private var hiddenShortcuts: some View {
         Group {
-            Button("") { appState.selectedStyle = .motorik }
+            Button("") { appState.chooseStyle(.motorik) }
                 .keyboardShortcut("m", modifiers: .command)
-            Button("") { appState.selectedStyle = .kosmic }
+            Button("") { appState.chooseStyle(.kosmic) }
                 .keyboardShortcut("k", modifiers: .command)
-            Button("") { appState.selectedStyle = .ambient }
+            Button("") { appState.chooseStyle(.ambient) }
                 .keyboardShortcut("a", modifiers: .command)
-            Button("") { appState.selectedStyle = .chill }
+            Button("") { appState.chooseStyle(.chill) }
                 .keyboardShortcut("c", modifiers: [])
             Button("") { appState.playMode = .song }
                 .keyboardShortcut("n", modifiers: [])

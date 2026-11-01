@@ -215,6 +215,8 @@ final class PlaybackEngine: ObservableObject {
     var onEngineError: ((String) -> Void)? = nil
     // onEngineRecovered: fired when the first engine.start() failed but the retry worked.
     var onEngineRecovered: ((String) -> Void)? = nil
+    // onEngineDiagnostic: session state after every start attempt failed, logged beside the ERROR line.
+    var onEngineDiagnostic: ((String) -> Void)? = nil
     // onMissingPatch: fired when loadSoundBankInstrument fails (preset stripped from SF2).
     var onMissingPatch: ((Int, Int) -> Void)? = nil   // (trackIndex, program)
     // onAudioInterrupted: fired on iOS when another app takes audio focus (e.g. Apple Music starts)
@@ -2864,28 +2866,72 @@ final class PlaybackEngine: ObservableObject {
         loadGMPrograms()
     }
 
+    #if os(iOS)
+    /// Activates the shared session and returns the failure, if any, so a start error can say
+    /// whether the session was the problem.
+    private func activateSession() -> NSError? {
+        do { try AVAudioSession.sharedInstance().setActive(true); return nil }
+        catch { return error as NSError }
+    }
+
+    /// One short line for the log: the session's sample rate, current output and activation result.
+    private func sessionSummary(activateError: NSError?) -> String {
+        let session = AVAudioSession.sharedInstance()
+        let out = session.currentRoute.outputs.first?.portType.rawValue ?? "none"
+        let act = activateError.map { "activate \($0.code)" } ?? "activate ok"
+        return "Session \(Int(session.sampleRate)) Hz, out \(out), \(act)"
+    }
+    #endif
+
     private func startEngine() {
         #if os(iOS)
         // Session must be active before the engine starts — starting on an inactive session
         // causes the engine to open onto a dead route, producing silence even though isRunning=true.
         // Re-assert the preferred buffer duration here in case it was cleared by an interruption.
         try? AVAudioSession.sharedInstance().setPreferredIOBufferDuration(0.023)
-        try? AVAudioSession.sharedInstance().setActive(true)
+        var activateError = activateSession()
         #endif
         do { try engine.start() }
         catch {
+            var lastError = error as NSError
             #if os(iOS)
+            let firstCode = lastError.code
             // A route that is still switching (e.g. a multipoint headset just handed to another
             // device) can fail the first start with -50. Retry once on a freshly reactivated session.
             engine.stop()
             Thread.sleep(forTimeInterval: 0.3)   // let the route settle; only runs after a failure
-            try? AVAudioSession.sharedInstance().setActive(true)
-            if (try? engine.start()) != nil {
-                onEngineRecovered?("Audio engine restarted after error \((error as NSError).code)")
+            activateError = activateSession()
+            do {
+                try engine.start()
+                onEngineRecovered?("Audio engine restarted after error \(firstCode)")
                 return
-            }
+            } catch { lastError = error as NSError }
+            // Still failing: the engine's output connection was made under an earlier route and
+            // can no longer match the hardware, and neither a plain retry nor Reset changes that.
+            // Reset the engine, drop and re-make the main mixer to output connection so it takes
+            // the current hardware format, and cycle the session before the last attempt.
+            engine.stop()
+            engine.reset()
+            engine.disconnectNodeOutput(engine.mainMixerNode)
+            try? AVAudioSession.sharedInstance().setActive(false)
+            Thread.sleep(forTimeInterval: 0.3)
+            activateError = activateSession()
+            // Use the hardware format explicitly: format nil would reuse the mixer's stale one.
+            // A dead route reports 0 Hz, and connecting with that raises, so fall back to nil then.
+            // Always reconnect: leaving the mixer unplugged would make a later start play silence.
+            let hwFormat = engine.outputNode.outputFormat(forBus: 0)
+            let usable = hwFormat.sampleRate > 0 && hwFormat.channelCount > 0
+            engine.connect(engine.mainMixerNode, to: engine.outputNode, format: usable ? hwFormat : nil)
+            do {
+                try engine.start()
+                onEngineRecovered?("Audio engine rebuilt after error \(firstCode)")
+                return
+            } catch { lastError = error as NSError }
+            let detail = sessionSummary(activateError: activateError)
+            print(detail)
+            onEngineDiagnostic?(detail)
             #endif
-            let msg = "Audio engine failed to start (error \((error as NSError).code))"
+            let msg = "Audio engine fail (\(lastError.code))"
             print(msg)
             onEngineError?(msg)
         }

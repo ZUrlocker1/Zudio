@@ -26,7 +26,7 @@ Segments (icon left of label):
 
 Uses a custom button-pair control (not SwiftUI Picker) so SF Symbol icons render correctly on macOS. Blue active color matches the track effects buttons. Font and height match the Reset button.
 
-When **Endless** is active, the style selector becomes a read-only indicator showing the currently playing style. It dims and ignores taps.
+When **Endless** is active, the style selector stays live and sets the style of the **next song only**. Tapping a style stores it as `endlessUserPick` and re-makes the pre-generated next song in that style; the playing song is untouched, and `selectedStyle` still describes it. The selector shows the pick, otherwise the playing style. `decideNextStyle()` moves the axis to the pick instead of rolling, updating the streak counters as if the rotation had chosen it, so the automatic rules continue from there. The pick is cleared when a song in that style starts, so the song after it is automatic again, and on any mode change or Reset. Generate with a pick pending makes that style at once. Every style picker and shortcut goes through `chooseStyle(_:)`. (Before 2.8 the selector dimmed and ignored taps in Endless.)
 
 ### Style continuum
 
@@ -109,7 +109,7 @@ private let songHistoryLimit = 10
 
 ### Mode switching while playing
 
-- **Endless → Song**: style selector unlocks; current song finishes normally; no new song generated.
+- **Endless → Song**: any pending next-song pick is dropped; current song finishes normally; no new song generated.
 - **Song → Endless**: style axis syncs to the currently playing style; pre-gen starts immediately in the background; stream continues when current song ends.
 
 ### Status log

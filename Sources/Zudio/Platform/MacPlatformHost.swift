@@ -103,17 +103,17 @@ final class MacPlatformHost: ZudioPlatformHost {
                     guard !target.isGenerating else { return event }
                     Task { @MainActor [weak target] in target?.loadFromLog() }
                 case 46: // 'm' — Motorik
-                    Task { @MainActor [weak target] in target?.selectedStyle = .motorik }
+                    Task { @MainActor [weak target] in target?.chooseStyle(.motorik) }
                 case 15: // 'r' — reset (always allowed — clears everything)
                     Task { @MainActor [weak target] in target?.resetTrackDefaults() }
                 case 40: // 'k' — Kosmic
-                    Task { @MainActor [weak target] in target?.selectedStyle = .kosmic }
+                    Task { @MainActor [weak target] in target?.chooseStyle(.kosmic) }
                 case 4:  // 'h' — help
                     Task { @MainActor [weak target] in target?.triggerShowHelp.toggle() }
                 case 0:  // 'a' — Ambient
-                    Task { @MainActor [weak target] in target?.selectedStyle = .ambient }
+                    Task { @MainActor [weak target] in target?.chooseStyle(.ambient) }
                 case 8:  // 'c' — Chill
-                    Task { @MainActor [weak target] in target?.selectedStyle = .chill }
+                    Task { @MainActor [weak target] in target?.chooseStyle(.chill) }
                 case 11: // 'b' — beginning of current track only, never rewinds to prior track
                     guard target.songState != nil else { return event }
                     Task { @MainActor [weak target] in target?.seekTo(step: 0) }

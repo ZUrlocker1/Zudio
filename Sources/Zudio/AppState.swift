@@ -146,6 +146,7 @@ final class AppState: ObservableObject {
         didSet {
             UserDefaults.standard.set(playMode.rawValue, forKey: "playMode")
             guard playMode != oldValue else { return }
+            endlessUserPick = nil
             if oldValue == .evolve { tearDownEvolve() }
             switch playMode {
             case .song:
@@ -467,6 +468,12 @@ final class AppState: ObservableObject {
     /// Consecutive songs confined to one pair — Ambient+Chill (0) or Kosmic+Motorik (1) — used by
     /// the hard streak cap in decideNextStyle(). Reset to 1 whenever the pair actually changes.
     private var songsInCurrentPair: Int = 0
+    /// Endless only: a style the user tapped for the next song. decideNextStyle() moves the axis
+    /// to it instead of rolling; it is cleared when that song starts, so the one after is automatic.
+    /// selectedStyle is left alone because it describes the song that is playing now.
+    @Published private(set) var endlessUserPick: MusicStyle? = nil
+    /// What the style picker shows: the pending Endless pick, otherwise the selected style.
+    var styleShown: MusicStyle { endlessUserPick ?? selectedStyle }
 
     // Pre-generated next song for seamless Endless transitions
     private var nextSongState:            SongState? = nil
@@ -564,6 +571,7 @@ final class AppState: ObservableObject {
         songsInCurrentStyle  = 0
         songsInCurrentPair   = 0
         endlessStyleIndex    = 1
+        endlessUserPick      = nil
         tearDownEvolve()
 
         // Reset style to default
@@ -1326,6 +1334,10 @@ final class AppState: ObservableObject {
         playback.onEngineRecovered = { [weak self] msg in
             self?.appendToLog([GenerationLogEntry(tag: "AUDIO", description: msg, isTitle: false)])
         }
+        // Session state when every start attempt failed, so a field report shows which cause it was.
+        playback.onEngineDiagnostic = { [weak self] msg in
+            self?.appendToLog([GenerationLogEntry(tag: "Audio", description: msg, isTitle: false)])
+        }
         // Log missing SF2 patches so stripped presets are visible in the generation log.
         playback.onMissingPatch = { [weak self] trackIndex, program in
             guard let self else { return }
@@ -1554,6 +1566,13 @@ final class AppState: ObservableObject {
         clearSleepTimerMessage()
         guard !isGenerating else { return }
         isGenerating = true
+        // A pending Endless pick is used now, as Generate uses the picker in Song mode. Discard the
+        // pre-gen first so its snapshot restore can't undo the jump, then move the axis to the pick.
+        if playMode == .endless, let pick = endlessUserPick {
+            discardPreGeneratedSong()
+            jumpEndlessAxis(to: pick)
+            endlessUserPick = nil
+        }
         // In Endless mode use the rotation's current style, not selectedStyle.
         // selectedStyle stays fixed on whatever the user last picked; only the rotation axis moves.
         let style = (playMode == .endless) ? endlessStyleAxis[endlessStyleIndex] : selectedStyle
@@ -2015,7 +2034,39 @@ final class AppState: ObservableObject {
         return next
     }
 
+    /// Every style picker and style shortcut comes here. Outside Endless it selects the style.
+    /// In Endless it sets the next song's style and re-makes the pre-generated song to match;
+    /// the playing song is untouched.
+    func chooseStyle(_ style: MusicStyle) {
+        guard playMode == .endless else { selectedStyle = style; return }
+        guard style != endlessUserPick else { return }
+        endlessUserPick = style
+        appendToLog([GenerationLogEntry(tag: "Endless",
+            description: "Next song: \(style.rawValue.capitalized)", isTitle: false)])
+        // If the approaching-end trigger already counted the old pre-gen as "up next", hand that
+        // over to the replacement.
+        if upNextLogged { upNextLogged = false; shouldLogNextUpWhenReady = true }
+        discardPreGeneratedSong()
+        preGenerateNextSong()
+    }
+
+    /// Moves the Endless axis to `style` and updates the streak counters as if the rotation
+    /// had chosen it, so the automatic rules continue from there.
+    private func jumpEndlessAxis(to style: MusicStyle) {
+        guard let idx = endlessStyleAxis.firstIndex(of: style) else { return }
+        let currentPair = endlessStyleIndex < endlessStyleAxis.count / 2 ? 0 : 1
+        songsInCurrentStyle = idx == endlessStyleIndex ? songsInCurrentStyle + 1 : 1
+        endlessStyleIndex   = idx
+        let newPair = endlessStyleIndex < endlessStyleAxis.count / 2 ? 0 : 1
+        songsInCurrentPair  = newPair == currentPair ? songsInCurrentPair + 1 : 1
+    }
+
     private func decideNextStyle() -> MusicStyle {
+        // A user pick wins over the roll. It is not cleared here: a discarded pre-gen re-reads it.
+        if let pick = endlessUserPick {
+            jumpEndlessAxis(to: pick)
+            return endlessStyleAxis[endlessStyleIndex]
+        }
         let atLeft  = endlessStyleIndex == 0
         let atRight = endlessStyleIndex == endlessStyleAxis.count - 1
         let currentPair = endlessStyleIndex < endlessStyleAxis.count / 2 ? 0 : 1   // 0 = Ambient+Chill, 1 = Kosmic+Motorik
@@ -2639,6 +2690,9 @@ final class AppState: ObservableObject {
 
     private func startEndlessSong(_ state: SongState) {
         selectedStyle                = state.style
+        // The picked song has started, so the next one is automatic. Only on a match: a pick made
+        // while an on-the-spot song was generating belongs to the song after this one.
+        if endlessUserPick == state.style { endlessUserPick = nil }
         shouldLogNextUpWhenReady     = false   // reset — next pre-gen is silent until trigger fires
         upNextLogged                 = false
         discardPreGeneratedSong()   // already taken or discarded by the caller; this clears any stray run
