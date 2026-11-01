@@ -1573,8 +1573,8 @@ final class AppState: ObservableObject {
             jumpEndlessAxis(to: pick)
             endlessUserPick = nil
         }
-        // In Endless mode use the rotation's current style, not selectedStyle.
-        // selectedStyle stays fixed on whatever the user last picked; only the rotation axis moves.
+        // In Endless mode use the rotation's current style, not selectedStyle; selectedStyle is
+        // synced to it once the song is generated.
         let style = (playMode == .endless) ? endlessStyleAxis[endlessStyleIndex] : selectedStyle
         let isFirstForStyle = !stylesWithGeneratedSongs.contains(style)
         // Brush Kit is index 1 in the Ambient drum pool ["Percussion Kit", "Brush Kit"]

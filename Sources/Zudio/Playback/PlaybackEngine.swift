@@ -413,7 +413,7 @@ final class PlaybackEngine: ObservableObject {
             case .oldDeviceUnavailable:
                 // Headphones pulled — stop scheduler (don't touch session, restartAudio re-arms it)
                 self.stopSchedulerOnly()
-                self.onAudioInterrupted?("Stopped, output disconnected")
+                self.onAudioInterrupted?("Stopped, disconnected")
                 self.restartAudio()
             case .newDeviceAvailable:
                 self.restartAudio()

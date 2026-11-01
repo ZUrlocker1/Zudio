@@ -976,7 +976,7 @@ struct HelpView: View {
                 Text("Zudio generates Ambient, Chill, Kosmic and Motorik inspired music using MIDI.")
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 Divider()
-                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback.")
+                helpLine("Generate (⌘G / Return)", "Creates a new song. Use Evolve (one style) or Endless (all styles) for continuous playback. In Endless, tap a style to choose the next song's style.")
                 helpLine("⏮ ⏭ Previous / Next track", "Go to the previous or next generated song.")
                 #if os(iOS)
                 helpLine("Export Audio (⌘E)", "Exports to an M4A audio file accessible from the Files app.")
