@@ -283,7 +283,7 @@ struct AmbientTitleGenerator {
 
     // Classical music forms — used in tech-grief pattern
     private static let classicalForms = [
-        "Suite", "Nocturne", "Requiem", "Étude", "Notes",
+        "Suite", "Nocturne", "Requiem", "Etude", "Notes",
         "Elegy", "Lament", "Prelude", "Dirge", "Concert",
         "Interlude", "Fugue", "Variations", "Aria", "Coda"
     ]

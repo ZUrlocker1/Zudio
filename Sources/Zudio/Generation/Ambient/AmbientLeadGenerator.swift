@@ -1395,7 +1395,7 @@ struct AmbientLeadGenerator {
         let neighbor = pivotIdx < upper.count - 1
             ? upper[pivotIdx + 1]
             : upper[Swift.max(0, pivotIdx - 1)]
-        // Prefer scale root (70%) or 5th (20%) for lower anchor — tonal stability à la Satie
+        // Prefer scale root (70%) or 5th (20%) for lower anchor — tonal stability a la Satie
         let rootPC  = frame.keySemitoneValue % 12
         let fifthPC = (rootPC + 7) % 12
         let anchorRoll = rng.nextDouble()

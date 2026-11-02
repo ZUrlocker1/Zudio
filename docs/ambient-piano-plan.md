@@ -37,7 +37,7 @@ The hollow guard logic in `generateAmbient` must check `isAmbientPiano` and skip
 - Analysed: *Not-yet-remembered* — 60 BPM, C# Aeolian, 3.2 min, 573 notes, vel flat at 80. Mode 3 (chromatic pendulum): metronomic oscillation between two 3-note chromatic clusters (`[Eb4,E4,Ab4]` ↔ `[C#4,Eb4,F#4]`) every 1 beat (IOI 4 steps) for the full song. Bass octave pairs (A1+A2, E1+E2, C#2+C#3) anchor each 2-bar section at very low register (MIDI 21–49), held 28–32 steps. Two-part structure: main clusters (bars 0–16, 32–48) + contrasting middle chords (bars 16–24).
 - Analysed: *Against the Sky* — 66 BPM, 4.6 min, only 56 chord events, vel flat at 64. Mode 2 (gong chord): two chord states Eb minor (`Eb2/3/4, F#3/4, Bb3/4`) ↔ F# major (`F#2/3/4, Bb3/4, C#3/4`), each voiced as 7 notes across 3 octaves, held 12–60 steps with silences of 12–60 steps between. Single breath notes (lone Eb3, Eb4) appear between chord strikes as tonal remnants. No melody, no velocity variation — the chord resonating IS the music.
 
-**Erik Satie — *Gymnopédies* (1888), *Gnossiennes* (1890)** *(AMB-PNO-002)*
+**Erik Satie — *Gymnopedies* (1888), *Gnossiennes* (1890)** *(AMB-PNO-002)*
 - The harmonic and structural ancestor. Analysed: Gnossienne 1 (two-register arch, ABCD repeat, cross-phrase +7 connection, 22 suspension figures), Gnossienne 2 (pure oscillation IOI 0.67–1.1 beats, 3–4 steps at 60 BPM), Gymnopedie 1 (22 suspension→resolution figures, 30% suspended phrase endings). Core idioms: stepwise oscillation around a pivot then large leap DOWN into lower register; suspended phrase endings on 2nd, b3, 4th, b7; exact phrase repetition rather than development.
 
 **Ólafur Arnalds — *re:member* (2018), *some kind of peace* (2020)** *(AMB-PNO-002)*
@@ -276,7 +276,7 @@ Introduce a new cluster pair C and D, different pitch classes from A/B, for 8 ba
 ## Lead rule 2 — AMB-PNO-002: Pensive Melody
 
 **Probability within Ambient Piano: 45%**  
-*Style reference: Erik Satie (Gnossiennes, Gymnopédies), Ólafur Arnalds (Saman, Near Light)*
+*Style reference: Erik Satie (Gnossiennes, Gymnopedies), Ólafur Arnalds (Saman, Near Light)*
 
 The Satie/Arnalds model has true melodic phrases with internal logic. The listener can follow and hum the melody. The fundamental structure is a **two-register architecture**: each phrase opens in a higher register, oscillates around a pivot pitch, then descends — via a large leap of 6–12 semitones — into a lower settlement zone where the phrase ends. The descent into the lower register is the emotional release of the phrase. This asymmetry — quick oscillating upper section, slow settling lower section — is the emotional signature of the style.
 

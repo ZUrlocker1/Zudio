@@ -142,11 +142,11 @@ The sequencer is the whole identity of Kosmic Drift — this track stays fully a
 
 **Excellent fit for Drift:**
 - **KOS-RTHM-009 Craven Faults Phase Drift** — 5-note cell drifting through a 15-bar cycle; organic phasing is very CBL; highest weight
-- **KOS-RTHM-003 JMJ Oxygène** — spacious ascending/descending quarter-note legato; the most "floating" arpeggio rule; sounds better here than at 120 BPM
+- **KOS-RTHM-003 JMJ Oxygene** — spacious ascending/descending quarter-note legato; the most "floating" arpeggio rule; sounds better here than at 120 BPM
 - **KOS-RTHM-002 JMJ Hook** — 4-note melodic hook at 8th/quarter note; at slow BPM this is the Air *La Femme d'Argent* arpeggiated character
 - **KOS-RTHM-001 TD Sequencer** — multi-voice 16th-note step sequencer; at 75 BPM the 16th notes feel deliberate, not rushed; CBL *MOS 6581* character
 - **KOS-RTHM-007 Pitch-Drifting Sequence** — 4-step quarter-note with slow transposition arc; the name is almost the substyle description
-- **KOS-RTHM-008 Oxygène 8-bar Arc** — 5–7 notes spread over 8 bars; extremely spacious at slow BPM
+- **KOS-RTHM-008 Oxygene 8-bar Arc** — 5–7 notes spread over 8 bars; extremely spacious at slow BPM
 - **KOS-RTHM-010 Craven Faults Modular Grit** — 7-note arch cell with ghost notes; BoC grainy-sequencer character
 
 **Excluded from Drift:**
@@ -156,11 +156,11 @@ The sequencer is the whole identity of Kosmic Drift — this track stays fully a
 
 **Proposed Drift arpeggio pool weights:**
 - KOS-RTHM-009 Craven Faults Phase Drift: 24%
-- KOS-RTHM-003 JMJ Oxygène: 20%
+- KOS-RTHM-003 JMJ Oxygene: 20%
 - KOS-RTHM-002 JMJ Hook: 16%
 - KOS-RTHM-001 TD Sequencer: 14%
 - KOS-RTHM-007 Pitch-Drifting: 12%
-- KOS-RTHM-008 Oxygène 8-bar Arc: 8%
+- KOS-RTHM-008 Oxygene 8-bar Arc: 8%
 - KOS-RTHM-010 Craven Faults Grit: 6%
 
 ---
@@ -357,7 +357,7 @@ Base Kosmic: static_drone 30%, two_chord_pendulum 25%, modal_drift 20%, suspende
 
 The existing base Kosmic key weighting (minor-heavy, Am/Em/Dm most common) is appropriate for Drift. No fundamental changes. Notes for reference:
 - A minor / A Dorian: CBL *Hydroponic Garden* tends toward A modal centers
-- D minor / D Dorian: very CBL and JMJ (Oxygène is D minor); high weight
+- D minor / D Dorian: very CBL and JMJ (Oxygene is D minor); high weight
 - G minor / G Dorian: Tycho uses warmer flat key centers
 - E minor: BoC uses E minor and E Dorian frequently
 
@@ -581,7 +581,7 @@ A distinct long-form structure inspired by Sigur Rós "Svefn-g-englar" (9 min, 2
 - **Form**: `single_evolving` only. No formal A/B sections. The song moves by gradual addition and subtraction, never by sectional contrast.
 - **Song length**: 300–540 seconds (5–9 minutes). Standard Drift song lengths are too short for this structure to breathe properly.
 - **Chord change rate**: every 4 bars — the pads, bass, and sequencer all follow this harmonic rhythm. Nothing moves faster than 4 bars harmonically.
-- **Sequencer (Rhythm track)**: KOS-RTHM-003 JMJ Oxygène or KOS-RTHM-008 Oxygène 8-bar Arc preferred — the most spacious arpeggio rules. KOS-RTHM-001 (dense 16th-note sequencer) excluded from this variant; it is too busy for the harmonic stasis.
+- **Sequencer (Rhythm track)**: KOS-RTHM-003 JMJ Oxygene or KOS-RTHM-008 Oxygene 8-bar Arc preferred — the most spacious arpeggio rules. KOS-RTHM-001 (dense 16th-note sequencer) excluded from this variant; it is too busy for the harmonic stasis.
 - **Key**: Dorian or Aeolian strongly preferred. E Dorian (Svefn), D Dorian, and A Aeolian are the most natural modal centers for this texture.
 
 ### Form weights

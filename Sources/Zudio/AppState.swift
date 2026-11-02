@@ -4221,7 +4221,7 @@ final class AppState: ObservableObject {
         playback.soloState = soloState
     }
 
-    /// AudioTexturePlayer (the Chill café loops and Ambient audio textures) is outside
+    /// AudioTexturePlayer (the Chill cafe loops and Ambient audio textures) is outside
     /// PlaybackEngine's mute graph, so it is silenced here: when the Texture track is muted, or
     /// another track is soloed and Texture is not.
     private func syncAudioTextureSilence() {

@@ -14,7 +14,7 @@ from description.
 ## Naming
 
 **Chill Soho.** Soho is where the London end of this music lived: the jazz-funk and Latin clubs,
-the Wag Club on Wardour Street, the café culture the Style Council worked in. It names the scene
+the Wag Club on Wardour Street, the cafe culture the Style Council worked in. It names the scene
 without naming a record, the same reasoning that named Motorik Europe. The critical label
 "sophisti-pop" is a retrospective coinage the bands disliked, and is not used in the UI.
 
@@ -125,7 +125,7 @@ What each record contributed:
   against base Chill's moving chord plans and Blues's 16-bar form
 - **Tempo** — 84–128 in one band
 - **Bass** — a melodic voice rather than an anchor
-- **Texture** — MIDI horns and bells instead of base Chill's café audio loops
+- **Texture** — MIDI horns and bells instead of base Chill's cafe audio loops
 - **Density** — lower on every track, with long silences built in
 
 ---
@@ -679,10 +679,10 @@ Lead 2 and Drums at 22 across Chill.
 
 ## Titles
 
-`ChillTitleGenerator` builds Soho titles in eight forms — place, café, period, prepositional,
+`ChillTitleGenerator` builds Soho titles in eight forms — place, cafe, period, prepositional,
 venue, late-night, paired nouns, gerund and clock — about 1,690 distinct titles. Banks: Soho
 streets (Wardour, Berwick, Dean, Frith, Greek, Carnaby), London districts, Hull (where Tracey
-Thorn and Ben Watt met), café words, period objects (Filofax, Walkman, Wine Bar) and venues. The
+Thorn and Ben Watt met), cafe words, period objects (Filofax, Walkman, Wine Bar) and venues. The
 tone is light, continuing base Chill's wry register.
 
 ---

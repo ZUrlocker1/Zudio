@@ -81,7 +81,7 @@ every math rock guitarist knows it.
 **Harmonic language:**
 - Major and minor tonality, but not functional — changes are not cadential
 - Extended unison sections where both guitars play the same line (unison = unity, divergence = tension)
-- Avoids blues clichés; closer to jazz phrasing without jazz harmony
+- Avoids blues cliches; closer to jazz phrasing without jazz harmony
 
 **Generative lessons from Television:**
 - The two-voice texture is the instrument: one angular melodic voice, one rhythmically
