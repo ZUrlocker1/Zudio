@@ -1,7 +1,9 @@
 # Kosmic Space — Design & Implementation Plan
 
-Status: **Phase 1 built on `kosmic-space` (2026-11-02), awaiting a listening batch.** It
-builds on macOS and iOS; nothing has been heard or run through the test suite yet. See
+Status: **Phase 1 built on `kosmic-space` as version 2.9 (build 135), a work in progress.**
+Zack's first listen (2026-11-02) was encouraging. It reads as Jarre, with the sequences and
+noise sweeps. The breaks below were added after that listen to relieve the monotony. It
+builds on macOS and iOS. No test suite has been run. See
 "Phase 1 as built" below for where the code had to interpret this plan. Phases 2 and 3 are
 designed but wait for listening on Phase 1.
 

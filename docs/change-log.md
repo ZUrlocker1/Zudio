@@ -1,5 +1,16 @@
 # Zudio Change Log
 
+## V 2.9 (Build 135) — Kosmic Space (work in progress)
+
+On the `kosmic-space` branch. Not released, and still being tuned by ear.
+
+- **New Kosmic Space substyle** — (2026-11-02) A Jean-Michel Jarre substyle of Kosmic, built from rules measured on 16 MIDI transcriptions of his music. This first phase models *Oxygene*. A locked root-and-octave sequencer runs over fast minor chord cycles of 2- and 4-bar chords, with the Minipops preset rhythm box, a falling Oxygene bass, a slow falling theme in the A sections and a see-saw riff in the B sections, string-machine pads and white-noise surf sweeps into the section changes. Every rule varies its source figure per song, so no song copies the original. Six new rules: KOS-DRUM-009 Oxygene Preset Box, KOS-BASS-018 Oxygene Falling Walk, KOS-RTHM-016 Oxygene Octave Sequencer, KOS-LD1-013 Oxygene Falling Theme, KOS-LD1-014 Oxygene See-Saw Riff and KOS-TEXT-005 Oxygene Surf Sweep.
+- **Testing share** — While it is being tuned, 80% of Kosmic songs are Space, 10% Drift and 10% base Kosmic. The intended release share is about Drift 30%, Space 25%, base 45%.
+- **Breaks** — (2026-11-02) A Space song breaks its repetition as the Oxygene records do. Lead 1 rests for 16–24 bars, the sequencer thins while the lead plays and fills out while it rests, the sequencer drops out once for 4–8 bars, and a noise swell marks each return. A short tom-roll fill comes before a break or return, at most three a song. The playback log calls out the sequencer break, for example `Bar 071  Sequencer and Lead 2 drop out`, and the generation log has a `Breaks` line.
+- **Space instruments** — Synth Brass 1 and 2, 5th Saw Wave and Bright Saw Stack for Lead 1; Synth Strings 1, Saw Lead and Square Lead 2 for Lead 2; Synth Strings 3, 4 and 5 and Stereo Strings Slow for the pads; Synth Bass 1 on Rhythm, Fretless Bass and White Noise Wave. They are added to the end of the Kosmic pickers. Base Kosmic and Drift never draw them at random.
+- **No French accents** — Rule names, log text, titles and docs use plain spellings (Oxygene, Equinoxe, Etude).
+- **Version 2.9 (build 135)**
+
 ## V 2.8 (Build 134) — iPhone Duo
 
 - **iPhone Duo layout** — (2026-10-27) The foldable iPhone Duo now gets a layout made for it, tested on a real Duo. Folded, it runs the iPhone player unchanged. Unfolded, it runs the iPad layout, opening on Visuals with the track view one tap away on Tracks. Folding and unfolding mid-song leaves playback alone, and the unfolded tab is remembered. The choice is made by size class, with every iPad kept on the iPad layout by its idiom, so no existing iPhone or iPad changes.
