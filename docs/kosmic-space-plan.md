@@ -914,8 +914,10 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
   over the last 1 beat (80%) or 2 beats (20%); the kick and the clap stay. They play only with
   KOS-DRUM-009, not when the song draws no percussion.
 - **The log** gains a `Breaks` line, such as `Lead 1 rests bars 33-48, sequencer out bars
-  71-76, 3 fills`. Live annotations show "Lead 1 rests / returns" and "Sequencer break /
-  returns" at their bars.
+  71-76, 3 fills`. During playback a coordinated break is called out at its bar, naming only
+  the parts actually playing either side of it, e.g. `Bar 071  Sequencer and Lead 2 drop out`
+  and `Bar 077  Sequencer and Lead 2 return`. A Lead 1 rest on its own gets no live line,
+  since leads come and go in every style (Zack, 2026-11-02).
 
 Not yet done:
 

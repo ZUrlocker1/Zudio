@@ -958,19 +958,24 @@ struct SongGenerator {
                                                     rhythmRules: rhythmRules, texRules: texRules,
                                                     xFilesBars: xFilesBars,
                                                     driftBridgeLabels: driftBridgeLabels)
-        if let arrangement = spaceArrangement {
-            let ann: (Int, String) -> Void = { bar, desc in
-                stepAnnotations[bar * 16, default: []].append(
-                    GenerationLogEntry(tag: "Space", description: desc, isTitle: false))
+        // Kosmic Space: a coordinated break is called out in the playback log as it happens, e.g.
+        // "Bar 071  Sequencer and Lead 2 drop out". A Lead 1 rest on its own is not — leads come
+        // and go in every style — but it is in the Breaks line of the generation log.
+        if let b = spaceArrangement?.sequencerBreak {
+            // Name only the parts that are really playing either side of the break.
+            func plays(_ track: Int, _ bars: Range<Int>) -> Bool {
+                trackEvents[track].contains { bars.contains($0.stepIndex / 16) }
             }
-            for rest in arrangement.leadRests {
-                ann(rest.lowerBound, "Lead 1 rests")
-                ann(rest.upperBound, "Lead 1 returns")
+            var leaving = ["Sequencer"], returning = ["Sequencer"]
+            if plays(kTrackLead2, (b.lowerBound - 4)..<b.lowerBound) { leaving.append("Lead 2") }
+            if plays(kTrackLead2, b.upperBound..<(b.upperBound + 4)) { returning.append("Lead 2") }
+            func line(_ parts: [String], _ one: String, _ many: String) -> String {
+                parts.joined(separator: " and ") + " " + (parts.count == 1 ? one : many)
             }
-            if let b = arrangement.sequencerBreak {
-                ann(b.lowerBound, "Sequencer break")
-                ann(b.upperBound, "Sequencer returns")
-            }
+            stepAnnotations[b.lowerBound * 16, default: []].append(
+                GenerationLogEntry(tag: "", description: line(leaving, "drops out", "drop out")))
+            stepAnnotations[b.upperBound * 16, default: []].append(
+                GenerationLogEntry(tag: "", description: line(returning, "returns", "return")))
         }
 
         var forced: [String: String] = [:]
