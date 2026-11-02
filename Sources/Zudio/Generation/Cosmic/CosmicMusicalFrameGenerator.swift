@@ -13,16 +13,37 @@ struct KosmicMusicalFrameGenerator {
         (frame.keySemitoneValue + 6) % 12
     }
 
+    // MARK: - Substyle shares
+
+    /// Shares of the one roll that picks Kosmic Drift, Kosmic Space or base Kosmic.
+    /// TESTING split: Drift 10 / Space 80 / base 10, so a listening batch is mostly Space.
+    /// Release split, to be confirmed by listening: Drift 0.30 / Space 0.25 / base 0.45.
+    /// Moving `driftShare` changes which existing seeds roll Drift; the determinism
+    /// fingerprint is pinned against the release values once they are restored.
+    static let driftShare = 0.10
+    static let spaceShare = 0.80
+
+    /// Salt for the Kosmic Space stream. Every Space-only draw in the frame and the chord-cycle
+    /// builder comes from `SeededRNG(seed: songSeed ^ spaceStreamSalt)`, so the main stream keeps
+    /// the order base Kosmic and Drift depend on.
+    static let spaceStreamSalt: UInt64 = 0x05AC_E0A7_1976_0E04
+
     static func generate(
         rng: inout SeededRNG,
+        seed: UInt64,
         keyOverride: String? = nil,
         tempoOverride: Int? = nil,
         moodOverride: Mood? = nil
     ) -> (frame: GlobalMusicalFrame, percussionStyle: PercussionStyle, kosmicProgFamily: KosmicProgressionFamily,
-          isKosmicDrift: Bool, isDriftDreamscape: Bool, driftVelocityBase: Int) {
+          isKosmicDrift: Bool, isDriftDreamscape: Bool, driftVelocityBase: Int, isKosmicSpace: Bool) {
 
-        // Kosmic Drift sub-style: 30% for release
-        let isKosmicDrift = rng.nextDouble() < 0.30
+        // Kosmic Drift and Kosmic Space share one draw — the slot Drift has always used
+        let substyleRoll  = rng.nextDouble()
+        let isKosmicDrift = substyleRoll < driftShare
+        let isKosmicSpace = !isKosmicDrift && substyleRoll < driftShare + spaceShare
+        var spaceRNG = SeededRNG(seed: seed ^ spaceStreamSalt)
+        // Space harmony family, drawn first because it sets the song mode
+        let spaceFamily: KosmicProgressionFamily? = isKosmicSpace ? pickSpaceFamily(rng: &spaceRNG) : nil
         // Dreamscape variant: ~10% of Drift songs (must be Drift first)
         let isDriftDreamscape = isKosmicDrift && rng.nextDouble() < 0.15
         // Flat velocity base for BoC-style rules: drawn once per song, 85–92
@@ -30,11 +51,14 @@ struct KosmicMusicalFrameGenerator {
 
         let key = keyOverride ?? pickKey(rng: &rng)
 
-        // Tempo: Drift uses Mode C (70–90); Dreamscape further restricts to 70–80.
+        // Tempo: Space 100–124 on its own stream; Drift uses Mode C (70–90); Dreamscape 70–80.
         // When isKosmicDrift, consume the same RNG slot as normal pickTempo would
         // to keep base Kosmic songs seed-stable regardless of the Drift flag.
         var tempo: Int
-        if isKosmicDrift {
+        if isKosmicSpace {
+            let _ = pickTempo(rng: &rng)   // consume base slot
+            tempo = pickSpaceTempo(rng: &spaceRNG)
+        } else if isKosmicDrift {
             let _ = pickTempo(rng: &rng)   // consume base slot — keeps non-Drift songs stable
             let driftRange = isDriftDreamscape ? 11 : 21   // 70–80 vs 70–90
             tempo = 70 + rng.nextInt(upperBound: driftRange)
@@ -48,7 +72,10 @@ struct KosmicMusicalFrameGenerator {
 
         // Mode: Drift uses different weights (Dorian 50%, Aeolian 22%, Mixolydian 20%, Ionian 8%, no Phrygian)
         let mode: Mode
-        if isKosmicDrift {
+        if let spaceFamily {
+            let _ = pickMode(rng: &rng)   // consume base slot
+            mode = spaceMode(for: spaceFamily, rng: &spaceRNG)
+        } else if isKosmicDrift {
             let _ = pickMode(rng: &rng)   // consume base slot
             let driftModes:   [Mode]   = [.Dorian, .Aeolian, .Mixolydian, .Ionian]
             let driftWeights: [Double] = [0.50,    0.22,     0.20,        0.08]
@@ -73,7 +100,10 @@ struct KosmicMusicalFrameGenerator {
 
         // Percussion / drum rule: Drift uses its own pool; Dreamscape forces floating snare
         let percStyle: PercussionStyle
-        if isKosmicDrift {
+        if isKosmicSpace {
+            let _ = pickPercussionStyle(tempo: tempo, rng: &rng)  // consume base slot
+            percStyle = pickSpacePercussionStyle(rng: &spaceRNG)
+        } else if isKosmicDrift {
             let _ = pickPercussionStyle(tempo: tempo, rng: &rng)  // consume base slot
             if isDriftDreamscape {
                 percStyle = .driftLopingGroove  // Dreamscape always uses floating snare variant
@@ -86,7 +116,10 @@ struct KosmicMusicalFrameGenerator {
 
         // Kosmic progression family: Drift uses static_drone-heavy weights
         let kosmicFamily: KosmicProgressionFamily
-        if isKosmicDrift {
+        if let spaceFamily {
+            let _ = pickKosmicProgressionFamily(rng: &rng)   // consume base slot
+            kosmicFamily = spaceFamily
+        } else if isKosmicDrift {
             let _ = pickKosmicProgressionFamily(rng: &rng)   // consume base slot
             // quartal_stack excluded — abstract/angular, anti-Drift character
             let driftKFamilies: [KosmicProgressionFamily] = [.static_drone, .two_chord_pendulum, .modal_drift, .suspended_resolution]
@@ -104,7 +137,45 @@ struct KosmicMusicalFrameGenerator {
             progressionFamily: family,
             totalBars: total
         )
-        return (frame, percStyle, kosmicFamily, isKosmicDrift, isDriftDreamscape, driftVelocityBase)
+        return (frame, percStyle, kosmicFamily, isKosmicDrift, isDriftDreamscape, driftVelocityBase, isKosmicSpace)
+    }
+
+    // MARK: - Kosmic Space (Phase 1: Oxygene)
+
+    /// Oxygene harmony families: Dorian Vamp 55% (Oxygene 4), Aeolian Cycle 30% (Oxygene 8),
+    /// Two-Chord Sway 15% (Oxygene 3).
+    private static func pickSpaceFamily(rng: inout SeededRNG) -> KosmicProgressionFamily {
+        let families: [KosmicProgressionFamily] = [.oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway]
+        let weights:  [Double]                  = [0.55,               0.30,                 0.15]
+        return families[rng.weightedPick(weights)]
+    }
+
+    /// The family sets the mode. Two-Chord Sway is Aeolian or Dorian, 50/50.
+    private static func spaceMode(for family: KosmicProgressionFamily, rng: inout SeededRNG) -> Mode {
+        switch family {
+        case .oxygeneDorianVamp:   return .Dorian
+        case .oxygeneAeolianCycle: return .Aeolian
+        default:                   return rng.nextDouble() < 0.50 ? .Aeolian : .Dorian
+        }
+    }
+
+    /// Space tempo: triangular, min 100, peak 118, max 124. The Oxygene pieces run 100, 110, 121.
+    private static func pickSpaceTempo(rng: inout SeededRNG) -> Int {
+        let minT = 100.0, peakT = 118.0, maxT = 124.0
+        let r  = rng.nextDouble()
+        let fc = (peakT - minT) / (maxT - minT)
+        let raw: Double
+        if r < fc {
+            raw = minT + Foundation.sqrt(r * (maxT - minT) * (peakT - minT))
+        } else {
+            raw = maxT - Foundation.sqrt((1 - r) * (maxT - minT) * (maxT - peakT))
+        }
+        return Swift.max(100, Swift.min(124, Int(raw.rounded())))
+    }
+
+    /// Space drum rule pool: KOS-DRUM-009 Oxygene Preset Box 85%, KOS-DRUM-000 no percussion 15%.
+    static func pickSpacePercussionStyle(rng: inout SeededRNG) -> PercussionStyle {
+        rng.nextDouble() < 0.85 ? .spaceOxygenePresetBox : .absent
     }
 
     /// Drift drum rule pool — evenly weighted regardless of tempo.
@@ -221,7 +292,8 @@ struct KosmicMusicalFrameGenerator {
 // MARK: - Automatic filter sweeps
 
 /// Which steps of a Kosmic song fire an automatic global filter sweep (the same sweep a tap on
-/// empty canvas triggers). 40% of regular Kosmic songs get 1-3 of them; Kosmic Drift gets none.
+/// empty canvas triggers). 40% of regular Kosmic songs get 1-3 of them; Kosmic Drift and Kosmic
+/// Space get none.
 ///
 /// The schedule is derived from the seed and the section structure with its own SeededRNG, so it
 /// consumes nothing from the generator's stream and never changes a note. The same seed always
@@ -239,7 +311,8 @@ enum KosmicAutoSweep {
     static let outroGuardBars = 16
 
     static func steps(for song: SongState) -> [Int] {
-        guard song.style == .kosmic, !song.isKosmicDrift else { return [] }
+        // Kosmic Space has its own sweeps on Texture (KOS-TEXT-005); the two would stack.
+        guard song.style == .kosmic, !song.isKosmicDrift, !song.isKosmicSpace else { return [] }
         var rng = SeededRNG(seed: song.globalSeed ^ 0x5EE9_F11A_7E50_C0DE)
         guard rng.nextDouble() < songChance else { return [] }
         let wanted = 1 + Int(rng.next() % 3)

@@ -35,8 +35,26 @@ struct KosmicLeadGenerator {
         xFilesBars: inout [Int],
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
-        driftVelocityBase: Int = 89
+        driftVelocityBase: Int = 89,
+        isKosmicSpace: Bool = false,
+        spaceDraws: KosmicSpaceDraws? = nil,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
+
+        // Kosmic Space: theme in A sections (KOS-LD1-013), riff in B sections (KOS-LD1-014), in
+        // every song. Space sets its own A and B rules, so Technique D escalation never runs.
+        if isKosmicSpace {
+            let _ = pickLeadRule(rng: &rng)   // consume base slot
+            lead1BaseRule = "KOS-LD1-013"
+            usedRuleIDs.insert("KOS-LD1-013")
+            if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
+            let lead = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                   rng: &rng, draws: spaceDraws)
+                     + generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                 rng: &rng, draws: spaceDraws)
+            // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
+            return silenceBars(lead, spaceArrangement?.leadRests ?? [])
+        }
 
         // Drift lead pool — different weights and includes new rules 010/011/012
         let aRule: String
@@ -202,10 +220,25 @@ struct KosmicLeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         lead1BaseRuleID: String? = nil,
-        xFilesBars: [Int] = []
+        xFilesBars: [Int] = [],
+        isKosmicSpace: Bool = false,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
-        let rule = pickLeadRule2(rng: &rng)
+        let baseRule = pickLeadRule2(rng: &rng)
+        // Kosmic Space: KOS-LD2-000 No lead 2 50%, KOS-LEAD-004 Echo melody 50%. Lead 1 never plays
+        // 004 in Space, so the same-rule lag never applies, and 004 is not sparse, so it is never
+        // escalated either.
+        let rule: String
+        if isKosmicSpace {
+            guard rng.nextDouble() < 0.50 else {
+                usedRuleIDs.insert("KOS-LD2-000")
+                return []
+            }
+            rule = "KOS-LEAD-004"
+        } else {
+            rule = baseRule
+        }
         usedRuleIDs.insert(rule)
 
         // Technique D equivalent for Lead 2: if the rule is sparse and we're in a B section,
@@ -313,6 +346,146 @@ struct KosmicLeadGenerator {
             }
         }
 
+        // Kosmic Space: Lead 2 drops out with the sequencer, as in Oxygene 8 and Oxygene 4.
+        if let seqBreak = spaceArrangement?.sequencerBreak {
+            events = silenceBars(events, [seqBreak])
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-013 Oxygene Falling Theme (Kosmic Space, A sections)
+    // Oxygene 4 theme, both transcriptions. In the source it is on a second voice; here it moves to
+    // Lead 1 for the A sections, which is how the source alternates theme and riff.
+    // A 2-bar statement: five notes on steps 0, 6, 8, 10, 14 (x.....x.x.x...x.), falling from high
+    // through chord tones to the root — top (6 steps), 5th (2), 3rd (3), 5th (3), root held through
+    // the second bar. Register: the root in MIDI 60–71, so an octave top lands in 72–83.
+    // Homage draws per song:
+    //   top — octave 30% (source), 6th 35% (the second measured pattern), 4th 35%
+    //   inner line — 5-3-5 35% (source), 5-4-5 35%, 6-5-3 30%
+    //   rhythm — the source 60%, or the compressed form both transcriptions also use 40%: four notes
+    //            on steps 0, 2, 4, 6 falling by scale step to the root, the last held through
+    // Within song (statements counted across all A sections): statements 1 and 2 exact. From
+    // statement 3 one variation each — transposed to the current chord root 40%, the opening note
+    // dropped so the figure starts on step 6 30%, or the final root replaced by the 5th, left open
+    // 30%. Every fourth statement is exact, and one in four is 2 bars of rest, so the theme breathes.
+
+    private static func generateOxygeneFallingTheme(
+        frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG, draws: KosmicSpaceDraws?
+    ) -> [MIDIEvent] {
+        let tops: [(steps: Int, name: String)] = [(7, "octave top"), (5, "sixth top"), (3, "fourth top")]
+        let top = tops[rng.weightedPick([0.30, 0.35, 0.35])]
+        let inners: [(steps: [Int], name: String)] = [([4, 2, 4], "5-3-5"), ([4, 3, 4], "5-4-5"),
+                                                      ([5, 4, 2], "6-5-3")]
+        let inner = inners[rng.weightedPick([0.35, 0.35, 0.30])]
+        let compressed = rng.nextDouble() < 0.40
+        draws?.record("KOS-LD1-013", compressed ? "compressed rhythm"
+                                                : "\(top.name), \(inner.name), source rhythm")
+
+        let scalePCs = frame.scalePCs
+        let tonicRoot = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
+                                        low: 60, high: 71)
+        // (step, scale steps above the root, duration)
+        let figure: [(step: Int, steps: Int, dur: Int)] = compressed
+            ? [(0, 3, 2), (2, 2, 2), (4, 1, 2), (6, 0, 26)]
+            : [(0, top.steps, 6), (6, inner.steps[0], 2), (8, inner.steps[1], 3),
+               (10, inner.steps[2], 3), (14, 0, 16)]
+
+        var events: [MIDIEvent] = []
+        var statement = 0
+        for section in structure.sections where section.label == .A {
+            var bar = section.startBar
+            while bar < section.endBar {
+                defer { bar += 2; statement += 1 }
+                let exact = statement < 2 || statement % 4 == 0
+                if !exact && statement % 4 == 3 { continue }   // 2 bars of rest
+                var transpose = false, dropOpening = false, openEnding = false
+                if !exact {
+                    let r = rng.nextDouble()
+                    if r < 0.40 { transpose = true } else if r < 0.70 { dropOpening = true } else { openEnding = true }
+                }
+                var root = tonicRoot
+                if transpose, let entry = tonalMap.entry(atBar: bar) {
+                    root = clampToRegister(spaceChordRootPC(entry, frame: frame) + 60, low: 60, high: 71)
+                }
+                let start = bar * 16
+                let end   = Swift.min(bar + 2, section.endBar) * 16
+                for (i, note) in figure.enumerated() {
+                    if dropOpening && i == 0 { continue }
+                    let isLast = i == figure.count - 1
+                    let pitch = scaleStep(root, by: isLast && openEnding ? 4 : note.steps, scalePCs: scalePCs)
+                    let onset = start + note.step
+                    guard onset < end else { continue }
+                    events.append(MIDIEvent(stepIndex: onset, note: UInt8(pitch),
+                                            velocity: i == 0 ? 66 : (isLast ? 58 : 62),
+                                            durationSteps: Swift.min(note.dur, end - onset)))
+                }
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-014 Oxygene See-Saw Riff (Kosmic Space, B sections)
+    // Oxygene 4 riff, both transcriptions. Six notes rocking between an anchor (the current chord
+    // root) and a pivot a fixed interval above it: anchor on steps 0, 2, 5, pivot on 1, 4, 6, step 3
+    // silent; notes 1 step long, the last held through the rest of the bar (about 9 steps). It plays
+    // every bar of its B sections and follows the chord, so with 2–4-bar chords each chord gets at
+    // least two statements. The pivot is a scale step count, so it stays in the scale (the source's
+    // fifth becomes a minor sixth on the next chord in just this way). The pair is folded by octaves
+    // so it centres in MIDI 72–84.
+    // Homage draws per song:
+    //   interval — fourth 30%, sixth 30%, octave 20%, fifth 20% (source)
+    //   grouping — 3+3 40% (source), 2+2+2 on steps 0, 1, 3, 4, 6, 7 30%, 3+2 on steps 0, 1, 2, 4, 5 30%
+    //   position — first half of the bar 60% (source) or second half from step 8 40%
+    //   anchor — below the pivot 60% (source) or above it, rocking downwards 40%
+    // Within song: in 1 bar of 8 the anchor moves up to the chord's 4th (measured in 5 of 45 bars).
+    // In the last B section every second statement may drop to a single 3-note group (50%),
+    // thinning the riff towards the outro.
+
+    private static func generateOxygeneSeeSawRiff(
+        frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG, draws: KosmicSpaceDraws?
+    ) -> [MIDIEvent] {
+        let intervals: [(steps: Int, name: String)] = [(3, "fourth"), (5, "sixth"), (7, "octave"), (4, "fifth")]
+        let interval = intervals[rng.weightedPick([0.30, 0.30, 0.20, 0.20])]
+        let groupings: [(steps: [Int], name: String)] = [([0, 1, 2, 4, 5, 6], "3+3"),
+                                                         ([0, 1, 3, 4, 6, 7], "2+2+2"),
+                                                         ([0, 1, 2, 4, 5],    "3+2")]
+        let grouping = groupings[rng.weightedPick([0.40, 0.30, 0.30])]
+        let offset = rng.nextDouble() < 0.60 ? 0 : 8
+        let anchorAbove = rng.nextDouble() >= 0.60
+        draws?.record("KOS-LD1-014", "\(interval.name), \(grouping.name), "
+                      + "\(offset == 0 ? "first half" : "second half"), "
+                      + "\(anchorAbove ? "anchor above" : "anchor below")")
+
+        let scalePCs = frame.scalePCs
+        let lastB = structure.sections.last(where: { $0.label == .B })
+        var events: [MIDIEvent] = []
+        for section in structure.sections where section.label == .B {
+            for bar in section.startBar..<section.endBar {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                let barInSection = bar - section.startBar
+                var anchor = spaceChordRootPC(entry, frame: frame) + 72
+                if barInSection % 8 == 5 { anchor = scaleStep(anchor, by: 3, scalePCs: scalePCs) }
+                var pivot = scaleStep(anchor, by: anchorAbove ? -interval.steps : interval.steps,
+                                      scalePCs: scalePCs)
+                while (anchor + pivot) / 2 >= 84 { anchor -= 12; pivot -= 12 }
+                while (anchor + pivot) / 2 < 72  { anchor += 12; pivot += 12 }
+
+                var steps = grouping.steps
+                if let lastB, section.startBar == lastB.startBar, barInSection % 2 == 1,
+                   rng.nextDouble() < 0.50 {
+                    steps = Array(steps.prefix(3))
+                }
+                for (i, step) in steps.enumerated() {
+                    let isLast = i == steps.count - 1
+                    let pitch  = i % 2 == 0 ? anchor : pivot
+                    events.append(MIDIEvent(stepIndex: bar * 16 + offset + step, note: UInt8(pitch),
+                                            velocity: i % 2 == 0 ? 64 : 58,
+                                            durationSteps: isLast ? 16 - offset - step : 1))
+                }
+            }
+        }
         return events
     }
 

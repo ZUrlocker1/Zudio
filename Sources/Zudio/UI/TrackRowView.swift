@@ -474,6 +474,16 @@ struct TrackRowView: View {
             case kTrackDrums:   [.space]
             default:            []
             }
+        } else if activeStyle == .kosmic && appState.songState?.isKosmicSpace == true {
+            // Kosmic Space — the same table as AppState.restoreDefaultEffects, which the iPhone uses.
+            defaults = switch trackIndex {
+            case kTrackLead1:    [.delay, .space]
+            case kTrackLead2:    [.space]
+            case kTrackPads:     [.space, .delay, .sweep]
+            case kTrackTexture:  [.delay, .space, .sweep]
+            case kTrackRhythm:   [.delay, .pan]
+            default:             []
+            }
         } else if activeStyle == .kosmic {
             let isDrift       = appState.songState?.isKosmicDrift == true
             let kl1VibProb: Float = isDrift ? 0.75 : 0.20

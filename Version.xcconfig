@@ -7,5 +7,5 @@
 //
 // To release a new version or build, change these two lines and nothing else.
 
-MARKETING_VERSION = 2.8
-CURRENT_PROJECT_VERSION = 134
+MARKETING_VERSION = 2.9
+CURRENT_PROJECT_VERSION = 135

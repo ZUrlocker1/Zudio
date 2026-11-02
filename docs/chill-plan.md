@@ -2433,9 +2433,9 @@ func configureChillEffects(bpm: Double) {
 Short (1–3 words), urban, nocturnal, cosmopolitan. Mixes French and English, evoking late-night city atmosphere, jazz-bar culture, and cool minimalism.
 
 Six pools, mood-shaded (Deep/Dream weight French + city; Bright/Free weight English + adj+noun):
-- French single words: Velours, Brume, Nuit, Crépuscule, Nocturne, Étude, Reverie, Minuit, Lumière, Calme
+- French single words: Velours, Brume, Nuit, Crepuscule, Nocturne, Etude, Reverie, Minuit, Lumiere, Calme
 - English two-word: Blue Hour, Glass City, Slow Burn, Still Frame, Warm Static, Cold Burn, Slow Exposure
-- City districts: Marais, Belleville, Brixton, Shoreditch, Saint-Germain, Bastille, Amsterdam, Ladbroke Grove, Lisbon, Baie d'Urfé, Montreal, Dorval, Pointe-Claire, Sainte-Anne-de-Bellevue, Saint-Laurent, Traverse City, Detroit
+- City districts: Marais, Belleville, Brixton, Shoreditch, Saint-Germain, Bastille, Amsterdam, Ladbroke Grove, Lisbon, Baie d'Urfe, Montreal, Dorval, Pointe-Claire, Sainte-Anne-de-Bellevue, Saint-Laurent, Traverse City, Detroit
 - Cool adjective + noun (generative, 13×14 = 182 combos): Quiet Signal, Dark Dissolve, Long Exposure, Faint Echo
 - Time-of-day: After Midnight, Three AM, Last Set, Before Dawn, Midnight Minus One
 - Jazz first names: Chet, Miles, Bill, Monk, Gil, Wes
@@ -2769,11 +2769,11 @@ All now passing after fixes. Batch averages: Pads 0.8/bar, bass vel 65, drums 0.
 
 **Location-based titles — ADDED:**
 New `locationPhrase()` pool added to `ChillTitleGenerator`, weighted at 25% across all moods.
-Combines a mood modifier with a place name: e.g. "Late Night Baie d'Urfé", "Cool Amsterdam",
+Combines a mood modifier with a place name: e.g. "Late Night Baie d'Urfe", "Cool Amsterdam",
 "Winter Marais", "Early Saint-Laurent", "North Shore Detroit".
 - Modifiers: Late Night, After Dark, Cool, Still, Low Light, West End, East Side, North Shore,
   Early, Quiet, Winter, Summer Night
-- Places: Montreal-area (Baie d'Urfé, Dorval, Pointe-Claire, Sainte-Anne, Saint-Laurent),
+- Places: Montreal-area (Baie d'Urfe, Dorval, Pointe-Claire, Sainte-Anne, Saint-Laurent),
   Paris districts (Saint-Germain, Marais, Belleville, Montmartre, Oberkampf),
   London (Shoreditch, Brixton, Hackney), plus Lisbon, Brooklyn, Detroit, Amsterdam
 Other pool weights adjusted downward proportionally to accommodate the 25% location slice.

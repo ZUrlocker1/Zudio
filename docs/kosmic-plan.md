@@ -32,15 +32,15 @@ in `docs/ambient-plan.md`.
 
 ### Jean-Michel Jarre — The Layerer
 
-**Albums studied:** Oxygène (1976), Équinoxe (1978), Magnetic Fields (1981)
+**Albums studied:** Oxygene (1976), Equinoxe (1978), Magnetic Fields (1981)
 
 **Tempo & Rhythm:**
 - Electronic rhythm (Korg Mini Pops) rather than drum kit; often "largely outside of time"
-- Oxygène Part 2: ~126 BPM; rhythm machine programmed with Bossa Nova/Slow Rock settings
+- Oxygene Part 2: ~126 BPM; rhythm machine programmed with Bossa Nova/Slow Rock settings
 - Many sections have no percussion at all — pulse is implied by arpeggios and sequencers
 
 **Keys & Harmony:**
-- Minor keys favored: Oxygène in F minor; Magnetic Fields moves C → Fm → F → Bbm → Cm
+- Minor keys favored: Oxygene in F minor; Magnetic Fields moves C → Fm → F → Bbm → Cm
 - Harmonic rhythm extremely slow: chord changes every 8–16 bars or longer
 - Multiple layered versions of the same chord (e.g., three Eminent String Machines processing one pad tone)
 
@@ -298,7 +298,7 @@ This is the most important new generator. It replaces RhythmGenerator for Kosmic
 
 **Rhythm grid (at 90 BPM):**
 - 16th-note arpeggios (fastest, most sequencer-like, TDream style) — `stepDuration = 1`
-- 8th-note arpeggios (moderate, JMJ Oxygène feel) — `stepDuration = 2`
+- 8th-note arpeggios (moderate, JMJ Oxygene feel) — `stepDuration = 2`
 - Dotted 8th arpeggios (creates triplet feel against 4/4 grid) — `stepDuration = 3`
 - Quarter-note arpeggios (slowest, most melodic, Vangelis-adjacent) — `stepDuration = 4`
 
@@ -506,20 +506,20 @@ This section provides concrete BPM, key, chord, and arpeggio data measured from 
 
 ### Jean-Michel Jarre — Specific Song Analysis
 
-**Oxygène Part 2**
+**Oxygene Part 2**
 - Tempo: ~87 BPM (feels like 173–174 at half-time/3/4 feel)
 - Key: D Minor
 - Time signature: 3/4 (unusual — most Kosmic is 4/4; this is an exception)
 - Chord progression: Gm → Cm → Dm → F → Eb
 - Generator lesson: Gm→Cm→Dm uses mostly 2nds and 4ths in bass movement — very smooth voice leading. The F→Eb at the end is the only chromatic step (whole tone down) and acts as the "surprise." Apply this: 4 diatonic chord changes, then 1 modal/chromatic pivot.
 
-**Oxygène Part 4**
+**Oxygene Part 4**
 - Tempo: 126 BPM (coincides with the Motorik range — confirms BPM overlap at the upper end)
 - Key: G Dorian
 - Arpeggio shape: Root → 2nd → 3rd → 5th → 3rd → 2nd → Root (7 notes, the "scale walk" pattern from §5.3)
 - Generator lesson: This is the canonical JMJ arpeggio. At 126 BPM with 8th notes = 4 notes/second. Confirms 8-step scale-walk as a top-priority arpeggio template.
 
-**Équinoxe Part 4**
+**Equinoxe Part 4**
 - Tempo: 115 BPM
 - Key: F Major (unusually bright for JMJ — Ionian mode)
 - Generator lesson: 115 BPM is the sweet spot for "fast Kosmic" — rhythmic but not propulsive. Confirms upper BPM bound at ~120 (above that it starts sounding Motorik).
@@ -619,14 +619,14 @@ Gate:           1v  1v  0v  1v  1v  0v  1v  1v   ← 2 silences out of 8
 **Confirmed BPM distribution (triangular, from all sources):**
 - Absolute minimum: 70 BPM (Chariots of Fire)
 - Most common slow range: 83–90 BPM (Alpha, JMJ-slow)
-- Most common mid range: 111–117 BPM (Blade Runner, Équinoxe Pt 4)
-- Most common fast range: 120–126 BPM (Oxygène Pt 4, upper Motorik overlap)
+- Most common mid range: 111–117 BPM (Blade Runner, Equinoxe Pt 4)
+- Most common fast range: 120–126 BPM (Oxygene Pt 4, upper Motorik overlap)
 - Absolute maximum: ~146 BPM for Kosmic (Ricochet — but this sounds like Motorik without the kick)
 - **Generator recommendation:** Triangular distribution min=95, peak=120, max=126. The corpus is clearly centred on 120.
 
 **Confirmed key preferences (from all sources combined):**
-- D Minor: JMJ (Oxygène Pt 2), Berlin School patterns — very common
-- G Minor/G Dorian: JMJ (Oxygène Pt 4), Schulze patterns
+- D Minor: JMJ (Oxygene Pt 2), Berlin School patterns — very common
+- G Minor/G Dorian: JMJ (Oxygene Pt 4), Schulze patterns
 - C Minor: TD (Ricochet), TD ambient patterns
 - F# Minor: Vangelis (Blade Runner)
 - B Minor, E Minor: Craven Faults
@@ -1017,7 +1017,7 @@ One base pattern selected per song; evolves in B sections.
 
 - KOS-RTHM-001 — TD Sequencer: repeating 8-step pattern over one octave (Tangerine Dream style)
 - KOS-RTHM-002 — JMJ Hook: distinctive 6-step melodic hook (Jean-Michel Jarre style)
-- KOS-RTHM-003 — Oxygène: three-voice layered ascending/descending figures
+- KOS-RTHM-003 — Oxygene: three-voice layered ascending/descending figures
 - KOS-RTHM-004 — Electric Buddha: syncopated 16-step pattern with rhythmic displacement
 - KOS-RTHM-006 — Kraftwerk Locked Pulse: staccato pulse; octave-displaced version in B sections
   or bar 32+ in `single_evolving`
@@ -1122,7 +1122,7 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
 
 ## Title Generator
 
-Space and cosmos vocabulary mixing English, French, and faux-German — drawing on the JMJ invented-word tradition (Oxygène, Équinoxe) and Tangerine Dream's Germanic spaciousness.
+Space and cosmos vocabulary mixing English, French, and faux-German — drawing on the JMJ invented-word tradition (Oxygene, Equinoxe) and Tangerine Dream's Germanic spaciousness.
 
 **Examples:** Vortexe, Proxima III, Dark Nebula, Silent Void, Ewig Kosmos, Tief Nebel, Dunkel Stern
 

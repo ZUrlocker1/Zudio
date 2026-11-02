@@ -179,6 +179,9 @@ final class PlaybackEngine: ObservableObject {
     private var panEnabled   = Array(repeating: false, count: kTrackCount)
     private var panPhase     = Array(repeating: Double(0), count: kTrackCount)
     private var panPhaseInc  = Array(repeating: Double(0), count: kTrackCount)  // per-track hz baked in
+    // Auto-pan swing as a fraction of full left-right. 1.0 everywhere except Kosmic Space's
+    // Rhythm, which swings about ±40%.
+    private var panDepth     = Array(repeating: Float(1.0), count: kTrackCount)
 
     // Vibrato LFO (pitch modulation via AVAudioUnitSampler.masterTuning)
     private var vibEnabled    = Array(repeating: false,    count: kTrackCount)
@@ -465,8 +468,14 @@ final class PlaybackEngine: ObservableObject {
     /// without starting an audio engine.
     /// Track order: Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6, LeadSynth=7.
     nonisolated static func staticPans(kosmic: Bool, motorik: Bool, ambient: Bool,
-                                       chillPads: Bool, chillSoho: Bool) -> [Float] {
-        if kosmic {
+                                       chillPads: Bool, chillSoho: Bool,
+                                       kosmicSpace: Bool = false) -> [Float] {
+        if kosmic && kosmicSpace {
+            // Kosmic Space: Lead 1 about 10% off centre, Lead 2 about 20% on the side opposite
+            // Rhythm's home position (Rhythm auto-pans around it), Bass and Drums hard centre,
+            // Texture as base Kosmic.
+            return [-0.10, -0.20, 0, 0.22, -0.22, 0, 0, 0]
+        } else if kosmic {
             return [-0.15, 0.15, 0, 0.22, -0.22, 0, 0, 0]             // LeadSynth: centre
         } else if motorik {
             // Pads and Rhythm panned for separation; Texture rarely used so stays centre
@@ -488,7 +497,8 @@ final class PlaybackEngine: ObservableObject {
     private func applyStaticPans() {
         trackStaticPan = Self.staticPans(kosmic: kosmicStyle, motorik: motorikStyle,
                                          ambient: ambientMode, chillPads: chillPadsMode,
-                                         chillSoho: chillSohoMode)
+                                         chillSoho: chillSohoMode,
+                                         kosmicSpace: songState?.isKosmicSpace == true)
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
         }
@@ -1428,6 +1438,7 @@ final class PlaybackEngine: ObservableObject {
         // Auto-pan LFO — simulated per-block in offline export
         var panEnabled: Bool
         var panHz: Float            // LFO rate in Hz
+        var panDepth: Float = 1     // swing as a fraction of full left-right
         // Vibrato LFO — simulated per-block in offline export
         var vibratoEnabled: Bool
         var vibratoHz: Float          // LFO rate in Hz
@@ -1491,6 +1502,7 @@ final class PlaybackEngine: ObservableObject {
                 tremoloDepth:       tremEnabled[i]  ? tremDepth[i]: 0,
                 panEnabled:         panEnabled[i],
                 panHz:              panEnabled[i]   ? panHz      : 0,
+                panDepth:           panDepth[i],
                 vibratoEnabled:     vibEnabled[i],
                 vibratoHz:          vibEnabled[i]   ? vibHz      : 0,
                 vibratoDepthCents:  vibEnabled[i]   ? vibDepth[i]: 0
@@ -2045,7 +2057,7 @@ final class PlaybackEngine: ObservableObject {
         // Skip Bass when the Kosmic intro bass pan is running — it owns that node.
         for i in 0..<kTrackCount where panEnabled[i] {
             panPhase[i] += panPhaseInc[i]
-            boosts[i].pan = Float(sin(panPhase[i]))
+            boosts[i].pan = Float(sin(panPhase[i])) * panDepth[i]
         }
 
     }
@@ -2216,6 +2228,7 @@ final class PlaybackEngine: ObservableObject {
         panEnabled[i]  = true
         panPhase[i]    = 0.0
         panPhaseInc[i] = 2.0 * Double.pi * hz / 20.0  // increment per 20fps tick
+        panDepth[i]    = (kosmicStyle && i == kTrackRhythm && songState?.isKosmicSpace == true) ? 0.4 : 1.0
         anyLFOActive   = true
         startSharedLFO()
     }

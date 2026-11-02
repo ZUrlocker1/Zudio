@@ -17,7 +17,9 @@ struct KosmicDrumGenerator {
         usedRuleIDs: inout Set<String>,
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
-        driftVelocityBase: Int = 89
+        driftVelocityBase: Int = 89,
+        spaceDraws: KosmicSpaceDraws? = nil,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         switch percussionStyle {
@@ -54,10 +56,88 @@ struct KosmicDrumGenerator {
             usedRuleIDs.insert("KOS-DRUM-008")
             return generateHalfTimeLope(frame: frame, structure: structure, rng: &rng, velBase: driftVelocityBase)
 
+        case .spaceOxygenePresetBox:
+            usedRuleIDs.insert("KOS-DRUM-009")
+            return generateOxygenePresetBox(frame: frame, rng: &rng, draws: spaceDraws,
+                                            fillBars: spaceArrangement?.fillBars ?? [])
+
         default:
             usedRuleIDs.insert("KOS-DRUM-000")
             return []
         }
+    }
+
+    // MARK: - KOS-DRUM-009 Oxygene Preset Box (Kosmic Space)
+    // The Minipops pattern measured on Oxygene 4, identical in both transcriptions (104 of 104 bars):
+    //   Closed hat xx..xxx.xxx.xxx.   Kick x.x...x...x.....   Clap steps 4, 12   Open hat step 2
+    //   Accent on step 12 — side stick, high tom or tambourine, drawn per song.
+    // Every bar the same, intro and outro included. No transition fills and no cold-start pickup:
+    // the preset box never varies, which is its character. The one exception is Zudio's own, not
+    // the corpus's (Zack, 2026-11-02): a short tom roll in the bar before a Space break or return,
+    // at most three a song (KosmicSpaceArrangement.fillBars), 1 beat 80% and 2 beats 20%, as
+    // Motorik Europe's sync fills.
+    // Homage draws per song: hat mask = the source (25%) or one of three variants that each move one
+    // gap (25% each); kick = the source (40%) or steps 0, 6, 10 (60%).
+    // Repeat guard: the last hat hit is dropped in every eighth bar, so no run of identical bars
+    // exceeds eight. The open hat owns step 2, so a mask's closed hat there is not played.
+
+    private static func generateOxygenePresetBox(
+        frame: GlobalMusicalFrame,
+        rng: inout SeededRNG,
+        draws: KosmicSpaceDraws?,
+        fillBars: [Int]
+    ) -> [MIDIEvent] {
+        let hatMasks = ["xx..xxx.xxx.xxx.", "xx..xxx.xx.xxxx.", "x.x.xxx.xxx.xxx.", "xx.xxx..xxx.xxx."]
+        let maskNames = ["source hats", "hat variant 1", "hat variant 2", "hat variant 3"]
+        let maskIdx = rng.nextInt(upperBound: hatMasks.count)
+        let hatSteps = hatMasks[maskIdx].enumerated()
+            .compactMap { $0.element == "x" ? $0.offset : nil }
+            .filter { $0 != 2 }
+        let fourKicks = rng.nextDouble() < 0.40
+        let kickSteps = fourKicks ? [0, 2, 6, 10] : [0, 6, 10]
+        let accents: [(note: GMDrum, name: String)] = [(.sidestick, "side stick"), (.hiTom, "high tom"),
+                                                       (.tambourine, "tambourine")]
+        let accent = accents[rng.nextInt(upperBound: accents.count)]
+        let guardStep = hatSteps.last ?? 14
+        draws?.record("KOS-DRUM-009", "\(maskNames[maskIdx]), \(fourKicks ? "four kicks" : "three kicks"), \(accent.name) accent")
+
+        var events: [MIDIEvent] = []
+        for bar in 0..<frame.totalBars {
+            let barStart = bar * 16
+            for step in hatSteps where !(bar % 8 == 7 && step == guardStep) {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                        velocity: step % 4 == 0 ? 70 : 54, durationSteps: 1))
+            }
+            for step in kickSteps {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
+                                        velocity: step == 0 ? 96 : 88, durationSteps: 1))
+            }
+            for step in [4, 12] {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.clap.rawValue,
+                                        velocity: 80, durationSteps: 1))
+            }
+            events.append(MIDIEvent(stepIndex: barStart + 2, note: GMDrum.openHat.rawValue,
+                                    velocity: 62, durationSteps: 1))
+            events.append(MIDIEvent(stepIndex: barStart + 12, note: accent.note.rawValue,
+                                    velocity: 66, durationSteps: 1))
+        }
+
+        // Fills replace the last 1 or 2 beats of their bar with a falling tom roll; the kick that
+        // opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
+        for bar in fillBars where bar > 0 && bar < frame.totalBars {
+            let beats = rng.nextDouble() < 0.80 ? 1 : 2
+            let from  = bar * 16 + 16 - beats * 4
+            events.removeAll { $0.stepIndex >= from && $0.stepIndex < bar * 16 + 16
+                               && $0.note != GMDrum.kick.rawValue && $0.note != GMDrum.clap.rawValue }
+            let roll: [GMDrum] = beats == 1
+                ? [.hiTom, .hiMidTom, .lowMidTom, .lowFloorTom]
+                : [.hiTom, .hiTom, .hiMidTom, .hiMidTom, .lowMidTom, .lowMidTom, .lowFloorTom, .lowFloorTom]
+            for (i, tom) in roll.enumerated() {
+                events.append(MIDIEvent(stepIndex: from + i, note: tom.rawValue,
+                                        velocity: UInt8(64 + 24 * i / (roll.count - 1)), durationSteps: 1))
+            }
+        }
+        return events
     }
 
     // MARK: - Sparse: dub-techno minimal groove (KOS-DRUM-002)

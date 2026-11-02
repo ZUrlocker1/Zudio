@@ -114,7 +114,7 @@ final class AudioTexturePlayer {
     /// player is running: `startFile` reads it rather than fading up into a mute.
     ///
     /// Only solo used to reach it. Muting the Texture track on a base Chill or Chill Blues song
-    /// changed nothing and the café loop played on (Zack, 2026-10-15).
+    /// changed nothing and the cafe loop played on (Zack, 2026-10-15).
     private(set) var silenced = false
 
     /// Instantly silences (or restores) the texture without a full fade — keeps the position in

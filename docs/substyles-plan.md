@@ -95,7 +95,7 @@ Low risk. The drum generator runs at a lower BPM with a stricter grid. Harmonic 
 ## Sub-Style 2: Ambient Piano
 
 **Parent style:** Ambient
-**Reference artists:** Harold Budd & Brian Eno (*Ambient 2: The Plateaux of Mirror*), Erik Satie (*Gymnopédies*, *Gnossiennes*), Nils Frahm (*Felt*)
+**Reference artists:** Harold Budd & Brian Eno (*Ambient 2: The Plateaux of Mirror*), Erik Satie (*Gymnopedies*, *Gnossiennes*), Nils Frahm (*Felt*)
 **Appears:** ~15% of Ambient songs
 **Full plan:** [ambient-piano.md](ambient-piano.md)
 

@@ -179,7 +179,7 @@ struct ChillTitleGenerator {
     ///
     /// Hull is here because Tracey Thorn and Ben Watt met at Hull University. Words come from
     /// "Title generation" in docs/chill-soho-plan.md, checked against the base bank: none collide.
-    /// No accents ("Cafe", not "Café"), matching the base Chill rule.
+    /// No accents ("Cafe", not "Cafe"), matching the base Chill rule.
     /// Chill Soho titles. Eight forms, all built from parts — measured across 4,000 songs, the
     /// old shape produced only 199 effectively distinct titles, so one song in five repeated an
     /// earlier one (Zack, 2026-10-11). Two bottlenecks caused most of it: a late-night form that

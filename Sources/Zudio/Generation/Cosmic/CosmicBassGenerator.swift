@@ -18,13 +18,19 @@ struct KosmicBassGenerator {
         bassEvolutionBars: inout [Int],
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
-        driftVelocityBase: Int = 89
+        driftVelocityBase: Int = 89,
+        isKosmicSpace: Bool = false,
+        spaceDraws: KosmicSpaceDraws? = nil
     ) -> [MIDIEvent] {
 
-        // Drift uses a different bass pool with new rules and adjusted weights
+        // Drift and Space use their own bass pools with new rules and adjusted weights
         let rules: [String]
         let weights: [Double]
-        if isKosmicDrift {
+        if isKosmicSpace {
+            // KOS-BASS-018 Oxygene Falling Walk 75%, KOS-BASS-001 Berlin School drone 25%
+            rules   = ["KOS-BASS-018", "KOS-BASS-001"]
+            weights = [0.75,           0.25]
+        } else if isKosmicDrift {
             if isDriftDreamscape {
                 // Dreamscape forces Four-Bar Hold
                 rules   = ["KOS-BASS-017"]
@@ -59,7 +65,8 @@ struct KosmicBassGenerator {
         // KOS-BASS-008 (Hallogallo Lock) REQUIRES the dual layer — sounds thin without it.
         // Drift: excluded entirely — staccato off-beats clutter the spacious feel.
         //   Exception: KOS-BASS-008 still gets it since it sounds thin without it.
-        let canUseDualLayer = !bassAbsent && !isKosmicDrift
+        // Space: excluded — KOS-BASS-018 is a complete figure and extra layers blur it.
+        let canUseDualLayer = !bassAbsent && !isKosmicDrift && !isKosmicSpace
             && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010"
             && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
         let driftNeedsDual  = isKosmicDrift && ruleID == "KOS-BASS-008"
@@ -67,7 +74,7 @@ struct KosmicBassGenerator {
         if useDualLayer { usedRuleIDs.insert("KOS-BASS-006") }
 
         // KOS-BASS-007: pulsating tremolo — excluded from Drift (rapid tremolo is anti-spacious).
-        let usePulsatingLayer = !isKosmicDrift && !bassAbsent && !useDualLayer
+        let usePulsatingLayer = !isKosmicDrift && !isKosmicSpace && !bassAbsent && !useDualLayer
             && ruleID != "KOS-BASS-004" && ruleID != "KOS-BASS-010"
             && ruleID != "KOS-BASS-012" && ruleID != "KOS-BASS-013"
             && rng.nextDouble() < 0.45
@@ -162,6 +169,8 @@ struct KosmicBassGenerator {
             let vb     = UInt8(clamping: driftVelocityBase)
             boc016Cell = [(0, vb), (second, vb), (0, vb), (fifth, vb)]
         }
+
+        let fallingWalk = ruleID == "KOS-BASS-018" ? oxygeneWalkDraws(rng: &rng, draws: spaceDraws) : nil
 
         var events: [MIDIEvent] = []
 
@@ -315,6 +324,13 @@ struct KosmicBassGenerator {
                                          entry: entry, frame: frame, rng: &rng,
                                          totalBars: frame.totalBars, isBody: true,
                                          structure: structure)
+                continue
+            }
+
+            // KOS-BASS-018: the whole figure, every body bar. Space has no bridges or sub-layers.
+            if let walk = fallingWalk {
+                events += oxygeneFallingWalkBar(barStart: barStart, bar: bar, entry: entry,
+                                                frame: frame, walk: walk)
                 continue
             }
 
@@ -484,6 +500,53 @@ struct KosmicBassGenerator {
         }
 
         return events
+    }
+
+    // MARK: - KOS-BASS-018 Oxygene Falling Walk (Kosmic Space)
+    // Oxygene 4 bass, both transcriptions (89 of 105 and 94 of 114 bars in the main pattern).
+    // Six notes a bar, rhythm x...x.x...x.x.x. (steps 0, 4, 6, 10, 12, 14), chord tones above the
+    // current root measured as octave, b7, octave, 5, b7, 5 — top, mid, top, low, mid, low — held
+    // 4, 2, 4, 1, 2, 1 steps. Register MIDI 29–46, the top note an octave above the root.
+    // Homage draws per song:
+    //   falling set (top, mid, low) — octave/6th/5th 35%, octave/5th/3rd 35%, octave/b7/5th 30% (source)
+    //   rhythm — the source 60%, or x.x.x.x...x.x.x. 40% (the second transcription's alternate)
+    // Within song: in 1 bar of 8 the figure shifts up a step — 9th, octave and 6th in place of top,
+    // mid and low (measured in 5 of 105 bars) — so it does not repeat for a whole song.
+
+    struct OxygeneWalk {
+        /// Scale steps above the root for top, mid and low.
+        let steps: [Int]
+        /// (step in bar, role 0 = top / 1 = mid / 2 = low, duration in steps)
+        let hits: [(step: Int, role: Int, dur: Int)]
+    }
+
+    private static func oxygeneWalkDraws(rng: inout SeededRNG, draws: KosmicSpaceDraws?) -> OxygeneWalk {
+        let sets: [(steps: [Int], name: String)] = [([7, 5, 4], "octave-6th-5th"),
+                                                    ([7, 4, 2], "octave-5th-3rd"),
+                                                    ([7, 6, 4], "octave-b7-5th")]
+        let set = sets[rng.weightedPick([0.35, 0.35, 0.30])]
+        let sourceRhythm = rng.nextDouble() < 0.60
+        // The alternate rhythm has seven hits; its roles keep the same top-mid-low fall.
+        let hits: [(step: Int, role: Int, dur: Int)] = sourceRhythm
+            ? [(0, 0, 4), (4, 1, 2), (6, 0, 4), (10, 2, 1), (12, 1, 2), (14, 2, 1)]
+            : [(0, 0, 2), (2, 1, 2), (4, 0, 2), (6, 1, 4), (10, 2, 2), (12, 1, 2), (14, 2, 1)]
+        draws?.record("KOS-BASS-018", "\(set.name), \(sourceRhythm ? "source rhythm" : "alternate rhythm")")
+        return OxygeneWalk(steps: set.steps, hits: hits)
+    }
+
+    private static func oxygeneFallingWalkBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry,
+        frame: GlobalMusicalFrame, walk: OxygeneWalk
+    ) -> [MIDIEvent] {
+        let scalePCs = frame.scalePCs
+        // Root 23–34 puts the top note at 35–46; the 3rd set's lowest note can reach 26.
+        let root  = clampToRegister(spaceChordRootPC(entry, frame: frame) + 24, low: 23, high: 34)
+        let steps = bar % 8 == 7 ? [8, 7, 5] : walk.steps
+        return walk.hits.map { hit in
+            let note = scaleStep(root, by: steps[hit.role], scalePCs: scalePCs)
+            return MIDIEvent(stepIndex: barStart + hit.step, note: UInt8(note),
+                             velocity: hit.step == 0 ? 96 : 88, durationSteps: hit.dur)
+        }
     }
 
     // MARK: - Primary bass (Sub-layer A)
