@@ -37,7 +37,8 @@ struct KosmicLeadGenerator {
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil
+        spaceDraws: KosmicSpaceDraws? = nil,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         // Kosmic Space: theme in A sections (KOS-LD1-013), riff in B sections (KOS-LD1-014), in
@@ -47,10 +48,12 @@ struct KosmicLeadGenerator {
             lead1BaseRule = "KOS-LD1-013"
             usedRuleIDs.insert("KOS-LD1-013")
             if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
-            return generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
-                                               rng: &rng, draws: spaceDraws)
-                 + generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
-                                             rng: &rng, draws: spaceDraws)
+            let lead = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                   rng: &rng, draws: spaceDraws)
+                     + generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                 rng: &rng, draws: spaceDraws)
+            // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
+            return silenceBars(lead, spaceArrangement?.leadRests ?? [])
         }
 
         // Drift lead pool — different weights and includes new rules 010/011/012
@@ -218,7 +221,8 @@ struct KosmicLeadGenerator {
         usedRuleIDs: inout Set<String>,
         lead1BaseRuleID: String? = nil,
         xFilesBars: [Int] = [],
-        isKosmicSpace: Bool = false
+        isKosmicSpace: Bool = false,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         let baseRule = pickLeadRule2(rng: &rng)
@@ -342,6 +346,10 @@ struct KosmicLeadGenerator {
             }
         }
 
+        // Kosmic Space: Lead 2 drops out with the sequencer, as in Oxygene 8 and Oxygene 4.
+        if let seqBreak = spaceArrangement?.sequencerBreak {
+            events = silenceBars(events, [seqBreak])
+        }
         return events
     }
 

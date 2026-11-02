@@ -45,7 +45,8 @@ struct KosmicArpeggioGenerator {
         forceRuleID: String? = nil,
         isKosmicDrift: Bool = false,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil
+        spaceDraws: KosmicSpaceDraws? = nil,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         // Drift: exclude Electric Buddha, JMJ Dual-Rate, Kraftwerk; weight spacious rules higher.
@@ -62,7 +63,8 @@ struct KosmicArpeggioGenerator {
         // rest windows, no fade before the outro (ArrangementFilter exempts Rhythm too).
         if isKosmicSpace {
             usedRuleIDs.insert("KOS-RTHM-016")
-            return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng, draws: spaceDraws)
+            return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng, draws: spaceDraws,
+                                                  arrangement: spaceArrangement)
         }
 
         let chosenRule: String
@@ -132,9 +134,9 @@ struct KosmicArpeggioGenerator {
 
     // MARK: - Jarre step-sequencer engine (Kosmic Space)
     // One engine for every Space sequencer rule in every phase; later rules are new patterns.
-    // A pattern is 16 steps, each a rest (nil) or a slot. Every bar the engine plays the pattern
-    // against the current chord root, so the 2–4-bar chords transpose it and no long identical run
-    // occurs. Register: root in MIDI 48–59, the other slots above it (the lower neighbour below).
+    // A pattern is 16 steps, each a rest (nil) or a slot, chosen per bar by the caller (nil for a
+    // silent bar). Every bar the engine plays its pattern against the current chord root, so the
+    // 2–4-bar chords transpose it and no long identical run occurs. Register: root in MIDI 48–59, the other slots above it (the lower neighbour below).
     // Every note is 1 step long and in the song's scale.
 
     enum JMJSlot {
@@ -144,12 +146,12 @@ struct KosmicArpeggioGenerator {
         case lowerNeighbour
     }
 
-    static func jmjStepSequencer(pattern: [JMJSlot?], frame: GlobalMusicalFrame,
-                                 tonalMap: TonalGovernanceMap) -> [MIDIEvent] {
+    static func jmjStepSequencer(frame: GlobalMusicalFrame, tonalMap: TonalGovernanceMap,
+                                 pattern patternForBar: (Int) -> [JMJSlot?]?) -> [MIDIEvent] {
         let scalePCs = frame.scalePCs
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
-            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            guard let pattern = patternForBar(bar), let entry = tonalMap.entry(atBar: bar) else { continue }
             let root = clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)
             for (step, slot) in pattern.prefix(16).enumerated() {
                 guard let slot else { continue }
@@ -173,18 +175,23 @@ struct KosmicArpeggioGenerator {
     // MARK: - KOS-RTHM-016: Oxygene Octave Sequencer (Kosmic Space)
     // Oxygene 4 sequencer (45 of 104 bars in the main pattern, the rest one-gap variants):
     //   R . O . R O R . O O R . O R O .   — root and octave on steps 0, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14
+    // By section, as the corpus does: the full source pattern in the intro, the outro and Lead 1's
+    // rests, and the song's thinner variant wherever Lead 1 plays (Oxygene 4: 8.9–9.0 notes a bar
+    // under the lead against 9.7–9.9 without it; Oxygene 6: 3.1–3.3 against 5.5). Silent through
+    // the arrangement's sequencer break.
     // Homage draws per song:
-    //   mask — the source 25%, or a measured thinner variant 25% each: without step 9, without
-    //          steps 9 and 13, without steps 4, 9 and 13
+    //   thinner variant — one of the measured ones, a third each: without step 9, without steps
+    //                     9 and 13, without steps 4, 9 and 13
     //   slot swap — in 25% of songs the octave becomes the fifth throughout
 
     private static func generateOxygeneOctaveSequencer(
         frame: GlobalMusicalFrame,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        draws: KosmicSpaceDraws?
+        draws: KosmicSpaceDraws?,
+        arrangement: KosmicSpaceArrangement?
     ) -> [MIDIEvent] {
-        let masks: [(drop: Set<Int>, name: String)] = [([], "source mask"), ([9], "no step 9"),
+        let masks: [(drop: Set<Int>, name: String)] = [([9], "no step 9"),
                                                        ([9, 13], "no steps 9 and 13"),
                                                        ([4, 9, 13], "no steps 4, 9 and 13")]
         let mask = masks[rng.nextInt(upperBound: masks.count)]
@@ -192,9 +199,13 @@ struct KosmicArpeggioGenerator {
         let upper: JMJSlot = useFifth ? .fifth : .octave
         let source: [JMJSlot?] = [.root, nil, upper, nil, .root, upper, .root, nil,
                                   upper, upper, .root, nil, upper, .root, upper, nil]
-        let pattern = source.enumerated().map { mask.drop.contains($0.offset) ? nil : $0.element }
-        draws?.record("KOS-RTHM-016", "\(mask.name), \(useFifth ? "root and fifth" : "root and octave")")
-        return jmjStepSequencer(pattern: pattern, frame: frame, tonalMap: tonalMap)
+        let thin = source.enumerated().map { mask.drop.contains($0.offset) ? nil : $0.element }
+        draws?.record("KOS-RTHM-016", "\(mask.name) under the lead, \(useFifth ? "root and fifth" : "root and octave")")
+        return jmjStepSequencer(frame: frame, tonalMap: tonalMap) { bar in
+            guard let arrangement else { return source }
+            if arrangement.sequencerRests(atBar: bar) { return nil }
+            return arrangement.leadPlays(atBar: bar) ? thin : source
+        }
     }
 
     // MARK: - KOS-RTHM-001: Tangerine Dream multi-voice step-sequencer

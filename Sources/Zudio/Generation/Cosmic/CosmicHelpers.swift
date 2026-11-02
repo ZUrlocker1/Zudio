@@ -67,3 +67,17 @@ final class KosmicSpaceDraws {
     private(set) var notes: [String: String] = [:]
     func record(_ ruleID: String, _ draws: String) { notes[ruleID] = draws }
 }
+
+// Remove the notes that start inside any of the bar ranges, and cut short the ones that would
+// sound into them, so a part falls silent cleanly for a break.
+func silenceBars(_ events: [MIDIEvent], _ ranges: [Range<Int>]) -> [MIDIEvent] {
+    guard !ranges.isEmpty else { return events }
+    return events.compactMap { ev in
+        let start = ev.stepIndex
+        if ranges.contains(where: { $0.contains(start / 16) }) { return nil }
+        let end = start + ev.durationSteps
+        guard let cut = ranges.map({ $0.lowerBound * 16 }).filter({ $0 > start && $0 < end }).min()
+        else { return ev }
+        return MIDIEvent(stepIndex: start, note: ev.note, velocity: ev.velocity, durationSteps: cut - start)
+    }
+}

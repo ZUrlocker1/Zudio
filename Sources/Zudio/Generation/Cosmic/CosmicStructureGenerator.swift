@@ -570,3 +570,117 @@ struct KosmicStructureGenerator {
         return plan
     }
 }
+
+// MARK: - Kosmic Space arrangement
+
+/// Where a Kosmic Space song breaks its own repetition. Measured on the corpus with
+/// tools/jarre_breaks.py:
+///
+/// - In the Oxygene pieces drums and bass never stop (104 bars in Oxygene 4, 112 in Oxygene 6).
+///   What comes and goes is the lead: one or two rests of 16–23 bars (Oxygene 4, 6 and 8), each
+///   starting and ending on or near a section edge.
+/// - The sequencer answers the lead: thinner while it plays, fuller while it rests
+///   (Oxygene 6: 3.1–3.3 against 5.5 notes a bar; Oxygene 4: 8.9–9.0 against 9.7–9.9).
+/// - Short sequencer breaks of 4–8 bars happen while drums and bass carry on, with Lead 2
+///   dropping out alongside (Oxygene 8: 6, 4, 8 bars; Oxygene 4's second transcription: 6, 6).
+/// - A noise swell marks the returns (Oxygene 6; three of four in Oxygene 8).
+///
+/// Drum fills are Zudio's own addition (Zack, 2026-11-02) — the Oxygene preset-box pieces have
+/// none. They follow Motorik Europe's sync: only in the bar before a break or a return, 1 beat
+/// mostly and 2 at most, never more than three a song.
+///
+/// Every edge sits on a landing bar: a body section's start or a 16-bar point inside a body
+/// section. Nothing breaks in the first 16 body bars or the last 8 before the outro. Derived
+/// from the structure and the song seed alone, so per-track regeneration rebuilds the same
+/// schedule without storing it.
+struct KosmicSpaceArrangement {
+    /// Body bars where Lead 1 sits out.
+    let leadRests: [Range<Int>]
+    /// Bars where Rhythm (and Lead 2) sit out.
+    let sequencerBreak: Range<Int>?
+    /// Bars that take a drum fill.
+    let fillBars: [Int]
+    /// First and last-plus-one bars of the body.
+    let bodyStart: Int
+    let bodyEnd: Int
+
+    /// Bars that a returning part lands on — each takes a guaranteed surf sweep.
+    var returnBars: [Int] {
+        leadRests.map(\.upperBound) + (sequencerBreak.map { [$0.upperBound] } ?? [])
+    }
+
+    func leadRests(atBar bar: Int) -> Bool { leadRests.contains { $0.contains(bar) } }
+    func sequencerRests(atBar bar: Int) -> Bool { sequencerBreak?.contains(bar) == true }
+    /// True in body bars where Lead 1 is playing; the sequencer thins under it.
+    func leadPlays(atBar bar: Int) -> Bool { bar >= bodyStart && bar < bodyEnd && !leadRests(atBar: bar) }
+
+    static func make(structure: SongStructure, totalBars: Int, seed: UInt64) -> KosmicSpaceArrangement {
+        let body = structure.sections.filter { $0.label == .A || $0.label == .B }
+        guard let first = body.first, let last = body.last else {
+            return KosmicSpaceArrangement(leadRests: [], sequencerBreak: nil, fillBars: [],
+                                          bodyStart: 0, bodyEnd: totalBars)
+        }
+        var rng = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xB2EA_C5)
+        let earliest = first.startBar + 16
+        let latest   = last.endBar - 8
+
+        // Landing bars, a section start weighted above a 16-bar point
+        var landings: [Int: Double] = [:]
+        for sec in body {
+            if sec.startBar > first.startBar { landings[sec.startBar] = 3 }
+            for b in stride(from: sec.startBar + 16, to: sec.endBar, by: 16) where landings[b] == nil {
+                landings[b] = 1
+            }
+        }
+        let landingBars = landings.keys.sorted()
+
+        func weightedChoice(_ options: [(Range<Int>, Double)]) -> Range<Int>? {
+            guard !options.isEmpty else { return nil }
+            return options[rng.weightedPick(options.map(\.1))].0
+        }
+        func leadBarsLeft(_ sec: SongSection, resting: [Range<Int>]) -> Int {
+            (sec.startBar..<sec.endBar).filter { b in !resting.contains { $0.contains(b) } }.count
+        }
+
+        // Lead 1 rests: from one landing bar to another 16–24 bars later. Every body section keeps
+        // at least 8 bars of lead, so the theme and the riff are both still heard.
+        var rests: [Range<Int>] = []
+        let restCount = totalBars > 110 ? 2 : 1
+        for _ in 0..<restCount {
+            var options: [(Range<Int>, Double)] = []
+            for s in landingBars where s >= earliest {
+                for l in landingBars where l - s >= 16 && l - s <= 24 && l <= latest {
+                    let r = s..<l
+                    guard rests.allSatisfy({ r.lowerBound >= $0.upperBound + 16 || r.upperBound + 16 <= $0.lowerBound })
+                    else { continue }
+                    guard body.allSatisfy({ leadBarsLeft($0, resting: rests + [r]) >= 8 }) else { continue }
+                    options.append((r, (landings[s] ?? 1) * (landings[l] ?? 1)))
+                }
+            }
+            if let r = weightedChoice(options) { rests.append(r) }
+        }
+        rests.sort { $0.lowerBound < $1.lowerBound }
+
+        // One sequencer break of 4, 6 or 8 bars, ending on a landing bar while Lead 1 is playing
+        let length = [4, 6, 8][rng.weightedPick([0.2, 0.6, 0.2])]
+        var breakOptions: [(Range<Int>, Double)] = []
+        for l in landingBars where l <= latest && l - length >= earliest {
+            let r = (l - length)..<l
+            guard rests.allSatisfy({ r.upperBound + 4 <= $0.lowerBound || r.lowerBound >= $0.upperBound + 4 })
+            else { continue }
+            breakOptions.append((r, landings[l] ?? 1))
+        }
+        let seqBreak = weightedChoice(breakOptions)
+
+        // Fills: the bar before each return first, then the bar before the break begins
+        var fills: [Int] = []
+        if let b = seqBreak { fills.append(b.upperBound - 1) }
+        fills += rests.map { $0.upperBound - 1 }
+        if let b = seqBreak { fills.append(b.lowerBound - 1) }
+        var seen = Set<Int>()
+        fills = Array(fills.filter { seen.insert($0).inserted }.prefix(3)).sorted()
+
+        return KosmicSpaceArrangement(leadRests: rests, sequencerBreak: seqBreak, fillBars: fills,
+                                      bodyStart: first.startBar, bodyEnd: last.endBar)
+    }
+}

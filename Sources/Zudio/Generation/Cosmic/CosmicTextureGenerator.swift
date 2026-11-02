@@ -24,13 +24,15 @@ struct KosmicTextureGenerator {
         forceRuleID: String? = nil,
         isKosmicDrift: Bool = false,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil
+        spaceDraws: KosmicSpaceDraws? = nil,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         if isKosmicSpace {
             usedRuleIDs.insert("KOS-TEXT-005")
             return generateOxygeneSurfSweep(frame: frame, structure: structure, tonalMap: tonalMap,
-                                            rng: &rng, draws: spaceDraws)
+                                            rng: &rng, draws: spaceDraws,
+                                            returnBars: spaceArrangement?.returnBars ?? [])
         }
 
         // Clash fix: KOS-TEXT-003 (Spatial Sweep — chromatic passing) clashes with quartal
@@ -502,10 +504,12 @@ struct KosmicTextureGenerator {
     // section. Each fires at 70%, never within 8 bars of the previous event.
     // Variant (25% of songs), Oxygene 6's wash: a 2-bar swell every 2 bars through B sections only,
     // nothing in A.
+    // Either way, every bar where the arrangement brings a part back takes a swell (Oxygene 6;
+    // three of four returns in Oxygene 8).
 
     private static func generateOxygeneSurfSweep(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG, draws: KosmicSpaceDraws?
+        rng: inout SeededRNG, draws: KosmicSpaceDraws?, returnBars: [Int]
     ) -> [MIDIEvent] {
         let wash = rng.nextDouble() < 0.25
         draws?.record("KOS-TEXT-005", wash ? "Oxygene 6 wash in B sections" : "boundary swells")
@@ -524,7 +528,11 @@ struct KosmicTextureGenerator {
                     if let ev = swell(atBar: bar, velocity: 58) { events.append(ev) }
                 }
             }
-            return events
+            let washBars = Set(events.map { ($0.stepIndex + 4) / 16 })
+            for bar in returnBars where !washBars.contains(bar) && !washBars.contains(bar - 1) {
+                if let ev = swell(atBar: bar, velocity: 72) { events.append(ev) }
+            }
+            return events.sorted { $0.stepIndex < $1.stepIndex }
         }
 
         var boundaries: [Int] = []
@@ -533,9 +541,11 @@ struct KosmicTextureGenerator {
             guard section.label == .A || section.label == .B else { continue }
             boundaries += Array(stride(from: section.startBar + 8, to: section.endBar, by: 8))
         }
+        let forced = Set(returnBars)
         var lastBar = Int.min / 2
-        for bar in boundaries.sorted() where bar < frame.totalBars {
-            guard rng.nextDouble() < 0.70, bar - lastBar >= 8 else { continue }
+        for bar in Set(boundaries + returnBars).sorted() where bar < frame.totalBars {
+            let fire = rng.nextDouble() < 0.70
+            guard forced.contains(bar) || (fire && bar - lastBar >= 8) else { continue }
             if let ev = swell(atBar: bar, velocity: 72) { events.append(ev); lastBar = bar }
         }
         return events

@@ -299,9 +299,10 @@ Every bar the same:
 - **Accent** — one voice on step 12, drawn per song: side stick (37), high tom (50) or
   tambourine (54)
 
-`durationSteps: 1`. **No fills, no transition fills, no cold-start pickup, no intro or outro
+`durationSteps: 1`. **No transition fills, no cold-start pickup, no intro or outro
 variants.** The preset box never varies, which is its character. It plays through intro and
-outro.
+outro. The one exception is the fills at the edges of the arrangement's breaks (see "Breaks"
+below), which are Zudio's own addition, not the corpus's.
 
 *Homage draws, per song:*
 
@@ -869,6 +870,52 @@ Where the plan left a gap or could not be followed literally, the code does this
   1, 2, 7 and 8.
 - **Base Kosmic and Drift instrument picks** are capped at the pool sizes they had before
   Space appended to them, so they never draw a Space instrument.
+
+### Breaks (added 2026-11-02, after the first listen)
+
+Zack's first listen: it reads as Jarre, but 100 bars of unbroken drums, bass and sequencer
+are monotonous. `tools/jarre_breaks.py` measured how the corpus itself breaks the repetition:
+
+- **In the Oxygene pieces, drums and bass never stop**: 104 bars in Oxygene 4, 112 in Oxygene 6,
+  and likewise in Oxygene 3, 8 and the unnumbered Oxygene. The preset-box pieces (Oxygene 3, 4
+  and 6) have no drum fills.
+- **The lead comes and goes.** Lead 1 rests for 16–23 bars once or twice a piece (Oxygene 4:
+  16; Oxygene 6: 20; Oxygene 8: 18 and 18; Oxygene 4's second transcription: 23). Each rest
+  starts and ends on or within 4 bars of a section edge.
+- **The sequencer answers the lead, by section.** It is thinner while the lead plays: 3.1–3.3
+  against 5.5 notes a bar in Oxygene 6, and 8.9–9.0 against 9.7–9.9 in Oxygene 4.
+- **Short sequencer breaks of 4–8 bars** while drums and bass carry on (Oxygene 8: 6, 4, 8;
+  Oxygene 4's second transcription: 6, 6), with Lead 2 dropping out alongside.
+- **A noise swell marks the returns** (Oxygene 6; three of four in Oxygene 8).
+- Drum breaks (Magnetic Fields 1: 4 bars twice, with bass and lead) and regular fills
+  (Equinoxe, Magnetic Fields 1) belong to the later albums. They stay in Phase 2.
+
+`KosmicSpaceArrangement`, in `CosmicStructureGenerator.swift`, builds this schedule per song
+from the structure and the seed alone, so a regenerated track rebuilds it without storing it:
+
+- **Landing bars.** Every edge falls on a body section's start or a 16-bar point inside a body
+  section. Nothing breaks in the first 16 body bars or the last 8 before the outro.
+- **Lead 1 rests.** One rest, two in songs over 110 bars, each running from one landing bar to
+  another 16–24 bars later. A section start is weighted 3:1 over a 16-bar point. Every body
+  section keeps at least 8 bars of lead, so theme and riff are both heard. Lead 2 plays on.
+- **Sequencer by section.** The full source pattern plays in the intro, the outro and Lead 1's
+  rests. The song's thinner variant (one of the three measured masks) plays wherever Lead 1
+  does. This replaces the per-song mask draw.
+- **One sequencer break** of 4, 6 or 8 bars (20/60/20), ending on a landing bar at least 4 bars
+  clear of any lead rest. Rhythm and Lead 2 are silent; drums and bass carry on. A simulation
+  over the range of Space song shapes found a place for it in 94 of 100 songs. The rest are long
+  abab and abba songs whose two lead rests leave no room.
+- **A swell on every return.** KOS-TEXT-005 adds a swell on each bar where Lead 1 or the
+  sequencer returns, whatever its 70% draw and 8-bar spacing would say. The wash variant adds
+  one too, where its B-section swells do not already cover it.
+- **Drum fills, Zudio's addition** (Zack, 2026-11-02, "like Motorik Europe"). They go in the bar
+  before the sequencer returns, the bar before each lead return, and the bar before the
+  sequencer break, in that order of priority, at most three a song. Each is a falling tom roll
+  over the last 1 beat (80%) or 2 beats (20%); the kick and the clap stay. They play only with
+  KOS-DRUM-009, not when the song draws no percussion.
+- **The log** gains a `Breaks` line, such as `Lead 1 rests bars 33-48, sequencer out bars
+  71-76, 3 fills`. Live annotations show "Lead 1 rests / returns" and "Sequencer break /
+  returns" at their bars.
 
 Not yet done:
 
