@@ -622,7 +622,7 @@ struct SongGenerator {
             bassEvolutionBars: &bassEvolutionBars,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws
+            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement
         )
 
         // Drums
@@ -976,6 +976,16 @@ struct SongGenerator {
                 GenerationLogEntry(tag: "", description: line(leaving, "drops out", "drop out")))
             stepAnnotations[b.upperBound * 16, default: []].append(
                 GenerationLogEntry(tag: "", description: line(returning, "returns", "return")))
+        }
+
+        // Simpler drum stretches are called out as they start and end (preset box songs only)
+        if percussionStyle == .spaceOxygenePresetBox, let thins = spaceArrangement?.drumThins {
+            for t in thins {
+                stepAnnotations[t.range.lowerBound * 16, default: []].append(
+                    GenerationLogEntry(tag: "", description: "Drums simplify"))
+                stepAnnotations[t.range.upperBound * 16, default: []].append(
+                    GenerationLogEntry(tag: "", description: "Drums return"))
+            }
         }
 
         var forced: [String: String] = [:]
@@ -1720,7 +1730,7 @@ struct SongGenerator {
                     isKosmicDrift: songState.isKosmicDrift,
                     isDriftDreamscape: songState.isDriftDreamscape,
                     driftVelocityBase: 89,
-                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws)
+                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement)
             } else if isChill {
                 events = ChillBassGenerator.generate(
                     frame: songState.frame, structure: songState.structure,

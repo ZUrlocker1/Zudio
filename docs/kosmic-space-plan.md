@@ -924,15 +924,29 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
   since leads come and go in every style (Zack, 2026-11-02).
 
 - **Drum variety and the handclap** (Zack, 2026-11-02, from the song Spectrion). The 808 box was
-  relentless, and the handclap on beats 2 and 4 read as disco. `KosmicSpaceArrangement` now holds
-  `drumThins` and `clapRanges`, drawn on their own stream so the break schedule is unchanged.
-  - Simpler beat at each body section start after the first, and 32 bars into sections of 40 or
-    more bars: 55% per point, at least one a song, 8 or 16 bars, never into the last 8 before the
-    outro or over the sequencer break. Variant 0 (60%) drops the 16th hats. Variant 1 (40%) goes
-    to quarter hats, kick on steps 0 and 10, no open hat.
+  relentless, and the handclap on beats 2 and 4 read as disco. `KosmicSpaceArrangement` holds
+  `drumThins`, `bassThins` and `clapRanges`, drawn on their own stream so the break schedule is
+  unchanged.
+  - Variant 0 (60%) drops the 16th hats. Variant 1 (40%) goes to quarter hats, kick on steps 0 and
+    10, no open hat.
   - The clap plays in about 10% of songs, in one or two whole body sections, and not in a thin
     stretch. Otherwise the song's step 12 accent is the only backbeat.
-
+- **Coordinated thinning of drums and bass** (Zack, 2026-11-02, from Kroneon II and Sub-Nexione,
+  where only 8 bars in 124 had thinned and the bass never did). Candidate points are each body
+  section start after the first and every 16 bars after it, never into the last 8 before the
+  outro. Each has a 50% chance of a stretch of 8, 12 or 16 bars (40/20/40), with 8 full bars
+  between stretches and none over the sequencer break. A song over 100 bars gets at least two, a
+  shorter one at least one.
+  - In 60% of drum stretches the bass thins over exactly the same bars, so both go back to the
+    full pattern together under the closing fill. In the rest the bass plays on.
+  - One more stretch of 8 or 12 bars, in 50% of songs, thins the bass alone, apart from any drum
+    stretch.
+  - A thin bass bar (KOS-BASS-018 only) is the octave on beat 1 and the walk's low note on beat 3,
+    each held half a bar. The Berlin School drone (KOS-BASS-001) is already sparse and does not
+    thin.
+  - The edges of a bass stretch are annotated with the existing `Bass pattern evolving` line,
+    through `bassEvolutionBars`. That also replaces the fingerprint detector's chord-change
+    lines for Falling Walk songs. Drum stretches get `Drums simplify` at their first bar and `Drums return` at the bar after their last (Zack's wording), for preset-box songs only.
 - **Theme variation and thin-stretch fills** (Zack, 2026-11-02). KOS-LD1-013 draws a note count
   (5 at 50%, 4 at 25%, 6 at 25%) and a rhythm per song. The 5-note source onsets (0, 6, 8, 10, 14)
   are 35% of that draw, and are never used with the source top note and the 5-3-5 inner line

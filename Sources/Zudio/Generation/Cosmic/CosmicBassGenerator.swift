@@ -20,7 +20,8 @@ struct KosmicBassGenerator {
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil
+        spaceDraws: KosmicSpaceDraws? = nil,
+        spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         // Drift and Space use their own bass pools with new rules and adjusted weights
@@ -329,8 +330,15 @@ struct KosmicBassGenerator {
 
             // KOS-BASS-018: the whole figure, every body bar. Space has no bridges or sub-layers.
             if let walk = fallingWalk {
+                // A thin stretch plays root and octave on beats 1 and 3; its edges are annotated
+                // as "pattern evolving" through bassEvolutionBars.
+                let thin = spaceArrangement?.bassThins(atBar: bar) == true
+                if section.label == .A || section.label == .B,
+                   thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
+                    bassEvolutionBars.append(bar)
+                }
                 events += oxygeneFallingWalkBar(barStart: barStart, bar: bar, entry: entry,
-                                                frame: frame, walk: walk)
+                                                frame: frame, walk: walk, thin: thin)
                 continue
             }
 
@@ -536,11 +544,18 @@ struct KosmicBassGenerator {
 
     private static func oxygeneFallingWalkBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry,
-        frame: GlobalMusicalFrame, walk: OxygeneWalk
+        frame: GlobalMusicalFrame, walk: OxygeneWalk, thin: Bool = false
     ) -> [MIDIEvent] {
         let scalePCs = frame.scalePCs
         // Root 23–34 puts the top note at 35–46; the 3rd set's lowest note can reach 26.
         let root  = clampToRegister(spaceChordRootPC(entry, frame: frame) + 24, low: 23, high: 34)
+        if thin {
+            // The octave on beat 1 and the walk's low note on beat 3, each held half a bar
+            let top = scaleStep(root, by: walk.steps[0], scalePCs: scalePCs)
+            let low = scaleStep(root, by: walk.steps[2], scalePCs: scalePCs)
+            return [MIDIEvent(stepIndex: barStart,     note: UInt8(top), velocity: 96, durationSteps: 8),
+                    MIDIEvent(stepIndex: barStart + 8, note: UInt8(low), velocity: 88, durationSteps: 7)]
+        }
         let steps = bar % 8 == 7 ? [8, 7, 5] : walk.steps
         return walk.hits.map { hit in
             let note = scaleStep(root, by: steps[hit.role], scalePCs: scalePCs)

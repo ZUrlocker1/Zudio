@@ -608,6 +608,9 @@ struct KosmicSpaceArrangement {
     let fillBars: [Int]
     /// Stretches where the preset box drops to a simpler beat, at section starts and 32-bar points.
     let drumThins: [DrumThin]
+    /// Stretches where the Falling Walk bass drops to root and octave. Some match a drum stretch
+    /// exactly, so both return to the full pattern together; others stand alone.
+    let bassThins: [Range<Int>]
     /// Body stretches where the preset box adds its handclap on beats 2 and 4. Empty in about 90%
     /// of songs.
     let clapRanges: [Range<Int>]
@@ -620,6 +623,7 @@ struct KosmicSpaceArrangement {
         leadRests.map(\.upperBound) + (sequencerBreak.map { [$0.upperBound] } ?? [])
     }
 
+    func bassThins(atBar bar: Int) -> Bool { bassThins.contains { $0.contains(bar) } }
     func drumThin(atBar bar: Int) -> DrumThin? { drumThins.first { $0.range.contains(bar) } }
     func clapPlays(atBar bar: Int) -> Bool { clapRanges.contains { $0.contains(bar) } }
     func leadRests(atBar bar: Int) -> Bool { leadRests.contains { $0.contains(bar) } }
@@ -631,7 +635,7 @@ struct KosmicSpaceArrangement {
         let body = structure.sections.filter { $0.label == .A || $0.label == .B }
         guard let first = body.first, let last = body.last else {
             return KosmicSpaceArrangement(leadRests: [], sequencerBreak: nil, fillBars: [],
-                                          drumThins: [], clapRanges: [],
+                                          drumThins: [], bassThins: [], clapRanges: [],
                                           bodyStart: 0, bodyEnd: totalBars)
         }
         var rng = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xB2EA_C5)
@@ -697,25 +701,54 @@ struct KosmicSpaceArrangement {
         // Drum changes come from their own stream, so the schedule above is unchanged by them.
         var drumRNG = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xD2_0B7E)
 
-        // Simpler beat: at each body section start after the first, and 32 bars into a long section,
-        // 55% of the time for 8 or 16 bars (never into the last 8 before the outro, never over the
-        // sequencer break, whose own thinning is enough). At least one when any point is available.
+        // Simpler beat, and a simpler bass: candidate points are each body section start after the
+        // first and every 16 bars after it, never into the last 8 before the outro. Each point has a
+        // 50% chance of a stretch of 8, 12 or 16 bars, with 8 bars of full pattern between stretches
+        // and none over the sequencer break (whose own thinning is enough). A song of over 100 bars
+        // gets at least two, a shorter one at least one.
+        // In 60% of drum stretches the bass thins over exactly the same bars, so both return to the
+        // full pattern together under the closing fill; in the rest the bass plays on. One more
+        // stretch of 8 or 12 bars, 50% of songs, thins the bass alone, apart from any drum stretch.
         var points: [(bar: Int, end: Int)] = []
         for sec in body {
-            if sec.startBar > first.startBar { points.append((sec.startBar, sec.endBar)) }
-            if sec.endBar - sec.startBar >= 40 { points.append((sec.startBar + 32, sec.endBar)) }
+            let end = Swift.min(sec.endBar, last.endBar - 8)
+            if sec.startBar > first.startBar { points.append((sec.startBar, end)) }
+            for b in stride(from: sec.startBar + 16, to: end - 3, by: 16) { points.append((b, end)) }
         }
+        points.sort { $0.bar < $1.bar }
+        var thinRanges: [Range<Int>] = []
         var thins: [DrumThin] = []
-        var chosen = points.map { _ in drumRNG.nextDouble() < 0.55 }
-        if !chosen.isEmpty && !chosen.contains(true) { chosen[drumRNG.nextInt(upperBound: chosen.count)] = true }
-        for (point, take) in zip(points, chosen) where take {
-            let length = drumRNG.nextDouble() < 0.5 ? 8 : 16
-            let variant = drumRNG.nextDouble() < 0.6 ? 0 : 1
-            let r = point.bar..<Swift.min(point.bar + length, point.end, last.endBar - 8)
-            guard r.count >= 4, seqBreak.map({ r.upperBound <= $0.lowerBound || r.lowerBound >= $0.upperBound }) != false
-            else { continue }
-            thins.append(DrumThin(range: r, variant: variant))
+        var bassThins: [Range<Int>] = []
+        func fits(_ r: Range<Int>) -> Bool {
+            guard r.count >= 4 else { return false }
+            if let b = seqBreak, !(r.upperBound <= b.lowerBound || r.lowerBound >= b.upperBound) { return false }
+            return (thinRanges + bassThins).allSatisfy { r.lowerBound >= $0.upperBound + 8 || r.upperBound + 8 <= $0.lowerBound }
         }
+        func addDrumStretch(_ point: (bar: Int, end: Int)) {
+            let length = [8, 12, 16][drumRNG.weightedPick([0.4, 0.2, 0.4])]
+            let variant = drumRNG.nextDouble() < 0.6 ? 0 : 1
+            let together = drumRNG.nextDouble() < 0.60
+            let r = point.bar..<Swift.min(point.bar + length, point.end)
+            guard fits(r) else { return }
+            thinRanges.append(r)
+            thins.append(DrumThin(range: r, variant: variant))
+            if together { bassThins.append(r) }
+        }
+        for point in points where drumRNG.nextDouble() < 0.50 { addDrumStretch(point) }
+        let wanted = totalBars > 100 ? 2 : 1
+        var spare = points.filter { p in !thins.contains { $0.range.contains(p.bar) } }
+        while thins.count < wanted && !spare.isEmpty {
+            addDrumStretch(spare.remove(at: drumRNG.nextInt(upperBound: spare.count)))
+        }
+        thins.sort { $0.range.lowerBound < $1.range.lowerBound }
+        if drumRNG.nextDouble() < 0.50 {
+            let length = drumRNG.nextDouble() < 0.5 ? 8 : 12
+            let options = points.map { $0.bar..<Swift.min($0.bar + length, $0.end) }.filter(fits)
+            if !options.isEmpty {
+                bassThins.append(options[drumRNG.nextInt(upperBound: options.count)])
+            }
+        }
+        bassThins.sort { $0.lowerBound < $1.lowerBound }
 
         // Handclap: rare, in about 10% of songs, and then in one or two body sections only.
         var claps: [Range<Int>] = []
@@ -729,7 +762,7 @@ struct KosmicSpaceArrangement {
         }
 
         return KosmicSpaceArrangement(leadRests: rests, sequencerBreak: seqBreak, fillBars: fills,
-                                      drumThins: thins, clapRanges: claps,
+                                      drumThins: thins, bassThins: bassThins, clapRanges: claps,
                                       bodyStart: first.startBar, bodyEnd: last.endBar)
     }
 }
