@@ -2,6 +2,9 @@ APP_NAME   = Zudio
 APP_DIR    = /tmp/$(APP_NAME).app
 BINARY     = .build/debug/$(APP_NAME)
 PLIST_SRC  = Sources/Zudio/Info.plist
+# Version and build number come from Version.xcconfig, as they do for the Xcode targets.
+VERSION    = $(shell sed -n 's/^MARKETING_VERSION *= *//p' Version.xcconfig)
+BUILD_NUM  = $(shell sed -n 's/^CURRENT_PROJECT_VERSION *= *//p' Version.xcconfig)
 
 .PHONY: run build bundle clean
 
@@ -18,7 +21,8 @@ bundle: build
 	mkdir -p $(APP_DIR)/Contents/MacOS
 	mkdir -p $(APP_DIR)/Contents/Resources
 	cp $(BINARY)    $(APP_DIR)/Contents/MacOS/$(APP_NAME)
-	cp $(PLIST_SRC) $(APP_DIR)/Contents/Info.plist
+	sed -e 's/$$(MARKETING_VERSION)/$(VERSION)/' -e 's/$$(CURRENT_PROJECT_VERSION)/$(BUILD_NUM)/' \
+	    $(PLIST_SRC) > $(APP_DIR)/Contents/Info.plist
 	cp -r assets    $(APP_DIR)/Contents/Resources/
 	cp assets/images/icon/zudio-icon.icns $(APP_DIR)/Contents/Resources/
 	cp assets/zudio-doc.icns             $(APP_DIR)/Contents/Resources/
