@@ -1,822 +1,873 @@
 # Kosmic Space — Design & Implementation Plan
 
-Status: **design complete, ready to implement.** Builds 130 for iOS and Mac were uploaded
-to App Store Connect on 2026-09-24, scheduled for release Oct 1. Those binaries are locked,
-so repository changes no longer affect what ships.
+Status: **Phase 1 ready to implement (2026-11-02).** Phases 2 and 3 are designed but wait
+for listening on Phase 1.
 
-**Work on a branch until the app is actually live.** If review rejects, `main` needs to be
-in the state that produced the uploaded build.
+This is the single document for Kosmic Space. It replaces the original plan, written in
+September before Motorik Europe and Chill Soho were built, and the corpus review of
+2026-11-02, whose findings are folded in here. Where this document and either earlier
+version disagree, this one wins.
 
-Every decision below is settled. Where a value could have gone more than one way, the choice
-is stated with its reason.
-
----
-
-## Naming
-
-**Kosmic Space.** Second substyle of Kosmic, alongside Kosmic Drift. Triggered by
-`isKosmicSpace == true` on SongState; `displayStyleName` returns "Kosmic Space".
+**Work on a branch** so `main` stays releasable.
 
 ---
 
-## Musical Identity
+## Contents
 
-Kosmic Space is the Jean-Michel Jarre substyle: a continuous sequencer figure as the spine of
-the song, very slow harmonic movement above it, long sustained string-machine pads, a narrow
-high lead, and filtered-noise sweeps marking section boundaries. Where base Kosmic drifts and
-Kosmic Drift floats, **Space pulses** — the sequencer never stops.
-
-Reference albums: *Oxygène* (1976), *Équinoxe* (1978), *Magnetic Fields* (1981),
-*Chronologie* (1993).
-
-**Tie-breaker.** *Oxygène Part 4* is the reference track — the classic statement of this
-style, and the one measured most closely in the Evidence Base below. Where an implementation
-decision is genuinely balanced, choose the option closer to it: chordal movement over static
-drone, strings over other pad timbres, a bass that pulses rhythmically while still moving
-melodically, and a lead that is sparse and distinct against a dense sequencer.
+- What Kosmic Space is
+- Evidence base
+- Design principles
+- Phase 1 — Oxygène (build now)
+- Phase 2 — Magnetic
+- Phase 3 — Chronologie (optional)
+- Rule ledger: new, reused and dropped
+- Implementation checklist
+- Verification
+- Open questions
 
 ---
 
-## Method: Homage, Not Transcription
+## What Kosmic Space is
 
-Every rule here is a **statistical constraint** — interval distribution, repeating-cell
-length, register band, note duration, density. No rule encodes a melody, and none should. The
-goal is output unmistakably of Jarre's world in gesture and texture, and original in note
-content — the same relationship Motorik Arcade has to its arcade-soundtrack references.
+The Jean-Michel Jarre substyle of Kosmic, alongside Kosmic Drift. Base Kosmic blends Jarre
+with Tangerine Dream, Vangelis, Eno, Craven Faults and Electric Buddha Band. Space concentrates
+on Jarre alone, the same subtraction Motorik Arcade made.
 
-`KOS-LEAD-015` needs the most discipline, because the behaviour it generalises comes from a
-very recognisable source. It specifies only the envelope: band width, density, interval mix,
-phrase length. Contour direction is drawn per phrase and phrase length varies within its
-range, so the generator cannot settle into a fixed shape.
+**What makes it Jarre**, in order of how much each contributes:
 
-**Do not encode a fixed interval sequence or a characteristic opening gesture in any rule.**
+1. A **sequencer** of one or two pitch classes in a gapped 16th-note rhythm, locked to the bar
+   and moving with every chord
+2. **Fast minor chord cycles** underneath it, 2–4 bars per chord in loops of 4–8 bars
+3. A **bass** with its own fixed figure, walking chord tones (Oxygène) or pumping octaves
+   (later albums)
+4. A **preset rhythm box**, mechanical and unvarying
+5. A **theme and a riff** that take turns by section
+6. **String-machine pads**
+7. **Noise sweeps** landing on section boundaries
 
----
+**Naming.** `isKosmicSpace` on SongState. `displayStyleName` returns "Kosmic Space".
 
-## Evidence Base
+**Three flavours**, one per era, each coupling its own harmony, drums, bass and sequencer:
 
-Nine fan transcriptions analysed with `tools/jarre_analyze.py` — Oxygène Parts 2, 3 and 4,
-Magnetic Fields Parts 1 and 2, Chronologie Parts 2 and 3, and two Équinoxe files — covering
-more than fifty source tracks. Oxygène Part 4 is Type 0 and must be split by MIDI channel,
-not by track.
+- **Oxygène** (1976). Phase 1.
+- **Magnetic** (Équinoxe 1978 and Magnetic Fields 1981). Phase 2.
+- **Chronologie** (1993, with Oxygène 7–13 and the 1980s pieces). Phase 3, optional.
 
-The measurements that set values in this plan:
-
-- **Parallel detuned sequencer voices.** Magnetic Fields Part 1 carries two sequencer parts
-  of 1,948 and 1,946 notes with identical register (46–72) and identical density (2.74
-  notes/beat). The same file pairs two pad tracks identically, so the doubling habit is
-  general rather than sequencer-specific.
-- **Sequencer cells run 8–21 notes, median 13.** Nothing measured below 8.
-- **Bass pulses and moves at the same time.** Oxygène Part 4's bass channel: register 29–43,
-  94% of intervals a 2nd–4th, 2% leaps, density 1.6 notes/beat. Magnetic Fields Part 1's
-  moving bass layer agrees at 72% stepwise. Two unrelated files.
-- **Two distinct lead behaviours.** Oxygène Part 4's principal riff is leap-dominant — 32% of
-  intervals above a fifth, 9% stepwise, sparse at 0.81 notes/beat, inside a 12-semitone band
-  above MIDI 70. The Magnetic Fields leads invert this at 85% stepwise. The catalog carries
-  one rule for each.
-- **Leads occupy narrow bands** — seven and thirteen semitones in Magnetic Fields Part 2.
-  Leads are placed, not roamed.
-- **Pads sustain 8 beats or longer**, consistent across three pad tracks.
-- **Tempo**, with Magnetic Fields Part 2 corrected from its double-time transcription: 98,
-  100, 120, 121, 132.
-- **Percussion either runs continuously or drops out for whole sections.** Magnetic Fields
-  Part 1's percussion goes silent twice for **24 bars each** across a 152-bar song — about a
-  third of the song with no kit. Part 2's runs unbroken for all 276 bars. There is no middle
-  behaviour: no short gaps, no fills-as-breaks.
-- **Melodic voices are layered, not solo.** Counting melodic-register tracks per file:
-  Magnetic Fields Part 2 has five, Équinoxe four, Oxygène Part 2 two. Only the shortest file
-  is single-voiced. Registers cluster tightly (p71, p75, p76, p77 in Part 2) — the habit is
-  stacking nearby voices rather than separating them widely.
-- **Parts make statements, then leave.** Measured as runs of activity separated by silence,
-  with the phrase boundary set adaptively from each track's own density. Per role — statement
-  length, silence between, and the silence-to-statement ratio:
-  - **Lead**: 4 notes / 13 steps, then 13 steps silence. **Ratio 1.0:1** — a lead is silent
-    about as long as it plays.
-  - **Bass**: 10 notes / 83 steps, then 93 steps silence. Ratio 1.0:1.
-  - **Pads**: 26 notes / 457 steps, then 183 steps silence. Ratio 0.5:1 — long holds, long gaps.
-  - **Sequencer**: 42 notes / 84 steps, then 8 steps silence. Ratio 0.3:1 — near-continuous.
-
-  This matters more than a bare rest ratio: a part can be 90% silent either by scattering
-  single notes or by playing a phrase and stopping. Only the second is a statement, and it is
-  what these tracks do.
-- **Parts also leave entirely.** Dropouts of two bars or more: bass 5 of 5 tracks, sequencer 5
-  of 8, pads 2 of 2, lead 3 of 5. Leaving the arrangement is normal behaviour here, not a
-  drum-specific habit.
-- **Velocity is flat** — one value per track across every file, consistent with sequencer
-  programming. No dynamics rules are derived.
+A rhythm section built from one album's rules reads as that album; a mixed one reads as
+nothing in particular. That is the lesson of Motorik Europe's sync groups.
 
 ---
 
-## How It Differs from Base Kosmic
+## Evidence base
 
-Base Kosmic blends Jarre with Tangerine Dream, Vangelis, Craven Faults, Eno, Loscil and
-Electric Buddha Band, and six of its rules already carry his name. Space is **subtraction and
-concentration** — the same move Motorik Arcade made.
+### The corpus
 
-- **Rhythm is never silent.** Base Kosmic can drop the arpeggio; Space cannot.
-- **Every other lineage is excluded** — no Electric Buddha, Craven Faults, Kraftwerk, Berlin
-  School, Moroder, Tycho or Sigur Rós rules on any track.
-- **Harmonic rhythm is much slower** — 8 to 16 bars per chord.
-- **Pads are longer** — 8-beat minimum sustains.
-- **Instrument pools are narrowed hard**, to raw oscillator waveforms and string machines.
+Sixteen fan transcriptions in `~/Downloads/jarre-midi`, outside the repo because they are
+transcriptions of copyrighted works. Zack pruned duplicates and weak files, so each is a
+distinct piece except Oxygène Part 4, which has two transcriptions. The two agree on the bass,
+the riff and the theme.
+
+- **Oxygène (1976)** — Part 3 (100 BPM), Part 4 (121, two transcriptions), Part 6 (110)
+- **Équinoxe (1978)** — one file, part not given (120)
+- **Magnetic Fields (1981)** — Parts 1 (132), 2 (98), 4 (91), 5 (120). Parts 2 and 4 were
+  transcribed in double time and are corrected in the tools.
+- **Zoolook (1984)** — Arpegiator (104)
+- **Rendez-Vous (1986)** — Part 2 (135, 8.8 minutes)
+- **Chronologie (1993)** — Parts 2 (162 as transcribed), 4 (120), 5 (119)
+- **Oxygène 7–13 (1997)** — Part 8 (136), and an unnumbered "Oxygene" (105) that is probably
+  from the same album
+
+### Tools
+
+All in `tools/`:
+
+- `fetch_jarre_midi.py` — downloads the corpus. It writes outside the repo, so it needs the
+  sandbox bypassed.
+- `jarre_survey.py` — every part's program, register, density and active bars
+- `jarre_deep.py` — role-aware passes: `--sections`, `--harmony`, `--seq`, `--bass`, `--drums`,
+  `--pads`, `--tex`, `--lead`, `--interplay`. A hand-made `ROLES` map says which part plays
+  which role, because guessing roles from register misfiled half of Jarre's parts.
+- `jarre_analyze.py` — the original generic pass, superseded by `jarre_deep.py`
+
+The caveats are the usual ones for fan transcriptions: hard quantisation and flat velocity.
+**Velocity is out of scope**, since Jarre is sequencer music. Rules use Kosmic's existing
+velocity conventions and add no dynamics.
+
+### What the corpus establishes
+
+- **Harmony moves fast.** Chords change every 1–4 bars (median 2) in loops of 4–8 bars. Long
+  single chords occur only as pedal sections of 12–30 bars at intros and builds.
+- **Sequencers are small and locked.** Mostly one or two pitch classes (root and octave, root
+  and fifth, sometimes a leading tone) in a gapped 16th rhythm, locked to the bar and
+  transposing with each chord. The only true phasing is a 3-note cell (Oxygène 8).
+- **The 3-grouping is the common thread.** Figures grouped in threes against 4/4 appear in
+  every era: the Équinoxe sequencer, the Oxygène 8 bass and harpsichord, the Magnetic Fields
+  kick `x..xx..xx..xx..x` (Parts 1, 2 and 4), the Équinoxe and Chronologie 5 leads, and
+  Oxygène 6's dotted quarters.
+- **Riff and theme alternate by section.** In Oxygène 4 the slow falling theme carries the
+  A sections and the fifth-rocking riff the B sections. In Équinoxe the sequencer and the lead
+  never play at the same time.
+- **Leads are oscillating or closed figures:**
+  - see-saws: Oxygène 4 `[+7 −7 +7]`, Équinoxe `[−3 +3 −3]`
+  - broken triads: Magnetic Fields 1 `[+3 +4 −7]`
+  - turns descending in sequence: Magnetic Fields 2 `[+2 +1 −1 −2]`
+- **Leads come and go.** Lead 1 plays in 17–93% of bars (median about 55%), and in under a
+  third in the sparser pieces.
+- **Modes**, across 15 pieces: Aeolian 6, Ionian 3, Dorian 2, harmonic minor 2, Phrygian 1,
+  Mixolydian 1. Zudio's `Mode` enum already has `HarmonicMinor` and `Phrygian`.
+- **Tempo** spans 91–136, median about 120.
+- **Pads** are string machines in 13 of 15 pieces. Oxygène holds them 8 beats; the later
+  albums one bar.
+- **Sweeps** start just before 8-bar boundaries. Oxygène 4's land on bars 17, 25 and 33.
+- **Lead timbres** chosen by the transcribers are synth strings and synth brass, not saw
+  leads. This is weak evidence, but consistent across files.
+- **Doubling.** Magnetic Fields 1's two sequencers are identical, and Part 4 triples its
+  bass.
+- **Quiet sections** occur in six pieces. Melodic density halves and two or more major parts
+  leave. Magnetic Fields 1 is the clearest case: the sequencer, lead and drums go, the pads
+  turn to choir, and the harmony changes cycle.
+
+### What it overturned in the September plan
+
+- 8–16-bar chords. The corpus moves every 1–4 bars.
+- A 9–15-step scale-walk sequencer phasing against the bar. The corpus locks to the bar.
+- A 120 BPM tempo cap.
+- Excluding Phrygian and harmonic minor.
+- A sequencer that never stops. Breakdowns drop it.
+- Reusing base Kosmic's "JMJ" rules. `KOS-DRUM-001` "JMJ Mini Pops" plays a kick every other
+  bar over quarter-note hats, nothing like the Minipops pattern measured on Oxygène 4.
+  `KOS-RTHM-003`, `005` and `008` are scale arcs found in no source.
 
 ---
 
-## How It Differs from Kosmic Drift
+## Design principles
 
-- **Space pulses, Drift floats.** Space requires a continuous sixteenth-note sequencer at
-  2.5–3.0 notes/beat. Drift has no such requirement.
-- **Tempo:** Space 95–120, Drift 70–90. No overlap.
-- **Mode:** Drift is Dorian-dominant (50%); Space is Aeolian-dominant (40%) and darker.
-- **Drums:** Space excludes the Drift loping grooves entirely.
-- **Bass:** Space excludes Drift's smooth-arpeggio and BoC-loop rules.
+**Homage, not copy.** Every rule is a statistical constraint measured from a named work, and
+no rule encodes a melody. Signature rules transform the source in two layers:
 
----
+- **Per-song draws.** Interval, grouping, rotation and register come from a measured family.
+  Where the source's own value is one option, it is weighted *below* the alternatives, so no
+  song reproduces the original figure exactly.
+- **Within-song development.** A figure is stated twice exactly, then transposes with the
+  chord, the way the Oxygène 4 riff follows its chord from i to ii. Every fourth statement
+  returns to the plain form.
 
-## The Seven-Track Collapse
+**Named for the work.** Each new rule's name cites the album or piece it is measured from,
+plus a short description. Its ID continues the track's numbering, and retired IDs are never
+recycled. Lead rules use the `KOS-LD1-` and `KOS-LD2-` prefixes Kosmic Drift introduced.
 
-Jarre's arrangements run 12–14 tracks; Zudio has seven.
+**Bang for the buck.** We reuse an existing rule wherever one is close enough. Where several
+measured figures are the same machine with different data, as every Jarre sequencer is, they
+share one implementation with a preset per album.
 
-- **Two sequencer tracks → Rhythm**, one part. Their stereo width returns as auto-pan.
-- **Two bass layers → Bass.** Generate the moving layer only; never a static drone.
-- **Four percussion tracks → Drums**, one kit.
-- **Five melodic tracks → Lead 1 and Lead 2.** Lead 1 takes the principal melody, Lead 2 a
-  high narrow counter-line; the rest are dropped.
-- **Pads and drones → Pads and Texture**, split by duration: 8-beat-plus sustains to Pads,
-  sparse atmospheric events to Texture.
+**Keep the structure.** Space uses Kosmic's existing song structure: intro, A and B sections,
+outro, and the forms ab, aba, abab and abba. Lead 1 can already play a different rule in B
+sections, which delivers the theme and riff alternation for free. The one structural addition,
+the Phase 2 breakdown, is a mute schedule, not a new section type.
 
----
+**The one place we don't economise is harmony.** Kosmic's chord builder gives a section one
+or two chords of at least 8 bars, at random roots. It cannot play a repeating cycle, and the
+fast cycle under the sequencer is the core of the sound. So Phase 1 adds a chord-cycle builder,
+and every flavour's progressions are then data.
 
-## Cross-Track Coordination
-
-The sequencer is the song; every other track is defined relative to it.
-
-**Rhythm** carries both pulse and harmony and is excluded from random block-silencing, as
-Motorik Arcade already does for Lead 1.
-
-**One bounded exception.** The measurement shows sequencer parts dropping out in 5 of 8 source
-tracks, so "never silent" would be a departure from the evidence rather than a reading of it.
-The arrangement arc may remove Rhythm for **one window of 4–8 bars, in the final third only**.
-Everywhere else it runs unbroken. That preserves the spine through the body of the song while
-allowing the one breakdown the sources actually use.
-
-**Bass** moves underneath at roughly half Rhythm's density — ~1.6 notes/beat against ~2.7 —
-in longer note values. It shares the harmony but never competes for the pulse.
-
-**Lead 1** sits in a narrow band above MIDI 70, clear of Rhythm's 46–72 register, so the two
-never mask each other.
-
-**Lead 2**, when present, takes a second narrow band offset from Lead 1's by at least a fifth,
-at lower velocity. It never doubles Lead 1 at the unison or octave.
-
-**Pads** hold 8-beat-plus sustains, changing only at chord boundaries.
-
-**Texture** is event-driven, not a wash — sweeps at section boundaries.
-
-**Stereo width comes from two sources, never both at once.** When `KOS-LEAD-017 "Second
-Sequencer"` fires (30% of songs), Rhythm and Lead 2 are two real sequencer lines panned to
-opposite positions — the measured `seq1l`/`seq2r` arrangement, reproduced rather than
-simulated. Otherwise Rhythm auto-pans alone.
-
-Detuning two voices onto the single Rhythm track is **not** used: it would double polyphony on
-the busiest track in the substyle, where splitting the same load across Rhythm and Lead 2
-costs the same and sounds more like the source.
+**Determinism.** Space must not change what an existing base-Kosmic or Drift seed generates,
+except that some base seeds now roll Space. That is the same trade Europe made. The Space
+decision reuses Drift's existing roll value, and every *new* draw comes from a stream derived
+from the song seed, so existing draws keep their order. Where Space skips a base step (the
+bridge roll, the base tempo pick), it still consumes the RNG slot, as Drift already does.
 
 ---
 
-## Rule Catalog
-
-### Implementation conventions
-
-Each rule below carries an **Implementation** paragraph specifying step placement, pitch
-selection, velocity and gate. These are written against the real APIs:
-
-- `MIDIEvent(stepIndex:note:velocity:durationSteps:)`. `stepIndex` is absolute —
-  `bar * 16 + stepInBar`. One step is a sixteenth, so a bar is 16 steps and a beat is 4.
-- `TonalGovernanceEntry` gives `chordWindow` (with `startBar`, `lengthBars`, `chordRoot` as a
-  degree string, and `chordTones` as a `Set<Int>` of pitch classes) plus `sectionMode`.
-- Rule functions follow the existing per-bar signature in the Cosmic generators, e.g.
-  `(barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, rng: inout SeededRNG, totalBars: Int, isBody: Bool) -> [MIDIEvent]`.
-- Register clamps are applied after pitch-class selection, by transposing octaves until the
-  note falls inside the stated MIDI range.
-- **Velocity is 80 flat on every melodic track** unless a rule says otherwise. The corpus
-  showed one velocity per track throughout; this is deliberate, not an oversight.
-
-Each new rule must also be added to its generator's `rules`/`weights` arrays, which is where
-the percentages below are applied.
+## Phase 1 — Oxygène
 
-
-Weights sum to 100% per track. Rules marked *(shared)* already exist; the rest are new and
-continue each track's existing numbering.
+Everything here is built in Phase 1. Space songs are all Oxygène until Phase 2 lands.
 
-### Drums
-
-**KOS-DRUM-000 "No percussion"** *(shared)* — 35%
-Many Jarre sections have no kit at all; the sequencer carries the pulse.
-
-**KOS-DRUM-001 "JMJ Mini Pops"** *(shared)* — 35%
-The existing preset-box pattern, already named for this artist. Plays continuously.
+### Frame
 
-**KOS-DRUM-010 "Phased Pulse"** — 20%
-The Mini Pops pattern, but **dropping out for one or two stretches of 16–32 bars** and
-returning — measured from Magnetic Fields Part 1, where percussion goes silent twice for 24
-bars each across 152 bars. Entries and exits land **on section boundaries**, coinciding with
-the `KOS-TEXT-005` sweep, so the kit arriving or leaving reads as the section changing rather
-than as an arbitrary gap.
-
-Constraints: never drop out in the first 16 bars; never leave more than half the song
-drumless; gaps are whole sections, never short. The dropouts are long and deliberate — the
-corpus shows no short gaps or fills-as-breaks, so neither should this.
-
-*Implementation.* Reuses the `KOS-DRUM-001` per-bar pattern unchanged; this rule only decides
-**which bars are silent**. At generation time, before emitting any bars, build the gap set:
-roll 1 or 2 gaps (50/50); for each, draw a length of 16, 24 or 32 bars (weights 0.3/0.4/0.3)
-and a start bar that is a multiple of 8, at least bar 16, and does not overlap an existing gap
-or extend past `totalBars - 8`. If the two gaps together would exceed `totalBars / 2`, drop
-the second. Then `guard !gapBars.contains(bar) else { return [] }` at the top of the per-bar
-function. Because gap starts are multiples of 8 they coincide with chord-window and section
-boundaries, which is what makes entries and exits read as structural.
+**Space roll.** One draw, shared with Drift:
 
-Note this is the only drum behaviour Zudio cannot express through the arrangement filter:
-`ArrangementFilter.subjectTracks` excludes Drums entirely, so the phasing must be built into
-the rule itself. Motorik Arcade's `MOT-DRUM-011 "Light Four"` is the precedent — it phases
-its kick in and out internally for the same reason.
+```
+let roll = rng.nextDouble() // the existing Drift draw
+isKosmicDrift = roll < driftShare
+isKosmicSpace = !isKosmicDrift && roll < driftShare + spaceShare
+```
 
-**KOS-DRUM-009 "Dense Sixteenth Pulse"** — 10%
-Mechanical sixteenths confined to a narrow 36–51 range. No fills, no humanisation, no
-velocity variation — the preset-box character comes from its refusal to vary. Continuous
-throughout, matching Magnetic Fields Part 2's unbroken 276 bars.
+**Testing split: Drift 10 / Space 80 / base 10**, so a test batch is mostly Space. Keep the two
+shares as named constants in one place, because they will be readjusted when testing is done.
+The intended release split is Drift 30 / Space 25 / base 45, to be confirmed by listening.
 
-*Implementation.* Every bar, identically: closed hat (42) on even steps 0,2,4,6,8,10,12,14;
-kick (36) on steps 0 and 8; snare (38) on steps 4 and 12. Twelve events per bar = 3.0
-notes/beat. Velocity 80 on all three voices with **no variation whatsoever** — do not apply
-the humanisation the other Kosmic drum rules use. `durationSteps: 1`. No fills at section
-boundaries, no intro or outro variant — identical output in **every bar it plays**. When the
-track enters and leaves is set by the arrangement arc (see Song Structure), not by this rule.
+While the testing split is in force, Drift's threshold moves from 0.30 to 0.10, so some
+existing Drift seeds generate differently. That is accepted for testing. The determinism test
+below pins base and Drift seeds against the release split, and runs only once the release
+values are restored.
 
-Excluded: `KOS-DRUM-002`, `004`, `005`, `006`, `007`, `008`.
+**Tempo.** 100–124, triangular with a peak at 118. The corpus's Oxygène pieces run 100, 110
+and 121. Draw it on the derived stream, consume the base tempo slot, and apply it before the
+bar count is chosen so song length stays 225–270 seconds.
 
-### Bass
-
-**KOS-BASS-018 "Pulsing Stepwise Bass"** — 50%
-Register 29–46. **At least 75% of melodic intervals a 2nd through 4th, no leaps above a
-fifth**, note duration ~0.5 beat, density 1.5–2.0 notes/beat.
+**Harmony family**, drawn per song:
 
-Pulse and movement are separate axes and this rule requires both: *pulsing* is rhythm — a
-steady unbroken subdivision — while *stepwise* is pitch. **Never rest, never drone.** The
-pulse stays constant while the pitch keeps moving.
+- **Oxygène Dorian Vamp** (55%) — Dorian. *Oxygène 4.*
+- **Oxygène Aeolian Cycle** (30%) — Aeolian. *Oxygène 8.*
+- **Oxygène Two-Chord Sway** (15%) — Aeolian or Dorian 50/50. *Oxygène 3.*
 
-This applies *within the bars the bass plays*. Whether the track is playing at all is the
-arrangement arc's decision, not this rule's — the same separation as `KOS-DRUM-009`. Measured
-bass tracks drop out in 5 of 5 sources, so the part leaving is expected; the part idling is not.
-
-*Implementation.* Emit on all eight even steps of every bar — 0,2,4,6,8,10,12,14 — giving 2.0
-notes/beat with no rests. `durationSteps: 2` (legato, each note running into the next),
-velocity 80 flat.
-
-Pitch is a constrained walk over scale pitch classes:
+The family sets the song mode. These are new `KosmicProgressionFamily` cases. The enum is
+`Codable`, so new cases are appended and existing raw values never change.
 
-1. On step 0 of each **chord window**, anchor to `chordWindow.chordRoot` transposed into
-   MIDI 29–46.
-2. For every subsequent note, draw a scale-degree step of ±1 or ±2 (weights 0.7 / 0.3).
-3. Direction is drawn 60/40 **toward the current chord root** — measured as whether the
-   candidate reduces the semitone distance to the root — which prevents the walk drifting to
-   the register edges over a 16-bar window.
-4. Reject and re-draw any candidate whose interval from the previous note exceeds 7 semitones,
-   or which falls outside MIDI 29–46. After three rejections, snap to the nearest chord tone.
-5. On step 0 of every bar, if the current note is not a chord tone, move to the nearest one.
+**Percussion style.** A new `PercussionStyle` case for `KOS-DRUM-009`, appended to the enum.
 
-That produces roughly 75–85% intervals of a 2nd–4th with no leaps above a fifth, matching the
-measurement, without hard-coding the percentages.
+### Harmony: the chord-cycle builder
 
-**KOS-BASS-002 "Root-Fifth Slow Walk"** *(shared)* — 25%
-Slow root-and-fifth movement; sits under a busy sequencer without competing.
+New code in `KosmicStructureGenerator`, used only when `isKosmicSpace`. It replaces the 1–2
+random chords per section with a cycle looped through the section.
 
-**KOS-BASS-017 "Four-bar hold, root sustain"** *(shared)* — 25%
-The long-hold option for sections where the sequencer carries everything.
+A cycle is data: an array of `(degree: String, type: ChordType, bars: Int)`. Degree strings
+are the ones `degreeSemitone` already accepts ("1", "2", "b3", "4", "b6", "b7" and so on).
+Each window is built with `NotePoolBuilder.build`, exactly as today.
 
-Excluded: `KOS-BASS-003`, `004`, `008`, `010`, `011`, `012`, and any single-pitch drone bass.
+- **Body sections (A and B)** loop the cycle from the section's first bar, cutting the last
+  window short at the section end.
+- **Intro and outro** stay on the tonic, as Kosmic already forces. This doubles as the corpus's
+  pedal intro.
+- **Every window is 2 or 4 bars** and starts on an even bar. `KOS-PADS-001` re-attacks on even
+  bars only, so an odd-bar change would leave the pad holding the old chord for a bar. If any
+  Kosmic intro length is odd, round it to even for Space.
+- **Variation.** Every fourth pass through the cycle takes its alternate last window, where
+  the family has one.
 
-### Lead 1
+**Phase 1 cycles:**
 
-**Both Lead 1 rules draw from a single song motif rather than generating each phrase
-independently.** This is what separates a memorable line from a plausible one: Jarre's
-melodies are short, strongly shaped and repeated with conviction. A fresh random walk per
-phrase satisfies the interval statistics and is forgettable.
+- **Oxygène Dorian Vamp** — i ×4, ii ×2, then a last window drawn per pass: i ×2 (50%),
+  bIII ×2 (25%) or IV ×2 (25%). Measured from Oxygène 4, both transcriptions: i ×4, II ×2,
+  bIII or IV or i ×2. The 1-bar bIII–IV pair in the source becomes one 2-bar window, to keep
+  the even-bar rule.
+- **Oxygène Aeolian Cycle** — i ×4, bVII ×2, iv ×2. Alternate last window: bVI ×2. Measured
+  from Oxygène 8. Its occasional V (major) turnaround is left for Phase 2's harmonic-minor
+  families.
+- **Oxygène Two-Chord Sway** — i ×2, v ×2. Oxygène 3 alternates every bar; 2 bars keeps the
+  even-bar rule and suits the slower pace.
 
-*Motif construction and use.* At song start, build one motif and reuse it all song:
+Chord types: minor for i, ii, iv and v; major for bIII, IV (Dorian), bVI and bVII. Where the
+mode makes a type non-diatonic, `NotePoolBuilder` already guards the clash.
 
-- The motif is an array of `(degreeOffset, stepOffset, durationSteps)`, length 4...8, where
-  `degreeOffset` is a **scale-degree offset from the chord root**, not an absolute pitch. Storing
-  it relatively is what lets it transpose correctly when the harmony moves.
-- Build it using the interval rules of whichever Lead 1 rule was drawn — stepwise for
-  `KOS-LEAD-013`, leap-dominant for `KOS-LEAD-015`. The motif inherits the rule's character.
-- `stepOffset` values are drawn from the rule's placement grid and are strictly increasing.
+### Structure
 
-Each time the lead enters, it **states the motif**, realised against the current chord:
+Space uses `KosmicStructureGenerator` as it is, with three changes:
 
-- Statements 1 and 2: exact, transposed to the current chord root.
-- From statement 3 on, apply one variation drawn per statement: **diatonic transposition** by a
-  third or fourth (0.35), **contour inversion** around the first note (0.2), **rhythmic
-  displacement** by 2 or 4 steps (0.25), or **tail extension** — hold the final note twice as
-  long (0.2).
-- Every fourth statement is exact again, whatever the draw. Returning to the plain form is what
-  makes the variations read as variations rather than as drift.
-- Rest 4...12 steps between statements, as before.
+- **Forms** ab 25%, aba 30%, abab 30%, abba 15%. No `single_evolving`: without a B section
+  the riff never plays.
+- **No bridges.** The bridge roll still consumes its RNG draw but always fails for Space. This
+  removes the Electric Buddha drum bridges, the bridgeAlt call-and-response, bridgeMelody and
+  the X-Files whistle, none of which is Jarre.
+- **Chord windows** come from the cycle builder above.
 
-Two songs generated under this scheme share a character and no material; within one song, the
-listener hears the same idea developing.
+Nothing else changes. Intro, A, B and outro keep their existing lengths and intensity labels.
 
+### Rule pools
 
-**KOS-LEAD-006 "JMJ evolving phrase"** *(shared)* — 35%
+Each track's pool when `isKosmicSpace`, with weights. Rules not listed are excluded.
 
-**KOS-LEAD-004 "Echo melody"** *(shared)* — 25%
-Sparse phrases with space around them, suited to the delay this track carries.
+- **Drums** — `KOS-DRUM-009` Oxygène Preset Box 85%, `KOS-DRUM-000` No percussion 15%
+- **Bass** — `KOS-BASS-018` Oxygène Falling Walk 75%, `KOS-BASS-001` Berlin School drone 25%
+  (reused)
+- **Rhythm** — `KOS-RTHM-016` Oxygène Octave Sequencer 100%
+- **Pads** — `KOS-PADS-001` Eno long drone 100% (reused, string instruments)
+- **Lead 1** — `KOS-LD1-013` Oxygène Falling Theme in A sections, `KOS-LD1-014` Oxygène See-Saw
+  Riff in B sections. Both fire in every Space song through the existing A/B rule split.
+- **Lead 2** — `KOS-LD2-000` No lead 2 50%, `KOS-LEAD-004` Echo melody 50% (reused)
+- **Texture** — `KOS-TEXT-005` Oxygène Surf Sweep 100%
 
-**KOS-LEAD-013 "Narrow Step Melody"** — 20%
-Confined to a **7–13 semitone band above MIDI 70** for the whole song, with 2nd–4th intervals
-dominant and leaps above a fifth rare.
+### New rules
 
-*Implementation.* At song start, draw a band: low edge uniformly from 70...74, width uniformly
-from 7...13. Every note is clamped into that band for the entire song.
+Steps are 16ths: 16 steps a bar, 4 a beat, `stepIndex = bar * 16 + step`. "Root" means
+`chordWindow.chordRoot` in the current window. Every pitch is snapped to the song's scale
+after transposition. Register clamps fold by octaves, never clamp to the edge.
 
-Phrases: draw length **3...6 notes** (measured median 4). Notes land on even steps (0,2,4,...)
-within the bar, starting at step 0 or step 8 (50/50). `durationSteps: 2`, velocity 80.
+#### KOS-DRUM-009 "Oxygène Preset Box"
 
-**Silence between phrases is drawn to roughly match the phrase's own length** — measured
-ratio is 1.0:1, so a phrase spanning 13 steps is followed by about 13 steps of rest. Draw the
-rest as 0.8...1.4 × the phrase span, minimum 8 steps. A fixed short rest would make the lead
-chatter; matching silence to statement is what makes each phrase land.
+*The Minipops pattern measured on Oxygène 4, identical in both transcriptions (104 of 104
+bars).*
 
-Pitch: first note of each phrase is a member of `chordWindow.chordTones` inside the band.
-Subsequent notes walk ±1 or ±2 scale degrees (weights 0.65 / 0.35); reject any interval above
-5 semitones and re-draw. If a candidate leaves the band, reflect the direction rather than
-clamping, so the line turns around instead of flattening against the edge.
+Every bar the same:
 
-**KOS-LEAD-015 "Wide Interval Hook"** — 20%
-The inverse profile: sparse and leap-dominant, a **10–14 semitone window above MIDI 70**,
-noticeably thinner than the sequencer beneath it. Fourths, fifths, sixths and octaves are the
-working vocabulary.
+- **Closed hat (42)** — steps 0, 1, 4, 5, 6, 8, 9, 10, 12, 13, 14 (`xx..xxx.xxx.xxx.`)
+- **Kick (36)** — steps 0, 2, 6, 10 (`x.x...x...x.....`)
+- **Clap (39)** — steps 4, 12
+- **Open hat (46)** — step 2
+- **Accent** — one voice on step 12, drawn per song: side stick (37), high tom (50) or
+  tambourine (54)
 
-*Implementation.* Band drawn as for `KOS-LEAD-013` but wider: low edge 70...74, width 10...14.
+`durationSteps: 1`. **No fills, no transition fills, no cold-start pickup, no intro or outro
+variants.** The preset box never varies, which is its character. It plays through intro and
+outro.
 
-Placement is sparse — notes on steps 0, 6, 10 of a bar, or 0, 4, 12, chosen per phrase — giving
-0.75 notes/beat. `durationSteps: 3` (longer than the step melody, so the sparseness reads as
-deliberate rather than absent), velocity 80.
+*Homage draws, per song:*
 
-Pitch: first note of each phrase is a chord tone in the band. Each subsequent interval is drawn
-from **5, 7, 9 or 12 semitones** (weights 0.3 / 0.3 / 0.2 / 0.2) with direction drawn fresh per
-note, then snapped to the nearest scale pitch class. Roughly one note in five may instead take
-a 2nd, to avoid the line becoming mechanically angular. If a candidate leaves the band, invert
-the direction and retry once, then fall back to the nearest in-band chord tone.
-
-Phrase length 4...8 notes, **contour direction drawn per phrase** rather than following any
-fixed rise-and-fall. This is the rule where a fixed shape would make the output recognisable
-as its source, so the shape must come from the draw.
+- **Hat mask** — the source (above, 0.25), or one of three variants that each move one gap
+  (0.25 each):
+  - `xx..xxx.xx.xxxx.`
+  - `x.x.xxx.xxx.xxx.`
+  - `xx.xxx..xxx.xxx.`
+- **Kick** — the source (0.4) or steps 0, 6, 10 (0.6)
 
-Excluded: `KOS-LEAD-001`, `002`, `003`, `005`, `007`, `008`, `009`, and `KOS-LD1-010/011/012`.
+*Repeat guard:* drop one hat hit in every eighth bar, so no stretch exceeds 8 identical bars.
 
-**Glide is not used.** The pitch-bend infrastructure exists — `PlaybackEngine` runs a 60fps
-per-track vibrato — but no glide was measurable in any source, so no rule depends on it.
+#### KOS-BASS-018 "Oxygène Falling Walk"
 
-### Lead 2
+*Oxygène 4 bass, both transcriptions (89 of 105 and 94 of 114 bars in the main pattern).*
 
-Jarre runs 10–14 tracks and layers melodic voices freely; Zudio has seven. Leaving Lead 2
-idle would waste the one spare voice available, so it is active in **four songs out of five**.
-It does not have to carry a melody: the corpus's most distinctive texture is two *sequencer*
-lines, not two leads.
+Six notes a bar, rhythm `x...x.x...x.x.x.` (steps 0, 4, 6, 10, 12, 14). Pitches are chord
+tones relative to the root, measured as octave, b7, octave, 5, b7, 5:
 
-**KOS-LEAD-017 "Second Sequencer"** — 30%
-Lead 2 carries a companion sequencer line rather than a melody. Same cell construction as `KOS-RTHM-016`, in the same 46–72 register, on a different
-instrument, panned opposite to Rhythm.
+- step 0: **top**, held 4 steps
+- step 4: **mid**, held 2 steps
+- step 6: **top**, held 4 steps
+- step 10: **low**, held 1 step
+- step 12: **mid**, held 2 steps
+- step 14: **low**, held 1 step
 
-*Implementation.* Call the same cell builder, with two differences: draw a **different cell
-length** from `KOS-RTHM-016`'s (retry until they differ), and offset the emission by 2 steps.
-Two coprime cell lengths of different sizes phase against each other as well as against the
-bar, which is what produces the shifting interlock rather than a doubled unison. Velocity 72 —
-slightly under Rhythm, so Rhythm stays the lead voice of the pair. This reproduces the measured `seq1l`/`seq2r`
-pair directly instead of approximating it, and spreads the polyphony across two tracks rather
-than doubling it on one.
+Register MIDI 29–46, with the top note an octave above the root.
 
-When this rule fires, Rhythm and Lead 2 form the stereo pair and Rhythm's auto-pan is
-disabled — the width comes from the two tracks sitting at opposite positions.
+*Homage draws, per song:*
 
-**KOS-LEAD-014 "High Counter-Line"** — 30%
-A second narrow band offset from Lead 1's by a third to a fifth — close, not distant, matching
-the tight register clustering measured in Magnetic Fields Part 2.
+- **Falling set (top, mid, low)** — octave/6th/5th (0.35), octave/5th/3rd (0.35),
+  octave/b7/5th (0.30, the source)
+- **Rhythm** — the source (0.6), or `x.x.x.x...x.x.x.` (0.4), the second transcription's
+  alternate
 
-*Implementation.* Band low edge = Lead 1's low edge + 3...7 semitones, width 7...10. Phrases of
-3...6 notes on even steps, `durationSteps: 2`, velocity 68.
+*Within song:* in 1 bar of 8 the figure shifts up a step, with 9th, octave and 6th in place of
+top, mid and low (measured in 5 of 105 bars), so it does not repeat for a whole song.
 
-**Interleaving is the point**: generate Lead 1 first, then emit Lead 2 phrases only into step
-ranges where Lead 1 is resting. If Lead 1 is active for more than 70% of the song, drop every
-second Lead 2 phrase rather than layering them. Pitch selection as `KOS-LEAD-013`.
+#### KOS-RTHM-016 "Oxygène Octave Sequencer" — and the sequencer engine
 
-**KOS-LEAD-016 "Doubling Layer"** — 20%
-Thickening rather than counterpoint. The analogue of the duplicate-pair habit the corpus shows
-on both sequencer and pad tracks.
+*Oxygène 4 sequencer (45 of 104 bars in the main pattern, the rest one-gap variants).*
 
-*Implementation.* This rule generates no rhythm of its own. Take Lead 1's emitted events and,
-for each, emit a matching event at the same `stepIndex` and `durationSteps`, transposed by a
-fixed offset drawn once per song: **+12 semitones (0.5), +4 (0.25), or +9 (0.25)**, snapped to
-the nearest scale pitch class so thirds and sixths stay diatonic. Velocity 60 — well under Lead
-1's 80, so the pair reads as one enriched voice.
+**The engine.** One function, `jmjStepSequencer(pattern:)`, used by every Space sequencer rule
+in every phase. A pattern is 16 steps, each a rest or one of the slots root, octave, fifth,
+lower neighbour (a semitone below the root, or the scale tone below) or third. Each bar the
+engine emits the pattern against the current chord root. Register MIDI 48–64 (measured 48–62):
+root in the octave starting at 48–55, other slots above it. `durationSteps: 1`. The same pattern plays
+every bar. The chord transposes it, so with 2–4-bar chords no long identical run occurs.
 
-If Lead 1 draws `KOS-LEAD-015` (the sparse hook), skip every second doubled note; doubling a
-sparse line note-for-note thickens it into something less sparse, which defeats that rule.
+**The Oxygène pattern** (source):
 
-**The effects are what make this work.** Doubled at the same register with the same treatment,
-the second voice just adds volume. Lead 2 therefore takes a different chain from Lead 1:
+`R . O . R O R . O O R . O R O .`, which is root and octave alternating on steps 0, 2, 4, 5, 6,
+8, 9, 10, 12, 13 and 14.
 
-- **Vibrato** — slow and shallow. This is the substitute for the parallel-detuned-oscillator
-  shimmer described in kosmic-plan.md §2: an LFO on pitch against a dry Lead 1 produces the
-  same beating, and Zudio drives it through the existing 60fps per-track modulation rather
-  than needing anything new.
-- **Pan** — offset from Lead 1's position, so the pair occupies width rather than stacking in
-  the centre.
-- **Air** — presence peak plus high shelf, placing the double *above* Lead 1 in brightness so
-  the ear reads it as sheen rather than as a second player.
+*Homage draws, per song:*
 
-Lead 1 stays comparatively dry so the contrast is audible. If Lead 1 already carries delay,
-Lead 2 should not — two delays on near-identical phrase rhythms smear into mud.
+- **Mask** — the source (0.25), or one of the measured thinner variants (0.25 each): without
+  step 9, without steps 9 and 13, or without steps 4, 9 and 13
+- **Slot swap** — in 25% of songs the octave becomes the fifth throughout
 
-**KOS-LD2-000 "No lead 2"** *(shared)* — 20%
-Reserved for the sparsest songs, where Lead 1 alone over the sequencer is the point.
+*Rhythm never rests* except where the song's form gives it silence (Phase 2 breakdowns).
+`ArrangementFilter` excludes Rhythm from block-silencing for Space, as Arcade does for Lead 1.
 
-### Rhythm
+Phase 2 and 3 sequencer rules are new presets for this engine, not new code.
 
-**KOS-RTHM-016 "Long Sequencer Cell"** — 30%
-A repeating cell of **9–15 steps**, sixteenth notes, register 46–72. Intervals weighted to
-2nds and 3rds with leaps above a fifth under 10%. The cell repeats unchanged for the whole
-chord window.
+#### KOS-LD1-013 "Oxygène Falling Theme"
 
-*Implementation.* Build the cell once per chord window, then loop it continuously.
+*Oxygène 4 theme, both transcriptions. In the source it is on a second voice. Here it moves to
+Lead 1 for the A sections, which is how the source alternates theme and riff.*
 
-1. Draw cell length `N` uniformly from 9...15. **Do not draw 16 or a divisor of 16.** A cell
-   whose length is coprime with the 16-step bar phases against the barline — a 13-step cell
-   starts three steps later each bar and realigns only after 13 bars. That drift is the
-   Berlin-school sequencer character and the main reason this rule exists; a 16-step cell
-   would lock to the bar and sound static.
-2. Each of the `N` cell elements is a note with probability 0.7, otherwise a rest. Redraw the
-   whole cell if it yields fewer than 6 notes. At ~70% fill this gives ~2.8 notes/beat,
-   matching the measured 2.74.
-3. Pitch per note element: start on `chordWindow.chordRoot` in MIDI 46–72, then walk ±1 or ±2
-   scale degrees (weights 0.6 / 0.4), rejecting any interval above 7 semitones. Every third
-   note element, snap to the nearest member of `chordWindow.chordTones`.
-4. Emit by absolute step: for each step `t` in the chord window, the cell element is
-   `t % N`; if it is a note, emit at `stepIndex = barStart + t`.
-5. `durationSteps: 1`, velocity 80 flat.
+A 2-bar statement. Five notes in rhythm `x.....x.x.x...x.` (steps 0, 6, 8, 10, 14), falling
+from high through chord tones to the root:
 
-The cell is regenerated at each new chord window, so harmony changes bring a new figure while
-the character stays constant.
+- step 0: **top**, held 6 steps
+- step 6: **5th**, held 2
+- step 8: **3rd**, held 3
+- step 10: **5th**, held 3
+- step 14: **root**, held through the next bar (about 16 steps)
 
-**KOS-RTHM-008 "JMJ Oxygen 8-bar arc"** *(shared)* — 30%
+The second bar of each statement is the held root, then the next statement begins. Register:
+the top note in 72–84, the root an octave below it.
 
-**KOS-RTHM-005 "JMJ dual arpeggio"** *(shared)* — 25%
-The closest existing rule to the measured stereo sequencer pair, and the natural home for the
-auto-pan treatment.
+*Homage draws, per song:*
 
-**KOS-RTHM-003 "JMJ oscillation"** *(shared)* — 15%
+- **Top note** — the octave above the root (0.3, the source), the 6th (0.35, measured as the
+  second pattern) or the 4th (0.35)
+- **Inner line** — 5–3–5 (0.35, the source), 5–4–5 (0.35), or 6–5–3 (0.3)
+- **Rhythm** — the source (0.6), or the compressed form both transcriptions also use: four
+  notes on steps 0, 2, 4, 6 falling by step to the root, the last held through the bar (0.4)
 
-Excluded: `KOS-RTHM-001`, `002`, `004`, `006`, `009`, `010`, and `011`–`015` — Space's Rhythm
-track is a sequencer, not a comping instrument.
+*Within song:* statements 1 and 2 exact. From statement 3, one variation per statement:
 
-### Pads
+- transposed to the current chord root (0.4)
+- the opening note dropped and the figure starting on step 6 (0.3)
+- the final root replaced by the 5th, left open (0.3)
 
-**KOS-PADS-009 "Long Sustain Layer"** — 40%
-Note durations of **8 beats or longer**, 2–4 simultaneous voices, changing only at chord
-boundaries.
+Every fourth statement is exact. One statement in four is replaced by 2 bars of rest, so the
+theme breathes. Measured: the theme sounds in about half the bars of its sections.
 
-*Implementation.* Emit only on step 0 of a chord window, and again every 8 bars within a window
-longer than 8 bars (so a 16-bar chord re-attacks once, keeping the sound alive without
-introducing movement).
+#### KOS-LD1-014 "Oxygène See-Saw Riff"
 
-Voice count drawn 2...4 per song and held. Pitches are members of `chordWindow.chordTones`,
-voiced in MIDI 51–72, spaced at least 3 semitones apart, lowest voice on the chord root.
-`durationSteps: 32` for an 8-bar window, or 128 for a 16-bar window — i.e. the full span to
-the next attack, so voices sustain without gaps. Velocity 70.
+*Oxygène 4 riff, both transcriptions. B sections only.*
 
-Voices enter staggered: first at step 0, each subsequent voice 1...3 steps later. That
-stagger is what keeps a stacked chord from sounding like one triggered sample, and is the
-cheap approximation of the layered string machines in the source.
+Six notes rocking between an **anchor** (a chord tone) and a **pivot** a fixed interval above
+it: anchor on steps 0, 2 and 5, pivot on steps 1, 4 and 6, step 3 silent. The last pivot is
+held about 9 steps, through the rest of the bar. Notes 1 step long. Register 72–84,
+a 12-semitone band.
 
-**KOS-PADS-001 "Eno long drone"** *(shared)* — 35%
+Stated once a bar for 2 bars on a chord, then following the chord, so the anchor moves to the
+new root. The source's interval also follows the chord (fifth, then minor sixth), so the pivot
+is snapped to the scale after transposition.
 
-**KOS-PADS-002 "Vangelis swell"** *(shared)* — 25%
+*Homage draws, per song:*
 
-Excluded: `KOS-PADS-003`, `006`, `007` — the gating fights the sequencer.
+- **Interval** — fourth (0.3), sixth (0.3), octave (0.2), fifth (0.2, the source)
+- **Grouping** — 3+3 as source (0.4), 2+2+2 on steps 0, 1, 3, 4, 6, 7 (0.3), or 3+2 on
+  steps 0, 1, 2, 4, 5 (0.3). All fit in half a bar.
+- **Position** — first half of the bar (0.6, source) or second half, starting step 8 (0.4)
+- **Anchor** — below the pivot (0.6, source) or above it, rocking downwards (0.4)
 
-### Texture
+*Within song:*
 
-**KOS-TEXT-005 "Oxygène Sweep"** — 40%
-Filtered noise rising or falling across 2–4 bars, **placed at section boundaries rather than
-randomly** — the placement is what makes it structural rather than decorative. Uses White
-Noise Wave (bank 12, program 122).
+- In 1 bar of 8, the anchor moves up to the chord's 4th (measured in 5 of 45 bars).
+- The riff plays every bar of its B section, as in both transcriptions. The breathing comes
+  from the A sections, where the theme rests about half the time.
+- In the last B section, every second statement may drop to a single 3-note group, thinning
+  the riff towards the outro.
 
-*Implementation.* Identify boundary bars: the first bar of each section, plus the first bar of
-any chord window at least 8 bars long. At each, with probability 0.7, emit a sweep.
+#### KOS-TEXT-005 "Oxygène Surf Sweep"
 
-A sweep is a **single long note**, not a run: one event at step 0 of the boundary bar minus
-2...4 bars — i.e. it begins *before* the boundary and lands on it — with
-`durationSteps: 32...64` (2–4 bars). Pitch is the chord root transposed into MIDI 60–72;
-direction is carried by the `sweep` filter effect on the Texture track rather than by note
-movement, which is why one held note suffices.
+*Oxygène 4, 6 and 8. Oxygène 4's swells start a beat before the boundary and run about two
+bars.*
 
-Velocity 64 rising to 80 across the song's sweeps, so later boundaries land harder. Never emit
-two sweeps within 8 bars of each other; if boundaries fall closer than that, keep the first.
+One long note per event on the noise instrument, starting at step 12 of the bar before an
+8-bar boundary and held 32 steps. Pitch is the chord root in MIDI 60–72. The direction of the
+swell comes from the Texture track's `sweep` effect, not from note movement.
 
-**KOS-TEXT-003 "Spatial sweep chromatic"** *(shared)* — 30%
+- **Boundaries** — every section start except the first bar of the song, plus every 8th bar
+  inside a body section. Emit at 70% of them, never within 8 bars of the previous event.
+- **Variant** (25% of songs) — Oxygène 6's wash: a 2-bar swell every 2 bars through B sections
+  only, nothing in A.
 
-**KOS-TEXT-002 "Distant Pulse"** *(shared)* — 30%
+The automatic Kosmic filter sweep is switched off for Space. Its guard already excludes Drift
+and needs to exclude Space too, so the two sweeps don't stack on the same boundaries.
 
-Excluded: `KOS-TEXT-001` (competes with the sequencer), `004`.
+### Reused rules
+
+Used unchanged, with notes on why each is close enough.
+
+- **`KOS-PADS-001` "Eno long drone"** — root, fifth, octave and upper third, re-attacked every
+  2 bars on the current chord, swelling over 32 bars. With 2- and 4-bar chord windows it
+  follows every change, which makes it the Oxygène string machine once it plays a string
+  instrument. Its 1-in-8 breath gap matches the corpus's pads leaving and returning.
+- **`KOS-BASS-001` "Berlin School drone"** — root held 2 bars, re-attacked. It stands in for
+  the long-held basses of Oxygène 3 and 6 and the unnumbered Oxygène.
+- **`KOS-LEAD-004` "Echo melody"** — a 2-bar phrase, 2 bars rest, the phrase a third away, 2
+  bars rest. That is the corpus's statement-then-equal-silence. On Lead 2 it answers the theme
+  without competing.
+- **`KOS-LD2-000` "No lead 2"** and **`KOS-DRUM-000` "No percussion"** — as named.
+
+### Things Kosmic does that Space switches off
+
+Each is a flag check, following the existing Drift checks:
+
+- **Bridges, and the X-Files whistle** that lives in them
+- **Bass sub-layers** — the `KOS-RULE-17` staccato layer and the `KOS-RULE-23` tremolo layer.
+  `KOS-BASS-018` is a complete figure, and extra layers blur it.
+- **Drum fills and pickups** — the transition fill before section changes and the cold-start
+  pickup
+- **Lead 1 B-section escalation** ("Technique D"). Space sets its own A and B rules instead.
+- **Lead 2 same-rule lag and sparse escalation.** Lead 2's pool here never draws a Lead 1 rule.
+- **The automatic filter sweep**, as above
+
+### Instruments
+
+**Appended to the Kosmic pools.** Appending keeps every existing index, so saved songs still
+point at the same sounds. Never reorder a pool. All are already in `Zudio.sf2` and unused by
+Kosmic, so they cost no memory.
+
+- **Lead 1** — Synth Brass 1 (0/62), Synth Brass 2 (0/63), 5th Saw Wave (0/86), Bright Saw
+  Stack (11/100)
+- **Lead 2** — Synth Strings 1 (0/50), Saw Lead (0/81), Square Lead 2 (12/80)
+- **Pads** — Synth Strings 3 (8/50), Synth Strings 4 (11/50), Synth Strings 5 (11/51), Stereo
+  Strings Slow (0/49)
+- **Rhythm** — Synth Bass 1 (0/38)
+- **Bass** — Fretless Bass (0/35)
+- **Texture** — White Noise Wave (12/122)
+
+**Space subsets**, enforced by both pick pools and the sanitiser:
+
+- **Lead 1** — Brightness, Synth Brass 1, Synth Brass 2, 5th Saw Wave, Bright Saw Stack. The
+  transcribers put synth brass and synth strings on Jarre's leads. The orchestral winds in the
+  Kosmic pool (Flute, Oboe, Recorder, Shenai) read as Vangelis and are excluded.
+- **Lead 2** — Brightness, Synth Strings 1, Saw Lead, Square Lead 2
+- **Pads** — Synth Strings, Synth Strings 3, 4 and 5, Stereo Strings Slow, Sweep Pad. Strings
+  are weighted to about 80% of picks.
+- **Rhythm** — Moog, Synth Bass 1, Harpsi Pad
+- **Bass** — Moog, Synth Bass 3, Fretless Bass
+- **Texture** — White Noise Wave only in Phase 1, since the sweep rule needs a noise source
+- **Drums** — 808 Kit, Machine Kit
+
+**Where pools live.** Adding instruments touches four places: `poolNames`, `poolPrograms`,
+`instrumentPickPool` and `instrumentPickPoolStatic`. The static one is the one usually missed.
+Check the user-facing instrument picker in `TrackRowView` and its iPhone mirror in
+`PhonePlayerView` show the appended names.
+
+**Bank audition.** The picks above come from preset names and the transcribers' choices, not
+from listening. Audition them in Phase 1. The string pad matters most. If no preset in the
+bank sounds like a string machine, an external Solina-type sample is justified: about 2 MB for
+a single extracted preset, licence permitting redistribution in a paid app, with
+musical-artifacts.com the place to look (search "Solina", "string ensemble", "string
+machine"). That is a Phase 1 listening decision, not a build step.
+
+### Effects and stereo
+
+- **Pads** take `sweep` in addition to Space's default reverb, slow and shallow, as the
+  stand-in for the Small Stone phaser on Jarre's string machine
+- **Rhythm** auto-pans across about ±40%
+- **Bass and Drums** hard centre
+- **Lead 1** centre or about 10% off
+- **Lead 2** about 20% opposite Rhythm's current side
+- **Pads** widest
+- **Texture** keeps its existing panning
+
+### Titles
+
+`KosmicTitleGenerator` needs no new logic. Weight Space toward patterns 1, 2, 7 and 8 (a
+coined word, a coined word plus a Roman numeral, fake-Greek, fake-Greek plus a numeral), which
+echo the "Part IV" convention.
+
+### Logging
+
+One `GenerationLogEntry` with tag `Space` naming the flavour and harmony family, for example
+`Space Oxygène, Dorian Vamp`. Each new rule's log line names its per-song draws, for example
+`KOS-LD1-014 Oxygène See-Saw Riff (sixth, 2+2+2, second half)`, so a song's character can be
+read from its log.
 
 ---
 
-## Instruments
+## Phase 2 — Magnetic
 
-### The source instruments
+Begins after Phase 1 has been listened to. It adds the second flavour, the breakdown, and the
+harmonic-minor and Phrygian families.
 
-What Jarre actually played, which determines what to reach for and what to avoid:
+### Flavour roll
 
-- **RMI Harmonic Synthesizer** — early *digital additive* synth. Provided the signature
-  chorused sound of the Oxygène Part 4 hook. Additive, not subtractive: the tone is built
-  from summed harmonics, bright and chorused rather than filtered.
-- **Eminent 310 Unique** — electric organ with an integrated string-synthesiser section.
-  Routed through an **Electro-Harmonix Small Stone phaser**, this produced the sweeping
-  string pads. The phaser is not optional — it is what makes the sound move.
-- **ARP 2600** — semi-modular. Analogue basslines, sound effects, rhythmic noise.
-- **EMS Synthi AKS** — suitcase synth with patch matrix; primary melodic and sound-design tool.
-- **EMS VCS3** ("The Putney") — pin-matrix modular, used for bubbling effects and unstable
-  analogue modulation.
-- **Mellotron M400** — tape replay, used for atmospheric and organic textural layers.
+A `KosmicSpaceFlavour` enum (`oxygene`, `magnetic`, later `chronologie`), stored on SongState
+and drawn on the derived stream: **Oxygène 50 / Magnetic 50** until Phase 3. The flavour picks
+the harmony family, drums, bass and sequencer preset. Lead 1, Lead 2, Pads and Texture draw
+from the shared Space pools, weighted toward the flavour.
 
-Three consequences for the picks below:
+**Magnetic tempo:** 92–132, peak 120.
 
-1. **The lead is additive and chorused, not a filtered sawtooth.** The Part 4 hook came from
-   the RMI Harmonic. A bright, shimmering, slightly chorused tone is closer than a resonant
-   saw lead — and closer still than a bare oscillator waveform.
-2. **The string pad needs modulation.** An unmodulated string ensemble is only half the
-   sound. See Effects Defaults.
-3. **Noise and bubbling belong on Texture**, from the ARP 2600 and VCS3 — which is what
-   `KOS-TEXT-005` and the FX presets are for. Mellotron sits here too, as atmospheric layer,
-   not as the string pad.
+### Breakdown
 
+The one structural addition. It is a **mute schedule**, built the way Motorik Europe's section
+dropout is:
 
-**No new samples required.** All of the following are already present and unused in
-`Zudio.sf2`. Because unused presets share sample data with used ones, wiring them up costs
-approximately **zero megabytes and zero additional CPU**, while giving Kosmic Space sounds
-heard nowhere else in the app.
+- One breakdown per song, in Magnetic songs (70%) and Oxygène songs (30%). 8 or 12 bars,
+  starting on an 8-bar boundary inside the second half of a body section, never in the first
+  24 bars or the last 16.
+- **Silent during it:** Rhythm, Lead 1 and Drums
+- **Changed:** Bass switches to long held roots, as `KOS-BASS-001` does. The chord-cycle
+  builder uses the family's **B-cycle** for those bars.
+- **Unchanged:** Pads continue, and Texture emits a surf sweep into it and out of it.
+- **Return:** drums re-enter on the next 8-bar boundary with the sweep landing.
 
-- **Lead 1** — **Brightness** (0/100, already at pool index 1), **5th Saw Wave** (0/86),
-  **Bright Saw Stack** (11/100), **Saw Lead** (0/81). Ordered by expected fit: the Part 4
-  hook came from an additive synth, so favour bright and chorused over resonant-and-filtered.
-  Brightness and the stacked/fifths presets get closer to an additive shimmer than a plain
-  saw lead does. All four are harmonically rich enough to carry a melody over a dense
-  sequencer, which is the baseline requirement.
+Measured from Magnetic Fields 1, whose two 12-bar breakdowns drop sequencer, lead and drums
+and change chord cycle.
 
-  *Raw Sine Wave and raw Square Wave are deliberately excluded.* A GM sine is a pure tone
-  with no harmonics, no filter movement and no envelope character — it either disappears
-  under the sequencer or reads as a test tone. Square is nearly as static. What Jarre played
-  was sawtooth through a resonant, envelope-shaped filter: harmonically dense and *moving*.
-  Sawtooth presets are the closest the bank gets; a bare oscillator waveform is authentic to
-  the synthesis method and wrong for the result.
+### Harmony families, Magnetic
 
-  Also excludes the orchestral winds in the base Kosmic pool (Flute, Oboe, Recorder,
-  Shenai) — those read as Vangelis.
+- **Magnetic Fields Harmonic Minor Arc** — i ×4, bVI ×4, iv ×4, V ×4, with V major. Mode
+  `HarmonicMinor`. *Magnetic Fields 1.* B-cycle: bIII ×2, i ×2, bVI ×2, V ×2.
+- **Magnetic Fields Harmonic Minor Turn** — i ×2, V ×2, bVI ×2, bVII ×2. Mode
+  `HarmonicMinor`. *Magnetic Fields 2.* B-cycle: iv ×2, V ×2, i ×4.
+- **Équinoxe Phrygian Cadence** — i ×8 (pedal), then iv ×2, bII ×2, bVII ×2, i ×2. Mode
+  `Phrygian`. *Équinoxe.* B-cycle: bVI ×4, bIII ×4.
+- **Magnetic Fields Major Descent** — I ×2, vi ×2, V ×2, IV ×2. Mode `Ionian`. *Magnetic
+  Fields 4.* B-cycle: iii ×2, IV ×2, ii ×2, V ×2.
 
-- **Lead 2** — **Saw Lead 2** (12/81), **Sawtooth Stab** (11/81), Square Lead 2 (12/80).
-  Square is defensible *here* but not on Lead 1: a doubling or counter voice benefits from
-  being thinner than the part it sits against, which is the same reason Air is applied to it.
+Weights: Arc 35, Turn 25, Phrygian 25, Major Descent 15.
 
-  **Pool extension required.** Neither the Kosmic Lead 1 pool
-  (`[73, 100, 68, 74, 89, 8080, 76, 111]`) nor Lead 2 (`[100, 70, 84, 85, 98]`) currently
-  contains these programs, so they must be **appended**. Appending is safe — it leaves every
-  existing index untouched, as adding Long Lake to the texture pool did. **Never reorder a
-  pool**: instrument assignments are persisted as indices, so reordering silently repoints
-  every previously saved song.
-- **Rhythm** — Moog (existing pool index 0; program 39 in this bank), Square Lead 3
-  (13/80). Moog sits in the sequencer's 46–72 register naturally, which is why it belongs
-  here rather than on Lead 1, where it would be too dark.
-- **Pads** — Synth Strings 3 (8/50), Synth Strings 4 (11/50), Synth Strings 5 (11/51), plus
-  the existing Synth Strings. **Weight these above the non-string pads** — strings are central
-  to the target sound.
-- **Bass** — Moog, Mono Synth, Synth Bass 3 (all existing in pool).
-- **Texture** — White Noise Wave (12/122), Starship (8/125), Shooting Star (12/127), Solar
-  Wind 2 (12/89), Echo Pan (2/102). This track carries the ARP 2600 noise and VCS3 bubbling
-  roles, and is also where a **Mellotron** sample would belong if one is added — as an
-  atmospheric layer, never as the string pad.
-- **Drums** — 808 Kit, Machine Kit (existing).
+**Oxygène B-cycles**, added in this phase for Oxygène breakdowns:
 
-**These picks are a starting point, not a final answer.** They were chosen by reading preset
-names and reasoning about synthesis, not by listening. Expect to audition more of the bank
-before settling — `Zudio.sf2` holds 156 presets and the audit found 64 unused, so there is
-substantial unheard material. `5th Saw Wave` is the one I would try first, since parallel
-fifths in the oscillator is characteristic of this repertoire.
+- Dorian Vamp: bIII ×2, IV ×2
+- Aeolian Cycle: bVI ×2, bIII ×2
+- Two-Chord Sway: iv ×4
 
-If the bank cannot supply a convincing lead or a usable filtered-noise sweep after that,
-an external sample is justified. The SC55 piano is the precedent: several free SF2 banks were
-compared — **Florestan, SC-55 variants, Velocity Grand, Yamaha PSR**, against the
-**GeneralUser GS** bank Zudio originally shipped — the best one chosen by ear, and a single
-preset extracted to a ~2 MB file rather than bundling a whole bank. Budget for Kosmic Space
-is 10–30 MB, which is generous by that standard.
+### New rules, Phase 2
 
-### Where to look
+**KOS-DRUM-010 "Magnetic Fields Rhythm Box"** — *Magnetic Fields 1, 2 and 4.*
 
-**[musical-artifacts.com](https://musical-artifacts.com/)** — the same library the SC55 piano
-came from (recorded in ambient-plan.md §6.1a). Libre soundfont resources, browsable by tag,
-format and licence.
+- Kick on steps 0, 3, 4, 7, 8, 11, 12, 15 (`x..xx..xx..xx..x`)
+- Ride (51) or closed hat on all 16 steps
+- Snare: off (0.5), or on steps 2, 3, 6, 10, 11, 14 (0.5, Part 2's pattern)
+- In 30% of songs, an agogo-style voice on the quarters, from Part 4
 
-The single highest-value target is the **string machine**. The instrument behind the string
-sound on *Oxygène* and *Équinoxe* was the **Eminent 310**, whose string section was later sold
-separately as the **Solina String Ensemble** — so "Solina", "ARP String Ensemble" and
-"string machine" are the search terms, not "synth strings". That timbre is widely sampled
-because it is a well-loved classic, and it is the one colour most likely to make Kosmic Space
-instantly recognisable. It maps directly onto `KOS-PADS-009 "Long Sustain Layer"`.
+No fills. *Homage:* the kick grouping rotates by 0, 3 or 6 steps per song.
 
-Secondary targets, in order of likely value:
+**KOS-BASS-019 "Magnetic Octave Pump"** — one rule, three variants drawn per song:
 
-- **Analogue lead** — Moog- or ARP-derived. The bank's sawtooth presets are a reasonable
-  stand-in, but a sampled analogue lead with real filter character would serve
-  `KOS-LEAD-015` better than anything currently available.
-- **Filtered noise / sweep** — if White Noise Wave (12/122) proves unusable for
-  `KOS-TEXT-005`, a dedicated noise or sweep sample is the fallback. This is the one rule in
-  the plan with no confirmed-good sound behind it.
-- **Sequencer/pulse timbre** — lower priority. Moog already covers the Rhythm track
-  adequately.
+- **Équinoxe octave eighths** (0.4) — root and octave alternating on the eight even steps.
+  *Équinoxe, Chronologie 2.* 30% of these songs run 16ths instead, as Magnetic Fields 4 and
+  Arpegiator do.
+- **Magnetic Fields octave pops** (0.35) — a root pedal on 16ths, rhythm `x..xxxxxx..xxxxx`,
+  with the octave on steps 4, 7, 12 and 15. *Magnetic Fields 2.* A sub-option alternates
+  root and b7 instead (*Oxygène 8*).
+- **Magnetic Fields leading-tone pedal** (0.25) — the octave with its lower neighbour a
+  semitone below, rhythm `x..x.xxxx..x.xxx`, neighbour on steps 6 and 14. *Magnetic Fields
+  1.* In `HarmonicMinor` songs, on the V chord, the neighbour is the leading tone.
 
-**Confirmed to exist on the site** (found by search; none auditioned):
+Register MIDI 29–48.
 
-- **[Mellotron soundfonts sf2](https://musical-artifacts.com/artifacts/500)** — the strongest
-  lead. Its contents include an **M400 String Section**, and an M400 is exactly the Mellotron
-  Jarre used. Also carries M300A/B Violins and MKII 3 Violins. For Texture, not for the
-  string pad.
-- **[Mellotron 02 Soundfont](https://musical-artifacts.com/artifacts/8005)** — a more recent
-  Mellotron upload; worth comparing against the above.
-- **[Moog Disco Bass](https://musical-artifacts.com/artifacts/1651)** — bass register. Low
-  priority, since Moog already covers Rhythm and the bank's synth basses cover Bass.
-- **[Patch93's SC-55](https://musical-artifacts.com/artifacts/1228)** — the SC-55 family the
-  Stereo Piano came from. Not a Kosmic Space need, listed for provenance.
-- **[Florestan Basic GM GS](https://musical-artifacts.com/artifacts/400)** — sampled from a
-  Roland Sound Canvas. General-purpose; unlikely to beat the existing bank.
+**KOS-RTHM-017 "Équinoxe Fifth Triplets"** — a sequencer-engine preset. Root–fifth–fifth
+groups across the bar, `R . 5 5 R 5 5 R R . 5 5 R 5 5 R`, 14 notes. *Équinoxe.*
+*Homage:* the fifth becomes a fourth or octave per song (0.3 each, the source 0.4).
 
-**Not found, still wanted.** Searching did not surface any Solina, Eminent, ARP 2600, EMS
-VCS3 or Synthi soundfont on the site. They may well be there — the site returns 403 to
-automated requests, so its catalogue could not be browsed directly. These need a manual look:
+**KOS-RTHM-018 "Magnetic Fields Leading-Tone Cell"** — a sequencer-engine preset. Octave
+and lower neighbour, 13 notes, `O . R O N R R O . R N O R . O R`, where N is the lower
+neighbour. *Magnetic Fields 1.*
 
-- [SF2 tagged retro + synth](https://musical-artifacts.com/artifacts?formats=sf2&tags=retro,synth)
-- [SF2 tagged synth](https://musical-artifacts.com/artifacts?formats=sf2&tags=synth)
-- [SF2 tagged mellotron](https://musical-artifacts.com/artifacts?formats=sf2&tags=mellotron)
+**KOS-LD1-015 "Magnetic Fields Turn Melody"** — *Magnetic Fields 2.* A turn figure
+(`[+2 +1 −1 −2]`, `[−1 −2 +3]` and three relatives) in two 6-note 16th runs per bar on steps
+2–7 and 10–15 (`..xxxxxx..xxxxxx`). Each half bar starts one scale step lower, so the line
+sequences down over 3–5 steps, then resets. About 45% repeated notes. Register 62–84.
+*Homage:* the turn shape is drawn per song from the five, and the sequence length per
+statement. Within-song development as in Design principles.
 
-On-site search terms, in priority order: **Solina**, **string ensemble**, **string machine**,
-**Eminent**, **ARP**, **EMS**, **Synthi**, **VCS3**, **Polymoog**, **analog strings**.
+**Équinoxe thirds as a See-Saw variant** — not a new rule. `KOS-LD1-014` gains two draws for
+Magnetic songs: interval a minor or major third (Équinoxe's `[−3 +3 −3]`), and the rhythm
+3+3+2 on steps 0, 2, 5, 8, 10, 13 (`x.x..x..x.x..x..`). In Phrygian songs the pivot may land
+on bII.
 
-**What to listen for.** For the pad: a continuous, chorused, slightly detuned ensemble that
-sustains indefinitely with no tape loop point and no re-trigger. If it wobbles or runs out
-after a few seconds it is a Mellotron — useful for Texture, wrong for the pad. For the lead:
-brightness that *changes across the note*. Static samples are why the existing bank's presets
-may disappoint.
+**KOS-LD2-001 "Magnetic Fields Twin"** — one rule, two variants drawn per song:
 
-Three constraints on anything chosen:
+- **Stereo twin** (0.5) — replays Rhythm's notes exactly on a different instrument, panned
+  opposite. Rhythm's auto-pan is disabled when this fires. *Magnetic Fields 1, whose two
+  sequencers are identical.*
+- **Late octave** (0.5) — doubles Lead 1 an octave up, from the start of the last third of
+  the song only. *Magnetic Fields 2.*
 
-- **Licence must permit redistribution in a paid App Store app.** Licensing on the site is
-  per upload, not site-wide, so it has to be checked artifact by artifact.
-- **Extract the single preset**, not the bank. The SC55 piano is 2 MB for exactly this reason.
-- **Audition against the existing bank first.** Only spend the budget where the difference is
-  obvious in an A/B of the same generated passage.
+It generates no rhythm of its own, so it runs after Rhythm and Lead 1 and after any filter
+that thins them. Motorik Europe's `MOT-LD2-012` is the code precedent.
 
-I have not heard any of these candidates — they are search directions, not recommendations.
+### Phase 2 pools
+
+**Magnetic songs:**
+
+- **Drums** — `KOS-DRUM-010` 70%, `KOS-DRUM-009` 15%, `KOS-DRUM-000` 15%
+- **Bass** — `KOS-BASS-019` 80%, `KOS-BASS-001` 20%
+- **Rhythm** — `KOS-RTHM-017` 45%, `KOS-RTHM-018` 40%, `KOS-RTHM-016` 15%
+- **Lead 1** — A sections `KOS-LD1-015` 60% or `KOS-LD1-013` 40%. B sections `KOS-LD1-014`
+  (thirds variant weighted up) 60% or `KOS-LD1-015` 40%, never the same rule as A.
+- **Lead 2** — `KOS-LD2-001` 45%, `KOS-LD2-000` 30%, `KOS-LEAD-004` 25%
+- **Pads**, **Texture** — as Phase 1
+
+**Oxygène songs:** as Phase 1, plus `KOS-LD2-001` at 25% of Lead 2 (No lead 2 drops to 35%,
+Echo melody to 40%).
+
+### Phase 2 instruments
+
+Append Concert Choir (0/52) and Synth Voice (0/54) to Pads, for breakdowns only. Zudio picks
+instruments per song, not per section, so the choir rides on **Texture** during a breakdown: a
+held chord-root-and-fifth on Texture's instrument switched to Concert Choir for those bars. If
+a per-section program change on Texture proves awkward, drop the choir. Pads already continue
+through the breakdown, so the contrast holds without it.
 
 ---
 
-## Effects Defaults
+## Phase 3 — Chronologie (optional)
 
-Kosmic Space inherits base Kosmic's effect defaults, with two divergences, both serving
-stereo width rather than colour.
+Only if Phases 1 and 2 leave room for a third flavour after listening. Flavour split becomes
+Oxygène 35 / Magnetic 35 / Chronologie 30. Tempo 108–136, peak 122.
 
-**Rhythm** auto-pans when it is the only sequencer. When `KOS-LEAD-017 "Second Sequencer"`
-fires, Rhythm and Lead 2 sit at opposite fixed positions instead and neither auto-pans.
+### Harmony families, Chronologie
 
-**Lead 2** always differs from Lead 1 in treatment, whichever rule it draws. Under
-`KOS-LEAD-016 "Doubling Layer"` that means vibrato, offset pan and Air, with Lead 1 kept dry
-by comparison. Under the other two rules a pan offset alone is enough, since those voices are
-already distinct in pitch content.
+- **Chronologie Andalusian Descent** — i ×2, bVII ×2, bVI ×2, v ×2. Aeolian. *Chronologie 2,
+  the unnumbered Oxygène.* B-cycle: a chromatic bass climb from i to v over a held tonic, 4
+  bars, as a transition (*Chronologie 2*).
+- **Chronologie Pop Loop** — I ×2, V ×2, ii ×2, IV ×2, alternating with I ×2, IV ×2, vi ×4.
+  Ionian. *Chronologie 4.*
+- **Zoolook Pedal** — one chord for 16 bars, then i ×4, bVII ×4, v ×8. Aeolian or Mixolydian.
+  *Arpegiator, Rendez-Vous 2.*
 
-**Pads take Sweep in addition to Space.** The Eminent 310's string section went through an
-Electro-Harmonix Small Stone phaser, and that modulation is what produces the sweeping string
-pad this substyle is built around. Zudio has no phaser; `sweep` (LFO-driven low-pass) is the
-closest available and should be enabled on Pads by default here, slow and shallow. An
-unmodulated string ensemble is only half the sound — this is the difference between "strings"
-and *that* string sound.
+### New rules, Phase 3
 
-**Stereo layout.** Everything else defaults to centre, which sounds narrow against records
-where every element is placed. Kosmic Space specifies positions:
+**KOS-DRUM-011 "Chronologie Four-on-the-Floor"** — kick on the quarters, snare or clap on 2
+and 4. Hats drawn per song: 16th closed hats with tambourine `x.....xxx.....xx` (*Équinoxe*),
+or eighth hats with a single high woodblock ticking 16ths (*Chronologie 4 and 5*). The tick
+alone may run through an intro.
 
-- **Bass and Drums** — hard centre, always. Low frequencies stay centred; this is not a
-  stylistic choice.
-- **Rhythm** — left of centre (~30%) when Lead 2 carries the second sequencer, otherwise
-  auto-panning across a ±40% span.
-- **Lead 2** — right of centre (~30%) under `KOS-LEAD-017`, forming the pair with Rhythm.
-  Under the other rules, offset ~20% opposite whichever side Rhythm occupies.
-- **Lead 1** — centre or ~10% off. The melody stays in the middle so the width around it reads
-  as space rather than as a hole.
-- **Pads** — widest element. When `KOS-PADS-009` draws 3 or 4 voices, spread them across
-  ±50%, lowest voice centred.
-- **Texture** — retains its existing panning, which suits the sweeps.
+**KOS-RTHM-019 "Zoolook Pedal Arpeggiator"** — a sequencer-engine preset. A 16th root pedal
+with an inserted note every third step, `[0 0 N 0 0 N 0 0 5 0 0 5 0 0 3 0]`, where N is the
+lower neighbour. *Arpegiator.* *Homage:* the inserted slots are drawn from chord tones per
+song.
 
-The intent is a wide bed with a centred spine: bass and drums anchoring, sequencers opposed,
-pads filling the edges, lead in the middle.
+**KOS-PADS-009 "Oxygène 7–13 Anticipated Strings"** — `KOS-PADS-001` with every attack moved
+one 16th early, so each chord change lands on step 15 of the bar before. *Oxygène 8, the
+unnumbered Oxygène.* A wrapper, not a new voicing.
 
----
+### Reused in Phase 3
 
-## Song Structure
+- **`KOS-LEAD-004` "Echo melody"** as the Chronologie Lead 1. It matches the measured
+  Chronologie short calls: 2–6 notes, silence about equal to the statement.
 
-No verse/chorus model — but not a flat drone either. Jarre's long tracks **accumulate and
-release**, and a substyle that runs every track from bar 1 to the end will sound static however
-good the individual rules are.
+### Phase 3 pools, Chronologie songs
 
-**Entry schedule.** Tracks enter in a fixed order, at bar positions drawn per song:
-
-- **Rhythm** — bar 1, always. The sequencer is the spine and it never rests.
-- **Bass** — bar 8 or 16 (50/50).
-- **Pads** — bar 16 or 24.
-- **Texture** — first boundary sweep, typically bar 16–32.
-- **Lead 1** — bar 24, 32 or 40. Latest entry of the melodic parts, so the sequencer is
-  established before a melody arrives over it.
-- **Lead 2** — at least 16 bars after Lead 1, when present.
-
-Entries land on multiples of 8 so they coincide with chord-window and section boundaries.
-
-**Withdrawal.** In the final third, remove one or two of Pads, Lead 2 or Drums for 8–16 bars,
-then optionally restore. This is the release half of the arc. `KOS-DRUM-010` already does this
-for Drums; when that rule is active, do not also withdraw Drums here.
-
-**Ending.** Tracks drop out in reverse entry order over the last 8–16 bars, leaving the
-sequencer last. No fade, no fanfare — the song thins until only the spine remains, then stops.
-
-**Section boundaries** are marked by `KOS-TEXT-005` sweeps, and **Lead 1 and Rhythm may swap
-program** at one. Tempo is fixed for the whole song.
+- **Drums** — `KOS-DRUM-011` 75%, `KOS-DRUM-009` 10%, `KOS-DRUM-000` 15%
+- **Bass** — `KOS-BASS-019` (eighths variant weighted up) 60%, `KOS-BASS-001` 40%
+- **Rhythm** — `KOS-RTHM-019` 40%, `KOS-RTHM-016` 35%, `KOS-RTHM-017` 25%
+- **Lead 1** — A sections `KOS-LEAD-004` 60% or `KOS-LD1-015` 40%. B sections `KOS-LD1-014`.
+- **Lead 2** — as Magnetic
+- **Pads** — `KOS-PADS-009` 60%, `KOS-PADS-001` 40%
+- **Texture** — as Phase 1
 
 ---
 
-## Mode and Harmony
+## Rule ledger
 
-- **Modes:** Aeolian 40%, Dorian 35%, Ionian 15%, Mixolydian 10%. No Phrygian, no Lydian.
-- **Tempo: 95–120.** Below the 121+ band that reads as Motorik. Overlaps base Kosmic
-  deliberately — Space is identified by its sequencer and harmonic rate, not its BPM.
-- **Harmonic rhythm:** chord duration 8 bars (60%), 16 bars (30%), 4 bars (10%). Adjacent
-  chords share **at least 3 pitch classes**. Exactly one chromatic pivot per song, in the final
-  third.
-- **Meter: 4/4 only.**
+### New: 15 rule IDs, 11 implementations
+
+Phase 1, six rules:
+
+- `KOS-DRUM-009` Oxygène Preset Box
+- `KOS-BASS-018` Oxygène Falling Walk
+- `KOS-RTHM-016` Oxygène Octave Sequencer, together with the sequencer engine
+- `KOS-LD1-013` Oxygène Falling Theme
+- `KOS-LD1-014` Oxygène See-Saw Riff
+- `KOS-TEXT-005` Oxygène Surf Sweep
+
+Phase 2, six rule IDs and four implementations:
+
+- `KOS-DRUM-010` Magnetic Fields Rhythm Box
+- `KOS-BASS-019` Magnetic Octave Pump
+- `KOS-LD1-015` Magnetic Fields Turn Melody
+- `KOS-LD2-001` Magnetic Fields Twin
+- `KOS-RTHM-017` Équinoxe Fifth Triplets (a preset of the sequencer engine)
+- `KOS-RTHM-018` Magnetic Fields Leading-Tone Cell (a preset)
+
+Phase 3, three rule IDs and one-and-a-half implementations:
+
+- `KOS-DRUM-011` Chronologie Four-on-the-Floor
+- `KOS-RTHM-019` Zoolook Pedal Arpeggiator (a preset)
+- `KOS-PADS-009` Oxygène 7–13 Anticipated Strings (a wrapper around `KOS-PADS-001`)
+
+New infrastructure:
+
+- Phase 1 — the chord-cycle builder, the Space flag and its plumbing
+- Phase 2 — the flavour enum and the breakdown mute schedule
+
+### Reused unchanged
+
+- `KOS-PADS-001` Eno long drone
+- `KOS-BASS-001` Berlin School drone
+- `KOS-LEAD-004` Echo melody
+- `KOS-LD2-000` No lead 2
+- `KOS-DRUM-000` No percussion
+
+### Excluded from Space
+
+Base Kosmic keeps all of these. Nothing is removed from base Kosmic or Drift.
+
+- **Drums** — `KOS-DRUM-001` through `008`. `001` "JMJ Mini Pops" does not match the measured
+  Minipops pattern, and `009` replaces it for Space.
+- **Bass** — every rule except `001`. Several are other artists' signatures: Tangerine Dream,
+  Moroder, Neu!, Kraftwerk, McCartney, Loscil, Boards of Canada.
+- **Rhythm** — `KOS-RTHM-001` through `015`, including the three "JMJ" ones (`003`, `005`,
+  `008`), which match no source
+- **Lead 1** — every `KOS-LEAD-` rule except `004`, and `KOS-LD1-010` to `012`
+- **Pads** — every rule except `001`
+- **Texture** — `KOS-TEXT-001` to `004`
+
+### Considered and dropped
+
+Each was a single-source nicety rather than central to the sound:
+
+- Rendez-Vous statement drums
+- the Oxygène 7–13 three-note phasing cell
+- Rendez-Vous string eighths
+- the Magnetic Fields broken-chord lead
+- the Chronologie octave flicker
+- the Équinoxe sustained answer
+- Magnetic Fields bar-chord pads
+- the Chronologie chromatic glissando
+- the Chronologie bell bursts
+
+The Oxygène reverse swell is folded into `KOS-TEXT-005`'s variant. The September plan's
+`KOS-LEAD-013`, `015`, `016` and `017`, `KOS-RTHM-016` "Long Sequencer Cell", `KOS-BASS-018`
+"Pulsing Stepwise Bass" and `KOS-DRUM-010` "Phased Pulse" were never built. Their IDs are
+reassigned here, which is safe because no saved song can name them.
 
 ---
 
-## Title Generation
-
-`KosmicTitleGenerator` needs no new logic. Weight Kosmic Space toward patterns 1, 2, 7 and 8 —
-single coined word, coined word plus Roman numeral, fake-Greek, fake-Greek plus numeral — and
-away from the two-word English patterns, which read as generic ambient. The Roman-numeral
-patterns echo the "Part II / Part IV" convention directly.
-
----
-
-## Implementation Checklist
+## Implementation checklist — Phase 1
 
 Missing any one of these produces a half-existing substyle.
 
-1. `SongState.isKosmicSpace` — new stored property, **plus every `withXxx()` copy method**.
-   Omitting one silently defaults it to false.
-2. `SongState.displayStyleName` — add the case above the existing Drift case.
-3. `CosmicMusicalFrameGenerator` — one ordered roll, following the Motorik pattern:
-   `isKosmicDrift = roll < 0.30`, `isKosmicSpace = !isKosmicDrift && roll < 0.55`.
-   **Split: Drift 30% / Space 25% / base 45%.** Then tempo and mode per above.
-4. Thread `isKosmicSpace` through all seven Cosmic generators, as `isKosmicDrift` already is.
-5. `instrumentPickPool` **and** `instrumentPickPoolStatic` — both. The static one is the one
-   usually missed.
-6. Add `sanitiseSpaceInstruments`, alongside the existing Blues/Noir/Drift sanitisers, so an
-   instrument carried over from the previous song is replaced when outside Space's set.
-7. Rule-ID → description map for every new ID: `KOS-DRUM-009`, `KOS-BASS-018`, `KOS-LEAD-013`,
-   `KOS-LEAD-014`, `KOS-LEAD-015`, `KOS-RTHM-016`, `KOS-PADS-009`, `KOS-TEXT-005`,
-   `KOS-DRUM-010`, `KOS-LEAD-016`.
-8. `PersistedSong.displaySubstyleName` — the pre-build-125 inference list.
-9. `ArrangementFilter` — exclude Rhythm from block-silencing when `isKosmicSpace`.
-9a. **Arrangement arc** — per-track entry bars, the final-third withdrawal, and the
-   reverse-order ending. This is new machinery, not a rule: it gates which bars each track
-   emits into, above whatever its rule produces. Nearest existing analogue is
-   `KOS-DRUM-010`'s gap set, which it should not double up with when that rule is active.
-10. Endless-mode weighting — decide whether Space counts as Kosmic for the streak cap.
-
-Generate a batch and listen before treating the 25% share as final.
+1. **`SongState.isKosmicSpace`** — a new stored property, plus **every `withXxx()` copy
+   method**. Omitting one silently defaults it to false.
+2. **`SongState.displayStyleName`** — returns "Kosmic Space", checked above the Drift case.
+3. **`PersistedSong.displaySubstyleName`** (`AppState.swift`) — recognises Space songs.
+4. **`CosmicMusicalFrameGenerator`** — the shared roll, tempo band and harmony family. New
+   draws come from a derived stream.
+5. **`KosmicProgressionFamily`** — three appended cases. **`PercussionStyle`** — one appended
+   case.
+6. **The chord-cycle builder** in `KosmicStructureGenerator`, with the even-bar alignment
+   rule.
+7. **`SongGenerator`** — Space form weights, and the bridge roll consumed but forced false.
+8. **Thread `isKosmicSpace`** through the seven Cosmic generators, as `isKosmicDrift` already
+   is, and through `PlaybackEngine` wherever Drift has a cached flag that affects Kosmic
+   behaviour.
+9. **Rule pools and the six new rules** in their generators:
+   - `CosmicDrumGenerator` — `KOS-DRUM-009`
+   - `CosmicBassGenerator` — `KOS-BASS-018`
+   - `CosmicArpeggioGenerator` — the sequencer engine and `KOS-RTHM-016`
+   - `CosmicLeadGenerator` — `KOS-LD1-013` and `014`, and the Lead 2 pool
+   - `CosmicTextureGenerator` — `KOS-TEXT-005`
+10. **Switch-offs** — bridges, bass sub-layers, drum fills and pickups, Lead 1 escalation,
+    Lead 2 lag and escalation, the automatic filter sweep.
+11. **`ArrangementFilter`** — exclude Rhythm from block-silencing when `isKosmicSpace`.
+12. **Instruments** — append to the six Kosmic pools in all four places (`poolNames`,
+    `poolPrograms`, `instrumentPickPool`, `instrumentPickPoolStatic`). Add the Space subsets,
+    and a Space branch in `sanitiseInstruments`. Only two instruments are re-picked per song,
+    so without the sanitiser a Space song inherits Flute on Lead 1 from the previous song.
+13. **Rule-ID → description map** — the six new IDs.
+14. **Log line** — the `Space` entry and the per-rule draw descriptions.
+15. **Endless mode** — Space counts as Kosmic for style weighting and the streak cap.
+16. **Effects defaults** — sweep on Pads, Rhythm auto-pan, stereo positions.
+17. **iPhone** — check that `PhonePlayerView` mirrors anything `TrackRowView` does for Drift,
+    especially `onChange(defaultsResetToken)` logic.
 
 ---
 
-## Reference: Kosmic Drift as the Implementation Model
+## Verification
 
-Kosmic Space follows the same pattern as Kosmic Drift: a probabilistic substyle flag decided at
-frame-generation time, separate musical constraints per track generator activated by that flag,
-narrowed instrument pick pools, and `displayStyleName` returning the substyle name in the UI.
-Drift also demonstrates the sanitiser pattern for carried-over instruments and the ordered-roll
-approach to substyle selection, both reused directly here.
+Kept light, as usual: build, the affected suite, and a generated batch to listen to.
 
-Expect several batches of listening tests across the full rule catalog, mode range and BPM
-range before it is ready — the same process Arcade went through.
+**Tests** (a new `KosmicSpaceTests`, pinning measurable behaviour as `MotorikSyncTests`
+does):
+
+- the flag survives every `SongState` copy method, and the roll is deterministic
+- base Kosmic and Drift seeds that do not roll Space generate exactly what they did before.
+  This is a `DeterminismTests` fingerprint on a fixed seed set, run against the release split.
+- Space never has a bridge section or a `single_evolving` form
+- every chord window in a Space song is 2 or 4 bars and starts on an even bar
+- every Space song uses only the pooled rules, and Lead 1 plays `KOS-LD1-013` in A sections
+  and `KOS-LD1-014` in B sections
+- every Rhythm note is in key and on one of the pattern's steps
+- `KOS-DRUM-009` emits identical bars apart from the 1-in-8 repeat guard
+- tempo stays within 100–124
+
+**Listening batch** — 20 Space songs. Listen for:
+
+- whether the sequencer and chord cycle read as Jarre within the first 16 bars
+- whether the theme and riff alternation is audible
+- whether `KOS-PADS-001` on strings sounds like a string machine, or the bank needs a sample
+- the Space share for release (testing runs 80%; the intended release share is 25%)
+
+---
+
+## Open questions
+
+- **Two unidentified files.** The Équinoxe file has no part number, and the unnumbered
+  Oxygène (105 BPM, fretless bass, choir, no lead) is probably from Oxygène 7–13. If either is
+  recognised by ear, the rule names that cite them can be made exact.
+- **Chronologie 2's tempo.** It is transcribed at 162 against 119–120 for the other
+  Chronologie parts. It sets no number in this plan.
+- **Phase 2 choir.** Whether a per-section program change on Texture is cheap enough, or the
+  choir is dropped.
+- **Phase 3 at all.** Decided after listening to Phases 1 and 2.

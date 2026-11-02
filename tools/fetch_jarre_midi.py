@@ -27,20 +27,41 @@ import json, os, re, sys, time, urllib.parse, urllib.request
 # The "require" patterns exist because the search is fuzzy: querying "oxygene part 4"
 # happily returns parts 2 and 3, which is how the first run produced duplicates of the
 # wrong tracks. A result is only accepted if its own name confirms the part number.
+#
+# Names on bitmidi come in two spellings, "J.M.JARRE.Oxygene part 4.mid" and
+# "Oxygene-(Part-4)-1.mid", so the part pattern allows punctuation and an optional
+# "part" between title and number. Versions of the same part by different
+# transcribers are all kept: they disagree, and agreement between them is evidence.
+def _part(title, n):
+    return rf"{title}\W*(part\W*)?{n}\b"
+
+# Results whose name matches any of these are never taken: remixes and covers by
+# other artists, which would measure someone else's arrangement.
+EXCLUDE = [r"remix", r"shane 54", r"gubellini", r"sash", r"medley"]
+
 TARGETS = [
-    ("Oxygene 4", ["oxygene part 4", "oxygene 4", "oxygene iv", "jarre oxygene"],
-     [r"oxyg[eè]ne\D{0,6}(4|iv)\b"], 3),
-    ("Oxygene 2", ["oxygene part 2", "oxygene 2"],
-     [r"oxyg[eè]ne\D{0,6}(2|ii)\b"], 2),
-    ("Equinoxe 5", ["equinoxe part 5", "equinoxe 5", "equinoxe v"],
-     [r"equinoxe\D{0,6}(5|v)\b"], 2),
-    ("Magnetic Fields 2", ["magnetic fields part 2", "magnetic fields 2", "champs magnetiques"],
-     [r"magnetic\s*fields?\D{0,6}(2|ii)\b", r"champs"], 2),
-    ("Chronologie 4", ["chronologie part 4", "chronologie 4"],
-     [r"chronologie\D{0,6}(4|iv)\b"], 2),
+    ("Oxygene 1", ["oxygene"], [_part("oxyg[eè]ne", 1)], 3),
+    ("Oxygene 2", ["oxygene"], [_part("oxyg[eè]ne", 2)], 3),
+    ("Oxygene 3", ["oxygene"], [_part("oxyg[eè]ne", 3)], 3),
+    ("Oxygene 4", ["oxygene"], [_part("oxyg[eè]ne", 4)], 4),
+    ("Oxygene 6", ["oxygene"], [_part("oxyg[eè]ne", 6)], 3),
+    ("Oxygene 8", ["oxygene"], [_part("oxyg[eè]ne", 8)], 2),
+    ("Oxygene", ["oxygene", "jean michel jarre"], [r"^(j\.m\.jarre\.)?ox[iy]g[eè]ne\.mid$"], 3),
+    ("Equinoxe", ["equinoxe", "jean michel jarre"], [r"^(j\.m\.jarre\.)?equinoxe\.mid$"], 3),
+    ("Magnetic Fields 1", ["magnetic fields"], [_part(r"magnetic\W*fields?", 1)], 3),
+    ("Magnetic Fields 2", ["magnetic fields"], [_part(r"magnetic\W*fields?", 2)], 3),
+    ("Magnetic Fields 4", ["magnetic fields"], [_part(r"magnetic\W*fields?", 4)], 3),
+    ("Magnetic Fields 5", ["magnetic fields"], [_part(r"magnetic\W*fields?", 5)], 3),
+    ("Chronologie 2", ["chronologie"], [_part("chronologie", 2)], 3),
+    ("Chronologie 3", ["chronologie"], [_part("chronologie", 3)], 3),
+    ("Chronologie 4", ["chronologie"], [_part("chronologie", 4)], 3),
+    ("Chronologie 5", ["chronologie"], [_part("chronologie", 5)], 3),
+    ("Chronologie 8", ["chronologie"], [_part("chronologie", 8)], 3),
+    ("Rendez-Vous 2", ["rendez-vous"], [_part(r"rendez\W*vous", 2)], 2),
+    ("Arpegiator", ["jean michel jarre"], [r"arpegiator"], 1),
 ]
 
-API  = "https://bitmidi.com/api/midi/search?q={}"
+API  = "https://bitmidi.com/api/midi/search?q={}&pageSize=50"
 BASE = "https://bitmidi.com"
 UA   = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Zudio-research/1.0"
 
@@ -53,11 +74,16 @@ def get(url, binary=False):
 
 def search(query):
     """Returns [(name, absolute_download_url)] for one query string."""
-    try:
-        data = get(API.format(urllib.parse.quote(query)))
-    except Exception as e:
-        print(f"      search failed: {e}")
-        return []
+    data = None
+    for attempt in range(3):                      # the API sometimes drops the connection
+        try:
+            data = get(API.format(urllib.parse.quote(query)))
+            break
+        except Exception as e:
+            if attempt == 2:
+                print(f"      search failed: {e}")
+                return []
+            time.sleep(1.5)
     results = (data.get("result") or {}).get("results") or []
     out = []
     for r in results:
@@ -96,6 +122,8 @@ def main():
                 low = name.lower()
                 if require and not any(re.search(rx, low) for rx in require):
                     continue                      # name does not confirm the part number
+                if any(re.search(rx, low) for rx in EXCLUDE):
+                    continue
                 seen_urls.add(url)
                 pool.append((name, url))
             if len(pool) >= keep:
