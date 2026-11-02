@@ -6,8 +6,8 @@
 //   KOS-RTHM-001  Tangerine Dream step-sequencer: multi-voice modal grid, 16th notes,
 //                skip positions, parallel voices, glacial modulation. Phaedra/Rubycon era.
 //   KOS-RTHM-002  JMJ Hook: single-voice 4-note ascending hook, 8th/quarter notes,
-//                brighter register, occasional harmony voice a 3rd above. Oxygène/Équinoxe era.
-//   KOS-RTHM-003  JMJ Oxygène Oscillation: one voice slowly ascending then descending,
+//                brighter register, occasional harmony voice a 3rd above. Oxygene/Equinoxe era.
+//   KOS-RTHM-003  JMJ Oxygene Oscillation: one voice slowly ascending then descending,
 //                quarter-note legato. Very spacious. Classic early JMJ feel.
 //   KOS-RTHM-004  Electric Buddha Groove: pentatonic, 2 interlocking voices, syncopated
 //                16th-note grid with quarter-note anchor on beat 1. Driving and accessible.
@@ -20,7 +20,7 @@
 //   KOS-RTHM-007  Pitch-Drifting Sequence: 4-step quarter-note pattern whose home pitch
 //                transposes up one scale step every 4 bars through first body half, then
 //                back down. Phaedra/Schulze slow-modulation style. Probabilistic gate.
-//   KOS-RTHM-008  Oxygène 8-bar Arc: 5–7 notes spread across an 8-bar window, each held
+//   KOS-RTHM-008  Oxygene 8-bar Arc: 5–7 notes spread across an 8-bar window, each held
 //                1.5–2 bars. Ascending arcs on even 8-bar blocks, descending on odd.
 //                Very sparse — wide interval arcs across multiple bars.
 //   KOS-RTHM-009  Craven Faults Phase Drift: 5-note cell at 3-step intervals (15-step cycle,
@@ -29,6 +29,8 @@
 //   KOS-RTHM-010  Craven Faults Modular Grit: 7-note cell at 2-step intervals (14-step cycle).
 //                Phase advances 2 notes per bar over 7-bar cycle. 65% gate + 25% ghost notes.
 //                Staccato (dur=1), MIDI 58–76, vel 44–60 (ghosts 22–38).
+//   KOS-RTHM-016  Oxygene Octave Sequencer (Kosmic Space): the Oxygene 4 root/octave pattern
+//                on the shared Jarre step-sequencer engine, `jmjStepSequencer(pattern:)`.
 
 import Foundation
 
@@ -41,7 +43,9 @@ struct KosmicArpeggioGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
-        isKosmicDrift: Bool = false
+        isKosmicDrift: Bool = false,
+        isKosmicSpace: Bool = false,
+        spaceDraws: KosmicSpaceDraws? = nil
     ) -> [MIDIEvent] {
 
         // Drift: exclude Electric Buddha, JMJ Dual-Rate, Kraftwerk; weight spacious rules higher.
@@ -53,6 +57,13 @@ struct KosmicArpeggioGenerator {
                                      0.12,           0.12,           0.09,           0.07,
                                      0.06,           0.06]
         let baseChoice = baseRules[rng.weightedPick(baseWeights)]
+
+        // Kosmic Space: KOS-RTHM-016 100%. Locked to the bar and never rested — no stagger, no
+        // rest windows, no fade before the outro (ArrangementFilter exempts Rhythm too).
+        if isKosmicSpace {
+            usedRuleIDs.insert("KOS-RTHM-016")
+            return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng, draws: spaceDraws)
+        }
 
         let chosenRule: String
         if isKosmicDrift {
@@ -117,6 +128,73 @@ struct KosmicArpeggioGenerator {
         // Long intro hint: sparse ascending phrase from the midpoint of 6/8-bar intros
         events += generateLongIntroHint(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         return events
+    }
+
+    // MARK: - Jarre step-sequencer engine (Kosmic Space)
+    // One engine for every Space sequencer rule in every phase; later rules are new patterns.
+    // A pattern is 16 steps, each a rest (nil) or a slot. Every bar the engine plays the pattern
+    // against the current chord root, so the 2–4-bar chords transpose it and no long identical run
+    // occurs. Register: root in MIDI 48–59, the other slots above it (the lower neighbour below).
+    // Every note is 1 step long and in the song's scale.
+
+    enum JMJSlot {
+        case root, octave, fifth, third
+        /// A semitone below the root when that is in the scale (a leading tone), else the scale
+        /// tone below.
+        case lowerNeighbour
+    }
+
+    static func jmjStepSequencer(pattern: [JMJSlot?], frame: GlobalMusicalFrame,
+                                 tonalMap: TonalGovernanceMap) -> [MIDIEvent] {
+        let scalePCs = frame.scalePCs
+        var events: [MIDIEvent] = []
+        for bar in 0..<frame.totalBars {
+            guard let entry = tonalMap.entry(atBar: bar) else { continue }
+            let root = clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)
+            for (step, slot) in pattern.prefix(16).enumerated() {
+                guard let slot else { continue }
+                let note: Int
+                switch slot {
+                case .root:   note = root
+                case .octave: note = root + 12
+                case .fifth:  note = scaleStep(root, by: 4, scalePCs: scalePCs)
+                case .third:  note = scaleStep(root, by: 2, scalePCs: scalePCs)
+                case .lowerNeighbour:
+                    note = scalePCs.contains((root + 11) % 12) ? root - 1
+                         : scaleStep(root, by: -1, scalePCs: scalePCs)
+                }
+                events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(note),
+                                        velocity: step % 4 == 0 ? 74 : 64, durationSteps: 1))
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-RTHM-016: Oxygene Octave Sequencer (Kosmic Space)
+    // Oxygene 4 sequencer (45 of 104 bars in the main pattern, the rest one-gap variants):
+    //   R . O . R O R . O O R . O R O .   — root and octave on steps 0, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14
+    // Homage draws per song:
+    //   mask — the source 25%, or a measured thinner variant 25% each: without step 9, without
+    //          steps 9 and 13, without steps 4, 9 and 13
+    //   slot swap — in 25% of songs the octave becomes the fifth throughout
+
+    private static func generateOxygeneOctaveSequencer(
+        frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG,
+        draws: KosmicSpaceDraws?
+    ) -> [MIDIEvent] {
+        let masks: [(drop: Set<Int>, name: String)] = [([], "source mask"), ([9], "no step 9"),
+                                                       ([9, 13], "no steps 9 and 13"),
+                                                       ([4, 9, 13], "no steps 4, 9 and 13")]
+        let mask = masks[rng.nextInt(upperBound: masks.count)]
+        let useFifth = rng.nextDouble() < 0.25
+        let upper: JMJSlot = useFifth ? .fifth : .octave
+        let source: [JMJSlot?] = [.root, nil, upper, nil, .root, upper, .root, nil,
+                                  upper, upper, .root, nil, upper, .root, upper, nil]
+        let pattern = source.enumerated().map { mask.drop.contains($0.offset) ? nil : $0.element }
+        draws?.record("KOS-RTHM-016", "\(mask.name), \(useFifth ? "root and fifth" : "root and octave")")
+        return jmjStepSequencer(pattern: pattern, frame: frame, tonalMap: tonalMap)
     }
 
     // MARK: - KOS-RTHM-001: Tangerine Dream multi-voice step-sequencer
@@ -269,7 +347,7 @@ struct KosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - KOS-RTHM-003: JMJ Oxygène — single voice ascending then descending, quarter legato
+    // MARK: - KOS-RTHM-003: JMJ Oxygene — single voice ascending then descending, quarter legato
 
     private static func generateJMJOxygene(
         frame: GlobalMusicalFrame,
@@ -613,7 +691,7 @@ struct KosmicArpeggioGenerator {
         return events
     }
 
-    // MARK: - KOS-RTHM-008: Oxygène 8-bar Arc
+    // MARK: - KOS-RTHM-008: Oxygene 8-bar Arc
 
     private static func generateOxygene8Bar(
         frame: GlobalMusicalFrame, structure: SongStructure,
@@ -931,7 +1009,7 @@ struct KosmicArpeggioGenerator {
         }
     }
 
-    /// JMJ Oxygène 4-note set, quarter-note register MIDI 58–78
+    /// JMJ Oxygene 4-note set, quarter-note register MIDI 58–78
     private static func jmjOxygeneNotes(entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> [Int] {
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let scalePCs = frame.scalePCs

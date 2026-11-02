@@ -1,7 +1,9 @@
 # Kosmic Space — Design & Implementation Plan
 
-Status: **Phase 1 ready to implement (2026-11-02).** Phases 2 and 3 are designed but wait
-for listening on Phase 1.
+Status: **Phase 1 built on `kosmic-space` (2026-11-02), awaiting a listening batch.** It
+builds on macOS and iOS; nothing has been heard or run through the test suite yet. See
+"Phase 1 as built" below for where the code had to interpret this plan. Phases 2 and 3 are
+designed but wait for listening on Phase 1.
 
 This is the single document for Kosmic Space. It replaces the original plan, written in
 September before Motorik Europe and Chill Soho were built, and the corpus review of
@@ -17,7 +19,7 @@ version disagree, this one wins.
 - What Kosmic Space is
 - Evidence base
 - Design principles
-- Phase 1 — Oxygène (build now)
+- Phase 1 — Oxygene (build now)
 - Phase 2 — Magnetic
 - Phase 3 — Chronologie (optional)
 - Rule ledger: new, reused and dropped
@@ -38,7 +40,7 @@ on Jarre alone, the same subtraction Motorik Arcade made.
 1. A **sequencer** of one or two pitch classes in a gapped 16th-note rhythm, locked to the bar
    and moving with every chord
 2. **Fast minor chord cycles** underneath it, 2–4 bars per chord in loops of 4–8 bars
-3. A **bass** with its own fixed figure, walking chord tones (Oxygène) or pumping octaves
+3. A **bass** with its own fixed figure, walking chord tones (Oxygene) or pumping octaves
    (later albums)
 4. A **preset rhythm box**, mechanical and unvarying
 5. A **theme and a riff** that take turns by section
@@ -49,9 +51,9 @@ on Jarre alone, the same subtraction Motorik Arcade made.
 
 **Three flavours**, one per era, each coupling its own harmony, drums, bass and sequencer:
 
-- **Oxygène** (1976). Phase 1.
-- **Magnetic** (Équinoxe 1978 and Magnetic Fields 1981). Phase 2.
-- **Chronologie** (1993, with Oxygène 7–13 and the 1980s pieces). Phase 3, optional.
+- **Oxygene** (1976). Phase 1.
+- **Magnetic** (Equinoxe 1978 and Magnetic Fields 1981). Phase 2.
+- **Chronologie** (1993, with Oxygene 7–13 and the 1980s pieces). Phase 3, optional.
 
 A rhythm section built from one album's rules reads as that album; a mixed one reads as
 nothing in particular. That is the lesson of Motorik Europe's sync groups.
@@ -64,17 +66,17 @@ nothing in particular. That is the lesson of Motorik Europe's sync groups.
 
 Sixteen fan transcriptions in `~/Downloads/jarre-midi`, outside the repo because they are
 transcriptions of copyrighted works. Zack pruned duplicates and weak files, so each is a
-distinct piece except Oxygène Part 4, which has two transcriptions. The two agree on the bass,
+distinct piece except Oxygene Part 4, which has two transcriptions. The two agree on the bass,
 the riff and the theme.
 
-- **Oxygène (1976)** — Part 3 (100 BPM), Part 4 (121, two transcriptions), Part 6 (110)
-- **Équinoxe (1978)** — one file, part not given (120)
+- **Oxygene (1976)** — Part 3 (100 BPM), Part 4 (121, two transcriptions), Part 6 (110)
+- **Equinoxe (1978)** — one file, part not given (120)
 - **Magnetic Fields (1981)** — Parts 1 (132), 2 (98), 4 (91), 5 (120). Parts 2 and 4 were
   transcribed in double time and are corrected in the tools.
 - **Zoolook (1984)** — Arpegiator (104)
 - **Rendez-Vous (1986)** — Part 2 (135, 8.8 minutes)
 - **Chronologie (1993)** — Parts 2 (162 as transcribed), 4 (120), 5 (119)
-- **Oxygène 7–13 (1997)** — Part 8 (136), and an unnumbered "Oxygene" (105) that is probably
+- **Oxygene 7–13 (1997)** — Part 8 (136), and an unnumbered "Oxygene" (105) that is probably
   from the same album
 
 ### Tools
@@ -99,16 +101,16 @@ velocity conventions and add no dynamics.
   single chords occur only as pedal sections of 12–30 bars at intros and builds.
 - **Sequencers are small and locked.** Mostly one or two pitch classes (root and octave, root
   and fifth, sometimes a leading tone) in a gapped 16th rhythm, locked to the bar and
-  transposing with each chord. The only true phasing is a 3-note cell (Oxygène 8).
+  transposing with each chord. The only true phasing is a 3-note cell (Oxygene 8).
 - **The 3-grouping is the common thread.** Figures grouped in threes against 4/4 appear in
-  every era: the Équinoxe sequencer, the Oxygène 8 bass and harpsichord, the Magnetic Fields
-  kick `x..xx..xx..xx..x` (Parts 1, 2 and 4), the Équinoxe and Chronologie 5 leads, and
-  Oxygène 6's dotted quarters.
-- **Riff and theme alternate by section.** In Oxygène 4 the slow falling theme carries the
-  A sections and the fifth-rocking riff the B sections. In Équinoxe the sequencer and the lead
+  every era: the Equinoxe sequencer, the Oxygene 8 bass and harpsichord, the Magnetic Fields
+  kick `x..xx..xx..xx..x` (Parts 1, 2 and 4), the Equinoxe and Chronologie 5 leads, and
+  Oxygene 6's dotted quarters.
+- **Riff and theme alternate by section.** In Oxygene 4 the slow falling theme carries the
+  A sections and the fifth-rocking riff the B sections. In Equinoxe the sequencer and the lead
   never play at the same time.
 - **Leads are oscillating or closed figures:**
-  - see-saws: Oxygène 4 `[+7 −7 +7]`, Équinoxe `[−3 +3 −3]`
+  - see-saws: Oxygene 4 `[+7 −7 +7]`, Equinoxe `[−3 +3 −3]`
   - broken triads: Magnetic Fields 1 `[+3 +4 −7]`
   - turns descending in sequence: Magnetic Fields 2 `[+2 +1 −1 −2]`
 - **Leads come and go.** Lead 1 plays in 17–93% of bars (median about 55%), and in under a
@@ -116,9 +118,9 @@ velocity conventions and add no dynamics.
 - **Modes**, across 15 pieces: Aeolian 6, Ionian 3, Dorian 2, harmonic minor 2, Phrygian 1,
   Mixolydian 1. Zudio's `Mode` enum already has `HarmonicMinor` and `Phrygian`.
 - **Tempo** spans 91–136, median about 120.
-- **Pads** are string machines in 13 of 15 pieces. Oxygène holds them 8 beats; the later
+- **Pads** are string machines in 13 of 15 pieces. Oxygene holds them 8 beats; the later
   albums one bar.
-- **Sweeps** start just before 8-bar boundaries. Oxygène 4's land on bars 17, 25 and 33.
+- **Sweeps** start just before 8-bar boundaries. Oxygene 4's land on bars 17, 25 and 33.
 - **Lead timbres** chosen by the transcribers are synth strings and synth brass, not saw
   leads. This is weak evidence, but consistent across files.
 - **Doubling.** Magnetic Fields 1's two sequencers are identical, and Part 4 triples its
@@ -135,7 +137,7 @@ velocity conventions and add no dynamics.
 - Excluding Phrygian and harmonic minor.
 - A sequencer that never stops. Breakdowns drop it.
 - Reusing base Kosmic's "JMJ" rules. `KOS-DRUM-001` "JMJ Mini Pops" plays a kick every other
-  bar over quarter-note hats, nothing like the Minipops pattern measured on Oxygène 4.
+  bar over quarter-note hats, nothing like the Minipops pattern measured on Oxygene 4.
   `KOS-RTHM-003`, `005` and `008` are scale arcs found in no source.
 
 ---
@@ -149,7 +151,7 @@ no rule encodes a melody. Signature rules transform the source in two layers:
   Where the source's own value is one option, it is weighted *below* the alternatives, so no
   song reproduces the original figure exactly.
 - **Within-song development.** A figure is stated twice exactly, then transposes with the
-  chord, the way the Oxygène 4 riff follows its chord from i to ii. Every fourth statement
+  chord, the way the Oxygene 4 riff follows its chord from i to ii. Every fourth statement
   returns to the plain form.
 
 **Named for the work.** Each new rule's name cites the album or piece it is measured from,
@@ -178,9 +180,9 @@ bridge roll, the base tempo pick), it still consumes the RNG slot, as Drift alre
 
 ---
 
-## Phase 1 — Oxygène
+## Phase 1 — Oxygene
 
-Everything here is built in Phase 1. Space songs are all Oxygène until Phase 2 lands.
+Everything here is built in Phase 1. Space songs are all Oxygene until Phase 2 lands.
 
 ### Frame
 
@@ -201,15 +203,15 @@ existing Drift seeds generate differently. That is accepted for testing. The det
 below pins base and Drift seeds against the release split, and runs only once the release
 values are restored.
 
-**Tempo.** 100–124, triangular with a peak at 118. The corpus's Oxygène pieces run 100, 110
+**Tempo.** 100–124, triangular with a peak at 118. The corpus's Oxygene pieces run 100, 110
 and 121. Draw it on the derived stream, consume the base tempo slot, and apply it before the
 bar count is chosen so song length stays 225–270 seconds.
 
 **Harmony family**, drawn per song:
 
-- **Oxygène Dorian Vamp** (55%) — Dorian. *Oxygène 4.*
-- **Oxygène Aeolian Cycle** (30%) — Aeolian. *Oxygène 8.*
-- **Oxygène Two-Chord Sway** (15%) — Aeolian or Dorian 50/50. *Oxygène 3.*
+- **Oxygene Dorian Vamp** (55%) — Dorian. *Oxygene 4.*
+- **Oxygene Aeolian Cycle** (30%) — Aeolian. *Oxygene 8.*
+- **Oxygene Two-Chord Sway** (15%) — Aeolian or Dorian 50/50. *Oxygene 3.*
 
 The family sets the song mode. These are new `KosmicProgressionFamily` cases. The enum is
 `Codable`, so new cases are appended and existing raw values never change.
@@ -237,14 +239,14 @@ Each window is built with `NotePoolBuilder.build`, exactly as today.
 
 **Phase 1 cycles:**
 
-- **Oxygène Dorian Vamp** — i ×4, ii ×2, then a last window drawn per pass: i ×2 (50%),
-  bIII ×2 (25%) or IV ×2 (25%). Measured from Oxygène 4, both transcriptions: i ×4, II ×2,
+- **Oxygene Dorian Vamp** — i ×4, ii ×2, then a last window drawn per pass: i ×2 (50%),
+  bIII ×2 (25%) or IV ×2 (25%). Measured from Oxygene 4, both transcriptions: i ×4, II ×2,
   bIII or IV or i ×2. The 1-bar bIII–IV pair in the source becomes one 2-bar window, to keep
   the even-bar rule.
-- **Oxygène Aeolian Cycle** — i ×4, bVII ×2, iv ×2. Alternate last window: bVI ×2. Measured
-  from Oxygène 8. Its occasional V (major) turnaround is left for Phase 2's harmonic-minor
+- **Oxygene Aeolian Cycle** — i ×4, bVII ×2, iv ×2. Alternate last window: bVI ×2. Measured
+  from Oxygene 8. Its occasional V (major) turnaround is left for Phase 2's harmonic-minor
   families.
-- **Oxygène Two-Chord Sway** — i ×2, v ×2. Oxygène 3 alternates every bar; 2 bars keeps the
+- **Oxygene Two-Chord Sway** — i ×2, v ×2. Oxygene 3 alternates every bar; 2 bars keeps the
   even-bar rule and suits the slower pace.
 
 Chord types: minor for i, ii, iv and v; major for bIII, IV (Dorian), bVI and bVII. Where the
@@ -267,15 +269,15 @@ Nothing else changes. Intro, A, B and outro keep their existing lengths and inte
 
 Each track's pool when `isKosmicSpace`, with weights. Rules not listed are excluded.
 
-- **Drums** — `KOS-DRUM-009` Oxygène Preset Box 85%, `KOS-DRUM-000` No percussion 15%
-- **Bass** — `KOS-BASS-018` Oxygène Falling Walk 75%, `KOS-BASS-001` Berlin School drone 25%
+- **Drums** — `KOS-DRUM-009` Oxygene Preset Box 85%, `KOS-DRUM-000` No percussion 15%
+- **Bass** — `KOS-BASS-018` Oxygene Falling Walk 75%, `KOS-BASS-001` Berlin School drone 25%
   (reused)
-- **Rhythm** — `KOS-RTHM-016` Oxygène Octave Sequencer 100%
+- **Rhythm** — `KOS-RTHM-016` Oxygene Octave Sequencer 100%
 - **Pads** — `KOS-PADS-001` Eno long drone 100% (reused, string instruments)
-- **Lead 1** — `KOS-LD1-013` Oxygène Falling Theme in A sections, `KOS-LD1-014` Oxygène See-Saw
+- **Lead 1** — `KOS-LD1-013` Oxygene Falling Theme in A sections, `KOS-LD1-014` Oxygene See-Saw
   Riff in B sections. Both fire in every Space song through the existing A/B rule split.
 - **Lead 2** — `KOS-LD2-000` No lead 2 50%, `KOS-LEAD-004` Echo melody 50% (reused)
-- **Texture** — `KOS-TEXT-005` Oxygène Surf Sweep 100%
+- **Texture** — `KOS-TEXT-005` Oxygene Surf Sweep 100%
 
 ### New rules
 
@@ -283,9 +285,9 @@ Steps are 16ths: 16 steps a bar, 4 a beat, `stepIndex = bar * 16 + step`. "Root"
 `chordWindow.chordRoot` in the current window. Every pitch is snapped to the song's scale
 after transposition. Register clamps fold by octaves, never clamp to the edge.
 
-#### KOS-DRUM-009 "Oxygène Preset Box"
+#### KOS-DRUM-009 "Oxygene Preset Box"
 
-*The Minipops pattern measured on Oxygène 4, identical in both transcriptions (104 of 104
+*The Minipops pattern measured on Oxygene 4, identical in both transcriptions (104 of 104
 bars).*
 
 Every bar the same:
@@ -312,9 +314,9 @@ outro.
 
 *Repeat guard:* drop one hat hit in every eighth bar, so no stretch exceeds 8 identical bars.
 
-#### KOS-BASS-018 "Oxygène Falling Walk"
+#### KOS-BASS-018 "Oxygene Falling Walk"
 
-*Oxygène 4 bass, both transcriptions (89 of 105 and 94 of 114 bars in the main pattern).*
+*Oxygene 4 bass, both transcriptions (89 of 105 and 94 of 114 bars in the main pattern).*
 
 Six notes a bar, rhythm `x...x.x...x.x.x.` (steps 0, 4, 6, 10, 12, 14). Pitches are chord
 tones relative to the root, measured as octave, b7, octave, 5, b7, 5:
@@ -338,9 +340,9 @@ Register MIDI 29–46, with the top note an octave above the root.
 *Within song:* in 1 bar of 8 the figure shifts up a step, with 9th, octave and 6th in place of
 top, mid and low (measured in 5 of 105 bars), so it does not repeat for a whole song.
 
-#### KOS-RTHM-016 "Oxygène Octave Sequencer" — and the sequencer engine
+#### KOS-RTHM-016 "Oxygene Octave Sequencer" — and the sequencer engine
 
-*Oxygène 4 sequencer (45 of 104 bars in the main pattern, the rest one-gap variants).*
+*Oxygene 4 sequencer (45 of 104 bars in the main pattern, the rest one-gap variants).*
 
 **The engine.** One function, `jmjStepSequencer(pattern:)`, used by every Space sequencer rule
 in every phase. A pattern is 16 steps, each a rest or one of the slots root, octave, fifth,
@@ -349,7 +351,7 @@ engine emits the pattern against the current chord root. Register MIDI 48–64 (
 root in the octave starting at 48–55, other slots above it. `durationSteps: 1`. The same pattern plays
 every bar. The chord transposes it, so with 2–4-bar chords no long identical run occurs.
 
-**The Oxygène pattern** (source):
+**The Oxygene pattern** (source):
 
 `R . O . R O R . O O R . O R O .`, which is root and octave alternating on steps 0, 2, 4, 5, 6,
 8, 9, 10, 12, 13 and 14.
@@ -365,9 +367,9 @@ every bar. The chord transposes it, so with 2–4-bar chords no long identical r
 
 Phase 2 and 3 sequencer rules are new presets for this engine, not new code.
 
-#### KOS-LD1-013 "Oxygène Falling Theme"
+#### KOS-LD1-013 "Oxygene Falling Theme"
 
-*Oxygène 4 theme, both transcriptions. In the source it is on a second voice. Here it moves to
+*Oxygene 4 theme, both transcriptions. In the source it is on a second voice. Here it moves to
 Lead 1 for the A sections, which is how the source alternates theme and riff.*
 
 A 2-bar statement. Five notes in rhythm `x.....x.x.x...x.` (steps 0, 6, 8, 10, 14), falling
@@ -399,9 +401,9 @@ the top note in 72–84, the root an octave below it.
 Every fourth statement is exact. One statement in four is replaced by 2 bars of rest, so the
 theme breathes. Measured: the theme sounds in about half the bars of its sections.
 
-#### KOS-LD1-014 "Oxygène See-Saw Riff"
+#### KOS-LD1-014 "Oxygene See-Saw Riff"
 
-*Oxygène 4 riff, both transcriptions. B sections only.*
+*Oxygene 4 riff, both transcriptions. B sections only.*
 
 Six notes rocking between an **anchor** (a chord tone) and a **pivot** a fixed interval above
 it: anchor on steps 0, 2 and 5, pivot on steps 1, 4 and 6, step 3 silent. The last pivot is
@@ -428,9 +430,9 @@ is snapped to the scale after transposition.
 - In the last B section, every second statement may drop to a single 3-note group, thinning
   the riff towards the outro.
 
-#### KOS-TEXT-005 "Oxygène Surf Sweep"
+#### KOS-TEXT-005 "Oxygene Surf Sweep"
 
-*Oxygène 4, 6 and 8. Oxygène 4's swells start a beat before the boundary and run about two
+*Oxygene 4, 6 and 8. Oxygene 4's swells start a beat before the boundary and run about two
 bars.*
 
 One long note per event on the noise instrument, starting at step 12 of the bar before an
@@ -439,7 +441,7 @@ swell comes from the Texture track's `sweep` effect, not from note movement.
 
 - **Boundaries** — every section start except the first bar of the song, plus every 8th bar
   inside a body section. Emit at 70% of them, never within 8 bars of the previous event.
-- **Variant** (25% of songs) — Oxygène 6's wash: a 2-bar swell every 2 bars through B sections
+- **Variant** (25% of songs) — Oxygene 6's wash: a 2-bar swell every 2 bars through B sections
   only, nothing in A.
 
 The automatic Kosmic filter sweep is switched off for Space. Its guard already excludes Drift
@@ -451,10 +453,10 @@ Used unchanged, with notes on why each is close enough.
 
 - **`KOS-PADS-001` "Eno long drone"** — root, fifth, octave and upper third, re-attacked every
   2 bars on the current chord, swelling over 32 bars. With 2- and 4-bar chord windows it
-  follows every change, which makes it the Oxygène string machine once it plays a string
+  follows every change, which makes it the Oxygene string machine once it plays a string
   instrument. Its 1-in-8 breath gap matches the corpus's pads leaving and returning.
 - **`KOS-BASS-001` "Berlin School drone"** — root held 2 bars, re-attacked. It stands in for
-  the long-held basses of Oxygène 3 and 6 and the unnumbered Oxygène.
+  the long-held basses of Oxygene 3 and 6 and the unnumbered Oxygene.
 - **`KOS-LEAD-004` "Echo melody"** — a 2-bar phrase, 2 bars rest, the phrase a third away, 2
   bars rest. That is the corpus's statement-then-equal-silence. On Lead 2 it answers the theme
   without competing.
@@ -533,8 +535,8 @@ echo the "Part IV" convention.
 ### Logging
 
 One `GenerationLogEntry` with tag `Space` naming the flavour and harmony family, for example
-`Space Oxygène, Dorian Vamp`. Each new rule's log line names its per-song draws, for example
-`KOS-LD1-014 Oxygène See-Saw Riff (sixth, 2+2+2, second half)`, so a song's character can be
+`Space Oxygene, Dorian Vamp`. Each new rule's log line names its per-song draws, for example
+`KOS-LD1-014 Oxygene See-Saw Riff (sixth, 2+2+2, second half)`, so a song's character can be
 read from its log.
 
 ---
@@ -547,7 +549,7 @@ harmonic-minor and Phrygian families.
 ### Flavour roll
 
 A `KosmicSpaceFlavour` enum (`oxygene`, `magnetic`, later `chronologie`), stored on SongState
-and drawn on the derived stream: **Oxygène 50 / Magnetic 50** until Phase 3. The flavour picks
+and drawn on the derived stream: **Oxygene 50 / Magnetic 50** until Phase 3. The flavour picks
 the harmony family, drums, bass and sequencer preset. Lead 1, Lead 2, Pads and Texture draw
 from the shared Space pools, weighted toward the flavour.
 
@@ -558,7 +560,7 @@ from the shared Space pools, weighted toward the flavour.
 The one structural addition. It is a **mute schedule**, built the way Motorik Europe's section
 dropout is:
 
-- One breakdown per song, in Magnetic songs (70%) and Oxygène songs (30%). 8 or 12 bars,
+- One breakdown per song, in Magnetic songs (70%) and Oxygene songs (30%). 8 or 12 bars,
   starting on an 8-bar boundary inside the second half of a body section, never in the first
   24 bars or the last 16.
 - **Silent during it:** Rhythm, Lead 1 and Drums
@@ -576,14 +578,14 @@ and change chord cycle.
   `HarmonicMinor`. *Magnetic Fields 1.* B-cycle: bIII ×2, i ×2, bVI ×2, V ×2.
 - **Magnetic Fields Harmonic Minor Turn** — i ×2, V ×2, bVI ×2, bVII ×2. Mode
   `HarmonicMinor`. *Magnetic Fields 2.* B-cycle: iv ×2, V ×2, i ×4.
-- **Équinoxe Phrygian Cadence** — i ×8 (pedal), then iv ×2, bII ×2, bVII ×2, i ×2. Mode
-  `Phrygian`. *Équinoxe.* B-cycle: bVI ×4, bIII ×4.
+- **Equinoxe Phrygian Cadence** — i ×8 (pedal), then iv ×2, bII ×2, bVII ×2, i ×2. Mode
+  `Phrygian`. *Equinoxe.* B-cycle: bVI ×4, bIII ×4.
 - **Magnetic Fields Major Descent** — I ×2, vi ×2, V ×2, IV ×2. Mode `Ionian`. *Magnetic
   Fields 4.* B-cycle: iii ×2, IV ×2, ii ×2, V ×2.
 
 Weights: Arc 35, Turn 25, Phrygian 25, Major Descent 15.
 
-**Oxygène B-cycles**, added in this phase for Oxygène breakdowns:
+**Oxygene B-cycles**, added in this phase for Oxygene breakdowns:
 
 - Dorian Vamp: bIII ×2, IV ×2
 - Aeolian Cycle: bVI ×2, bIII ×2
@@ -602,20 +604,20 @@ No fills. *Homage:* the kick grouping rotates by 0, 3 or 6 steps per song.
 
 **KOS-BASS-019 "Magnetic Octave Pump"** — one rule, three variants drawn per song:
 
-- **Équinoxe octave eighths** (0.4) — root and octave alternating on the eight even steps.
-  *Équinoxe, Chronologie 2.* 30% of these songs run 16ths instead, as Magnetic Fields 4 and
+- **Equinoxe octave eighths** (0.4) — root and octave alternating on the eight even steps.
+  *Equinoxe, Chronologie 2.* 30% of these songs run 16ths instead, as Magnetic Fields 4 and
   Arpegiator do.
 - **Magnetic Fields octave pops** (0.35) — a root pedal on 16ths, rhythm `x..xxxxxx..xxxxx`,
   with the octave on steps 4, 7, 12 and 15. *Magnetic Fields 2.* A sub-option alternates
-  root and b7 instead (*Oxygène 8*).
+  root and b7 instead (*Oxygene 8*).
 - **Magnetic Fields leading-tone pedal** (0.25) — the octave with its lower neighbour a
   semitone below, rhythm `x..x.xxxx..x.xxx`, neighbour on steps 6 and 14. *Magnetic Fields
   1.* In `HarmonicMinor` songs, on the V chord, the neighbour is the leading tone.
 
 Register MIDI 29–48.
 
-**KOS-RTHM-017 "Équinoxe Fifth Triplets"** — a sequencer-engine preset. Root–fifth–fifth
-groups across the bar, `R . 5 5 R 5 5 R R . 5 5 R 5 5 R`, 14 notes. *Équinoxe.*
+**KOS-RTHM-017 "Equinoxe Fifth Triplets"** — a sequencer-engine preset. Root–fifth–fifth
+groups across the bar, `R . 5 5 R 5 5 R R . 5 5 R 5 5 R`, 14 notes. *Equinoxe.*
 *Homage:* the fifth becomes a fourth or octave per song (0.3 each, the source 0.4).
 
 **KOS-RTHM-018 "Magnetic Fields Leading-Tone Cell"** — a sequencer-engine preset. Octave
@@ -629,8 +631,8 @@ sequences down over 3–5 steps, then resets. About 45% repeated notes. Register
 *Homage:* the turn shape is drawn per song from the five, and the sequence length per
 statement. Within-song development as in Design principles.
 
-**Équinoxe thirds as a See-Saw variant** — not a new rule. `KOS-LD1-014` gains two draws for
-Magnetic songs: interval a minor or major third (Équinoxe's `[−3 +3 −3]`), and the rhythm
+**Equinoxe thirds as a See-Saw variant** — not a new rule. `KOS-LD1-014` gains two draws for
+Magnetic songs: interval a minor or major third (Equinoxe's `[−3 +3 −3]`), and the rhythm
 3+3+2 on steps 0, 2, 5, 8, 10, 13 (`x.x..x..x.x..x..`). In Phrygian songs the pivot may land
 on bII.
 
@@ -657,7 +659,7 @@ that thins them. Motorik Europe's `MOT-LD2-012` is the code precedent.
 - **Lead 2** — `KOS-LD2-001` 45%, `KOS-LD2-000` 30%, `KOS-LEAD-004` 25%
 - **Pads**, **Texture** — as Phase 1
 
-**Oxygène songs:** as Phase 1, plus `KOS-LD2-001` at 25% of Lead 2 (No lead 2 drops to 35%,
+**Oxygene songs:** as Phase 1, plus `KOS-LD2-001` at 25% of Lead 2 (No lead 2 drops to 35%,
 Echo melody to 40%).
 
 ### Phase 2 instruments
@@ -673,12 +675,12 @@ through the breakdown, so the contrast holds without it.
 ## Phase 3 — Chronologie (optional)
 
 Only if Phases 1 and 2 leave room for a third flavour after listening. Flavour split becomes
-Oxygène 35 / Magnetic 35 / Chronologie 30. Tempo 108–136, peak 122.
+Oxygene 35 / Magnetic 35 / Chronologie 30. Tempo 108–136, peak 122.
 
 ### Harmony families, Chronologie
 
 - **Chronologie Andalusian Descent** — i ×2, bVII ×2, bVI ×2, v ×2. Aeolian. *Chronologie 2,
-  the unnumbered Oxygène.* B-cycle: a chromatic bass climb from i to v over a held tonic, 4
+  the unnumbered Oxygene.* B-cycle: a chromatic bass climb from i to v over a held tonic, 4
   bars, as a transition (*Chronologie 2*).
 - **Chronologie Pop Loop** — I ×2, V ×2, ii ×2, IV ×2, alternating with I ×2, IV ×2, vi ×4.
   Ionian. *Chronologie 4.*
@@ -688,7 +690,7 @@ Oxygène 35 / Magnetic 35 / Chronologie 30. Tempo 108–136, peak 122.
 ### New rules, Phase 3
 
 **KOS-DRUM-011 "Chronologie Four-on-the-Floor"** — kick on the quarters, snare or clap on 2
-and 4. Hats drawn per song: 16th closed hats with tambourine `x.....xxx.....xx` (*Équinoxe*),
+and 4. Hats drawn per song: 16th closed hats with tambourine `x.....xxx.....xx` (*Equinoxe*),
 or eighth hats with a single high woodblock ticking 16ths (*Chronologie 4 and 5*). The tick
 alone may run through an intro.
 
@@ -697,9 +699,9 @@ with an inserted note every third step, `[0 0 N 0 0 N 0 0 5 0 0 5 0 0 3 0]`, whe
 lower neighbour. *Arpegiator.* *Homage:* the inserted slots are drawn from chord tones per
 song.
 
-**KOS-PADS-009 "Oxygène 7–13 Anticipated Strings"** — `KOS-PADS-001` with every attack moved
-one 16th early, so each chord change lands on step 15 of the bar before. *Oxygène 8, the
-unnumbered Oxygène.* A wrapper, not a new voicing.
+**KOS-PADS-009 "Oxygene 7–13 Anticipated Strings"** — `KOS-PADS-001` with every attack moved
+one 16th early, so each chord change lands on step 15 of the bar before. *Oxygene 8, the
+unnumbered Oxygene.* A wrapper, not a new voicing.
 
 ### Reused in Phase 3
 
@@ -724,12 +726,12 @@ unnumbered Oxygène.* A wrapper, not a new voicing.
 
 Phase 1, six rules:
 
-- `KOS-DRUM-009` Oxygène Preset Box
-- `KOS-BASS-018` Oxygène Falling Walk
-- `KOS-RTHM-016` Oxygène Octave Sequencer, together with the sequencer engine
-- `KOS-LD1-013` Oxygène Falling Theme
-- `KOS-LD1-014` Oxygène See-Saw Riff
-- `KOS-TEXT-005` Oxygène Surf Sweep
+- `KOS-DRUM-009` Oxygene Preset Box
+- `KOS-BASS-018` Oxygene Falling Walk
+- `KOS-RTHM-016` Oxygene Octave Sequencer, together with the sequencer engine
+- `KOS-LD1-013` Oxygene Falling Theme
+- `KOS-LD1-014` Oxygene See-Saw Riff
+- `KOS-TEXT-005` Oxygene Surf Sweep
 
 Phase 2, six rule IDs and four implementations:
 
@@ -737,14 +739,14 @@ Phase 2, six rule IDs and four implementations:
 - `KOS-BASS-019` Magnetic Octave Pump
 - `KOS-LD1-015` Magnetic Fields Turn Melody
 - `KOS-LD2-001` Magnetic Fields Twin
-- `KOS-RTHM-017` Équinoxe Fifth Triplets (a preset of the sequencer engine)
+- `KOS-RTHM-017` Equinoxe Fifth Triplets (a preset of the sequencer engine)
 - `KOS-RTHM-018` Magnetic Fields Leading-Tone Cell (a preset)
 
 Phase 3, three rule IDs and one-and-a-half implementations:
 
 - `KOS-DRUM-011` Chronologie Four-on-the-Floor
 - `KOS-RTHM-019` Zoolook Pedal Arpeggiator (a preset)
-- `KOS-PADS-009` Oxygène 7–13 Anticipated Strings (a wrapper around `KOS-PADS-001`)
+- `KOS-PADS-009` Oxygene 7–13 Anticipated Strings (a wrapper around `KOS-PADS-001`)
 
 New infrastructure:
 
@@ -778,16 +780,16 @@ Base Kosmic keeps all of these. Nothing is removed from base Kosmic or Drift.
 Each was a single-source nicety rather than central to the sound:
 
 - Rendez-Vous statement drums
-- the Oxygène 7–13 three-note phasing cell
+- the Oxygene 7–13 three-note phasing cell
 - Rendez-Vous string eighths
 - the Magnetic Fields broken-chord lead
 - the Chronologie octave flicker
-- the Équinoxe sustained answer
+- the Equinoxe sustained answer
 - Magnetic Fields bar-chord pads
 - the Chronologie chromatic glissando
 - the Chronologie bell bursts
 
-The Oxygène reverse swell is folded into `KOS-TEXT-005`'s variant. The September plan's
+The Oxygene reverse swell is folded into `KOS-TEXT-005`'s variant. The September plan's
 `KOS-LEAD-013`, `015`, `016` and `017`, `KOS-RTHM-016` "Long Sequencer Cell", `KOS-BASS-018`
 "Pulsing Stepwise Bass" and `KOS-DRUM-010` "Phased Pulse" were never built. Their IDs are
 reassigned here, which is safe because no saved song can name them.
@@ -834,6 +836,48 @@ Missing any one of these produces a half-existing substyle.
 
 ---
 
+## Phase 1 as built (2026-11-02)
+
+Where the plan left a gap or could not be followed literally, the code does this:
+
+- **Sequencer register.** The root sits in MIDI 48–59, with the octave above it. The plan's
+  48–64 cannot hold root and octave for all twelve keys.
+- **Bass register.** The root (never played) sits in 23–34, so the top note lands in 35–46.
+  With the octave/5th/3rd set, the low note can reach 26 in the keys of B, C and C#.
+- **Bass alternate rhythm.** `x.x.x.x...x.x.x.` has seven hits. Their roles are top, mid,
+  top, mid, low, mid, low, keeping the same fall.
+- **Theme, compressed rhythm.** The four notes on steps 0, 2, 4 and 6 fall by scale step:
+  4th, 3rd, 2nd, root. The top-note draw does not apply to this form.
+- **Riff register.** The anchor and pivot pair is folded by octaves so its midpoint lies in
+  72–84.
+- **Preset box.** The open hat owns step 2, so a hat mask's closed hat there is not played.
+  The repeat guard drops the mask's last hat in every eighth bar.
+- **Rhythm is never thinned.** Besides the `ArrangementFilter` exemption, Space skips base
+  Kosmic's density guard and the second-B Rhythm thinning, because either would break the
+  locked pattern.
+- **Forced base rules are ignored** by Space, as Drift's bass already does. The curated first
+  Kosmic song forces KOS-BASS-010, KOS-RTHM-002 and the Electric Buddha groove; under the
+  testing split it usually rolls Space, and would otherwise be a hybrid.
+- **Texture takes `sweep`** by default, since KOS-TEXT-005 relies on it for the swell's shape.
+- **Panning.** Lead 1 is at −0.10 and Lead 2 at −0.20, opposite Rhythm's home at +0.22.
+  Rhythm auto-pans ±40% around it, which is a new `panDepth`, also applied in offline
+  export. Pads stay centred: a single sampler cannot be panned wider than that.
+- **Per-song draws in the log.** Each new rule's log line carries its draws, for example
+  `KOS-LD1-014 Oxygene See-Saw Riff (sixth, 2+2+2, second half, anchor below)`. Regen lines
+  do the same.
+- **Titles.** Space draws from the same pattern list, with 80% of the weight on patterns
+  1, 2, 7 and 8.
+- **Base Kosmic and Drift instrument picks** are capped at the pool sizes they had before
+  Space appended to them, so they never draw a Space instrument.
+
+Not yet done:
+
+- `KosmicSpaceTests`, and the `DeterminismTests` fingerprint at the release split.
+- Existing tests that read the old 30% Drift share or base-Kosmic fingerprints will
+  disagree under the testing split. These include `KosmicDriftCompareTests`, possibly
+  `KosmicAutoSweepTests`, and the Kosmic `DeterminismTests` seeds. This is expected until
+  the release split is restored.
+
 ## Verification
 
 Kept light, as usual: build, the affected suite, and a generated batch to listen to.
@@ -863,8 +907,8 @@ does):
 
 ## Open questions
 
-- **Two unidentified files.** The Équinoxe file has no part number, and the unnumbered
-  Oxygène (105 BPM, fretless bass, choir, no lead) is probably from Oxygène 7–13. If either is
+- **Two unidentified files.** The Equinoxe file has no part number, and the unnumbered
+  Oxygene (105 BPM, fretless bass, choir, no lead) is probably from Oxygene 7–13. If either is
   recognised by ear, the rule names that cite them can be made exact.
 - **Chronologie 2's tempo.** It is transcribed at 162 against 119–120 for the other
   Chronologie parts. It sets no number in this plan.

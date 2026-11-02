@@ -504,7 +504,7 @@ enum OfflineExport {
 
                 if snap.panEnabled {
                     panPhases[i] += 2 * .pi * Double(snap.panHz) * dt
-                    tremoloGains[i].pan = Float(sin(panPhases[i]))
+                    tremoloGains[i].pan = Float(sin(panPhases[i])) * snap.panDepth
                 }
 
                 if snap.vibratoEnabled {
@@ -705,7 +705,7 @@ enum OfflineExport {
                     }
                     if snap.panEnabled {
                         panPhase += 2 * .pi * Double(snap.panHz) * dt
-                        tremoloGain.pan = Float(sin(panPhase))
+                        tremoloGain.pan = Float(sin(panPhase)) * snap.panDepth
                     }
                     if snap.vibratoEnabled {
                         vibratoPhase += 2 * .pi * Double(snap.vibratoHz) * dt

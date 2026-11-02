@@ -285,6 +285,10 @@ final class AppState: ObservableObject {
                                        "KOS-BASS-014","KOS-BASS-015","KOS-BASS-016","KOS-BASS-017"]) {
                 return "Kosmic Drift"
             }
+            if !vals.isDisjoint(with: ["KOS-DRUM-009", "KOS-BASS-018", "KOS-RTHM-016",
+                                       "KOS-LD1-013", "KOS-LD1-014", "KOS-TEXT-005"]) {
+                return "Kosmic Space"
+            }
             return style.rawValue.capitalized
         }
 
@@ -739,18 +743,22 @@ final class AppState: ObservableObject {
         // comping voice — Jazz Guitar is in 8 of the 14 records and Clean Guitar in 7, between
         // them more notes than anything else. Neither was in Zudio.sf2 until both were copied in
         // for the 2026-10-15 audition, alongside five more — see the Soho rhythm branch above.
-        // Full Kosmic pool is always shown to the user (Regular + Drift-exclusive instruments combined).
+        // Full Kosmic pool is always shown to the user (Regular + Drift + Space instruments combined).
+        // Kosmic Space's instruments are APPENDED after the existing entries so every saved
+        // song's pool index still points at the same sound. Never reorder these pools.
         // instrumentPickPool() restricts random generation to the appropriate substyle subset.
         switch (trackIndex, style) {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet","Flute","Soprano Sax","Recorder"]
         case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
-        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai"]
+        case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai",
+                                                "Synth Brass 1","Synth Brass 2","5th Saw Wave","Bright Saw Stack"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         // Blues drops Flute; the generator never chose Xylophone for any form, so it is gone.
         case (kTrackLead2,   .chill):   return ["Vibraphone","Flute","Soprano Sax","Trombone","Alto Sax","Tenor Sax","Synth Brass 1"]
         case (kTrackLead2,   .ambient): return ["Harp","Acoustic Guitar","FX Crystal","Space Voice","FX Atmosphere"]
-        case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal"]
+        case (kTrackLead2,   .kosmic):  return ["Brightness","Bassoon","Charang","Vox Solo","Crystal",
+                                                "Synth Strings 1","Saw Lead","Square Lead 2"]
         case (kTrackLead2,   .motorik): return ["Polysynth","Brightness","Moog","Elec Guitar","Square Lead","Synth Lead","Saw Lead","5th Saw Wave"]
         case (kTrackLead2,   _):        return ["Polysynth","Brightness","Minimoog","Elec Guitar"]
         // Chill pads. The corpus's sustained voices are Stereo Strings Slow (p49, 850 notes
@@ -774,7 +782,8 @@ final class AppState: ObservableObject {
         // common to all three.
         case (kTrackPads,    .chill):   return ["Warm Pad","Strings Fast","Sweep Pad","Soundtrack","Cello","Synth Strings 5","Strings Slow","Halo Pad","Bowed Glass"]
         case (kTrackPads,    .ambient): return ["Sweep Pad","Synth Strings","Halo Pad","Soundtrack"]
-        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2"]
+        case (kTrackPads,    .kosmic):  return ["Sweep Pad","Synth Strings","Warm Pad","Space Voice","Halo Pad","Bowed Glass","Fantasia 2",
+                                                "Synth Strings 3","Synth Strings 4","Synth Strings 5","Stereo Strings Slow"]
         case (kTrackPads,    _):        return ["Halo Pad","Sweep Pad","Bowed Glass","Synth Strings"]
         // Chill rhythm, every form. The guitars after Nylon were copied into Zudio.sf2 from
         // GeneralUser GS 2.0.3 (tools/sf2_copy_presets.py) for a Soho audition (2026-10-15) and
@@ -788,18 +797,20 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  .chill):    return ["Rhodes","Wurlitzer","B3 Organ","Perc Organ","Stereo Piano","Rock Organ","Tonewheel","Nylon Guitar",
                                                  "Jazz Guitar","Funk Guitar"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
-        case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad"]
+        case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad",
+                                                 "Synth Bass 1"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
-        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain"]
+        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain","White Noise Wave"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
                                                 "Solar Wind","Interference","Guitar Fdbk","Metal Pad","Ice Rain","Mystery Pad"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
-        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad"]
+        case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad",
+                                                "Fretless Bass"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 1"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
@@ -825,33 +836,36 @@ final class AppState: ObservableObject {
         switch (trackIndex, style) {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71, 73, 64, 74]
         case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77]
-        case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111]  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
+        case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111,  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
+                                              62, 63, 86, 11100]                     // + Space: Synth Brass 1/2, 5th Saw, Bright Saw Stack
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 65, 66, 62]
         case (kTrackLead2, .ambient):  return [46, 24, 98, 91, 99]
-        case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98]
+        case (kTrackLead2, .kosmic):   return [100, 70, 84, 85, 98, 50, 81, 12080]  // + Space: Synth Strings 1, Saw Lead, Square Lead 2
         case (kTrackLead2, .motorik):  return [90, 100, 39, 30, 80, 87, 81, 86]
         case (kTrackLead2, _):         return [90, 100, 39, 30]
         case (kTrackPads, .ambient):   return [95, 50, 94, 97]
-        case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088]
+        case (kTrackPads, .kosmic):    return [95, 50, 89, 91, 94, 92, 12088,
+                                              8050, 11050, 11051, 49]                // + Space: Synth Strings 3/4/5, Stereo Strings Slow
         case (kTrackPads, .chill):     return [89, 48, 95, 97, 42, 11051, 49, 94, 92]
         case (kTrackPads, _):          return [94, 95, 92, 50]
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016, 24, 26, 8028]
-        case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096]  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
+        case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096,  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
+                                              38]                                     // + Space: Synth Bass 1
         // Clavinet (GM 7) was removed in build 131: the preset is not present in Zudio.sf2, so it
         // played silent and logged "Missing MIDI patch 7".
         case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84, 11088, 4]
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
-        case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96]  // + Rain
+        case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96, 12122]  // + Rain, + Space: White Noise Wave
         case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031, 93, 96, 11096]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
-        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89]
+        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89, 35]  // + Space: Fretless Bass
         case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 38]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
@@ -1443,7 +1457,7 @@ final class AppState: ObservableObject {
         if autoSweepCache.key != key {
             var steps = Set(KosmicAutoSweep.steps(for: song))
             if playMode == .evolve, let anchor = evolveAnchorState,
-               anchor.style == .kosmic, !anchor.isKosmicDrift {
+               anchor.style == .kosmic, !anchor.isKosmicDrift, !anchor.isKosmicSpace {
                 let pass1Start = (anchor.structure.outroSection?.startBar ?? anchor.frame.totalBars)
                 switch evolvePhase {
                 case .pass1:
@@ -2541,14 +2555,41 @@ final class AppState: ObservableObject {
             return state?.motorikNoirVariation == true ? [0, 2, 3, 5, 6, 7] : [1, 3, 4, 5]
         }
         if style == .kosmic {
+            // Kosmic Space subsets, enforced by both pick pools and the sanitiser (which reads
+            // this table), so a Space song never inherits Flute on Lead 1 from the last song.
+            // Indices past the original pools are Space's appended instruments.
+            if state?.isKosmicSpace == true {
+                switch trackIndex {
+                // Brightness, Synth Brass 1, Synth Brass 2, 5th Saw Wave, Bright Saw Stack — the
+                // transcribers put synth brass on Jarre's leads; the orchestral winds read as Vangelis.
+                case kTrackLead1:   return [1, 8, 9, 10, 11]
+                // Brightness, Synth Strings 1, Saw Lead, Square Lead 2
+                case kTrackLead2:   return [0, 5, 6, 7]
+                // Synth Strings, Synth Strings 3/4/5 and Stereo Strings Slow at 80% of picks,
+                // Sweep Pad 20% — the string machine of 13 of the 15 corpus pieces
+                case kTrackPads:    return [1,1,1,1, 7,7,7,7, 8,8,8,8, 9,9,9,9, 10,10,10,10, 0,0,0,0,0]
+                // Moog, Synth Bass 1, Harpsi Pad
+                case kTrackRhythm:  return [0, 8, 3]
+                // Moog, Synth Bass 3, Fretless Bass
+                case kTrackBass:    return [0, 4, 8]
+                // White Noise Wave only: KOS-TEXT-005 needs a noise source
+                case kTrackTexture: return [5]
+                // 808 Kit, Machine Kit
+                case kTrackDrums:   return [0, 1]
+                default: break
+                }
+            }
+            // Base Kosmic and Drift draw only from the pools as they stood before Space appended
+            // to them, so their instrument choices are unchanged.
             let isDrift = state?.isKosmicDrift == true
             switch trackIndex {
             case kTrackLead1:   return isDrift ? [4,5,6,7]       : [0,1,2,3]
+            case kTrackLead2:   return Array(0..<min(poolCount, 5))
             case kTrackRhythm:  return isDrift ? [0,4,5,6,7]     : [0,1,2,3]
             case kTrackDrums:   return isDrift ? [2,3,4]         : [0,1,2]
-            case kTrackTexture: return isDrift ? Array(0..<poolCount) : [0,1,2,3]
-            case kTrackPads:    return isDrift ? [0,1,2,4,5,6]   : Array(0..<poolCount)
-            case kTrackBass:    return isDrift ? [1,3,4,6,7]     : Array(0..<poolCount)
+            case kTrackTexture: return isDrift ? Array(0..<min(poolCount, 5)) : [0,1,2,3]
+            case kTrackPads:    return isDrift ? [0,1,2,4,5,6]   : Array(0..<min(poolCount, 7))
+            case kTrackBass:    return isDrift ? [1,3,4,6,7]     : Array(0..<min(poolCount, 8))
             default: break
             }
         }
@@ -4417,6 +4458,21 @@ final class AppState: ObservableObject {
             let bassTrem = !isDriftEffects && trackIndex == kTrackBass    && Float.random(in: 0..<1) < 0.15
             let texPan   = !isDriftEffects && trackIndex == kTrackTexture && Float.random(in: 0..<1) < 0.15
 
+            // Kosmic Space: sweep on Pads (the stand-in for the phaser on Jarre's string machine),
+            // auto-pan on Rhythm (about ±40%, set in PlaybackEngine), sweep on Texture to shape
+            // KOS-TEXT-005's noise swells, and no bass tremolo over the falling walk. No Space
+            // lead instrument is vibrato-eligible.
+            if songState?.isKosmicSpace == true {
+                defaults = switch trackIndex {
+                case kTrackLead1:   [.delay, .space]
+                case kTrackLead2:   [.space]
+                case kTrackPads:    [.space, .delay, .sweep]
+                case kTrackTexture: [.delay, .space, .sweep]
+                case kTrackRhythm:  [.delay, .pan]
+                default:            []
+                }
+                break
+            }
             defaults = switch trackIndex {
             case kTrackLead1:   kl1Vib ? [.delay, .space, .vibrato] : [.delay, .space]
             case kTrackLead2:   kl2Vib ? [.space, .vibrato]         : [.space]

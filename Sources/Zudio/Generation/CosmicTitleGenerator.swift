@@ -12,10 +12,22 @@
 //   8. Fake-Greek + Roman numeral    — Orpheon II, Elyseon IV
 
 struct KosmicTitleGenerator {
-    static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
+    static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG,
+                         isKosmicSpace: Bool = false) -> String {
+        if isKosmicSpace {
+            // One draw, as for base Kosmic, from a list weighted 80% toward patterns 1, 2, 7 and 8
+            // (coined word, coined word + numeral, fake-Greek, fake-Greek + numeral), which echo
+            // Jarre's "Part IV" convention. Patterns 3 and 5 take the rest.
+            let pick = spacePatternIndices[rng.nextInt(upperBound: spacePatternIndices.count)]
+            return patterns[pick](frame, &rng)
+        }
         let pattern = patterns[rng.nextInt(upperBound: patterns.count)]
         return pattern(frame, &rng)
     }
+
+    /// Indices into `patterns` for Kosmic Space: 0–1 = pattern 1, 2 = pattern 2, 3 = pattern 3,
+    /// 6 = pattern 5, 9–10 = pattern 7, 11 = pattern 8.
+    private static let spacePatternIndices = [0, 1, 2, 2, 9, 10, 11, 11, 3, 6]
 
     // MARK: - Word banks
 

@@ -431,6 +431,7 @@ enum PercussionStyle: String, Codable, Sendable {
     case softPulse                   // Ambient: gentle kick + hat (AMB-DRUM-002)
     case driftLopingGroove           // Drift: doubled kick + snare variant (clean/lopsided/floating) (KOS-DRUM-007)
     case driftHalfTimeLope           // Drift: snare on beat 3 only, sparse hat, BPM ≤ 78 (KOS-DRUM-008)
+    case spaceOxygenePresetBox       // Space: the Oxygene 4 Minipops pattern, unvarying (KOS-DRUM-009)
 }
 
 // MARK: - Kosmic song forms
@@ -454,6 +455,11 @@ enum KosmicProgressionFamily: String, Codable, Sendable {
     case modal_drift
     case suspended_resolution
     case quartal_stack
+    // Kosmic Space (appended — raw values of the cases above never change).
+    // Each is a chord cycle looped through body sections; see KosmicStructureGenerator.spaceCycle.
+    case oxygeneDorianVamp      // Oxygene 4: i ×4, ii ×2, then i, bIII or IV ×2. Dorian.
+    case oxygeneAeolianCycle    // Oxygene 8: i ×4, bVII ×2, iv ×2 (alternate last: bVI). Aeolian.
+    case oxygeneTwoChordSway    // Oxygene 3: i ×2, v ×2. Aeolian or Dorian.
 }
 
 // MARK: - Ambient progression families

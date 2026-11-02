@@ -73,6 +73,9 @@ struct SongState: Sendable {
     let isKosmicDrift: Bool
     /// Kosmic Drift only: true when the Dreamscape variant is active (Floating snare + Four-Bar Hold + Svefn Float).
     let isDriftDreamscape: Bool
+    /// Kosmic-only: true when the Kosmic Space sub-style is active (Jean-Michel Jarre — locked
+    /// sequencer over fast minor chord cycles, preset rhythm box). See docs/kosmic-space-plan.md.
+    let isKosmicSpace: Bool
     /// Ambient-only: true when the Ambient Piano sub-style is active (sparse piano, near-silence).
     let isAmbientPiano: Bool
     /// Ambient Piano rule selected at generation time. "AMB-PNO-001" / "AMB-PNO-002" / "AMB-PNO-003"; "" otherwise.
@@ -112,6 +115,7 @@ struct SongState: Sendable {
         if motorikNoirVariation { return "Motorik Noir" }
         if motorikArcadeVariation { return "Motorik Arcade" }
         if motorikSync.isActive { return "Motorik Europe" }
+        if isKosmicSpace { return "Kosmic Space" }
         if isKosmicDrift { return "Kosmic Drift" }
         return style.rawValue.capitalized
     }
@@ -152,6 +156,7 @@ struct SongState: Sendable {
         motorikNoirRhythmDistortion: Bool = false,
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
+        isKosmicSpace: Bool = false,
         isAmbientPiano: Bool = false,
         ambientPianoRule: String = "",
         chillAudioTexture: String? = nil,
@@ -194,6 +199,7 @@ struct SongState: Sendable {
         self.motorikNoirRhythmDistortion = motorikNoirRhythmDistortion
         self.isKosmicDrift               = isKosmicDrift
         self.isDriftDreamscape       = isDriftDreamscape
+        self.isKosmicSpace           = isKosmicSpace
         self.isAmbientPiano          = isAmbientPiano
         self.ambientPianoRule        = ambientPianoRule
         self.chillAudioTexture        = chillAudioTexture
@@ -235,6 +241,7 @@ struct SongState: Sendable {
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+                  isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
@@ -262,6 +269,7 @@ struct SongState: Sendable {
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+                  isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
@@ -289,6 +297,7 @@ struct SongState: Sendable {
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+                  isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: texture, ambientAudioTextureOffset: offset,
@@ -316,6 +325,7 @@ struct SongState: Sendable {
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+                  isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: texture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
@@ -355,6 +365,7 @@ struct SongState: Sendable {
                   motorikNoirBassDistortion: anchor.motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: anchor.motorikNoirRhythmDistortion,
                   isKosmicDrift: anchor.isKosmicDrift, isDriftDreamscape: anchor.isDriftDreamscape,
+                  isKosmicSpace: anchor.isKosmicSpace,
                   isAmbientPiano: anchor.isAmbientPiano, ambientPianoRule: anchor.ambientPianoRule,
                   chillAudioTexture: anchor.chillAudioTexture,
                   chillAudioTextureOffset: anchor.chillAudioTextureOffset,
@@ -390,6 +401,7 @@ struct SongState: Sendable {
                   motorikNoirBassDistortion: motorikNoirBassDistortion,
                   motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
                   isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+                  isKosmicSpace: isKosmicSpace,
                   isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
@@ -430,6 +442,7 @@ struct SongState: Sendable {
             motorikNoirBassDistortion: motorikNoirBassDistortion,
             motorikNoirRhythmDistortion: motorikNoirRhythmDistortion,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
+            isKosmicSpace: isKosmicSpace,
             isAmbientPiano: isAmbientPiano, ambientPianoRule: ambientPianoRule,
             chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
             ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,

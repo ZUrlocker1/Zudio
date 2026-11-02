@@ -7,6 +7,9 @@
 //   .bridge       — A-1 escalating drum bridge (Mister Mosca style, 4-8 bars)
 //   .bridgeAlt    — A-2 sparse hit + call-and-response (Caligari Drop style, 4-8 bars)
 //   .bridgeMelody — Archetype B melody bridge (Dark Sun style, 16-24 bars + pre/post ramps)
+//
+// Kosmic Space never takes a bridge (the roll is still consumed), and its body sections loop a
+// chord cycle of 2- and 4-bar windows instead of the 1–2 long random chords (`buildSpaceChordPlan`).
 
 struct KosmicStructureGenerator {
     static func generate(
@@ -16,7 +19,9 @@ struct KosmicStructureGenerator {
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
         forceBridge: Bool = false,
-        isKosmicDrift: Bool = false
+        isKosmicDrift: Bool = false,
+        isKosmicSpace: Bool = false,
+        seed: UInt64 = 0
     ) -> SongStructure {
         let (sections, introStyle, outroStyle) = buildSections(
             form: kosmicForm,
@@ -24,14 +29,25 @@ struct KosmicStructureGenerator {
             percussionStyle: percussionStyle,
             rng: &rng,
             forceBridge: forceBridge,
-            isKosmicDrift: isKosmicDrift
+            isKosmicDrift: isKosmicDrift,
+            isKosmicSpace: isKosmicSpace
         )
-        let chordPlan = buildChordPlan(
+        // Space still runs the base chord builder so the main stream is consumed exactly as
+        // before (the title is drawn from it afterwards), then replaces the plan with its cycle.
+        let basePlan = buildChordPlan(
             frame: frame,
             sections: sections,
             kosmicProgFamily: kosmicProgFamily,
             rng: &rng
         )
+        let chordPlan: [ChordWindow]
+        if isKosmicSpace {
+            var cycleRNG = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xC7C1E)
+            chordPlan = buildSpaceChordPlan(frame: frame, sections: sections,
+                                            family: kosmicProgFamily, rng: &cycleRNG)
+        } else {
+            chordPlan = basePlan
+        }
         return SongStructure(sections: sections, chordPlan: chordPlan,
                              introStyle: introStyle, outroStyle: outroStyle)
     }
@@ -44,10 +60,13 @@ struct KosmicStructureGenerator {
         percussionStyle: PercussionStyle,
         rng: inout SeededRNG,
         forceBridge: Bool = false,
-        isKosmicDrift: Bool = false
+        isKosmicDrift: Bool = false,
+        isKosmicSpace: Bool = false
     ) -> (sections: [SongSection], introStyle: IntroStyle, outroStyle: OutroStyle) {
 
-        // Kosmic intro: 2 bars (25%), 4 bars (62.5%), 8 bars (12.5%)
+        // Kosmic intro: 2 bars (25%), 4 bars (62.5%), 8 bars (12.5%).
+        // Every intro and outro length is even, and totalBars is a multiple of 4, so every
+        // section starts on an even bar — which Kosmic Space's chord cycle relies on.
         let introLengths: [Int]    = [2,    4,     8    ]
         let introWeights: [Double] = [0.25, 0.625, 0.125]
         let introBars = introLengths[rng.weightedPick(introWeights)]
@@ -68,7 +87,8 @@ struct KosmicStructureGenerator {
         // Body — build raw sections then optionally insert bridge
         var bodySections = buildBodySections(form: form, bodyBars: bodyBars, cursor: cursor, rng: &rng)
         bodySections = insertBridgeIfNeeded(form: form, sections: bodySections, rng: &rng,
-                                            forceBridge: forceBridge, isKosmicDrift: isKosmicDrift)
+                                            forceBridge: forceBridge, isKosmicDrift: isKosmicDrift,
+                                            isKosmicSpace: isKosmicSpace)
         sections.append(contentsOf: bodySections)
         cursor += bodyBars
 
@@ -179,10 +199,15 @@ struct KosmicStructureGenerator {
     /// Only for ab/aba forms. 35% chance. Bars are taken from the preceding A section.
     private static func insertBridgeIfNeeded(
         form: KosmicSongForm, sections: [SongSection], rng: inout SeededRNG,
-        forceBridge: Bool = false, isKosmicDrift: Bool = false
+        forceBridge: Bool = false, isKosmicDrift: Bool = false, isKosmicSpace: Bool = false
     ) -> [SongSection] {
         // Only ab/aba forms get bridges
         guard form == .ab || form == .two_world || form == .aba || form == .build_and_dissolve else {
+            return sections
+        }
+        // Kosmic Space: no bridges. The roll is still drawn so the stream stays in step.
+        if isKosmicSpace {
+            if !forceBridge { _ = rng.nextDouble() }
             return sections
         }
         // Drift: 80% during testing (reduce to 30% for release); base Kosmic: 35%.
@@ -400,7 +425,8 @@ struct KosmicStructureGenerator {
         switch progFamily {
         case .static_drone:
             return "1"
-        case .two_chord_pendulum:
+        case .two_chord_pendulum, .oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway:
+            // Space families reach the base builder only to consume its draws (see generate).
             // b6 (bVI) is diatonic only in Aeolian (natural minor). In Dorian and Mixolydian
             // the 6th is raised — using b6 creates a borrowed root whose chord tones are
             // entirely outside the key. Fall back to "4" (IV — always diatonic) for those modes.
@@ -446,7 +472,7 @@ struct KosmicStructureGenerator {
                 let weights: [Double]    = [0.40,   0.35,  0.25]
                 return types[rng.weightedPick(weights)]
             }
-        case .two_chord_pendulum:
+        case .two_chord_pendulum, .oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway:
             // Clash fix: avoid major chord in minor modes — the major 3rd clashes with scale
             if isMinorMode {
                 let types:   [ChordType] = [.minor, .sus2]
@@ -466,5 +492,81 @@ struct KosmicStructureGenerator {
         case .quartal_stack:
             return rng.nextDouble() < 0.70 ? .quartal : .sus4
         }
+    }
+
+    // MARK: - Kosmic Space chord cycles
+
+    /// One window of a Space chord cycle: a degree string `degreeSemitone` accepts, a chord
+    /// type and a length of 2 or 4 bars.
+    struct SpaceChord {
+        let degree: String
+        let type: ChordType
+        let bars: Int
+    }
+
+    /// One pass through the family's cycle. `pass` counts passes across the whole song, so the
+    /// variation lands every fourth pass whatever the section lengths.
+    ///   Oxygene Dorian Vamp (Oxygene 4) — i ×4, ii ×2, then i (50%), bIII (25%) or IV (25%) ×2.
+    ///     The source's 1-bar bIII–IV pair becomes one 2-bar window to keep the even-bar rule.
+    ///   Oxygene Aeolian Cycle (Oxygene 8) — i ×4, bVII ×2, iv ×2; every fourth pass ends bVI ×2.
+    ///   Oxygene Two-Chord Sway (Oxygene 3) — i ×2, v ×2.
+    static func spaceCycle(family: KosmicProgressionFamily, pass: Int,
+                           rng: inout SeededRNG) -> [SpaceChord] {
+        switch family {
+        case .oxygeneDorianVamp:
+            let r = rng.nextDouble()
+            let last = r < 0.50 ? SpaceChord(degree: "1",  type: .minor, bars: 2)
+                     : r < 0.75 ? SpaceChord(degree: "b3", type: .major, bars: 2)
+                     :            SpaceChord(degree: "4",  type: .major, bars: 2)
+            return [SpaceChord(degree: "1", type: .minor, bars: 4),
+                    SpaceChord(degree: "2", type: .minor, bars: 2),
+                    last]
+        case .oxygeneAeolianCycle:
+            let last = pass % 4 == 3 ? SpaceChord(degree: "b6", type: .major, bars: 2)
+                                     : SpaceChord(degree: "4",  type: .minor, bars: 2)
+            return [SpaceChord(degree: "1",  type: .minor, bars: 4),
+                    SpaceChord(degree: "b7", type: .major, bars: 2),
+                    last]
+        default:
+            return [SpaceChord(degree: "1", type: .minor, bars: 2),
+                    SpaceChord(degree: "5", type: .minor, bars: 2)]
+        }
+    }
+
+    /// Kosmic Space chord plan. Intro and outro hold the tonic, as base Kosmic forces (this is
+    /// also the corpus's pedal intro). Body sections loop the cycle from their first bar and cut
+    /// the last window short at the section end. Every window is 2 or 4 bars and starts on an
+    /// even bar, because KOS-PADS-001 re-attacks on even bars only.
+    private static func buildSpaceChordPlan(
+        frame: GlobalMusicalFrame,
+        sections: [SongSection],
+        family: KosmicProgressionFamily,
+        rng: inout SeededRNG
+    ) -> [ChordWindow] {
+        func window(_ start: Int, _ length: Int, _ degree: String, _ type: ChordType) -> ChordWindow {
+            let (tones, tensions, avoids) = NotePoolBuilder.build(
+                chordRootDegree: degree, chordType: type, key: frame.key, mode: frame.mode)
+            return ChordWindow(startBar: start, lengthBars: length,
+                               chordRoot: degree, chordType: type,
+                               chordTones: tones, scaleTensions: tensions, avoidTones: avoids)
+        }
+        var plan: [ChordWindow] = []
+        var pass = 0
+        for section in sections {
+            guard section.label == .A || section.label == .B else {
+                plan.append(window(section.startBar, section.lengthBars, "1", .minor))
+                continue
+            }
+            var bar = section.startBar
+            while bar < section.endBar {
+                for chord in spaceCycle(family: family, pass: pass, rng: &rng) where bar < section.endBar {
+                    let length = Swift.min(chord.bars, section.endBar - bar)
+                    plan.append(window(bar, length, chord.degree, chord.type))
+                    bar += length
+                }
+                pass += 1
+            }
+        }
+        return plan
     }
 }

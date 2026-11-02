@@ -17,7 +17,8 @@ struct KosmicPadsGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         forceRuleID: String? = nil,
-        isKosmicDrift: Bool = false
+        isKosmicDrift: Bool = false,
+        isKosmicSpace: Bool = false
     ) -> [MIDIEvent] {
 
         // Pick primary pad rule
@@ -25,8 +26,12 @@ struct KosmicPadsGenerator {
         let padWeights: [Double] = [0.18,           0.20,           0.18,           0.13,           0.13,            0.18]
 
         // forceRuleID > quartal_stack/suspended_resolution constraints > weighted pick
+        // Kosmic Space: KOS-PADS-001 only. It re-attacks every 2 bars on the current chord, so with
+        // Space's 2- and 4-bar chord windows it follows every change — the Oxygene string machine.
         let primaryRule: String
-        if let forced = forceRuleID {
+        if isKosmicSpace {
+            primaryRule = "KOS-PADS-001"
+        } else if let forced = forceRuleID {
             primaryRule = forced
         } else if kosmicProgFamily == .quartal_stack {
             primaryRule = "KOS-PADS-005"
@@ -41,8 +46,9 @@ struct KosmicPadsGenerator {
         // Per-bar probability compounds across many bars — a 40% per-bar rate fires in >99% of songs.
         // A single song-level gate keeps these as genuine occasional colour, not guaranteed fixtures.
         // bIII is a minor-mode colour — suppress in major modes where flat-3 clashes
-        let use008 = frame.mode != .Ionian && frame.mode != .Mixolydian && rng.nextDouble() < 0.40
-        let use006 = rng.nextDouble() < 0.30   // KOS-PADS-006: Shimmer Layer
+        // Space takes neither layer.
+        let use008 = !isKosmicSpace && frame.mode != .Ionian && frame.mode != .Mixolydian && rng.nextDouble() < 0.40
+        let use006 = !isKosmicSpace && rng.nextDouble() < 0.30   // KOS-PADS-006: Shimmer Layer
         if use008 { usedRuleIDs.insert("KOS-PADS-008") }
         if use006 { usedRuleIDs.insert("KOS-PADS-006") }
 
@@ -616,7 +622,7 @@ struct KosmicPadsGenerator {
     // MARK: - KOS-PADS-007: Gated Chord Pulse
     // Root+fifth re-attacked each quarter beat with independent per-beat gate probability.
     // Beats 1 and 3 weighted higher; creates a rhythmically active pad in the JMJ/TD style
-    // (Équinoxe, Stratosfear) rather than a static drone.
+    // (Equinoxe, Stratosfear) rather than a static drone.
 
     private static func gatedChordPulseBar(
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
