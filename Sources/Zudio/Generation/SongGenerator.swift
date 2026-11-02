@@ -2867,20 +2867,9 @@ struct SongGenerator {
             default:                   familyName = "Two-Chord Sway"
             }
             log.append(GenerationLogEntry(tag: "Space", description: "Space Oxygene, \(familyName)"))
-            if let arrangement = spaceArrangement {
-                // Bars are 1-based, as the scrollbar shows them.
-                func span(_ r: Range<Int>) -> String { "bars \(r.lowerBound + 1)-\(r.upperBound)" }
-                var parts = arrangement.leadRests.map { "Lead 1 rests \(span($0))" }
-                if let b = arrangement.sequencerBreak { parts.append("sequencer out \(span(b))") }
-                let fills = percussionStyle == .spaceOxygenePresetBox ? arrangement.fillBars.count : 0
-                parts.append(fills == 1 ? "1 fill" : "\(fills) fills")
-                log.append(GenerationLogEntry(tag: "Breaks", description: parts.joined(separator: ", ")))
-            }
         }
-        // A Space rule's line names its per-song draws, so a song's character reads from the log.
-        func withDraws(_ ruleID: String, _ desc: String) -> String {
-            spaceDraws[ruleID].map { "\(desc) (\($0))" } ?? desc
-        }
+        // Space rule lines stay short: the per-song draws are not shown in the log.
+        func withDraws(_ ruleID: String, _ desc: String) -> String { desc }
 
         // Kosmic form
         let kosmicFormLabel: String

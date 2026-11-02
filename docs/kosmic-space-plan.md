@@ -493,7 +493,7 @@ Kosmic, so they cost no memory.
   Strings Slow (0/49)
 - **Rhythm** — Synth Bass 1 (0/38)
 - **Bass** — Fretless Bass (0/35)
-- **Texture** — White Noise Wave (12/122)
+- **Texture** — White Noise Wave (12/122), Solar Wind 2 (12/89), Starship (8/125), Interference (11/127). Solar Wind (11/89) was already in the pool.
 
 **Space subsets**, enforced by both pick pools and the sanitiser:
 
@@ -505,7 +505,7 @@ Kosmic, so they cost no memory.
   are weighted to about 80% of picks.
 - **Rhythm** — Moog, Synth Bass 1, Harpsi Pad
 - **Bass** — Moog, Synth Bass 3, Fretless Bass
-- **Texture** — White Noise Wave only in Phase 1, since the sweep rule needs a noise source
+- **Texture** — White Noise Wave, Solar Wind, Solar Wind 2, Starship and Interference, 20% each (Zack, 2026-11-02). The sweep rule needs a noise or wind source, so the musical pad swells (Halo Pad, Atmosphere, Sweep Pad, Bowed Glass, Space Voice) were left out. Solar Wind 2 takes Solar Wind's 0.40 gain as a starting guess; Starship and Interference are at the default Texture gain. None is auditioned yet.
 - **Drums** — 808 Kit, Machine Kit
 
 **Where pools live.** Adding instruments touches four places: `poolNames`, `poolPrograms`,
@@ -917,11 +917,29 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
   sequencer break, in that order of priority, at most three a song. Each is a falling tom roll
   over the last 1 beat (80%) or 2 beats (20%); the kick and the clap stay. They play only with
   KOS-DRUM-009, not when the song draws no percussion.
-- **The log** gains a `Breaks` line, such as `Lead 1 rests bars 33-48, sequencer out bars
-  71-76, 3 fills`. During playback a coordinated break is called out at its bar, naming only
+- **The log** carries no `Breaks` line and no per-song draws in parentheses (Zack, 2026-11-02:
+  keep it short). During playback a coordinated break is called out at its bar, naming only
   the parts actually playing either side of it, e.g. `Bar 071  Sequencer and Lead 2 drop out`
   and `Bar 077  Sequencer and Lead 2 return`. A Lead 1 rest on its own gets no live line,
   since leads come and go in every style (Zack, 2026-11-02).
+
+- **Drum variety and the handclap** (Zack, 2026-11-02, from the song Spectrion). The 808 box was
+  relentless, and the handclap on beats 2 and 4 read as disco. `KosmicSpaceArrangement` now holds
+  `drumThins` and `clapRanges`, drawn on their own stream so the break schedule is unchanged.
+  - Simpler beat at each body section start after the first, and 32 bars into sections of 40 or
+    more bars: 55% per point, at least one a song, 8 or 16 bars, never into the last 8 before the
+    outro or over the sequencer break. Variant 0 (60%) drops the 16th hats. Variant 1 (40%) goes
+    to quarter hats, kick on steps 0 and 10, no open hat.
+  - The clap plays in about 10% of songs, in one or two whole body sections, and not in a thin
+    stretch. Otherwise the song's step 12 accent is the only backbeat.
+
+- **Theme variation and thin-stretch fills** (Zack, 2026-11-02). KOS-LD1-013 draws a note count
+  (5 at 50%, 4 at 25%, 6 at 25%) and a rhythm per song. The 5-note source onsets (0, 6, 8, 10, 14)
+  are 35% of that draw, and are never used with the source top note and the 5-3-5 inner line
+  together, so statements 1 and 2 are never the original figure. The 4-note form drops the inner
+  third. The 6-note form adds a passing step above the first inner note, and is only used when
+  there is room for it. Each simpler drum stretch ends on a 1- or 2-beat fill into the fuller beat,
+  in addition to the three break fills.
 
 Not yet done:
 

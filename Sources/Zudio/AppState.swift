@@ -803,7 +803,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
-        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain","White Noise Wave"]
+        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain","White Noise Wave","Solar Wind 2","Starship","Interference"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
                                                 "Solar Wind","Interference","Guitar Fdbk","Metal Pad","Ice Rain","Mystery Pad"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]
@@ -860,7 +860,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm, _):        return [28, 39, 29]
         case (kTrackTexture, .chill):  return [240, 241, 251, 242, 243, 245, 250]
         case (kTrackTexture, .ambient):return [49, 92, 52, 99, 90]
-        case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96, 12122]  // + Rain, + Space: White Noise Wave
+        case (kTrackTexture, .kosmic): return [90, 86, 11089, 102, 96, 12122, 12089, 8125, 11127]  // + Rain, + Space: White Noise Wave, Solar Wind 2, Starship, Interference
         case (kTrackTexture, .motorik): return [86, 94, 89, 99, 102, 11089, 11127, 8031, 93, 96, 11096]
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
@@ -2572,8 +2572,9 @@ final class AppState: ObservableObject {
                 case kTrackRhythm:  return [0, 8, 3]
                 // Moog, Synth Bass 3, Fretless Bass
                 case kTrackBass:    return [0, 4, 8]
-                // White Noise Wave only: KOS-TEXT-005 needs a noise source
-                case kTrackTexture: return [5]
+                // White Noise Wave, Solar Wind, Solar Wind 2, Starship, Interference, 20% each:
+                // KOS-TEXT-005 needs a noise or wind source for its swell
+                case kTrackTexture: return [5, 2, 6, 7, 8]
                 // 808 Kit, Machine Kit
                 case kTrackDrums:   return [0, 1]
                 default: break

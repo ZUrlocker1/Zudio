@@ -379,17 +379,53 @@ struct KosmicLeadGenerator {
                                                       ([5, 4, 2], "6-5-3")]
         let inner = inners[rng.weightedPick([0.35, 0.35, 0.30])]
         let compressed = rng.nextDouble() < 0.40
+
+        // Note count and rhythm. The source form (5 notes on 0, 6, 8, 10, 14) is one option among
+        // several, and a song never plays it with the source top note and inner line as well:
+        // statements 1 and 2 are exact within the song's own draws, so they must not be the original.
+        let sourceShape = top.steps == 7 && inner.steps == [4, 2, 4]
+        let countRoll = rng.nextDouble()
+        var noteCount = countRoll < 0.50 ? 5 : (countRoll < 0.75 ? 4 : 6)
+        if noteCount == 6 && top.steps <= inner.steps[0] + 1 { noteCount = 5 }   // no room for a passing note
+        var onsets: [Int]
+        switch noteCount {
+        case 4:
+            onsets = rng.nextDouble() < 0.5 ? [0, 6, 10, 14] : [0, 8, 10, 14]
+        case 6:
+            onsets = rng.nextDouble() < 0.5 ? [0, 4, 6, 8, 10, 14] : [0, 6, 8, 10, 12, 14]
+        default:
+            let r = rng.nextDouble()
+            onsets = r < 0.35 ? [0, 6, 8, 10, 14] : (r < 0.70 ? [0, 4, 8, 10, 14] : [0, 6, 10, 12, 14])
+            if sourceShape && onsets == [0, 6, 8, 10, 14] {
+                onsets = rng.nextDouble() < 0.5 ? [0, 4, 8, 10, 14] : [0, 6, 10, 12, 14]
+            }
+        }
+        // Scale steps above the root for each note, falling to the root
+        var pitchSteps: [Int]
+        switch noteCount {
+        case 4:  pitchSteps = [top.steps, inner.steps[0], inner.steps[2], 0]
+        case 6:  pitchSteps = [top.steps, inner.steps[0] + 1, inner.steps[0], inner.steps[1], inner.steps[2], 0]
+        default: pitchSteps = [top.steps] + inner.steps + [0]
+        }
         draws?.record("KOS-LD1-013", compressed ? "compressed rhythm"
-                                                : "\(top.name), \(inner.name), source rhythm")
+                                                : "\(top.name), \(inner.name), \(noteCount) notes")
 
         let scalePCs = frame.scalePCs
         let tonicRoot = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
                                         low: 60, high: 71)
         // (step, scale steps above the root, duration)
-        let figure: [(step: Int, steps: Int, dur: Int)] = compressed
-            ? [(0, 3, 2), (2, 2, 2), (4, 1, 2), (6, 0, 26)]
-            : [(0, top.steps, 6), (6, inner.steps[0], 2), (8, inner.steps[1], 3),
-               (10, inner.steps[2], 3), (14, 0, 16)]
+        var figure: [(step: Int, steps: Int, dur: Int)] = []
+        if compressed {
+            figure = [(0, 3, 2), (2, 2, 2), (4, 1, 2), (6, 0, 26)]
+        } else if onsets == [0, 6, 8, 10, 14] {
+            figure = [(0, pitchSteps[0], 6), (6, pitchSteps[1], 2), (8, pitchSteps[2], 3),
+                      (10, pitchSteps[3], 3), (14, pitchSteps[4], 16)]
+        } else {
+            for (i, onset) in onsets.enumerated() {
+                let last = i == onsets.count - 1
+                figure.append((onset, pitchSteps[i], last ? 16 : Swift.max(1, onsets[i + 1] - onset)))
+            }
+        }
 
         var events: [MIDIEvent] = []
         var statement = 0

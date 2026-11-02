@@ -593,6 +593,12 @@ struct KosmicStructureGenerator {
 /// section. Nothing breaks in the first 16 body bars or the last 8 before the outro. Derived
 /// from the structure and the song seed alone, so per-track regeneration rebuilds the same
 /// schedule without storing it.
+struct DrumThin {
+    let range: Range<Int>
+    /// 0 = eighth-note hats (no 16ths); 1 = quarter hats, kick on 0 and 10 only, no open hat.
+    let variant: Int
+}
+
 struct KosmicSpaceArrangement {
     /// Body bars where Lead 1 sits out.
     let leadRests: [Range<Int>]
@@ -600,6 +606,11 @@ struct KosmicSpaceArrangement {
     let sequencerBreak: Range<Int>?
     /// Bars that take a drum fill.
     let fillBars: [Int]
+    /// Stretches where the preset box drops to a simpler beat, at section starts and 32-bar points.
+    let drumThins: [DrumThin]
+    /// Body stretches where the preset box adds its handclap on beats 2 and 4. Empty in about 90%
+    /// of songs.
+    let clapRanges: [Range<Int>]
     /// First and last-plus-one bars of the body.
     let bodyStart: Int
     let bodyEnd: Int
@@ -609,6 +620,8 @@ struct KosmicSpaceArrangement {
         leadRests.map(\.upperBound) + (sequencerBreak.map { [$0.upperBound] } ?? [])
     }
 
+    func drumThin(atBar bar: Int) -> DrumThin? { drumThins.first { $0.range.contains(bar) } }
+    func clapPlays(atBar bar: Int) -> Bool { clapRanges.contains { $0.contains(bar) } }
     func leadRests(atBar bar: Int) -> Bool { leadRests.contains { $0.contains(bar) } }
     func sequencerRests(atBar bar: Int) -> Bool { sequencerBreak?.contains(bar) == true }
     /// True in body bars where Lead 1 is playing; the sequencer thins under it.
@@ -618,6 +631,7 @@ struct KosmicSpaceArrangement {
         let body = structure.sections.filter { $0.label == .A || $0.label == .B }
         guard let first = body.first, let last = body.last else {
             return KosmicSpaceArrangement(leadRests: [], sequencerBreak: nil, fillBars: [],
+                                          drumThins: [], clapRanges: [],
                                           bodyStart: 0, bodyEnd: totalBars)
         }
         var rng = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xB2EA_C5)
@@ -680,7 +694,42 @@ struct KosmicSpaceArrangement {
         var seen = Set<Int>()
         fills = Array(fills.filter { seen.insert($0).inserted }.prefix(3)).sorted()
 
+        // Drum changes come from their own stream, so the schedule above is unchanged by them.
+        var drumRNG = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xD2_0B7E)
+
+        // Simpler beat: at each body section start after the first, and 32 bars into a long section,
+        // 55% of the time for 8 or 16 bars (never into the last 8 before the outro, never over the
+        // sequencer break, whose own thinning is enough). At least one when any point is available.
+        var points: [(bar: Int, end: Int)] = []
+        for sec in body {
+            if sec.startBar > first.startBar { points.append((sec.startBar, sec.endBar)) }
+            if sec.endBar - sec.startBar >= 40 { points.append((sec.startBar + 32, sec.endBar)) }
+        }
+        var thins: [DrumThin] = []
+        var chosen = points.map { _ in drumRNG.nextDouble() < 0.55 }
+        if !chosen.isEmpty && !chosen.contains(true) { chosen[drumRNG.nextInt(upperBound: chosen.count)] = true }
+        for (point, take) in zip(points, chosen) where take {
+            let length = drumRNG.nextDouble() < 0.5 ? 8 : 16
+            let variant = drumRNG.nextDouble() < 0.6 ? 0 : 1
+            let r = point.bar..<Swift.min(point.bar + length, point.end, last.endBar - 8)
+            guard r.count >= 4, seqBreak.map({ r.upperBound <= $0.lowerBound || r.lowerBound >= $0.upperBound }) != false
+            else { continue }
+            thins.append(DrumThin(range: r, variant: variant))
+        }
+
+        // Handclap: rare, in about 10% of songs, and then in one or two body sections only.
+        var claps: [Range<Int>] = []
+        if drumRNG.nextDouble() < 0.10 {
+            var secs = body
+            let n = drumRNG.nextDouble() < 0.5 ? 1 : 2
+            for _ in 0..<Swift.min(n, secs.count) {
+                let sec = secs.remove(at: drumRNG.nextInt(upperBound: secs.count))
+                claps.append(sec.startBar..<sec.endBar)
+            }
+        }
+
         return KosmicSpaceArrangement(leadRests: rests, sequencerBreak: seqBreak, fillBars: fills,
+                                      drumThins: thins, clapRanges: claps,
                                       bodyStart: first.startBar, bodyEnd: last.endBar)
     }
 }

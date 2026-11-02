@@ -1287,6 +1287,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.42   // Rain (Ice Rain) runs loud on Kosmic Texture — pull back
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 11089 {
                 vol = 0.40   // Solar Wind runs loud on Kosmic Texture — pull back
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 12089 {
+                vol = 0.40   // Solar Wind 2, as Solar Wind (starting guess, not yet auditioned)
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 102 {
                 vol = 0.50   // FX Echoes — pull back from general 1.4 Texture boost
             } else if trackIndex == kTrackTexture && ambientMode {

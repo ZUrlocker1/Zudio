@@ -59,7 +59,8 @@ struct KosmicDrumGenerator {
         case .spaceOxygenePresetBox:
             usedRuleIDs.insert("KOS-DRUM-009")
             return generateOxygenePresetBox(frame: frame, rng: &rng, draws: spaceDraws,
-                                            fillBars: spaceArrangement?.fillBars ?? [])
+                                            fillBars: spaceArrangement?.fillBars ?? [],
+                                            arrangement: spaceArrangement)
 
         default:
             usedRuleIDs.insert("KOS-DRUM-000")
@@ -76,6 +77,10 @@ struct KosmicDrumGenerator {
     // the corpus's (Zack, 2026-11-02): a short tom roll in the bar before a Space break or return,
     // at most three a song (KosmicSpaceArrangement.fillBars), 1 beat 80% and 2 beats 20%, as
     // Motorik Europe's sync fills.
+    // Also Zudio's own: the box drops to a simpler beat for 8 or 16 bars at body section starts and
+    // 32 bars into long sections (KosmicSpaceArrangement.drumThins), and the handclap on beats 2 and
+    // 4 plays only in about 10% of songs, in one or two body sections (clapRanges). The side stick,
+    // tom or tambourine accent on step 12 is the song's backbeat the rest of the time.
     // Homage draws per song: hat mask = the source (25%) or one of three variants that each move one
     // gap (25% each); kick = the source (40%) or steps 0, 6, 10 (60%).
     // Repeat guard: the last hat hit is dropped in every eighth bar, so no run of identical bars
@@ -85,7 +90,8 @@ struct KosmicDrumGenerator {
         frame: GlobalMusicalFrame,
         rng: inout SeededRNG,
         draws: KosmicSpaceDraws?,
-        fillBars: [Int]
+        fillBars: [Int],
+        arrangement: KosmicSpaceArrangement?
     ) -> [MIDIEvent] {
         let hatMasks = ["xx..xxx.xxx.xxx.", "xx..xxx.xx.xxxx.", "x.x.xxx.xxx.xxx.", "xx.xxx..xxx.xxx."]
         let maskNames = ["source hats", "hat variant 1", "hat variant 2", "hat variant 3"]
@@ -104,27 +110,43 @@ struct KosmicDrumGenerator {
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
             let barStart = bar * 16
-            for step in hatSteps where !(bar % 8 == 7 && step == guardStep) {
+            // A simpler beat in the arrangement's thin stretches: variant 0 drops the 16th hats,
+            // variant 1 goes to quarter hats with the kick on 0 and 10 and no open hat.
+            let thin = arrangement?.drumThin(atBar: bar)?.variant
+            let barHats = thin == nil ? hatSteps
+                : thin == 0 ? hatSteps.filter { $0 % 2 == 0 }
+                : hatSteps.filter { $0 % 4 == 0 }
+            let barKicks = thin == 1 ? [0, 10] : kickSteps
+            for step in barHats where !(bar % 8 == 7 && step == guardStep) {
                 events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
                                         velocity: step % 4 == 0 ? 70 : 54, durationSteps: 1))
             }
-            for step in kickSteps {
+            for step in barKicks {
                 events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
                                         velocity: step == 0 ? 96 : 88, durationSteps: 1))
             }
-            for step in [4, 12] {
-                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.clap.rawValue,
-                                        velocity: 80, durationSteps: 1))
+            // The handclap is rare, only in the arrangement's clap stretches
+            if thin == nil, arrangement?.clapPlays(atBar: bar) == true {
+                for step in [4, 12] {
+                    events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.clap.rawValue,
+                                            velocity: 80, durationSteps: 1))
+                }
             }
-            events.append(MIDIEvent(stepIndex: barStart + 2, note: GMDrum.openHat.rawValue,
-                                    velocity: 62, durationSteps: 1))
+            if thin != 1 {
+                events.append(MIDIEvent(stepIndex: barStart + 2, note: GMDrum.openHat.rawValue,
+                                        velocity: 62, durationSteps: 1))
+            }
             events.append(MIDIEvent(stepIndex: barStart + 12, note: accent.note.rawValue,
                                     velocity: 66, durationSteps: 1))
         }
 
         // Fills replace the last 1 or 2 beats of their bar with a falling tom roll; the kick that
         // opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
-        for bar in fillBars where bar > 0 && bar < frame.totalBars {
+        // A simpler stretch ends on a short fill into the fuller beat.
+        let thinEnds = (arrangement?.drumThins ?? []).map { $0.range.upperBound - 1 }
+        var seenFill = Set<Int>()
+        let allFills = (fillBars + thinEnds).filter { seenFill.insert($0).inserted }.sorted()
+        for bar in allFills where bar > 0 && bar < frame.totalBars {
             let beats = rng.nextDouble() < 0.80 ? 1 : 2
             let from  = bar * 16 + 16 - beats * 4
             events.removeAll { $0.stepIndex >= from && $0.stepIndex < bar * 16 + 16
