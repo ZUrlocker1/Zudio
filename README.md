@@ -21,7 +21,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 The download is `2.8` (build 133), with iPhone Duo support and Chill Soho in it. Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder. The previous release is [2.7](https://github.com/ZUrlocker1/Zudio/releases/download/v2.7/Zudio-2.7.dmg) (build 132).
 
-**Work in progress — v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre, starting with *Oxygene*. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. It is on the `kosmic-space` branch, not in the download above, and still being tuned by ear. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
+**Work in progress — v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre, starting with *Oxygene*. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. It is in the source on `main`, not in the download above, and is still being tuned by ear. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
 
 **What's new — v2.8 iPhone Duo:** Zudio now has a layout made for the iPhone Duo, the foldable iPhone. Tested on a real Duo. Folded, it is the iPhone player it always was. Unfolded, it is the iPad layout, opening on Visuals with the track view one tap away on the Tracks tab. Fold and unfold mid-song and playback carries on.
 

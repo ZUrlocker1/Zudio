@@ -1,6 +1,6 @@
 # Kosmic Space — Design & Implementation Plan
 
-Status: **Phase 1 built on `kosmic-space` as version 2.9 (build 135), a work in progress.**
+Status: **Phase 1 built and merged to `main` as version 2.9 (build 135), a work in progress.**
 Zack's first listen (2026-11-02) was encouraging. It reads as Jarre, with the sequences and
 noise sweeps. The breaks below were added after that listen to relieve the monotony. It
 builds on macOS and iOS. No test suite has been run. See
@@ -12,7 +12,9 @@ September before Motorik Europe and Chill Soho were built, and the corpus review
 2026-11-02, whose findings are folded in here. Where this document and either earlier
 version disagree, this one wins.
 
-**Work on a branch** so `main` stays releasable.
+**Work happens on `main`.** Zack is the only user of the repo, so work in progress goes on
+`main`, marked as version 2.9 work in progress. The README's download link stays on the last
+published DMG until 2.9 is released (Zack, 2026-11-02).
 
 ---
 

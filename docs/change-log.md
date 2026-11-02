@@ -2,7 +2,7 @@
 
 ## V 2.9 (Build 135) — Kosmic Space (work in progress)
 
-On the `kosmic-space` branch. Not released, and still being tuned by ear.
+In the source on `main` (merged 2026-11-02). Not released: the download is still 2.8. Still being tuned by ear.
 
 - **New Kosmic Space substyle** — (2026-11-02) A Jean-Michel Jarre substyle of Kosmic, built from rules measured on 16 MIDI transcriptions of his music. This first phase models *Oxygene*. A locked root-and-octave sequencer runs over fast minor chord cycles of 2- and 4-bar chords, with the Minipops preset rhythm box, a falling Oxygene bass, a slow falling theme in the A sections and a see-saw riff in the B sections, string-machine pads and white-noise surf sweeps into the section changes. Every rule varies its source figure per song, so no song copies the original. Six new rules: KOS-DRUM-009 Oxygene Preset Box, KOS-BASS-018 Oxygene Falling Walk, KOS-RTHM-016 Oxygene Octave Sequencer, KOS-LD1-013 Oxygene Falling Theme, KOS-LD1-014 Oxygene See-Saw Riff and KOS-TEXT-005 Oxygene Surf Sweep.
 - **Testing share** — While it is being tuned, 80% of Kosmic songs are Space, 10% Drift and 10% base Kosmic. The intended release share is about Drift 30%, Space 25%, base 45%.
