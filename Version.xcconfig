@@ -1,0 +1,11 @@
+// Version.xcconfig — the one place Zudio's version and build number are set.
+//
+// Every target reads these: the Mac app, the iPhone/iPad app, the Share and Quick Look
+// extensions. The Mac Info.plist refers to them as $(MARKETING_VERSION) and
+// $(CURRENT_PROJECT_VERSION); the Makefile fills them in for its swift-build bundle.
+// The About box, the iPhone info sheet and exported logs read the built app's bundle.
+//
+// To release a new version or build, change these two lines and nothing else.
+
+MARKETING_VERSION = 2.9
+CURRENT_PROJECT_VERSION = 135

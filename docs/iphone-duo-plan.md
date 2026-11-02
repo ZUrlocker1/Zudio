@@ -208,6 +208,6 @@ range and was not changed.
 
 ## Version
 
-**2.8 (build 134)** is set in `Sources/Zudio/Info.plist` (Mac) and all six build configurations in
-`project.pbxproj`. The iOS target takes its version from the pbxproj, since `iOS-Info.plist` has no
-version keys. `check-duo.sh` in the repo root reports whether a Duo simulator is installed.
+**2.8 (build 134)** is set in `Version.xcconfig` at the repo root, the one place every target reads
+it from (2026-11-02; before that it was typed into `Sources/Zudio/Info.plist` and six build
+configurations in `project.pbxproj`). `check-duo.sh` in the repo root reports whether a Duo simulator is installed.
