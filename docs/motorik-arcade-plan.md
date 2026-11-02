@@ -242,7 +242,7 @@ Each track draws from a restricted, equal-weight subset of the shared Motorik in
 
 - **Lead 1:** Mono Synth *(Arcade-only)*, Saw Lead 3, Synth Lead, Saw Stack.
 - **Lead 2:** Moog, Synth Lead, 5th Saw Wave.
-- **Bass:** Lead Bass, Elec Bass *(Arcade-only)*, Mean Saw Bass, Techno Bass, Synth Bass 1 *(Arcade-only)*.
+- **Bass:** Lead Bass, Elec Bass *(Arcade-only)*, Mean Saw Bass, Techno Bass, Synth Bass 3 *(Arcade-only; replaced Synth Bass 1, whose preset plays only a click)*.
 - **Rhythm:** Guitar Pulse *(Arcade-only)*, Synth Bass 3, Electric Piano 1 *(Arcade-only)*, Clavinet *(Arcade-only)*.
 - **Pads:** Halo Pad, Sweep Pad, Synth Strings.
 - **Texture:** Fifths Lead, FX Atmosphere, Solar Wind, Interference, Metal Pad *(Arcade-only)*, Ice Rain *(Arcade-only)*, Mystery Pad *(Arcade-only)*.

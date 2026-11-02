@@ -686,7 +686,7 @@ final class AppState: ObservableObject {
         (kTrackTexture, .kosmic,  3), // FX Echoes        patch 102  (index shifted: FX Atmosphere removed)
         (kTrackRhythm,  .kosmic,  6), // Synth Chime      patch 11098 (index shifted: Crystal Bells removed)
         (kTrackBass,    .kosmic,  7), // Warm Pad         patch 89
-        (kTrackBass,    .motorik, 6), // Synth Bass 1     patch 38
+        (kTrackBass,    .motorik, 6), // Synth Bass 3     patch 8038
     ]
 
     private static let trackDisplayName: [Int: String] = [
@@ -798,7 +798,7 @@ final class AppState: ObservableObject {
                                                  "Jazz Guitar","Funk Guitar"]
         case (kTrackRhythm,  .ambient):  return ["Glockenspiel","Celesta","Crystal","Rain","Tinker Bell","Windchime","Church Bells","Kalimba"]
         case (kTrackRhythm,  .kosmic):   return ["Moog","Wurlitzer","Rock Organ","Harpsi Pad","New Age Pad","Synth Mallet","Synth Chime","Mystery Pad",
-                                                 "Synth Bass 1"]
+                                                 "Pulse Bass"]
         case (kTrackRhythm,  .motorik):  return ["Guitar Pulse","Crunch Guitar","Fuzz Guitar","Doctor Solo","Acoustic Bass","Pick Bass","Synth Bass 3","Charang","Harpsi Pad","Electric Piano 1"]
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
@@ -811,7 +811,7 @@ final class AppState: ObservableObject {
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
         case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad",
                                                 "Fretless Bass"]
-        case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 1"]
+        case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 3"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
         case (kTrackDrums,   .ambient): return ["Percussion Kit", "Brush Kit"]
@@ -853,7 +853,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm, .ambient): return [9, 8, 98, 96, 112, 5124, 8014, 108]
         case (kTrackRhythm, .chill):   return [4, 5, 17, 16, 61001, 18, 8016, 24, 26, 8028]
         case (kTrackRhythm, .kosmic):  return [39, 5, 18, 11088, 88, 1098, 11098, 11096,  // + New Age Pad, Synth Mallet, Synth Chime, Mystery Pad
-                                              38]                                     // + Space: Synth Bass 1
+                                              11039]                                  // + Space: Pulse Bass (Synth Bass 1, 38, is a 25 ms click in the SF2)
         // Clavinet (GM 7) was removed in build 131: the preset is not present in Zudio.sf2, so it
         // played silent and logged "Missing MIDI patch 7".
         case (kTrackRhythm, .motorik): return [28, 29, 30, 8081, 32, 34, 8038, 84, 11088, 4]
@@ -866,7 +866,7 @@ final class AppState: ObservableObject {
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
         case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89, 35]  // + Space: Fretless Bass
-        case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 38]
+        case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 8038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
         case (kTrackDrums, .ambient):  return [0, 40]
@@ -2568,7 +2568,7 @@ final class AppState: ObservableObject {
                 // Synth Strings, Synth Strings 3/4/5 and Stereo Strings Slow at 80% of picks,
                 // Sweep Pad 20% — the string machine of 13 of the 15 corpus pieces
                 case kTrackPads:    return [1,1,1,1, 7,7,7,7, 8,8,8,8, 9,9,9,9, 10,10,10,10, 0,0,0,0,0]
-                // Moog, Synth Bass 1, Harpsi Pad
+                // Moog, Pulse Bass, Harpsi Pad
                 case kTrackRhythm:  return [0, 8, 3]
                 // Moog, Synth Bass 3, Fretless Bass
                 case kTrackBass:    return [0, 4, 8]
@@ -4460,15 +4460,15 @@ final class AppState: ObservableObject {
             let texPan   = !isDriftEffects && trackIndex == kTrackTexture && Float.random(in: 0..<1) < 0.15
 
             // Kosmic Space: sweep on Pads (the stand-in for the phaser on Jarre's string machine),
-            // auto-pan on Rhythm (about ±40%, set in PlaybackEngine), sweep on Texture to shape
-            // KOS-TEXT-005's noise swells, and no bass tremolo over the falling walk. No Space
+            // auto-pan on Rhythm (about ±40%, set in PlaybackEngine), sweep and a slow auto-pan (one sweep per 4 bars)
+            // on Texture to shape and move KOS-TEXT-005's noise swells, and no bass tremolo over the falling walk. No Space
             // lead instrument is vibrato-eligible.
             if songState?.isKosmicSpace == true {
                 defaults = switch trackIndex {
                 case kTrackLead1:   [.delay, .space]
                 case kTrackLead2:   [.space]
                 case kTrackPads:    [.space, .delay, .sweep]
-                case kTrackTexture: [.delay, .space, .sweep]
+                case kTrackTexture: [.delay, .space, .sweep, .pan]
                 case kTrackRhythm:  [.delay, .pan]
                 default:            []
                 }

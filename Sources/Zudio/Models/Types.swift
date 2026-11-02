@@ -88,7 +88,7 @@ enum MotorikSync: String, Sendable, CaseIterable {
         // [0=Guitar Pulse, 1=Crunch Guitar, 2=Fuzz Guitar, 3=Doctor Solo, 4=Acoustic Bass,
         //  5=Pick Bass, 6=Synth Bass 3, 7=Charang, 8=Harpsi Pad, 9=Electric Piano 1]
         case kTrackRhythm:  return [3, 6, 9]
-        // [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 1]
+        // [0=Moog, 1=Lead Bass, 2=Rock Bass, 3=Elec Bass, 4=Mean Saw Bass, 5=Techno Bass, 6=Synth Bass 3]
         case kTrackBass:    return [0, 1, 4, 5, 6]
         // [0=Rock Kit, 1=Brush Kit, 2=Dance Drums, 3=Machine Kit] — electronic kits only
         case kTrackDrums:   return [2, 3]

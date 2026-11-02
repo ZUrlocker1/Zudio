@@ -491,7 +491,7 @@ Kosmic, so they cost no memory.
 - **Lead 2** — Synth Strings 1 (0/50), Saw Lead (0/81), Square Lead 2 (12/80)
 - **Pads** — Synth Strings 3 (8/50), Synth Strings 4 (11/50), Synth Strings 5 (11/51), Stereo
   Strings Slow (0/49)
-- **Rhythm** — Synth Bass 1 (0/38)
+- **Rhythm** — Pulse Bass (11/39). Synth Bass 1 (0/38) was first, but its preset plays a 25 ms click and then silence at every pitch and length (measured offline, 2026-11-02), so it was swapped out
 - **Bass** — Fretless Bass (0/35)
 - **Texture** — White Noise Wave (12/122), Solar Wind 2 (12/89), Starship (8/125), Interference (11/127). Solar Wind (11/89) was already in the pool.
 
@@ -503,9 +503,9 @@ Kosmic, so they cost no memory.
 - **Lead 2** — Brightness, Synth Strings 1, Saw Lead, Square Lead 2
 - **Pads** — Synth Strings, Synth Strings 3, 4 and 5, Stereo Strings Slow, Sweep Pad. Strings
   are weighted to about 80% of picks.
-- **Rhythm** — Moog, Synth Bass 1, Harpsi Pad
+- **Rhythm** — Moog, Pulse Bass, Harpsi Pad
 - **Bass** — Moog, Synth Bass 3, Fretless Bass
-- **Texture** — White Noise Wave, Solar Wind, Solar Wind 2, Starship and Interference, 20% each (Zack, 2026-11-02). The sweep rule needs a noise or wind source, so the musical pad swells (Halo Pad, Atmosphere, Sweep Pad, Bowed Glass, Space Voice) were left out. Solar Wind 2 takes Solar Wind's 0.40 gain as a starting guess; Starship and Interference are at the default Texture gain. None is auditioned yet.
+- **Texture** — White Noise Wave, Solar Wind, Solar Wind 2, Starship and Interference, 20% each (Zack, 2026-11-02). The sweep rule needs a noise or wind source, so the musical pad swells (Halo Pad, Atmosphere, Sweep Pad, Bowed Glass, Space Voice) were left out. Levels were measured offline (2026-11-02): Solar Wind 2 gain 1.5 (it was half as loud as Solar Wind at 0.40), Starship 0.8 (it ran about 1.7 times White Noise Wave at the default 1.4). Interference is the quietest of the five at the default gain and is unchanged. Space Lead 1 Synth Brass 2 is trimmed to 0.20 and Space Lead 2 Saw Lead to 0.45, both measured several times louder than their neighbours.
 - **Drums** — 808 Kit, Machine Kit
 
 **Where pools live.** Adding instruments touches four places: `poolNames`, `poolPrograms`,
@@ -529,7 +529,7 @@ machine"). That is a Phase 1 listening decision, not a build step.
 - **Lead 1** centre or about 10% off
 - **Lead 2** about 20% opposite Rhythm's current side
 - **Pads** widest
-- **Texture** keeps its existing panning
+- **Texture** takes an auto-pan (Zack, 2026-11-02), one full sweep per 2, 4 or 8 bars (25/50/25), drawn per song from the seed by `KosmicMusicalFrameGenerator.spaceTexturePanBars`. Solar Wind on Space Texture has its own gain of 0.85; base Kosmic and Drift keep 0.40.
 
 ### Titles
 
@@ -941,8 +941,8 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
     full pattern together under the closing fill. In the rest the bass plays on.
   - One more stretch of 8 or 12 bars, in 50% of songs, thins the bass alone, apart from any drum
     stretch.
-  - A thin bass bar (KOS-BASS-018 only) is the octave on beat 1 and the walk's low note on beat 3,
-    each held half a bar. The Berlin School drone (KOS-BASS-001) is already sparse and does not
+  - A thin bass bar (KOS-BASS-018 only) keeps the walk's notes on steps 0, 6 and 12 with their own
+    pitches, held 6, 6 and 4 steps. The short notes drop out (3 of 6, or 3 of 7 in the alternate rhythm). The Berlin School drone (KOS-BASS-001) is already sparse and does not
     thin.
   - The edges of a bass stretch are annotated with the existing `Bass pattern evolving` line,
     through `bassEvolutionBars`. That also replaces the fingerprint detector's chord-change

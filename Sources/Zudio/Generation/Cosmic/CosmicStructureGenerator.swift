@@ -608,7 +608,7 @@ struct KosmicSpaceArrangement {
     let fillBars: [Int]
     /// Stretches where the preset box drops to a simpler beat, at section starts and 32-bar points.
     let drumThins: [DrumThin]
-    /// Stretches where the Falling Walk bass drops to root and octave. Some match a drum stretch
+    /// Stretches where the Falling Walk bass drops to half its notes. Some match a drum stretch
     /// exactly, so both return to the full pattern together; others stand alone.
     let bassThins: [Range<Int>]
     /// Body stretches where the preset box adds its handclap on beats 2 and 4. Empty in about 90%

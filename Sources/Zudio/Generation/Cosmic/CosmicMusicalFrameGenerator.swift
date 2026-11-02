@@ -28,6 +28,14 @@ struct KosmicMusicalFrameGenerator {
     /// the order base Kosmic and Drift depend on.
     static let spaceStreamSalt: UInt64 = 0x05AC_E0A7_1976_0E04
 
+    /// Bars per full left-right sweep of a Space song's Texture auto-pan: 2 (25%), 4 (50%) or
+    /// 8 (25%). Drawn from the song seed on its own stream, so playback, regeneration and export
+    /// agree without storing it.
+    static func spaceTexturePanBars(seed: UInt64) -> Int {
+        var rng = SeededRNG(seed: seed ^ spaceStreamSalt ^ 0x7E87_9A17)
+        return [2, 4, 8][rng.weightedPick([0.25, 0.50, 0.25])]
+    }
+
     static func generate(
         rng: inout SeededRNG,
         seed: UInt64,

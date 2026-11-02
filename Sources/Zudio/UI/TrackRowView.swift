@@ -480,7 +480,7 @@ struct TrackRowView: View {
             case kTrackLead1:    [.delay, .space]
             case kTrackLead2:    [.space]
             case kTrackPads:     [.space, .delay, .sweep]
-            case kTrackTexture:  [.delay, .space, .sweep]
+            case kTrackTexture:  [.delay, .space, .sweep, .pan]
             case kTrackRhythm:   [.delay, .pan]
             default:             []
             }

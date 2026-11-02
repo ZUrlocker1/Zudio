@@ -609,7 +609,7 @@ rigid two-pitch-class cell played on Fuzz Guitar is a guitar riff, not a sequenc
 - **Rhythm** `[3, 6, 9]` — Doctor Solo, Synth Bass 3, Electric Piano 1. Excludes the three
   guitars, both acoustic basses, Charang and Harpsi Pad. (Clavinet was removed from the Motorik
   pool entirely in build 131 — its sound is absent from `Zudio.sf2`, so it played silent.)
-- **Bass** `[0, 1, 4, 5, 6]` — Moog, Lead Bass, Mean Saw Bass, Techno Bass, Synth Bass 1.
+- **Bass** `[0, 1, 4, 5, 6]` — Moog, Lead Bass, Mean Saw Bass, Techno Bass, Synth Bass 3 (replaced Synth Bass 1, whose preset plays only a click).
   Excludes Rock Bass and Elec Bass.
 - **Drums** `[2, 3]` — Dance Drums, Machine Kit. Electronic kits only.
 - **Lead 1** `[0, 1, 3, 5, 6, 7]` — Mono Synth, Saw Lead 3, Polysynth, Square Lead, Synth Lead,

@@ -1234,10 +1234,14 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.3    // Saw Lead 3 runs soft on Motorik Lead 1 — boost
             } else if trackIndex == kTrackLead2 && program == 13088 {
                 vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
+            } else if trackIndex == kTrackLead2 && kosmicStyle && program == 81 {
+                vol = 0.45   // Saw Lead measures about 2.5 times louder than Brightness and Synth Strings 1 on Space Lead 2
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 81 {
                 vol = 1.10   // Mono Synth on Motorik Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
+            } else if trackIndex == kTrackLead1 && kosmicStyle && program == 63 {
+                vol = 0.20   // Synth Brass 2 measures 4 to 10 times louder than Synth Brass 1 and the other Space leads
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 80 {
                 vol = 0.48   // Square Lead on Kosmic Lead 1 — lower than Motorik Noir (0.68)
             } else if trackIndex == kTrackLead1 && program == 80 {
@@ -1285,10 +1289,14 @@ final class PlaybackEngine: ObservableObject {
             // Kosmic Texture specific — must sit before the general kTrackTexture catch-all below
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 96 {
                 vol = 0.42   // Rain (Ice Rain) runs loud on Kosmic Texture — pull back
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 11089 && songState?.isKosmicSpace == true {
+                vol = 0.85   // Solar Wind on Space Texture: the 0.40 trim below left it at half the level of its neighbours
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 11089 {
                 vol = 0.40   // Solar Wind runs loud on Kosmic Texture — pull back
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 12089 {
-                vol = 0.40   // Solar Wind 2, as Solar Wind (starting guess, not yet auditioned)
+                vol = 1.5    // Solar Wind 2 samples run about half as loud as Solar Wind's; measured, then raised
+            } else if trackIndex == kTrackTexture && kosmicStyle && program == 8125 {
+                vol = 0.8    // Starship runs hot at the default Texture gain — measured at about 1.7x White Noise Wave
             } else if trackIndex == kTrackTexture && kosmicStyle && program == 102 {
                 vol = 0.50   // FX Echoes — pull back from general 1.4 Texture boost
             } else if trackIndex == kTrackTexture && ambientMode {
@@ -1315,6 +1323,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.50   // Rock Organ runs hot on Chill rhythm — pull back
             } else if trackIndex == kTrackRhythm && chillPadsMode && program == 61001 {
                 vol = 1.0    // Stereo Piano on Chill Rhythm — gain via boost node
+            } else if trackIndex == kTrackRhythm && kosmicStyle && program == 11039 {
+                vol = 1.4    // Pulse Bass runs soft against Moog on Space Rhythm
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
                 vol = 0.17   // Mono Synth on Kosmic bass — pull back further
             } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
@@ -1857,10 +1867,14 @@ final class PlaybackEngine: ObservableObject {
             if enabled {
                 let hz: Double
                 if (ambientMode || kosmicStyle) && trackIndex == kTrackTexture {
-                    // 1 full sweep per 4 bars — tempo-aware, slow and meditative.
+                    // 1 full sweep per 4 bars (Space: 2, 4 or 8) — tempo-aware, slow and meditative.
                     // Ambient: ~12.8s at 75 BPM. Kosmic Drift: ~10.6s at 90 BPM.
                     let bpm = Double(songState?.frame.tempo ?? 75)
-                    hz = bpm / 960.0
+                    // Kosmic Space draws 2, 4 or 8 bars per sweep per song (a bar is 240 / bpm seconds).
+                    let bars = songState?.isKosmicSpace == true
+                        ? Double(KosmicMusicalFrameGenerator.spaceTexturePanBars(seed: songState?.globalSeed ?? 0))
+                        : 4.0
+                    hz = bpm / (240.0 * bars)
                 } else {
                     hz = 0.5
                 }
