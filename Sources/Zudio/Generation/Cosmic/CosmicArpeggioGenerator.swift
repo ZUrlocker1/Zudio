@@ -59,10 +59,23 @@ struct KosmicArpeggioGenerator {
                                      0.06,           0.06]
         let baseChoice = baseRules[rng.weightedPick(baseWeights)]
 
-        // Kosmic Space: KOS-RTHM-016 100%. Locked to the bar and never rested — no stagger, no
-        // rest windows, no fade before the outro (ArrangementFilter exempts Rhythm too).
+        // Kosmic Space: no stagger, no rest windows, no fade before the outro (ArrangementFilter
+        // exempts Rhythm too).
         if isKosmicSpace {
-            usedRuleIDs.insert("KOS-RTHM-016")
+            // KOS-RTHM-016 Oxygene Octave Sequencer 60%, KOS-RTHM-002 JMJ Hook 20%, KOS-RTHM-005 JMJ
+            // Dual-Rate 20%. The two base rules are gated, 8th-note lines that follow the chords; they
+            // sit an octave down, under Lead 1's register, and rest through the sequencer break.
+            let spaceRule = ["KOS-RTHM-016", "KOS-RTHM-002", "KOS-RTHM-005"][rng.weightedPick([0.60, 0.20, 0.20])]
+            usedRuleIDs.insert(spaceRule)
+            if spaceRule != "KOS-RTHM-016" {
+                let line = spaceRule == "KOS-RTHM-002"
+                    ? generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+                    : generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+                return line.filter { spaceArrangement?.sequencerRests(atBar: $0.stepIndex / 16) != true }.map {
+                    MIDIEvent(stepIndex: $0.stepIndex, note: UInt8(max(36, Int($0.note) - 12)),
+                              velocity: $0.velocity, durationSteps: $0.durationSteps)
+                }
+            }
             return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng, draws: spaceDraws,
                                                   arrangement: spaceArrangement)
         }

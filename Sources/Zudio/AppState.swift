@@ -2575,8 +2575,8 @@ final class AppState: ObservableObject {
                 // White Noise Wave, Solar Wind, Solar Wind 2, Starship, Interference, 20% each:
                 // KOS-TEXT-005 needs a noise or wind source for its swell
                 case kTrackTexture: return [5, 2, 6, 7, 8]
-                // 808 Kit, Machine Kit
-                case kTrackDrums:   return [0, 1]
+                // 808 Kit 75%, Machine Kit 25% (its synth toms bloop in the fills)
+                case kTrackDrums:   return [0, 0, 0, 1]
                 default: break
                 }
             }
@@ -4466,7 +4466,8 @@ final class AppState: ObservableObject {
             if songState?.isKosmicSpace == true {
                 defaults = switch trackIndex {
                 case kTrackLead1:   [.delay, .space]
-                case kTrackLead2:   [.space]
+                // Square Lead 2 (pool index 7) is too harsh dry, so it always takes tremolo
+                case kTrackLead2:   instrumentOverrides[kTrackLead2] == 7 ? [.space, .tremolo] : [.space]
                 case kTrackPads:    [.space, .delay, .sweep]
                 case kTrackTexture: [.delay, .space, .sweep, .pan]
                 case kTrackRhythm:  [.delay, .pan]

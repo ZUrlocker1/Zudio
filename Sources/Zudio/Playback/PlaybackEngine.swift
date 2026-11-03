@@ -235,6 +235,7 @@ final class PlaybackEngine: ObservableObject {
     var kosmicStyle: Bool = false {
         didSet {
             cachedIsKosmicDrift = kosmicStyle && songState?.isKosmicDrift == true
+            cachedIsKosmicSpace = kosmicStyle && songState?.isKosmicSpace == true
             if kosmicStyle && kosmicStyle != oldValue { applyKosmicAudio() }
         }
     }
@@ -434,6 +435,7 @@ final class PlaybackEngine: ObservableObject {
         // Update cachedIsKosmicDrift here so it reflects the INCOMING song, not the previous one.
         // kosmicStyle is set before load() is called in AppState, so didSet fires with stale songState.
         cachedIsKosmicDrift = kosmicStyle && state.isKosmicDrift
+        cachedIsKosmicSpace = kosmicStyle && state.isKosmicSpace
         approachingEndFired = false
         outroStartFired     = false
         activeVisualizerNotes = []
@@ -728,6 +730,7 @@ final class PlaybackEngine: ObservableObject {
     /// so the audio thread always sees the correct value regardless of intermediate resets.
     func updateKosmicDriftCache(_ isDrift: Bool) {
         cachedIsKosmicDrift = kosmicStyle && isDrift
+        cachedIsKosmicSpace = kosmicStyle && songState?.isKosmicSpace == true
     }
 
     /// Called on iOS before applyCurrentInstrumentsToPlayback() so that route-change engine
@@ -825,7 +828,9 @@ final class PlaybackEngine: ObservableObject {
                 case 50:         fireNote = GMDrum.openHat.rawValue; wasRemapped = true
                 default:         fireNote = ev.note;                 wasRemapped = false
                 }
-            } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 {
+            } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 && !cachedIsKosmicSpace {
+                // Kosmic Space keeps the Machine Kit's own synth toms: the space-age bloops and beeps
+                // are wanted in its fills (about 25% of Space songs draw the kit).
                 switch ev.note {
                 case 41, 43, 45: fireNote = GMDrum.snare.rawValue;   wasRemapped = true
                 case 48:         fireNote = GMDrum.snare.rawValue;   wasRemapped = true
@@ -1146,6 +1151,7 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedLead2Program:   UInt8 = 255
     nonisolated(unsafe) private var cachedIsAmbientPiano:   Bool  = false
     nonisolated(unsafe) private var cachedIsKosmicDrift:    Bool  = false
+    nonisolated(unsafe) private var cachedIsKosmicSpace:    Bool  = false
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
     /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls
@@ -1234,6 +1240,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.3    // Saw Lead 3 runs soft on Motorik Lead 1 — boost
             } else if trackIndex == kTrackLead2 && program == 13088 {
                 vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
+            } else if trackIndex == kTrackLead2 && kosmicStyle && program == 12080 {
+                vol = 0.60   // Square Lead 2 on Space Lead 2 ran a bit loud at the default gain
             } else if trackIndex == kTrackLead2 && kosmicStyle && program == 81 {
                 vol = 0.45   // Saw Lead measures about 2.5 times louder than Brightness and Synth Strings 1 on Space Lead 2
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 81 {

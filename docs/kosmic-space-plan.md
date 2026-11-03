@@ -954,6 +954,20 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
   third. The 6-note form adds a passing step above the first inner note, and is only used when
   there is room for it. Each simpler drum stretch ends on a 1- or 2-beat fill into the fuller beat,
   in addition to the three break fills.
+- **Machine Kit bloops and Square Lead 2** (Zack, 2026-11-03). Space draws Machine Kit for 25% of
+  songs (808 Kit 75%), and plays its own synth toms, so the tom-roll fills bloop. The engine's
+  tom-to-snare remap, written for Noir, now skips Space. No second drum voice. Square Lead 2 on Lead 2
+  has gain 0.60 and always takes tremolo; Space Lead 2's chips are tremolo, delay and space.
+- **Base JMJ rules in the Space mix** (Zack, 2026-11-03, "a bit more variety before Phase 2"). The
+  plan had excluded them as matching no source; Zack overruled that.
+  - Drums: KOS-DRUM-009 65%, KOS-DRUM-001 JMJ Mini Pops 20%, none 15%. Simpler-stretch and fill
+    annotations apply to the preset box only.
+  - Lead 1: in 30% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff.
+    The theme is unchanged; it is drawn after the theme and riff.
+  - Rhythm: KOS-RTHM-016 60%, KOS-RTHM-002 JMJ Hook 20%, KOS-RTHM-005 JMJ Dual-Rate 20%. Chosen as the
+    two closest to a sequencer (8th-note grids that follow the chords). They play an octave down, under
+    Lead 1, and rest through the sequencer break. They do not thin under the lead. RTHM-003 and 008 are
+    slow solo lines and stay out.
 
 Not yet done:
 

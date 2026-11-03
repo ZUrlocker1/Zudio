@@ -48,10 +48,26 @@ struct KosmicLeadGenerator {
             lead1BaseRule = "KOS-LD1-013"
             usedRuleIDs.insert("KOS-LD1-013")
             if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
-            let lead = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                   rng: &rng, draws: spaceDraws)
-                     + generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
+            let theme = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                    rng: &rng, draws: spaceDraws)
+            var riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
                                                  rng: &rng, draws: spaceDraws)
+            // In 30% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff,
+            // for variety. Drawn after the theme and riff, so they are unchanged for a given seed.
+            var phrase: [MIDIEvent] = []
+            if rng.nextDouble() < 0.30, structure.sections.contains(where: { $0.label == .B }) {
+                var discard: [Int] = []
+                let bSections = structure.sections.filter { $0.label == .B }
+                func inB(_ ev: MIDIEvent) -> Bool {
+                    bSections.contains { ($0.startBar..<$0.endBar).contains(ev.stepIndex / 16) }
+                }
+                phrase = generateJMJPhraseLoop(frame: frame, structure: structure, tonalMap: tonalMap,
+                                               rng: &rng, xFilesBars: &discard).filter(inB)
+                riff = riff.filter { !inB($0) }
+                usedRuleIDs.remove("KOS-LD1-014")
+                usedRuleIDs.insert("KOS-LEAD-006")
+            }
+            let lead = theme + riff + phrase
             // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
             return silenceBars(lead, spaceArrangement?.leadRests ?? [])
         }

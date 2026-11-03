@@ -343,6 +343,8 @@ struct TrackRowView: View {
         case kTrackLead2:
             if isChill   { return [.space, .delay, .vibrato] }
             if isAmbient { return [.tremolo, .delay, .space] }   // delay chip visible whether locked or not
+            // No Space lead takes vibrato, so Space Lead 2 offers tremolo in its place (Square Lead 2 runs it by default).
+            if activeStyle == .kosmic && appState.songState?.isKosmicSpace == true { return [.tremolo, .delay, .space] }
             return isKosmic ? [.vibrato, .delay, .space] : [.air, .delay, .reverb]
         case kTrackPads:
             if isChill   { return [.space, .sweep, .boost] }
@@ -478,7 +480,8 @@ struct TrackRowView: View {
             // Kosmic Space — the same table as AppState.restoreDefaultEffects, which the iPhone uses.
             defaults = switch trackIndex {
             case kTrackLead1:    [.delay, .space]
-            case kTrackLead2:    [.space]
+            // Square Lead 2 (pool index 7) is too harsh dry, so it always takes tremolo
+            case kTrackLead2:    appState.instrumentOverrides[kTrackLead2] == 7 ? [.space, .tremolo] : [.space]
             case kTrackPads:     [.space, .delay, .sweep]
             case kTrackTexture:  [.delay, .space, .sweep, .pan]
             case kTrackRhythm:   [.delay, .pan]

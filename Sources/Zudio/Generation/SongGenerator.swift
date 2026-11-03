@@ -493,7 +493,7 @@ struct SongGenerator {
 
         // Space keeps to its own drum pool: a forced base style (the curated first Kosmic song
         // forces the Electric Buddha groove) is ignored, as Drift's bass ignores forced base rules.
-        let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .absent]
+        let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .minimal, .absent]
         let percussionStyle = isKosmicSpace
             ? (forcePercussionStyle.flatMap { spacePercussion.contains($0) ? $0 : nil } ?? percussionStylePicked)
             : (forcePercussionStyle ?? percussionStylePicked)
