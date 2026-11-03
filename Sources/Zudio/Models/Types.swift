@@ -638,6 +638,8 @@ enum GMDrum: UInt8 {
     case rideBell      = 53
     case tambourine    = 54
     case crash2        = 57
+    case cowbell       = 56
+    case claves        = 75
 }
 
 // MARK: - Register boundaries (MIDI note ranges per track)

@@ -14,20 +14,101 @@
 struct KosmicTitleGenerator {
     static func generate(frame: GlobalMusicalFrame, rng: inout SeededRNG,
                          isKosmicSpace: Bool = false) -> String {
-        if isKosmicSpace {
-            // One draw, as for base Kosmic, from a list weighted 80% toward patterns 1, 2, 7 and 8
-            // (coined word, coined word + numeral, fake-Greek, fake-Greek + numeral), which echo
-            // Jarre's "Part IV" convention. Patterns 3 and 5 take the rest.
-            let pick = spacePatternIndices[rng.nextInt(upperBound: spacePatternIndices.count)]
-            return patterns[pick](frame, &rng)
-        }
+        if isKosmicSpace { return spaceTitle(frame: frame, rng: &rng) }
         let pattern = patterns[rng.nextInt(upperBound: patterns.count)]
         return pattern(frame, &rng)
     }
 
-    /// Indices into `patterns` for Kosmic Space: 0–1 = pattern 1, 2 = pattern 2, 3 = pattern 3,
-    /// 6 = pattern 5, 9–10 = pattern 7, 11 = pattern 8.
-    private static let spacePatternIndices = [0, 1, 2, 2, 9, 10, 11, 11, 3, 6]
+    // MARK: - Kosmic Space titles
+    // Single words repeated too often (Zack, 2026-11-03): 40% of Space titles came from about 63
+    // words. Space now has its own patterns, JMJ in spirit and allowed a joke, and a larger single-word
+    // pool. Base Kosmic and Drift titles are unchanged. Nothing draws from the song stream after the
+    // title, so the extra draws change only the title. No commas or apostrophes: titles become file
+    // names, and the save panel strips both.
+    //   15% single word          Galexion, Kroneon
+    //   15% part number          Fluxion Part 4, Kroneon Part VI
+    //   12% two coined words     Magnetique Cosmopod IX, Quantique Orbitron
+    //   12% French phrase        Les Chants Paradoxes, Le Grand Plexion, La Nuit Ionique
+    //   12% Jarre templates      Waiting for Kroneon, Rendez-Vous a Proxima, Pyreon & Plexion
+    //    4% long-running series  Galexion V Part 7 of 42, Plexion 7-13
+    //    4% gear jokes           Concerto for Minipops, Laser Harp No 3
+    //   26% the earlier Space patterns: word + numeral 6%, fake-Greek + numeral 6%, prefix + word 7%,
+    //       adjective + noun 7%
+
+    private static let spaceExtraWords = [
+        "Galexion", "Synthetique", "Orbitale", "Cosmodrome", "Ondioline", "Hypnotique", "Zoolon",
+        "Equinova", "Stellarix", "Lunatique", "Rotonde", "Gravitone", "Photonique", "Neutrino",
+        "Sputnique", "Teslatron", "Polyphonique", "Oscillon"
+    ]
+
+    private static let comicNouns = [
+        "Cosmopod", "Orbitron", "Moonmoog", "Roboloop", "Laserharp", "Zoomzoom", "Minipod",
+        "Pulsotron", "Spacebox", "Starfax", "Teletone", "Moogmobile"
+    ]
+
+    /// French adjectives the same in both genders, so they fit Le, La and Les alike
+    private static let frenchAdjectives = [
+        "Magnetique", "Ionique", "Cosmique", "Quantique", "Electronique", "Hypnotique",
+        "Polaire", "Stellaire", "Lunaire", "Paradoxe", "Synthetique", "Galactique"
+    ]
+
+    private static let gearTitles = [
+        "Concerto for Minipops", "Sonata for Theremin and Stylophone", "Prelude for Eminent 310",
+        "Nocturne for ARP 2600", "Suite for Fairlight", "Variations on a Rhythm Box",
+        "Laser Harp No", "Etude for Moogs"
+    ]
+
+    private static let longRomanNumerals = ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XII"]
+
+    private static func spaceTitle(frame: GlobalMusicalFrame, rng: inout SeededRNG) -> String {
+        func pick(_ list: [String]) -> String { list[rng.nextInt(upperBound: list.count)] }
+        let singles = jmjXWords + greekStyleWords + spaceExtraWords
+        let coined  = jmjXWords + spaceExtraWords
+        switch rng.weightedPick([0.15, 0.15, 0.12, 0.12, 0.12, 0.04, 0.04, 0.06, 0.06, 0.07, 0.07]) {
+        case 0:
+            return pick(singles)
+        case 1:
+            let word = pick(singles)
+            return rng.nextDouble() < 0.50 ? "\(word) Part \(2 + rng.nextInt(upperBound: 8))"
+                                           : "\(word) Part \(pick(romanNumerals))"
+        case 2:
+            let name = "\(pick(coined)) \(pick(comicNouns))"
+            return rng.nextDouble() < 0.50 ? "\(name) \(pick(longRomanNumerals))" : name
+        case 3:
+            switch rng.nextInt(upperBound: 5) {
+            case 0:  return "Les Chants \(pick(frenchAdjectives.filter { $0 != "Magnetique" }))s"
+            case 1:  return "Le Grand \(pick(greekStyleWords))"
+            case 2:  return "La Nuit \(pick(frenchAdjectives))"
+            case 3:  return "Les Jardins \(pick(frenchAdjectives))s"
+            default: return "Le Reve \(pick(frenchAdjectives))"
+            }
+        case 4:
+            switch rng.nextInt(upperBound: 3) {
+            case 0:  return "Waiting for \(pick(greekStyleWords + spaceExtraWords))"
+            case 1:  return "Rendez-Vous a \(pick(coined))"
+            default:
+                let first = pick(greekStyleWords)
+                return "\(first) & \(pick(greekStyleWords.filter { $0 != first }))"
+            }
+        case 5:
+            let word = pick(coined)
+            if rng.nextDouble() < 0.50 {
+                let of = [42, 64, 99, 108][rng.nextInt(upperBound: 4)]
+                return "\(word) \(pick(longRomanNumerals)) Part \(2 + rng.nextInt(upperBound: 12)) of \(of)"
+            }
+            let from = 3 + rng.nextInt(upperBound: 7)
+            return "\(word) \(from)-\(from + 4 + rng.nextInt(upperBound: 5))"
+        case 6:
+            let gear = pick(gearTitles)
+            if gear == "Laser Harp No" { return "Laser Harp No \(2 + rng.nextInt(upperBound: 8))" }
+            if gear == "Etude for Moogs" { return "Etude for \(pick(["Three", "Eight", "Twelve"])) Moogs" }
+            return gear
+        case 7:  return patterns[2](frame, &rng)
+        case 8:  return patterns[11](frame, &rng)
+        case 9:  return patterns[3](frame, &rng)
+        default: return patterns[6](frame, &rng)
+        }
+    }
 
     // MARK: - Word banks
 

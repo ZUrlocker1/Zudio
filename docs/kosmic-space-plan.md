@@ -887,7 +887,10 @@ Where the plan left a gap or could not be followed literally, the code does this
   `KOS-LD1-014 Oxygene See-Saw Riff (sixth, 2+2+2, second half, anchor below)`. Regen lines
   do the same.
 - **Titles.** Space draws from the same pattern list, with 80% of the weight on patterns
-  1, 2, 7 and 8.
+  1, 2, 7 and 8. Superseded 2026-11-03 (Zack: single words repeat): Space has its own patterns,
+  single word 15%, part number 15%, two coined words 12%, French phrase 12%, Jarre templates 12%,
+  long-running series 4%, gear jokes 4%, and the earlier numeral, prefix and adjective patterns
+  26%. Weights and word lists are in `KosmicTitleGenerator.spaceTitle`.
 - **Base Kosmic and Drift instrument picks** are capped at the pool sizes they had before
   Space appended to them, so they never draw a Space instrument.
 
@@ -1036,10 +1039,28 @@ preset shows as "White Noise" in the Texture picker, so it is not abbreviated.
 **Theme return (Zack, 2026-11-03, from Aztraeon):** a song that ends on a B section (ab, abab) never
 hears its A theme again; aba and abba return on their own. So 8 bars two thirds into the last B section
 (at an 8-bar point, at least 8 bars in) replay the first A section's opening 8 bars in place of the B
-rule. Chord loops restart at each body section, so the chords line up. No draws; a lead rest over the
-window still silences it.
+rule. Those 8 bars also take the first A section's opening chords (`spaceThemeReturnBar`, shared by
+the chord plan and Lead 1). No draws; a lead rest over the window still silences it.
+
+**B-section chords and the riff (Zack, 2026-11-03, from Fluxion III):** a Two-Chord Sway song played
+i–v for all 132 bars, and the riff ran 40 bars without a break up to E6. B sections now loop their own
+8-bar cycle (`spaceBCycle`), leaving the tonic and coming home at the end: Dorian Vamp bIII ×2, IV ×2,
+i ×4; Aeolian Cycle bVI ×2, bIII ×2, bVII ×2, i ×2; Two-Chord Sway i ×2, iv ×2 (iv major in Dorian).
+B passes still draw the A cycle, so A-section chords are unchanged for a seed. KOS-LD1-014 folds its
+top note into 73–84 (it was the pair's midpoint in 72–84) and rests in the last 2 bars of every 8 of
+its section, after the last-B thinning draw so Lead 1's later draws are unchanged. The Lead Synth
+doubling of Lead 1 stays, as in all Kosmic.
 
 **Tuning after listening (Zack, 2026-11-03):** the first drum stretch always thins the bass too. KOS-BASS-018 gains a breath bar and a turn bar, deterministic and lighter than the Pump's. KOS-DRUM-001 Mini Pops drops out in the first two drum stretches and returns on a 1 or 2 beat tom roll (Space only). KOS-DRUM-012 thins over every bass or drum stretch (bongo, low conga, quiet shaker), keeps the guiro out of them, plays the guiro at velocity 38 and 30, and is drawn 13% of the time. Trims: Square Lead 2 0.48, Saw Lead 0.36, Moog rhythm 0.38, Synth Brass 2 0.16. The `Space Oxygene, ...` log line was dropped as redundant.
+
+**Fills and bloops (Zack, 2026-11-03, from Eternal-Cosmos):** both Space kits' toms are synth bloops
+(808 Kit pitched sines, Machine Kit an electric tom), so the preset box's high-tom accent put one in
+every bar. The accent draw is now side stick, claves or tambourine. Every Space fill, in the preset
+box and on Mini Pops returns, draws snare roll 45%, tom roll 30% or cowbell figure 25% (steps 0, 3, 6
+and an open hat into the downbeat), never the same as the song's previous fill. Half the preset-box
+fills land on a crash on the next downbeat; Mini Pops is too sparse for one. Lead 2 trims: Square
+Lead 2 0.38, Saw Lead 0.28. Bright Saw Stack shows as Bright Saw. The on-screen Instruments line
+names instruments; the saved file keeps program numbers.
 
 - **KOS-LD1-017 "Oxygene 8 Offbeat Climb"** (A sections, added 2026-11-03). Oxygene 8 lead (alto sax,
   piano and clarinet in unison), bars 17–49 and 67–138, read bar by bar. Statements fill one bar and
@@ -1114,6 +1135,13 @@ does):
 ---
 
 ## Open questions
+
+- **Bridges in Space, to explore** (Zack, 2026-11-03). Space has no bridges; base Kosmic's are
+  Electric Buddha drum bridges and melody bridges with the X-Files whistle, none of them Jarre. Explore
+  a Space bridge of its own, different from base Kosmic's, at a low share (about 20%) and only in the
+  ab and aba forms. The Space bridge roll is already drawn and discarded, so a Space bridge can use that
+  draw without moving any other. Candidates: the Phase 2 breakdown's mute schedule over the family's
+  B-cycle, or a pads-and-texture interlude. Not designed yet.
 
 - **Two unidentified files.** The Equinoxe file has no part number, and the unnumbered
   Oxygene (105 BPM, fretless bass, choir, no lead) is probably from Oxygene 7–13. If either is

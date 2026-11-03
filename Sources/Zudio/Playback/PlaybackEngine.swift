@@ -1241,9 +1241,9 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead2 && program == 13088 {
                 vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
             } else if trackIndex == kTrackLead2 && kosmicStyle && program == 12080 {
-                vol = 0.48   // Square Lead 2 on Space Lead 2 ran loud (trimmed again 2026-11-03)
+                vol = 0.38   // Square Lead 2 on Space Lead 2 ran loud (last trimmed 2026-11-03)
             } else if trackIndex == kTrackLead2 && kosmicStyle && program == 81 {
-                vol = 0.36   // Saw Lead measures about 2.5 times louder than Brightness and Synth Strings 1 on Space Lead 2 (trimmed again 2026-11-03)
+                vol = 0.28   // Saw Lead measures about 2.5 times louder than Brightness and Synth Strings 1 on Space Lead 2 (last trimmed 2026-11-03)
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 81 {
                 vol = 1.10   // Mono Synth on Motorik Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 81 {

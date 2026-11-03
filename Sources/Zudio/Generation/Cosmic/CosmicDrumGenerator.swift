@@ -146,16 +146,16 @@ struct KosmicDrumGenerator {
     // MARK: - KOS-DRUM-009 Oxygene Preset Box (Kosmic Space)
     // The Minipops pattern measured on Oxygene 4, identical in both transcriptions (104 of 104 bars):
     //   Closed hat xx..xxx.xxx.xxx.   Kick x.x...x...x.....   Clap steps 4, 12   Open hat step 2
-    //   Accent on step 12 — side stick, high tom or tambourine, drawn per song.
+    //   Accent on step 12 — side stick, claves or tambourine, drawn per song.
     // Every bar the same, intro and outro included. No transition fills and no cold-start pickup:
     // the preset box never varies, which is its character. The one exception is Zudio's own, not
-    // the corpus's (Zack, 2026-11-02): a short tom roll in the bar before a Space break or return,
+    // the corpus's (Zack, 2026-11-02): a short fill in the bar before a Space break or return,
     // at most three a song (KosmicSpaceArrangement.fillBars), 1 beat 80% and 2 beats 20%, as
     // Motorik Europe's sync fills.
     // Also Zudio's own: the box drops to a simpler beat for 8 or 16 bars at body section starts and
     // 32 bars into long sections (KosmicSpaceArrangement.drumThins), and the handclap on beats 2 and
     // 4 plays only in about 10% of songs, in one or two body sections (clapRanges). The side stick,
-    // tom or tambourine accent on step 12 is the song's backbeat the rest of the time.
+    // claves or tambourine accent on step 12 is the song's backbeat the rest of the time.
     // Homage draws per song: hat mask = the source (25%) or one of three variants that each move one
     // gap (25% each); kick = the source (40%) or steps 0, 6, 10 (60%).
     // Repeat guard: the last hat hit is dropped in every eighth bar, so no run of identical bars
@@ -176,7 +176,9 @@ struct KosmicDrumGenerator {
             .filter { $0 != 2 }
         let fourKicks = rng.nextDouble() < 0.40
         let kickSteps = fourKicks ? [0, 2, 6, 10] : [0, 6, 10]
-        let accents: [(note: GMDrum, name: String)] = [(.sidestick, "side stick"), (.hiTom, "high tom"),
+        // The high tom accent was a synth-tom bloop in every bar on both Space kits; claves, a
+        // Minipops voice, took its place (Zack, 2026-11-03). Toms belong to the fills.
+        let accents: [(note: GMDrum, name: String)] = [(.sidestick, "side stick"), (.claves, "claves"),
                                                        (.tambourine, "tambourine")]
         let accent = accents[rng.nextInt(upperBound: accents.count)]
         let guardStep = hatSteps.last ?? 14
@@ -215,26 +217,70 @@ struct KosmicDrumGenerator {
                                     velocity: 66, durationSteps: 1))
         }
 
-        // Fills replace the last 1 or 2 beats of their bar with a falling tom roll; the kick that
-        // opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
-        // A simpler stretch ends on a short fill into the fuller beat.
+        // Fills replace the last 1 or 2 beats of their bar with one of the Space fills below; the
+        // kick that opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
+        // A simpler stretch ends on a short fill into the fuller beat. Half the fills land on a
+        // crash on the next downbeat (Zack, 2026-11-03).
         let thinEnds = (arrangement?.drumThins ?? []).map { $0.range.upperBound - 1 }
         var seenFill = Set<Int>()
         let allFills = (fillBars + thinEnds).filter { seenFill.insert($0).inserted }.sorted()
+        var lastFill: SpaceFill? = nil
         for bar in allFills where bar > 0 && bar < frame.totalBars {
             let beats = rng.nextDouble() < 0.80 ? 1 : 2
             let from  = bar * 16 + 16 - beats * 4
             events.removeAll { $0.stepIndex >= from && $0.stepIndex < bar * 16 + 16
                                && $0.note != GMDrum.kick.rawValue && $0.note != GMDrum.clap.rawValue }
-            let roll: [GMDrum] = beats == 1
-                ? [.hiTom, .hiMidTom, .lowMidTom, .lowFloorTom]
-                : [.hiTom, .hiTom, .hiMidTom, .hiMidTom, .lowMidTom, .lowMidTom, .lowFloorTom, .lowFloorTom]
-            for (i, tom) in roll.enumerated() {
-                events.append(MIDIEvent(stepIndex: from + i, note: tom.rawValue,
-                                        velocity: UInt8(64 + 24 * i / (roll.count - 1)), durationSteps: 1))
+            let kind = drawSpaceFill(after: lastFill, rng: &rng)
+            lastFill = kind
+            events += spaceFillEvents(kind, from: from, beats: beats)
+            if rng.nextDouble() < 0.50 && bar + 1 < frame.totalBars {
+                events.append(MIDIEvent(stepIndex: (bar + 1) * 16, note: GMDrum.crash1.rawValue,
+                                        velocity: 78, durationSteps: 1))
             }
         }
         return events
+    }
+
+    // MARK: - Space fills (Zack, 2026-11-03, from Eternal-Cosmos)
+    // Every Space fill was a falling tom roll, and the toms in both Space kits are synth toms
+    // (808 Kit plays pitched sines, Machine Kit an electric tom), so every fill blooped. The bloop
+    // is now one fill of three, never twice running:
+    //   snare roll 45% · tom roll 30% · cowbell figure 25%, in the 3-grouping (steps 0, 3, 6)
+    //   that runs through the corpus, with the open hat into the downbeat
+
+    private enum SpaceFill { case snareRoll, toms, cowbell }
+
+    private static func drawSpaceFill(after last: SpaceFill?, rng: inout SeededRNG) -> SpaceFill {
+        let weighted: [(SpaceFill, Double)] = [(.snareRoll, 0.45), (.toms, 0.30), (.cowbell, 0.25)]
+            .filter { $0.0 != last }
+        let total = weighted.reduce(0) { $0 + $1.1 }
+        var r = rng.nextDouble() * total
+        for (kind, weight) in weighted {
+            if r < weight { return kind }
+            r -= weight
+        }
+        return weighted.last?.0 ?? .snareRoll
+    }
+
+    private static func spaceFillEvents(_ kind: SpaceFill, from: Int, beats: Int) -> [MIDIEvent] {
+        let hits: [(step: Int, note: GMDrum)]
+        switch kind {
+        case .toms:
+            let roll: [GMDrum] = beats == 1
+                ? [.hiTom, .hiMidTom, .lowMidTom, .lowFloorTom]
+                : [.hiTom, .hiTom, .hiMidTom, .hiMidTom, .lowMidTom, .lowMidTom, .lowFloorTom, .lowFloorTom]
+            hits = roll.enumerated().map { ($0.offset, $0.element) }
+        case .snareRoll:
+            hits = (beats == 1 ? [0, 1, 2, 3] : [0, 2, 4, 5, 6, 7]).map { ($0, GMDrum.snare) }
+        case .cowbell:
+            hits = beats == 1 ? [(0, .cowbell), (2, .cowbell), (3, .openHat)]
+                              : [(0, .cowbell), (3, .cowbell), (6, .cowbell), (7, .openHat)]
+        }
+        let last = max(1, hits.count - 1)
+        return hits.enumerated().map { i, hit in
+            MIDIEvent(stepIndex: from + hit.step, note: hit.note.rawValue,
+                      velocity: UInt8(64 + 24 * i / last), durationSteps: 1)
+        }
     }
 
     // MARK: - Sparse: dub-techno minimal groove (KOS-DRUM-002)
@@ -348,6 +394,7 @@ struct KosmicDrumGenerator {
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let transitionBars = computeTransitionBars(structure: structure)
+        var lastDropoutFill: SpaceFill? = nil
 
         for bar in 0..<frame.totalBars {
             guard let section = structure.section(atBar: bar) else { continue }
@@ -356,18 +403,14 @@ struct KosmicDrumGenerator {
             let barStart = bar * 16
 
             // Space only (Zack, 2026-11-03): in the arrangement's first two thin stretches the Mini
-            // Pops box drops out completely, and comes back after a 1 or 2 beat tom roll.
+            // Pops box drops out completely, and comes back after a 1 or 2 beat Space fill, never
+            // the same fill twice running. No crash on the landing: the box is too sparse for one.
             if let stretch = dropouts.first(where: { $0.contains(bar) }) {
                 if bar == stretch.upperBound - 1 {
                     let beats = rng.nextDouble() < 0.70 ? 1 : 2
-                    let roll: [GMDrum] = beats == 1
-                        ? [.hiTom, .hiMidTom, .lowMidTom, .lowFloorTom]
-                        : [.hiTom, .hiTom, .hiMidTom, .hiMidTom, .lowMidTom, .lowMidTom, .lowFloorTom, .lowFloorTom]
-                    let from = barStart + 16 - beats * 4
-                    for (i, tom) in roll.enumerated() {
-                        events.append(MIDIEvent(stepIndex: from + i, note: tom.rawValue,
-                                                velocity: UInt8(64 + 24 * i / (roll.count - 1)), durationSteps: 1))
-                    }
+                    let kind = drawSpaceFill(after: lastDropoutFill, rng: &rng)
+                    lastDropoutFill = kind
+                    events += spaceFillEvents(kind, from: barStart + 16 - beats * 4, beats: beats)
                 }
                 continue
             }

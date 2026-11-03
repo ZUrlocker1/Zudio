@@ -91,20 +91,17 @@ struct KosmicLeadGenerator {
             var lead = theme + riff + phrase
             // Theme return (Zack, 2026-11-03): a song that ends on B (ab, abab) never hears its A theme
             // again, so 8 bars two thirds into the last B replay the first A section's opening 8 bars
-            // in place of the B rule. Space chord loops restart at every body section, so bars 8 apart
-            // from a section start carry the same chords. No draws, so regen rebuilds it exactly.
-            let body = structure.sections.filter { $0.label == .A || $0.label == .B }
-            if let lastB = body.last, lastB.label == .B, let firstA = body.first(where: { $0.label == .A }) {
-                let start = lastB.startBar + (lastB.lengthBars * 2 / 3) / 8 * 8
-                if start >= lastB.startBar + 8, start + 8 <= lastB.endBar, firstA.lengthBars >= 8 {
-                    let window = (start * 16)..<((start + 8) * 16)
-                    let source = (firstA.startBar * 16)..<((firstA.startBar + 8) * 16)
-                    let shift = window.lowerBound - source.lowerBound
-                    lead.removeAll { window.contains($0.stepIndex) }
-                    lead += theme.filter { source.contains($0.stepIndex) }.map {
-                        MIDIEvent(stepIndex: $0.stepIndex + shift, note: $0.note, velocity: $0.velocity,
-                                  durationSteps: Swift.min($0.durationSteps, source.upperBound - $0.stepIndex))
-                    }
+            // in place of the B rule. The chord plan gives those 8 bars the first A section's opening
+            // chords (KosmicStructureGenerator.spaceThemeReturnBar). No draws, so regen rebuilds it exactly.
+            if let start = KosmicStructureGenerator.spaceThemeReturnBar(sections: structure.sections),
+               let firstA = structure.sections.first(where: { $0.label == .A }) {
+                let window = (start * 16)..<((start + 8) * 16)
+                let source = (firstA.startBar * 16)..<((firstA.startBar + 8) * 16)
+                let shift = window.lowerBound - source.lowerBound
+                lead.removeAll { window.contains($0.stepIndex) }
+                lead += theme.filter { source.contains($0.stepIndex) }.map {
+                    MIDIEvent(stepIndex: $0.stepIndex + shift, note: $0.note, velocity: $0.velocity,
+                              durationSteps: Swift.min($0.durationSteps, source.upperBound - $0.stepIndex))
                 }
             }
             // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
@@ -709,10 +706,11 @@ struct KosmicLeadGenerator {
     // Oxygene 4 riff, both transcriptions. Six notes rocking between an anchor (the current chord
     // root) and a pivot a fixed interval above it: anchor on steps 0, 2, 5, pivot on 1, 4, 6, step 3
     // silent; notes 1 step long, the last held through the rest of the bar (about 9 steps). It plays
-    // every bar of its B sections and follows the chord, so with 2–4-bar chords each chord gets at
-    // least two statements. The pivot is a scale step count, so it stays in the scale (the source's
-    // fifth becomes a minor sixth on the next chord in just this way). The pair is folded by octaves
-    // so it centres in MIDI 72–84.
+    // every bar of its B sections but the last 2 of every 8, and follows the chord. The pivot is a
+    // scale step count, so it stays in the scale (the source's fifth becomes a minor sixth on the
+    // next chord in just this way). The pair is folded by octaves so its top note lands in MIDI
+    // 73–84. It used to be centred in 72–84, which put an octave riff's top note as high as 90 and
+    // played 40 bars without a break (Zack, 2026-11-03, Fluxion III).
     // Homage draws per song:
     //   interval — fourth 30%, sixth 30%, octave 20%, fifth 20% (source)
     //   grouping — 3+3 40% (source), 2+2+2 on steps 0, 1, 3, 4, 6, 7 30%, 3+2 on steps 0, 1, 2, 4, 5 30%
@@ -749,14 +747,16 @@ struct KosmicLeadGenerator {
                 if barInSection % 8 == 5 { anchor = scaleStep(anchor, by: 3, scalePCs: scalePCs) }
                 var pivot = scaleStep(anchor, by: anchorAbove ? -interval.steps : interval.steps,
                                       scalePCs: scalePCs)
-                while (anchor + pivot) / 2 >= 84 { anchor -= 12; pivot -= 12 }
-                while (anchor + pivot) / 2 < 72  { anchor += 12; pivot += 12 }
-
+                while Swift.max(anchor, pivot) > 84 { anchor -= 12; pivot -= 12 }
+                while Swift.max(anchor, pivot) < 73 { anchor += 12; pivot += 12 }
                 var steps = grouping.steps
                 if let lastB, section.startBar == lastB.startBar, barInSection % 2 == 1,
                    rng.nextDouble() < 0.50 {
                     steps = Array(steps.prefix(3))
                 }
+                // The riff breathes in the last 2 bars of every 8, before its chord loop restarts.
+                // After the draw above, so Lead 1's later draws are unchanged.
+                if barInSection % 8 >= 6 { continue }
                 for (i, step) in steps.enumerated() {
                     let isLast = i == steps.count - 1
                     let pitch  = i % 2 == 0 ? anchor : pivot

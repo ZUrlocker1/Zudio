@@ -44,9 +44,10 @@ struct AudioFileExporter {
         let kept = raw.unicodeScalars.filter {
             CharacterSet.alphanumerics.contains($0) || $0 == " " || $0 == "-" || $0 == "_"
         }
+        // Spaces are collapsed first, so a dropped character ("Pyreon & Plexion") leaves one hyphen
         return String(String.UnicodeScalarView(kept))
-            .trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: " ", with: "-")
+            .split(separator: " ")
+            .joined(separator: "-")
     }
 
     // MARK: - macOS Save Panels

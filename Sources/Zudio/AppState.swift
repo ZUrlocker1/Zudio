@@ -753,7 +753,7 @@ final class AppState: ObservableObject {
         case (kTrackLead1,   .chill):   return ["Muted Trumpet","Tenor Sax","Alto Sax","Trumpet","Clarinet","Flute","Soprano Sax","Recorder"]
         case (kTrackLead1,   .ambient): return ["Stereo Piano","Flute","Ocarina","Whistle","Brightness","Calliope Lead","Harp","Shakuhachi"]
         case (kTrackLead1,   .kosmic):  return ["Flute","Brightness","Oboe","Recorder","Warm Pad","Sine Wave","Bottle Blow","Shenai",
-                                                "Synth Brass 1","Synth Brass 2","5th Saw Wave","Bright Saw Stack"]
+                                                "Synth Brass 1","Synth Brass 2","5th Saw Wave","Bright Saw"]
         case (kTrackLead1,   .motorik): return ["Mono Synth","Saw Lead 3","Soft Brass","Polysynth","Chiff Lead","Square Lead","Synth Lead","Saw Stack"]
         case (kTrackLead1,   _):        return ["Mono Synth","Soft Brass","Pad 3 Poly","Chiff Lead"]
         // Blues drops Flute; the generator never chose Xylophone for any form, so it is gone.
@@ -839,7 +839,7 @@ final class AppState: ObservableObject {
         case (kTrackLead1, .chill):    return [59, 66, 65, 56, 71, 73, 64, 74]
         case (kTrackLead1, .ambient):  return [61001, 73, 79, 78, 100, 82, 46, 77]
         case (kTrackLead1, .kosmic):   return [73, 100, 68, 74, 89, 8080, 76, 111,  // + Warm Pad, Sine Wave, Bottle Blow, Shenai
-                                              62, 63, 86, 11100]                     // + Space: Synth Brass 1/2, 5th Saw, Bright Saw Stack
+                                              62, 63, 86, 11100]                     // + Space: Synth Brass 1/2, 5th Saw, Bright Saw
         case (kTrackLead1, .motorik):  return [81, 13081, 62, 90, 83, 80, 87, 11100]
         case (kTrackLead1, _):         return [81, 62, 90, 83]
         case (kTrackLead2, .chill):    return [11, 73, 64, 57, 65, 66, 62]
@@ -980,6 +980,37 @@ final class AppState: ObservableObject {
             }
         }
         return GenerationLogEntry(tag: "Instruments", description: parts.joined(separator: " "), isTitle: false)
+    }
+
+    /// The on-screen form of an "Instruments" line: instrument names in place of program numbers,
+    /// "L1: Synth Brass 1, Pd: Synth Strings 3" for "L1:62 Pd:8050". The .zudio file keeps the
+    /// program numbers, which reload parses, so only the status log is translated, here on its way
+    /// in (Zack, 2026-11-03). LS is Kosmic's hidden Lead Synth layer doubling Lead 1, always
+    /// Polysynth. A program not in the current style's pool is shown as its number.
+    private func readableInstrumentsEntry(_ entry: GenerationLogEntry) -> GenerationLogEntry {
+        guard entry.tag == "Instruments" else { return entry }
+        let shortNames = ["L1", "L2", "Pd", "Ry", "Tx", "Bs", "Dr", "LS"]
+        let style = songState?.style ?? selectedStyle
+        let isSoho = songState?.chillSohoVariation == true
+        var parts: [String] = []
+        for token in entry.description.split(separator: " ") {
+            let pair = token.split(separator: ":", maxSplits: 1).map(String.init)
+            guard pair.count == 2, let track = shortNames.firstIndex(of: pair[0]) else {
+                // Not a track token: the rest of a multi-word texture name ("Tx:Long Lake")
+                if !parts.isEmpty { parts[parts.count - 1] += " " + token }
+                continue
+            }
+            var name = pair[1]
+            if let program = Int(pair[1]) {
+                let programs = Self.instrumentPoolPrograms(trackIndex: track, style: style, isChillSoho: isSoho)
+                let names    = Self.instrumentPoolNames(trackIndex: track, style: style, isChillSoho: isSoho)
+                if let idx = programs.firstIndex(of: program), idx < names.count { name = names[idx] }
+                if track == kTrackLeadSynth && program == 90 { name = "Polysynth" }
+            }
+            parts.append("\(pair[0]): \(name)")
+        }
+        guard !parts.isEmpty else { return entry }
+        return GenerationLogEntry(tag: entry.tag, description: parts.joined(separator: ", "), isTitle: entry.isTitle)
     }
 
     /// The current song with its "Instruments" line rebuilt from what is playing now, for
@@ -1427,7 +1458,7 @@ final class AppState: ObservableObject {
     // Using a large drop (not a 1-entry trim) ensures the count changes noticeably.
     func appendToLog(_ entries: [GenerationLogEntry]) {
         guard !entries.isEmpty else { return }
-        statusLog.append(contentsOf: entries)
+        statusLog.append(contentsOf: entries.map(readableInstrumentsEntry))
         if statusLog.count > 600 {
             statusLog.removeFirst(statusLog.count - 400)
         }
@@ -2562,7 +2593,7 @@ final class AppState: ObservableObject {
             // Indices past the original pools are Space's appended instruments.
             if state?.isKosmicSpace == true {
                 switch trackIndex {
-                // Brightness, Synth Brass 1, Synth Brass 2, 5th Saw Wave, Bright Saw Stack — the
+                // Brightness, Synth Brass 1, Synth Brass 2, 5th Saw Wave, Bright Saw — the
                 // transcribers put synth brass on Jarre's leads; the orchestral winds read as Vangelis.
                 case kTrackLead1:   return [1, 8, 9, 10, 11]
                 // Brightness, Synth Strings 1, Saw Lead, Square Lead 2

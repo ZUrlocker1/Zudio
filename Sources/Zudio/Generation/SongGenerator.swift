@@ -3356,6 +3356,12 @@ struct SongGenerator {
                 }
                 return "double snap"
             case 2:
+                // Kosmic Space's preset box draws one of three fills (KosmicDrumGenerator.spaceFillEvents)
+                if drumRules.contains("KOS-DRUM-009") {
+                    if notes.contains(GMDrum.hiTom.rawValue)   { return "tom roll" }
+                    if notes.contains(GMDrum.cowbell.rawValue) { return "cowbell figure" }
+                    return "snare roll"
+                }
                 if notes.contains(GMDrum.hiTom.rawValue)  { return "Bonham tom roll" }
                 if notes.contains(GMDrum.kick.rawValue)   { return "funk cross" }
                 if evs.allSatisfy({ $0.note == GMDrum.snare.rawValue }) { return "double-time roll" }
@@ -3535,6 +3541,11 @@ struct SongGenerator {
         for fillBar in allFillBars.sorted() where fillBar < outroStartBar && hasDrums {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro && !sec.label.isBridge else { continue }
+            // Kosmic Space's Mini Pops drops out for whole stretches; with no hats there the bar
+            // read as a 3-beat fill that never played (Fluxion III, 2026-11-03). A Mini Pops bar
+            // always has a hat on beat 1, so a bar without one is a dropout bar.
+            if drumRules.contains("KOS-DRUM-001"),
+               !(drumByBar[fillBar] ?? []).contains(where: { $0.stepIndex % 16 < 4 }) { continue }
             let beats  = fillBeats(bar: fillBar)
             guard beats > 1 else { continue }  // 1-beat fills are too brief to clutter the log with
             let name   = fillName(bar: fillBar, beats: beats)

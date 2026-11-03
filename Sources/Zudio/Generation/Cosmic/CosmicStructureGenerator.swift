@@ -533,10 +533,50 @@ struct KosmicStructureGenerator {
         }
     }
 
+    /// The B-section loop (Zack, 2026-11-03, from Fluxion III: B must not repeat A's chords). Each
+    /// leaves the tonic for the family's other chords and comes home at the end, so the section
+    /// still reads as the same song. The Dorian and Aeolian pairs are the B-cycles this plan
+    /// designed for Phase 2's breakdowns, extended to an 8-bar loop.
+    ///   Oxygene Dorian Vamp — bIII ×2, IV ×2, i ×4.
+    ///   Oxygene Aeolian Cycle — bVI ×2, bIII ×2, bVII ×2, i ×2.
+    ///   Oxygene Two-Chord Sway — i ×2, iv ×2; iv is major in Dorian, where the minor iv is
+    ///     out of the scale.
+    static func spaceBCycle(family: KosmicProgressionFamily, mode: Mode) -> [SpaceChord] {
+        switch family {
+        case .oxygeneDorianVamp:
+            return [SpaceChord(degree: "b3", type: .major, bars: 2),
+                    SpaceChord(degree: "4",  type: .major, bars: 2),
+                    SpaceChord(degree: "1",  type: .minor, bars: 4)]
+        case .oxygeneAeolianCycle:
+            return [SpaceChord(degree: "b6", type: .major, bars: 2),
+                    SpaceChord(degree: "b3", type: .major, bars: 2),
+                    SpaceChord(degree: "b7", type: .major, bars: 2),
+                    SpaceChord(degree: "1",  type: .minor, bars: 2)]
+        default:
+            return [SpaceChord(degree: "1", type: .minor, bars: 2),
+                    SpaceChord(degree: "4", type: mode == .Dorian ? .major : .minor, bars: 2)]
+        }
+    }
+
+    /// The theme return (Zack, 2026-11-03): a song whose last body section is B (ab, abab) never
+    /// hears its A theme again, so the 8 bars from this bar replay the first A section's opening 8
+    /// bars, lead and chords alike. Two thirds into the last B, on an 8-bar point at least 8 bars
+    /// in. Nil when the song ends on A, or the sections are too short.
+    static func spaceThemeReturnBar(sections: [SongSection]) -> Int? {
+        let body = sections.filter { $0.label == .A || $0.label == .B }
+        guard let lastB = body.last, lastB.label == .B,
+              let firstA = body.first(where: { $0.label == .A }), firstA.lengthBars >= 8 else { return nil }
+        let start = lastB.startBar + (lastB.lengthBars * 2 / 3) / 8 * 8
+        return start >= lastB.startBar + 8 && start + 8 <= lastB.endBar ? start : nil
+    }
+
     /// Kosmic Space chord plan. Intro and outro hold the tonic, as base Kosmic forces (this is
     /// also the corpus's pedal intro). Body sections loop the cycle from their first bar and cut
     /// the last window short at the section end. Every window is 2 or 4 bars and starts on an
     /// even bar, because KOS-PADS-001 re-attacks on even bars only.
+    /// B sections loop `spaceBCycle`, but still draw the A cycle each pass, so the A sections'
+    /// draws are the same as when B repeated A. The theme return's 8 bars carry the first A
+    /// section's opening chords, so the replayed theme sits on the chords it was written over.
     private static func buildSpaceChordPlan(
         frame: GlobalMusicalFrame,
         sections: [SongSection],
@@ -552,6 +592,8 @@ struct KosmicStructureGenerator {
         }
         var plan: [ChordWindow] = []
         var pass = 0
+        let themeReturn = spaceThemeReturnBar(sections: sections)
+        let firstAStart = sections.first { $0.label == .A }?.startBar
         for section in sections {
             guard section.label == .A || section.label == .B else {
                 plan.append(window(section.startBar, section.lengthBars, "1", .minor))
@@ -559,12 +601,23 @@ struct KosmicStructureGenerator {
             }
             var bar = section.startBar
             while bar < section.endBar {
-                for chord in spaceCycle(family: family, pass: pass, rng: &rng) where bar < section.endBar {
+                let aCycle = spaceCycle(family: family, pass: pass, rng: &rng)
+                pass += 1
+                if bar == themeReturn, let firstAStart {
+                    let opening = plan.filter { $0.startBar >= firstAStart && $0.startBar < firstAStart + 8 }
+                    for w in opening {
+                        let length = Swift.min(w.lengthBars, firstAStart + 8 - w.startBar)
+                        plan.append(window(bar + w.startBar - firstAStart, length, w.chordRoot, w.chordType))
+                    }
+                    bar += 8
+                    continue
+                }
+                let cycle = section.label == .B ? spaceBCycle(family: family, mode: frame.mode) : aCycle
+                for chord in cycle where bar < section.endBar {
                     let length = Swift.min(chord.bars, section.endBar - bar)
                     plan.append(window(bar, length, chord.degree, chord.type))
                     bar += length
                 }
-                pass += 1
             }
         }
         return plan
