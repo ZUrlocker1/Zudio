@@ -21,16 +21,19 @@ struct KosmicBassGenerator {
         driftVelocityBase: Int = 89,
         isKosmicSpace: Bool = false,
         spaceDraws: KosmicSpaceDraws? = nil,
-        spaceArrangement: KosmicSpaceArrangement? = nil
+        spaceArrangement: KosmicSpaceArrangement? = nil,
+        spaceBusyRhythm: Bool = false
     ) -> [MIDIEvent] {
 
         // Drift and Space use their own bass pools with new rules and adjusted weights
         let rules: [String]
         let weights: [Double]
         if isKosmicSpace {
-            // KOS-BASS-018 Oxygene Falling Walk 75%, KOS-BASS-001 Berlin School drone 25%
-            rules   = ["KOS-BASS-018", "KOS-BASS-001"]
-            weights = [0.75,           0.25]
+            // KOS-BASS-018 Oxygene Falling Walk and KOS-BASS-020 Oxygene 8 Pump 37.5% each,
+            // KOS-BASS-001 Berlin School drone 25%. The Pump is never drawn under KOS-RTHM-005 JMJ
+            // Dual-Rate, the busiest Space rhythm: the walk takes its share.
+            rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001"]
+            weights = spaceBusyRhythm ? [0.75, 0.0, 0.25] : [0.375, 0.375, 0.25]
         } else if isKosmicDrift {
             if isDriftDreamscape {
                 // Dreamscape forces Four-Bar Hold
@@ -172,6 +175,26 @@ struct KosmicBassGenerator {
         }
 
         let fallingWalk = ruleID == "KOS-BASS-018" ? oxygeneWalkDraws(rng: &rng, draws: spaceDraws) : nil
+        // KOS-BASS-020: 30% of songs drop the b7 and pump bare octaves
+        let pumpSeventh: Bool? = ruleID == "KOS-BASS-020" ? rng.nextDouble() >= 0.30 : nil
+        // KOS-BASS-020 fifth-voicing bars: the turnaround of each 8-bar chord loop — a non-tonic window
+        // that hands back to the tonic and ends on an 8-bar point of its section. In Oxygene 8 these are
+        // the iv chord's 2 bars in every 8; here the Aeolian Cycle's iv, the Dorian Vamp's last window
+        // and every second v of the Two-Chord Sway.
+        var pumpFifthBars = Set<Int>()
+        let firstBodyStart = structure.sections.first { $0.label == .A || $0.label == .B }?.startBar
+        if pumpSeventh != nil {
+            let plan = structure.chordPlan
+            for (i, window) in plan.enumerated() where window.chordRoot != "1" {
+                guard let sec = structure.section(atBar: window.startBar),
+                      sec.label == .A || sec.label == .B else { continue }
+                let end = window.startBar + window.lengthBars
+                let handsBack = i + 1 >= plan.count || plan[i + 1].chordRoot == "1"
+                if handsBack && (end - sec.startBar) % 8 == 0 {
+                    pumpFifthBars.formUnion(window.startBar..<end)
+                }
+            }
+        }
 
         var events: [MIDIEvent] = []
 
@@ -339,6 +362,28 @@ struct KosmicBassGenerator {
                 }
                 events += oxygeneFallingWalkBar(barStart: barStart, bar: bar, entry: entry,
                                                 frame: frame, walk: walk, thin: thin)
+                continue
+            }
+
+            // KOS-BASS-020: the pump, every body bar; a thin stretch drops the low hits.
+            if let seventh = pumpSeventh {
+                let thin = spaceArrangement?.bassThins(atBar: bar) == true
+                if section.label == .A || section.label == .B,
+                   thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
+                    bassEvolutionBars.append(bar)
+                }
+                // Variation, as the source does it: a turn in the last bar before a new body section,
+                // the fifth voicing on the loop's turnaround, a breath in the second bar of each 8,
+                // and a late entry on the first bar of every body section after the first.
+                let next = structure.section(atBar: bar + 1)
+                let turn = bar == section.endBar - 1 && (next?.label == .A || next?.label == .B)
+                let variant: PumpVariant = turn ? .turn
+                    : pumpFifthBars.contains(bar) ? .fifth
+                    : (bar - section.startBar) % 8 == 1 ? .breath
+                    : .normal
+                let lateEntry = bar == section.startBar && bar != firstBodyStart
+                events += oxygenePumpBar(barStart: barStart, entry: entry, frame: frame,
+                                         seventh: seventh, thin: thin, variant: variant, lateEntry: lateEntry)
                 continue
             }
 
@@ -540,6 +585,69 @@ struct KosmicBassGenerator {
             : [(0, 0, 2), (2, 1, 2), (4, 0, 2), (6, 1, 4), (10, 2, 2), (12, 1, 2), (14, 2, 1)]
         draws?.record("KOS-BASS-018", "\(set.name), \(sourceRhythm ? "source rhythm" : "alternate rhythm")")
         return OxygeneWalk(steps: set.steps, hits: hits)
+    }
+
+    // MARK: - KOS-BASS-020 Oxygene 8 Pump (Kosmic Space)
+    // Oxygene 8 synth bass, 124 bars. Ten notes a bar, x.x.xx.xx.x.xx.x: the upper root on steps 0, 2,
+    // 5, 8, 10 and 13, the low root an octave down with the b7 above it on steps 4, 7, 12 and 15.
+    // Register: the upper root in MIDI 36–47. Homage draw per song: bare octaves, no b7, 30%.
+    // A thin bar keeps only the upper hits.
+    // Variation, measured over the source's 124 bars — the rhythm never changes except in the turn:
+    //   fifth  (22 bars) — the upper hits become the 5th and octave, the low hits root and 4th; in the
+    //                      source always on the iv chord, 2 bars in every 8
+    //   breath (10 bars) — the last low hit, step 15, drops out; the second bar of each 8
+    //   turn   (2 bars)  — x.x.xx.xx.x.x.xx, the low hits on 4, 7 and 12, then the 7th and the upper
+    //                      root together on 15 leading into the next phrase; the 7th is the raised
+    //                      leading tone on the tonic chord. Here the last bar before a new body section.
+    //   late entry (2 bars) — the bar starts on step 2; here the first bar of each body section after
+    //                      the first.
+
+    enum PumpVariant { case normal, fifth, breath, turn }
+
+    private static func oxygenePumpBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
+        seventh: Bool, thin: Bool, variant: PumpVariant = .normal, lateEntry: Bool = false
+    ) -> [MIDIEvent] {
+        let scalePCs = frame.scalePCs
+        let rootPC = spaceChordRootPC(entry, frame: frame)
+        let upper = clampToRegister(rootPC + 36, low: 36, high: 47)
+        let low   = upper - 12
+        let isTonic = rootPC == snapToScale(keySemitone(frame.key), scalePCs: scalePCs)
+        let seventhNote = variant == .turn && isTonic ? upper - 1 : scaleStep(low, by: 6, scalePCs: scalePCs)
+
+        let upperHits: [(step: Int, dur: Int)] = variant == .turn
+            ? [(0, 1), (2, 2), (5, 2), (8, 1), (10, 2), (14, 1)]
+            : [(0, 1), (2, 2), (5, 2), (8, 1), (10, 2), (13, 2)]
+        let upperNotes = variant == .fifth ? [scaleStep(low, by: 4, scalePCs: scalePCs), upper] : [upper]
+        var events: [MIDIEvent] = []
+        for hit in upperHits where !(lateEntry && hit.step == 0) {
+            for note in upperNotes {
+                events.append(MIDIEvent(stepIndex: barStart + hit.step, note: UInt8(note),
+                                        velocity: hit.step == 0 ? 96 : 88, durationSteps: hit.dur))
+            }
+        }
+        guard !thin else { return events }
+
+        // The turn and the breath have no low hit on step 15
+        let lowSteps = variant == .turn || variant == .breath ? [4, 7, 12] : [4, 7, 12, 15]
+        var lowNotes: [(note: Int, vel: UInt8)] = [(low, 84)]
+        if variant == .fifth {
+            if seventh { lowNotes.append((scaleStep(low, by: 3, scalePCs: scalePCs), 72)) }
+        } else if seventh || variant == .turn {
+            lowNotes.append((seventhNote, 72))
+        }
+        for step in lowSteps {
+            for n in lowNotes {
+                events.append(MIDIEvent(stepIndex: barStart + step, note: UInt8(n.note),
+                                        velocity: n.vel, durationSteps: 1))
+            }
+        }
+        if variant == .turn {
+            // Step 15: the 7th and the upper root together, into the next phrase
+            events.append(MIDIEvent(stepIndex: barStart + 15, note: UInt8(seventhNote), velocity: 76, durationSteps: 1))
+            events.append(MIDIEvent(stepIndex: barStart + 15, note: UInt8(upper), velocity: 84, durationSteps: 1))
+        }
+        return events
     }
 
     private static func oxygeneFallingWalkBar(

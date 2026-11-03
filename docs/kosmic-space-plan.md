@@ -2,10 +2,12 @@
 
 Status: **Phase 1 built and merged to `main` as version 2.9 (build 135), a work in progress.**
 Zack's first listen (2026-11-02) was encouraging. It reads as Jarre, with the sequences and
-noise sweeps. The breaks below were added after that listen to relieve the monotony. It
-builds on macOS and iOS. No test suite has been run. See
-"Phase 1 as built" below for where the code had to interpret this plan. Phases 2 and 3 are
-designed but wait for listening on Phase 1.
+noise sweeps. The breaks below were added after that listen to relieve the monotony. Later
+listens (2026-11-03) found the songs too alike, so Space now draws from several rules per track:
+base Kosmic's JMJ rules and five more Oxygene rules, each track drawn independently. It builds on
+macOS and iOS. No test suite has been run. See "Phase 1 as built" below for where the code had to
+interpret this plan, and its sections "Breaks" and "More Oxygene rules" for what came after.
+Phases 2 and 3 are designed but wait for listening on Phase 1.
 
 This is the single document for Kosmic Space. It replaces the original plan, written in
 September before Motorik Europe and Chill Soho were built, and the corpus review of
@@ -13,8 +15,8 @@ September before Motorik Europe and Chill Soho were built, and the corpus review
 version disagree, this one wins.
 
 **Work happens on `main`.** Zack is the only user of the repo, so work in progress goes on
-`main`, marked as version 2.9 work in progress. The README's download link stays on the last
-published DMG until 2.9 is released (Zack, 2026-11-02).
+`main`, marked as version 2.9 work in progress. On 2026-11-03 Zack published the 2.9 DMG as
+the README's download, marked as a work-in-progress build for testing Kosmic Space.
 
 ---
 
@@ -271,7 +273,8 @@ Nothing else changes. Intro, A, B and outro keep their existing lengths and inte
 
 ### Rule pools
 
-Each track's pool when `isKosmicSpace`, with weights. Rules not listed are excluded.
+Each track's pool when `isKosmicSpace`, as first built. Rules not listed were excluded. The pools
+have since grown; the current weights are under "More Oxygene rules" in "Phase 1 as built".
 
 - **Drums** — `KOS-DRUM-009` Oxygene Preset Box 85%, `KOS-DRUM-000` No percussion 15%
 - **Bass** — `KOS-BASS-018` Oxygene Falling Walk 75%, `KOS-BASS-001` Berlin School drone 25%
@@ -493,7 +496,7 @@ Kosmic, so they cost no memory.
   Strings Slow (0/49)
 - **Rhythm** — Pulse Bass (11/39). Synth Bass 1 (0/38) was first, but its preset plays a 25 ms click and then silence at every pitch and length (measured offline, 2026-11-02), so it was swapped out
 - **Bass** — Fretless Bass (0/35)
-- **Texture** — White Noise Wave (12/122), Solar Wind 2 (12/89), Starship (8/125), Interference (11/127). Solar Wind (11/89) was already in the pool.
+- **Texture** — White Noise Wave (12/122, shown in the picker as "White Noise"), Solar Wind 2 (12/89), Starship (8/125), Interference (11/127). Solar Wind (11/89) was already in the pool.
 
 **Space subsets**, enforced by both pick pools and the sanitiser:
 
@@ -506,7 +509,8 @@ Kosmic, so they cost no memory.
 - **Rhythm** — Moog, Pulse Bass, Harpsi Pad
 - **Bass** — Moog, Synth Bass 3, Fretless Bass
 - **Texture** — White Noise Wave, Solar Wind, Solar Wind 2, Starship and Interference, 20% each (Zack, 2026-11-02). The sweep rule needs a noise or wind source, so the musical pad swells (Halo Pad, Atmosphere, Sweep Pad, Bowed Glass, Space Voice) were left out. Levels were measured offline (2026-11-02): Solar Wind 2 gain 1.5 (it was half as loud as Solar Wind at 0.40), Starship 0.8 (it ran about 1.7 times White Noise Wave at the default 1.4). Interference is the quietest of the five at the default gain and is unchanged. Space Lead 1 Synth Brass 2 is trimmed to 0.20 and Space Lead 2 Saw Lead to 0.45, both measured several times louder than their neighbours.
-- **Drums** — 808 Kit, Machine Kit
+- **Drums** — 808 Kit 75%, Machine Kit 25%. Space plays Machine Kit's own synth toms, the
+  bloops, in its fills; the tom-to-snare remap written for Noir skips Space (2026-11-03).
 
 **Where pools live.** Adding instruments touches four places: `poolNames`, `poolPrograms`,
 `instrumentPickPool` and `instrumentPickPoolStatic`. The static one is the one usually missed.
@@ -607,7 +611,9 @@ Weights: Arc 35, Turn 25, Phrygian 25, Major Descent 15.
 
 No fills. *Homage:* the kick grouping rotates by 0, 3 or 6 steps per song.
 
-**KOS-BASS-019 "Magnetic Octave Pump"** — one rule, three variants drawn per song:
+**KOS-BASS-019 "Magnetic Octave Pump"** — one rule, three variants drawn per song. (Its Oxygene 8
+root-and-b7 sub-option was built early as `KOS-BASS-020` Oxygene 8 Pump, 2026-11-03, and can be
+dropped from this rule.)
 
 - **Equinoxe octave eighths** (0.4) — root and octave alternating on the eight even steps.
   *Equinoxe, Chronologie 2.* 30% of these songs run 16ths instead, as Magnetic Fields 4 and
@@ -766,18 +772,28 @@ New infrastructure:
 - `KOS-LD2-000` No lead 2
 - `KOS-DRUM-000` No percussion
 
+### Added after the first listens (2026-11-03)
+
+- Base Kosmic's JMJ rules, which match no transcription but which Zack wanted for variety:
+  `KOS-DRUM-001` JMJ Mini Pops, `KOS-RTHM-002` JMJ Hook, `KOS-RTHM-005` JMJ Dual-Rate and
+  `KOS-LEAD-006` JMJ Phrase Loop (B sections)
+- Five new Oxygene rules: `KOS-LD1-016` Oxygene 6 Rising Strings, `KOS-BASS-020` Oxygene 8 Pump,
+  `KOS-RTHM-021` Oxygene 8 Offbeat Pedal, `KOS-PADS-010` Oxygene 4 Staggered Bloom and
+  `KOS-DRUM-012` Oxygene 6 Hand Percussion. Eleven more candidates are listed under "More Oxygene
+  rules".
+
 ### Excluded from Space
 
 Base Kosmic keeps all of these. Nothing is removed from base Kosmic or Drift.
 
-- **Drums** — `KOS-DRUM-001` through `008`. `001` "JMJ Mini Pops" does not match the measured
-  Minipops pattern, and `009` replaces it for Space.
+- **Drums** — `KOS-DRUM-002` through `008`. `001` "JMJ Mini Pops" was excluded at first, as it
+  does not match the measured Minipops pattern, and joined the pool on 2026-11-03.
 - **Bass** — every rule except `001`. Several are other artists' signatures: Tangerine Dream,
   Moroder, Neu!, Kraftwerk, McCartney, Loscil, Boards of Canada.
-- **Rhythm** — `KOS-RTHM-001` through `015`, including the three "JMJ" ones (`003`, `005`,
-  `008`), which match no source
-- **Lead 1** — every `KOS-LEAD-` rule except `004`, and `KOS-LD1-010` to `012`
-- **Pads** — every rule except `001`
+- **Rhythm** — `KOS-RTHM-001` through `015` except `002` and `005`, which joined on 2026-11-03.
+  The other "JMJ" ones, `003` and `008`, are slow solo lines and stay out.
+- **Lead 1** — every `KOS-LEAD-` rule except `004` and `006`, and `KOS-LD1-010` to `012`
+- **Pads** — every base rule except `001`
 - **Texture** — `KOS-TEXT-001` to `004`
 
 ### Considered and dropped
@@ -960,14 +976,78 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
   has gain 0.60 and always takes tremolo; Space Lead 2's chips are tremolo, delay and space.
 - **Base JMJ rules in the Space mix** (Zack, 2026-11-03, "a bit more variety before Phase 2"). The
   plan had excluded them as matching no source; Zack overruled that.
-  - Drums: KOS-DRUM-009 65%, KOS-DRUM-001 JMJ Mini Pops 20%, none 15%. Simpler-stretch and fill
-    annotations apply to the preset box only.
-  - Lead 1: in 30% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff.
+  - Drums: KOS-DRUM-001 JMJ Mini Pops joins the pool (current weights below). Simpler-stretch and
+    fill annotations apply to the preset box only.
+  - Lead 1: in 50% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff.
     The theme is unchanged; it is drawn after the theme and riff.
-  - Rhythm: KOS-RTHM-016 60%, KOS-RTHM-002 JMJ Hook 20%, KOS-RTHM-005 JMJ Dual-Rate 20%. Chosen as the
+  - Rhythm: KOS-RTHM-002 JMJ Hook and KOS-RTHM-005 JMJ Dual-Rate join the pool. Chosen as the
     two closest to a sequencer (8th-note grids that follow the chords). They play an octave down, under
     Lead 1, and rest through the sequencer break. They do not thin under the lead. RTHM-003 and 008 are
     slow solo lines and stay out.
+
+### More Oxygene rules (added 2026-11-03)
+
+Zack found the songs very Jarre but too alike: one rule per track. The other Oxygene files were
+re-read part by part (Oxygene 3, 6, 8, the second Oxygene 4 transcription and the unnumbered
+Oxygene). Sixteen candidates came out; the first batch below is one per track, the most distinct
+of each. Zack's rulings: parts are drawn independently, for the happy accidents, with only a few
+exclusions between two busy parts; each new rule is as likely as the other Space rules in its track.
+
+- **KOS-LD1-016 "Oxygene 6 Rising Strings"** (A sections). Oxygene 6 strings, bars 34–53 and
+  again 76–95. Three long notes a bar on steps 0, 6 and 12, each bar a 3-note cell on the current
+  chord. A climb is up, neighbour, up, up, each cell starting on a chord tone near where the last
+  ended, so the line rises about an octave; a fall is four falling cells from the top. Source cycle,
+  16 bars: climb, climb, fall, a held note, three bars of rest. Register 58–84. Draws: a chromatic
+  approach into each climb (60%), rhythm 0, 6, 10 (40%), and an 8-bar climb-and-fall cycle (40%).
+- **KOS-BASS-020 "Oxygene 8 Pump"**. Oxygene 8 synth bass, 124 bars. `x.x.xx.xx.x.xx.x`: the upper
+  root on steps 0, 2, 5, 8, 10 and 13; the low root with the b7 above it on 4, 7, 12 and 15. Upper
+  root in 36–47. Draw: bare octaves, no b7 (30%). A thin bar keeps the upper root only.
+  Variation (Zack, 2026-11-03: too relentless), as the source varies over its 124 bars, the rhythm
+  fixed except in the turn:
+  - Fifth voicing (22 source bars, always the iv chord's 2 bars in every 8): upper hits become the 5th
+    and octave, low hits root and 4th. Here on each 8-bar chord loop's turnaround, the non-tonic window
+    that hands back to the tonic: the Aeolian Cycle's iv, the Dorian Vamp's last window (when not i),
+    every second v of the Two-Chord Sway.
+  - Breath (10 bars): the low hit on step 15 drops, in the second bar of each 8.
+  - Turn (2 bars): `x.x.xx.xx.x.x.xx`, with the 7th and upper root together on step 15, the 7th
+    raised to the leading tone on the tonic chord. Here the last bar before a new body section.
+  - Late entry (2 bars): the bar starts on step 2. Here the first bar of each body section after the
+    first.
+  The B-section voicing swap that was also offered is not in the corpus and was left out.
+- **KOS-RTHM-021 "Oxygene 8 Offbeat Pedal"**. Oxygene 8 reverse-cylinder part, bars 51–65. Offbeat
+  8ths alternating a low pedal with upper chord tones: steps 2–12 pedal, octave, pedal, 7th, octave,
+  5th; then a short bar on 6–12, pedal, 5th, 7th, octave. Root in 48–59. Rests through the sequencer
+  break. Draw: the upper line a step lower (6th, 5th, 4th), as bar 64 has it (30%).
+- **KOS-PADS-010 "Oxygene 4 Staggered Bloom"**. Oxygene 4 bowed glass, bars 35–118. A close triad
+  whose notes enter on steps 0, 4 and 8 and release together after 2 bars; the lowest note is the
+  first chord tone at or above MIDI 55. Draw: the bloom opens from the top down (30%).
+- **KOS-DRUM-012 "Oxygene 6 Hand Percussion"**. Oxygene 6, 105 identical bars, no kick, snare or
+  hats: low bongo 0, 8; mute conga 4; open conga 6; low conga 12, 14; maracas 0, 6; guiro 0, 6, 8;
+  shaker 2, 3, 4, 10, 12, 14; castanets 12, 13, 14 (in 60% of songs). Shaker step 3 drops every
+  eighth bar.
+  The guiro took over when it played every bar (Zack, 2026-11-03), so it plays only in two or three
+  stretches a song, 8 or 16 bars each, on a body section start or 16-bar point, at least 8 bars apart,
+  at velocity 50 and 40.
+
+**Levels and names (Zack, 2026-11-03):** Space Lead 1 Synth Brass 1 (62) at 0.65; Space Rhythm Moog
+(39) at 0.45 and Harpsi Pad (11088) at 0.50, base Kosmic keeping 0.65 and 0.75. The White Noise Wave
+preset shows as "White Noise" in the Texture picker, so it is not abbreviated.
+
+**Weights now:**
+
+- Lead 1, A sections: KOS-LD1-013 50%, KOS-LD1-016 50%. B sections: KOS-LD1-014 50%, KOS-LEAD-006 50%.
+- Rhythm: KOS-RTHM-016, 002, 005 and 021, 25% each.
+- Bass: KOS-BASS-018 and 020, 37.5% each, KOS-BASS-001 25%. The Pump is never drawn under
+  KOS-RTHM-005 Dual-Rate, the one exclusion so far; the walk takes its share.
+- Pads: KOS-PADS-001 and 010, 50% each.
+- Drums: KOS-DRUM-009, 001 and 012, about 28% each, none 15%.
+
+**Still on the list** (not built): KOS-LD1-017 Oxygene 8 Offbeat Climb, KOS-LD1-018 Oxygene 4
+Triplet Turn (sitar), an Oxygene 6 blues solo for the last section, KOS-BASS-021 Oxygene 3 Shadow
+Bass, KOS-BASS-022 Anticipated Octaves with the Oxygene 6 paired-8th descent, KOS-RTHM-020
+Oxygene 8 Phasing Cell, an Oxygene 6 paired-descent rhythm, KOS-PADS-011 Oxygene 6 Close Chords,
+KOS-PADS-009 brought forward from Phase 3, KOS-DRUM-013 Oxygene 8 Four Pulse, KOS-DRUM-014 Oxygene
+Half-Time. The regen log no longer appends draws in parentheses either.
 
 Not yet done:
 

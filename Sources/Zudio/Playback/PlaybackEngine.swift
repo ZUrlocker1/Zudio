@@ -813,9 +813,9 @@ final class PlaybackEngine: ObservableObject {
             // with kick/snare/open-hat so Bonham-style cascades sound like 808-appropriate fills.
             // Low/mid toms (≤45) → kick; hiMid tom (48) → snare; hi tom (50) → open hi-hat.
             //
-            // Machine Kit (program 24) is Motorik-only and exclusively used in Noir. Its electronic
-            // tom slots produce space-age bloop/beep hits that clash with the cold, austere aesthetic.
-            // Remap: low toms → kick, high toms → snare, crash → ride (klangy and sustained).
+            // Machine Kit (program 24): its electronic tom slots produce space-age bloop/beep hits that
+            // clash with Motorik Noir's cold, austere aesthetic. Remap: toms → snare, crash → ride
+            // (klangy and sustained). Kosmic Space keeps the bloops, so the remap skips it.
             // Velocity: native Machine Kit kick/snare/hat fire at 88% to tame harshness. Remapped
             // toms keep their original velocity — they were already moderate and scaling makes them
             // inaudible (e.g. an intro pickup tom at vel 78 → kick at vel 68 disappears entirely).
@@ -1248,6 +1248,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 1.10   // Mono Synth on Motorik Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 81 {
                 vol = 0.88   // Mono Synth slightly hot on Lead 1 — trim
+            } else if trackIndex == kTrackLead1 && kosmicStyle && program == 62 && songState?.isKosmicSpace == true {
+                vol = 0.65   // Synth Brass 1 ran loud on Space Lead 1 (Zack, 2026-11-03)
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 63 {
                 vol = 0.20   // Synth Brass 2 measures 4 to 10 times louder than Synth Brass 1 and the other Space leads
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 80 {
@@ -1359,6 +1361,10 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.34   // Wurlitzer runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 18 {
                 vol = 0.60   // Rock Organ runs hot on Kosmic rhythm — pull back
+            } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 && songState?.isKosmicSpace == true {
+                vol = 0.45   // Moog on Space Rhythm ran loud (Zack, 2026-11-03); base Kosmic keeps 0.65
+            } else if trackIndex == kTrackRhythm && kosmicStyle && program == 11088 && songState?.isKosmicSpace == true {
+                vol = 0.50   // Harpsi Pad on Space Rhythm ran loud (Zack, 2026-11-03); base Kosmic keeps 0.75
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 {
                 vol = 0.65   // Moog Lead on Kosmic rhythm — pull back
             // Drift Rhythm calibrations must sit before the general kosmicStyle catch below

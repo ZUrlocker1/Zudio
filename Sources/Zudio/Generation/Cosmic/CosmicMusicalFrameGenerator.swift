@@ -181,11 +181,15 @@ struct KosmicMusicalFrameGenerator {
         return Swift.max(100, Swift.min(124, Int(raw.rounded())))
     }
 
-    /// Space drum rule pool: KOS-DRUM-009 Oxygene Preset Box 65%, KOS-DRUM-001 JMJ Mini Pops 20%,
-    /// KOS-DRUM-000 no percussion 15%.
+    /// Space drum rule pool: KOS-DRUM-009 Oxygene Preset Box, KOS-DRUM-001 JMJ Mini Pops and
+    /// KOS-DRUM-012 Oxygene 6 Hand Percussion, about 28% each, and KOS-DRUM-000 no percussion 15%.
     static func pickSpacePercussionStyle(rng: inout SeededRNG) -> PercussionStyle {
         let r = rng.nextDouble()
-        return r < 0.65 ? .spaceOxygenePresetBox : r < 0.85 ? .minimal : .absent
+        let share = 0.85 / 3
+        return r < share ? .spaceOxygenePresetBox
+             : r < share * 2 ? .minimal
+             : r < 0.85 ? .spaceOxygeneHandPercussion
+             : .absent
     }
 
     /// Drift drum rule pool — evenly weighted regardless of tempo.

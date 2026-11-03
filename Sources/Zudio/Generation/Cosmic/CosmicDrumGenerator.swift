@@ -62,10 +62,71 @@ struct KosmicDrumGenerator {
                                             fillBars: spaceArrangement?.fillBars ?? [],
                                             arrangement: spaceArrangement)
 
+        case .spaceOxygeneHandPercussion:
+            usedRuleIDs.insert("KOS-DRUM-012")
+            return generateOxygeneHandPercussion(frame: frame, structure: structure, rng: &rng)
+
         default:
             usedRuleIDs.insert("KOS-DRUM-000")
             return []
         }
+    }
+
+    // MARK: - KOS-DRUM-012 Oxygene 6 Hand Percussion (Kosmic Space)
+    // The Oxygene 6 rhythm-box pattern, identical for 105 bars: hand percussion only, no kick, snare
+    // or hats. GM notes, with the source's relative levels (castanets softer):
+    //   low bongo (61) 0, 8 · mute high conga (62) 4 · open high conga (63) 6 · low conga (64) 12, 14
+    //   maracas (70) 0, 6 · shaker (82) 2, 3, 4, 10, 12, 14 · castanets (85) 12, 13, 14
+    //   long guiro (74) 0, 6, 8 — only in its stretches, below
+    // It plays every bar, intro and outro included, as the preset box does. Homage draw per song:
+    // castanets in 60% of songs. Repeat guard: the shaker on step 3 drops in every eighth bar.
+    // The guiro took over when it played every bar (Zack, 2026-11-03). It plays in two or three
+    // stretches a song, 8 or 16 bars each, starting on a body section start or a 16-bar point inside
+    // one, at least 8 bars apart, and quieter than the source's balance.
+
+    private static func generateOxygeneHandPercussion(frame: GlobalMusicalFrame, structure: SongStructure,
+                                                      rng: inout SeededRNG) -> [MIDIEvent] {
+        var voices: [(note: UInt8, steps: [Int], vel: UInt8)] = [
+            (61, [0, 8], 76), (62, [4], 76), (63, [6], 76), (64, [12, 14], 76),
+            (70, [0, 6], 72), (82, [2, 3, 4, 10, 12, 14], 70)
+        ]
+        if rng.nextDouble() < 0.60 { voices.append((85, [12, 13, 14], 48)) }
+
+        // Guiro stretches: candidates are body section starts and 16-bar points, never running into
+        // the outro; picked at random, two or three a song, each clear of the others by 8 bars.
+        let bodyEnd = structure.outroSection?.startBar ?? frame.totalBars
+        var candidates: [Int] = []
+        for section in structure.sections where section.label == .A || section.label == .B {
+            candidates += Array(stride(from: section.startBar, to: section.endBar, by: 16))
+        }
+        var guiro: [Range<Int>] = []
+        let wanted = rng.nextDouble() < 0.50 ? 2 : 3
+        while guiro.count < wanted && !candidates.isEmpty {
+            let start = candidates.remove(at: rng.nextInt(upperBound: candidates.count))
+            let length = rng.nextDouble() < 0.50 ? 8 : 16
+            let range = start..<Swift.min(start + length, bodyEnd)
+            guard range.count >= 8,
+                  !guiro.contains(where: { $0.lowerBound < range.upperBound + 8 && range.lowerBound < $0.upperBound + 8 })
+            else { continue }
+            guiro.append(range)
+        }
+
+        var events: [MIDIEvent] = []
+        for bar in 0..<frame.totalBars {
+            if guiro.contains(where: { $0.contains(bar) }) {
+                for (step, vel) in [(0, 50), (6, 40), (8, 50)] {
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: 74,
+                                            velocity: UInt8(vel), durationSteps: 1))
+                }
+            }
+            for voice in voices {
+                for step in voice.steps where !(voice.note == 82 && step == 3 && bar % 8 == 7) {
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: voice.note,
+                                            velocity: voice.vel, durationSteps: 1))
+                }
+            }
+        }
+        return events
     }
 
     // MARK: - KOS-DRUM-009 Oxygene Preset Box (Kosmic Space)

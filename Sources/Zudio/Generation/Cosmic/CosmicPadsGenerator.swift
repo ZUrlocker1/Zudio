@@ -26,11 +26,12 @@ struct KosmicPadsGenerator {
         let padWeights: [Double] = [0.18,           0.20,           0.18,           0.13,           0.13,            0.18]
 
         // forceRuleID > quartal_stack/suspended_resolution constraints > weighted pick
-        // Kosmic Space: KOS-PADS-001 only. It re-attacks every 2 bars on the current chord, so with
-        // Space's 2- and 4-bar chord windows it follows every change — the Oxygene string machine.
+        // Kosmic Space: KOS-PADS-001 and KOS-PADS-010 Oxygene 4 Staggered Bloom, 50% each. Both
+        // re-attack every 2 bars on the current chord, so with Space's 2- and 4-bar chord windows they
+        // follow every change — the Oxygene string machine.
         let primaryRule: String
         if isKosmicSpace {
-            primaryRule = "KOS-PADS-001"
+            primaryRule = rng.nextDouble() < 0.50 ? "KOS-PADS-001" : "KOS-PADS-010"
         } else if let forced = forceRuleID {
             primaryRule = forced
         } else if kosmicProgFamily == .quartal_stack {
@@ -51,6 +52,8 @@ struct KosmicPadsGenerator {
         let use006 = !isKosmicSpace && rng.nextDouble() < 0.30   // KOS-PADS-006: Shimmer Layer
         if use008 { usedRuleIDs.insert("KOS-PADS-008") }
         if use006 { usedRuleIDs.insert("KOS-PADS-006") }
+        // KOS-PADS-010: the bloom opens downwards, top note first, in 30% of songs
+        let bloomDown = primaryRule == "KOS-PADS-010" && rng.nextDouble() < 0.30
 
         var events: [MIDIEvent] = []
 
@@ -281,6 +284,8 @@ struct KosmicPadsGenerator {
                 events += suspendedResolutionBar(barStart: barStart, bar: bar, entry: entry, frame: frame)
             case "KOS-PADS-005":
                 events += quartalStackBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
+            case "KOS-PADS-010":
+                events += staggeredBloomBar(barStart: barStart, bar: bar, entry: entry, frame: frame, down: bloomDown)
             case "KOS-PADS-007":
                 events += gatedChordPulseBar(barStart: barStart, entry: entry, frame: frame, intensity: sectionIntensity, rng: &rng)
             default:
@@ -322,6 +327,34 @@ struct KosmicPadsGenerator {
     // MARK: - KOS-PAD-001: Long Drone
     // Whole notes held 2–4 bars (but we emit per bar with overlap),
     // voicing: root+5th+octave+(3rd at octave up), velocity 40–55
+
+    // MARK: - KOS-PADS-010 Oxygene 4 Staggered Bloom (Kosmic Space)
+    // Oxygene 4 bowed glass, bars 35–118. A close triad whose three notes enter a beat apart, on
+    // steps 0, 4 and 8, and all release together at the end of the 2-bar window (held 32, 28 and 24
+    // steps). The lowest note is the first chord tone at or above MIDI 55, as in the source (G3, G3,
+    // A3), and the other two are the next chord tones above it. Homage draw per song: the bloom opens
+    // from the top note down in 30% of songs.
+
+    private static func staggeredBloomBar(
+        barStart: Int, bar: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, down: Bool
+    ) -> [MIDIEvent] {
+        guard bar % 2 == 0 else { return [] }
+        let scalePCs = frame.scalePCs
+        let root = spaceChordRootPC(entry, frame: frame) + 48
+        let tonePCs = Set([root, scaleStep(root, by: 2, scalePCs: scalePCs),
+                           scaleStep(root, by: 4, scalePCs: scalePCs)].map { $0 % 12 })
+        var voicing: [Int] = []
+        var m = 55
+        while voicing.count < 3 {
+            if tonePCs.contains(m % 12) { voicing.append(m) }
+            m += 1
+        }
+        if down { voicing.reverse() }
+        return voicing.enumerated().map { i, note in
+            MIDIEvent(stepIndex: barStart + i * 4, note: UInt8(note),
+                      velocity: UInt8(60 - i * 4), durationSteps: 32 - i * 4)
+        }
+    }
 
     private static func longDroneBar(
         barStart: Int, bar: Int, sectionStartBar: Int,

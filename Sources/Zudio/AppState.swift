@@ -286,7 +286,9 @@ final class AppState: ObservableObject {
                 return "Kosmic Drift"
             }
             if !vals.isDisjoint(with: ["KOS-DRUM-009", "KOS-BASS-018", "KOS-RTHM-016",
-                                       "KOS-LD1-013", "KOS-LD1-014", "KOS-TEXT-005"]) {
+                                       "KOS-LD1-013", "KOS-LD1-014", "KOS-TEXT-005",
+                                       "KOS-DRUM-012", "KOS-BASS-020", "KOS-RTHM-021",
+                                       "KOS-LD1-016", "KOS-PADS-010"]) {
                 return "Kosmic Space"
             }
             return style.rawValue.capitalized
@@ -803,7 +805,7 @@ final class AppState: ObservableObject {
         case (kTrackRhythm,  _):         return ["Guitar Pulse","Moog Lead","Fuzz Guitar"]
         case (kTrackTexture, .chill):   return ["None","Another bar","Another pub","Bar sounds","City at night","Harbor","Vinyl crackle"]
         case (kTrackTexture, .ambient): return ["Strings","Bowed Glass","Choir Aahs","FX Atmosphere","Pad 3 Poly"]
-        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain","White Noise Wave","Solar Wind 2","Starship","Interference"]
+        case (kTrackTexture, .kosmic):  return ["Pad 3 Poly","Fifths Lead","Solar Wind","FX Echoes","Rain","White Noise","Solar Wind 2","Starship","Interference"]
         case (kTrackTexture, .motorik): return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes",
                                                 "Solar Wind","Interference","Guitar Fdbk","Metal Pad","Ice Rain","Mystery Pad"]
         case (kTrackTexture, _):        return ["Fifths Lead","Halo Pad","Warm Pad","FX Atmosphere","FX Echoes"]

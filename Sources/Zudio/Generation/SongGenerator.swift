@@ -493,7 +493,7 @@ struct SongGenerator {
 
         // Space keeps to its own drum pool: a forced base style (the curated first Kosmic song
         // forces the Electric Buddha groove) is ignored, as Drift's bass ignores forced base rules.
-        let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .minimal, .absent]
+        let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .minimal, .spaceOxygeneHandPercussion, .absent]
         let percussionStyle = isKosmicSpace
             ? (forcePercussionStyle.flatMap { spacePercussion.contains($0) ? $0 : nil } ?? percussionStylePicked)
             : (forcePercussionStyle ?? percussionStylePicked)
@@ -622,7 +622,8 @@ struct SongGenerator {
             bassEvolutionBars: &bassEvolutionBars,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement
+            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement,
+            spaceBusyRhythm: rhythmRules.contains("KOS-RTHM-005")
         )
 
         // Drums
@@ -1730,7 +1731,8 @@ struct SongGenerator {
                     isKosmicDrift: songState.isKosmicDrift,
                     isDriftDreamscape: songState.isDriftDreamscape,
                     driftVelocityBase: 89,
-                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement)
+                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement,
+                    spaceBusyRhythm: songState.generationLog.contains { $0.tag == "KOS-RTHM-005" })
             } else if isChill {
                 events = ChillBassGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1990,8 +1992,8 @@ struct SongGenerator {
             regenLog.append(GenerationLogEntry(tag: "—", description: "no rules captured"))
         } else {
             for ruleID in usedRules.sorted() {
-                var desc = ruleDescription(ruleID, trackIndex: trackIndex)
-                if let draws = regenSpaceDraws.notes[ruleID] { desc += " (\(draws))" }
+                // No per-song draws in parentheses: the log stays short (Zack, 2026-11-02)
+                let desc = ruleDescription(ruleID, trackIndex: trackIndex)
                 let tag  = (ruleID == "BASS-EVOL" || ruleID == "BASS-DEVOL") ? "BASS" : ruleID.hasPrefix("AMB-PNO-001-") ? "AMB-PNO-001" : ruleID
                 regenLog.append(GenerationLogEntry(tag: tag, description: desc))
             }
@@ -2723,6 +2725,7 @@ struct SongGenerator {
         case "KOS-DRUM-007": return "Loping groove"
         case "KOS-DRUM-008": return "Half-time lope"
         case "KOS-DRUM-009": return "Oxygene Preset Box"
+        case "KOS-DRUM-012": return "Oxygene 6 Hand Percussion"
         default:                 return ruleID
         }
     }
@@ -2747,6 +2750,7 @@ struct SongGenerator {
         case "KOS-BASS-016":  return "BoC loop — repeating cell"
         case "KOS-BASS-017":  return "Four-bar hold root sustain"
         case "KOS-BASS-018":  return "Oxygene Falling Walk"
+        case "KOS-BASS-020":  return "Oxygene 8 Pump"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
         default:              return ruleID.hasPrefix("KOS-") ? ruleID : "Unknown bass rule"
@@ -2763,6 +2767,7 @@ struct SongGenerator {
         case "KOS-PADS-006":  return "Electric Buddha shimmer"
         case "KOS-PADS-007":  return "Probabilistic gated chord pulse"
         case "KOS-PADS-008":  return "bIII colour chord layer"
+        case "KOS-PADS-010":  return "Oxygene 4 Staggered Bloom"
         default:              return ruleID
         }
     }
@@ -2783,6 +2788,7 @@ struct SongGenerator {
         case "KOS-LD1-012": return "Sigur Ros late entry float"
         case "KOS-LD1-013": return "Oxygene Falling Theme"
         case "KOS-LD1-014": return "Oxygene See-Saw Riff"
+        case "KOS-LD1-016": return "Oxygene 6 Rising Strings"
         case "KOS-LD2-000":  return "No lead 2"
         default:             return ruleID
         }
@@ -2806,6 +2812,7 @@ struct SongGenerator {
         case "KOS-RTHM-014": return "Chromatic tremolo"
         case "KOS-RTHM-015": return "Downbeat chord"
         case "KOS-RTHM-016": return "Oxygene Octave Sequencer"
+        case "KOS-RTHM-021": return "Oxygene 8 Offbeat Pedal"
         default:            return ruleID
         }
     }

@@ -41,21 +41,22 @@ struct KosmicLeadGenerator {
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
-        // Kosmic Space: theme in A sections (KOS-LD1-013), riff in B sections (KOS-LD1-014), in
-        // every song. Space sets its own A and B rules, so Technique D escalation never runs.
+        // Kosmic Space: KOS-LD1-013 Falling Theme or KOS-LD1-016 Rising Strings in A sections, the
+        // KOS-LD1-014 riff or KOS-LEAD-006 Phrase Loop in B sections. Space sets its own A and B rules,
+        // so Technique D escalation never runs.
         if isKosmicSpace {
             let _ = pickLeadRule(rng: &rng)   // consume base slot
             lead1BaseRule = "KOS-LD1-013"
             usedRuleIDs.insert("KOS-LD1-013")
             if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
-            let theme = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
+            var theme = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
                                                     rng: &rng, draws: spaceDraws)
             var riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
                                                  rng: &rng, draws: spaceDraws)
-            // In 30% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff,
+            // In 50% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff,
             // for variety. Drawn after the theme and riff, so they are unchanged for a given seed.
             var phrase: [MIDIEvent] = []
-            if rng.nextDouble() < 0.30, structure.sections.contains(where: { $0.label == .B }) {
+            if rng.nextDouble() < 0.50, structure.sections.contains(where: { $0.label == .B }) {
                 var discard: [Int] = []
                 let bSections = structure.sections.filter { $0.label == .B }
                 func inB(_ ev: MIDIEvent) -> Bool {
@@ -66,6 +67,15 @@ struct KosmicLeadGenerator {
                 riff = riff.filter { !inB($0) }
                 usedRuleIDs.remove("KOS-LD1-014")
                 usedRuleIDs.insert("KOS-LEAD-006")
+            }
+            // In 50% of songs KOS-LD1-016 Rising Strings plays the A sections in place of the theme.
+            // Drawn last, so the other Lead 1 draws are unchanged for a given seed.
+            if rng.nextDouble() < 0.50 {
+                theme = generateOxygeneRisingStrings(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                     rng: &rng)
+                lead1BaseRule = "KOS-LD1-016"
+                usedRuleIDs.remove("KOS-LD1-013")
+                usedRuleIDs.insert("KOS-LD1-016")
             }
             let lead = theme + riff + phrase
             // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
@@ -472,6 +482,93 @@ struct KosmicLeadGenerator {
                                             velocity: i == 0 ? 66 : (isLast ? 58 : 62),
                                             durationSteps: Swift.min(note.dur, end - onset)))
                 }
+            }
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-016 Oxygene 6 Rising Strings (Kosmic Space, A sections)
+    // Oxygene 6 strings, bars 34–53, played identically again at bars 76–95. Three long notes a bar
+    // on steps 0, 6 and 12 (held 6, 6 and 4), each bar a 3-note cell on the current chord:
+    //   climb, 4 bars — up, neighbour, up, up: each cell starts on a chord tone, a step above or
+    //                   below where the last one ended, so the line rises by about an octave
+    //   fall, 4 bars  — four falling cells from the top, the third bouncing back up
+    //   hold          — one chord tone a step above the fall's end, held a bar
+    // The source cycle, 16 bars: climb, climb, fall, hold, three bars of rest. Register MIDI 58–84.
+    // Homage draws per song:
+    //   chromatic approach — the first cell of each climb opens a semitone below its chord tone,
+    //                        as the source's F#-G-A does, 60%
+    //   rhythm — the source 60%, or steps 0, 6 and 10 (held 6, 4 and 6) 40%
+    //   cycle — the source 60%, or an 8-bar climb and fall with no hold or rest 40%
+
+    private enum RisingCell { case up, neighbour, down, hold, rest }
+
+    private static func generateOxygeneRisingStrings(
+        frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let approach = rng.nextDouble() < 0.60
+        let onsets: [(step: Int, dur: Int)] = rng.nextDouble() < 0.40
+            ? [(0, 6), (6, 4), (10, 6)] : [(0, 6), (6, 6), (12, 4)]
+        let climb: [RisingCell] = [.up, .neighbour, .up, .up]
+        let fall:  [RisingCell] = [.down, .down, .down, .down]
+        let cycle: [RisingCell] = rng.nextDouble() < 0.40
+            ? climb + fall
+            : climb + climb + fall + [.hold, .rest, .rest, .rest]
+        let scalePCs = frame.scalePCs
+
+        var events: [MIDIEvent] = []
+        for section in structure.sections where section.label == .A {
+            var last = 62
+            for bar in section.startBar..<section.endBar {
+                let pos = (bar - section.startBar) % cycle.count
+                let cell = cycle[pos]
+                guard cell != .rest, let entry = tonalMap.entry(atBar: bar) else { continue }
+                let root = spaceChordRootPC(entry, frame: frame) + 60
+                let tones = Set([root, scaleStep(root, by: 2, scalePCs: scalePCs),
+                                 scaleStep(root, by: 4, scalePCs: scalePCs)].map { $0 % 12 })
+                func toneAbove(_ t: Int) -> Int { (t...(t + 12)).first { tones.contains($0 % 12) } ?? t }
+                func toneBelow(_ t: Int) -> Int { stride(from: t, through: t - 12, by: -1).first { tones.contains($0 % 12) } ?? t }
+                func step(_ m: Int, _ by: Int) -> Int { scaleStep(m, by: by, scalePCs: scalePCs) }
+
+                // The cell's first chord tone, placed against where the last cell ended. An up cell
+                // on a 4-bar boundary always opens a climb, which starts again from the bottom.
+                var start: Int
+                switch (cell, pos % 4) {
+                case (.hold, _):        start = toneAbove(step(last, 1))
+                case (.up, 0):          start = toneAbove(62)
+                case (.neighbour, _):   start = toneAbove(step(last, 1))
+                case (.up, 2):          start = toneAbove(step(last, -1))
+                case (.up, _):          start = toneAbove(step(last, 1))
+                case (.down, 0):        start = toneBelow(last)
+                case (.down, 2):        start = toneAbove(step(last, 2))
+                default:                start = toneBelow(step(last, -1))
+                }
+                if start > 79 { start = toneBelow(start - 12) }
+                if start < 58 { start = toneAbove(start + 12) }
+
+                let notes: [Int]
+                switch cell {
+                case .up where pos % 4 == 0 && approach: notes = [start - 1, start, step(start, 1)]
+                case .up:        notes = [start, step(start, 1), step(start, 2)]
+                case .neighbour: notes = [start, step(start, -1), start]
+                case .down:      notes = [start, step(start, -1), step(start, -2)]
+                default:         notes = [start]
+                }
+                let end = section.endBar * 16
+                if cell == .hold {
+                    events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(start), velocity: 62,
+                                            durationSteps: Swift.min(16, end - bar * 16)))
+                } else {
+                    for (i, note) in notes.enumerated() {
+                        let onset = bar * 16 + onsets[i].step
+                        guard onset < end else { continue }
+                        events.append(MIDIEvent(stepIndex: onset, note: UInt8(note),
+                                                velocity: i == 0 ? 66 : 60,
+                                                durationSteps: Swift.min(onsets[i].dur, end - onset)))
+                    }
+                }
+                last = notes.last ?? start
             }
         }
         return events

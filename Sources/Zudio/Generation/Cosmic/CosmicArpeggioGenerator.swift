@@ -62,11 +62,16 @@ struct KosmicArpeggioGenerator {
         // Kosmic Space: no stagger, no rest windows, no fade before the outro (ArrangementFilter
         // exempts Rhythm too).
         if isKosmicSpace {
-            // KOS-RTHM-016 Oxygene Octave Sequencer 60%, KOS-RTHM-002 JMJ Hook 20%, KOS-RTHM-005 JMJ
-            // Dual-Rate 20%. The two base rules are gated, 8th-note lines that follow the chords; they
-            // sit an octave down, under Lead 1's register, and rest through the sequencer break.
-            let spaceRule = ["KOS-RTHM-016", "KOS-RTHM-002", "KOS-RTHM-005"][rng.weightedPick([0.60, 0.20, 0.20])]
+            // KOS-RTHM-016 Oxygene Octave Sequencer, KOS-RTHM-002 JMJ Hook, KOS-RTHM-005 JMJ Dual-Rate
+            // and KOS-RTHM-021 Oxygene 8 Offbeat Pedal, 25% each. The two base rules are gated, 8th-note
+            // lines that follow the chords; they sit an octave down, under Lead 1's register, and rest
+            // through the sequencer break.
+            let spaceRule = ["KOS-RTHM-016", "KOS-RTHM-002", "KOS-RTHM-005", "KOS-RTHM-021"][rng.weightedPick([0.25, 0.25, 0.25, 0.25])]
             usedRuleIDs.insert(spaceRule)
+            if spaceRule == "KOS-RTHM-021" {
+                return generateOxygeneOffbeatPedal(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                   arrangement: spaceArrangement)
+            }
             if spaceRule != "KOS-RTHM-016" {
                 let line = spaceRule == "KOS-RTHM-002"
                     ? generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
@@ -219,6 +224,42 @@ struct KosmicArpeggioGenerator {
             if arrangement.sequencerRests(atBar: bar) { return nil }
             return arrangement.leadPlays(atBar: bar) ? thin : source
         }
+    }
+
+    // MARK: - KOS-RTHM-021: Oxygene 8 Offbeat Pedal (Kosmic Space)
+    // Oxygene 8 reverse-cylinder part, bars 51–65. 8th notes off the downbeat, alternating a low
+    // pedal on the chord root with upper chord tones. Two bars: the full bar on steps 2–12 (pedal,
+    // octave, pedal, 7th, octave, 5th), then the short bar on steps 6–12 rising (pedal, 5th, 7th,
+    // octave). Root in MIDI 48–59, as the sequencer engine. Silent through the sequencer break.
+    // Homage draw per song: in 30% of songs the upper line sits a step lower (6th, 5th and 4th in
+    // place of octave, 7th and 5th), as Oxygene 8 bar 64 does.
+
+    private static func generateOxygeneOffbeatPedal(
+        frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG,
+        arrangement: KosmicSpaceArrangement?
+    ) -> [MIDIEvent] {
+        // Scale steps above the pedal for the top, middle and low upper voices
+        let upper = rng.nextDouble() < 0.30 ? [5, 4, 3] : [7, 6, 4]
+        let scalePCs = frame.scalePCs
+        var events: [MIDIEvent] = []
+        for bar in 0..<frame.totalBars {
+            guard arrangement?.sequencerRests(atBar: bar) != true,
+                  let entry = tonalMap.entry(atBar: bar) else { continue }
+            let pedal = clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)
+            // (step, scale steps above the pedal)
+            let figure: [(Int, Int)] = bar % 2 == 0
+                ? [(2, 0), (4, upper[0]), (6, 0), (8, upper[1]), (10, upper[0]), (12, upper[2])]
+                : [(6, 0), (8, upper[2]), (10, upper[1]), (12, upper[0])]
+            for (i, (step, steps)) in figure.enumerated() {
+                let last = i == figure.count - 1
+                events.append(MIDIEvent(stepIndex: bar * 16 + step,
+                                        note: UInt8(scaleStep(pedal, by: steps, scalePCs: scalePCs)),
+                                        velocity: steps == 0 ? 72 : 64, durationSteps: last ? 3 : 2))
+            }
+        }
+        return events
     }
 
     // MARK: - KOS-RTHM-001: Tangerine Dream multi-voice step-sequencer

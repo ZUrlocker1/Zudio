@@ -432,6 +432,7 @@ enum PercussionStyle: String, Codable, Sendable {
     case driftLopingGroove           // Drift: doubled kick + snare variant (clean/lopsided/floating) (KOS-DRUM-007)
     case driftHalfTimeLope           // Drift: snare on beat 3 only, sparse hat, BPM ≤ 78 (KOS-DRUM-008)
     case spaceOxygenePresetBox       // Space: the Oxygene 4 Minipops pattern, unvarying (KOS-DRUM-009)
+    case spaceOxygeneHandPercussion  // Space: the Oxygene 6 hand percussion, no kick or hats (KOS-DRUM-012)
 }
 
 // MARK: - Kosmic song forms
