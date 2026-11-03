@@ -558,6 +558,20 @@ struct KosmicBassGenerator {
             }
         }
 
+        // Kosmic Space bridge: the sequencer solo silences the bass; the breakdown holds the chord
+        // root an octave down, re-attacked every 2 bars, under the breakdown's slower chords.
+        if isKosmicSpace, let bridge = spaceArrangement?.bridge {
+            events = silenceBars(events, [bridge.range])
+            if bridge.kind == .breakdown {
+                for bar in stride(from: bridge.range.lowerBound, to: bridge.range.upperBound, by: 2) {
+                    guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                    events.append(MIDIEvent(stepIndex: bar * 16, note: bassRoot(entry: entry, frame: frame) - 12,
+                                            velocity: 84, durationSteps: 30))
+                }
+                events.sort { $0.stepIndex < $1.stepIndex }
+            }
+        }
+
         return events
     }
 

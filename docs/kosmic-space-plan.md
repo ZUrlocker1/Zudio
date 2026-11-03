@@ -266,7 +266,8 @@ Space uses `KosmicStructureGenerator` as it is, with three changes:
   the riff never plays.
 - **No bridges.** The bridge roll still consumes its RNG draw but always fails for Space. This
   removes the Electric Buddha drum bridges, the bridgeAlt call-and-response, bridgeMelody and
-  the X-Files whistle, none of which is Jarre.
+  the X-Files whistle, none of which is Jarre. Space has had its own bridge since 2026-11-03, a mute
+  schedule rather than a section; see "Bridges" under "Phase 1 as built".
 - **Chord windows** come from the cycle builder above.
 
 Nothing else changes. Intro, A, B and outro keep their existing lengths and intensity labels.
@@ -1083,6 +1084,37 @@ names instruments; the saved file keeps program numbers.
   above the pads (Aztraeon bar 36 an octave up, the arch at bars 38–39 not); legato joins each half
   phrase into one figure, which reaches above 67 and so is never lifted.
 
+**Bridges (Zack, 2026-11-03).** The earlier "no bridges" ruling is superseded for Space's own
+bridge; base Kosmic's bridge sections stay off. `tools/jarre_deep.py --sections` found four ways Jarre
+breaks a piece in the middle, all subtractive: Magnetic Fields 1 bars 73–84 and 137–148 (sequencer
+and lead out, drums at a third of their density, bass, pads and noise on a new cycle), Rendez-Vous 2
+bars 81–96 (the sequencer alone), Arpegiator bars 41–56 (drums and sequencer only), and the
+effects-only endings of Oxygene 3 and 6. Zack chose the first two:
+
+- **Where.** ab and aba forms only, `spaceBridgeShare` of them: 0.80 for testing, 0.30–0.40 at
+  release (about 1 Space song in 6 at 0.30 and 1 in 5 at 0.40, since ab and aba are 55% of Space
+  forms; 0.80 puts one in 44% of Space songs). The bridge
+  takes the last 8 or 12 bars of the first A section and ends where the first B begins, leaving A at
+  least 16 bars. It is a mute schedule (`SpaceBridge`, in `CosmicStructureGenerator.swift`), not a
+  section, so the A and B rules, the chord cycle draws and every track's rule draws are unchanged. It
+  has its own stream on the song seed, so the chord plan, the arrangement, the auto sweep and
+  per-track regen all rebuild it without storing it. The main-stream bridge roll is still discarded.
+- **Magnetic Fields Breakdown**, half the bridges, 8 or 12 bars. Sequencer, Lead 1 and Lead 2 out.
+  The preset box plays its quarter-hat thin beat, Hand Percussion its sparse core, Mini Pops plays on.
+  The bass holds the chord root an octave down, re-attacked every 2 bars. Pads carry 4-bar chords the
+  song's loops do not lean on, the last leading into B's first chord: Dorian Vamp v, bVII (12 bars:
+  bVII, v, bVII); Aeolian Cycle v, bIII (12: iv, v, bIII); Two-Chord Sway in Aeolian bVI, bVII
+  (12: bIII, bVI, bVII), in Dorian bIII, bVII (12: bIII, IV, bVII). Swells into it and out of it.
+- **Rendez-Vous Sequencer Solo**, the other half, 8 bars. The sequencer alone, playing its full
+  source pattern, with the pads in half of these songs; everything else silent. Two automatic filter
+  sweeps (`KosmicAutoSweep`, otherwise off in Space) reopen on its fifth bar and on the return. The
+  band comes back on a 2-beat fill and a crash (preset box; Mini Pops on its own dropout fill), with
+  the surf swell landing on B.
+- **Around it.** A song with a bridge has no sequencer break. Lead 1 rests stay 16 bars clear of
+  it, drum and bass thin stretches 8. Its return fill takes the first of the three fill slots. The log
+  adds "+ bridge" to the Form line and calls it out at its first bar under the Bridge tag, as Drift
+  does: `Magnetic breakdown 8 bar` or `Rendez-Vous solo 8 bar` (Zack, 2026-11-03).
+
 **Weights now:**
 
 - Lead 1, A sections: KOS-LD1-013, KOS-LD1-016 and KOS-LD1-017, a third each. B sections: KOS-LD1-014 50%, KOS-LEAD-006 50%.
@@ -1136,12 +1168,11 @@ does):
 
 ## Open questions
 
-- **Bridges in Space, to explore** (Zack, 2026-11-03). Space has no bridges; base Kosmic's are
-  Electric Buddha drum bridges and melody bridges with the X-Files whistle, none of them Jarre. Explore
-  a Space bridge of its own, different from base Kosmic's, at a low share (about 20%) and only in the
-  ab and aba forms. The Space bridge roll is already drawn and discarded, so a Space bridge can use that
-  draw without moving any other. Candidates: the Phase 2 breakdown's mute schedule over the family's
-  B-cycle, or a pads-and-texture interlude. Not designed yet.
+- **Bridges in Space** — built 2026-11-03 (see "Bridges" under "Phase 1 as built"). Still open: the
+  release share (0.30–0.40), and whether the Phase 2 breakdown becomes the in-section form of the
+  Magnetic Fields Breakdown rather than a second build. Not built and kept in reserve: a Pedal Rise
+  (one non-tonic chord held 8 bars, drums out, a long swell into the return) and an effects-only
+  interlude (pads and a held Texture effect).
 
 - **Two unidentified files.** The Equinoxe file has no part number, and the unnumbered
   Oxygene (105 BPM, fretless bass, choir, no lead) is probably from Oxygene 7–13. If either is

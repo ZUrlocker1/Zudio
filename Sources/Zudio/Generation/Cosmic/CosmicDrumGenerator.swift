@@ -33,8 +33,11 @@ struct KosmicDrumGenerator {
 
         case .minimal:
             usedRuleIDs.insert("KOS-DRUM-001")
+            // The Space sequencer solo is one more dropout, ending on its fill; the box plays on
+            // through the breakdown, already as sparse as one.
             return generateMinimal(frame: frame, structure: structure, rng: &rng,
-                                   dropouts: spaceArrangement?.miniPopsDropouts ?? [])
+                                   dropouts: (spaceArrangement?.miniPopsDropouts ?? [])
+                                       + (spaceArrangement?.soloRange ?? []))
 
         case .motorikGrid:
             usedRuleIDs.insert("KOS-DRUM-004")
@@ -65,8 +68,11 @@ struct KosmicDrumGenerator {
 
         case .spaceOxygeneHandPercussion:
             usedRuleIDs.insert("KOS-DRUM-012")
-            return generateOxygeneHandPercussion(frame: frame, structure: structure, rng: &rng,
-                                                 thins: spaceArrangement?.thinRanges ?? [])
+            // Thins to its sparse core through the breakdown and is silent through the solo.
+            let breakdown = spaceArrangement?.bridge.flatMap { $0.kind == .breakdown ? [$0.range] : nil } ?? []
+            let hands = generateOxygeneHandPercussion(frame: frame, structure: structure, rng: &rng,
+                                                      thins: (spaceArrangement?.thinRanges ?? []) + breakdown)
+            return silenceBars(hands, spaceArrangement?.soloRange ?? [])
 
         default:
             usedRuleIDs.insert("KOS-DRUM-000")
@@ -188,8 +194,10 @@ struct KosmicDrumGenerator {
         for bar in 0..<frame.totalBars {
             let barStart = bar * 16
             // A simpler beat in the arrangement's thin stretches: variant 0 drops the 16th hats,
-            // variant 1 goes to quarter hats with the kick on 0 and 10 and no open hat.
+            // variant 1 goes to quarter hats with the kick on 0 and 10 and no open hat. The
+            // breakdown bridge plays variant 1.
             let thin = arrangement?.drumThin(atBar: bar)?.variant
+                ?? (arrangement?.bridgeKind(atBar: bar) == .breakdown ? 1 : nil)
             let barHats = thin == nil ? hatSteps
                 : thin == 0 ? hatSteps.filter { $0 % 2 == 0 }
                 : hatSteps.filter { $0 % 4 == 0 }
@@ -220,23 +228,32 @@ struct KosmicDrumGenerator {
         // Fills replace the last 1 or 2 beats of their bar with one of the Space fills below; the
         // kick that opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
         // A simpler stretch ends on a short fill into the fuller beat. Half the fills land on a
-        // crash on the next downbeat (Zack, 2026-11-03).
+        // crash on the next downbeat (Zack, 2026-11-03). The fill out of the bridge is always 2 beats
+        // and always lands on a crash.
         let thinEnds = (arrangement?.drumThins ?? []).map { $0.range.upperBound - 1 }
+        let bridgeFill = arrangement?.bridge.map { $0.range.upperBound - 1 }
         var seenFill = Set<Int>()
         let allFills = (fillBars + thinEnds).filter { seenFill.insert($0).inserted }.sorted()
         var lastFill: SpaceFill? = nil
         for bar in allFills where bar > 0 && bar < frame.totalBars {
-            let beats = rng.nextDouble() < 0.80 ? 1 : 2
+            let drawnBeats = rng.nextDouble() < 0.80 ? 1 : 2
+            let beats = bar == bridgeFill ? 2 : drawnBeats
             let from  = bar * 16 + 16 - beats * 4
             events.removeAll { $0.stepIndex >= from && $0.stepIndex < bar * 16 + 16
                                && $0.note != GMDrum.kick.rawValue && $0.note != GMDrum.clap.rawValue }
             let kind = drawSpaceFill(after: lastFill, rng: &rng)
             lastFill = kind
             events += spaceFillEvents(kind, from: from, beats: beats)
-            if rng.nextDouble() < 0.50 && bar + 1 < frame.totalBars {
+            let crash = rng.nextDouble() < 0.50 || bar == bridgeFill
+            if crash && bar + 1 < frame.totalBars {
                 events.append(MIDIEvent(stepIndex: (bar + 1) * 16, note: GMDrum.crash1.rawValue,
                                         velocity: 78, durationSteps: 1))
             }
+        }
+        // The sequencer solo: the box is silent until the fill that brings the band back.
+        if let solo = arrangement?.soloRange.first {
+            let fillStart = (solo.upperBound - 1) * 16 + 8
+            events.removeAll { solo.contains($0.stepIndex / 16) && $0.stepIndex < fillStart }
         }
         return events
     }

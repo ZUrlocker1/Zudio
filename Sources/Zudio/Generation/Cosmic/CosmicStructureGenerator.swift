@@ -8,8 +8,10 @@
 //   .bridgeAlt    — A-2 sparse hit + call-and-response (Caligari Drop style, 4-8 bars)
 //   .bridgeMelody — Archetype B melody bridge (Dark Sun style, 16-24 bars + pre/post ramps)
 //
-// Kosmic Space never takes a bridge (the roll is still consumed), and its body sections loop a
-// chord cycle of 2- and 4-bar windows instead of the 1–2 long random chords (`buildSpaceChordPlan`).
+// Kosmic Space never takes a base bridge section (the roll is still consumed), and its body sections
+// loop a chord cycle of 2- and 4-bar windows instead of the 1–2 long random chords
+// (`buildSpaceChordPlan`). Its own bridge is a mute schedule over the end of the first A section
+// (`SpaceBridge`), not a section.
 
 struct KosmicStructureGenerator {
     static func generate(
@@ -43,8 +45,10 @@ struct KosmicStructureGenerator {
         let chordPlan: [ChordWindow]
         if isKosmicSpace {
             var cycleRNG = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xC7C1E)
-            chordPlan = buildSpaceChordPlan(frame: frame, sections: sections,
-                                            family: kosmicProgFamily, rng: &cycleRNG)
+            let cyclePlan = buildSpaceChordPlan(frame: frame, sections: sections,
+                                                family: kosmicProgFamily, rng: &cycleRNG)
+            chordPlan = applySpaceBridgeChords(plan: cyclePlan, frame: frame, family: kosmicProgFamily,
+                                               bridge: SpaceBridge.make(sections: sections, seed: seed))
         } else {
             chordPlan = basePlan
         }
@@ -622,6 +626,113 @@ struct KosmicStructureGenerator {
         }
         return plan
     }
+
+    /// The Magnetic Fields breakdown's chords. Magnetic Fields 1 changes cycle for its breakdowns,
+    /// so these are 4-bar windows, half the song's pace, on chords neither of the song's loops leans
+    /// on, and the last leads into the B section's first chord:
+    ///   Oxygene Dorian Vamp — v ×4, bVII ×4 (12 bars: bVII, v, bVII), bVII leading to B's bIII
+    ///   Oxygene Aeolian Cycle — v ×4, bIII ×4 (12 bars: iv, v, bIII), bIII leading to B's bVI
+    ///   Oxygene Two-Chord Sway — bVI ×4, bVII ×4 in Aeolian (12 bars: bIII, bVI, bVII), the
+    ///     Aeolian cadence home to B's i; in Dorian, where bVI is out of the scale, bIII ×4, bVII ×4
+    ///     (12 bars: bIII, IV, bVII)
+    /// Applied over the finished cycle plan, so every cycle draw is the same as without a bridge.
+    /// The sequencer solo keeps the song's cycle.
+    static func spaceBridgeChords(family: KosmicProgressionFamily, mode: Mode,
+                                  bars: Int) -> [SpaceChord] {
+        let long = bars >= 12
+        let degrees: [(String, ChordType)]
+        switch family {
+        case .oxygeneDorianVamp:
+            degrees = long ? [("b7", .major), ("5", .minor), ("b7", .major)]
+                           : [("5", .minor), ("b7", .major)]
+        case .oxygeneAeolianCycle:
+            degrees = long ? [("4", .minor), ("5", .minor), ("b3", .major)]
+                           : [("5", .minor), ("b3", .major)]
+        default:
+            if mode == .Dorian {
+                degrees = long ? [("b3", .major), ("4", .major), ("b7", .major)]
+                               : [("b3", .major), ("b7", .major)]
+            } else {
+                degrees = long ? [("b3", .major), ("b6", .major), ("b7", .major)]
+                               : [("b6", .major), ("b7", .major)]
+            }
+        }
+        return degrees.map { SpaceChord(degree: $0.0, type: $0.1, bars: 4) }
+    }
+
+    private static func applySpaceBridgeChords(
+        plan: [ChordWindow], frame: GlobalMusicalFrame, family: KosmicProgressionFamily,
+        bridge: SpaceBridge?
+    ) -> [ChordWindow] {
+        guard let bridge, bridge.kind == .breakdown else { return plan }
+        let range = bridge.range
+        var result: [ChordWindow] = []
+        for w in plan {
+            if range.contains(w.startBar) { continue }
+            if w.startBar < range.lowerBound && w.startBar + w.lengthBars > range.lowerBound {
+                result.append(ChordWindow(startBar: w.startBar, lengthBars: range.lowerBound - w.startBar,
+                                          chordRoot: w.chordRoot, chordType: w.chordType,
+                                          chordTones: w.chordTones, scaleTensions: w.scaleTensions,
+                                          avoidTones: w.avoidTones))
+            } else {
+                result.append(w)
+            }
+        }
+        var bar = range.lowerBound
+        for chord in spaceBridgeChords(family: family, mode: frame.mode, bars: range.count)
+        where bar < range.upperBound {
+            let length = Swift.min(chord.bars, range.upperBound - bar)
+            let (tones, tensions, avoids) = NotePoolBuilder.build(
+                chordRootDegree: chord.degree, chordType: chord.type, key: frame.key, mode: frame.mode)
+            result.append(ChordWindow(startBar: bar, lengthBars: length,
+                                      chordRoot: chord.degree, chordType: chord.type,
+                                      chordTones: tones, scaleTensions: tensions, avoidTones: avoids))
+            bar += length
+        }
+        return result.sorted { $0.startBar < $1.startBar }
+    }
+}
+
+// MARK: - Kosmic Space bridge
+
+/// Kosmic Space's bridge (Zack, 2026-11-03). Base Kosmic's bridges are Electric Buddha drum bridges
+/// and melody bridges, none of them Jarre; this one is built from how Jarre himself breaks a piece in
+/// the middle, measured with tools/jarre_deep.py --sections. Either kind is half the songs that
+/// take one:
+///   Magnetic Fields Breakdown, 8 or 12 bars (Magnetic Fields 1, bars 73–84 and 137–148): the
+///     sequencer, Lead 1 and Lead 2 drop out, the drums drop to a simpler beat, the bass holds long
+///     roots and the pads carry slower chords of their own (`spaceBridgeChords`). A swell into it
+///     and out of it.
+///   Rendez-Vous Sequencer Solo, 8 bars (Rendez-Vous 2, bars 81–96): the sequencer alone, the pads
+///     with it in half of these songs, under two filter sweeps (`KosmicAutoSweep`), and the drums
+///     come back with a 2-beat fill and a crash on the downbeat.
+/// Only in ab and aba forms, as base Kosmic's bridges, at `spaceBridgeShare` of them. It takes the
+/// last bars of the first A section and ends where the first B begins, as base Kosmic's bridge sits
+/// between A and B, leaving A at least 16 bars. It is a mute schedule over those bars rather than a
+/// section, so the A and B rules, the chord cycle and every track's draws are unchanged; a song with
+/// a bridge drops the sequencer break, which does the same job. Drawn from its own stream on the song
+/// seed, so the chord plan, the arrangement and per-track regen all rebuild it without storing it.
+struct SpaceBridge {
+    enum Kind { case breakdown, sequencerSolo }
+    let kind: Kind
+    let range: Range<Int>
+    /// The solo keeps the pads under the sequencer in half of its songs; the breakdown always does.
+    let padsPlay: Bool
+
+    static func make(sections: [SongSection], seed: UInt64) -> SpaceBridge? {
+        let body = sections.filter { $0.label == .A || $0.label == .B }
+        let labels = body.map(\.label)
+        guard labels == [.A, .B] || labels == [.A, .B, .A] else { return nil }
+        var rng = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xB81D_6E)
+        guard rng.nextDouble() < KosmicMusicalFrameGenerator.spaceBridgeShare else { return nil }
+        let isSolo = rng.nextDouble() < 0.50
+        let length = isSolo ? 8 : (rng.nextDouble() < 0.50 ? 8 : 12)
+        let padsPlay = isSolo ? rng.nextDouble() < 0.50 : true
+        let firstA = body[0]
+        guard firstA.lengthBars - length >= 16 else { return nil }
+        return SpaceBridge(kind: isSolo ? .sequencerSolo : .breakdown,
+                           range: (firstA.endBar - length)..<firstA.endBar, padsPlay: padsPlay)
+    }
 }
 
 // MARK: - Kosmic Space arrangement
@@ -667,13 +778,38 @@ struct KosmicSpaceArrangement {
     /// Body stretches where the preset box adds its handclap on beats 2 and 4. Empty in about 90%
     /// of songs.
     let clapRanges: [Range<Int>]
+    /// The song's bridge, in ab and aba songs only (`SpaceBridge`).
+    let bridge: SpaceBridge?
     /// First and last-plus-one bars of the body.
     let bodyStart: Int
     let bodyEnd: Int
 
-    /// Bars that a returning part lands on — each takes a guaranteed surf sweep.
+    /// Bars that a returning part lands on.
     var returnBars: [Int] {
         leadRests.map(\.upperBound) + (sequencerBreak.map { [$0.upperBound] } ?? [])
+            + (bridge.map { [$0.range.upperBound] } ?? [])
+    }
+    /// Bars that take a guaranteed surf sweep: every return, and the start of a breakdown.
+    var swellBars: [Int] {
+        returnBars + (bridge.flatMap { $0.kind == .breakdown ? [$0.range.lowerBound] : nil } ?? [])
+    }
+    private var bridgeRange: [Range<Int>] { bridge.map { [$0.range] } ?? [] }
+    /// The sequencer solo's bars, or nothing.
+    var soloRange: [Range<Int>] {
+        bridge.flatMap { $0.kind == .sequencerSolo ? [$0.range] : nil } ?? []
+    }
+    /// Lead 1 sits out its rests and the bridge.
+    var lead1Silences: [Range<Int>] { leadRests + bridgeRange }
+    /// Lead 2 sits out the sequencer break and the bridge.
+    var lead2Silences: [Range<Int>] { (sequencerBreak.map { [$0] } ?? []) + bridgeRange }
+    /// The solo leaves the pads out in half of its songs.
+    var padsSilences: [Range<Int>] { bridge?.padsPlay == false ? bridgeRange : [] }
+    /// The solo silences Texture until its last bar, where the swell into the return begins.
+    var textureSilences: [Range<Int>] { soloRange.map { $0.lowerBound..<($0.upperBound - 1) } }
+    /// The solo silences the bass; the breakdown replaces it with held roots.
+    func bridgeKind(atBar bar: Int) -> SpaceBridge.Kind? {
+        guard let bridge, bridge.range.contains(bar) else { return nil }
+        return bridge.kind
     }
 
     /// Every drum or bass stretch, overlaps merged. Hand Percussion thins over all of them.
@@ -694,8 +830,11 @@ struct KosmicSpaceArrangement {
     func bassThins(atBar bar: Int) -> Bool { bassThins.contains { $0.contains(bar) } }
     func drumThin(atBar bar: Int) -> DrumThin? { drumThins.first { $0.range.contains(bar) } }
     func clapPlays(atBar bar: Int) -> Bool { clapRanges.contains { $0.contains(bar) } }
-    func leadRests(atBar bar: Int) -> Bool { leadRests.contains { $0.contains(bar) } }
-    func sequencerRests(atBar bar: Int) -> Bool { sequencerBreak?.contains(bar) == true }
+    func leadRests(atBar bar: Int) -> Bool { lead1Silences.contains { $0.contains(bar) } }
+    /// The sequencer sits out its break and the breakdown, and plays alone in the solo.
+    func sequencerRests(atBar bar: Int) -> Bool {
+        sequencerBreak?.contains(bar) == true || bridgeKind(atBar: bar) == .breakdown
+    }
     /// True in body bars where Lead 1 is playing; the sequencer thins under it.
     func leadPlays(atBar bar: Int) -> Bool { bar >= bodyStart && bar < bodyEnd && !leadRests(atBar: bar) }
 
@@ -703,9 +842,11 @@ struct KosmicSpaceArrangement {
         let body = structure.sections.filter { $0.label == .A || $0.label == .B }
         guard let first = body.first, let last = body.last else {
             return KosmicSpaceArrangement(leadRests: [], sequencerBreak: nil, fillBars: [],
-                                          drumThins: [], bassThins: [], clapRanges: [],
+                                          drumThins: [], bassThins: [], clapRanges: [], bridge: nil,
                                           bodyStart: 0, bodyEnd: totalBars)
         }
+        let bridge = SpaceBridge.make(sections: structure.sections, seed: seed)
+        let bridgeRanges = bridge.map { [$0.range] } ?? []
         var rng = SeededRNG(seed: seed ^ KosmicMusicalFrameGenerator.spaceStreamSalt ^ 0xB2EA_C5)
         let earliest = first.startBar + 16
         let latest   = last.endBar - 8
@@ -737,9 +878,10 @@ struct KosmicSpaceArrangement {
             for s in landingBars where s >= earliest {
                 for l in landingBars where l - s >= 16 && l - s <= 24 && l <= latest {
                     let r = s..<l
-                    guard rests.allSatisfy({ r.lowerBound >= $0.upperBound + 16 || r.upperBound + 16 <= $0.lowerBound })
+                    // 16 bars clear of each other and of the bridge, which silences the lead too
+                    guard (rests + bridgeRanges).allSatisfy({ r.lowerBound >= $0.upperBound + 16 || r.upperBound + 16 <= $0.lowerBound })
                     else { continue }
-                    guard body.allSatisfy({ leadBarsLeft($0, resting: rests + [r]) >= 8 }) else { continue }
+                    guard body.allSatisfy({ leadBarsLeft($0, resting: rests + [r] + bridgeRanges) >= 8 }) else { continue }
                     options.append((r, (landings[s] ?? 1) * (landings[l] ?? 1)))
                 }
             }
@@ -756,10 +898,12 @@ struct KosmicSpaceArrangement {
             else { continue }
             breakOptions.append((r, landings[l] ?? 1))
         }
-        let seqBreak = weightedChoice(breakOptions)
+        // A song with a bridge has no sequencer break; the bridge does its job.
+        let seqBreak = bridge == nil ? weightedChoice(breakOptions) : nil
 
-        // Fills: the bar before each return first, then the bar before the break begins
-        var fills: [Int] = []
+        // Fills: the bar before the bridge ends, then the bar before each return, then the bar
+        // before the break begins
+        var fills: [Int] = bridgeRanges.map { $0.upperBound - 1 }
         if let b = seqBreak { fills.append(b.upperBound - 1) }
         fills += rests.map { $0.upperBound - 1 }
         if let b = seqBreak { fills.append(b.lowerBound - 1) }
@@ -790,6 +934,7 @@ struct KosmicSpaceArrangement {
         func fits(_ r: Range<Int>) -> Bool {
             guard r.count >= 4 else { return false }
             if let b = seqBreak, !(r.upperBound <= b.lowerBound || r.lowerBound >= b.upperBound) { return false }
+            if let b = bridge?.range, !(r.upperBound + 8 <= b.lowerBound || r.lowerBound >= b.upperBound + 8) { return false }
             return (thinRanges + bassThins).allSatisfy { r.lowerBound >= $0.upperBound + 8 || r.upperBound + 8 <= $0.lowerBound }
         }
         func addDrumStretch(_ point: (bar: Int, end: Int)) {
@@ -833,6 +978,6 @@ struct KosmicSpaceArrangement {
 
         return KosmicSpaceArrangement(leadRests: rests, sequencerBreak: seqBreak, fillBars: fills,
                                       drumThins: thins, bassThins: bassThins, clapRanges: claps,
-                                      bodyStart: first.startBar, bodyEnd: last.endBar)
+                                      bridge: bridge, bodyStart: first.startBar, bodyEnd: last.endBar)
     }
 }

@@ -600,7 +600,8 @@ struct SongGenerator {
             frame: frame, structure: structure, tonalMap: tonalMap,
             kosmicProgFamily: kosmicProgFamily,
             rng: &padsRNG, usedRuleIDs: &padRules, forceRuleID: forcePadsRuleID,
-            isKosmicDrift: isKosmicDrift, isKosmicSpace: isKosmicSpace
+            isKosmicDrift: isKosmicDrift, isKosmicSpace: isKosmicSpace,
+            spaceArrangement: spaceArrangement
         )
 
         // Texture (lower register arpeggio, orbital motives)
@@ -977,6 +978,14 @@ struct SongGenerator {
                 GenerationLogEntry(tag: "", description: line(leaving, "drops out", "drop out")))
             stepAnnotations[b.upperBound * 16, default: []].append(
                 GenerationLogEntry(tag: "", description: line(returning, "returns", "return")))
+        }
+
+        // The bridge is called out at its first bar, as Drift's are; it ends where B begins, which
+        // has its own line.
+        if let bridge = spaceArrangement?.bridge {
+            let name = bridge.kind == .breakdown ? "Magnetic breakdown" : "Rendez-Vous solo"
+            stepAnnotations[bridge.range.lowerBound * 16, default: []].append(
+                GenerationLogEntry(tag: "Bridge", description: "\(name) \(bridge.range.count) bar"))
         }
 
         // Simpler drum stretches are called out as they start and end. Mini Pops drops out in its
@@ -1775,7 +1784,8 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, kosmicProgFamily: songState.kosmicProgFamily,
                     rng: &rng, usedRuleIDs: &usedRules,
-                    isKosmicDrift: songState.isKosmicDrift, isKosmicSpace: isSpace)
+                    isKosmicDrift: songState.isKosmicDrift, isKosmicSpace: isSpace,
+                    spaceArrangement: regenArrangement)
             } else if isChill {
                 events = ChillPadsGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -2898,6 +2908,7 @@ struct SongGenerator {
         }
         // Append bridge note if one was inserted
         let hasBridge = structure.sections.contains { $0.label == .bridge || $0.label == .bridgeAlt || $0.label == .bridgeMelody }
+            || spaceArrangement?.bridge != nil
         let bridgeSuffix = hasBridge ? " + bridge" : ""
         log.append(GenerationLogEntry(tag: "Form", description: kosmicFormLabel + bridgeSuffix))
 
@@ -3543,8 +3554,9 @@ struct SongGenerator {
                   sec.label != .intro && sec.label != .outro && !sec.label.isBridge else { continue }
             // Kosmic Space's Mini Pops drops out for whole stretches; with no hats there the bar
             // read as a 3-beat fill that never played (Fluxion III, 2026-11-03). A Mini Pops bar
-            // always has a hat on beat 1, so a bar without one is a dropout bar.
-            if drumRules.contains("KOS-DRUM-001"),
+            // always has a hat on beat 1, so a bar without one is a dropout bar. The same holds for
+            // the preset box, silent through the sequencer solo bridge but for its closing fill.
+            if drumRules.contains("KOS-DRUM-001") || drumRules.contains("KOS-DRUM-009"),
                !(drumByBar[fillBar] ?? []).contains(where: { $0.stepIndex % 16 < 4 }) { continue }
             let beats  = fillBeats(bar: fillBar)
             guard beats > 1 else { continue }  // 1-beat fills are too brief to clutter the log with

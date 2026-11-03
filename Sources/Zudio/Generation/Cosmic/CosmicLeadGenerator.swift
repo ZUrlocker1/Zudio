@@ -104,8 +104,9 @@ struct KosmicLeadGenerator {
                               durationSteps: Swift.min($0.durationSteps, source.upperBound - $0.stepIndex))
                 }
             }
-            // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
-            return silenceBars(lead, spaceArrangement?.leadRests ?? [])
+            // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8. It sits out
+            // the bridge too.
+            return silenceBars(lead, spaceArrangement?.lead1Silences ?? [])
         }
 
         // Drift lead pool — different weights and includes new rules 010/011/012
@@ -398,9 +399,10 @@ struct KosmicLeadGenerator {
             }
         }
 
-        // Kosmic Space: Lead 2 drops out with the sequencer, as in Oxygene 8 and Oxygene 4.
-        if let seqBreak = spaceArrangement?.sequencerBreak {
-            events = silenceBars(events, [seqBreak])
+        // Kosmic Space: Lead 2 drops out with the sequencer, as in Oxygene 8 and Oxygene 4, and
+        // through the bridge.
+        if let silences = spaceArrangement?.lead2Silences {
+            events = silenceBars(events, silences)
         }
         return events
     }

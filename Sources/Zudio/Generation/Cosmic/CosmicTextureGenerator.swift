@@ -30,9 +30,12 @@ struct KosmicTextureGenerator {
 
         if isKosmicSpace {
             usedRuleIDs.insert("KOS-TEXT-005")
-            return generateOxygeneSurfSweep(frame: frame, structure: structure, tonalMap: tonalMap,
-                                            rng: &rng, draws: spaceDraws,
-                                            returnBars: spaceArrangement?.returnBars ?? [])
+            let sweeps = generateOxygeneSurfSweep(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                  rng: &rng, draws: spaceDraws,
+                                                  returnBars: spaceArrangement?.swellBars ?? [])
+            // The sequencer solo takes no swell of its own; one landing on its first bar rings on.
+            let silences = spaceArrangement?.textureSilences ?? []
+            return sweeps.filter { ev in !silences.contains { $0.contains(ev.stepIndex / 16) } }
         }
 
         // Clash fix: KOS-TEXT-003 (Spatial Sweep — chromatic passing) clashes with quartal

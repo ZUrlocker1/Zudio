@@ -22,6 +22,9 @@ struct KosmicMusicalFrameGenerator {
     /// fingerprint is pinned against the release values once they are restored.
     static let driftShare = 0.10
     static let spaceShare = 0.80
+    /// Share of Space songs in ab and aba forms that take a bridge (`SpaceBridge`).
+    /// TESTING value 0.80; release 0.30–0.40, to be confirmed by listening.
+    static let spaceBridgeShare = 0.80
 
     /// Salt for the Kosmic Space stream. Every Space-only draw in the frame and the chord-cycle
     /// builder comes from `SeededRNG(seed: songSeed ^ spaceStreamSalt)`, so the main stream keeps
@@ -306,8 +309,8 @@ struct KosmicMusicalFrameGenerator {
 // MARK: - Automatic filter sweeps
 
 /// Which steps of a Kosmic song fire an automatic global filter sweep (the same sweep a tap on
-/// empty canvas triggers). 40% of regular Kosmic songs get 1-3 of them; Kosmic Drift and Kosmic
-/// Space get none.
+/// empty canvas triggers). 40% of regular Kosmic songs get 1-3 of them; Kosmic Drift gets none, and
+/// Kosmic Space only the two in its sequencer solo bridge.
 ///
 /// The schedule is derived from the seed and the section structure with its own SeededRNG, so it
 /// consumes nothing from the generator's stream and never changes a note. The same seed always
@@ -325,8 +328,10 @@ enum KosmicAutoSweep {
     static let outroGuardBars = 16
 
     static func steps(for song: SongState) -> [Int] {
-        // Kosmic Space has its own sweeps on Texture (KOS-TEXT-005); the two would stack.
-        guard song.style == .kosmic, !song.isKosmicDrift, !song.isKosmicSpace else { return [] }
+        guard song.style == .kosmic, !song.isKosmicDrift else { return [] }
+        // Kosmic Space has its own sweeps on Texture (KOS-TEXT-005); the two would stack. The one
+        // exception is the sequencer solo, where only the sequencer and perhaps the pads play.
+        if song.isKosmicSpace { return spaceSoloSteps(song) }
         var rng = SeededRNG(seed: song.globalSeed ^ 0x5EE9_F11A_7E50_C0DE)
         guard rng.nextDouble() < songChance else { return [] }
         let wanted = 1 + Int(rng.next() % 3)
@@ -356,6 +361,15 @@ enum KosmicAutoSweep {
         }
         let lead = Swift.max(1, song.frame.tempo / 5)
         return chosen.sorted().map { Swift.max(0, $0 * 16 - lead) }
+    }
+
+    /// The Rendez-Vous sequencer solo (`SpaceBridge`): two sweeps over the lone sequencer, the
+    /// filter reopening on the solo's fifth bar and again on the downbeat where the band returns.
+    private static func spaceSoloSteps(_ song: SongState) -> [Int] {
+        guard let bridge = SpaceBridge.make(sections: song.structure.sections, seed: song.globalSeed),
+              bridge.kind == .sequencerSolo else { return [] }
+        let lead = Swift.max(1, song.frame.tempo / 5)
+        return [bridge.range.lowerBound + 4, bridge.range.upperBound].map { Swift.max(0, $0 * 16 - lead) }
     }
 
     private static func shuffled(_ a: [Int], rng: inout SeededRNG) -> [Int] {
