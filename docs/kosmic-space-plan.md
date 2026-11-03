@@ -779,8 +779,8 @@ New infrastructure:
   `KOS-LEAD-006` JMJ Phrase Loop (B sections)
 - Five new Oxygene rules: `KOS-LD1-016` Oxygene 6 Rising Strings, `KOS-BASS-020` Oxygene 8 Pump,
   `KOS-RTHM-021` Oxygene 8 Offbeat Pedal, `KOS-PADS-010` Oxygene 4 Staggered Bloom and
-  `KOS-DRUM-012` Oxygene 6 Hand Percussion. Eleven more candidates are listed under "More Oxygene
-  rules".
+  `KOS-DRUM-012` Oxygene 6 Hand Percussion; then `KOS-LD1-017` Oxygene 8 Offbeat Climb. Ten more
+  candidates are listed under "More Oxygene rules".
 
 ### Excluded from Space
 
@@ -1033,16 +1033,45 @@ exclusions between two busy parts; each new rule is as likely as the other Space
 (39) at 0.45 and Harpsi Pad (11088) at 0.50, base Kosmic keeping 0.65 and 0.75. The White Noise Wave
 preset shows as "White Noise" in the Texture picker, so it is not abbreviated.
 
+**Theme return (Zack, 2026-11-03, from Aztraeon):** a song that ends on a B section (ab, abab) never
+hears its A theme again; aba and abba return on their own. So 8 bars two thirds into the last B section
+(at an 8-bar point, at least 8 bars in) replay the first A section's opening 8 bars in place of the B
+rule. Chord loops restart at each body section, so the chords line up. No draws; a lead rest over the
+window still silences it.
+
+**Tuning after listening (Zack, 2026-11-03):** the first drum stretch always thins the bass too. KOS-BASS-018 gains a breath bar and a turn bar, deterministic and lighter than the Pump's. KOS-DRUM-001 Mini Pops drops out in the first two drum stretches and returns on a 1 or 2 beat tom roll (Space only). KOS-DRUM-012 thins over every bass or drum stretch (bongo, low conga, quiet shaker), keeps the guiro out of them, plays the guiro at velocity 38 and 30, and is drawn 13% of the time. Trims: Square Lead 2 0.48, Saw Lead 0.36, Moog rhythm 0.38, Synth Brass 2 0.16. The `Space Oxygene, ...` log line was dropped as redundant.
+
+- **KOS-LD1-017 "Oxygene 8 Offbeat Climb"** (A sections, added 2026-11-03). Oxygene 8 lead (alto sax,
+  piano and clarinet in unison), bars 17–49 and 67–138, read bar by bar. Statements fill one bar and
+  the next is silent, entering off the beat on step 2: climb (5th below, root, 2nd, 3rd, 4th, 4th on
+  steps 2, 4, 6, 8, 11, 14), leap (5th, root, 5th, 6th, 7th on 2, 6, 8, 11, 14) and turn (the climb's
+  first four, then root and 2nd), each from the current chord root in MIDI 62–73. A 16-bar phrase per
+  A section: pickup root, climb, leap, turn, pickup, climb, leap, and a falling answer from the key's
+  6th to the 5th below. Every third phrase, as bars 41–49: pickup, climb, a 2-bar arch three times
+  (key 3rd-4th-5th across the bar line, falling to the tonic), then 7 bars of rest. Draws: opening leap
+  from the 5th below 40% (source), 6th below 30%, 4th below 30%; the climb's top repeated 40% (source),
+  on to the 5th 30%, back to the 3rd 30%; rhythm source 60% or 2, 4, 6, 8, 10, 13 40%, never the
+  source rhythm with both source pitch draws. Drawn last in Lead 1 at one in three, so the three
+  A-section rules share evenly and earlier draws are unchanged for a seed.
+  Smoothed after the first listen (Zack, 2026-11-03, Aztraeon: clunky, not fluid). Every note is
+  held to the next, a statement's last note rings 10 steps into the silent bar and the pickup holds
+  into the entry. The leap statement steps down to the 4th, not the root. The phrase starts 2 bars
+  into the section, so each statement lands in the second bar of its chord window as in the source.
+  Register: tonic in 62–73, each chord root the nearest to it from a fourth below to a fifth above;
+  a statement over 84 drops an octave whole. The harmonic filter had lifted single short statements
+  above the pads (Aztraeon bar 36 an octave up, the arch at bars 38–39 not); legato joins each half
+  phrase into one figure, which reaches above 67 and so is never lifted.
+
 **Weights now:**
 
-- Lead 1, A sections: KOS-LD1-013 50%, KOS-LD1-016 50%. B sections: KOS-LD1-014 50%, KOS-LEAD-006 50%.
+- Lead 1, A sections: KOS-LD1-013, KOS-LD1-016 and KOS-LD1-017, a third each. B sections: KOS-LD1-014 50%, KOS-LEAD-006 50%.
 - Rhythm: KOS-RTHM-016, 002, 005 and 021, 25% each.
 - Bass: KOS-BASS-018 and 020, 37.5% each, KOS-BASS-001 25%. The Pump is never drawn under
   KOS-RTHM-005 Dual-Rate, the one exclusion so far; the walk takes its share.
 - Pads: KOS-PADS-001 and 010, 50% each.
-- Drums: KOS-DRUM-009, 001 and 012, about 28% each, none 15%.
+- Drums: KOS-DRUM-009 38%, 001 34%, 012 13%, none 15%.
 
-**Still on the list** (not built): KOS-LD1-017 Oxygene 8 Offbeat Climb, KOS-LD1-018 Oxygene 4
+**Still on the list** (not built): KOS-LD1-018 Oxygene 4
 Triplet Turn (sitar), an Oxygene 6 blues solo for the last section, KOS-BASS-021 Oxygene 3 Shadow
 Bass, KOS-BASS-022 Anticipated Octaves with the Oxygene 6 paired-8th descent, KOS-RTHM-020
 Oxygene 8 Phasing Cell, an Oxygene 6 paired-descent rhythm, KOS-PADS-011 Oxygene 6 Close Chords,

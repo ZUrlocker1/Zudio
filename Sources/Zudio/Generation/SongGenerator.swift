@@ -979,12 +979,20 @@ struct SongGenerator {
                 GenerationLogEntry(tag: "", description: line(returning, "returns", "return")))
         }
 
-        // Simpler drum stretches are called out as they start and end (preset box songs only)
-        if percussionStyle == .spaceOxygenePresetBox, let thins = spaceArrangement?.drumThins {
-            for t in thins {
-                stepAnnotations[t.range.lowerBound * 16, default: []].append(
-                    GenerationLogEntry(tag: "", description: "Drums simplify"))
-                stepAnnotations[t.range.upperBound * 16, default: []].append(
+        // Simpler drum stretches are called out as they start and end. Mini Pops drops out in its
+        // first two; Hand Percussion thins over every bass or drum stretch.
+        if let arr = spaceArrangement {
+            var calls: [(range: Range<Int>, start: String)] = []
+            switch percussionStyle {
+            case .spaceOxygenePresetBox: calls = arr.drumThins.map { ($0.range, "Drums simplify") }
+            case .minimal:               calls = arr.miniPopsDropouts.map { ($0, "Drums drop out") }
+            case .spaceOxygeneHandPercussion: calls = arr.thinRanges.map { ($0, "Drums simplify") }
+            default: break
+            }
+            for c in calls {
+                stepAnnotations[c.range.lowerBound * 16, default: []].append(
+                    GenerationLogEntry(tag: "", description: c.start))
+                stepAnnotations[c.range.upperBound * 16, default: []].append(
                     GenerationLogEntry(tag: "", description: "Drums return"))
             }
         }
@@ -2789,6 +2797,7 @@ struct SongGenerator {
         case "KOS-LD1-013": return "Oxygene Falling Theme"
         case "KOS-LD1-014": return "Oxygene See-Saw Riff"
         case "KOS-LD1-016": return "Oxygene 6 Rising Strings"
+        case "KOS-LD1-017": return "Oxygene 8 Offbeat Climb"
         case "KOS-LD2-000":  return "No lead 2"
         default:             return ruleID
         }
@@ -2875,16 +2884,6 @@ struct SongGenerator {
         let styleDesc = isKosmicSpace ? "Kosmic Space"
             : isDriftDreamscape ? "Kosmic Drift — Dreamscape" : isKosmicDrift ? "Kosmic Drift" : "Kosmic"
         log.append(GenerationLogEntry(tag: "Style", description: "\(styleDesc) – \(frame.tempo) bpm"))
-        if isKosmicSpace {
-            // Phase 1 has one flavour; Phase 2 adds Magnetic.
-            let familyName: String
-            switch kosmicProgFamily {
-            case .oxygeneDorianVamp:   familyName = "Dorian Vamp"
-            case .oxygeneAeolianCycle: familyName = "Aeolian Cycle"
-            default:                   familyName = "Two-Chord Sway"
-            }
-            log.append(GenerationLogEntry(tag: "Space", description: "Space Oxygene, \(familyName)"))
-        }
         // Space rule lines stay short: the per-song draws are not shown in the log.
         func withDraws(_ ruleID: String, _ desc: String) -> String { desc }
 

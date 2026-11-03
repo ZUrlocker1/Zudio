@@ -288,7 +288,7 @@ final class AppState: ObservableObject {
             if !vals.isDisjoint(with: ["KOS-DRUM-009", "KOS-BASS-018", "KOS-RTHM-016",
                                        "KOS-LD1-013", "KOS-LD1-014", "KOS-TEXT-005",
                                        "KOS-DRUM-012", "KOS-BASS-020", "KOS-RTHM-021",
-                                       "KOS-LD1-016", "KOS-PADS-010"]) {
+                                       "KOS-LD1-016", "KOS-PADS-010", "KOS-LD1-017"]) {
                 return "Kosmic Space"
             }
             return style.rawValue.capitalized

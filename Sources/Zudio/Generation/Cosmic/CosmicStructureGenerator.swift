@@ -623,6 +623,21 @@ struct KosmicSpaceArrangement {
         leadRests.map(\.upperBound) + (sequencerBreak.map { [$0.upperBound] } ?? [])
     }
 
+    /// Every drum or bass stretch, overlaps merged. Hand Percussion thins over all of them.
+    var thinRanges: [Range<Int>] {
+        var merged: [Range<Int>] = []
+        for r in (drumThins.map(\.range) + bassThins).sorted(by: { $0.lowerBound < $1.lowerBound }) {
+            if let last = merged.last, r.lowerBound <= last.upperBound {
+                merged[merged.count - 1] = last.lowerBound..<Swift.max(last.upperBound, r.upperBound)
+            } else {
+                merged.append(r)
+            }
+        }
+        return merged
+    }
+    /// The first two drum stretches, where JMJ Mini Pops drops out completely.
+    var miniPopsDropouts: [Range<Int>] { Array(drumThins.prefix(2).map(\.range)) }
+
     func bassThins(atBar bar: Int) -> Bool { bassThins.contains { $0.contains(bar) } }
     func drumThin(atBar bar: Int) -> DrumThin? { drumThins.first { $0.range.contains(bar) } }
     func clapPlays(atBar bar: Int) -> Bool { clapRanges.contains { $0.contains(bar) } }
@@ -727,7 +742,9 @@ struct KosmicSpaceArrangement {
         func addDrumStretch(_ point: (bar: Int, end: Int)) {
             let length = [8, 12, 16][drumRNG.weightedPick([0.4, 0.2, 0.4])]
             let variant = drumRNG.nextDouble() < 0.6 ? 0 : 1
-            let together = drumRNG.nextDouble() < 0.60
+            // The first stretch always takes the bass with it (Zack, 2026-11-03: both thinning
+            // together is the dramatic moment); later ones do so 60% of the time.
+            let together = drumRNG.nextDouble() < 0.60 || thins.isEmpty
             let r = point.bar..<Swift.min(point.bar + length, point.end)
             guard fits(r) else { return }
             thinRanges.append(r)

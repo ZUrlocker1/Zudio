@@ -360,8 +360,14 @@ struct KosmicBassGenerator {
                    thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
                     bassEvolutionBars.append(bar)
                 }
+                // Variation, lighter than the Pump's: a breath in the second bar of each 8 and a turn
+                // in the last bar before a new body section.
+                let next = structure.section(atBar: bar + 1)
+                let turn = bar == section.endBar - 1 && (next?.label == .A || next?.label == .B)
+                let variant: WalkVariant = turn ? .turn
+                    : (bar - section.startBar) % 8 == 1 ? .breath : .normal
                 events += oxygeneFallingWalkBar(barStart: barStart, bar: bar, entry: entry,
-                                                frame: frame, walk: walk, thin: thin)
+                                                frame: frame, walk: walk, thin: thin, variant: variant)
                 continue
             }
 
@@ -650,9 +656,16 @@ struct KosmicBassGenerator {
         return events
     }
 
+    // Walk variation (Zack, 2026-11-03: like the Pump, a little less). Deterministic, no draws:
+    //   breath — the last short note, step 14, drops out
+    //   turn   — step 14 plays the mid note instead of the low, lifting into the next section
+    // The existing lift on the last bar of each 8 (9th, octave, 6th) still applies.
+    enum WalkVariant { case normal, breath, turn }
+
     private static func oxygeneFallingWalkBar(
         barStart: Int, bar: Int, entry: TonalGovernanceEntry,
-        frame: GlobalMusicalFrame, walk: OxygeneWalk, thin: Bool = false
+        frame: GlobalMusicalFrame, walk: OxygeneWalk, thin: Bool = false,
+        variant: WalkVariant = .normal
     ) -> [MIDIEvent] {
         let scalePCs = frame.scalePCs
         // Root 23–34 puts the top note at 35–46; the 3rd set's lowest note can reach 26.
@@ -670,8 +683,10 @@ struct KosmicBassGenerator {
             }
         }
         let steps = bar % 8 == 7 ? [8, 7, 5] : walk.steps
-        return walk.hits.map { hit in
-            let note = scaleStep(root, by: steps[hit.role], scalePCs: scalePCs)
+        return walk.hits.compactMap { hit in
+            if hit.step == 14 && variant == .breath { return nil }
+            let role = hit.step == 14 && variant == .turn ? 1 : hit.role
+            let note = scaleStep(root, by: steps[role], scalePCs: scalePCs)
             return MIDIEvent(stepIndex: barStart + hit.step, note: UInt8(note),
                              velocity: hit.step == 0 ? 96 : 88, durationSteps: hit.dur)
         }

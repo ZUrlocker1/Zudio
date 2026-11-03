@@ -33,7 +33,8 @@ struct KosmicDrumGenerator {
 
         case .minimal:
             usedRuleIDs.insert("KOS-DRUM-001")
-            return generateMinimal(frame: frame, structure: structure, rng: &rng)
+            return generateMinimal(frame: frame, structure: structure, rng: &rng,
+                                   dropouts: spaceArrangement?.miniPopsDropouts ?? [])
 
         case .motorikGrid:
             usedRuleIDs.insert("KOS-DRUM-004")
@@ -64,7 +65,8 @@ struct KosmicDrumGenerator {
 
         case .spaceOxygeneHandPercussion:
             usedRuleIDs.insert("KOS-DRUM-012")
-            return generateOxygeneHandPercussion(frame: frame, structure: structure, rng: &rng)
+            return generateOxygeneHandPercussion(frame: frame, structure: structure, rng: &rng,
+                                                 thins: spaceArrangement?.thinRanges ?? [])
 
         default:
             usedRuleIDs.insert("KOS-DRUM-000")
@@ -82,10 +84,14 @@ struct KosmicDrumGenerator {
     // castanets in 60% of songs. Repeat guard: the shaker on step 3 drops in every eighth bar.
     // The guiro took over when it played every bar (Zack, 2026-11-03). It plays in two or three
     // stretches a song, 8 or 16 bars each, starting on a body section start or a 16-bar point inside
-    // one, at least 8 bars apart, and quieter than the source's balance.
+    // one, at least 8 bars apart, clear of every thin stretch, and much quieter than the source's balance.
+
+    // In every stretch where the bass or the drums thin (Zack, 2026-11-03, from Aureon) it drops to a
+    // sparse core: low bongo, low conga and a quiet shaker on beats 2 and 4. No guiro there, ever.
 
     private static func generateOxygeneHandPercussion(frame: GlobalMusicalFrame, structure: SongStructure,
-                                                      rng: inout SeededRNG) -> [MIDIEvent] {
+                                                      rng: inout SeededRNG,
+                                                      thins: [Range<Int>] = []) -> [MIDIEvent] {
         var voices: [(note: UInt8, steps: [Int], vel: UInt8)] = [
             (61, [0, 8], 76), (62, [4], 76), (63, [6], 76), (64, [12, 14], 76),
             (70, [0, 6], 72), (82, [2, 3, 4, 10, 12, 14], 70)
@@ -106,6 +112,7 @@ struct KosmicDrumGenerator {
             let length = rng.nextDouble() < 0.50 ? 8 : 16
             let range = start..<Swift.min(start + length, bodyEnd)
             guard range.count >= 8,
+                  !thins.contains(where: { $0.lowerBound < range.upperBound && range.lowerBound < $0.upperBound }),
                   !guiro.contains(where: { $0.lowerBound < range.upperBound + 8 && range.lowerBound < $0.upperBound + 8 })
             else { continue }
             guiro.append(range)
@@ -113,8 +120,15 @@ struct KosmicDrumGenerator {
 
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
+            if thins.contains(where: { $0.contains(bar) }) {
+                for (note, step, vel) in [(61, 0, 70), (61, 8, 66), (64, 12, 66), (82, 4, 50), (82, 12, 50)] {
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(note),
+                                            velocity: UInt8(vel), durationSteps: 1))
+                }
+                continue
+            }
             if guiro.contains(where: { $0.contains(bar) }) {
-                for (step, vel) in [(0, 50), (6, 40), (8, 50)] {
+                for (step, vel) in [(0, 38), (6, 30), (8, 38)] {
                     events.append(MIDIEvent(stepIndex: bar * 16 + step, note: 74,
                                             velocity: UInt8(vel), durationSteps: 1))
                 }
@@ -329,7 +343,8 @@ struct KosmicDrumGenerator {
     private static func generateMinimal(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        rng: inout SeededRNG
+        rng: inout SeededRNG,
+        dropouts: [Range<Int>] = []
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let transitionBars = computeTransitionBars(structure: structure)
@@ -339,6 +354,23 @@ struct KosmicDrumGenerator {
             guard section.label != .intro else { continue }
 
             let barStart = bar * 16
+
+            // Space only (Zack, 2026-11-03): in the arrangement's first two thin stretches the Mini
+            // Pops box drops out completely, and comes back after a 1 or 2 beat tom roll.
+            if let stretch = dropouts.first(where: { $0.contains(bar) }) {
+                if bar == stretch.upperBound - 1 {
+                    let beats = rng.nextDouble() < 0.70 ? 1 : 2
+                    let roll: [GMDrum] = beats == 1
+                        ? [.hiTom, .hiMidTom, .lowMidTom, .lowFloorTom]
+                        : [.hiTom, .hiTom, .hiMidTom, .hiMidTom, .lowMidTom, .lowMidTom, .lowFloorTom, .lowFloorTom]
+                    let from = barStart + 16 - beats * 4
+                    for (i, tom) in roll.enumerated() {
+                        events.append(MIDIEvent(stepIndex: from + i, note: tom.rawValue,
+                                                velocity: UInt8(64 + 24 * i / (roll.count - 1)), durationSteps: 1))
+                    }
+                }
+                continue
+            }
 
             if section.label == .bridge {
                 events += bridgeA1Bar(barStart: barStart, bar: bar, section: section, rng: &rng)

@@ -1241,9 +1241,9 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead2 && program == 13088 {
                 vol = 1.3    // Night Vision runs soft on Motorik Lead 2 — boost
             } else if trackIndex == kTrackLead2 && kosmicStyle && program == 12080 {
-                vol = 0.60   // Square Lead 2 on Space Lead 2 ran a bit loud at the default gain
+                vol = 0.48   // Square Lead 2 on Space Lead 2 ran loud (trimmed again 2026-11-03)
             } else if trackIndex == kTrackLead2 && kosmicStyle && program == 81 {
-                vol = 0.45   // Saw Lead measures about 2.5 times louder than Brightness and Synth Strings 1 on Space Lead 2
+                vol = 0.36   // Saw Lead measures about 2.5 times louder than Brightness and Synth Strings 1 on Space Lead 2 (trimmed again 2026-11-03)
             } else if trackIndex == kTrackLead1 && motorikStyle && program == 81 {
                 vol = 1.10   // Mono Synth on Motorik Lead 1 — boost for presence
             } else if trackIndex == kTrackLead1 && program == 81 {
@@ -1251,7 +1251,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 62 && songState?.isKosmicSpace == true {
                 vol = 0.65   // Synth Brass 1 ran loud on Space Lead 1 (Zack, 2026-11-03)
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 63 {
-                vol = 0.20   // Synth Brass 2 measures 4 to 10 times louder than Synth Brass 1 and the other Space leads
+                vol = 0.16   // Synth Brass 2 measures 4 to 10 times louder than Synth Brass 1 and the other Space leads (trimmed again 2026-11-03)
             } else if trackIndex == kTrackLead1 && kosmicStyle && program == 80 {
                 vol = 0.48   // Square Lead on Kosmic Lead 1 — lower than Motorik Noir (0.68)
             } else if trackIndex == kTrackLead1 && program == 80 {
@@ -1362,7 +1362,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 18 {
                 vol = 0.60   // Rock Organ runs hot on Kosmic rhythm — pull back
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 && songState?.isKosmicSpace == true {
-                vol = 0.45   // Moog on Space Rhythm ran loud (Zack, 2026-11-03); base Kosmic keeps 0.65
+                vol = 0.38   // Moog on Space Rhythm ran loud (Zack, 2026-11-03, trimmed twice); base Kosmic keeps 0.65
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 11088 && songState?.isKosmicSpace == true {
                 vol = 0.50   // Harpsi Pad on Space Rhythm ran loud (Zack, 2026-11-03); base Kosmic keeps 0.75
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 {

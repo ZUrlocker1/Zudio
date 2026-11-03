@@ -41,7 +41,8 @@ struct KosmicLeadGenerator {
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
-        // Kosmic Space: KOS-LD1-013 Falling Theme or KOS-LD1-016 Rising Strings in A sections, the
+        // Kosmic Space: KOS-LD1-013 Falling Theme, KOS-LD1-016 Rising Strings or KOS-LD1-017 Offbeat
+        // Climb in A sections, a third each, the
         // KOS-LD1-014 riff or KOS-LEAD-006 Phrase Loop in B sections. Space sets its own A and B rules,
         // so Technique D escalation never runs.
         if isKosmicSpace {
@@ -77,7 +78,35 @@ struct KosmicLeadGenerator {
                 usedRuleIDs.remove("KOS-LD1-013")
                 usedRuleIDs.insert("KOS-LD1-016")
             }
-            let lead = theme + riff + phrase
+            // In a third of songs KOS-LD1-017 Offbeat Climb plays the A sections instead, so the three
+            // A-section rules share them evenly. Drawn last, so the earlier draws are unchanged.
+            if rng.nextDouble() < 1.0 / 3.0 {
+                theme = generateOxygeneOffbeatClimb(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                    rng: &rng)
+                lead1BaseRule = "KOS-LD1-017"
+                usedRuleIDs.remove("KOS-LD1-013")
+                usedRuleIDs.remove("KOS-LD1-016")
+                usedRuleIDs.insert("KOS-LD1-017")
+            }
+            var lead = theme + riff + phrase
+            // Theme return (Zack, 2026-11-03): a song that ends on B (ab, abab) never hears its A theme
+            // again, so 8 bars two thirds into the last B replay the first A section's opening 8 bars
+            // in place of the B rule. Space chord loops restart at every body section, so bars 8 apart
+            // from a section start carry the same chords. No draws, so regen rebuilds it exactly.
+            let body = structure.sections.filter { $0.label == .A || $0.label == .B }
+            if let lastB = body.last, lastB.label == .B, let firstA = body.first(where: { $0.label == .A }) {
+                let start = lastB.startBar + (lastB.lengthBars * 2 / 3) / 8 * 8
+                if start >= lastB.startBar + 8, start + 8 <= lastB.endBar, firstA.lengthBars >= 8 {
+                    let window = (start * 16)..<((start + 8) * 16)
+                    let source = (firstA.startBar * 16)..<((firstA.startBar + 8) * 16)
+                    let shift = window.lowerBound - source.lowerBound
+                    lead.removeAll { window.contains($0.stepIndex) }
+                    lead += theme.filter { source.contains($0.stepIndex) }.map {
+                        MIDIEvent(stepIndex: $0.stepIndex + shift, note: $0.note, velocity: $0.velocity,
+                                  durationSteps: Swift.min($0.durationSteps, source.upperBound - $0.stepIndex))
+                    }
+                }
+            }
             // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8.
             return silenceBars(lead, spaceArrangement?.leadRests ?? [])
         }
@@ -570,6 +599,108 @@ struct KosmicLeadGenerator {
                 }
                 last = notes.last ?? start
             }
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-017 Oxygene 8 Offbeat Climb (Kosmic Space, A sections)
+    // Oxygene 8 lead, alto sax, piano and clarinet in unison, bars 17–49 and 67–138. Each statement
+    // fills one bar and the next is silent. It enters off the beat on step 2 and climbs by step from
+    // a leap up to the chord root: steps 2, 4, 6, 8, 11 and 14, the last two dotted 8ths apart.
+    // Statements, in scale steps from the current chord root:
+    //   climb — 5th below, root, 2nd, 3rd, 4th, 4th
+    //   leap  — 5th, 4th, 5th, 6th, 7th, on steps 2, 6, 8, 11, 14 (the source drops to the root and
+    //           back; a step down is smoother on a synth lead)
+    //   turn  — the climb's first four, then back to the root and the 2nd
+    // Phrase, 16 bars, starting 2 bars into each A section so that, as in the source, every
+    // statement lands in the second bar of its chord window: a single root on step 0 as a pickup,
+    // climb, leap, turn, pickup, climb, leap, and a falling answer from the tonic's 6th to the 5th
+    // below on steps 6, 8, 10, 13 and 15. Every third phrase, as the source's bars 41–49 do: pickup,
+    // climb, then a 2-bar arch three times, 3rd, 4th and 5th of the key rising across the bar line and
+    // falling back to the tonic, then 7 bars of rest.
+    // Legato (Zack, 2026-11-03: the source's short notes sounded clunky on a synth lead): each note is
+    // held to the next, the last of a statement rings 10 steps into the silent bar, and the pickup
+    // holds into the statement's entry, so the line flows and never restarts from silence.
+    // Register: the tonic in MIDI 62–73 and each chord root within a fifth of it, as the source
+    // places them; a statement that would pass 84 drops an octave whole. Legato joins each half
+    // phrase into one figure that reaches above 67, so the harmonic filter's lift above the pads never
+    // moves one statement without the others.
+    // Homage draws per song:
+    //   opening leap — from the 5th below 40% (source), the 6th below 30%, the 4th below 30%
+    //   climb's top — the 4th repeated 40% (source), on to the 5th 30%, turning back to the 3rd 30%
+    //   rhythm — the source 60%, or steps 2, 4, 6, 8, 10 and 13 40%; always the latter when the leap
+    //            and the top are both the source's
+
+    private static func generateOxygeneOffbeatClimb(
+        frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let leap = [-3, -2, -4][rng.weightedPick([0.40, 0.30, 0.30])]
+        let top = [[3, 3], [3, 4], [3, 2]][rng.weightedPick([0.40, 0.30, 0.30])]
+        // A song never plays the source leap, top and rhythm together, so it never copies the tune.
+        let rhythmRoll = rng.nextDouble()
+        let altRhythm = rhythmRoll < 0.40 || (leap == -3 && top == [3, 3])
+        let sixOnsets  = altRhythm ? [2, 4, 6, 8, 10, 13] : [2, 4, 6, 8, 11, 14]
+        let fiveOnsets = altRhythm ? [2, 6, 8, 10, 13] : [2, 6, 8, 11, 14]
+        let scalePCs = frame.scalePCs
+        let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
+                                    low: 62, high: 73)
+
+        // (onset, scale steps, duration); chord-relative unless noted. Each note is held to the next.
+        func figure(_ onsets: [Int], _ steps: [Int]) -> [(Int, Int, Int)] {
+            onsets.enumerated().map { i, o in
+                (o, steps[i], i == onsets.count - 1 ? 10 : onsets[i + 1] - o)
+            }
+        }
+        let climb  = figure(sixOnsets, [leap, 0, 1, 2] + top)
+        let leapUp = figure(fiveOnsets, [4, 3, 4, 5, 6])
+        let turn   = figure(sixOnsets, [leap, 0, 1, 2, 0, 1])
+        let answer: [(Int, Int, Int)] = [(6, 5, 2), (8, 4, 2), (10, 0, 3), (13, -2, 2), (15, -3, 10)]
+        let archUp:   [(Int, Int, Int)] = [(6, 2, 2), (8, 3, 4), (12, 4, 4)]
+        let archDown: [(Int, Int, Int)] = [(0, 5, 2), (2, 4, 2), (4, 2, 2), (6, 0, 10)]
+        enum Part { case pickup, climb, leap, turn, answer, archUp, archDown }
+        let standard: [Int: Part] = [0: .pickup, 1: .climb, 3: .leap, 5: .turn,
+                                     8: .pickup, 9: .climb, 11: .leap, 13: .answer]
+        let arch: [Int: Part] = [0: .pickup, 1: .climb, 3: .archUp, 4: .archDown, 5: .archUp,
+                                 6: .archDown, 7: .archUp, 8: .archDown]
+
+        var events: [MIDIEvent] = []
+        var phrase = 0
+        for section in structure.sections where section.label == .A {
+            let end = section.endBar * 16
+            let first = section.startBar + 2
+            guard first < section.endBar else { continue }
+            for bar in first..<section.endBar {
+                let pos = (bar - first) % 16
+                if pos == 0 && bar > first { phrase += 1 }
+                guard let part = (phrase % 3 == 2 ? arch : standard)[pos],
+                      let entry = tonalMap.entry(atBar: bar) else { continue }
+                // The chord root nearest the tonic, from a fourth below to a fifth above
+                var offset = (spaceChordRootPC(entry, frame: frame) - tonic % 12 + 12) % 12
+                if offset > 7 { offset -= 12 }
+                let root = tonic + offset
+                let notes: [(Int, Int, Int)]
+                var base = root
+                switch part {
+                case .pickup:   notes = [(0, 0, 18)]
+                case .climb:    notes = climb
+                case .leap:     notes = leapUp
+                case .turn:     notes = turn
+                case .answer:   notes = answer;   base = tonic
+                case .archUp:   notes = archUp;   base = tonic
+                case .archDown: notes = archDown; base = tonic
+                }
+                var pitches = notes.map { scaleStep(base, by: $0.1, scalePCs: scalePCs) }
+                if (pitches.max() ?? 0) > 84 { pitches = pitches.map { $0 - 12 } }
+                for (i, n) in notes.enumerated() {
+                    let onset = bar * 16 + n.0
+                    guard onset < end else { continue }
+                    events.append(MIDIEvent(stepIndex: onset, note: UInt8(pitches[i]),
+                                            velocity: i == 0 ? 66 : (i == notes.count - 1 ? 58 : 62),
+                                            durationSteps: Swift.min(n.2, end - onset)))
+                }
+            }
+            phrase += 1
         }
         return events
     }
