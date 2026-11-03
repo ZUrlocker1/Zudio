@@ -700,7 +700,8 @@ struct KosmicStructureGenerator {
 /// the middle, measured with tools/jarre_deep.py --sections. Either kind is half the songs that
 /// take one:
 ///   Magnetic Fields Breakdown, 8 or 12 bars (Magnetic Fields 1, bars 73–84 and 137–148): the
-///     sequencer, Lead 1 and Lead 2 drop out, the drums drop to a simpler beat, the bass holds long
+///     sequencer, Lead 1 and Lead 2 drop out, the preset box drops to the kick alone on beats 1 and 3
+///     (rebuilding with 8th hats over the last 4 bars of a 12-bar one), the bass holds long
 ///     roots and the pads carry slower chords of their own (`spaceBridgeChords`). A swell into it
 ///     and out of it.
 ///   Rendez-Vous Sequencer Solo, 8 bars (Rendez-Vous 2, bars 81–96): the sequencer alone, the pads
@@ -916,8 +917,9 @@ struct KosmicSpaceArrangement {
         // Simpler beat, and a simpler bass: candidate points are each body section start after the
         // first and every 16 bars after it, never into the last 8 before the outro. Each point has a
         // 50% chance of a stretch of 8, 12 or 16 bars, with 8 bars of full pattern between stretches
-        // and none over the sequencer break (whose own thinning is enough). A song of over 100 bars
-        // gets at least two, a shorter one at least one.
+        // and none over the sequencer break (whose own thinning is enough) or within 16 bars of the
+        // bridge. A song of over 100 bars gets at least two, a shorter one or one with a bridge at
+        // least one.
         // In 60% of drum stretches the bass thins over exactly the same bars, so both return to the
         // full pattern together under the closing fill; in the rest the bass plays on. One more
         // stretch of 8 or 12 bars, 50% of songs, thins the bass alone, apart from any drum stretch.
@@ -934,9 +936,13 @@ struct KosmicSpaceArrangement {
         func fits(_ r: Range<Int>) -> Bool {
             guard r.count >= 4 else { return false }
             if let b = seqBreak, !(r.upperBound <= b.lowerBound || r.lowerBound >= b.upperBound) { return false }
-            if let b = bridge?.range, !(r.upperBound + 8 <= b.lowerBound || r.lowerBound >= b.upperBound + 8) { return false }
+            if let b = bridge?.range, !(r.upperBound + 16 <= b.lowerBound || r.lowerBound >= b.upperBound + 16) { return false }
             return (thinRanges + bassThins).allSatisfy { r.lowerBound >= $0.upperBound + 8 || r.upperBound + 8 <= $0.lowerBound }
         }
+        // At most three breaks a song, the bridge counting as one (Zack, 2026-11-03): three thin
+        // stretches without a bridge, two with one. The bass-only stretch, drawn last, is the first
+        // to go.
+        let maxStretches = bridge == nil ? 3 : 2
         func addDrumStretch(_ point: (bar: Int, end: Int)) {
             let length = [8, 12, 16][drumRNG.weightedPick([0.4, 0.2, 0.4])]
             let variant = drumRNG.nextDouble() < 0.6 ? 0 : 1
@@ -944,13 +950,14 @@ struct KosmicSpaceArrangement {
             // together is the dramatic moment); later ones do so 60% of the time.
             let together = drumRNG.nextDouble() < 0.60 || thins.isEmpty
             let r = point.bar..<Swift.min(point.bar + length, point.end)
-            guard fits(r) else { return }
+            guard thins.count < maxStretches, fits(r) else { return }
             thinRanges.append(r)
             thins.append(DrumThin(range: r, variant: variant))
             if together { bassThins.append(r) }
         }
         for point in points where drumRNG.nextDouble() < 0.50 { addDrumStretch(point) }
-        let wanted = totalBars > 100 ? 2 : 1
+        // A song with a bridge needs only one: the bridge is its big moment (Zack, 2026-11-03).
+        let wanted = bridge == nil && totalBars > 100 ? 2 : 1
         var spare = points.filter { p in !thins.contains { $0.range.contains(p.bar) } }
         while thins.count < wanted && !spare.isEmpty {
             addDrumStretch(spare.remove(at: drumRNG.nextInt(upperBound: spare.count)))
@@ -959,7 +966,7 @@ struct KosmicSpaceArrangement {
         if drumRNG.nextDouble() < 0.50 {
             let length = drumRNG.nextDouble() < 0.5 ? 8 : 12
             let options = points.map { $0.bar..<Swift.min($0.bar + length, $0.end) }.filter(fits)
-            if !options.isEmpty {
+            if !options.isEmpty && thins.count < maxStretches {
                 bassThins.append(options[drumRNG.nextInt(upperBound: options.count)])
             }
         }

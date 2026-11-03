@@ -1100,7 +1100,10 @@ effects-only endings of Oxygene 3 and 6. Zack chose the first two:
   has its own stream on the song seed, so the chord plan, the arrangement, the auto sweep and
   per-track regen all rebuild it without storing it. The main-stream bridge roll is still discarded.
 - **Magnetic Fields Breakdown**, half the bridges, 8 or 12 bars. Sequencer, Lead 1 and Lead 2 out.
-  The preset box plays its quarter-hat thin beat, Hand Percussion its sparse core, Mini Pops plays on.
+  The preset box drops to the kick alone on beats 1 and 3, as Magnetic Fields 1 does for bars 72–79;
+  a 12-bar breakdown rebuilds with 8th-note hats over its last 4 bars, as bars 80–87 do. (It first
+  reused the thin stretches' quarter-hat beat, which made it sound like one; changed 2026-11-03.)
+  Hand Percussion plays its sparse core, Mini Pops plays on.
   The bass holds the chord root an octave down, re-attacked every 2 bars. Pads carry 4-bar chords the
   song's loops do not lean on, the last leading into B's first chord: Dorian Vamp v, bVII (12 bars:
   bVII, v, bVII); Aeolian Cycle v, bIII (12: iv, v, bIII); Two-Chord Sway in Aeolian bVI, bVII
@@ -1110,8 +1113,18 @@ effects-only endings of Oxygene 3 and 6. Zack chose the first two:
   sweeps (`KosmicAutoSweep`, otherwise off in Space) reopen on its fifth bar and on the return. The
   band comes back on a 2-beat fill and a crash (preset box; Mini Pops on its own dropout fill), with
   the surf swell landing on B.
-- **Around it.** A song with a bridge has no sequencer break. Lead 1 rests stay 16 bars clear of
-  it, drum and bass thin stretches 8. Its return fill takes the first of the three fill slots. The log
+- **Around it.** A song with a bridge has no sequencer break. Lead 1 rests and drum and bass thin
+  stretches stay 16 bars clear of it, and the song needs only one thin stretch, not two. At most
+  three breaks a song, the bridge counting as one: a bridge and at most two thin stretches, or at
+  most three thin stretches without one (Zack, 2026-11-03: three thinnings and a bridge is too many,
+  and they sounded alike). The bass-only stretch, drawn last, is the first to go. Its return fill
+  takes the first of the three fill slots.
+- **Measured** over 200 Space ab and aba songs (a temporary test reading `KosmicSpaceArrangement`).
+  Before these limits, bridge songs had 2 thin stretches in 110 of 160 and 3 or 4 in 26. Now the
+  160 bridge songs have none in 9, one in 70 and two in 81; the 40 without a bridge have two in 20
+  and three in 19. Drops of any kind cover about 23% of body bars on average, from 27%. The
+  sequencer break, in songs without a bridge, is not counted as a break here. Lead 1 rests often fall
+  on the same bars as a thin stretch, since both pick the same landing bars. The log
   adds "+ bridge" to the Form line and calls it out at its first bar under the Bridge tag, as Drift
   does: `Magnetic breakdown 8 bar` or `Rendez-Vous solo 8 bar` (Zack, 2026-11-03).
 

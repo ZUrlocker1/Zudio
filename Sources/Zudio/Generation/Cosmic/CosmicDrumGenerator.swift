@@ -193,11 +193,25 @@ struct KosmicDrumGenerator {
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
             let barStart = bar * 16
+            // The breakdown bridge, as Magnetic Fields 1 bars 72–79: the kick alone on beats 1 and 3.
+            // A 12-bar breakdown rebuilds over its last 4 bars, as bars 80–87 do, with the 8th-note
+            // hats back over the same kick.
+            if let bridge = arrangement?.bridge, bridge.kind == .breakdown, bridge.range.contains(bar) {
+                events.append(MIDIEvent(stepIndex: barStart, note: GMDrum.kick.rawValue,
+                                        velocity: 96, durationSteps: 1))
+                events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,
+                                        velocity: 88, durationSteps: 1))
+                if bridge.range.count >= 12 && bar >= bridge.range.upperBound - 4 {
+                    for step in hatSteps where step % 2 == 0 {
+                        events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                                velocity: step % 4 == 0 ? 70 : 54, durationSteps: 1))
+                    }
+                }
+                continue
+            }
             // A simpler beat in the arrangement's thin stretches: variant 0 drops the 16th hats,
-            // variant 1 goes to quarter hats with the kick on 0 and 10 and no open hat. The
-            // breakdown bridge plays variant 1.
+            // variant 1 goes to quarter hats with the kick on 0 and 10 and no open hat.
             let thin = arrangement?.drumThin(atBar: bar)?.variant
-                ?? (arrangement?.bridgeKind(atBar: bar) == .breakdown ? 1 : nil)
             let barHats = thin == nil ? hatSteps
                 : thin == 0 ? hatSteps.filter { $0 % 2 == 0 }
                 : hatSteps.filter { $0 % 4 == 0 }
