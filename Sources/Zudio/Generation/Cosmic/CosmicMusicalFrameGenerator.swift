@@ -5,6 +5,31 @@
 
 import Foundation
 
+/// Kosmic Space's derived seed streams. Every Space-only draw comes from one of these, so the main
+/// stream keeps the order base Kosmic and Drift depend on. Each is
+/// `SeededRNG(seed: songSeed ^ base ^ salt)`.
+/// NEVER change or reuse a value: every Space song's notes depend on them.
+enum KosmicSpaceStream: UInt64 {
+    /// The frame: harmony family, tempo and the Space draws made with it
+    case frame            = 0
+    /// Texture auto-pan rate
+    case texturePan       = 0x7E87_9A17
+    /// Chord-cycle builder
+    case chordCycle       = 0xC7C1E
+    /// The bridge (`SpaceBridge`)
+    case bridge           = 0xB81D_6E
+    /// The break schedule (`KosmicSpaceArrangement`)
+    case arrangement      = 0xB2EA_C5
+    /// The arrangement's drum and bass thinning and handclap
+    case arrangementDrums = 0xD2_0B7E
+
+    static let base: UInt64 = 0x05AC_E0A7_1976_0E04
+
+    func rng(seed: UInt64) -> SeededRNG {
+        SeededRNG(seed: seed ^ KosmicSpaceStream.base ^ rawValue)
+    }
+}
+
 struct KosmicMusicalFrameGenerator {
 
     // Shadow root semitone: tritone partner (KOS-RULE-14)
@@ -26,16 +51,11 @@ struct KosmicMusicalFrameGenerator {
     /// TESTING value 0.80; release 0.30–0.40, to be confirmed by listening.
     static let spaceBridgeShare = 0.80
 
-    /// Salt for the Kosmic Space stream. Every Space-only draw in the frame and the chord-cycle
-    /// builder comes from `SeededRNG(seed: songSeed ^ spaceStreamSalt)`, so the main stream keeps
-    /// the order base Kosmic and Drift depend on.
-    static let spaceStreamSalt: UInt64 = 0x05AC_E0A7_1976_0E04
-
     /// Bars per full left-right sweep of a Space song's Texture auto-pan: 2 (25%), 4 (50%) or
     /// 8 (25%). Drawn from the song seed on its own stream, so playback, regeneration and export
     /// agree without storing it.
     static func spaceTexturePanBars(seed: UInt64) -> Int {
-        var rng = SeededRNG(seed: seed ^ spaceStreamSalt ^ 0x7E87_9A17)
+        var rng = KosmicSpaceStream.texturePan.rng(seed: seed)
         return [2, 4, 8][rng.weightedPick([0.25, 0.50, 0.25])]
     }
 
@@ -52,7 +72,7 @@ struct KosmicMusicalFrameGenerator {
         let substyleRoll  = rng.nextDouble()
         let isKosmicDrift = substyleRoll < driftShare
         let isKosmicSpace = !isKosmicDrift && substyleRoll < driftShare + spaceShare
-        var spaceRNG = SeededRNG(seed: seed ^ spaceStreamSalt)
+        var spaceRNG = KosmicSpaceStream.frame.rng(seed: seed)
         // Space harmony family, drawn first because it sets the song mode
         let spaceFamily: KosmicProgressionFamily? = isKosmicSpace ? pickSpaceFamily(rng: &spaceRNG) : nil
         // Dreamscape variant: ~10% of Drift songs (must be Drift first)

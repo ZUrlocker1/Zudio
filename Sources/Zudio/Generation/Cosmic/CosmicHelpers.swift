@@ -60,23 +60,21 @@ func spaceChordRootPC(_ entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) 
                 scalePCs: frame.scalePCs)
 }
 
-// Per-song draws of the Kosmic Space rules, keyed by rule ID, for the generation log — so a
-// song's character can be read from it, e.g. "Oxygene See-Saw Riff (sixth, 2+2+2, second half)".
-// A reference box so the generators can take it as an optional parameter with a nil default.
-final class KosmicSpaceDraws {
-    private(set) var notes: [String: String] = [:]
-    func record(_ ruleID: String, _ draws: String) { notes[ruleID] = draws }
+// The Space sequencer register: the chord root in MIDI 48–59, as the Oxygene 4 sequencer plays it.
+func spaceSequencerRoot(_ entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> Int {
+    clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)
 }
 
 // Remove the notes that start inside any of the bar ranges, and cut short the ones that would
 // sound into them, so a part falls silent cleanly for a break.
 func silenceBars(_ events: [MIDIEvent], _ ranges: [Range<Int>]) -> [MIDIEvent] {
     guard !ranges.isEmpty else { return events }
+    let starts = ranges.map { $0.lowerBound * 16 }
     return events.compactMap { ev in
         let start = ev.stepIndex
         if ranges.contains(where: { $0.contains(start / 16) }) { return nil }
         let end = start + ev.durationSteps
-        guard let cut = ranges.map({ $0.lowerBound * 16 }).filter({ $0 > start && $0 < end }).min()
+        guard let cut = starts.filter({ $0 > start && $0 < end }).min()
         else { return ev }
         return MIDIEvent(stepIndex: start, note: ev.note, velocity: ev.velocity, durationSteps: cut - start)
     }

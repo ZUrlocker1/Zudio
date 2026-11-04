@@ -103,10 +103,10 @@ struct KosmicTitleGenerator {
             if gear == "Laser Harp No" { return "Laser Harp No \(2 + rng.nextInt(upperBound: 8))" }
             if gear == "Etude for Moogs" { return "Etude for \(pick(["Three", "Eight", "Twelve"])) Moogs" }
             return gear
-        case 7:  return patterns[2](frame, &rng)
-        case 8:  return patterns[11](frame, &rng)
-        case 9:  return patterns[3](frame, &rng)
-        default: return patterns[6](frame, &rng)
+        case 7:  return wordAndNumeral(&rng)
+        case 8:  return greekWordAndNumeral(&rng)
+        case 9:  return prefixAndWord(&rng)
+        default: return spaceAdjectiveAndNoun(&rng)
         }
     }
 
@@ -173,6 +173,36 @@ struct KosmicTitleGenerator {
 
     typealias PatternFn = @Sendable (GlobalMusicalFrame, inout SeededRNG) -> String
 
+    // The four patterns Space titles also draw on, by name
+
+    /// JMJ-X word + Roman numeral
+    private static func wordAndNumeral(_ rng: inout SeededRNG) -> String {
+        let word = jmjXWords[rng.nextInt(upperBound: jmjXWords.count)]
+        let num  = romanNumerals[rng.nextInt(upperBound: romanNumerals.count)]
+        return "\(word) \(num)"
+    }
+
+    /// Prefix + JMJ-X word  — "Inner Orbite", "Neo Equinoxe"
+    private static func prefixAndWord(_ rng: inout SeededRNG) -> String {
+        let pre  = kosmicPrefixes[rng.nextInt(upperBound: kosmicPrefixes.count)]
+        let word = jmjXWords[rng.nextInt(upperBound: jmjXWords.count)]
+        return "\(pre) \(word)"
+    }
+
+    /// Space adj + deep-space noun  — "Eternal Cosmos", "Vast Aether"
+    private static func spaceAdjectiveAndNoun(_ rng: inout SeededRNG) -> String {
+        let adj  = spaceAdjectives[rng.nextInt(upperBound: spaceAdjectives.count)]
+        let noun = deepSpaceNouns[rng.nextInt(upperBound: deepSpaceNouns.count)]
+        return "\(adj) \(noun)"
+    }
+
+    /// Fake-Greek + Roman numeral  — "Orpheon II", "Elyseon IV"
+    private static func greekWordAndNumeral(_ rng: inout SeededRNG) -> String {
+        let word = greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)]
+        let num  = romanNumerals[rng.nextInt(upperBound: romanNumerals.count)]
+        return "\(word) \(num)"
+    }
+
     private static let patterns: [PatternFn] = [
 
         // 1. Single JMJ-X word  (weight ×2 — most iconic)
@@ -180,23 +210,11 @@ struct KosmicTitleGenerator {
         { _, rng in jmjXWords[rng.nextInt(upperBound: jmjXWords.count)] },
 
         // 2. JMJ-X word + Roman numeral
-        { _, rng in
-            let word = jmjXWords[rng.nextInt(upperBound: jmjXWords.count)]
-            let num  = romanNumerals[rng.nextInt(upperBound: romanNumerals.count)]
-            return "\(word) \(num)"
-        },
+        { _, rng in wordAndNumeral(&rng) },
 
-        // 3. Prefix + JMJ-X word  — "Inner Orbite", "Neo Equinoxe"  (weight ×2)
-        { _, rng in
-            let pre  = kosmicPrefixes[rng.nextInt(upperBound: kosmicPrefixes.count)]
-            let word = jmjXWords[rng.nextInt(upperBound: jmjXWords.count)]
-            return "\(pre) \(word)"
-        },
-        { _, rng in
-            let pre  = kosmicPrefixes[rng.nextInt(upperBound: kosmicPrefixes.count)]
-            let word = jmjXWords[rng.nextInt(upperBound: jmjXWords.count)]
-            return "\(pre) \(word)"
-        },
+        // 3. Prefix + JMJ-X word  (weight ×2)
+        { _, rng in prefixAndWord(&rng) },
+        { _, rng in prefixAndWord(&rng) },
 
         // 4. Two-word English kosmic
         { _, rng in
@@ -206,16 +224,8 @@ struct KosmicTitleGenerator {
         },
 
         // 5. Space adj + deep-space noun  (weight ×2)
-        { _, rng in
-            let adj  = spaceAdjectives[rng.nextInt(upperBound: spaceAdjectives.count)]
-            let noun = deepSpaceNouns[rng.nextInt(upperBound: deepSpaceNouns.count)]
-            return "\(adj) \(noun)"
-        },
-        { _, rng in
-            let adj  = spaceAdjectives[rng.nextInt(upperBound: spaceAdjectives.count)]
-            let noun = deepSpaceNouns[rng.nextInt(upperBound: deepSpaceNouns.count)]
-            return "\(adj) \(noun)"
-        },
+        { _, rng in spaceAdjectiveAndNoun(&rng) },
+        { _, rng in spaceAdjectiveAndNoun(&rng) },
 
         // 6. Prefix + kosmic noun  — "Exo Helix", "Sub Horizon"
         { _, rng in
@@ -228,11 +238,7 @@ struct KosmicTitleGenerator {
         { _, rng in greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)] },
         { _, rng in greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)] },
 
-        // 8. Fake-Greek + Roman numeral  — "Orpheon II", "Elyseon IV"
-        { _, rng in
-            let word = greekStyleWords[rng.nextInt(upperBound: greekStyleWords.count)]
-            let num  = romanNumerals[rng.nextInt(upperBound: romanNumerals.count)]
-            return "\(word) \(num)"
-        },
+        // 8. Fake-Greek + Roman numeral
+        { _, rng in greekWordAndNumeral(&rng) },
     ]
 }

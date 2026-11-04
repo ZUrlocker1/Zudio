@@ -640,6 +640,16 @@ enum GMDrum: UInt8 {
     case crash2        = 57
     case cowbell       = 56
     case claves        = 75
+    // Hand percussion (KOS-DRUM-012 Oxygene 6 Hand Percussion)
+    case highBongo     = 60
+    case lowBongo      = 61
+    case muteHighConga = 62
+    case openHighConga = 63
+    case lowConga      = 64
+    case maracas       = 70
+    case longGuiro     = 74
+    case shaker        = 82
+    case castanets     = 85
 }
 
 // MARK: - Register boundaries (MIDI note ranges per track)

@@ -550,7 +550,6 @@ struct SongGenerator {
         var texRNG    = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: kTrackTexture))
 
         // Per-song draws of the Space rules, for the log
-        let spaceDraws = KosmicSpaceDraws()
         // Space's breaks — Lead 1 rests, the sequencer break and the fills at their edges.
         // Derived once and handed to every generator that needs it.
         let spaceArrangement = isKosmicSpace
@@ -567,7 +566,7 @@ struct SongGenerator {
             lead1BaseRule: &lead1BaseRule, xFilesBars: &xFilesBars,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement
+            isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement
         )
 
         // Arpeggio (rhythm slot) — the heartbeat of Kosmic
@@ -576,7 +575,7 @@ struct SongGenerator {
             frame: frame, structure: structure, tonalMap: tonalMap,
             rng: &rhythmRNG, usedRuleIDs: &rhythmRules, forceRuleID: forceArpRuleID,
             isKosmicDrift: isKosmicDrift,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement
+            isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement
         )
 
         // Lead 2 — always silent in Drift
@@ -611,7 +610,7 @@ struct SongGenerator {
             kosmicProgFamily: kosmicProgFamily,
             rng: &texRNG, usedRuleIDs: &texRules, forceRuleID: forceTexRuleID,
             isKosmicDrift: isKosmicDrift,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement
+            isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement
         )
 
         // Bass
@@ -623,8 +622,8 @@ struct SongGenerator {
             bassEvolutionBars: &bassEvolutionBars,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws, spaceArrangement: spaceArrangement,
-            spaceBusyRhythm: rhythmRules.contains("KOS-RTHM-005")
+            isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement,
+            spaceBusyRhythm: !rhythmRules.isDisjoint(with: KosmicBassGenerator.spaceBusyRhythms)
         )
 
         // Drums
@@ -635,15 +634,18 @@ struct SongGenerator {
             rng: &drumRNG, usedRuleIDs: &drumRules,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            spaceDraws: spaceDraws, spaceArrangement: spaceArrangement
+            spaceArrangement: spaceArrangement
         )
 
         // Post-processing: apply arrangement and harmonic filters
         // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Kosmic)
         // Kosmic Space: the sequencer is never block-silenced or thinned — the same pattern plays
-        // every bar, and silence comes only from the song's form (Phase 2 breakdowns).
+        // every bar, and silence comes only from the song's form (Phase 2 breakdowns). Lead 1, Lead 2
+        // and Pads are exempt too (Zack, 2026-11-03): their rests come from `KosmicSpaceArrangement`,
+        // and the filter's random blocks would cut leads across section edges. It never fired on them
+        // when measured, so no song changed; it guards against Phase 2's denser Lead 2.
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed,
-                                              exemptTracks: isKosmicSpace ? [kTrackRhythm] : [])
+                                              exemptTracks: isKosmicSpace ? [kTrackRhythm, kTrackLead1, kTrackLead2, kTrackPads] : [])
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
 
         // Kosmic density guard: if Rhythm is more than 2× as dense as Lead 1, thin Rhythm
@@ -776,144 +778,14 @@ struct SongGenerator {
         }
 
         // MARK: - Kosmic Drift bridge implementations
-        // Applied per bridge section after all other filters.
-        // Each type shapes the events during bridge bars to produce the intended character.
-        // Results are stored in driftBridgeLabels for annotation logging below.
-        var driftBridgeLabels: [Int: String] = [:]   // [bridgeStartBar: logLabel]
-
-        if isKosmicDrift {
-            let bridgeSections = structure.sections.filter {
-                $0.label == .bridge || $0.label == .bridgeAlt || $0.label == .bridgeMelody
-            }
-            if !bridgeSections.isEmpty {
-                var bridgeRNG = SeededRNG(seed: seed &+ 0xDB)
-
-                for sec in bridgeSections {
-                    let s = sec.startBar; let e = sec.endBar
-
-                    // Helper: is an event inside this bridge section?
-                    func inBridge(_ ev: MIDIEvent) -> Bool {
-                        let b = ev.stepIndex / 16; return b >= s && b < e
-                    }
-
-                    // Pick Drift bridge type — weighted per plan
-                    // Harmonic Dissolution 35%, Modulation+Thin 25%, Solo Breath 20%,
-                    // Textural Fade 12%, Bass Exit 8%
-                    let bRoll = bridgeRNG.nextDouble()
-                    let bridgeType: Int  // 0=dissolution, 1=modulation, 2=breath, 3=fade, 4=bassExit
-                    if      bRoll < 0.35 { bridgeType = 0 }
-                    else if bRoll < 0.60 { bridgeType = 1 }
-                    else if bRoll < 0.80 { bridgeType = 2 }
-                    else if bRoll < 0.92 { bridgeType = 3 }
-                    else                 { bridgeType = 4 }
-
-                    switch bridgeType {
-
-                    case 0: // HARMONIC DISSOLUTION
-                    // Sequencer stops. Lead silent. Bass silent.
-                    // Pads sustain softly — the only sound is held chords dissolving into reverb.
-                    driftBridgeLabels[s] = "Harmonic dissolution"
-                    trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { !inBridge($0) }
-                    trackEvents[kTrackLead1]  = trackEvents[kTrackLead1].filter  { !inBridge($0) }
-                    trackEvents[kTrackBass]   = trackEvents[kTrackBass].filter   { !inBridge($0) }
-                    trackEvents[kTrackDrums]  = trackEvents[kTrackDrums].filter  { !inBridge($0) }
-                    // Pads: keep but soften — they blur and sustain into the silence
-                    trackEvents[kTrackPads] = trackEvents[kTrackPads].map { ev in
-                        guard inBridge(ev) else { return ev }
-                        return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                         velocity: UInt8(max(15, Int(ev.velocity) * 55 / 100)),
-                                         durationSteps: ev.durationSteps)
-                    }
-
-                    case 1: // MODULATION + THINNED GROOVE
-                    // Groove strips to kick only. Sequencer thins. Pads + bass + rhythm
-                    // transpose by ±3 or +5 semitones. Harmonic shift with rhythmic continuity.
-                    let semitones = bridgeRNG.nextDouble() < 0.60 ? 3 : 5
-                    driftBridgeLabels[s] = "Modulation +\(semitones) semitones"
-                    // Drums: kick only in bridge
-                    let kickNote = GMDrum.kick.rawValue
-                    trackEvents[kTrackDrums] = trackEvents[kTrackDrums].filter { ev in
-                        guard inBridge(ev) else { return true }
-                        return ev.note == kickNote
-                    }
-                    // Rhythm: thin to 35% non-downbeat retention
-                    var modRNG = SeededRNG(seed: seed &+ 0xDC)
-                    trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { ev in
-                        guard inBridge(ev) else { return true }
-                        return ev.stepIndex % 16 == 0 || modRNG.nextDouble() < 0.35
-                    }
-                    // Transpose melodic tracks by semitones
-                    for track in [kTrackRhythm, kTrackBass, kTrackPads, kTrackLead1] {
-                        trackEvents[track] = trackEvents[track].map { ev in
-                            guard inBridge(ev) else { return ev }
-                            let newNote = Int(ev.note) + semitones
-                            guard newNote >= 0 && newNote <= 127 else { return ev }
-                            return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(newNote),
-                                             velocity: ev.velocity, durationSteps: ev.durationSteps)
-                        }
-                    }
-
-                    case 2: // SOLO BREATH
-                    // Everything drops except Lead 1 and a softened root pad.
-                    // No groove, no sequencer, no bass — maximum space for the lead voice.
-                    driftBridgeLabels[s] = "Solo breath"
-                    trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { !inBridge($0) }
-                    trackEvents[kTrackDrums]  = trackEvents[kTrackDrums].filter  { !inBridge($0) }
-                    trackEvents[kTrackBass]   = trackEvents[kTrackBass].filter   { !inBridge($0) }
-                    // Pads: keep only the lowest note per step (root drone), softened
-                    var breathPadByStep: [Int: MIDIEvent] = [:]
-                    for ev in trackEvents[kTrackPads] where inBridge(ev) {
-                        if let existing = breathPadByStep[ev.stepIndex] {
-                            if ev.note < existing.note { breathPadByStep[ev.stepIndex] = ev }
-                        } else {
-                            breathPadByStep[ev.stepIndex] = ev
-                        }
-                    }
-                    trackEvents[kTrackPads] = trackEvents[kTrackPads].filter { !inBridge($0) }
-                        + breathPadByStep.values.map { ev in
-                            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                      velocity: UInt8(max(15, Int(ev.velocity) * 50 / 100)),
-                                      durationSteps: ev.durationSteps)
-                        }.sorted { $0.stepIndex < $1.stepIndex }
-
-                    case 3: // TEXTURAL FADE
-                    // All tracks fade to near-silence over the bridge span — rhythm, bass,
-                    // pads, drums all ramp down to ~20% velocity. Lead stays at full level
-                    // so it surfaces above the fading texture.
-                    driftBridgeLabels[s] = "Textural fade"
-                    let bridgeSteps = sec.lengthBars * 16
-                    for track in [kTrackRhythm, kTrackBass, kTrackPads, kTrackDrums] {
-                        trackEvents[track] = trackEvents[track].map { ev in
-                            guard inBridge(ev) else { return ev }
-                            let pos = Double(ev.stepIndex - s * 16) / Double(max(1, bridgeSteps))
-                            let scale = max(20, Int(100 - pos * 80))   // 100% → 20%
-                            return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                                             velocity: UInt8(max(1, Int(ev.velocity) * scale / 100)),
-                                             durationSteps: ev.durationSteps)
-                        }
-                    }
-
-                    default: // BASS EXIT (case 4)
-                    // Bass drops silently for the bridge duration. Groove and sequencer
-                    // continue unchanged. The absence of the bass creates an unanchored,
-                    // floating quality. Confirmed by Roygbiv MIDI (bars 25-32).
-                    driftBridgeLabels[s] = "Bass exit"
-                    trackEvents[kTrackBass] = trackEvents[kTrackBass].filter { !inBridge($0) }
-
-                    } // end switch
-                } // end for bridgeSec
-            } // end if !bridgeSections.isEmpty
-        } // end if isKosmicDrift
+        // Applied per bridge section after all other filters (`applyDriftBridges`). A Drift track
+        // regen repeats it on the new track.
+        let driftBridgeLabels = isKosmicDrift
+            ? applyDriftBridges(&trackEvents, structure: structure, seed: seed) : [:]
 
         // Lead Synth — copy AFTER all filters so it mirrors exactly what Lead 1 plays.
         // (Bug fix: copying before filters caused Lead Synth to have more notes than Lead 1.)
-        // Drift: raised to 75% so the Polysynth doubler adds warmth and body to the sparser lead.
-        let leadSynthScale = isKosmicDrift ? 75 : 60
-        trackEvents[kTrackLeadSynth] = trackEvents[kTrackLead1].map { ev in
-            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
-                      velocity: UInt8(max(1, Int(ev.velocity) * leadSynthScale / 100)),
-                      durationSteps: ev.durationSteps)
-        }
+        trackEvents[kTrackLeadSynth] = kosmicLeadSynth(trackEvents[kTrackLead1], isKosmicDrift: isKosmicDrift)
 
         // Title generation — Kosmic uses its own space-themed generator
         // Drift single-word titles get a prefix or suffix to signal the substyle character
@@ -951,59 +823,35 @@ struct SongGenerator {
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
             rhythmRules: rhythmRules, texRules: texRules,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
-            isKosmicSpace: isKosmicSpace, spaceDraws: spaceDraws.notes,
+            isKosmicSpace: isKosmicSpace,
             spaceArrangement: spaceArrangement
         )
 
+        // Space only: the drum rules name its fills and skip bars where a Space box has dropped out.
+        // Base Kosmic and Drift never passed them, and their annotations stay as they were.
         var stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents,
-                                                    frame: frame, bassEvolutionBars: bassEvolutionBars,
+                                                    frame: frame, drumRules: isKosmicSpace ? drumRules : [],
+                                                    bassEvolutionBars: bassEvolutionBars,
                                                     rhythmRules: rhythmRules, texRules: texRules,
                                                     xFilesBars: xFilesBars,
                                                     driftBridgeLabels: driftBridgeLabels)
         // Kosmic Space: a coordinated break is called out in the playback log as it happens, e.g.
         // "Bar 071  Sequencer and Lead 2 drop out". A Lead 1 rest on its own is not — leads come
         // and go in every style — but it is in the Breaks line of the generation log.
-        if let b = spaceArrangement?.sequencerBreak {
-            // Name only the parts that are really playing either side of the break.
-            func plays(_ track: Int, _ bars: Range<Int>) -> Bool {
-                trackEvents[track].contains { bars.contains($0.stepIndex / 16) }
-            }
-            var leaving = ["Sequencer"], returning = ["Sequencer"]
-            if plays(kTrackLead2, (b.lowerBound - 4)..<b.lowerBound) { leaving.append("Lead 2") }
-            if plays(kTrackLead2, b.upperBound..<(b.upperBound + 4)) { returning.append("Lead 2") }
-            func line(_ parts: [String], _ one: String, _ many: String) -> String {
-                parts.joined(separator: " and ") + " " + (parts.count == 1 ? one : many)
-            }
-            stepAnnotations[b.lowerBound * 16, default: []].append(
-                GenerationLogEntry(tag: "", description: line(leaving, "drops out", "drop out")))
-            stepAnnotations[b.upperBound * 16, default: []].append(
-                GenerationLogEntry(tag: "", description: line(returning, "returns", "return")))
+        if let arr = spaceArrangement {
+            appendSpaceBreakLines(&stepAnnotations, arr, lead2: trackEvents[kTrackLead2])
         }
 
         // The bridge is called out at its first bar, as Drift's are; it ends where B begins, which
         // has its own line.
         if let bridge = spaceArrangement?.bridge {
-            let name = bridge.kind == .breakdown ? "Magnetic breakdown" : "Rendez-Vous solo"
+            let name = bridge.kind == .breakdown ? "Magnetic breakdown" : "Sequencer solo"
             stepAnnotations[bridge.range.lowerBound * 16, default: []].append(
                 GenerationLogEntry(tag: "Bridge", description: "\(name) \(bridge.range.count) bar"))
         }
 
-        // Simpler drum stretches are called out as they start and end. Mini Pops drops out in its
-        // first two; Hand Percussion thins over every bass or drum stretch.
         if let arr = spaceArrangement {
-            var calls: [(range: Range<Int>, start: String)] = []
-            switch percussionStyle {
-            case .spaceOxygenePresetBox: calls = arr.drumThins.map { ($0.range, "Drums simplify") }
-            case .minimal:               calls = arr.miniPopsDropouts.map { ($0, "Drums drop out") }
-            case .spaceOxygeneHandPercussion: calls = arr.thinRanges.map { ($0, "Drums simplify") }
-            default: break
-            }
-            for c in calls {
-                stepAnnotations[c.range.lowerBound * 16, default: []].append(
-                    GenerationLogEntry(tag: "", description: c.start))
-                stepAnnotations[c.range.upperBound * 16, default: []].append(
-                    GenerationLogEntry(tag: "", description: "Drums return"))
-            }
+            appendSpaceDrumLines(&stepAnnotations, arr, drumRules: drumRules)
         }
 
         var forced: [String: String] = [:]
@@ -1661,7 +1509,6 @@ struct SongGenerator {
         let newTrackSeed = overrideSeed ?? UInt64.random(in: .min ... .max)
         var rng = SeededRNG(seed: newTrackSeed)
         var usedRules: Set<String> = []
-        let regenSpaceDraws = KosmicSpaceDraws()
         let isSpace = songState.style == .kosmic && songState.isKosmicSpace
         let regenArrangement = isSpace
             ? KosmicSpaceArrangement.make(structure: songState.structure,
@@ -1710,7 +1557,7 @@ struct SongGenerator {
                     isKosmicDrift: songState.isKosmicDrift,
                     isDriftDreamscape: songState.isDriftDreamscape,
                     driftVelocityBase: 89,
-                    spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement)
+                    spaceArrangement: regenArrangement)
             } else if isChill {
                 var ignoredFills: [Int] = []
                 let regenSohoPlan: ChillDrumGenerator.SohoDrumPlan? = songState.chillSohoVariation
@@ -1748,8 +1595,12 @@ struct SongGenerator {
                     isKosmicDrift: songState.isKosmicDrift,
                     isDriftDreamscape: songState.isDriftDreamscape,
                     driftVelocityBase: 89,
-                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement,
-                    spaceBusyRhythm: songState.generationLog.contains { $0.tag == "KOS-RTHM-005" })
+                    isKosmicSpace: isSpace, spaceArrangement: regenArrangement,
+                    // The song's own Rhythm rule, from the log as generated: regen lines pile up
+                    // after it, and reload replays Rhythm before Bass, so reading the whole log let
+                    // a reloaded bass come back different from the one heard (found 2026-11-03).
+                    spaceBusyRhythm: songState.generationLog.prefix { $0.tag != "⚡ REGEN" }
+                        .contains { KosmicBassGenerator.spaceBusyRhythms.contains($0.tag) })
             } else if isChill {
                 events = ChillBassGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1825,7 +1676,7 @@ struct SongGenerator {
                     lead1BaseRule: &unusedBaseRule, xFilesBars: &unusedXFilesBars,
                     isKosmicDrift: songState.isKosmicDrift,
                     isDriftDreamscape: songState.isDriftDreamscape,
-                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement)
+                    isKosmicSpace: isSpace, spaceArrangement: regenArrangement)
             } else if isChill {
                 (events, _, _, _) = ChillLeadGenerator.generateLead1(
                     frame: songState.frame, structure: songState.structure,
@@ -1896,7 +1747,7 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     isKosmicDrift: songState.isKosmicDrift,
-                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement)
+                    isKosmicSpace: isSpace, spaceArrangement: regenArrangement)
             } else if isChill {
                 events = ChillRhythmGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1939,7 +1790,7 @@ struct SongGenerator {
                     kosmicProgFamily: songState.kosmicProgFamily,
                     rng: &rng, usedRuleIDs: &usedRules,
                     isKosmicDrift: songState.isKosmicDrift,
-                    isKosmicSpace: isSpace, spaceDraws: regenSpaceDraws, spaceArrangement: regenArrangement)
+                    isKosmicSpace: isSpace, spaceArrangement: regenArrangement)
             } else if isChill && songState.chillSohoVariation {
                 // Chill Soho texture is MIDI and never absent — regenerate it, re-reading the
                 // song's existing drum track so the stabs still land on its crashes.
@@ -1998,6 +1849,25 @@ struct SongGenerator {
             events = foldedIntoRegister(events, bounds)
         }
 
+        // A regenerated Kosmic lead gets the harmonic filter a generated song's leads get, the clash
+        // guard, the lift above the pads and the velocity arc; regen had skipped it (found 2026-11-03).
+        if isKosmic, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
+            events = HarmonicFilter.filterLead(events, track: trackIndex,
+                                               pads: songState.trackEvents[kTrackPads],
+                                               frame: songState.frame, structure: songState.structure,
+                                               bounds: kRegisterBounds[trackIndex] ?? RegisterBounds(low: 55, high: 88))
+        }
+
+        // A regenerated Drift track gets its bridge treatment, as generation gives it, replayed on a
+        // copy of the song so the other tracks are untouched. Lead 1's Lead Synth is rebuilt below.
+        if isKosmic && songState.isKosmicDrift
+            && [kTrackLead1, kTrackPads, kTrackRhythm, kTrackBass, kTrackDrums].contains(trackIndex) {
+            var song = songState.trackEvents
+            song[trackIndex] = events
+            _ = applyDriftBridges(&song, structure: songState.structure, seed: songState.globalSeed)
+            events = song[trackIndex]
+        }
+
         // Build regen log entries for the status box
         let trackName = trackIndex < kTrackNames.count ? kTrackNames[trackIndex] : "Track \(trackIndex)"
         var regenLog: [GenerationLogEntry] = [
@@ -2048,12 +1918,44 @@ struct SongGenerator {
             newStepAnnotations = cleared
         }
 
+        // Kosmic Space: a regenerated drum track may be a different box, with its own fills and
+        // stretches, and a regenerated Lead 2 may play where the old one did not, so their playback
+        // lines are rebuilt rather than kept (found 2026-11-03).
+        if let arr = regenArrangement, trackIndex == kTrackDrums || trackIndex == kTrackLead2 {
+            var notes = newStepAnnotations ?? songState.stepAnnotations
+            let drumLines: Set<String> = ["Drums simplify", "Drums drop out", "Drums return"]
+            for key in notes.keys {
+                notes[key]?.removeAll { e in
+                    trackIndex == kTrackDrums
+                        ? e.tag == "Drum fill" || (e.tag.isEmpty && drumLines.contains(e.description))
+                        : e.tag.isEmpty && e.description.hasPrefix("Sequencer")
+                }
+                if notes[key]?.isEmpty == true { notes.removeValue(forKey: key) }
+            }
+            if trackIndex == kTrackDrums {
+                appendSpaceDrumLines(&notes, arr, drumRules: usedRules)
+                for (step, lines) in spaceFillLines(drums: events, drumRules: usedRules, structure: songState.structure,
+                                                    totalBars: songState.frame.totalBars) {
+                    notes[step, default: []] += lines
+                }
+            } else {
+                appendSpaceBreakLines(&notes, arr, lead2: events)
+            }
+            newStepAnnotations = notes
+        }
+
         var updated = songState.replacingEvents(events, forTrack: trackIndex, appendingLog: regenLog,
                                                  replacingStepAnnotations: newStepAnnotations)
         if ambientAudioTextureChanged {
             updated = updated.withAmbientAudioTexture(regenAmbientAudioTexture, offset: regenAmbientAudioOffset)
         }
         updated.trackOverrides[trackIndex] = newTrackSeed
+        // A regenerated Kosmic Lead 1 takes its Lead Synth doubling with it; the Polysynth had kept
+        // doubling the old line under the new one (found 2026-11-03).
+        if isKosmic && trackIndex == kTrackLead1 {
+            updated = updated.replacingEvents(kosmicLeadSynth(events, isKosmicDrift: songState.isKosmicDrift),
+                                              forTrack: kTrackLeadSynth)
+        }
         // A regenerated bass has its own slides; re-mark them in the log.
         if trackIndex == kTrackBass && isChill { updated = ChillBassSlides.annotated(updated) }
         // A regenerated Chill Lead 1 has its own returns to form; re-mark them.
@@ -2064,6 +1966,220 @@ struct SongGenerator {
                                               appendingLog: [], replacingStepAnnotations: notes)
         }
         return updated
+    }
+
+    // MARK: - Kosmic Space playback lines
+    // Built here, not inline, so a regenerated drum, Lead 2 or Rhythm track rebuilds its own lines
+    // rather than keeping the old track's (found 2026-11-03).
+
+    /// The sequencer break, naming only the parts really playing either side of it.
+    static func appendSpaceBreakLines(_ notes: inout [Int: [GenerationLogEntry]],
+                                      _ arr: KosmicSpaceArrangement, lead2: [MIDIEvent]) {
+        guard let b = arr.sequencerBreak else { return }
+        func plays(_ bars: Range<Int>) -> Bool { lead2.contains { bars.contains($0.stepIndex / 16) } }
+        var leaving = ["Sequencer"], returning = ["Sequencer"]
+        if plays((b.lowerBound - 4)..<b.lowerBound) { leaving.append("Lead 2") }
+        if plays(b.upperBound..<(b.upperBound + 4)) { returning.append("Lead 2") }
+        func line(_ parts: [String], _ one: String, _ many: String) -> String {
+            parts.joined(separator: " and ") + " " + (parts.count == 1 ? one : many)
+        }
+        notes[b.lowerBound * 16, default: []].append(
+            GenerationLogEntry(tag: "", description: line(leaving, "drops out", "drop out")))
+        notes[b.upperBound * 16, default: []].append(
+            GenerationLogEntry(tag: "", description: line(returning, "returns", "return")))
+    }
+
+    /// Simpler drum stretches, called out as they start and end, for the song's Space drum rule.
+    /// Mini Pops drops out in its first two; Hand Percussion thins over every bass or drum stretch.
+    static func appendSpaceDrumLines(_ notes: inout [Int: [GenerationLogEntry]],
+                                     _ arr: KosmicSpaceArrangement, drumRules: Set<String>) {
+        let calls: [(range: Range<Int>, start: String)]
+        if drumRules.contains("KOS-DRUM-009")      { calls = arr.drumThins.map { ($0.range, "Drums simplify") } }
+        else if drumRules.contains("KOS-DRUM-001") { calls = arr.miniPopsDropouts.map { ($0, "Drums drop out") } }
+        else if drumRules.contains("KOS-DRUM-012") { calls = arr.thinRanges.map { ($0, "Drums simplify") } }
+        else { calls = [] }
+        for c in calls {
+            notes[c.range.lowerBound * 16, default: []].append(GenerationLogEntry(tag: "", description: c.start))
+            notes[c.range.upperBound * 16, default: []].append(GenerationLogEntry(tag: "", description: "Drums return"))
+        }
+    }
+
+    /// Kosmic Drift's bridge treatments, one per bridge section, shaping the events in its bars:
+    /// Rhythm, Lead 1, Bass, Drums and Pads. Returns the log label for each bridge's first bar.
+    /// Its draws come from streams on the song seed and depend on no note except the modulation
+    /// bridge's Rhythm thinning, which touches Rhythm alone, so a regen can replay it for one track
+    /// on a copy of the song and keep that track (found 2026-11-03: regen had skipped it).
+    static func applyDriftBridges(_ trackEvents: inout [[MIDIEvent]], structure: SongStructure,
+                                  seed: UInt64) -> [Int: String] {
+        var driftBridgeLabels: [Int: String] = [:]   // [bridgeStartBar: logLabel]
+        let bridgeSections = structure.sections.filter {
+            $0.label == .bridge || $0.label == .bridgeAlt || $0.label == .bridgeMelody
+        }
+        if !bridgeSections.isEmpty {
+            var bridgeRNG = SeededRNG(seed: seed &+ 0xDB)
+
+            for sec in bridgeSections {
+                let s = sec.startBar; let e = sec.endBar
+
+                // Helper: is an event inside this bridge section?
+                func inBridge(_ ev: MIDIEvent) -> Bool {
+                    let b = ev.stepIndex / 16; return b >= s && b < e
+                }
+
+                // Pick Drift bridge type — weighted per plan
+                // Harmonic Dissolution 35%, Modulation+Thin 25%, Solo Breath 20%,
+                // Textural Fade 12%, Bass Exit 8%
+                let bRoll = bridgeRNG.nextDouble()
+                let bridgeType: Int  // 0=dissolution, 1=modulation, 2=breath, 3=fade, 4=bassExit
+                if      bRoll < 0.35 { bridgeType = 0 }
+                else if bRoll < 0.60 { bridgeType = 1 }
+                else if bRoll < 0.80 { bridgeType = 2 }
+                else if bRoll < 0.92 { bridgeType = 3 }
+                else                 { bridgeType = 4 }
+
+                switch bridgeType {
+
+                case 0: // HARMONIC DISSOLUTION
+                // Sequencer stops. Lead silent. Bass silent.
+                // Pads sustain softly — the only sound is held chords dissolving into reverb.
+                driftBridgeLabels[s] = "Harmonic dissolution"
+                trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { !inBridge($0) }
+                trackEvents[kTrackLead1]  = trackEvents[kTrackLead1].filter  { !inBridge($0) }
+                trackEvents[kTrackBass]   = trackEvents[kTrackBass].filter   { !inBridge($0) }
+                trackEvents[kTrackDrums]  = trackEvents[kTrackDrums].filter  { !inBridge($0) }
+                // Pads: keep but soften — they blur and sustain into the silence
+                trackEvents[kTrackPads] = trackEvents[kTrackPads].map { ev in
+                    guard inBridge(ev) else { return ev }
+                    return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                     velocity: UInt8(max(15, Int(ev.velocity) * 55 / 100)),
+                                     durationSteps: ev.durationSteps)
+                }
+
+                case 1: // MODULATION + THINNED GROOVE
+                // Groove strips to kick only. Sequencer thins. Pads + bass + rhythm
+                // transpose by ±3 or +5 semitones. Harmonic shift with rhythmic continuity.
+                let semitones = bridgeRNG.nextDouble() < 0.60 ? 3 : 5
+                driftBridgeLabels[s] = "Modulation +\(semitones) semitones"
+                // Drums: kick only in bridge
+                let kickNote = GMDrum.kick.rawValue
+                trackEvents[kTrackDrums] = trackEvents[kTrackDrums].filter { ev in
+                    guard inBridge(ev) else { return true }
+                    return ev.note == kickNote
+                }
+                // Rhythm: thin to 35% non-downbeat retention
+                var modRNG = SeededRNG(seed: seed &+ 0xDC)
+                trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { ev in
+                    guard inBridge(ev) else { return true }
+                    return ev.stepIndex % 16 == 0 || modRNG.nextDouble() < 0.35
+                }
+                // Transpose melodic tracks by semitones
+                for track in [kTrackRhythm, kTrackBass, kTrackPads, kTrackLead1] {
+                    trackEvents[track] = trackEvents[track].map { ev in
+                        guard inBridge(ev) else { return ev }
+                        let newNote = Int(ev.note) + semitones
+                        guard newNote >= 0 && newNote <= 127 else { return ev }
+                        return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(newNote),
+                                         velocity: ev.velocity, durationSteps: ev.durationSteps)
+                    }
+                }
+
+                case 2: // SOLO BREATH
+                // Everything drops except Lead 1 and a softened root pad.
+                // No groove, no sequencer, no bass — maximum space for the lead voice.
+                driftBridgeLabels[s] = "Solo breath"
+                trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { !inBridge($0) }
+                trackEvents[kTrackDrums]  = trackEvents[kTrackDrums].filter  { !inBridge($0) }
+                trackEvents[kTrackBass]   = trackEvents[kTrackBass].filter   { !inBridge($0) }
+                // Pads: keep only the lowest note per step (root drone), softened
+                var breathPadByStep: [Int: MIDIEvent] = [:]
+                for ev in trackEvents[kTrackPads] where inBridge(ev) {
+                    if let existing = breathPadByStep[ev.stepIndex] {
+                        if ev.note < existing.note { breathPadByStep[ev.stepIndex] = ev }
+                    } else {
+                        breathPadByStep[ev.stepIndex] = ev
+                    }
+                }
+                trackEvents[kTrackPads] = trackEvents[kTrackPads].filter { !inBridge($0) }
+                    + breathPadByStep.values.map { ev in
+                        MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                  velocity: UInt8(max(15, Int(ev.velocity) * 50 / 100)),
+                                  durationSteps: ev.durationSteps)
+                    }.sorted { $0.stepIndex < $1.stepIndex }
+
+                case 3: // TEXTURAL FADE
+                // All tracks fade to near-silence over the bridge span — rhythm, bass,
+                // pads, drums all ramp down to ~20% velocity. Lead stays at full level
+                // so it surfaces above the fading texture.
+                driftBridgeLabels[s] = "Textural fade"
+                let bridgeSteps = sec.lengthBars * 16
+                for track in [kTrackRhythm, kTrackBass, kTrackPads, kTrackDrums] {
+                    trackEvents[track] = trackEvents[track].map { ev in
+                        guard inBridge(ev) else { return ev }
+                        let pos = Double(ev.stepIndex - s * 16) / Double(max(1, bridgeSteps))
+                        let scale = max(20, Int(100 - pos * 80))   // 100% → 20%
+                        return MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                                         velocity: UInt8(max(1, Int(ev.velocity) * scale / 100)),
+                                         durationSteps: ev.durationSteps)
+                    }
+                }
+
+                default: // BASS EXIT (case 4)
+                // Bass drops silently for the bridge duration. Groove and sequencer
+                // continue unchanged. The absence of the bass creates an unanchored,
+                // floating quality. Confirmed by Roygbiv MIDI (bars 25-32).
+                driftBridgeLabels[s] = "Bass exit"
+                trackEvents[kTrackBass] = trackEvents[kTrackBass].filter { !inBridge($0) }
+
+                } // end switch
+            } // end for bridgeSec
+        } // end if !bridgeSections.isEmpty
+        return driftBridgeLabels
+    }
+
+    /// Kosmic Space's fill lines, read from the drum track itself. Its fills fall at section changes,
+    /// thin-stretch ends, breaks and the bridge, which the structural fill candidates do not all
+    /// cover, and its boxes drop out or fall to the kick alone, which read as fills that never
+    /// played. Space fills use voices the boxes otherwise never play: snare, toms and claves, and
+    /// for Hand Percussion the high bongo (60). Two or more of them make a fill (the claves accent is
+    /// one), and the first gives its length. 1-beat fills are left out, as for every style.
+    /// No fill plays claves now; they stay in the list for the accent.
+    static func spaceFillLines(drums: [MIDIEvent], drumRules: Set<String>,
+                               structure: SongStructure, totalBars: Int) -> [Int: [GenerationLogEntry]] {
+        let hands = drumRules.contains("KOS-DRUM-012")
+        guard hands || drumRules.contains("KOS-DRUM-001") || drumRules.contains("KOS-DRUM-009") else { return [:] }
+        let toms = Set([GMDrum.hiTom, .hiMidTom, .lowMidTom, .highFloorTom, .lowFloorTom].map(\.rawValue))
+        let voices: Set<UInt8> = hands ? [GMDrum.highBongo.rawValue]
+                                       : toms.union([GMDrum.snare.rawValue, GMDrum.claves.rawValue])
+        let bodyEnd = structure.outroSection?.startBar ?? totalBars
+        var byBar: [Int: [MIDIEvent]] = [:]
+        for ev in drums where voices.contains(ev.note) { byBar[ev.stepIndex / 16, default: []].append(ev) }
+        var out: [Int: [GenerationLogEntry]] = [:]
+        for (bar, hits) in byBar where hits.count >= 2 && bar < bodyEnd {
+            guard let sec = structure.section(atBar: bar), sec.label != .intro && sec.label != .outro,
+                  let first = hits.map({ $0.stepIndex % 16 }).min() else { continue }
+            let beats = first >= 12 ? 1 : first >= 8 ? 2 : 3
+            guard beats > 1 else { continue }
+            let notes = Set(hits.map(\.note))
+            // The kick and snare fill puts a kick on beat 4, which neither box plays
+            let kickOnFour = drums.contains { $0.stepIndex == bar * 16 + 12 && $0.note == GMDrum.kick.rawValue }
+            let name = hands ? "conga roll"
+                : !notes.isDisjoint(with: toms) ? "tom roll"
+                : kickOnFour ? "kick and snare fill" : "snare roll"
+            // Fired a beat ahead of the fill, as every style's fill lines are
+            out[bar * 16 + (beats == 2 ? 4 : 0)] = [GenerationLogEntry(tag: "Drum fill", description: "\(beats) beat \(name)")]
+        }
+        return out
+    }
+
+    /// Kosmic's hidden Lead Synth layer: Lead 1 doubled on Polysynth at 60% velocity.
+    /// Drift: raised to 75% so the Polysynth doubler adds warmth and body to the sparser lead.
+    static func kosmicLeadSynth(_ lead1: [MIDIEvent], isKosmicDrift: Bool) -> [MIDIEvent] {
+        let scale = isKosmicDrift ? 75 : 60
+        return lead1.map { ev in
+            MIDIEvent(stepIndex: ev.stepIndex, note: ev.note,
+                      velocity: UInt8(max(1, Int(ev.velocity) * scale / 100)),
+                      durationSteps: ev.durationSteps)
+        }
     }
 
     /// A Chill lead with bar 0 removed when the song has no intro — see generateChill.
@@ -2882,7 +2998,6 @@ struct SongGenerator {
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
         isKosmicSpace: Bool = false,
-        spaceDraws: [String: String] = [:],
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
@@ -2894,8 +3009,6 @@ struct SongGenerator {
         let styleDesc = isKosmicSpace ? "Kosmic Space"
             : isDriftDreamscape ? "Kosmic Drift — Dreamscape" : isKosmicDrift ? "Kosmic Drift" : "Kosmic"
         log.append(GenerationLogEntry(tag: "Style", description: "\(styleDesc) – \(frame.tempo) bpm"))
-        // Space rule lines stay short: the per-song draws are not shown in the log.
-        func withDraws(_ ruleID: String, _ desc: String) -> String { desc }
 
         // Kosmic form
         let kosmicFormLabel: String
@@ -2919,39 +3032,39 @@ struct SongGenerator {
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicRthmRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicRthmRuleDescription(ruleID)))
         }
 
         // Lead 1
         for ruleID in lead1Rules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicLeadRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicLeadRuleDescription(ruleID)))
         }
 
         // Lead 2 — skip any rule already shown under Lead 1 (same rule = Lead 2 mirrors Lead 1
         // with a timing offset; logging it twice is redundant and looks like a bug).
         for ruleID in lead2Rules.sorted() {
             guard !lead1Rules.contains(ruleID) else { continue }
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicLeadRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicLeadRuleDescription(ruleID)))
         }
 
         // Pads
         for ruleID in padRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicPadRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicPadRuleDescription(ruleID)))
         }
 
         // Texture
         for ruleID in texRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicTexRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicTexRuleDescription(ruleID)))
         }
 
         // Bass
         for ruleID in bassRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicBassRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicBassRuleDescription(ruleID)))
         }
 
         // Drums
         for ruleID in drumRules.sorted() {
-            log.append(GenerationLogEntry(tag: ruleID, description: withDraws(ruleID, kosmicDrumRuleDescription(ruleID))))
+            log.append(GenerationLogEntry(tag: ruleID, description: kosmicDrumRuleDescription(ruleID)))
         }
 
         return log
@@ -3367,12 +3480,6 @@ struct SongGenerator {
                 }
                 return "double snap"
             case 2:
-                // Kosmic Space's preset box draws one of three fills (KosmicDrumGenerator.spaceFillEvents)
-                if drumRules.contains("KOS-DRUM-009") {
-                    if notes.contains(GMDrum.hiTom.rawValue)   { return "tom roll" }
-                    if notes.contains(GMDrum.cowbell.rawValue) { return "cowbell figure" }
-                    return "snare roll"
-                }
                 if notes.contains(GMDrum.hiTom.rawValue)  { return "Bonham tom roll" }
                 if notes.contains(GMDrum.kick.rawValue)   { return "funk cross" }
                 if evs.allSatisfy({ $0.note == GMDrum.snare.rawValue }) { return "double-time roll" }
@@ -3549,15 +3656,16 @@ struct SongGenerator {
         //    Fire steps:          1-beat → step 4,  2-beat → step 0,  3-beat → step 0.
         //    Skip entirely when percussion is absent (drum track empty), or for Ambient.
         let hasDrums = includeDrumFills && kTrackDrums < trackEvents.count && !trackEvents[kTrackDrums].isEmpty
-        for fillBar in allFillBars.sorted() where fillBar < outroStartBar && hasDrums {
+        // Kosmic Space reads its fills from the drum track (spaceFillLines); drumRules is passed for
+        // Space songs only.
+        let spaceFills = hasDrums && kTrackDrums < trackEvents.count
+            ? spaceFillLines(drums: trackEvents[kTrackDrums], drumRules: drumRules, structure: structure, totalBars: totalBars)
+            : [:]
+        let isSpaceKit = ["KOS-DRUM-001", "KOS-DRUM-009", "KOS-DRUM-012"].contains { drumRules.contains($0) }
+        for (step, lines) in spaceFills.sorted(by: { $0.key < $1.key }) { out[step, default: []] += lines }
+        for fillBar in allFillBars.sorted() where fillBar < outroStartBar && hasDrums && !isSpaceKit {
             guard let sec = structure.section(atBar: fillBar),
                   sec.label != .intro && sec.label != .outro && !sec.label.isBridge else { continue }
-            // Kosmic Space's Mini Pops drops out for whole stretches; with no hats there the bar
-            // read as a 3-beat fill that never played (Fluxion III, 2026-11-03). A Mini Pops bar
-            // always has a hat on beat 1, so a bar without one is a dropout bar. The same holds for
-            // the preset box, silent through the sequencer solo bridge but for its closing fill.
-            if drumRules.contains("KOS-DRUM-001") || drumRules.contains("KOS-DRUM-009"),
-               !(drumByBar[fillBar] ?? []).contains(where: { $0.stepIndex % 16 < 4 }) { continue }
             let beats  = fillBeats(bar: fillBar)
             guard beats > 1 else { continue }  // 1-beat fills are too brief to clutter the log with
             let name   = fillName(bar: fillBar, beats: beats)

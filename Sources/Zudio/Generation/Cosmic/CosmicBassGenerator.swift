@@ -8,6 +8,10 @@ import Foundation
 
 struct KosmicBassGenerator {
 
+    /// Space Rhythm rules the Pump is never drawn under: JMJ Dual-Rate, and the Octave Sequencer, about
+    /// 10 notes a bar against the Pump's 12 (Zack, 2026-11-03: too busy with Lead 1 over them).
+    static let spaceBusyRhythms: Set<String> = ["KOS-RTHM-005", "KOS-RTHM-016"]
+
     static func generate(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
@@ -20,7 +24,6 @@ struct KosmicBassGenerator {
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil,
         spaceArrangement: KosmicSpaceArrangement? = nil,
         spaceBusyRhythm: Bool = false
     ) -> [MIDIEvent] {
@@ -30,8 +33,8 @@ struct KosmicBassGenerator {
         let weights: [Double]
         if isKosmicSpace {
             // KOS-BASS-018 Oxygene Falling Walk and KOS-BASS-020 Oxygene 8 Pump 37.5% each,
-            // KOS-BASS-001 Berlin School drone 25%. The Pump is never drawn under KOS-RTHM-005 JMJ
-            // Dual-Rate, the busiest Space rhythm: the walk takes its share.
+            // KOS-BASS-001 Berlin School drone 25%. The Pump is never drawn under the busy Space
+            // rhythms in `spaceBusyRhythms`: the walk takes its share.
             rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001"]
             weights = spaceBusyRhythm ? [0.75, 0.0, 0.25] : [0.375, 0.375, 0.25]
         } else if isKosmicDrift {
@@ -174,7 +177,7 @@ struct KosmicBassGenerator {
             boc016Cell = [(0, vb), (second, vb), (0, vb), (fifth, vb)]
         }
 
-        let fallingWalk = ruleID == "KOS-BASS-018" ? oxygeneWalkDraws(rng: &rng, draws: spaceDraws) : nil
+        let fallingWalk = ruleID == "KOS-BASS-018" ? oxygeneWalkDraws(rng: &rng) : nil
         // KOS-BASS-020: 30% of songs drop the b7 and pump bare octaves
         let pumpSeventh: Bool? = ruleID == "KOS-BASS-020" ? rng.nextDouble() >= 0.30 : nil
         // KOS-BASS-020 fifth-voicing bars: the turnaround of each 8-bar chord loop — a non-tonic window
@@ -351,45 +354,37 @@ struct KosmicBassGenerator {
                 continue
             }
 
-            // KOS-BASS-018: the whole figure, every body bar. Space has no bridges or sub-layers.
-            if let walk = fallingWalk {
-                // A thin stretch plays half the walk (steps 0, 6 and 12, held longer); its edges are annotated
-                // as "pattern evolving" through bassEvolutionBars.
+            // KOS-BASS-018 Falling Walk and KOS-BASS-020 Pump, every body bar. Space has no bridges or
+            // sub-layers. Both thin over the arrangement's bass stretches, whose edges are annotated as
+            // "pattern evolving" through bassEvolutionBars, and both vary on the same bars: a turn in
+            // the last bar before a new body section, a breath in the second bar of each 8.
+            if fallingWalk != nil || pumpSeventh != nil {
                 let thin = spaceArrangement?.bassThins(atBar: bar) == true
                 if section.label == .A || section.label == .B,
                    thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
                     bassEvolutionBars.append(bar)
                 }
-                // Variation, lighter than the Pump's: a breath in the second bar of each 8 and a turn
-                // in the last bar before a new body section.
                 let next = structure.section(atBar: bar + 1)
                 let turn = bar == section.endBar - 1 && (next?.label == .A || next?.label == .B)
-                let variant: WalkVariant = turn ? .turn
-                    : (bar - section.startBar) % 8 == 1 ? .breath : .normal
-                events += oxygeneFallingWalkBar(barStart: barStart, bar: bar, entry: entry,
-                                                frame: frame, walk: walk, thin: thin, variant: variant)
-                continue
-            }
-
-            // KOS-BASS-020: the pump, every body bar; a thin stretch drops the low hits.
-            if let seventh = pumpSeventh {
-                let thin = spaceArrangement?.bassThins(atBar: bar) == true
-                if section.label == .A || section.label == .B,
-                   thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
-                    bassEvolutionBars.append(bar)
+                let breath = (bar - section.startBar) % 8 == 1
+                if let walk = fallingWalk {
+                    // A thin bar plays half the walk (steps 0, 6 and 12, held longer). The variation is
+                    // lighter than the Pump's.
+                    let variant: WalkVariant = turn ? .turn : breath ? .breath : .normal
+                    events += oxygeneFallingWalkBar(barStart: barStart, bar: bar, entry: entry,
+                                                    frame: frame, walk: walk, thin: thin, variant: variant)
+                } else if let seventh = pumpSeventh {
+                    // A thin bar drops the low hits. As the source does it, the Pump also takes the
+                    // fifth voicing on the loop's turnaround and a late entry on the first bar of every
+                    // body section after the first.
+                    let variant: PumpVariant = turn ? .turn
+                        : pumpFifthBars.contains(bar) ? .fifth
+                        : breath ? .breath
+                        : .normal
+                    let lateEntry = bar == section.startBar && bar != firstBodyStart
+                    events += oxygenePumpBar(barStart: barStart, entry: entry, frame: frame,
+                                             seventh: seventh, thin: thin, variant: variant, lateEntry: lateEntry)
                 }
-                // Variation, as the source does it: a turn in the last bar before a new body section,
-                // the fifth voicing on the loop's turnaround, a breath in the second bar of each 8,
-                // and a late entry on the first bar of every body section after the first.
-                let next = structure.section(atBar: bar + 1)
-                let turn = bar == section.endBar - 1 && (next?.label == .A || next?.label == .B)
-                let variant: PumpVariant = turn ? .turn
-                    : pumpFifthBars.contains(bar) ? .fifth
-                    : (bar - section.startBar) % 8 == 1 ? .breath
-                    : .normal
-                let lateEntry = bar == section.startBar && bar != firstBodyStart
-                events += oxygenePumpBar(barStart: barStart, entry: entry, frame: frame,
-                                         seventh: seventh, thin: thin, variant: variant, lateEntry: lateEntry)
                 continue
             }
 
@@ -558,18 +553,43 @@ struct KosmicBassGenerator {
             }
         }
 
-        // Kosmic Space bridge: the sequencer solo silences the bass; the breakdown holds the chord
-        // root an octave down, re-attacked every 2 bars, under the breakdown's slower chords.
+        // Kosmic Space: the Berlin School drone is already sparse, so where the walk and the Pump thin
+        // it drops out, and returns with the full beat under the closing fill (Zack, 2026-11-03). The
+        // first drum stretch always takes the bass with it, so every drone song has one full drop.
+        // Before the bridge pass, which reads B's first bass note. No draws.
+        if isKosmicSpace, ruleID == "KOS-BASS-001", let arr = spaceArrangement, !arr.bassThins.isEmpty {
+            events = silenceBars(events, arr.bassThins)
+            for r in arr.bassThins { bassEvolutionBars += [r.lowerBound, r.upperBound] }
+        }
+
+        // Kosmic Space bridge: the breakdown holds the chord root an octave down, re-attacked every
+        // 2 bars, under the breakdown's slower chords. The sequencer solo silences the bass after one
+        // such root on its first bar, which marks the drop (Zack, 2026-11-03). Both end on a two-note
+        // pickup on steps 12 and 14 of the last bar, walking up by scale step to the bass's first note
+        // in B, under the drums' return fill. No draws.
         if isKosmicSpace, let bridge = spaceArrangement?.bridge {
+            let pickupStart = bridge.pickupStep
+            let returnBar = bridge.range.upperBound
+            let target = events.filter { $0.stepIndex / 16 == returnBar }.min { $0.stepIndex < $1.stepIndex }
+                .map { Int($0.note) }
+                ?? tonalMap.entry(atBar: returnBar).map { Int(bassRoot(entry: $0, frame: frame)) }
             events = silenceBars(events, [bridge.range])
-            if bridge.kind == .breakdown {
-                for bar in stride(from: bridge.range.lowerBound, to: bridge.range.upperBound, by: 2) {
-                    guard let entry = tonalMap.entry(atBar: bar) else { continue }
-                    events.append(MIDIEvent(stepIndex: bar * 16, note: bassRoot(entry: entry, frame: frame) - 12,
-                                            velocity: 84, durationSteps: 30))
-                }
-                events.sort { $0.stepIndex < $1.stepIndex }
+            let holdBars = bridge.kind == .breakdown
+                ? Array(stride(from: bridge.range.lowerBound, to: bridge.range.upperBound, by: 2))
+                : [bridge.range.lowerBound]
+            for bar in holdBars {
+                guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                events.append(MIDIEvent(stepIndex: bar * 16, note: bassRoot(entry: entry, frame: frame) - 12,
+                                        velocity: 84, durationSteps: min(30, pickupStart - bar * 16)))
             }
+            if let target {
+                for (i, steps) in [-2, -1].enumerated() {
+                    events.append(MIDIEvent(stepIndex: pickupStart + i * 2,
+                                            note: UInt8(scaleStep(target, by: steps, scalePCs: frame.scalePCs)),
+                                            velocity: UInt8(80 + i * 8), durationSteps: 2))
+                }
+            }
+            events.sort { $0.stepIndex < $1.stepIndex }
         }
 
         return events
@@ -593,7 +613,7 @@ struct KosmicBassGenerator {
         let hits: [(step: Int, role: Int, dur: Int)]
     }
 
-    private static func oxygeneWalkDraws(rng: inout SeededRNG, draws: KosmicSpaceDraws?) -> OxygeneWalk {
+    private static func oxygeneWalkDraws(rng: inout SeededRNG) -> OxygeneWalk {
         let sets: [(steps: [Int], name: String)] = [([7, 5, 4], "octave-6th-5th"),
                                                     ([7, 4, 2], "octave-5th-3rd"),
                                                     ([7, 6, 4], "octave-b7-5th")]
@@ -603,7 +623,6 @@ struct KosmicBassGenerator {
         let hits: [(step: Int, role: Int, dur: Int)] = sourceRhythm
             ? [(0, 0, 4), (4, 1, 2), (6, 0, 4), (10, 2, 1), (12, 1, 2), (14, 2, 1)]
             : [(0, 0, 2), (2, 1, 2), (4, 0, 2), (6, 1, 4), (10, 2, 2), (12, 1, 2), (14, 2, 1)]
-        draws?.record("KOS-BASS-018", "\(set.name), \(sourceRhythm ? "source rhythm" : "alternate rhythm")")
         return OxygeneWalk(steps: set.steps, hits: hits)
     }
 

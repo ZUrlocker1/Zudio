@@ -22,15 +22,6 @@ struct KosmicPadsGenerator {
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
-        // Kosmic Space: the sequencer solo bridge leaves the pads out in half of its songs.
-        if let silences = spaceArrangement?.padsSilences, !silences.isEmpty {
-            return silenceBars(generate(frame: frame, structure: structure, tonalMap: tonalMap,
-                                        kosmicProgFamily: kosmicProgFamily, rng: &rng,
-                                        usedRuleIDs: &usedRuleIDs, forceRuleID: forceRuleID,
-                                        isKosmicDrift: isKosmicDrift, isKosmicSpace: isKosmicSpace),
-                               silences)
-        }
-
         // Pick primary pad rule
         let padRules:   [String] = ["KOS-PADS-001", "KOS-PADS-002", "KOS-PADS-003", "KOS-PADS-004", "KOS-PADS-005", "KOS-PADS-007"]
         let padWeights: [Double] = [0.18,           0.20,           0.18,           0.13,           0.13,            0.18]
@@ -331,7 +322,8 @@ struct KosmicPadsGenerator {
             }
         }
 
-        return events
+        // Kosmic Space: the sequencer solo bridge leaves the pads out in half of its songs.
+        return silenceBars(events, spaceArrangement?.padsSilences ?? [])
     }
 
     // MARK: - KOS-PAD-001: Long Drone

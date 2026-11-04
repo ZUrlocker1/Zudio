@@ -18,7 +18,6 @@ struct KosmicDrumGenerator {
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
-        spaceDraws: KosmicSpaceDraws? = nil,
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
@@ -35,9 +34,12 @@ struct KosmicDrumGenerator {
             usedRuleIDs.insert("KOS-DRUM-001")
             // The Space sequencer solo is one more dropout, ending on its fill; the box plays on
             // through the breakdown, already as sparse as one.
-            return generateMinimal(frame: frame, structure: structure, rng: &rng,
-                                   dropouts: (spaceArrangement?.miniPopsDropouts ?? [])
-                                       + (spaceArrangement?.soloRange ?? []))
+            let pops = generateMinimal(frame: frame, structure: structure, rng: &rng,
+                                       dropouts: (spaceArrangement?.miniPopsDropouts ?? [])
+                                           + (spaceArrangement?.soloRange ?? []),
+                                       soloDropout: spaceArrangement?.soloRange.first)
+            return markSpaceBridge(pops, arrangement: spaceArrangement, totalBars: frame.totalBars,
+                                   returnFill: .miniPops)
 
         case .motorikGrid:
             usedRuleIDs.insert("KOS-DRUM-004")
@@ -62,22 +64,57 @@ struct KosmicDrumGenerator {
 
         case .spaceOxygenePresetBox:
             usedRuleIDs.insert("KOS-DRUM-009")
-            return generateOxygenePresetBox(frame: frame, rng: &rng, draws: spaceDraws,
-                                            fillBars: spaceArrangement?.fillBars ?? [],
-                                            arrangement: spaceArrangement)
+            let box = generateOxygenePresetBox(frame: frame, rng: &rng,
+                                               fillBars: spaceArrangement?.fillBars ?? [],
+                                               arrangement: spaceArrangement)
+            return markSpaceBridge(box, arrangement: spaceArrangement, totalBars: frame.totalBars,
+                                   returnFill: .presetBox)
 
         case .spaceOxygeneHandPercussion:
             usedRuleIDs.insert("KOS-DRUM-012")
             // Thins to its sparse core through the breakdown and is silent through the solo.
-            let breakdown = spaceArrangement?.bridge.flatMap { $0.kind == .breakdown ? [$0.range] : nil } ?? []
             let hands = generateOxygeneHandPercussion(frame: frame, structure: structure, rng: &rng,
-                                                      thins: (spaceArrangement?.thinRanges ?? []) + breakdown)
-            return silenceBars(hands, spaceArrangement?.soloRange ?? [])
+                                                      thins: (spaceArrangement?.thinRanges ?? [])
+                                                          + (spaceArrangement?.breakdownRange ?? []))
+            return markSpaceBridge(silenceBars(hands, spaceArrangement?.soloRange ?? []),
+                                   arrangement: spaceArrangement, totalBars: frame.totalBars,
+                                   returnFill: .handPercussion)
 
         default:
             usedRuleIDs.insert("KOS-DRUM-000")
             return []
         }
+    }
+
+    // MARK: - Space bridge edges (Zack, 2026-11-03, La Nuit Hypnotique)
+    // The surf swell alone did not mark the way into a bridge or out of it. Every Space drum rule
+    // now crashes on the bridge's first downbeat and on B's, and ends the bridge on a 2-beat fill
+    // under the bass's pickup. The preset box already has its fill and B crash; Mini Pops has its
+    // dropout fill out of the solo and gets a snare roll out of the breakdown, which it plays
+    // through; Hand Percussion gets a falling bongo and conga roll, its own voices. No draws.
+
+    private enum BridgeReturnFill { case presetBox, miniPops, handPercussion }
+
+    private static func markSpaceBridge(_ events: [MIDIEvent], arrangement: KosmicSpaceArrangement?,
+                                        totalBars: Int, returnFill: BridgeReturnFill) -> [MIDIEvent] {
+        guard let bridge = arrangement?.bridge else { return events }
+        var events = events
+        switch returnFill {
+        case .presetBox:
+            break
+        case .miniPops where bridge.kind == .breakdown:
+            spliceFill(&events, .snareRoll, from: bridge.returnFillStep, beats: SpaceBridge.returnFillBeats)
+        case .miniPops:
+            break
+        case .handPercussion:
+            spliceFill(&events, .congaRoll, from: bridge.returnFillStep, beats: SpaceBridge.returnFillBeats)
+        }
+        let crashes = [bridge.range.lowerBound * 16, bridge.range.upperBound * 16]
+        for step in crashes where step / 16 < totalBars
+            && !events.contains(where: { $0.stepIndex == step && $0.note == GMDrum.crash1.rawValue }) {
+            events.append(MIDIEvent(stepIndex: step, note: GMDrum.crash1.rawValue, velocity: 78, durationSteps: 1))
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
     // MARK: - KOS-DRUM-012 Oxygene 6 Hand Percussion (Kosmic Space)
@@ -98,11 +135,11 @@ struct KosmicDrumGenerator {
     private static func generateOxygeneHandPercussion(frame: GlobalMusicalFrame, structure: SongStructure,
                                                       rng: inout SeededRNG,
                                                       thins: [Range<Int>] = []) -> [MIDIEvent] {
-        var voices: [(note: UInt8, steps: [Int], vel: UInt8)] = [
-            (61, [0, 8], 76), (62, [4], 76), (63, [6], 76), (64, [12, 14], 76),
-            (70, [0, 6], 72), (82, [2, 3, 4, 10, 12, 14], 70)
+        var voices: [(note: GMDrum, steps: [Int], vel: UInt8)] = [
+            (.lowBongo, [0, 8], 76), (.muteHighConga, [4], 76), (.openHighConga, [6], 76), (.lowConga, [12, 14], 76),
+            (.maracas, [0, 6], 72), (.shaker, [2, 3, 4, 10, 12, 14], 70)
         ]
-        if rng.nextDouble() < 0.60 { voices.append((85, [12, 13, 14], 48)) }
+        if rng.nextDouble() < 0.60 { voices.append((.castanets, [12, 13, 14], 48)) }
 
         // Guiro stretches: candidates are body section starts and 16-bar points, never running into
         // the outro; picked at random, two or three a song, each clear of the others by 8 bars.
@@ -127,21 +164,23 @@ struct KosmicDrumGenerator {
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
             if thins.contains(where: { $0.contains(bar) }) {
-                for (note, step, vel) in [(61, 0, 70), (61, 8, 66), (64, 12, 66), (82, 4, 50), (82, 12, 50)] {
-                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(note),
-                                            velocity: UInt8(vel), durationSteps: 1))
+                let core: [(GMDrum, Int, UInt8)] = [(.lowBongo, 0, 70), (.lowBongo, 8, 66), (.lowConga, 12, 66),
+                                                    (.shaker, 4, 50), (.shaker, 12, 50)]
+                for (note, step, vel) in core {
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: note.rawValue,
+                                            velocity: vel, durationSteps: 1))
                 }
                 continue
             }
             if guiro.contains(where: { $0.contains(bar) }) {
                 for (step, vel) in [(0, 38), (6, 30), (8, 38)] {
-                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: 74,
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: GMDrum.longGuiro.rawValue,
                                             velocity: UInt8(vel), durationSteps: 1))
                 }
             }
             for voice in voices {
-                for step in voice.steps where !(voice.note == 82 && step == 3 && bar % 8 == 7) {
-                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: voice.note,
+                for step in voice.steps where !(voice.note == .shaker && step == 3 && bar % 8 == 7) {
+                    events.append(MIDIEvent(stepIndex: bar * 16 + step, note: voice.note.rawValue,
                                             velocity: voice.vel, durationSteps: 1))
                 }
             }
@@ -170,12 +209,10 @@ struct KosmicDrumGenerator {
     private static func generateOxygenePresetBox(
         frame: GlobalMusicalFrame,
         rng: inout SeededRNG,
-        draws: KosmicSpaceDraws?,
         fillBars: [Int],
         arrangement: KosmicSpaceArrangement?
     ) -> [MIDIEvent] {
         let hatMasks = ["xx..xxx.xxx.xxx.", "xx..xxx.xx.xxxx.", "x.x.xxx.xxx.xxx.", "xx.xxx..xxx.xxx."]
-        let maskNames = ["source hats", "hat variant 1", "hat variant 2", "hat variant 3"]
         let maskIdx = rng.nextInt(upperBound: hatMasks.count)
         let hatSteps = hatMasks[maskIdx].enumerated()
             .compactMap { $0.element == "x" ? $0.offset : nil }
@@ -188,7 +225,6 @@ struct KosmicDrumGenerator {
                                                        (.tambourine, "tambourine")]
         let accent = accents[rng.nextInt(upperBound: accents.count)]
         let guardStep = hatSteps.last ?? 14
-        draws?.record("KOS-DRUM-009", "\(maskNames[maskIdx]), \(fourKicks ? "four kicks" : "three kicks"), \(accent.name) accent")
 
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
@@ -243,7 +279,7 @@ struct KosmicDrumGenerator {
         // kick that opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
         // A simpler stretch ends on a short fill into the fuller beat. Half the fills land on a
         // crash on the next downbeat (Zack, 2026-11-03). The fill out of the bridge is always 2 beats
-        // and always lands on a crash.
+        // and always lands on a crash, as does every kick and snare fill.
         let thinEnds = (arrangement?.drumThins ?? []).map { $0.range.upperBound - 1 }
         let bridgeFill = arrangement?.bridge.map { $0.range.upperBound - 1 }
         var seenFill = Set<Int>()
@@ -251,23 +287,20 @@ struct KosmicDrumGenerator {
         var lastFill: SpaceFill? = nil
         for bar in allFills where bar > 0 && bar < frame.totalBars {
             let drawnBeats = rng.nextDouble() < 0.80 ? 1 : 2
-            let beats = bar == bridgeFill ? 2 : drawnBeats
-            let from  = bar * 16 + 16 - beats * 4
-            events.removeAll { $0.stepIndex >= from && $0.stepIndex < bar * 16 + 16
-                               && $0.note != GMDrum.kick.rawValue && $0.note != GMDrum.clap.rawValue }
+            let beats = bar == bridgeFill ? SpaceBridge.returnFillBeats : drawnBeats
             let kind = drawSpaceFill(after: lastFill, rng: &rng)
             lastFill = kind
-            events += spaceFillEvents(kind, from: from, beats: beats)
-            let crash = rng.nextDouble() < 0.50 || bar == bridgeFill
+            spliceFill(&events, kind, from: bar * 16 + 16 - beats * 4, beats: beats,
+                       keeping: [GMDrum.kick.rawValue, GMDrum.clap.rawValue])
+            let crash = rng.nextDouble() < 0.50 || bar == bridgeFill || kind == .kickSnare
             if crash && bar + 1 < frame.totalBars {
                 events.append(MIDIEvent(stepIndex: (bar + 1) * 16, note: GMDrum.crash1.rawValue,
                                         velocity: 78, durationSteps: 1))
             }
         }
         // The sequencer solo: the box is silent until the fill that brings the band back.
-        if let solo = arrangement?.soloRange.first {
-            let fillStart = (solo.upperBound - 1) * 16 + 8
-            events.removeAll { solo.contains($0.stepIndex / 16) && $0.stepIndex < fillStart }
+        if let bridge = arrangement?.bridge, bridge.kind == .sequencerSolo {
+            events.removeAll { bridge.range.contains($0.stepIndex / 16) && $0.stepIndex < bridge.returnFillStep }
         }
         return events
     }
@@ -276,13 +309,28 @@ struct KosmicDrumGenerator {
     // Every Space fill was a falling tom roll, and the toms in both Space kits are synth toms
     // (808 Kit plays pitched sines, Machine Kit an electric tom), so every fill blooped. The bloop
     // is now one fill of three, never twice running:
-    //   snare roll 45% · tom roll 30% · cowbell figure 25%, in the 3-grouping (steps 0, 3, 6)
-    //   that runs through the corpus, with the open hat into the downbeat
+    //   snare roll 45% · tom roll 30% · kick and snare 25%
+    // The third was a figure on cowbell, then on claves; both read as acoustic knocks against an
+    // electronic kit, and the claves figure's closing open hat could not be heard, so it gave no
+    // lift (Zack, 2026-11-03, Chronique and Le Grand Orthodoxx). The kick and snare fill is the
+    // plain drum-machine fill, and the preset box always lands it on a crash. Same draws, so no seed
+    // changes beyond the notes.
 
-    private enum SpaceFill { case snareRoll, toms, cowbell }
+    /// `congaRoll` is Hand Percussion's way out of the bridge and is never drawn.
+    private enum SpaceFill { case snareRoll, toms, kickSnare, congaRoll }
+
+    /// Replaces `beats` beats of the line from `from` with a fill, keeping the voices in `keeping`.
+    /// A fill hit that a kept voice already plays on the same step is not doubled.
+    private static func spliceFill(_ events: inout [MIDIEvent], _ kind: SpaceFill, from: Int, beats: Int,
+                                   keeping: Set<UInt8> = []) {
+        events.removeAll { $0.stepIndex >= from && $0.stepIndex < from + beats * 4 && !keeping.contains($0.note) }
+        let kept = events.filter { $0.stepIndex >= from && $0.stepIndex < from + beats * 4 }
+        events += spaceFillEvents(kind, from: from, beats: beats)
+            .filter { e in !kept.contains { $0.stepIndex == e.stepIndex && $0.note == e.note } }
+    }
 
     private static func drawSpaceFill(after last: SpaceFill?, rng: inout SeededRNG) -> SpaceFill {
-        let weighted: [(SpaceFill, Double)] = [(.snareRoll, 0.45), (.toms, 0.30), (.cowbell, 0.25)]
+        let weighted: [(SpaceFill, Double)] = [(.snareRoll, 0.45), (.toms, 0.30), (.kickSnare, 0.25)]
             .filter { $0.0 != last }
         let total = weighted.reduce(0) { $0 + $1.1 }
         var r = rng.nextDouble() * total
@@ -303,14 +351,23 @@ struct KosmicDrumGenerator {
             hits = roll.enumerated().map { ($0.offset, $0.element) }
         case .snareRoll:
             hits = (beats == 1 ? [0, 1, 2, 3] : [0, 2, 4, 5, 6, 7]).map { ($0, GMDrum.snare) }
-        case .cowbell:
-            hits = beats == 1 ? [(0, .cowbell), (2, .cowbell), (3, .openHat)]
-                              : [(0, .cowbell), (3, .cowbell), (6, .cowbell), (7, .openHat)]
+        case .kickSnare:
+            // A kick, then 16th snares into the downbeat; in 2 beats, snares with the kick on beat 4.
+            // Neither box plays a kick on beat 4, which is how the log tells this fill apart.
+            hits = beats == 1 ? [(0, .kick), (1, .snare), (2, .snare), (3, .snare)]
+                              : [(0, .snare), (2, .snare), (3, .snare), (4, .kick), (5, .snare), (6, .snare), (7, .snare)]
+        case .congaRoll:
+            // High bongo down to low conga, on every 16th of its 2 beats
+            let roll: [GMDrum] = [.highBongo, .highBongo, .lowBongo, .lowBongo,
+                                  .openHighConga, .muteHighConga, .lowConga, .lowConga]
+            hits = roll.enumerated().map { ($0.offset, $0.element) }
         }
         let last = max(1, hits.count - 1)
         return hits.enumerated().map { i, hit in
-            MIDIEvent(stepIndex: from + hit.step, note: hit.note.rawValue,
-                      velocity: UInt8(64 + 24 * i / last), durationSteps: 1)
+            // Rising through the fill; a kick inside it hits firmly, so it pushes rather than thuds
+            let rising = 64 + 24 * i / last
+            return MIDIEvent(stepIndex: from + hit.step, note: hit.note.rawValue,
+                             velocity: UInt8(hit.note == .kick ? max(rising, 84) : rising), durationSteps: 1)
         }
     }
 
@@ -421,7 +478,8 @@ struct KosmicDrumGenerator {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         rng: inout SeededRNG,
-        dropouts: [Range<Int>] = []
+        dropouts: [Range<Int>] = [],
+        soloDropout: Range<Int>? = nil
     ) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let transitionBars = computeTransitionBars(structure: structure)
@@ -438,7 +496,10 @@ struct KosmicDrumGenerator {
             // the same fill twice running. No crash on the landing: the box is too sparse for one.
             if let stretch = dropouts.first(where: { $0.contains(bar) }) {
                 if bar == stretch.upperBound - 1 {
-                    let beats = rng.nextDouble() < 0.70 ? 1 : 2
+                    // Out of the sequencer solo always 2 beats, under the bass pickup, as the preset
+                    // box's; the draw is still taken so later draws are unchanged.
+                    let drawnBeats = rng.nextDouble() < 0.70 ? 1 : 2
+                    let beats = stretch == soloDropout ? SpaceBridge.returnFillBeats : drawnBeats
                     let kind = drawSpaceFill(after: lastDropoutFill, rng: &rng)
                     lastDropoutFill = kind
                     events += spaceFillEvents(kind, from: barStart + 16 - beats * 4, beats: beats)

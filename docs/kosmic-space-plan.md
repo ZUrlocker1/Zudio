@@ -876,7 +876,9 @@ Where the plan left a gap or could not be followed literally, the code does this
   The repeat guard drops the mask's last hat in every eighth bar.
 - **Rhythm is never thinned.** Besides the `ArrangementFilter` exemption, Space skips base
   Kosmic's density guard and the second-B Rhythm thinning, because either would break the
-  locked pattern.
+  locked pattern. Since 2026-11-03 Lead 1, Lead 2 and Pads are exempt from `ArrangementFilter`
+  too (Zack): their rests come from `KosmicSpaceArrangement`. Measured over 50 songs, the filter
+  had never touched them, so no song changed.
 - **Forced base rules are ignored** by Space, as Drift's bass already does. The curated first
   Kosmic song forces KOS-BASS-010, KOS-RTHM-002 and the Electric Buddha groove; under the
   testing split it usually rolls Space, and would otherwise be a hybrid.
@@ -884,9 +886,11 @@ Where the plan left a gap or could not be followed literally, the code does this
 - **Panning.** Lead 1 is at −0.10 and Lead 2 at −0.20, opposite Rhythm's home at +0.22.
   Rhythm auto-pans ±40% around it, which is a new `panDepth`, also applied in offline
   export. Pads stay centred: a single sampler cannot be panned wider than that.
-- **Per-song draws in the log.** Each new rule's log line carries its draws, for example
-  `KOS-LD1-014 Oxygene See-Saw Riff (sixth, 2+2+2, second half, anchor below)`. Regen lines
-  do the same.
+- **Per-song draws in the log.** First built so each new rule's log line carried its draws, for
+  example `KOS-LD1-014 Oxygene See-Saw Riff (sixth, 2+2+2, second half, anchor below)`. Dropped
+  on 2026-11-02 (Zack: keep the log short), and the recorder that collected them
+  (`KosmicSpaceDraws`) was removed on 2026-11-03. Rule lines, regen lines included, carry the
+  rule's name only.
 - **Titles.** Space draws from the same pattern list, with 80% of the weight on patterns
   1, 2, 7 and 8. Superseded 2026-11-03 (Zack: single words repeat): Space has its own patterns,
   single word 15%, part number 15%, two coined words 12%, French phrase 12%, Jarre templates 12%,
@@ -962,8 +966,9 @@ from the structure and the seed alone, so a regenerated track rebuilds it withou
   - One more stretch of 8 or 12 bars, in 50% of songs, thins the bass alone, apart from any drum
     stretch.
   - A thin bass bar (KOS-BASS-018 only) keeps the walk's notes on steps 0, 6 and 12 with their own
-    pitches, held 6, 6 and 4 steps. The short notes drop out (3 of 6, or 3 of 7 in the alternate rhythm). The Berlin School drone (KOS-BASS-001) is already sparse and does not
-    thin.
+    pitches, held 6, 6 and 4 steps. The short notes drop out (3 of 6, or 3 of 7 in the alternate rhythm). The Berlin School drone (KOS-BASS-001) is already sparse, so it drops out
+    completely over every bass stretch and returns under the closing fill (Zack, 2026-11-03). The
+    first drum stretch always takes the bass, so every drone song has one full drop.
   - The edges of a bass stretch are annotated with the existing `Bass pattern evolving` line,
     through `bassEvolutionBars`. That also replaces the fingerprint detector's chord-change
     lines for Falling Walk songs. Drum stretches get `Drums simplify` at their first bar and `Drums return` at the bar after their last (Zack's wording), for preset-box songs only.
@@ -1040,7 +1045,7 @@ preset shows as "White Noise" in the Texture picker, so it is not abbreviated.
 **Theme return (Zack, 2026-11-03, from Aztraeon):** a song that ends on a B section (ab, abab) never
 hears its A theme again; aba and abba return on their own. So 8 bars two thirds into the last B section
 (at an 8-bar point, at least 8 bars in) replay the first A section's opening 8 bars in place of the B
-rule. Those 8 bars also take the first A section's opening chords (`spaceThemeReturnBar`, shared by
+rule. Those 8 bars also take the first A section's opening chords (`SpaceThemeReturn`, shared by
 the chord plan and Lead 1). No draws; a lead rest over the window still silences it.
 
 **B-section chords and the riff (Zack, 2026-11-03, from Fluxion III):** a Two-Chord Sway song played
@@ -1057,8 +1062,11 @@ doubling of Lead 1 stays, as in all Kosmic.
 **Fills and bloops (Zack, 2026-11-03, from Eternal-Cosmos):** both Space kits' toms are synth bloops
 (808 Kit pitched sines, Machine Kit an electric tom), so the preset box's high-tom accent put one in
 every bar. The accent draw is now side stick, claves or tambourine. Every Space fill, in the preset
-box and on Mini Pops returns, draws snare roll 45%, tom roll 30% or cowbell figure 25% (steps 0, 3, 6
-and an open hat into the downbeat), never the same as the song's previous fill. Half the preset-box
+box and on Mini Pops returns, draws snare roll 45%, tom roll 30% or claves figure 25% (steps 0, 3, 6
+and an open hat into the downbeat), never the same as the song's previous fill. The claves figure
+became a kick and snare fill on 2026-11-03 (see "Open questions"). The figure was first on
+cowbell, which sounded off genre in every kit (Zack, 2026-11-03, Chronique); no Space rule plays the
+cowbell now. Square Lead 2 on Space Lead 2 is now 0.28. Half the preset-box
 fills land on a crash on the next downbeat; Mini Pops is too sparse for one. Lead 2 trims: Square
 Lead 2 0.38, Saw Lead 0.28. Bright Saw Stack shows as Bright Saw. The on-screen Instruments line
 names instruments; the saved file keeps program numbers.
@@ -1112,7 +1120,19 @@ effects-only endings of Oxygene 3 and 6. Zack chose the first two:
   source pattern, with the pads in half of these songs; everything else silent. Two automatic filter
   sweeps (`KosmicAutoSweep`, otherwise off in Space) reopen on its fifth bar and on the return. The
   band comes back on a 2-beat fill and a crash (preset box; Mini Pops on its own dropout fill), with
-  the surf swell landing on B.
+  the surf swell landing on B. Whatever the song's Rhythm rule, the solo's 8 bars play KOS-RTHM-016's
+  full source pattern, root and octave in 48–59 (Zack, 2026-11-03, La Nuit Hypnotique: under Dual-Rate
+  the solo was 2–4 notes a bar). It is logged as `Sequencer solo 8 bar`, since "Rendez-Vous solo"
+  read as a lead solo.
+- **Edges** (Zack, 2026-11-03: the swell alone did not mark them). No draws, so nothing else moves.
+  In: a crash on the bridge's first downbeat for every drum rule, and in the solo the bass holds one
+  root an octave down for 2 bars before it drops out. Out: a two-note bass pickup on steps 12 and 14
+  of the last bar, walking up by scale step to the bass's first note in B, under a 2-beat drum fill,
+  then a crash on B. Preset box: its own fill, as before. Mini Pops: its dropout fill out of the solo,
+  a snare roll out of the breakdown. Hand Percussion: a falling bongo and conga roll (60, 61, 63, 62,
+  64). No percussion: the pickup alone. The fill length and the fill and pickup steps live on
+  `SpaceBridge` (`returnFillBeats`, `returnFillStep`, `pickupStep`), which every drum rule and the
+  bass read.
 - **Around it.** A song with a bridge has no sequencer break. Lead 1 rests and drum and bass thin
   stretches stay 16 bars clear of it, and the song needs only one thin stretch, not two. At most
   three breaks a song, the bridge counting as one: a bridge and at most two thin stretches, or at
@@ -1126,14 +1146,27 @@ effects-only endings of Oxygene 3 and 6. Zack chose the first two:
   sequencer break, in songs without a bridge, is not counted as a break here. Lead 1 rests often fall
   on the same bars as a thin stretch, since both pick the same landing bars. The log
   adds "+ bridge" to the Form line and calls it out at its first bar under the Bridge tag, as Drift
-  does: `Magnetic breakdown 8 bar` or `Rendez-Vous solo 8 bar` (Zack, 2026-11-03).
+  does: `Magnetic breakdown 8 bar` or `Sequencer solo 8 bar` (Zack, 2026-11-03).
+- **Fill lines in the log.** The Kosmic call never passed the drum rules to the annotation builder, so
+  the Space fill names and the dropout guard never ran. Space songs now pass them; base Kosmic and
+  Drift still do not, so their logs are unchanged. A Space fill is read from the voices only fills
+  play (snare, toms, claves; the high bongo for Hand Percussion), which also stops kick-only
+  breakdown bars being logged as fills. It is read from the drum track (`spaceFillLines`), not the
+  structural fill candidates, so thin-stretch and break fills appear. A drum or Lead 2 regen rebuilds
+  its Space lines (`appendSpaceDrumLines`, `appendSpaceBreakLines`).
+- **Regen fixes, all Kosmic** (2026-11-03, from a code review). A Lead 1 regen rebuilds the Lead Synth
+  doubling, and Kosmic lead regen runs `HarmonicFilter.filterLead` as generation does. Space bass regen
+  reads `spaceBusyRhythm` from the log up to the first regen line only, so reload matches. Mini Pops'
+  fill out of the solo is always 2 beats. Drift's bridge processing now
+  also runs on a Drift track regen (`applyDriftBridges`, 2026-11-03).
 
 **Weights now:**
 
 - Lead 1, A sections: KOS-LD1-013, KOS-LD1-016 and KOS-LD1-017, a third each. B sections: KOS-LD1-014 50%, KOS-LEAD-006 50%.
 - Rhythm: KOS-RTHM-016, 002, 005 and 021, 25% each.
 - Bass: KOS-BASS-018 and 020, 37.5% each, KOS-BASS-001 25%. The Pump is never drawn under
-  KOS-RTHM-005 Dual-Rate, the one exclusion so far; the walk takes its share.
+  KOS-RTHM-005 Dual-Rate or KOS-RTHM-016 Octave Sequencer (`spaceBusyRhythms`); the walk takes
+  its share, so the Pump plays in about 15% of Space songs.
 - Pads: KOS-PADS-001 and 010, 50% each.
 - Drums: KOS-DRUM-009 38%, 001 34%, 012 13%, none 15%.
 
@@ -1180,6 +1213,28 @@ does):
 ---
 
 ## Open questions
+
+- **Busyness (Zack, 2026-11-03), settled.** Measured over the first 100 Space songs (a temporary
+  test, since removed): runs of over 32 bars with Lead 1 sounding, Rhythm at 4 or more notes a bar
+  and Bass at 4 or more are rare. None if every bar must be dense, 2 to 6 songs if gaps of up to 2
+  bars are bridged; the arrangement's rests and stretches break the band within 32 bars in 95 of 100
+  songs. What differed was notes a bar: Rhythm 016 about 9 to 10, 005 6, 021 5, 002 4; Bass 020 Pump
+  12 (its thin bars keep 6), 018 5 to 6, 001 under 1. The Octave Sequencer with the Pump, about 22
+  notes a bar under the lead, was the busiest pair by far, so the Pump is no longer drawn under
+  KOS-RTHM-016 (Zack chose this alone, not the 32-bar guard, which would have changed about 2 songs
+  in 100).
+- **ArrangementFilter in Space, settled.** Lead 1, Lead 2 and Pads exempt, as Rhythm already was
+  (Zack, 2026-11-03). Measured before: it never fired on them, so no song changed.
+- **Ruled and built 2026-11-03.** The Berlin School drone (KOS-BASS-001) drops out in Space's bass
+  thin stretches and returns under the closing fill. The Space gain trims for programs 63, 81 and
+  12080 stay on for all Kosmic. A Drift track regen repeats Drift's bridge processing
+  (`applyDriftBridges`), for Lead 1, Pads, Rhythm, Bass and Drums (Pads too: the bridges soften,
+  transpose or fade them).
+- **Fills (Zack, 2026-11-03, Le Grand Orthodoxx).** The claves figure read as an acoustic knock
+  against an electronic kit, and its closing open hat could not be heard, so it gave no lift. It is
+  now a kick and snare fill: in 1 beat a kick then three 16th snares, in 2 beats snares with a kick
+  on beat 4, rising into the downbeat, and the preset box always lands it on a crash. Same weight
+  and draw. The claves accent on step 12 is unchanged.
 
 - **Bridges in Space** — built 2026-11-03 (see "Bridges" under "Phase 1 as built"). Still open: the
   release share (0.30–0.40), and whether the Phase 2 breakdown becomes the in-section form of the

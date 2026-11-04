@@ -37,7 +37,6 @@ struct KosmicLeadGenerator {
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil,
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
@@ -51,9 +50,9 @@ struct KosmicLeadGenerator {
             usedRuleIDs.insert("KOS-LD1-013")
             if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
             var theme = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng, draws: spaceDraws)
+                                                    rng: &rng)
             var riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                 rng: &rng, draws: spaceDraws)
+                                                 rng: &rng)
             // In 50% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff,
             // for variety. Drawn after the theme and riff, so they are unchanged for a given seed.
             var phrase: [MIDIEvent] = []
@@ -92,12 +91,11 @@ struct KosmicLeadGenerator {
             // Theme return (Zack, 2026-11-03): a song that ends on B (ab, abab) never hears its A theme
             // again, so 8 bars two thirds into the last B replay the first A section's opening 8 bars
             // in place of the B rule. The chord plan gives those 8 bars the first A section's opening
-            // chords (KosmicStructureGenerator.spaceThemeReturnBar). No draws, so regen rebuilds it exactly.
-            if let start = KosmicStructureGenerator.spaceThemeReturnBar(sections: structure.sections),
-               let firstA = structure.sections.first(where: { $0.label == .A }) {
-                let window = (start * 16)..<((start + 8) * 16)
-                let source = (firstA.startBar * 16)..<((firstA.startBar + 8) * 16)
-                let shift = window.lowerBound - source.lowerBound
+            // chords (SpaceThemeReturn). No draws, so regen rebuilds it exactly.
+            if let themeReturn = SpaceThemeReturn.make(sections: structure.sections) {
+                let window = (themeReturn.range.lowerBound * 16)..<(themeReturn.range.upperBound * 16)
+                let source = (themeReturn.sourceRange.lowerBound * 16)..<(themeReturn.sourceRange.upperBound * 16)
+                let shift = themeReturn.shift * 16
                 lead.removeAll { window.contains($0.stepIndex) }
                 lead += theme.filter { source.contains($0.stepIndex) }.map {
                     MIDIEvent(stepIndex: $0.stepIndex + shift, note: $0.note, velocity: $0.velocity,
@@ -425,7 +423,7 @@ struct KosmicLeadGenerator {
 
     private static func generateOxygeneFallingTheme(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG, draws: KosmicSpaceDraws?
+        rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let tops: [(steps: Int, name: String)] = [(7, "octave top"), (5, "sixth top"), (3, "fourth top")]
         let top = tops[rng.weightedPick([0.30, 0.35, 0.35])]
@@ -461,9 +459,6 @@ struct KosmicLeadGenerator {
         case 6:  pitchSteps = [top.steps, inner.steps[0] + 1, inner.steps[0], inner.steps[1], inner.steps[2], 0]
         default: pitchSteps = [top.steps] + inner.steps + [0]
         }
-        draws?.record("KOS-LD1-013", compressed ? "compressed rhythm"
-                                                : "\(top.name), \(inner.name), \(noteCount) notes")
-
         let scalePCs = frame.scalePCs
         let tonicRoot = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
                                         low: 60, high: 71)
@@ -724,7 +719,7 @@ struct KosmicLeadGenerator {
 
     private static func generateOxygeneSeeSawRiff(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG, draws: KosmicSpaceDraws?
+        rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let intervals: [(steps: Int, name: String)] = [(3, "fourth"), (5, "sixth"), (7, "octave"), (4, "fifth")]
         let interval = intervals[rng.weightedPick([0.30, 0.30, 0.20, 0.20])]
@@ -734,9 +729,6 @@ struct KosmicLeadGenerator {
         let grouping = groupings[rng.weightedPick([0.40, 0.30, 0.30])]
         let offset = rng.nextDouble() < 0.60 ? 0 : 8
         let anchorAbove = rng.nextDouble() >= 0.60
-        draws?.record("KOS-LD1-014", "\(interval.name), \(grouping.name), "
-                      + "\(offset == 0 ? "first half" : "second half"), "
-                      + "\(anchorAbove ? "anchor above" : "anchor below")")
 
         let scalePCs = frame.scalePCs
         let lastB = structure.sections.last(where: { $0.label == .B })

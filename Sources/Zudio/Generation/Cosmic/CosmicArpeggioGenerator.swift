@@ -45,7 +45,6 @@ struct KosmicArpeggioGenerator {
         forceRuleID: String? = nil,
         isKosmicDrift: Bool = false,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil,
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
@@ -68,20 +67,31 @@ struct KosmicArpeggioGenerator {
             // through the sequencer break.
             let spaceRule = ["KOS-RTHM-016", "KOS-RTHM-002", "KOS-RTHM-005", "KOS-RTHM-021"][rng.weightedPick([0.25, 0.25, 0.25, 0.25])]
             usedRuleIDs.insert(spaceRule)
+            // The sequencer solo bridge belongs to the sequencer, as in Rendez-Vous 2 bars 81–96: whatever
+            // the rule, its 8 bars play the full Oxygene pattern (Zack, 2026-11-03, La Nuit Hypnotique,
+            // where Dual-Rate's 2–4 notes a bar left the solo bare). No draws.
+            let solo = spaceArrangement?.soloRange ?? []
+            func withSolo(_ line: [MIDIEvent]) -> [MIDIEvent] {
+                guard !solo.isEmpty else { return line }
+                let inSolo = { (bar: Int) in solo.contains { $0.contains(bar) } }
+                return (silenceBars(line, solo)
+                        + jmjStepSequencer(frame: frame, tonalMap: tonalMap) { inSolo($0) ? oxygeneSourcePattern : nil })
+                    .sorted { $0.stepIndex < $1.stepIndex }
+            }
             if spaceRule == "KOS-RTHM-021" {
-                return generateOxygeneOffbeatPedal(frame: frame, tonalMap: tonalMap, rng: &rng,
-                                                   arrangement: spaceArrangement)
+                return withSolo(generateOxygeneOffbeatPedal(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                            arrangement: spaceArrangement))
             }
             if spaceRule != "KOS-RTHM-016" {
                 let line = spaceRule == "KOS-RTHM-002"
                     ? generateJMJHook(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
                     : generateJMJDualRate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-                return line.filter { spaceArrangement?.sequencerRests(atBar: $0.stepIndex / 16) != true }.map {
+                return withSolo(line.filter { spaceArrangement?.sequencerRests(atBar: $0.stepIndex / 16) != true }.map {
                     MIDIEvent(stepIndex: $0.stepIndex, note: UInt8(max(36, Int($0.note) - 12)),
                               velocity: $0.velocity, durationSteps: $0.durationSteps)
-                }
+                })
             }
-            return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng, draws: spaceDraws,
+            return generateOxygeneOctaveSequencer(frame: frame, tonalMap: tonalMap, rng: &rng,
                                                   arrangement: spaceArrangement)
         }
 
@@ -170,7 +180,7 @@ struct KosmicArpeggioGenerator {
         var events: [MIDIEvent] = []
         for bar in 0..<frame.totalBars {
             guard let pattern = patternForBar(bar), let entry = tonalMap.entry(atBar: bar) else { continue }
-            let root = clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)
+            let root = spaceSequencerRoot(entry, frame: frame)
             for (step, slot) in pattern.prefix(16).enumerated() {
                 guard let slot else { continue }
                 let note: Int
@@ -202,11 +212,14 @@ struct KosmicArpeggioGenerator {
     //                     9 and 13, without steps 4, 9 and 13
     //   slot swap — in 25% of songs the octave becomes the fifth throughout
 
+    /// The source pattern, root and octave. The other Space Rhythm rules play it through the solo.
+    static let oxygeneSourcePattern: [JMJSlot?] = [.root, nil, .octave, nil, .root, .octave, .root, nil,
+                                                    .octave, .octave, .root, nil, .octave, .root, .octave, nil]
+
     private static func generateOxygeneOctaveSequencer(
         frame: GlobalMusicalFrame,
         tonalMap: TonalGovernanceMap,
         rng: inout SeededRNG,
-        draws: KosmicSpaceDraws?,
         arrangement: KosmicSpaceArrangement?
     ) -> [MIDIEvent] {
         let masks: [(drop: Set<Int>, name: String)] = [([9], "no step 9"),
@@ -218,10 +231,11 @@ struct KosmicArpeggioGenerator {
         let source: [JMJSlot?] = [.root, nil, upper, nil, .root, upper, .root, nil,
                                   upper, upper, .root, nil, upper, .root, upper, nil]
         let thin = source.enumerated().map { mask.drop.contains($0.offset) ? nil : $0.element }
-        draws?.record("KOS-RTHM-016", "\(mask.name) under the lead, \(useFifth ? "root and fifth" : "root and octave")")
         return jmjStepSequencer(frame: frame, tonalMap: tonalMap) { bar in
             guard let arrangement else { return source }
             if arrangement.sequencerRests(atBar: bar) { return nil }
+            // The solo plays the song's own full pattern, slot swap included
+            if arrangement.bridgeKind(atBar: bar) == .sequencerSolo { return source }
             return arrangement.leadPlays(atBar: bar) ? thin : source
         }
     }
@@ -247,7 +261,7 @@ struct KosmicArpeggioGenerator {
         for bar in 0..<frame.totalBars {
             guard arrangement?.sequencerRests(atBar: bar) != true,
                   let entry = tonalMap.entry(atBar: bar) else { continue }
-            let pedal = clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)
+            let pedal = spaceSequencerRoot(entry, frame: frame)
             // (step, scale steps above the pedal)
             let figure: [(Int, Int)] = bar % 2 == 0
                 ? [(2, 0), (4, upper[0]), (6, 0), (8, upper[1]), (10, upper[0]), (12, upper[2])]

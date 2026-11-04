@@ -62,7 +62,11 @@ struct SongStructure: Equatable, Sendable {
 
     var introSection: SongSection? { sections.first { $0.label == .intro } }
     var outroSection: SongSection? { sections.first { $0.label == .outro } }
-    var bodySections: [SongSection] { sections.filter { $0.label == .A || $0.label == .B } }
+    var bodySections: [SongSection] { SongStructure.bodySections(sections) }
+    /// The A and B sections of a section list, for code that runs before the structure exists.
+    static func bodySections(_ sections: [SongSection]) -> [SongSection] {
+        sections.filter { $0.label == .A || $0.label == .B }
+    }
 
     /// True if this song has at least one B section (any form other than single_evolving).
     var hasBSection: Bool { sections.contains { $0.label == .B } }

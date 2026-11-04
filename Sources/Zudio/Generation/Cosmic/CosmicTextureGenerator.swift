@@ -24,14 +24,13 @@ struct KosmicTextureGenerator {
         forceRuleID: String? = nil,
         isKosmicDrift: Bool = false,
         isKosmicSpace: Bool = false,
-        spaceDraws: KosmicSpaceDraws? = nil,
         spaceArrangement: KosmicSpaceArrangement? = nil
     ) -> [MIDIEvent] {
 
         if isKosmicSpace {
             usedRuleIDs.insert("KOS-TEXT-005")
             let sweeps = generateOxygeneSurfSweep(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                  rng: &rng, draws: spaceDraws,
+                                                  rng: &rng,
                                                   returnBars: spaceArrangement?.swellBars ?? [])
             // The sequencer solo takes no swell of its own; one landing on its first bar rings on.
             let silences = spaceArrangement?.textureSilences ?? []
@@ -512,10 +511,9 @@ struct KosmicTextureGenerator {
 
     private static func generateOxygeneSurfSweep(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG, draws: KosmicSpaceDraws?, returnBars: [Int]
+        rng: inout SeededRNG, returnBars: [Int]
     ) -> [MIDIEvent] {
         let wash = rng.nextDouble() < 0.25
-        draws?.record("KOS-TEXT-005", wash ? "Oxygene 6 wash in B sections" : "boundary swells")
 
         func swell(atBar bar: Int, velocity: UInt8) -> MIDIEvent? {
             guard let entry = tonalMap.entry(atBar: bar) else { return nil }
