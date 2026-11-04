@@ -7,7 +7,9 @@ listens (2026-11-03) found the songs too alike, so Space now draws from several 
 base Kosmic's JMJ rules and five more Oxygene rules, each track drawn independently. It builds on
 macOS and iOS. No test suite has been run. See "Phase 1 as built" below for where the code had to
 interpret this plan, and its sections "Breaks" and "More Oxygene rules" for what came after.
-Phases 2 and 3 are designed but wait for listening on Phase 1.
+Phases 2 and 3 are designed but wait for listening on Phase 1. As of 2026-11-03 the next step is
+Phase 2 (Magnetic); the open scoping question is whether its breakdown becomes the existing
+bridge's in-section form (see "Open questions").
 
 This is the single document for Kosmic Space. It replaces the original plan, written in
 September before Motorik Europe and Chill Soho were built, and the corpus review of
