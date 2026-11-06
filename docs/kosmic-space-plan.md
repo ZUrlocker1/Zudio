@@ -31,6 +31,7 @@ the README's download, marked as a work-in-progress build for testing Kosmic Spa
 - Design principles
 - Phase 1 — Oxygene (build now)
 - Phase 2 — Magnetic
+- Phase 2 as built
 - Phase 3 — Chronologie (optional)
 - Rule ledger: new, reused and dropped
 - Implementation checklist
@@ -620,7 +621,7 @@ bVII, i ×2 each; Two-Chord Sway i ×2, iv ×2.
 Magnetic rhythm box gets short, subtle ones at section boundaries and where drums drop out or come
 back, so a hundred bars of sequenced drums do not sit unbroken.
 
-**KOS-BASS-019 "Magnetic Octave Pump"** — one rule, three variants drawn per song. (Its Oxygene 8
+**KOS-BASS-019 "Magnetic Fields Octave Pump"** — one rule, three variants drawn per song. (Its Oxygene 8
 root-and-b7 sub-option was built early as `KOS-BASS-020` Oxygene 8 Pump, 2026-11-03, and can be
 dropped from this rule.)
 
@@ -672,22 +673,16 @@ that thins them. Motorik Europe's `MOT-LD2-012` is the code precedent.
 
 ### Phase 2 pools
 
-These are the rules each track gains. All join the shared Space pool at equal weight (see "One
-pool, no flavour roll"); the weights below are the earlier flavour-split design and stand as a
-guide to what each rule replaces, not as separate pools.
+Every track keeps one Space pool, and the Magnetic rules join it (see "One pool, no flavour roll"
+and, for the weights as built, "Phase 2 as built"):
 
-**Magnetic songs:**
-
-- **Drums** — `KOS-DRUM-010` 70%, `KOS-DRUM-009` 15%, `KOS-DRUM-000` 15%
-- **Bass** — `KOS-BASS-019` 80%, `KOS-BASS-001` 20%
-- **Rhythm** — `KOS-RTHM-017` 45%, `KOS-RTHM-018` 40%, `KOS-RTHM-016` 15%
-- **Lead 1** — A sections `KOS-LD1-015` 60% or `KOS-LD1-013` 40%. B sections `KOS-LD1-014`
-  (thirds variant weighted up) 60% or `KOS-LD1-015` 40%, never the same rule as A.
-- **Lead 2** — `KOS-LD2-001` 45%, `KOS-LD2-000` 30%, `KOS-LEAD-004` 25%
+- **Drums** — gains `KOS-DRUM-010`
+- **Bass** — gains `KOS-BASS-019`; neither pump plays under a busy sequencer
+- **Rhythm** — gains `KOS-RTHM-017` and `KOS-RTHM-018`, both busy
+- **Lead 1** — A sections gain `KOS-LD1-015`. B sections keep `KOS-LD1-014` or `KOS-LEAD-006`; the
+  See-Saw's thirds variant, above, is not built yet
+- **Lead 2** — will gain `KOS-LD2-001`, not built yet
 - **Pads**, **Texture** — as Phase 1
-
-**Oxygene songs:** as Phase 1, plus `KOS-LD2-001` at 25% of Lead 2 (No lead 2 drops to 35%,
-Echo melody to 40%).
 
 ### Phase 2 instruments
 
@@ -760,14 +755,14 @@ Phase 1, six rules:
 - `KOS-LD1-014` Oxygene See-Saw Riff
 - `KOS-TEXT-005` Oxygene Surf Sweep
 
-Phase 2, six rule IDs and four implementations:
+Phase 2, six rule IDs; five built 2026-11-06:
 
-- `KOS-DRUM-010` Magnetic Fields Rhythm Box
-- `KOS-BASS-019` Magnetic Octave Pump
-- `KOS-LD1-015` Magnetic Fields Turn Melody
-- `KOS-LD2-001` Magnetic Fields Twin
-- `KOS-RTHM-017` Equinoxe Fifth Triplets (a preset of the sequencer engine)
-- `KOS-RTHM-018` Magnetic Fields Leading-Tone Cell (a preset)
+- `KOS-DRUM-010` Magnetic Fields Rhythm Box — built
+- `KOS-BASS-019` Magnetic Fields Octave Pump — built
+- `KOS-LD1-015` Magnetic Fields Turn Melody — built
+- `KOS-RTHM-017` Equinoxe Fifth Triplets (a preset of the sequencer engine) — built
+- `KOS-RTHM-018` Magnetic Fields Leading-Tone Cell (a preset) — built
+- `KOS-LD2-001` Magnetic Fields Twin — not built yet
 
 Phase 3, three rule IDs and one-and-a-half implementations:
 
@@ -778,7 +773,8 @@ Phase 3, three rule IDs and one-and-a-half implementations:
 New infrastructure:
 
 - Phase 1 — the chord-cycle builder, the Space flag and its plumbing
-- Phase 2 — the breakdown mute schedule
+- Phase 2 — the chord's own scale and the fit pass (spaceChordScale, fitSpaceChordScale), built;
+  the breakdown mute schedule, not built
 
 ### Reused unchanged
 
