@@ -637,6 +637,13 @@ struct SongGenerator {
             spaceArrangement: spaceArrangement
         )
 
+        // Kosmic Space: notes the chord under them has altered move onto the chord's scale.
+        if isKosmicSpace {
+            for t in 0..<kTrackDrums {
+                trackEvents[t] = fitSpaceChordScale(trackEvents[t], structure: structure, frame: frame)
+            }
+        }
+
         // Post-processing: apply arrangement and harmonic filters
         // (DensitySimplifier and DrumVariationEngine are Motorik-specific — skip for Kosmic)
         // Kosmic Space: the sequencer is never block-silenced or thinned — the same pattern plays
@@ -1849,6 +1856,10 @@ struct SongGenerator {
             events = foldedIntoRegister(events, bounds)
         }
 
+        if isSpace && trackIndex != kTrackDrums {
+            events = fitSpaceChordScale(events, structure: songState.structure, frame: songState.frame)
+        }
+
         // A regenerated Kosmic lead gets the harmonic filter a generated song's leads get, the clash
         // guard, the lift above the pads and the velocity arc; regen had skipped it (found 2026-11-03).
         if isKosmic, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
@@ -2973,6 +2984,10 @@ struct SongGenerator {
         case .oxygeneDorianVamp:     return "Oxygene Dorian Vamp i ii"
         case .oxygeneAeolianCycle:   return "Oxygene Aeolian Cycle i bVII iv"
         case .oxygeneTwoChordSway:   return "Oxygene Two-Chord Sway i v"
+        case .magneticArc:           return "Magnetic Fields Arc i bVI iv V"
+        case .magneticTurn:          return "Magnetic Fields Turn i V bVI bVII"
+        case .equinoxePhrygian:      return "Equinoxe Phrygian i iv bII"
+        case .magneticDescent:       return "Magnetic Fields Descent I vi V IV"
         }
     }
 

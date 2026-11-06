@@ -50,6 +50,9 @@ struct VisualizerView: View {
 
     // Red flash when an ERROR is logged — jumps to full and fades out.
     @State private var errorFlashOpacity: Double = 0
+    // "Error - see log." toast in the bottom-left corner, shown 6.5s like "Visuals off".
+    @State private var errorToastVisible = false
+    @State private var errorToastGeneration = 0
 
     var body: some View {
         // Re-render on orb note changes; PlaybackEngine no longer publishes them itself.
@@ -60,6 +63,22 @@ struct VisualizerView: View {
             .onChangeCompat(of: appState.errorFlashToken) { (_: Int) in
                 errorFlashOpacity = 0.55
                 withAnimation(.easeOut(duration: 0.5)) { errorFlashOpacity = 0 }
+                errorToastVisible = true
+                errorToastGeneration += 1
+                let generation = errorToastGeneration
+                DispatchQueue.main.asyncAfter(deadline: .now() + 6.5) {
+                    guard generation == errorToastGeneration else { return }
+                    withAnimation(.easeOut(duration: 0.6)) { errorToastVisible = false }
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                Text("Error - see log.")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.red.opacity(0.90))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                    .opacity(errorToastVisible ? 1 : 0)
+                    .allowsHitTesting(false)
             }
     }
 

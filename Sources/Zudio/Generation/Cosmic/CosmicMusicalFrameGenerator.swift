@@ -48,8 +48,8 @@ struct KosmicMusicalFrameGenerator {
     static let driftShare = 0.10
     static let spaceShare = 0.80
     /// Share of Space songs in ab and aba forms that take a bridge (`SpaceBridge`).
-    /// TESTING value 0.80; release 0.30–0.40, to be confirmed by listening.
-    static let spaceBridgeShare = 0.80
+    /// Release value 0.30 (Zack, 2026-11-06): about 1 Space song in 6. Testing used 0.80.
+    static let spaceBridgeShare = 0.30
 
     /// Bars per full left-right sweep of a Space song's Texture auto-pan: 2 (25%), 4 (50%) or
     /// 8 (25%). Drawn from the song seed on its own stream, so playback, regeneration and export
@@ -82,7 +82,7 @@ struct KosmicMusicalFrameGenerator {
 
         let key = keyOverride ?? pickKey(rng: &rng)
 
-        // Tempo: Space 100–124 on its own stream; Drift uses Mode C (70–90); Dreamscape 70–80.
+        // Tempo: Space 96–128 on its own stream; Drift uses Mode C (70–90); Dreamscape 70–80.
         // When isKosmicDrift, consume the same RNG slot as normal pickTempo would
         // to keep base Kosmic songs seed-stable regardless of the Drift flag.
         var tempo: Int
@@ -173,26 +173,35 @@ struct KosmicMusicalFrameGenerator {
 
     // MARK: - Kosmic Space (Phase 1: Oxygene)
 
-    /// Oxygene harmony families: Dorian Vamp 55% (Oxygene 4), Aeolian Cycle 30% (Oxygene 8),
-    /// Two-Chord Sway 15% (Oxygene 3).
+    /// Space harmony families, every one in one pool. Each Magnetic family takes the average
+    /// Oxygene family's weight (Zack, 2026-11-06), and the Oxygene three keep their 55/30/15 shape:
+    /// Dorian Vamp 23.6%, Aeolian Cycle 12.8%, Two-Chord Sway 6.4% (Oxygene 4, 8 and 3); Magnetic
+    /// Fields Arc, Magnetic Fields Turn, Equinoxe Phrygian and Magnetic Fields Descent 14.3% each.
     private static func pickSpaceFamily(rng: inout SeededRNG) -> KosmicProgressionFamily {
-        let families: [KosmicProgressionFamily] = [.oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway]
-        let weights:  [Double]                  = [0.55,               0.30,                 0.15]
+        let families: [KosmicProgressionFamily] = [.oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway,
+                                                   .magneticArc, .magneticTurn, .equinoxePhrygian, .magneticDescent]
+        let weights:  [Double]                  = [0.236,              0.128,                0.064,
+                                                   0.143,        0.143,         0.143,             0.143]
         return families[rng.weightedPick(weights)]
     }
 
-    /// The family sets the mode. Two-Chord Sway is Aeolian or Dorian, 50/50.
+    /// The family sets the mode. Two-Chord Sway is Aeolian or Dorian, 50/50. The two Magnetic Fields
+    /// minor families are Aeolian: their major V brings its own leading tone (`spaceChordScale`), as
+    /// Jarre plays harmonic minor only over the V, and the bVII of the Turn stays in the scale.
     private static func spaceMode(for family: KosmicProgressionFamily, rng: inout SeededRNG) -> Mode {
         switch family {
         case .oxygeneDorianVamp:   return .Dorian
-        case .oxygeneAeolianCycle: return .Aeolian
+        case .oxygeneAeolianCycle, .magneticArc, .magneticTurn: return .Aeolian
+        case .equinoxePhrygian:    return .Phrygian
+        case .magneticDescent:     return .Ionian
         default:                   return rng.nextDouble() < 0.50 ? .Aeolian : .Dorian
         }
     }
 
-    /// Space tempo: triangular, min 100, peak 118, max 124. The Oxygene pieces run 100, 110, 121.
+    /// Space tempo: triangular, min 96, peak 118, max 128 (widened for Magnetic Fields and
+    /// Equinoxe, Zack, 2026-11-06). The Oxygene pieces run 100, 110, 121.
     private static func pickSpaceTempo(rng: inout SeededRNG) -> Int {
-        let minT = 100.0, peakT = 118.0, maxT = 124.0
+        let minT = 96.0, peakT = 118.0, maxT = 128.0
         let r  = rng.nextDouble()
         let fc = (peakT - minT) / (maxT - minT)
         let raw: Double
@@ -201,7 +210,7 @@ struct KosmicMusicalFrameGenerator {
         } else {
             raw = maxT - Foundation.sqrt((1 - r) * (maxT - minT) * (maxT - peakT))
         }
-        return Swift.max(100, Swift.min(124, Int(raw.rounded())))
+        return Swift.max(96, Swift.min(128, Int(raw.rounded())))
     }
 
     /// Space drum rule pool: KOS-DRUM-009 Oxygene Preset Box 38%, KOS-DRUM-001 JMJ Mini Pops 34%,

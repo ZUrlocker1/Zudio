@@ -60,6 +60,45 @@ func spaceChordRootPC(_ entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) 
                 scalePCs: frame.scalePCs)
 }
 
+// A Space chord can hold a note outside the song's scale: the major V of the Magnetic Fields minor
+// families carries the leading tone. Under that chord the scale swaps each such note in for the
+// scale note a semitone below it, or above when that one is a chord tone, so A Aeolian over an
+// E major chord reads as A harmonic minor. Returns the swaps, old pitch class to new; empty for
+// a chord inside the scale, which every Oxygene chord is.
+func spaceChordAlterations(chordTones: Set<Int>, scalePCs: Set<Int>) -> [Int: Int] {
+    var swaps: [Int: Int] = [:]
+    for t in chordTones.sorted() where !scalePCs.contains(t) {
+        let below = (t + 11) % 12, above = (t + 1) % 12
+        if scalePCs.contains(below) && !chordTones.contains(below) { swaps[below] = t }
+        else if scalePCs.contains(above) && !chordTones.contains(above) { swaps[above] = t }
+    }
+    return swaps
+}
+
+// The song's scale under one Space chord: `spaceChordAlterations` applied.
+func spaceChordScale(chordTones: Set<Int>, frame: GlobalMusicalFrame) -> Set<Int> {
+    let swaps = spaceChordAlterations(chordTones: chordTones, scalePCs: frame.scalePCs)
+    return frame.scalePCs.subtracting(swaps.keys).union(swaps.values)
+}
+
+// Every Space rule snaps its notes to the song's scale as it writes them. This moves only the
+// notes the chord under them has swapped out (the minor 3rd over a major V becomes the major 3rd)
+// and leaves every other note alone, so it never moves a note twice. Run once per pitched track,
+// after generation and after a regen.
+func fitSpaceChordScale(_ events: [MIDIEvent], structure: SongStructure,
+                        frame: GlobalMusicalFrame) -> [MIDIEvent] {
+    events.map { ev in
+        guard let cw = structure.chordWindow(atBar: ev.stepIndex / 16),
+              let to = spaceChordAlterations(chordTones: cw.chordTones,
+                                             scalePCs: frame.scalePCs)[Int(ev.note) % 12]
+        else { return ev }
+        var d = to - Int(ev.note) % 12
+        if d > 6 { d -= 12 } else if d < -6 { d += 12 }
+        return MIDIEvent(stepIndex: ev.stepIndex, note: UInt8(Int(ev.note) + d),
+                         velocity: ev.velocity, durationSteps: ev.durationSteps)
+    }
+}
+
 // The Space sequencer register: the chord root in MIDI 48–59, as the Oxygene 4 sequencer plays it.
 func spaceSequencerRoot(_ entry: TonalGovernanceEntry, frame: GlobalMusicalFrame) -> Int {
     clampToRegister(spaceChordRootPC(entry, frame: frame) + 48, low: 48, high: 59)

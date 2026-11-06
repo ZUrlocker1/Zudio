@@ -46,6 +46,10 @@ In the source on `main` (merged 2026-11-02). Published 2026-11-03 as the 2.9 dow
 - **Kosmic Space code cleanup** — (2026-11-03) The bridge timing, theme return, seed streams and chord windows are each defined once, and unused draw logging is gone. Every Kosmic song generates exactly as before, checked note for note over 300 seeds.
 - **Mini Pops out of the solo** — (2026-11-03) Mini Pops always returns from the sequencer solo on a 2-beat fill, under the bass pickup.
 - **Version 2.9 (build 135)**
+- **Magnetic harmony** — (2026-11-06) Phase 2 begins. Four chord cycles from *Magnetic Fields* and *Equinoxe* join the three Oxygene ones in a single pool, each as likely as an average Oxygene cycle: Magnetic Fields Arc i bVI iv V, Magnetic Fields Turn i V bVI bVII, Equinoxe Phrygian i iv bII and Magnetic Fields Descent I vi V IV. Each has its own B-section loop and breakdown chords. Over a major V chord, every Space part takes the leading tone, as Jarre plays harmonic minor only over the V. All rules still mix freely; there is no Oxygene or Magnetic flavour roll. Space tempo widens to 96–128.
+- **Fewer Space bridges** — (2026-11-06) A bridge now comes in 30% of Space songs in AB and ABA form, about 1 Space song in 6, down from 80% while testing.
+- **Space levels** — (2026-11-06) The Moog bass is a little quieter and Bright Saw on Lead 1 a little louder, in Space songs only.
+- **Log and error display** — (2026-11-06) The Instruments line is compact, `L1:Brightness L2:Saw Lead`. An audio device change no longer repeats the Instruments line, and audio messages use the `Audio` tag throughout. An error also shows "Error - see log." in red in the visualizer's corner for a few seconds.
 
 ## V 2.8 (Build 134) — iPhone Duo
 

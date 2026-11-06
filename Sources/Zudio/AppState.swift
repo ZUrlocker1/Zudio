@@ -979,7 +979,7 @@ final class AppState: ObservableObject {
     }
 
     /// The on-screen form of an "Instruments" line: instrument names in place of program numbers,
-    /// "L1: Synth Brass 1, Pd: Synth Strings 3" for "L1:62 Pd:8050". The .zudio file keeps the
+    /// "L1:Synth Brass 1 Pd:Synth Strings 3" for "L1:62 Pd:8050". The .zudio file keeps the
     /// program numbers, which reload parses, so only the status log is translated, here on its way
     /// in (Zack, 2026-11-03). LS is Kosmic's hidden Lead Synth layer doubling Lead 1, always
     /// Polysynth. A program not in the current style's pool is shown as its number.
@@ -1003,10 +1003,10 @@ final class AppState: ObservableObject {
                 if let idx = programs.firstIndex(of: program), idx < names.count { name = names[idx] }
                 if track == kTrackLeadSynth && program == 90 { name = "Polysynth" }
             }
-            parts.append("\(pair[0]): \(name)")
+            parts.append("\(pair[0]):\(name)")
         }
         guard !parts.isEmpty else { return entry }
-        return GenerationLogEntry(tag: entry.tag, description: parts.joined(separator: ", "), isTitle: entry.isTitle)
+        return GenerationLogEntry(tag: entry.tag, description: parts.joined(separator: " "), isTitle: entry.isTitle)
     }
 
     /// The current song with its "Instruments" line rebuilt from what is playing now, for
@@ -1026,7 +1026,21 @@ final class AppState: ObservableObject {
         return song
     }
 
-    private func applyCurrentInstrumentsToPlayback() {
+    /// Kosmic Space volume trims on top of the shared Kosmic pool values (Zack, 2026-11-06):
+    /// Moog bass a little lower, Bright Saw on Lead 1 a little higher. Base Kosmic and Drift
+    /// are untouched because the trim applies only when the song is Space.
+    private func spaceCC7Trim(_ cc7: Int, trackIndex: Int, poolIdx: Int, style: MusicStyle) -> Int {
+        guard style == .kosmic, songState?.isKosmicSpace == true else { return cc7 }
+        let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style)
+        guard poolIdx < names.count else { return cc7 }
+        switch (trackIndex, names[poolIdx]) {
+        case (kTrackBass,  "Moog"):       return cc7 - 8
+        case (kTrackLead1, "Bright Saw"): return min(127, cc7 + 10)
+        default:                          return cc7
+        }
+    }
+
+    private func applyCurrentInstrumentsToPlayback(logInstruments: Bool = true) {
         // iOS: loadSoundBankInstrument() must be called while the engine is stopped —
         // calling it while running appears to succeed but produces silence. Stop once,
         // load all tracks (including kTrackLeadSynth=7, Kosmic's hidden doubling layer),
@@ -1055,7 +1069,8 @@ final class AppState: ObservableObject {
             let program = (trackIndex == kTrackLead2 ? lead2MirroredProgram : nil) ?? poolProgram
             playback.setProgram(program, forTrack: trackIndex, immediate: true)
             let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
-            let cc7 = idx < cc7Values.count ? cc7Values[idx] : 100
+            let cc7 = spaceCC7Trim(idx < cc7Values.count ? cc7Values[idx] : 100,
+                                   trackIndex: trackIndex, poolIdx: idx, style: style)
             playback.setChannelVolume(cc7, forTrack: trackIndex)
             // Check that the load was confirmed (currentProgram updated only on success)
             let loaded = playback.loadedProgram(forTrack: trackIndex)
@@ -1087,7 +1102,7 @@ final class AppState: ObservableObject {
 
         // Log the actual programs loaded so mismatches are immediately visible.
         let instrumentsEntry = instrumentsLogEntry(style: style)
-        appendToLog([instrumentsEntry])
+        if logInstruments { appendToLog([instrumentsEntry]) }
         // Also store in songState.generationLog so SongLogExporter writes it to .zudio files.
         songState?.generationLog.removeAll { $0.tag == "Instruments" }
         songState?.generationLog.append(instrumentsEntry)
@@ -1362,7 +1377,7 @@ final class AppState: ObservableObject {
         // without this the playing song falls back to default GM patches until the next song load.
         playback.onAudioEngineRestarted = { [weak self] in
             guard let self else { return }
-            self.applyCurrentInstrumentsToPlayback()
+            self.applyCurrentInstrumentsToPlayback(logInstruments: false)
             self.appendToLog([GenerationLogEntry(
                 tag: "Audio",
                 description: "New device — reloading",
@@ -1375,7 +1390,7 @@ final class AppState: ObservableObject {
         }
         // A start failure that the retry fixed: logged green so a recovery is visible.
         playback.onEngineRecovered = { [weak self] msg in
-            self?.appendToLog([GenerationLogEntry(tag: "AUDIO", description: msg, isTitle: false)])
+            self?.appendToLog([GenerationLogEntry(tag: "Audio", description: msg, isTitle: false)])
         }
         // Session state when every start attempt failed, so a field report shows which cause it was.
         playback.onEngineDiagnostic = { [weak self] msg in
@@ -1402,7 +1417,7 @@ final class AppState: ObservableObject {
             let now = Date()
             if self.lastInterruptionLogAt == nil || now.timeIntervalSince(self.lastInterruptionLogAt!) > 3 {
                 self.lastInterruptionLogAt = now
-                self.appendToLog([GenerationLogEntry(tag: "AUDIO", description: reason)])
+                self.appendToLog([GenerationLogEntry(tag: "Audio", description: reason)])
             }
         }
 
@@ -4069,7 +4084,8 @@ final class AppState: ObservableObject {
         let poolPrograms = Self.instrumentPoolPrograms(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
         if let poolIdx = poolPrograms.firstIndex(of: program) {
             let cc7Values = Self.instrumentPoolVolumeCC7(trackIndex: trackIndex, style: style, isChillSoho: isSoho)
-            let cc7 = poolIdx < cc7Values.count ? cc7Values[poolIdx] : 100
+            let cc7 = spaceCC7Trim(poolIdx < cc7Values.count ? cc7Values[poolIdx] : 100,
+                                   trackIndex: trackIndex, poolIdx: poolIdx, style: style)
             playback.setChannelVolume(cc7, forTrack: trackIndex)
             recordInstrument(poolIdx, forTrack: trackIndex, style: style)
         }

@@ -429,7 +429,8 @@ struct KosmicStructureGenerator {
         switch progFamily {
         case .static_drone:
             return "1"
-        case .two_chord_pendulum, .oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway:
+        case .two_chord_pendulum, .oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway,
+             .magneticArc, .magneticTurn, .equinoxePhrygian, .magneticDescent:
             // Space families reach the base builder only to consume its draws (see generate).
             // b6 (bVI) is diatonic only in Aeolian (natural minor). In Dorian and Mixolydian
             // the 6th is raised — using b6 creates a borrowed root whose chord tones are
@@ -476,7 +477,8 @@ struct KosmicStructureGenerator {
                 let weights: [Double]    = [0.40,   0.35,  0.25]
                 return types[rng.weightedPick(weights)]
             }
-        case .two_chord_pendulum, .oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway:
+        case .two_chord_pendulum, .oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway,
+             .magneticArc, .magneticTurn, .equinoxePhrygian, .magneticDescent:
             // Clash fix: avoid major chord in minor modes — the major 3rd clashes with scale
             if isMinorMode {
                 let types:   [ChordType] = [.minor, .sus2]
@@ -514,6 +516,11 @@ struct KosmicStructureGenerator {
     ///     The source's 1-bar bIII–IV pair becomes one 2-bar window to keep the even-bar rule.
     ///   Oxygene Aeolian Cycle (Oxygene 8) — i ×4, bVII ×2, iv ×2; every fourth pass ends bVI ×2.
     ///   Oxygene Two-Chord Sway (Oxygene 3) — i ×2, v ×2.
+    ///   Magnetic Fields Arc (Magnetic Fields 1) — i, bVI, iv, V ×4 each; V is major, its leading
+    ///     tone from the chord's own scale (`spaceChordScale`).
+    ///   Magnetic Fields Turn (Magnetic Fields 2) — i, V, bVI, bVII ×2 each, V major.
+    ///   Equinoxe Phrygian (Equinoxe) — i ×8 as two windows, then iv, bII, bvii, i ×2 each.
+    ///   Magnetic Fields Descent (Magnetic Fields 4) — I, vi, V, IV ×2 each.
     static func spaceCycle(family: KosmicProgressionFamily, pass: Int,
                            rng: inout SeededRNG) -> [SpaceChord] {
         switch family {
@@ -531,6 +538,28 @@ struct KosmicStructureGenerator {
             return [SpaceChord(degree: "1",  type: .minor, bars: 4),
                     SpaceChord(degree: "b7", type: .major, bars: 2),
                     last]
+        case .magneticArc:
+            return [SpaceChord(degree: "1",  type: .minor, bars: 4),
+                    SpaceChord(degree: "b6", type: .major, bars: 4),
+                    SpaceChord(degree: "4",  type: .minor, bars: 4),
+                    SpaceChord(degree: "5",  type: .major, bars: 4)]
+        case .magneticTurn:
+            return [SpaceChord(degree: "1",  type: .minor, bars: 2),
+                    SpaceChord(degree: "5",  type: .major, bars: 2),
+                    SpaceChord(degree: "b6", type: .major, bars: 2),
+                    SpaceChord(degree: "b7", type: .major, bars: 2)]
+        case .equinoxePhrygian:
+            return [SpaceChord(degree: "1",  type: .minor, bars: 4),
+                    SpaceChord(degree: "1",  type: .minor, bars: 4),
+                    SpaceChord(degree: "4",  type: .minor, bars: 2),
+                    SpaceChord(degree: "b2", type: .major, bars: 2),
+                    SpaceChord(degree: "b7", type: .minor, bars: 2),
+                    SpaceChord(degree: "1",  type: .minor, bars: 2)]
+        case .magneticDescent:
+            return [SpaceChord(degree: "1", type: .major, bars: 2),
+                    SpaceChord(degree: "6", type: .minor, bars: 2),
+                    SpaceChord(degree: "5", type: .major, bars: 2),
+                    SpaceChord(degree: "4", type: .major, bars: 2)]
         default:
             return [SpaceChord(degree: "1", type: .minor, bars: 2),
                     SpaceChord(degree: "5", type: .minor, bars: 2)]
@@ -545,6 +574,10 @@ struct KosmicStructureGenerator {
     ///   Oxygene Aeolian Cycle — bVI ×2, bIII ×2, bVII ×2, i ×2.
     ///   Oxygene Two-Chord Sway — i ×2, iv ×2; iv is major in Dorian, where the minor iv is
     ///     out of the scale.
+    ///   Magnetic Fields Arc — bIII, bVI, V, i ×2 each.
+    ///   Magnetic Fields Turn — iv ×2, V ×2, i ×4.
+    ///   Equinoxe Phrygian — bVI, bIII, bII, i ×2 each, home by the Phrygian cadence.
+    ///   Magnetic Fields Descent — iii, IV, V, I ×2 each.
     static func spaceBCycle(family: KosmicProgressionFamily, mode: Mode) -> [SpaceChord] {
         switch family {
         case .oxygeneDorianVamp:
@@ -556,6 +589,25 @@ struct KosmicStructureGenerator {
                     SpaceChord(degree: "b3", type: .major, bars: 2),
                     SpaceChord(degree: "b7", type: .major, bars: 2),
                     SpaceChord(degree: "1",  type: .minor, bars: 2)]
+        case .magneticArc:
+            return [SpaceChord(degree: "b3", type: .major, bars: 2),
+                    SpaceChord(degree: "b6", type: .major, bars: 2),
+                    SpaceChord(degree: "5",  type: .major, bars: 2),
+                    SpaceChord(degree: "1",  type: .minor, bars: 2)]
+        case .magneticTurn:
+            return [SpaceChord(degree: "4", type: .minor, bars: 2),
+                    SpaceChord(degree: "5", type: .major, bars: 2),
+                    SpaceChord(degree: "1", type: .minor, bars: 4)]
+        case .equinoxePhrygian:
+            return [SpaceChord(degree: "b6", type: .major, bars: 2),
+                    SpaceChord(degree: "b3", type: .major, bars: 2),
+                    SpaceChord(degree: "b2", type: .major, bars: 2),
+                    SpaceChord(degree: "1",  type: .minor, bars: 2)]
+        case .magneticDescent:
+            return [SpaceChord(degree: "3", type: .minor, bars: 2),
+                    SpaceChord(degree: "4", type: .major, bars: 2),
+                    SpaceChord(degree: "5", type: .major, bars: 2),
+                    SpaceChord(degree: "1", type: .major, bars: 2)]
         default:
             return [SpaceChord(degree: "1", type: .minor, bars: 2),
                     SpaceChord(degree: "4", type: mode == .Dorian ? .major : .minor, bars: 2)]
@@ -580,7 +632,8 @@ struct KosmicStructureGenerator {
         let themeReturn = SpaceThemeReturn.make(sections: sections)
         for section in sections {
             guard section.label == .A || section.label == .B else {
-                plan.append(spaceWindow(frame, section.startBar, section.lengthBars, "1", .minor))
+                plan.append(spaceWindow(frame, section.startBar, section.lengthBars, "1",
+                                        frame.mode == .Ionian ? .major : .minor))
                 continue
             }
             var bar = section.startBar
@@ -607,11 +660,15 @@ struct KosmicStructureGenerator {
         return plan
     }
 
-    /// One Space chord window, its note pools built as every Kosmic window's are.
+    /// One Space chord window, its note pools built on the chord's scale (`spaceChordScale`).
     private static func spaceWindow(_ frame: GlobalMusicalFrame, _ start: Int, _ length: Int,
                                     _ degree: String, _ type: ChordType) -> ChordWindow {
-        let (tones, tensions, avoids) = NotePoolBuilder.build(
+        let (tones, _, _) = NotePoolBuilder.build(
             chordRootDegree: degree, chordType: type, key: frame.key, mode: frame.mode)
+        // The chord's own scale, so a major V's leading tone is a chord tone, not an avoid tone.
+        let scale = spaceChordScale(chordTones: tones, frame: frame)
+        let tensions = scale.subtracting(tones)
+        let avoids = Set(0..<12).subtracting(scale)
         return ChordWindow(startBar: start, lengthBars: length,
                            chordRoot: degree, chordType: type,
                            chordTones: tones, scaleTensions: tensions, avoidTones: avoids)
@@ -638,6 +695,10 @@ struct KosmicStructureGenerator {
     ///   Oxygene Two-Chord Sway — bVI ×4, bVII ×4 in Aeolian (12 bars: bIII, bVI, bVII), the
     ///     Aeolian cadence home to B's i; in Dorian, where bVI is out of the scale, bIII ×4, bVII ×4
     ///     (12 bars: bIII, IV, bVII)
+    ///   Magnetic Fields Arc — iv ×4, bVII ×4 (12 bars: bVI, iv, bVII), bVII leading to B's bIII
+    ///   Magnetic Fields Turn — bIII ×4, i ×4 (12 bars: bIII, bVII, i), i leading to B's iv
+    ///   Equinoxe Phrygian — iv ×4, bvii ×4 (12 bars: bIII, iv, bvii), bvii stepping to B's bVI
+    ///   Magnetic Fields Descent — ii ×4, vi ×4 (12 bars: IV, ii, vi), vi leading to B's iii
     /// Applied over the finished cycle plan, so every cycle draw is the same as without a bridge.
     /// The sequencer solo keeps the song's cycle.
     static func spaceBridgeChords(family: KosmicProgressionFamily, mode: Mode,
@@ -651,6 +712,18 @@ struct KosmicStructureGenerator {
         case .oxygeneAeolianCycle:
             degrees = long ? [("4", .minor), ("5", .minor), ("b3", .major)]
                            : [("5", .minor), ("b3", .major)]
+        case .magneticArc:
+            degrees = long ? [("b6", .major), ("4", .minor), ("b7", .major)]
+                           : [("4", .minor), ("b7", .major)]
+        case .magneticTurn:
+            degrees = long ? [("b3", .major), ("b7", .major), ("1", .minor)]
+                           : [("b3", .major), ("1", .minor)]
+        case .equinoxePhrygian:
+            degrees = long ? [("b3", .major), ("4", .minor), ("b7", .minor)]
+                           : [("4", .minor), ("b7", .minor)]
+        case .magneticDescent:
+            degrees = long ? [("4", .major), ("2", .minor), ("6", .minor)]
+                           : [("2", .minor), ("6", .minor)]
         default:
             if mode == .Dorian {
                 degrees = long ? [("b3", .major), ("4", .major), ("b7", .major)]
