@@ -70,6 +70,14 @@ struct KosmicDrumGenerator {
             return markSpaceBridge(box, arrangement: spaceArrangement, totalBars: frame.totalBars,
                                    returnFill: .presetBox)
 
+        case .spaceMagneticRhythmBox:
+            usedRuleIDs.insert("KOS-DRUM-010")
+            let box = generateMagneticRhythmBox(frame: frame, structure: structure, rng: &rng,
+                                                fillBars: spaceArrangement?.fillBars ?? [],
+                                                arrangement: spaceArrangement)
+            return markSpaceBridge(box, arrangement: spaceArrangement, totalBars: frame.totalBars,
+                                   returnFill: .presetBox)
+
         case .spaceOxygeneHandPercussion:
             usedRuleIDs.insert("KOS-DRUM-012")
             // Thins to its sparse core through the breakdown and is silent through the solo.
@@ -275,18 +283,28 @@ struct KosmicDrumGenerator {
                                     velocity: 66, durationSteps: 1))
         }
 
-        // Fills replace the last 1 or 2 beats of their bar with one of the Space fills below; the
-        // kick that opens the fill and the clap on beat 4 stay, so the box still sounds like itself.
-        // A simpler stretch ends on a short fill into the fuller beat. Half the fills land on a
-        // crash on the next downbeat (Zack, 2026-11-03). The fill out of the bridge is always 2 beats
-        // and always lands on a crash, as does every kick and snare fill.
         let thinEnds = (arrangement?.drumThins ?? []).map { $0.range.upperBound - 1 }
+        addSpaceBoxFills(&events, frame: frame, rng: &rng, fillBars: fillBars + thinEnds,
+                         arrangement: arrangement, oneBeat: false)
+        return events
+    }
+
+    /// The fills and the solo silence both boxes share. Fills replace the last 1 or 2 beats of their
+    /// bar with one of the Space fills below; the kick that opens the fill and the clap on beat 4
+    /// stay, so the box still sounds like itself. Half the fills land on a crash on the next downbeat
+    /// (Zack, 2026-11-03). The fill out of the bridge is always 2 beats and always lands on a crash,
+    /// as does every kick and snare fill. `oneBeat` keeps every other fill to 1 beat, for the
+    /// Magnetic box's subtler fills. The sequencer solo silences the box until the fill that brings
+    /// the band back.
+    private static func addSpaceBoxFills(_ events: inout [MIDIEvent], frame: GlobalMusicalFrame,
+                                         rng: inout SeededRNG, fillBars: [Int],
+                                         arrangement: KosmicSpaceArrangement?, oneBeat: Bool) {
         let bridgeFill = arrangement?.bridge.map { $0.range.upperBound - 1 }
         var seenFill = Set<Int>()
-        let allFills = (fillBars + thinEnds).filter { seenFill.insert($0).inserted }.sorted()
+        let allFills = fillBars.filter { seenFill.insert($0).inserted }.sorted()
         var lastFill: SpaceFill? = nil
         for bar in allFills where bar > 0 && bar < frame.totalBars {
-            let drawnBeats = rng.nextDouble() < 0.80 ? 1 : 2
+            let drawnBeats = rng.nextDouble() < 0.80 || oneBeat ? 1 : 2
             let beats = bar == bridgeFill ? SpaceBridge.returnFillBeats : drawnBeats
             let kind = drawSpaceFill(after: lastFill, rng: &rng)
             lastFill = kind
@@ -298,11 +316,75 @@ struct KosmicDrumGenerator {
                                         velocity: 78, durationSteps: 1))
             }
         }
-        // The sequencer solo: the box is silent until the fill that brings the band back.
         if let bridge = arrangement?.bridge, bridge.kind == .sequencerSolo {
             events.removeAll { bridge.range.contains($0.stepIndex / 16) && $0.stepIndex < bridge.returnFillStep }
         }
-        return events
+    }
+
+    // MARK: - KOS-DRUM-010 Magnetic Fields Rhythm Box (Kosmic Space)
+    // The rhythm box of Magnetic Fields 1, 2 and 4: the kick in pairs, x..xx..xx..xx..x, under a
+    // ride or closed hat on every 16th. Homage draws per song:
+    //   kick grouping — rotated by 3 or 6 steps (35% each) or the source (30%)
+    //   top — ride 50%, closed hat 50%
+    //   snare — off 50%, or Magnetic Fields 2's steps 2, 3, 6, 10, 11 and 14 50%, on the electric
+    //           snare (40), which the Space fills never use, so the fill log never mistakes it
+    //   agogo — on the quarters in 30% of songs, from Magnetic Fields 4
+    // Jarre plays no fills here, but a hundred bars of it unbroken is dull (Zack, 2026-11-06), so the
+    // box takes short 1-beat Space fills at every body section change and on each side of its simpler
+    // stretches, as well as the arrangement's break fills. B sections add an open hat on the last
+    // 8th of every second bar. The breakdown bridge and the simpler stretches work as the preset
+    // box's: the kick alone on beats 1 and 3, and 8th or quarter tops. Repeat guard: the top's last
+    // 16th drops in every eighth bar.
+
+    private static func generateMagneticRhythmBox(
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        rng: inout SeededRNG,
+        fillBars: [Int],
+        arrangement: KosmicSpaceArrangement?
+    ) -> [MIDIEvent] {
+        let rotation = [0, 3, 6][rng.weightedPick([0.30, 0.35, 0.35])]
+        let kickSteps = [0, 3, 4, 7, 8, 11, 12, 15].map { ($0 + rotation) % 16 }.sorted()
+        let top: GMDrum = rng.nextDouble() < 0.50 ? .ride : .closedHat
+        let snareSteps: [Int] = rng.nextDouble() < 0.50 ? [] : [2, 3, 6, 10, 11, 14]
+        let agogo = rng.nextDouble() < 0.30
+
+        var events: [MIDIEvent] = []
+        func hit(_ step: Int, _ note: GMDrum, _ vel: UInt8) {
+            events.append(MIDIEvent(stepIndex: step, note: note.rawValue, velocity: vel, durationSteps: 1))
+        }
+        for bar in 0..<frame.totalBars {
+            let barStart = bar * 16
+            if let bridge = arrangement?.bridge, bridge.kind == .breakdown, bridge.range.contains(bar) {
+                hit(barStart, .kick, 96)
+                hit(barStart + 8, .kick, 88)
+                if bridge.range.count >= 12 && bar >= bridge.range.upperBound - 4 {
+                    for step in stride(from: 0, to: 16, by: 2) { hit(barStart + step, top, step % 4 == 0 ? 66 : 52) }
+                }
+                continue
+            }
+            // Simpler stretches: variant 0 drops to 8th tops and no snare, variant 1 to quarter tops
+            // with the kick on beats 1 and 3.
+            let thin = arrangement?.drumThin(atBar: bar)?.variant
+            let topStep = thin == nil ? 1 : thin == 0 ? 2 : 4
+            for step in stride(from: 0, to: 16, by: topStep) where !(bar % 8 == 7 && step == 15) {
+                hit(barStart + step, top, step % 4 == 0 ? 66 : 48)
+            }
+            for step in thin == 1 ? [0, 8] : kickSteps { hit(barStart + step, .kick, step % 8 == 0 ? 96 : 84) }
+            if thin == nil {
+                for step in snareSteps { hit(barStart + step, .snare2, step % 4 == 2 ? 72 : 60) }
+                if agogo { for step in [0, 4, 8, 12] { hit(barStart + step, .highAgogo, 58) } }
+                if structure.section(atBar: bar)?.label == .B && bar % 2 == 1 { hit(barStart + 14, .openHat, 60) }
+            }
+        }
+
+        let thins = arrangement?.drumThins ?? []
+        let sectionEdges = structure.sections.dropFirst()
+            .filter { $0.label == .A || $0.label == .B }.map { $0.startBar - 1 }
+        let edges = sectionEdges + thins.flatMap { [$0.range.lowerBound - 1, $0.range.upperBound - 1] }
+        addSpaceBoxFills(&events, frame: frame, rng: &rng, fillBars: fillBars + edges,
+                         arrangement: arrangement, oneBeat: true)
+        return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
     // MARK: - Space fills (Zack, 2026-11-03, from Eternal-Cosmos)

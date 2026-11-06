@@ -493,7 +493,8 @@ struct SongGenerator {
 
         // Space keeps to its own drum pool: a forced base style (the curated first Kosmic song
         // forces the Electric Buddha groove) is ignored, as Drift's bass ignores forced base rules.
-        let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .minimal, .spaceOxygeneHandPercussion, .absent]
+        let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .minimal, .spaceOxygeneHandPercussion, .absent,
+                                                       .spaceMagneticRhythmBox]
         let percussionStyle = isKosmicSpace
             ? (forcePercussionStyle.flatMap { spacePercussion.contains($0) ? $0 : nil } ?? percussionStylePicked)
             : (forcePercussionStyle ?? percussionStylePicked)
@@ -2005,7 +2006,7 @@ struct SongGenerator {
     static func appendSpaceDrumLines(_ notes: inout [Int: [GenerationLogEntry]],
                                      _ arr: KosmicSpaceArrangement, drumRules: Set<String>) {
         let calls: [(range: Range<Int>, start: String)]
-        if drumRules.contains("KOS-DRUM-009")      { calls = arr.drumThins.map { ($0.range, "Drums simplify") } }
+        if drumRules.contains("KOS-DRUM-009") || drumRules.contains("KOS-DRUM-010") { calls = arr.drumThins.map { ($0.range, "Drums simplify") } }
         else if drumRules.contains("KOS-DRUM-001") { calls = arr.miniPopsDropouts.map { ($0, "Drums drop out") } }
         else if drumRules.contains("KOS-DRUM-012") { calls = arr.thinRanges.map { ($0, "Drums simplify") } }
         else { calls = [] }
@@ -2157,7 +2158,8 @@ struct SongGenerator {
     static func spaceFillLines(drums: [MIDIEvent], drumRules: Set<String>,
                                structure: SongStructure, totalBars: Int) -> [Int: [GenerationLogEntry]] {
         let hands = drumRules.contains("KOS-DRUM-012")
-        guard hands || drumRules.contains("KOS-DRUM-001") || drumRules.contains("KOS-DRUM-009") else { return [:] }
+        guard hands || drumRules.contains("KOS-DRUM-001") || drumRules.contains("KOS-DRUM-009")
+                || drumRules.contains("KOS-DRUM-010") else { return [:] }
         let toms = Set([GMDrum.hiTom, .hiMidTom, .lowMidTom, .highFloorTom, .lowFloorTom].map(\.rawValue))
         let voices: Set<UInt8> = hands ? [GMDrum.highBongo.rawValue]
                                        : toms.union([GMDrum.snare.rawValue, GMDrum.claves.rawValue])
@@ -2871,6 +2873,7 @@ struct SongGenerator {
         case "KOS-DRUM-008": return "Half-time lope"
         case "KOS-DRUM-009": return "Oxygene Preset Box"
         case "KOS-DRUM-012": return "Oxygene 6 Hand Percussion"
+        case "KOS-DRUM-010": return "Magnetic Fields Rhythm Box"
         default:                 return ruleID
         }
     }
@@ -2896,6 +2899,7 @@ struct SongGenerator {
         case "KOS-BASS-017":  return "Four-bar hold root sustain"
         case "KOS-BASS-018":  return "Oxygene Falling Walk"
         case "KOS-BASS-020":  return "Oxygene 8 Pump"
+        case "KOS-BASS-019":  return "Magnetic Fields Octave Pump"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
         default:              return ruleID.hasPrefix("KOS-") ? ruleID : "Unknown bass rule"
@@ -2934,6 +2938,7 @@ struct SongGenerator {
         case "KOS-LD1-013": return "Oxygene Falling Theme"
         case "KOS-LD1-014": return "Oxygene See-Saw Riff"
         case "KOS-LD1-016": return "Oxygene 6 Rising Strings"
+        case "KOS-LD1-015": return "Magnetic Fields Turn Melody"
         case "KOS-LD1-017": return "Oxygene 8 Offbeat Climb"
         case "KOS-LD2-000":  return "No lead 2"
         default:             return ruleID
@@ -2958,6 +2963,8 @@ struct SongGenerator {
         case "KOS-RTHM-014": return "Chromatic tremolo"
         case "KOS-RTHM-015": return "Downbeat chord"
         case "KOS-RTHM-016": return "Oxygene Octave Sequencer"
+        case "KOS-RTHM-017": return "Equinoxe Fifth Triplets"
+        case "KOS-RTHM-018": return "Magnetic Fields Leading-Tone Cell"
         case "KOS-RTHM-021": return "Oxygene 8 Offbeat Pedal"
         default:            return ruleID
         }
@@ -3676,7 +3683,7 @@ struct SongGenerator {
         let spaceFills = hasDrums && kTrackDrums < trackEvents.count
             ? spaceFillLines(drums: trackEvents[kTrackDrums], drumRules: drumRules, structure: structure, totalBars: totalBars)
             : [:]
-        let isSpaceKit = ["KOS-DRUM-001", "KOS-DRUM-009", "KOS-DRUM-012"].contains { drumRules.contains($0) }
+        let isSpaceKit = ["KOS-DRUM-001", "KOS-DRUM-009", "KOS-DRUM-010", "KOS-DRUM-012"].contains { drumRules.contains($0) }
         for (step, lines) in spaceFills.sorted(by: { $0.key < $1.key }) { out[step, default: []] += lines }
         for fillBar in allFillBars.sorted() where fillBar < outroStartBar && hasDrums && !isSpaceKit {
             guard let sec = structure.section(atBar: fillBar),

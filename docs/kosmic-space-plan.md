@@ -7,9 +7,11 @@ listens (2026-11-03) found the songs too alike, so Space now draws from several 
 base Kosmic's JMJ rules and five more Oxygene rules, each track drawn independently. It builds on
 macOS and iOS. No test suite has been run. See "Phase 1 as built" below for where the code had to
 interpret this plan, and its sections "Breaks" and "More Oxygene rules" for what came after.
-Phases 2 and 3 are designed but wait for listening on Phase 1. As of 2026-11-03 the next step is
-Phase 2 (Magnetic); the open scoping question is whether its breakdown becomes the existing
-bridge's in-section form (see "Open questions").
+Phase 2 (Magnetic) began on 2026-11-06: its harmony families and its drum, bass, sequencer and
+Lead 1 rules are built; see "Phase 2 as built". Still to come: KOS-LD2-001 Magnetic Fields Twin,
+the See-Saw thirds variant and the breakdown. Phase 3 is designed but
+waits for listening. The open scoping question is whether the Phase 2 breakdown becomes the
+existing bridge's in-section form (see "Open questions").
 
 This is the single document for Kosmic Space. It replaces the original plan, written in
 September before Motorik Europe and Chill Soho were built, and the corpus review of
@@ -57,14 +59,16 @@ on Jarre alone, the same subtraction Motorik Arcade made.
 
 **Naming.** `isKosmicSpace` on SongState. `displayStyleName` returns "Kosmic Space".
 
-**Three flavours**, one per era, each coupling its own harmony, drums, bass and sequencer:
+**Three eras of source**, whose rules all draw from one pool:
 
 - **Oxygene** (1976). Phase 1.
 - **Magnetic** (Equinoxe 1978 and Magnetic Fields 1981). Phase 2.
 - **Chronologie** (1993, with Oxygene 7–13 and the 1980s pieces). Phase 3, optional.
 
-A rhythm section built from one album's rules reads as that album; a mixed one reads as
-nothing in particular. That is the lesson of Motorik Europe's sync groups.
+There is no per-song flavour. Every track draws its rule independently from a pool that holds
+the rules of every era, each as likely as the others on its track, so a song can pair Magnetic
+Fields harmony with an Oxygene sequencer. The mixing is part of the variety. The generation
+log names each rule by its album, so a song's sources stay visible.
 
 ---
 
@@ -178,7 +182,7 @@ the Phase 2 breakdown, is a mute schedule, not a new section type.
 **The one place we don't economise is harmony.** Kosmic's chord builder gives a section one
 or two chords of at least 8 bars, at random roots. It cannot play a repeating cycle, and the
 fast cycle under the sequencer is the core of the sound. So Phase 1 adds a chord-cycle builder,
-and every flavour's progressions are then data.
+and every harmony family's progressions are then data.
 
 **Determinism.** Space must not change what an existing base-Kosmic or Drift seed generates,
 except that some base seeds now roll Space. That is the same trade Europe made. The Space
@@ -211,17 +215,19 @@ existing Drift seeds generate differently. That is accepted for testing. The det
 below pins base and Drift seeds against the release split, and runs only once the release
 values are restored.
 
-**Tempo.** 100–124, triangular with a peak at 118. The corpus's Oxygene pieces run 100, 110
-and 121. Draw it on the derived stream, consume the base tempo slot, and apply it before the
+**Tempo.** 96–128, triangular with a peak at 118 (widened from 100–124 for the Magnetic Fields
+and Equinoxe pieces). The corpus's Oxygene pieces run 100, 110 and 121. Draw it on the derived stream, consume the base tempo slot, and apply it before the
 bar count is chosen so song length stays 225–270 seconds.
 
 **Harmony family**, drawn per song:
 
-- **Oxygene Dorian Vamp** (55%) — Dorian. *Oxygene 4.*
-- **Oxygene Aeolian Cycle** (30%) — Aeolian. *Oxygene 8.*
-- **Oxygene Two-Chord Sway** (15%) — Aeolian or Dorian 50/50. *Oxygene 3.*
+- **Oxygene Dorian Vamp** — Dorian. *Oxygene 4.*
+- **Oxygene Aeolian Cycle** — Aeolian. *Oxygene 8.*
+- **Oxygene Two-Chord Sway** — Aeolian or Dorian 50/50. *Oxygene 3.*
 
-The family sets the song mode. These are new `KosmicProgressionFamily` cases. The enum is
+Within the Oxygene three the weights are 55 / 30 / 15. Since Phase 2 they share one pool with the
+four Magnetic families, each of which has the weight of an average Oxygene family; see "Phase 2
+as built". The family sets the song mode. These are new `KosmicProgressionFamily` cases. The enum is
 `Codable`, so new cases are appended and existing raw values never change.
 
 **Percussion style.** A new `PercussionStyle` case for `KOS-DRUM-009`, appended to the enum.
@@ -546,8 +552,8 @@ echo the "Part IV" convention.
 
 ### Logging
 
-One `GenerationLogEntry` with tag `Space` naming the flavour and harmony family, for example
-`Space Oxygene, Dorian Vamp`. Each new rule's log line names its per-song draws, for example
+The harmony family shows on the `Chords` line of the generation log, for example
+`Oxygene Dorian Vamp i ii` or `Magnetic Fields Arc i bVI iv V`. Each new rule's log line names its per-song draws, for example
 `KOS-LD1-014 Oxygene See-Saw Riff (sixth, 2+2+2, second half)`, so a song's character can be
 read from its log.
 
@@ -555,24 +561,24 @@ read from its log.
 
 ## Phase 2 — Magnetic
 
-Begins after Phase 1 has been listened to. It adds the second flavour, the breakdown, and the
-harmonic-minor and Phrygian families.
+Begins after Phase 1 has been listened to. It adds the Magnetic rules, the breakdown, and the
+Magnetic Fields and Equinoxe harmony families.
 
-### Flavour roll
+### One pool, no flavour roll
 
-A `KosmicSpaceFlavour` enum (`oxygene`, `magnetic`, later `chronologie`), stored on SongState
-and drawn on the derived stream: **Oxygene 50 / Magnetic 50** until Phase 3. The flavour picks
-the harmony family, drums, bass and sequencer preset. Lead 1, Lead 2, Pads and Texture draw
-from the shared Space pools, weighted toward the flavour.
-
-**Magnetic tempo:** 92–132, peak 120.
+Phase 2's rules join Phase 1's in a single Space pool. There is no flavour enum, no flavour roll
+and no new SongState field. Each track draws independently, as it does in Phase 1, and every new
+rule carries the same weight as the other rules on its track. Exclusions exist only between two
+busy parts, as the Pump and the Octave Sequencer. Tempo is the one Space range, 96–128, peak 118.
+The "Phase 2 pools" below list the rules each track gains rather than separate Magnetic and
+Oxygene pools.
 
 ### Breakdown
 
 The one structural addition. It is a **mute schedule**, built the way Motorik Europe's section
 dropout is:
 
-- One breakdown per song, in Magnetic songs (70%) and Oxygene songs (30%). 8 or 12 bars,
+- One breakdown per song, at a single share for all Space songs. 8 or 12 bars,
   starting on an 8-bar boundary inside the second half of a body section, never in the first
   24 bars or the last 16.
 - **Silent during it:** Rhythm, Lead 1 and Drums
@@ -586,22 +592,20 @@ and change chord cycle.
 
 ### Harmony families, Magnetic
 
-- **Magnetic Fields Harmonic Minor Arc** — i ×4, bVI ×4, iv ×4, V ×4, with V major. Mode
-  `HarmonicMinor`. *Magnetic Fields 1.* B-cycle: bIII ×2, i ×2, bVI ×2, V ×2.
-- **Magnetic Fields Harmonic Minor Turn** — i ×2, V ×2, bVI ×2, bVII ×2. Mode
-  `HarmonicMinor`. *Magnetic Fields 2.* B-cycle: iv ×2, V ×2, i ×4.
-- **Equinoxe Phrygian Cadence** — i ×8 (pedal), then iv ×2, bII ×2, bVII ×2, i ×2. Mode
-  `Phrygian`. *Equinoxe.* B-cycle: bVI ×4, bIII ×4.
-- **Magnetic Fields Major Descent** — I ×2, vi ×2, V ×2, IV ×2. Mode `Ionian`. *Magnetic
-  Fields 4.* B-cycle: iii ×2, IV ×2, ii ×2, V ×2.
+Built 2026-11-06; see "Phase 2 as built". Each family is a KosmicProgressionFamily case with its
+own A cycle, B cycle and breakdown chords:
 
-Weights: Arc 35, Turn 25, Phrygian 25, Major Descent 15.
+- **Magnetic Fields Arc** — i ×4, bVI ×4, iv ×4, V ×4, with V major. Aeolian. *Magnetic Fields 1.*
+  B-cycle: bIII, bVI, V, i ×2 each.
+- **Magnetic Fields Turn** — i ×2, V ×2, bVI ×2, bVII ×2, with V major. Aeolian. *Magnetic Fields 2.*
+  B-cycle: iv ×2, V ×2, i ×4.
+- **Equinoxe Phrygian** — i ×8 (pedal), then iv ×2, bII ×2, bvii ×2, i ×2. Phrygian. *Equinoxe.*
+  B-cycle: bVI, bIII, bII, i ×2 each.
+- **Magnetic Fields Descent** — I ×2, vi ×2, V ×2, IV ×2. Ionian. *Magnetic Fields 4.* B-cycle:
+  iii, IV, V, I ×2 each.
 
-**Oxygene B-cycles**, added in this phase for Oxygene breakdowns:
-
-- Dorian Vamp: bIII ×2, IV ×2
-- Aeolian Cycle: bVI ×2, bIII ×2
-- Two-Chord Sway: iv ×4
+**Oxygene B-cycles** (built in Phase 1): Dorian Vamp bIII ×2, IV ×2, i ×4; Aeolian Cycle bVI, bIII,
+bVII, i ×2 each; Two-Chord Sway i ×2, iv ×2.
 
 ### New rules, Phase 2
 
@@ -612,7 +616,9 @@ Weights: Arc 35, Turn 25, Phrygian 25, Major Descent 15.
 - Snare: off (0.5), or on steps 2, 3, 6, 10, 11, 14 (0.5, Part 2's pattern)
 - In 30% of songs, an agogo-style voice on the quarters, from Part 4
 
-No fills. *Homage:* the kick grouping rotates by 0, 3 or 6 steps per song.
+*Homage:* the kick grouping rotates by 0, 3 or 6 steps per song. Jarre plays no fills, but the
+Magnetic rhythm box gets short, subtle ones at section boundaries and where drums drop out or come
+back, so a hundred bars of sequenced drums do not sit unbroken.
 
 **KOS-BASS-019 "Magnetic Octave Pump"** — one rule, three variants drawn per song. (Its Oxygene 8
 root-and-b7 sub-option was built early as `KOS-BASS-020` Oxygene 8 Pump, 2026-11-03, and can be
@@ -626,9 +632,10 @@ dropped from this rule.)
   root and b7 instead (*Oxygene 8*).
 - **Magnetic Fields leading-tone pedal** (0.25) — the octave with its lower neighbour a
   semitone below, rhythm `x..x.xxxx..x.xxx`, neighbour on steps 6 and 14. *Magnetic Fields
-  1.* In `HarmonicMinor` songs, on the V chord, the neighbour is the leading tone.
+  1.* On a major V chord, the neighbour is the leading tone (spaceChordScale).
 
-Register MIDI 29–48.
+Register MIDI 29–48. Like the drums, the Magnetic bass varies over the song rather than playing one
+unchanging pattern, as the Pump and the Falling Walk already do.
 
 **KOS-RTHM-017 "Equinoxe Fifth Triplets"** — a sequencer-engine preset. Root–fifth–fifth
 groups across the bar, `R . 5 5 R 5 5 R R . 5 5 R 5 5 R`, 14 notes. *Equinoxe.*
@@ -643,7 +650,9 @@ neighbour. *Magnetic Fields 1.*
 2–7 and 10–15 (`..xxxxxx..xxxxxx`). Each half bar starts one scale step lower, so the line
 sequences down over 3–5 steps, then resets. About 45% repeated notes. Register 62–84.
 *Homage:* the turn shape is drawn per song from the five, and the sequence length per
-statement. Within-song development as in Design principles.
+statement. Within-song development as in Design principles. Like the Oxygene lead rules, every new Lead 1
+rule varies its figure from song to song, so the new rules bring different melodies and not just a
+different tempo, key or scale.
 
 **Equinoxe thirds as a See-Saw variant** — not a new rule. `KOS-LD1-014` gains two draws for
 Magnetic songs: interval a minor or major third (Equinoxe's `[−3 +3 −3]`), and the rhythm
@@ -662,6 +671,10 @@ It generates no rhythm of its own, so it runs after Rhythm and Lead 1 and after 
 that thins them. Motorik Europe's `MOT-LD2-012` is the code precedent.
 
 ### Phase 2 pools
+
+These are the rules each track gains. All join the shared Space pool at equal weight (see "One
+pool, no flavour roll"); the weights below are the earlier flavour-split design and stand as a
+guide to what each rule replaces, not as separate pools.
 
 **Magnetic songs:**
 
@@ -688,8 +701,8 @@ through the breakdown, so the contrast holds without it.
 
 ## Phase 3 — Chronologie (optional)
 
-Only if Phases 1 and 2 leave room for a third flavour after listening. Flavour split becomes
-Oxygene 35 / Magnetic 35 / Chronologie 30. Tempo 108–136, peak 122.
+Only if Phases 1 and 2 leave room for a third era of source after listening. Its rules join the
+same single pool. Tempo 108–136, peak 122.
 
 ### Harmony families, Chronologie
 
@@ -765,7 +778,7 @@ Phase 3, three rule IDs and one-and-a-half implementations:
 New infrastructure:
 
 - Phase 1 — the chord-cycle builder, the Space flag and its plumbing
-- Phase 2 — the flavour enum and the breakdown mute schedule
+- Phase 2 — the breakdown mute schedule
 
 ### Reused unchanged
 
@@ -1101,9 +1114,8 @@ and lead out, drums at a third of their density, bass, pads and noise on a new c
 bars 81–96 (the sequencer alone), Arpegiator bars 41–56 (drums and sequencer only), and the
 effects-only endings of Oxygene 3 and 6. Zack chose the first two:
 
-- **Where.** ab and aba forms only, `spaceBridgeShare` of them: 0.80 for testing, 0.30–0.40 at
-  release (about 1 Space song in 6 at 0.30 and 1 in 5 at 0.40, since ab and aba are 55% of Space
-  forms; 0.80 puts one in 44% of Space songs). The bridge
+- **Where.** ab and aba forms only, `spaceBridgeShare` of them: 0.30 (about 1 Space song in 6,
+  since ab and aba are 55% of Space forms). The bridge
   takes the last 8 or 12 bars of the first A section and ends where the first B begins, leaving A at
   least 16 bars. It is a mute schedule (`SpaceBridge`, in `CosmicStructureGenerator.swift`), not a
   section, so the A and B rules, the chord cycle draws and every track's rule draws are unchanged. It
@@ -1187,6 +1199,106 @@ Not yet done:
   `KosmicAutoSweepTests`, and the Kosmic `DeterminismTests` seeds. This is expected until
   the release split is restored.
 
+## Phase 2 as built
+
+### Harmony (2026-11-06)
+
+The four Magnetic harmony families are in the single Space pool with the three Oxygene families.
+Each Magnetic family has the weight of an average Oxygene family (about 14.3% each); the Oxygene
+three keep their 55 / 30 / 15 shape and come to 23.6, 12.8 and 6.4%. Magnetic harmony therefore
+opens about 57% of Space songs. Counted over 1,203 Space songs, the shares matched. The new
+KosmicProgressionFamily cases are appended: magneticArc, magneticTurn, equinoxePhrygian and
+magneticDescent, with log labels "Magnetic Fields Arc i bVI iv V", "Magnetic Fields Turn i V bVI
+bVII", "Equinoxe Phrygian i iv bII" and "Magnetic Fields Descent I vi V IV".
+
+**Modes.** The family sets the mode. Arc and Turn are Aeolian, with the V chord major; the
+leading tone belongs to that chord alone, as Jarre plays harmonic minor only over the V, and the
+Turn's bVII stays in the scale. Equinoxe Phrygian is Phrygian. Descent is Ionian, and its intro
+and outro tonic is a major chord. The HarmonicMinor mode is not used.
+
+**Tempo.** One Space range, 96–128, triangular, peak 118.
+
+**Cycle data.** spaceCycle, spaceBCycle and spaceBridgeChords in KosmicStructureGenerator each
+carry the four families, with the same even-bar rule and 2- and 4-bar windows. The Arc and the
+Phrygian's tonic pedal are 4-bar windows. Breakdown chords for the bridge: Arc iv ×4, bVII ×4
+(12 bars: bVI, iv, bVII); Turn bIII ×4, i ×4 (12 bars: bIII, bVII, i); Phrygian iv ×4, bvii ×4
+(12 bars: bIII, iv, bvii); Descent ii ×4, vi ×4 (12 bars: IV, ii, vi).
+
+### Notes stay in the scale
+
+Every Space rule already snaps its notes to the song's scale (snapToScale, snapMidiToScale and
+scaleStep in CosmicHelpers.swift). A chord that carries a note outside the scale needed two more
+steps, both in CosmicHelpers.swift:
+
+- **The chord's own scale.** spaceChordScale swaps into the song's scale each chord tone that is
+  outside it, in place of the scale note a semitone below (above, when that one is itself a chord
+  tone). E major over A Aeolian reads as A harmonic minor. spaceWindow builds each Space chord
+  window's tensions and avoid tones on that scale, so the leading tone is a chord tone, and
+  HarmonicFilter's clash guard keeps the major third and removes the natural seventh. An
+  Oxygene chord is always inside the scale, so for those songs nothing changes.
+- **One fit pass.** fitSpaceChordScale runs once per pitched track after generation, and after a
+  single-track regen, in SongGenerator. It moves only the notes the chord under them has swapped
+  out, and leaves every other note alone, so a note the rule already snapped is never adjusted
+  twice. Drums are skipped. Before the Magnetic families existed it left the determinism
+  fingerprint identical.
+
+Measured over 1,500 seeds, no Arc or Turn song held the natural seventh over a V chord, and the
+leading tone sounded there.
+
+### Rules (2026-11-06)
+
+Five Magnetic rules, each in its track's single Space pool. A rule joining a pool of unequal
+weights takes the average weight of the rules already there, and they keep their shape.
+
+- **KOS-DRUM-010 Magnetic Fields Rhythm Box** — 20% of Space songs, with Preset Box 30.4, Mini Pops
+  27.2, Hand Percussion 10.4 and no percussion 12. The paired kick x..xx..xx..xx..x, rotated by 3
+  or 6 steps (35% each) or the source (30%), under a ride or closed hat (50/50) on every 16th.
+  Snare off, or on Magnetic Fields 2's steps 2, 3, 6, 10, 11 and 14 (50/50), on the electric snare
+  (40), which no Space fill uses, so the fill log never mistakes the pattern for a fill. An agogo on
+  the quarters in 30% of songs. B sections add an open hat on the last 8th of every second bar.
+  Jarre plays no fills here, but the box takes short 1-beat Space fills at every body section
+  change and on both sides of its simpler stretches, as well as the arrangement's break fills; the
+  bridge return fill stays 2 beats. The fill code is shared with the Preset Box
+  (addSpaceBoxFills). Simpler stretches and the breakdown work as the Preset Box's.
+- **KOS-BASS-019 Magnetic Fields Octave Pump** — 25% of the bass pool (Falling Walk and Oxygene 8 Pump
+  28.1 each, Berlin School drone 18.8), but never under a busy sequencer, so in practice about 7%
+  of Space songs. Three figures per song: octave eighths 40% (30% of those on 16ths), octave pops
+  35%, neighbour pedal 25%, as designed above; root in MIDI 31–42. It varies as the Oxygene 8
+  Pump does: thin bars keep held quarter notes, the fifth on the loop's turnaround, a breath in
+  the second bar of each 8, a root–3rd–5th–octave turn before each new body section and a late
+  entry into each one after the first. The eighths also switch density over the last 8 bars of a
+  section of 16 or more.
+- **KOS-RTHM-017 Equinoxe Fifth Triplets** and **KOS-RTHM-018 Magnetic Fields Leading-Tone Cell**
+  — sequencer-engine presets, each a sixth of the Rhythm pool with the four earlier rules. They
+  play as the Octave Sequencer does: the full figure in the intro, the outro, Lead 1's rests and
+  the sequencer solo, a thinner one under Lead 1, silent through the sequencer break (the shared
+  helper spaceSequencer). 017 draws its upper note, fifth 40% (source), fourth or octave 30% each,
+  and one of three thinner variants. 018 draws a rotation of 0 (30%), 4 or 8 steps (35% each), the
+  octave or the fifth (70/30) and one of three thinner variants; its neighbour is a semitone below
+  the root where the scale has one. The engine's slots gained a fourth. Both count as busy
+  (about 12 notes a bar), so neither pump plays under them.
+- **KOS-LD1-015 Magnetic Fields Turn Melody** — the fourth A-section rule, a quarter of songs, with
+  the Falling Theme, Rising Strings and Offbeat Climb. A statement of 3 to 5 half-bar 16th runs on
+  steps 2–7 and 10–15 from the start of each 4-bar block, each run a scale step lower, the rest of
+  the block silent; every fourth statement climbs instead. Each run starts from the current chord.
+  Per-song draws, so the melody differs from song to song and not only in key or tempo: the turn
+  shape (five, the source's two at 15% each), the run count, the start on root, 3rd or 5th, and 6-
+  or 5-note runs. Legato, each note held to the next. Measured range MIDI 57–84.
+
+Measured over 600 seeds (479 Space songs): 304 Space songs held at least one Magnetic rule. Notes
+a bar: Rhythm Box 24.9 drum hits, Fifth Triplets 11.9, Leading-Tone Cell 11.3, Octave Pump 8.6.
+Every pitched note stayed in its chord's scale but for the Oxygene 8 Pump's deliberate raised
+leading tone in its turn bar.
+
+### Space levels and bridge share (2026-11-06)
+
+spaceBridgeShare is 0.30, its release value: a bridge in about 30% of Space songs in ab and aba
+form, 1 Space song in 6. Moog on Bass is 8 CC7 steps lower and Bright Saw on Lead 1 is 10 higher,
+in Space songs only (spaceCC7Trim in AppState.swift); base Kosmic and Drift keep the shared
+values.
+
+---
+
 ## Verification
 
 Kept light, as usual: build, the affected suite, and a generated batch to listen to.
@@ -1203,7 +1315,7 @@ does):
   and `KOS-LD1-014` in B sections
 - every Rhythm note is in key and on one of the pattern's steps
 - `KOS-DRUM-009` emits identical bars apart from the 1-in-8 repeat guard
-- tempo stays within 100–124
+- tempo stays within 96–128
 
 **Listening batch** — 20 Space songs. Listen for:
 
@@ -1238,8 +1350,8 @@ does):
   on beat 4, rising into the downbeat, and the preset box always lands it on a crash. Same weight
   and draw. The claves accent on step 12 is unchanged.
 
-- **Bridges in Space** — built 2026-11-03 (see "Bridges" under "Phase 1 as built"). Still open: the
-  release share (0.30–0.40), and whether the Phase 2 breakdown becomes the in-section form of the
+- **Bridges in Space** — built 2026-11-03 (see "Bridges" under "Phase 1 as built"); the release
+  share is 0.30. Still open: whether the Phase 2 breakdown becomes the in-section form of the
   Magnetic Fields Breakdown rather than a second build. Not built and kept in reserve: a Pedal Rise
   (one non-tonic chord held 8 bars, drums out, a long swell into the return) and an effects-only
   interlude (pads and a held Texture effect).

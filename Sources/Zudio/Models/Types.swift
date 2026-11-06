@@ -433,6 +433,7 @@ enum PercussionStyle: String, Codable, Sendable {
     case driftHalfTimeLope           // Drift: snare on beat 3 only, sparse hat, BPM ≤ 78 (KOS-DRUM-008)
     case spaceOxygenePresetBox       // Space: the Oxygene 4 Minipops pattern, unvarying (KOS-DRUM-009)
     case spaceOxygeneHandPercussion  // Space: the Oxygene 6 hand percussion, no kick or hats (KOS-DRUM-012)
+    case spaceMagneticRhythmBox      // Space: the Magnetic Fields rhythm box, 16th ride or hats (KOS-DRUM-010)
 }
 
 // MARK: - Kosmic song forms
@@ -643,6 +644,7 @@ enum GMDrum: UInt8 {
     case tambourine    = 54
     case crash2        = 57
     case cowbell       = 56
+    case highAgogo     = 67
     case claves        = 75
     // Hand percussion (KOS-DRUM-012 Oxygene 6 Hand Percussion)
     case highBongo     = 60

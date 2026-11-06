@@ -61,11 +61,14 @@ struct KosmicArpeggioGenerator {
         // Kosmic Space: no stagger, no rest windows, no fade before the outro (ArrangementFilter
         // exempts Rhythm too).
         if isKosmicSpace {
-            // KOS-RTHM-016 Oxygene Octave Sequencer, KOS-RTHM-002 JMJ Hook, KOS-RTHM-005 JMJ Dual-Rate
-            // and KOS-RTHM-021 Oxygene 8 Offbeat Pedal, 25% each. The two base rules are gated, 8th-note
+            // KOS-RTHM-016 Oxygene Octave Sequencer, KOS-RTHM-002 JMJ Hook, KOS-RTHM-005 JMJ Dual-Rate,
+            // KOS-RTHM-021 Oxygene 8 Offbeat Pedal, KOS-RTHM-017 Equinoxe Fifth Triplets and
+            // KOS-RTHM-018 Magnetic Fields Leading-Tone Cell, a sixth each. The two base rules are gated, 8th-note
             // lines that follow the chords; they sit an octave down, under Lead 1's register, and rest
             // through the sequencer break.
-            let spaceRule = ["KOS-RTHM-016", "KOS-RTHM-002", "KOS-RTHM-005", "KOS-RTHM-021"][rng.weightedPick([0.25, 0.25, 0.25, 0.25])]
+            let spaceRules = ["KOS-RTHM-016", "KOS-RTHM-002", "KOS-RTHM-005", "KOS-RTHM-021",
+                              "KOS-RTHM-017", "KOS-RTHM-018"]
+            let spaceRule = spaceRules[rng.weightedPick(Array(repeating: 1.0 / 6.0, count: 6))]
             usedRuleIDs.insert(spaceRule)
             // The sequencer solo bridge belongs to the sequencer, as in Rendez-Vous 2 bars 81–96: whatever
             // the rule, its 8 bars play the full Oxygene pattern (Zack, 2026-11-03, La Nuit Hypnotique,
@@ -81,6 +84,14 @@ struct KosmicArpeggioGenerator {
             if spaceRule == "KOS-RTHM-021" {
                 return withSolo(generateOxygeneOffbeatPedal(frame: frame, tonalMap: tonalMap, rng: &rng,
                                                             arrangement: spaceArrangement))
+            }
+            if spaceRule == "KOS-RTHM-017" {
+                return generateEquinoxeFifthTriplets(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                     arrangement: spaceArrangement)
+            }
+            if spaceRule == "KOS-RTHM-018" {
+                return generateMagneticLeadingToneCell(frame: frame, tonalMap: tonalMap, rng: &rng,
+                                                       arrangement: spaceArrangement)
             }
             if spaceRule != "KOS-RTHM-016" {
                 let line = spaceRule == "KOS-RTHM-002"
@@ -168,7 +179,7 @@ struct KosmicArpeggioGenerator {
     // Every note is 1 step long and in the song's scale.
 
     enum JMJSlot {
-        case root, octave, fifth, third
+        case root, octave, fifth, third, fourth
         /// A semitone below the root when that is in the scale (a leading tone), else the scale
         /// tone below.
         case lowerNeighbour
@@ -189,6 +200,7 @@ struct KosmicArpeggioGenerator {
                 case .octave: note = root + 12
                 case .fifth:  note = scaleStep(root, by: 4, scalePCs: scalePCs)
                 case .third:  note = scaleStep(root, by: 2, scalePCs: scalePCs)
+                case .fourth: note = scaleStep(root, by: 3, scalePCs: scalePCs)
                 case .lowerNeighbour:
                     note = scalePCs.contains((root + 11) % 12) ? root - 1
                          : scaleStep(root, by: -1, scalePCs: scalePCs)
@@ -238,6 +250,63 @@ struct KosmicArpeggioGenerator {
             if arrangement.bridgeKind(atBar: bar) == .sequencerSolo { return source }
             return arrangement.leadPlays(atBar: bar) ? thin : source
         }
+    }
+
+    /// A Space sequencer that plays `source` in the intro, the outro, Lead 1's rests and the
+    /// sequencer solo, and `thin` wherever Lead 1 plays, and rests through the sequencer break,
+    /// as KOS-RTHM-016 does.
+    private static func spaceSequencer(frame: GlobalMusicalFrame, tonalMap: TonalGovernanceMap,
+                                       source: [JMJSlot?], thinDrop: Set<Int>,
+                                       arrangement: KosmicSpaceArrangement?) -> [MIDIEvent] {
+        let thin = source.enumerated().map { thinDrop.contains($0.offset) ? nil : $0.element }
+        return jmjStepSequencer(frame: frame, tonalMap: tonalMap) { bar in
+            guard let arrangement else { return source }
+            if arrangement.sequencerRests(atBar: bar) { return nil }
+            if arrangement.bridgeKind(atBar: bar) == .sequencerSolo { return source }
+            return arrangement.leadPlays(atBar: bar) ? thin : source
+        }
+    }
+
+    // MARK: - KOS-RTHM-017: Equinoxe Fifth Triplets (Kosmic Space)
+    // The Equinoxe sequencer: root-fifth-fifth groups across the bar, R . 5 5 R 5 5 R R . 5 5 R 5 5 R,
+    // 14 notes, played as the Octave Sequencer is (full where Lead 1 rests, thinner under it).
+    // Homage draws per song:
+    //   upper note — the fifth 40% (source), the fourth 30% or the octave 30%
+    //   thinner variant — without steps 3 and 11, without steps 6 and 14, or without steps 3, 6, 11
+    //                     and 14, a third each
+
+    private static func generateEquinoxeFifthTriplets(
+        frame: GlobalMusicalFrame, tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        arrangement: KosmicSpaceArrangement?
+    ) -> [MIDIEvent] {
+        let u: JMJSlot = [.fifth, .fourth, .octave][rng.weightedPick([0.40, 0.30, 0.30])]
+        let drop: Set<Int> = [[3, 11], [6, 14], [3, 6, 11, 14]][rng.nextInt(upperBound: 3)]
+        let source: [JMJSlot?] = [.root, nil, u, u, .root, u, u, .root, .root, nil, u, u, .root, u, u, .root]
+        return spaceSequencer(frame: frame, tonalMap: tonalMap, source: source, thinDrop: drop,
+                              arrangement: arrangement)
+    }
+
+    // MARK: - KOS-RTHM-018: Magnetic Fields Leading-Tone Cell (Kosmic Space)
+    // The Magnetic Fields 1 sequencer: the octave and the root with the lower neighbour, 13 notes,
+    // O . R O N R R O . R N O R . O R. The neighbour is a semitone below the root where the scale
+    // has one, so over a major V it is the leading tone of the chord. Played as the Octave Sequencer is.
+    // Homage draws per song:
+    //   rotation — the cell starts 4 or 8 steps in (35% each) or on its own first step (30%)
+    //   upper note — the octave 70%, the fifth 30%
+    //   thinner variant — without step 7, without steps 7 and 15, or without steps 3 and 11, a third each
+
+    private static func generateMagneticLeadingToneCell(
+        frame: GlobalMusicalFrame, tonalMap: TonalGovernanceMap, rng: inout SeededRNG,
+        arrangement: KosmicSpaceArrangement?
+    ) -> [MIDIEvent] {
+        let rotation = [0, 4, 8][rng.weightedPick([0.30, 0.35, 0.35])]
+        let o: JMJSlot = rng.nextDouble() < 0.70 ? .octave : .fifth
+        let drop: Set<Int> = [[7], [7, 15], [3, 11]][rng.nextInt(upperBound: 3)]
+        let cell: [JMJSlot?] = [o, nil, .root, o, .lowerNeighbour, .root, .root, o,
+                                nil, .root, .lowerNeighbour, o, .root, nil, o, .root]
+        let source = (0..<16).map { cell[($0 + rotation) % 16] }
+        return spaceSequencer(frame: frame, tonalMap: tonalMap, source: source, thinDrop: drop,
+                              arrangement: arrangement)
     }
 
     // MARK: - KOS-RTHM-021: Oxygene 8 Offbeat Pedal (Kosmic Space)

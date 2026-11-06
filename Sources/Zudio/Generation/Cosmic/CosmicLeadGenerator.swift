@@ -87,6 +87,15 @@ struct KosmicLeadGenerator {
                 usedRuleIDs.remove("KOS-LD1-016")
                 usedRuleIDs.insert("KOS-LD1-017")
             }
+            // In a quarter of songs KOS-LD1-015 Magnetic Fields Turn Melody plays the A sections
+            // instead, so the four A-section rules share them evenly. Drawn last, as above.
+            if rng.nextDouble() < 0.25 {
+                theme = generateMagneticTurnMelody(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                   rng: &rng)
+                lead1BaseRule = "KOS-LD1-015"
+                usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-016", "KOS-LD1-017"])
+                usedRuleIDs.insert("KOS-LD1-015")
+            }
             var lead = theme + riff + phrase
             // Theme return (Zack, 2026-11-03): a song that ends on B (ab, abab) never hears its A theme
             // again, so 8 bars two thirds into the last B replay the first A section's opening 8 bars
@@ -695,6 +704,66 @@ struct KosmicLeadGenerator {
                 }
             }
             phrase += 1
+        }
+        return events
+    }
+
+    // MARK: - KOS-LD1-015 Magnetic Fields Turn Melody (Kosmic Space, A sections)
+    // Magnetic Fields 2 lead: a turn figure in 16th runs on steps 2–7 and 10–15 of the bar, each half
+    // bar's run starting one scale step lower, so the line sequences down, then resets. Here a
+    // statement is 3 to 5 runs from the start of each 4-bar block of the A section, and the rest of
+    // the block is silent. Every run starts from the current chord, so the figure follows the chords;
+    // every fourth statement climbs instead of falling. Legato: each note is held to the next, the
+    // last of a statement for 6 steps. Register: the chord root nearest a tonic in MIDI 62–73, and a
+    // statement that leaves 57–84 moves an octave whole.
+    // Homage draws per song, so no two songs share a melody:
+    //   turn shape — [+2 +1 -1 -2] or [-1 -2 +3] (the source's, 15% each), or [+1 +1 -2], [+2 -1 -1]
+    //                or [-2 +1 +1] (about 23% each), in scale steps, repeated through the run
+    //   run length — 3, 4 or 5 runs a statement, a third each
+    //   start — on the chord's root 30%, 3rd 35% or 5th 35%
+    //   run — 6 notes 60%, or 5 with the last held 40%
+
+    private static func generateMagneticTurnMelody(
+        frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let shapes: [[Int]] = [[2, 1, -1, -2], [-1, -2, 3], [1, 1, -2], [2, -1, -1], [-2, 1, 1]]
+        let shape = shapes[rng.weightedPick([0.15, 0.15, 0.24, 0.23, 0.23])]
+        let runs = 3 + rng.nextInt(upperBound: 3)
+        let startDegree = [0, 2, 4][rng.weightedPick([0.30, 0.35, 0.35])]
+        let runLength = rng.nextDouble() < 0.60 ? 6 : 5
+        let scalePCs = frame.scalePCs
+        let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
+                                    low: 62, high: 73)
+
+        var events: [MIDIEvent] = []
+        var statement = 0
+        for section in structure.sections where section.label == .A {
+            let end = section.endBar * 16
+            for block in stride(from: section.startBar, to: section.endBar, by: 4) {
+                let direction = statement % 4 == 3 ? 1 : -1
+                statement += 1
+                var notes: [(onset: Int, pitch: Int)] = []
+                for k in 0..<runs {
+                    let bar = block + k / 2
+                    guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                    // The chord root nearest the tonic, from a fourth below to a fifth above
+                    var offset = (spaceChordRootPC(entry, frame: frame) - tonic % 12 + 12) % 12
+                    if offset > 7 { offset -= 12 }
+                    var pitch = scaleStep(tonic + offset, by: startDegree + direction * k, scalePCs: scalePCs)
+                    for i in 0..<runLength {
+                        notes.append((bar * 16 + (k % 2 == 0 ? 2 : 10) + i, pitch))
+                        pitch = scaleStep(pitch, by: shape[i % shape.count], scalePCs: scalePCs)
+                    }
+                }
+                let shift = (notes.map(\.pitch).max() ?? 0) > 84 ? -12 : (notes.map(\.pitch).min() ?? 60) < 57 ? 12 : 0
+                for (i, n) in notes.enumerated() where n.onset < end {
+                    let next = i + 1 < notes.count ? notes[i + 1].onset : n.onset + 6
+                    events.append(MIDIEvent(stepIndex: n.onset, note: UInt8(n.pitch + shift),
+                                            velocity: i == 0 ? 68 : (n.onset % 8 == 2 ? 64 : 58),
+                                            durationSteps: Swift.min(next - n.onset, end - n.onset)))
+                }
+            }
         }
         return events
     }

@@ -10,7 +10,7 @@ struct KosmicBassGenerator {
 
     /// Space Rhythm rules the Pump is never drawn under: JMJ Dual-Rate, and the Octave Sequencer, about
     /// 10 notes a bar against the Pump's 12 (Zack, 2026-11-03: too busy with Lead 1 over them).
-    static let spaceBusyRhythms: Set<String> = ["KOS-RTHM-005", "KOS-RTHM-016"]
+    static let spaceBusyRhythms: Set<String> = ["KOS-RTHM-005", "KOS-RTHM-016", "KOS-RTHM-017", "KOS-RTHM-018"]
 
     static func generate(
         frame: GlobalMusicalFrame,
@@ -32,11 +32,13 @@ struct KosmicBassGenerator {
         let rules: [String]
         let weights: [Double]
         if isKosmicSpace {
-            // KOS-BASS-018 Oxygene Falling Walk and KOS-BASS-020 Oxygene 8 Pump 37.5% each,
-            // KOS-BASS-001 Berlin School drone 25%. The Pump is never drawn under the busy Space
-            // rhythms in `spaceBusyRhythms`: the walk takes its share.
-            rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001"]
-            weights = spaceBusyRhythm ? [0.75, 0.0, 0.25] : [0.375, 0.375, 0.25]
+            // KOS-BASS-019 Magnetic Fields Octave Pump takes the average weight of the three older
+            // rules, 25%, and they keep their shape (Zack, 2026-11-06): KOS-BASS-018 Oxygene Falling
+            // Walk and KOS-BASS-020 Oxygene 8 Pump 28.1% each, KOS-BASS-001 Berlin School drone
+            // 18.8%. Neither pump is drawn under the busy Space rhythms in `spaceBusyRhythms`: the
+            // walk takes their share.
+            rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001", "KOS-BASS-019"]
+            weights = spaceBusyRhythm ? [0.75, 0.0, 0.25, 0.0] : [0.28125, 0.28125, 0.1875, 0.25]
         } else if isKosmicDrift {
             if isDriftDreamscape {
                 // Dreamscape forces Four-Bar Hold
@@ -180,13 +182,14 @@ struct KosmicBassGenerator {
         let fallingWalk = ruleID == "KOS-BASS-018" ? oxygeneWalkDraws(rng: &rng) : nil
         // KOS-BASS-020: 30% of songs drop the b7 and pump bare octaves
         let pumpSeventh: Bool? = ruleID == "KOS-BASS-020" ? rng.nextDouble() >= 0.30 : nil
+        let magneticPump = ruleID == "KOS-BASS-019" ? magneticPumpDraws(rng: &rng) : nil
         // KOS-BASS-020 fifth-voicing bars: the turnaround of each 8-bar chord loop — a non-tonic window
         // that hands back to the tonic and ends on an 8-bar point of its section. In Oxygene 8 these are
         // the iv chord's 2 bars in every 8; here the Aeolian Cycle's iv, the Dorian Vamp's last window
         // and every second v of the Two-Chord Sway.
         var pumpFifthBars = Set<Int>()
         let firstBodyStart = structure.sections.first { $0.label == .A || $0.label == .B }?.startBar
-        if pumpSeventh != nil {
+        if pumpSeventh != nil || magneticPump != nil {
             let plan = structure.chordPlan
             for (i, window) in plan.enumerated() where window.chordRoot != "1" {
                 guard let sec = structure.section(atBar: window.startBar),
@@ -358,7 +361,7 @@ struct KosmicBassGenerator {
             // sub-layers. Both thin over the arrangement's bass stretches, whose edges are annotated as
             // "pattern evolving" through bassEvolutionBars, and both vary on the same bars: a turn in
             // the last bar before a new body section, a breath in the second bar of each 8.
-            if fallingWalk != nil || pumpSeventh != nil {
+            if fallingWalk != nil || pumpSeventh != nil || magneticPump != nil {
                 let thin = spaceArrangement?.bassThins(atBar: bar) == true
                 if section.label == .A || section.label == .B,
                    thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
@@ -384,6 +387,17 @@ struct KosmicBassGenerator {
                     let lateEntry = bar == section.startBar && bar != firstBodyStart
                     events += oxygenePumpBar(barStart: barStart, entry: entry, frame: frame,
                                              seventh: seventh, thin: thin, variant: variant, lateEntry: lateEntry)
+                } else if let pump = magneticPump {
+                    // The Oxygene Pump's variations, and the eighths switch density over the last 8
+                    // bars of a body section of 16 or more, a lift into the next.
+                    let variant: PumpVariant = turn ? .turn
+                        : pumpFifthBars.contains(bar) ? .fifth
+                        : breath ? .breath
+                        : .normal
+                    events += magneticPumpBar(barStart: barStart, entry: entry, frame: frame, pump: pump,
+                                              thin: thin, variant: variant,
+                                              lateEntry: bar == section.startBar && bar != firstBodyStart,
+                                              lift: section.lengthBars >= 16 && bar >= section.endBar - 8)
                 }
                 continue
             }
@@ -687,6 +701,73 @@ struct KosmicBassGenerator {
             events.append(MIDIEvent(stepIndex: barStart + 15, note: UInt8(upper), velocity: 84, durationSteps: 1))
         }
         return events
+    }
+
+    // MARK: - KOS-BASS-019 Magnetic Fields Octave Pump (Kosmic Space)
+    // The octave basses of Equinoxe and Magnetic Fields, one rule with three figures drawn per song:
+    //   octave eighths (40%) — root and octave alternating on the 8ths (Equinoxe, Chronologie 2);
+    //       30% of these songs run 16ths, as Magnetic Fields 4 and Arpegiator do
+    //   octave pops (35%) — a root pedal on 16ths, x..xxxxxx..xxxxx, the octave on steps 4, 7, 12
+    //       and 15 (Magnetic Fields 2)
+    //   neighbour pedal (25%) — the octave and its lower neighbour, x..x.xxxx..x.xxx, the neighbour
+    //       on steps 6 and 14 and the root on the downbeat (Magnetic Fields 1); the neighbour is a
+    //       semitone below where the scale has one, else the scale step below
+    // Root in MIDI 31–42, the octave above it. Variation over the song, as the Oxygene 8 Pump's: a
+    // thin bar keeps the quarter notes, held; the fifth replaces the octave on the chord loop's
+    // turnaround; a breath drops the last note in the second bar of each 8; a turn climbs root, 3rd,
+    // 5th, octave on the last beat before a new body section; each body section after the first
+    // enters late. The eighths also switch to 16ths (or back) over the last 8 bars of a long section.
+
+    enum MagneticPumpKind { case eighths, pops, pedal }
+
+    struct MagneticPump {
+        let kind: MagneticPumpKind
+        let sixteenths: Bool
+    }
+
+    private static func magneticPumpDraws(rng: inout SeededRNG) -> MagneticPump {
+        let kind: MagneticPumpKind = [.eighths, .pops, .pedal][rng.weightedPick([0.40, 0.35, 0.25])]
+        return MagneticPump(kind: kind, sixteenths: kind == .eighths && rng.nextDouble() < 0.30)
+    }
+
+    private static func magneticPumpBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, pump: MagneticPump,
+        thin: Bool, variant: PumpVariant, lateEntry: Bool, lift: Bool
+    ) -> [MIDIEvent] {
+        let scalePCs = frame.scalePCs
+        let root = clampToRegister(spaceChordRootPC(entry, frame: frame) + 36, low: 31, high: 42)
+        let octave = root + 12
+        let upper = variant == .fifth ? scaleStep(root, by: 4, scalePCs: scalePCs) : octave
+        // (step, note, duration)
+        var hits: [(step: Int, note: Int, dur: Int)]
+        switch pump.kind {
+        case .eighths:
+            hits = pump.sixteenths != lift
+                ? (0..<16).map { ($0, $0 % 2 == 0 ? root : upper, 1) }
+                : stride(from: 0, to: 16, by: 2).map { ($0, $0 % 4 == 0 ? root : upper, 2) }
+        case .pops:
+            hits = [0, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15].map { ($0, [4, 7, 12, 15].contains($0) ? upper : root, 1) }
+        case .pedal:
+            let neighbour = scalePCs.contains((octave + 11) % 12) ? octave - 1
+                          : scaleStep(octave, by: -1, scalePCs: scalePCs)
+            hits = [0, 3, 5, 6, 7, 8, 11, 13, 14, 15].map {
+                ($0, $0 == 0 ? root : $0 == 6 || $0 == 14 ? neighbour : upper, 1)
+            }
+        }
+        if thin {
+            hits = hits.filter { $0.step % 4 == 0 }.map { ($0.step, $0.note, 4) }
+        } else if variant == .breath {
+            hits.removeLast()
+        } else if variant == .turn {
+            hits.removeAll { $0.step >= 12 }
+            hits += [2, 4, 7].enumerated().map { (13 + $0.offset, scaleStep(root, by: $0.element, scalePCs: scalePCs), 1) }
+            hits.insert((12, root, 1), at: hits.count - 3)
+        }
+        if lateEntry { hits.removeAll { $0.step == 0 } }
+        return hits.map {
+            MIDIEvent(stepIndex: barStart + $0.step, note: UInt8($0.note),
+                      velocity: $0.step == 0 ? 96 : $0.step % 4 == 0 ? 88 : 80, durationSteps: $0.dur)
+        }
     }
 
     // Walk variation (Zack, 2026-11-03: like the Pump, a little less). Deterministic, no draws:
