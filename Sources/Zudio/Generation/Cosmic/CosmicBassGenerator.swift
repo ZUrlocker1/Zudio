@@ -32,13 +32,13 @@ struct KosmicBassGenerator {
         let rules: [String]
         let weights: [Double]
         if isKosmicSpace {
-            // KOS-BASS-019 Magnetic Fields Octave Pump takes the average weight of the three older
-            // rules, 25%, and they keep their shape (Zack, 2026-11-06): KOS-BASS-018 Oxygene Falling
-            // Walk and KOS-BASS-020 Oxygene 8 Pump 28.1% each, KOS-BASS-001 Berlin School drone
-            // 18.8%. Neither pump is drawn under the busy Space rhythms in `spaceBusyRhythms`: the
-            // walk takes their share.
+            // KOS-BASS-019 Magnetic Fields Octave Pump is raised to 35% of the bass pool where a pump
+            // may play (Zack, 2026-11-06: the busy-rhythm exclusion left it in about 7% of songs, and
+            // he wanted 10-15%): KOS-BASS-018 Oxygene Falling Walk and KOS-BASS-020 Oxygene 8 Pump
+            // 24% each, KOS-BASS-001 Berlin School drone 17%. Neither pump is drawn under the busy
+            // Space rhythms in `spaceBusyRhythms`: the walk takes their share.
             rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001", "KOS-BASS-019"]
-            weights = spaceBusyRhythm ? [0.75, 0.0, 0.25, 0.0] : [0.28125, 0.28125, 0.1875, 0.25]
+            weights = spaceBusyRhythm ? [0.75, 0.0, 0.25, 0.0] : [0.24, 0.24, 0.17, 0.35]
         } else if isKosmicDrift {
             if isDriftDreamscape {
                 // Dreamscape forces Four-Bar Hold

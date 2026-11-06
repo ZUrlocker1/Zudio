@@ -1256,9 +1256,10 @@ weights takes the average weight of the rules already there, and they keep their
   change and on both sides of its simpler stretches, as well as the arrangement's break fills; the
   bridge return fill stays 2 beats. The fill code is shared with the Preset Box
   (addSpaceBoxFills). Simpler stretches and the breakdown work as the Preset Box's.
-- **KOS-BASS-019 Magnetic Fields Octave Pump** — 25% of the bass pool (Falling Walk and Oxygene 8 Pump
-  28.1 each, Berlin School drone 18.8), but never under a busy sequencer, so in practice about 7%
-  of Space songs. Three figures per song: octave eighths 40% (30% of those on 16ths), octave pops
+- **KOS-BASS-019 Magnetic Fields Octave Pump** — 35% of the bass pool wherever a pump may play
+  (Falling Walk and Oxygene 8 Pump 24 each, Berlin School drone 17), but never under a busy
+  sequencer, so it plays in 12.0% of Space songs (144 of 1,203; raised from 25% and about 7% to reach
+  Zack's 10–15%). Three figures per song: octave eighths 40% (30% of those on 16ths), octave pops
   35%, neighbour pedal 25%, as designed above; root in MIDI 31–42. It varies as the Oxygene 8
   Pump does: thin bars keep held quarter notes, the fifth on the loop's turnaround, a breath in
   the second bar of each 8, a root–3rd–5th–octave turn before each new body section and a late
