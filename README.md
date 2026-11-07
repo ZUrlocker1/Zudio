@@ -21,7 +21,7 @@ This repository contains the macOS app source, implementation notes, and support
 
 The download is `2.9` (build 135), a work-in-progress build for testing Kosmic Space (below). Universal binary — runs natively on both Apple Silicon and Intel Macs. Download the DMG disk image file, open it, and drag Zudio to your Applications folder.
 
-**Work in progress — v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre, starting with *Oxygene*. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. Each part draws from several rules taken from Oxygene 4, 6 and 8, so songs vary. Chord cycles and drum, bass, sequencer and lead rules from *Magnetic Fields* and *Equinoxe* are in the mix too. It is in the 2.9 download above for testing, and is still being tuned by ear, so songs and rules will change. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
+**Work in progress — v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre, starting with *Oxygene*. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. Each part draws from several rules taken from Oxygene 4, 6 and 8, so songs vary. Chord cycles and drum, bass, sequencer and lead rules from *Magnetic Fields* and *Equinoxe* are in the mix too, along with a major-key pop loop from *Chronologie* and string pads that lean into each chord change. It is in the 2.9 download above for testing, and is still being tuned by ear, so songs and rules will change. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
 
 **What's new — v2.8 iPhone Duo:** Zudio now has a layout made for the iPhone Duo, the foldable iPhone. Tested on a real Duo. Folded, it is the iPhone player it always was. Unfolded, it is the iPad layout, opening on Visuals with the track view one tap away on the Tracks tab. Fold and unfold mid-song and playback carries on.
 
@@ -69,7 +69,7 @@ Earlier releases are covered in the [change log](docs/change-log.md).
 
 - [motorik-plan.md](docs/motorik-plan.md) — Motorik style: genre research, song analysis, universal rules, and complete implemented specification (drums, bass, pads, leads, voicings).
 - [kosmic-plan.md](docs/kosmic-plan.md) — Kosmic style: genre research, artist-by-artist analysis, universal rules, MIDI analysis findings, and complete implemented specification.
-- [kosmic-space-plan.md](docs/kosmic-space-plan.md) — Kosmic Space (work in progress): the Jean-Michel Jarre substyle, its corpus measurements, rules, phases and what Phase 1 built.
+- [kosmic-space-plan.md](docs/kosmic-space-plan.md) — Kosmic Space (work in progress): the Jean-Michel Jarre substyle, its corpus measurements, harmony families, rules by track and what is on hold.
 - [ambient-plan.md](docs/ambient-plan.md) — Ambient style: genre research, artist-by-artist analysis, universal rules, generator design, and MIDI analysis.
 - [chill-plan.md](docs/chill-plan.md) — Chill style: genre research, artist-by-artist analysis (St Germain, Moby, Air, DJ Cam Quartet, Electric Buddha Band), universal rules, generator design, and MIDI analysis.
 
