@@ -215,7 +215,7 @@ struct KosmicMusicalFrameGenerator {
         return Swift.max(96, Swift.min(128, Int(raw.rounded())))
     }
 
-    /// Space drum rule pool. KOS-DRUM-010 Magnetic Fields Rhythm Box takes the average weight of the
+    /// Space drum rule pool. KOS-DRUM-010 Magnetic Gallop takes the average weight of the
     /// four older choices, 20%, and they keep their shape (Zack, 2026-11-06): KOS-DRUM-009 Oxygene
     /// Preset Box 30.4%, KOS-DRUM-001 JMJ Mini Pops 27.2%, KOS-DRUM-012 Oxygene 6 Hand Percussion
     /// 10.4% (distinctive, so rare; Zack, 2026-11-03) and KOS-DRUM-000 no percussion 12%.

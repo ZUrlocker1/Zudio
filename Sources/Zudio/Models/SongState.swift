@@ -126,7 +126,9 @@ struct SongState: Sendable {
     /// doubles Lead 1 and shares few onsets with Rhythm.
     var isSpaceStereoTwin: Bool {
         guard isKosmicSpace, trackEvents.count > kTrackRhythm else { return false }
-        let twin = trackEvents[kTrackLead2], rhythm = trackEvents[kTrackRhythm]
+        let twin = trackEvents[kTrackLead2]
+        // The twin rests in B sections, so compare with Rhythm's notes outside them
+        let rhythm = trackEvents[kTrackRhythm].filter { structure.section(atBar: $0.stepIndex / 16)?.label != .B }
         guard twin.count >= 16, twin.count * 10 >= rhythm.count * 8 else { return false }
         let onsets = Set(rhythm.map(\.stepIndex))
         return twin.filter { onsets.contains($0.stepIndex) }.count * 10 >= twin.count * 9

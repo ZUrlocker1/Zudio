@@ -18,7 +18,8 @@ struct KosmicDrumGenerator {
         isKosmicDrift: Bool = false,
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
-        spaceArrangement: KosmicSpaceArrangement? = nil
+        spaceArrangement: KosmicSpaceArrangement? = nil,
+        spaceWalkingBass: Bool = false
     ) -> [MIDIEvent] {
 
         switch percussionStyle {
@@ -74,7 +75,8 @@ struct KosmicDrumGenerator {
             usedRuleIDs.insert("KOS-DRUM-010")
             let box = generateMagneticRhythmBox(frame: frame, structure: structure, rng: &rng,
                                                 fillBars: spaceArrangement?.fillBars ?? [],
-                                                arrangement: spaceArrangement)
+                                                arrangement: spaceArrangement,
+                                                walkingBass: spaceWalkingBass)
             return markSpaceBridge(box, arrangement: spaceArrangement, totalBars: frame.totalBars,
                                    returnFill: .presetBox)
 
@@ -321,10 +323,13 @@ struct KosmicDrumGenerator {
         }
     }
 
-    // MARK: - KOS-DRUM-010 Magnetic Fields Rhythm Box (Kosmic Space)
-    // The rhythm box of Magnetic Fields 1, 2 and 4: the kick in pairs, x..xx..xx..xx..x, under a
-    // ride or closed hat on every 16th. Homage draws per song:
-    //   kick grouping — rotated by 3 or 6 steps (35% each) or the source (30%)
+    // MARK: - KOS-DRUM-010 Magnetic Gallop (Kosmic Space)
+    // The rhythm box of Magnetic Fields 1, 2 and 4: the kick in pairs under a ride or closed hat on
+    // every 16th. Magnetic Fields 1's pairs straddle the beat (x..xx..xx..xx..x) against a bass that
+    // syncopates with them; under Space's 8th-note basses that put a kick a 16th after a third of the
+    // bass notes, and its shifted versions lost beat 1. So the pairs lead into each beat on steps
+    // 2-3, 6-7, 10-11 and 14-15, with a kick on beat 1 (Zack, 2026-11-07, Empyrion-Axolotl). The old
+    // grouping draw still runs so later draws do not move. Homage draws per song:
     //   top — ride 50%, closed hat 50%
     //   snare — off 50%, or Magnetic Fields 2's steps 2, 3, 6, 10, 11 and 14 50%, on the electric
     //           snare (40), which the Space fills never use, so the fill log never mistakes it
@@ -332,19 +337,27 @@ struct KosmicDrumGenerator {
     // Jarre plays no fills here, but a hundred bars of it unbroken is dull (Zack, 2026-11-06), so the
     // box takes short 1-beat Space fills at every body section change and on each side of its simpler
     // stretches, as well as the arrangement's break fills. B sections add an open hat on the last
-    // 8th of every second bar. The breakdown bridge and the simpler stretches work as the preset
-    // box's: the kick alone on beats 1 and 3, and 8th or quarter tops. Repeat guard: the top's last
-    // 16th drops in every eighth bar.
+    // 8th of every second bar. The simpler stretches drop the gallop for the kick alone on beats 1
+    // and 3, under 8th or quarter tops, so a long song gets relief from it. When the bass is the
+    // Berlin School drone, Falling Walk or Magnetic Triad Walk, B sections play the plainer kick of
+    // Magnetic Fields 2 and 4 on steps 0, 6, 8 and 14, which lands on those basses' 8ths; under the
+    // two Pumps, whose 16ths it misses, B keeps the gallop. Repeat guard: the top's last 16th drops
+    // in every eighth bar.
+
+    /// Bass rules whose 8th-note lines the Magnetic Gallop's B-section kick lands on.
+    static let spaceWalkingBasses: Set<String> = ["KOS-BASS-001", "KOS-BASS-018", "KOS-BASS-021"]
 
     private static func generateMagneticRhythmBox(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         rng: inout SeededRNG,
         fillBars: [Int],
-        arrangement: KosmicSpaceArrangement?
+        arrangement: KosmicSpaceArrangement?,
+        walkingBass: Bool
     ) -> [MIDIEvent] {
-        let rotation = [0, 3, 6][rng.weightedPick([0.30, 0.35, 0.35])]
-        let kickSteps = [0, 3, 4, 7, 8, 11, 12, 15].map { ($0 + rotation) % 16 }.sorted()
+        _ = rng.weightedPick([0.30, 0.35, 0.35])   // retired grouping draw, kept for the draw order
+        let kickSteps = [0, 2, 3, 6, 7, 10, 11, 14, 15]
+        let pulseSteps = [0, 6, 8, 14]   // Magnetic Fields 2 and 4, B sections over a drone or walk
         let top: GMDrum = rng.nextDouble() < 0.50 ? .ride : .closedHat
         let snareSteps: [Int] = rng.nextDouble() < 0.50 ? [] : [2, 3, 6, 10, 11, 14]
         let agogo = rng.nextDouble() < 0.30
@@ -363,18 +376,23 @@ struct KosmicDrumGenerator {
                 }
                 continue
             }
-            // Simpler stretches: variant 0 drops to 8th tops and no snare, variant 1 to quarter tops
-            // with the kick on beats 1 and 3.
+            // Simpler stretches: the kick on beats 1 and 3 only; variant 0 has 8th tops, variant 1
+            // quarter tops; no snare, agogo or open hat.
             let thin = arrangement?.drumThin(atBar: bar)?.variant
-            let topStep = thin == nil ? 1 : thin == 0 ? 2 : 4
+            let inB = structure.section(atBar: bar)?.label == .B
+            // Full B bars lighten: 8th tops under a ride bell on the beats, and the snare keeps only its
+            // off-beats (Zack, 2026-11-07).
+            let topStep = thin == nil ? (inB ? 2 : 1) : thin == 0 ? 2 : 4
             for step in stride(from: 0, to: 16, by: topStep) where !(bar % 8 == 7 && step == 15) {
                 hit(barStart + step, top, step % 4 == 0 ? 66 : 48)
             }
-            for step in thin == 1 ? [0, 8] : kickSteps { hit(barStart + step, .kick, step % 8 == 0 ? 96 : 84) }
+            let kicks = thin != nil ? [0, 8] : inB && walkingBass ? pulseSteps : kickSteps
+            for step in kicks { hit(barStart + step, .kick, step % 8 == 0 ? 96 : 84) }
             if thin == nil {
-                for step in snareSteps { hit(barStart + step, .snare2, step % 4 == 2 ? 72 : 60) }
+                for step in snareSteps where !(inB && step % 4 == 3) { hit(barStart + step, .snare2, step % 4 == 2 ? 72 : 60) }
+                if inB { for step in [0, 4, 8, 12] { hit(barStart + step, .rideBell, step == 0 ? 64 : 56) } }
                 if agogo { for step in [0, 4, 8, 12] { hit(barStart + step, .highAgogo, 58) } }
-                if structure.section(atBar: bar)?.label == .B && bar % 2 == 1 { hit(barStart + 14, .openHat, 60) }
+                if inB && bar % 2 == 1 { hit(barStart + 14, .openHat, 60) }
             }
         }
 
@@ -384,6 +402,22 @@ struct KosmicDrumGenerator {
         let edges = sectionEdges + thins.flatMap { [$0.range.lowerBound - 1, $0.range.upperBound - 1] }
         addSpaceBoxFills(&events, frame: frame, rng: &rng, fillBars: fillBars + edges,
                          arrangement: arrangement, oneBeat: true)
+        // Phrase fills: a full stretch of more than 16 bars without a fill takes a 1-beat fill at the end
+        // of each 8-bar phrase (Zack, 2026-11-07). Drawn from a derived stream so no other draw moves.
+        let placed = Set(fillBars + edges)
+        let phraseFills = (0..<frame.totalBars).filter { bar in
+            guard let section = structure.section(atBar: bar), section.label == .A || section.label == .B,
+                  (bar - section.startBar) % 8 == 7, bar + 1 < section.endBar,
+                  arrangement?.drumThin(atBar: bar) == nil, arrangement?.drumThin(atBar: bar + 1) == nil,
+                  !(arrangement?.bridge?.range.contains(bar) ?? false) else { return false }
+            return !placed.contains { abs($0 - bar) <= 7 }
+        }
+        if !phraseFills.isEmpty {
+            var peek = rng
+            var phraseRNG = SeededRNG(seed: peek.next() ^ 0x0A6A_11E7_F111_0010)
+            addSpaceBoxFills(&events, frame: frame, rng: &phraseRNG, fillBars: phraseFills,
+                             arrangement: arrangement, oneBeat: true)
+        }
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
@@ -391,7 +425,7 @@ struct KosmicDrumGenerator {
     // Every Space fill was a falling tom roll, and the toms in both Space kits are synth toms
     // (808 Kit plays pitched sines, Machine Kit an electric tom), so every fill blooped. The bloop
     // is now one fill of three, never twice running:
-    //   snare roll 45% · tom roll 30% · kick and snare 25%
+    //   snare roll 35% · tom roll 40% · kick and snare 25%, toms raised from 30% (Zack, 2026-11-07)
     // The third was a figure on cowbell, then on claves; both read as acoustic knocks against an
     // electronic kit, and the claves figure's closing open hat could not be heard, so it gave no
     // lift (Zack, 2026-11-03, Chronique and Le Grand Orthodoxx). The kick and snare fill is the
@@ -412,7 +446,7 @@ struct KosmicDrumGenerator {
     }
 
     private static func drawSpaceFill(after last: SpaceFill?, rng: inout SeededRNG) -> SpaceFill {
-        let weighted: [(SpaceFill, Double)] = [(.snareRoll, 0.45), (.toms, 0.30), (.kickSnare, 0.25)]
+        let weighted: [(SpaceFill, Double)] = [(.snareRoll, 0.35), (.toms, 0.40), (.kickSnare, 0.25)]
             .filter { $0.0 != last }
         let total = weighted.reduce(0) { $0 + $1.1 }
         var r = rng.nextDouble() * total

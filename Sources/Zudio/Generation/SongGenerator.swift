@@ -578,6 +578,11 @@ struct SongGenerator {
             isKosmicDrift: isKosmicDrift,
             isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement
         )
+        if isKosmicSpace {
+            var peek = rhythmRNG
+            trackEvents[kTrackRhythm] = KosmicArpeggioGenerator.spaceHoldBDensity(
+                trackEvents[kTrackRhythm], structure: structure, seed: peek.next() ^ 0x0B0B_5EED_0000_0005)
+        }
 
         // Lead 2 — always silent in Drift
         var lead2Rules: Set<String> = []
@@ -636,7 +641,8 @@ struct SongGenerator {
             rng: &drumRNG, usedRuleIDs: &drumRules,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            spaceArrangement: spaceArrangement
+            spaceArrangement: spaceArrangement,
+            spaceWalkingBass: !bassRules.isDisjoint(with: KosmicDrumGenerator.spaceWalkingBasses)
         )
 
         // Kosmic Space: notes the chord under them has altered move onto the chord's scale.
@@ -1567,7 +1573,9 @@ struct SongGenerator {
                     isKosmicDrift: songState.isKosmicDrift,
                     isDriftDreamscape: songState.isDriftDreamscape,
                     driftVelocityBase: 89,
-                    spaceArrangement: regenArrangement)
+                    spaceArrangement: regenArrangement,
+                    spaceWalkingBass: songState.generationLog
+                        .contains { KosmicDrumGenerator.spaceWalkingBasses.contains($0.tag) })
             } else if isChill {
                 var ignoredFills: [Int] = []
                 let regenSohoPlan: ChillDrumGenerator.SohoDrumPlan? = songState.chillSohoVariation
@@ -1759,6 +1767,11 @@ struct SongGenerator {
                     tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules,
                     isKosmicDrift: songState.isKosmicDrift,
                     isKosmicSpace: isSpace, spaceArrangement: regenArrangement)
+                if isSpace {
+                    var peek = rng
+                    events = KosmicArpeggioGenerator.spaceHoldBDensity(
+                        events, structure: songState.structure, seed: peek.next() ^ 0x0B0B_5EED_0000_0005)
+                }
             } else if isChill {
                 events = ChillRhythmGenerator.generate(
                     frame: songState.frame, structure: songState.structure,
@@ -1969,7 +1982,7 @@ struct SongGenerator {
         // Kosmic Space: a KOS-LD2-001 stereo twin follows a regenerated Rhythm, so it stays a twin.
         // Reload replays Lead 2's override before Rhythm's, so this also keeps a reloaded twin in step.
         if isSpace, trackIndex == kTrackRhythm, songState.isSpaceStereoTwin {
-            updated = updated.replacingEvents(KosmicLeadGenerator.spaceStereoTwin(rhythm: events),
+            updated = updated.replacingEvents(KosmicLeadGenerator.spaceStereoTwin(rhythm: events, structure: songState.structure),
                                               forTrack: kTrackLead2)
         }
         // A regenerated Kosmic Lead 1 takes its Lead Synth doubling with it; the Polysynth had kept
@@ -2886,7 +2899,7 @@ struct SongGenerator {
         case "KOS-DRUM-008": return "Half-time lope"
         case "KOS-DRUM-009": return "Oxygene Preset Box"
         case "KOS-DRUM-012": return "Oxygene 6 Hand Percussion"
-        case "KOS-DRUM-010": return "Magnetic Rhythm Box"
+        case "KOS-DRUM-010": return "Magnetic Gallop"
         default:                 return ruleID
         }
     }

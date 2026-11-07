@@ -318,7 +318,7 @@ struct KosmicLeadGenerator {
             if r >= 1.0 / 3.0 {
                 usedRuleIDs.insert("KOS-LD2-001")
                 return rng.nextDouble() < 0.50
-                    ? spaceStereoTwin(rhythm: rhythmEvents)
+                    ? spaceStereoTwin(rhythm: rhythmEvents, structure: structure)
                     : magneticLateOctave(lead1: lead1Events, totalBars: frame.totalBars)
             }
             rule = "KOS-LEAD-004"
@@ -853,15 +853,16 @@ struct KosmicLeadGenerator {
 
     // MARK: - KOS-LD2-001 Magnetic Twin (Kosmic Space)
     // One rule, two variants, a half each. It generates no rhythm of its own.
-    //   stereo twin — Rhythm's notes exactly, on Lead 2's instrument, panned opposite Rhythm, whose
+    //   stereo twin — Rhythm's notes outside B sections, on Lead 2's instrument, panned opposite Rhythm, whose
     //                 auto-pan is off (Magnetic Fields 1, whose two sequencers are identical). The
     //                 playback side finds it with SongState.isSpaceStereoTwin.
     //   late octave — Lead 1 an octave up from the first 8-bar point of the song's last third
     //                 (Magnetic Fields 2); a note that would pass MIDI 88 doubles in unison instead.
 
     /// The stereo twin of a Space Rhythm part. Also used to refresh the twin after a Rhythm regen.
-    static func spaceStereoTwin(rhythm: [MIDIEvent]) -> [MIDIEvent] {
-        rhythm.map {
+    /// The twin rests in B sections, where Rhythm and Lead 1 share the foreground.
+    static func spaceStereoTwin(rhythm: [MIDIEvent], structure: SongStructure) -> [MIDIEvent] {
+        rhythm.filter { structure.section(atBar: $0.stepIndex / 16)?.label != .B }.map {
             MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
                       velocity: UInt8(max(20, Int($0.velocity) - 6)), durationSteps: $0.durationSteps)
         }

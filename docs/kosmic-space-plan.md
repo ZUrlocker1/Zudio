@@ -193,8 +193,8 @@ the outro.
 - **Swells.** KOS-TEXT-005 adds a swell on every bar where Lead 1 or the sequencer returns.
 - **Drum fills** (preset box and Mini Pops returns): a kick and snare fill, snare roll or tom roll,
   never the same as the song's previous fill; half the preset-box fills land on a crash. The
-  Magnetic Rhythm Box takes short 1-beat fills at body section changes and around its simpler
-  stretches (`addSpaceBoxFills`).
+  Magnetic Gallop takes short 1-beat fills at body section changes and around its simpler
+  stretches, plus one at the end of each 8-bar phrase that has none within 7 bars (`addSpaceBoxFills`). Fill weights: tom roll 40%, snare roll 35%, kick and snare 25%.
 - **Theme return.** A song ending on a B section (ab, abab) replays the first A section's opening 8
   bars, with its chords, two thirds into the last B section (`SpaceThemeReturn`).
 - **Live annotations.** During playback a coordinated break is called out at its bar naming the
@@ -229,7 +229,7 @@ fold by octaves. Weights are shares of Space songs on that track.
 
 ### Drums
 
-KOS-DRUM-009 Preset Box 30.4%, KOS-DRUM-001 Mini Pops 27.2%, KOS-DRUM-010 Magnetic Rhythm Box
+KOS-DRUM-009 Preset Box 30.4%, KOS-DRUM-001 Mini Pops 27.2%, KOS-DRUM-010 Magnetic Gallop
 20%, KOS-DRUM-012 Hand Percussion 10.4%, no percussion 12%. Kits: 808 Kit 75%, Machine Kit 25%,
 playing its own synth toms in fills; its electric snare (40) plays as the plain snare.
 
@@ -244,11 +244,7 @@ hats (60%) or go to quarter hats with kick on 0 and 10 and no open hat (40%).
 **KOS-DRUM-001 JMJ Mini Pops** — base Kosmic's rule, in the pool for variety. Drops out in the first
 two drum stretches and returns on a 1- or 2-beat tom roll.
 
-**KOS-DRUM-010 Magnetic Fields Rhythm Box** — Magnetic Fields 1, 2 and 4. Kick on `x..xx..xx..xx..x`
-rotated by 0, 3 or 6 steps (30/35/35), under a ride or closed hat (50/50) on every 16th. Snare off,
-or on steps 2, 3, 6, 10, 11, 14 (50/50), on the electric snare so the fill log never mistakes it for
-a fill. An agogo on the quarters in 30% of songs. B sections add an open hat on the last 8th of
-every second bar.
+**KOS-DRUM-010 Magnetic Gallop** — Magnetic Fields 1, 2 and 4. Kick pairs lead into each beat on steps 0, 2, 3, 6, 7, 10, 11, 14, 15 (Magnetic Fields 1's pairs straddle the beat, which put a kick a 16th after about a third of the 8th-note bass notes; this figure measured 0% there under the drone, Falling Walk and Triad Walk), under a ride or closed hat (50/50) on every 16th. Snare off, or on steps 2, 3, 6, 10, 11, 14 (50/50), on the electric snare so the fill log never mistakes it for a fill. An agogo on the quarters in 30% of songs. Simpler stretches drop to the kick on beats 1 and 3. Full B bars lighten: 8th tops, a ride bell on the beats, the snare on its off-beats only, and an open hat on the last 8th of every second bar; when the bass is the drone, Falling Walk or Triad Walk the B kick is the plainer 0, 6, 8, 14 of Magnetic Fields 2 and 4 (the Pumps keep the gallop kick).
 
 **KOS-DRUM-012 Oxygene 6 Hand Percussion** — no kick, snare or hats: low bongo 0, 8; mute conga 4;
 open conga 6; low conga 12, 14; maracas 0, 6; shaker 2, 3, 4, 10, 12, 14; castanets 12, 13, 14 in
@@ -298,6 +294,12 @@ chord transposes it, so no long identical run occurs. Rhythm is never thinned by
 filter or the density guard; it rests only for the sequencer break and the bridge. The sequencer
 rules play the full figure in the intro, outro, Lead 1's rests and the sequencer solo, a thinner
 one under Lead 1 (`spaceSequencer`).
+
+**B sections hold the A density.** After any Space Rhythm rule runs, `spaceHoldBDensity` trims each B
+bar to the mean note count of the first A section's sounding bars, rounded up. Whole onsets go, off-beat
+16ths first, then 8ths, quarter-note onsets last, and a bar never drops below the target. Ties come from
+a derived stream, so no draw moves. A bars, bridges, the intro and the outro are untouched. It runs at
+generation and at Rhythm regen.
 
 - **KOS-RTHM-016 Oxygene Octave Sequencer** — `R . O . R O R . O O R . O R O .`. Mask: source or
   three thinner variants (25% each). In 25% of songs the octave becomes the fifth. Busy.
@@ -362,9 +364,9 @@ A sections draw one of five rules, 20% each. B sections draw one of three, a thi
 KOS-LEAD-004 Echo melody, KOS-LD2-001 Magnetic Twin and KOS-LD2-000 No lead 2, a third each.
 
 **KOS-LD2-001 Magnetic Twin** — two variants, 50/50. **Stereo twin:** Rhythm's notes replayed on
-Lead 2, 6 velocity lower; static pans Rhythm +0.45, Lead 2 −0.45; Rhythm's auto-pan holds still.
+Lead 2 outside B sections (it rests whenever B plays), 6 velocity lower; static pans Rhythm +0.45, Lead 2 −0.45; Rhythm's auto-pan holds still.
 `SongState.isSpaceStereoTwin` finds the variant from the notes (Lead 2 at least 80% of Rhythm's
-count, 90% on Rhythm's onsets), so it survives regen and reload, and a Rhythm regen carries the twin
+count outside B, 90% on Rhythm's onsets), so it survives regen and reload, and a Rhythm regen carries the twin
 with it. **Late octave:** Lead 1 doubled an octave up from the first 8-bar point of the last third,
 a note above 88 in unison. It runs after Rhythm and Lead 1.
 
@@ -453,7 +455,7 @@ rebuilt after a drum or Lead 2 regen.
 
 **Built, new to Space (22 rules):**
 
-- Drums: KOS-DRUM-009 Oxygene Preset Box, KOS-DRUM-010 Magnetic Fields Rhythm Box, KOS-DRUM-012
+- Drums: KOS-DRUM-009 Oxygene Preset Box, KOS-DRUM-010 Magnetic Gallop, KOS-DRUM-012
   Oxygene 6 Hand Percussion
 - Bass: KOS-BASS-018 Oxygene Falling Walk, KOS-BASS-019 Magnetic Fields Octave Pump, KOS-BASS-020
   Oxygene 8 Pump, KOS-BASS-021 Magnetic Triad Walk

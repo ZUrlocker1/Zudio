@@ -171,6 +171,49 @@ struct KosmicArpeggioGenerator {
         return events
     }
 
+    // MARK: - Kosmic Space: B sections hold Rhythm's A density
+    // A B section raised Rhythm's density (the intensity multiplier, a second voice, or a busier B
+    // pattern) just as the bass and drums step up, and Rhythm drowned Lead 1. Every B bar is trimmed
+    // to the mean number of notes in this part's first A section, bars that have any, rounded up. Whole onsets go,
+    // off-beat 16ths first, then 8ths, with quarter-note onsets the last to go, and a bar keeps at
+    // least one. Ties are drawn from a derived stream, so no generation draw moves. A bars, bridges
+    // and the intro and outro are untouched.
+
+    static func spaceHoldBDensity(_ events: [MIDIEvent], structure: SongStructure, seed: UInt64) -> [MIDIEvent] {
+        guard let firstA = structure.sections.first(where: { $0.label == .A }) else { return events }
+        var aNotes: [Int: Int] = [:]
+        var bSteps: [Int: [Int: Int]] = [:]   // bar -> onset step -> note count
+        for ev in events {
+            let bar = ev.stepIndex / 16
+            switch structure.section(atBar: bar)?.label {
+            case .A where bar < firstA.endBar: aNotes[bar, default: 0] += 1
+            case .B: bSteps[bar, default: [:]][ev.stepIndex, default: 0] += 1
+            default: break
+            }
+        }
+        guard !aNotes.isEmpty else { return events }
+        let mean = Double(aNotes.values.reduce(0, +)) / Double(aNotes.count)
+        let target = max(1, Int(mean.rounded(.up)))
+
+        var rng = SeededRNG(seed: seed)
+        func rank(_ step: Int) -> Int { step % 4 == 0 ? 2 : step % 2 == 0 ? 1 : 0 }
+        var dropped = Set<Int>()
+        for bar in bSteps.keys.sorted() {
+            let onsets = bSteps[bar]!
+            var total = onsets.values.reduce(0, +)
+            guard total > target else { continue }
+            let ordered = onsets.keys.map { (step: $0, tie: rng.next()) }
+                .sorted { rank($0.step) != rank($1.step) ? rank($0.step) < rank($1.step) : $0.tie < $1.tie }
+            var remaining = onsets.count
+            for item in ordered where total - onsets[item.step]! >= target && remaining > 1 {
+                dropped.insert(item.step)
+                total -= onsets[item.step]!
+                remaining -= 1
+            }
+        }
+        return events.filter { !dropped.contains($0.stepIndex) }
+    }
+
     // MARK: - Jarre step-sequencer engine (Kosmic Space)
     // One engine for every Space sequencer rule in every phase; later rules are new patterns.
     // A pattern is 16 steps, each a rest (nil) or a slot, chosen per bar by the caller (nil for a
