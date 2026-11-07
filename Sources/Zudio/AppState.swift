@@ -808,7 +808,7 @@ final class AppState: ObservableObject {
         case (kTrackBass,    .chill):   return ["Fretless Bass","Acoustic Bass","Elec Bass"]
         case (kTrackBass,    .ambient): return ["Cello","French Horn","Voice Oohs","FM Synth","Metallic Pad"]
         case (kTrackBass,    .kosmic):  return ["Moog","Lead Bass","Mono Synth","Rock Bass","Synth Bass 3","Pulse Bass","Tonewheel","Warm Pad",
-                                                "Fretless Bass"]
+                                                "Fretless Bass","Synth Bass 101","Mean Saw Bass"]
         case (kTrackBass,    .motorik): return ["Moog","Lead Bass","Rock Bass","Elec Bass","Mean Saw Bass","Techno Bass","Synth Bass 3"]
         case (kTrackBass,    _):        return ["Moog Bass","Lead Bass","Rock Bass","Elec Bass"]
         case (kTrackDrums,   .chill):   return ["Brush Kit","808 Kit","Jazz Drums"]
@@ -863,7 +863,7 @@ final class AppState: ObservableObject {
         case (kTrackTexture, _):       return [86, 94, 89, 99, 102]
         case (kTrackBass, .chill):     return [35, 32, 33]
         case (kTrackBass, .ambient):   return [42, 60, 54, 62, 93]
-        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89, 35]  // + Space: Fretless Bass
+        case (kTrackBass, .kosmic):    return [39, 87, 81, 34, 8038, 11039, 16, 89, 35, 1038, 12038]  // + Space: Fretless Bass, Synth Bass 101, Mean Saw Bass
         case (kTrackBass, .motorik):   return [39, 87, 34, 33, 12038, 11038, 8038]
         case (kTrackBass, _):          return [39, 87, 34, 33]
         case (kTrackDrums, .chill):    return [40, 25, 32]
@@ -2621,15 +2621,20 @@ final class AppState: ObservableObject {
                 // Brightness, Synth Brass 1, Synth Brass 2, 5th Saw Wave, Bright Saw — the
                 // transcribers put synth brass on Jarre's leads; the orchestral winds read as Vangelis.
                 case kTrackLead1:   return [1, 8, 9, 10, 11]
-                // Brightness, Synth Strings 1, Saw Lead, Square Lead 2
-                case kTrackLead2:   return [0, 5, 6, 7]
+                // Brightness 25%, Synth Strings 1 and Saw Lead 27.5% each, Square Lead 2 20%
+                // (Zack, 2026-11-07: Square Lead 2 slightly under an even split)
+                case kTrackLead2:   return [0,0,0,0,0,0,0,0,0,0,
+                                            5,5,5,5,5,5,5,5,5,5,5,
+                                            6,6,6,6,6,6,6,6,6,6,6,
+                                            7,7,7,7,7,7,7,7]
                 // Synth Strings, Synth Strings 3/4/5 and Stereo Strings Slow at 80% of picks,
                 // Sweep Pad 20% — the string machine of 13 of the 15 corpus pieces
                 case kTrackPads:    return [1,1,1,1, 7,7,7,7, 8,8,8,8, 9,9,9,9, 10,10,10,10, 0,0,0,0,0]
                 // Moog, Pulse Bass, Harpsi Pad
                 case kTrackRhythm:  return [0, 8, 3]
-                // Moog, Synth Bass 3, Fretless Bass
-                case kTrackBass:    return [0, 4, 8]
+                // Moog, Synth Bass 3, Fretless Bass, Synth Bass 101, Mean Saw Bass (the last two
+                // are on audition, Zack 2026-11-07)
+                case kTrackBass:    return [0, 4, 8, 9, 10]
                 // White Noise Wave, Solar Wind, Solar Wind 2, Starship, Interference, 20% each:
                 // KOS-TEXT-005 needs a noise or wind source for its swell
                 case kTrackTexture: return [5, 2, 6, 7, 8]

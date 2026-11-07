@@ -432,12 +432,13 @@ Base Kosmic and Drift picks are capped at their pre-Space pool sizes.
 
 - **Lead 1** — Brightness, Synth Brass 1 (0/62), Synth Brass 2 (0/63), 5th Saw Wave (0/86), Bright
   Saw Stack (11/100, shown as Bright Saw)
-- **Lead 2** — Brightness, Synth Strings 1 (0/50), Saw Lead (0/81), Square Lead 2 (12/80, always
-  with tremolo)
+- **Lead 2** — Brightness 25%, Synth Strings 1 (0/50) and Saw Lead (0/81) 27.5% each, Square Lead 2
+  (12/80, always with tremolo) 20%
 - **Pads** — Synth Strings, Synth Strings 3 (8/50), 4 (11/50), 5 (11/51), Stereo Strings Slow
   (0/49), Sweep Pad; strings about 80% of picks
 - **Rhythm** — Moog, Pulse Bass (11/39), Harpsi Pad
-- **Bass** — Moog, Synth Bass 3, Fretless Bass (0/35)
+- **Bass** — Moog, Synth Bass 3, Fretless Bass (0/35), Synth Bass 101 (1/38) and Mean Saw Bass
+  (12/38); the last two are on audition and may be removed by ear
 - **Texture** — White Noise Wave (12/122, shown as White Noise), Solar Wind, Solar Wind 2 (12/89),
   Starship (8/125), Interference (11/127), 20% each
 - **Drums** — 808 Kit 75%, Machine Kit 25%
