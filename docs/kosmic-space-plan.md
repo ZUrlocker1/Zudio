@@ -437,8 +437,8 @@ Base Kosmic and Drift picks are capped at their pre-Space pool sizes.
 - **Pads** — Synth Strings, Synth Strings 3 (8/50), 4 (11/50), 5 (11/51), Stereo Strings Slow
   (0/49), Sweep Pad; strings about 80% of picks
 - **Rhythm** — Moog, Pulse Bass (11/39), Harpsi Pad
-- **Bass** — Moog, Synth Bass 3, Fretless Bass (0/35), Synth Bass 101 (1/38) and Mean Saw Bass
-  (12/38); the last two are on audition and may be removed by ear
+- **Bass** — Moog, Synth Bass 3, Fretless Bass (0/35), Synth Bass 101 (1/38), Mean Saw Bass (12/38),
+  20% each
 - **Texture** — White Noise Wave (12/122, shown as White Noise), Solar Wind, Solar Wind 2 (12/89),
   Starship (8/125), Interference (11/127), 20% each
 - **Drums** — 808 Kit 75%, Machine Kit 25%
@@ -447,10 +447,19 @@ Per-instrument level trims were set by ear and live in code (`spaceCC7Trim` in A
 the per-program gain tables); they are not restated here. The on-screen Instruments line names
 instruments; the saved file keeps program numbers and its format is unchanged.
 
-**Effects and stereo.** Pads take `sweep`, Space's reverb and a very slow, shallow auto-pan (about ±25%,
-one sweep per 8 bars); Rhythm's delay echoes on three 16ths (0.75 beat) against its eighths and sixteenths; Texture takes `sweep` and a slow
-auto-pan (one sweep per 2, 4 or 8 bars, 25/50/25); Rhythm auto-pans ±40% around +0.22; Lead 1 at
-−0.10, Lead 2 at −0.20; Bass and Drums centre. The stereo Twin overrides the Rhythm and Lead 2 pans.
+**Effects and stereo.**
+- **Pads** — `sweep`, Space's reverb and delay, and a very slow, shallow auto-pan (about ±25%, one
+  sweep per 8 bars) with a Pan chip.
+- **Texture** — `sweep`, delay, Space's reverb and a slow auto-pan (one sweep per 2, 4 or 8 bars,
+  25/50/25).
+- **Rhythm** — delay echoing on three 16ths (0.75 beat) against the sequencer's eighths and
+  sixteenths, and an auto-pan of ±40% around +0.22. No reverb by default.
+- **Lead 1** — delay and Space's reverb, at −0.10. **Lead 2** — Space's reverb at −0.20, with
+  tremolo when the instrument is Square Lead 2.
+- **Bass and Drums** — centre, no effects.
+- The stereo Twin overrides the Rhythm and Lead 2 pans.
+- Mean Saw Bass plays at 85% volume, Moog bass 3 below and Synth Bass 101 5 above the shared Kosmic
+  level.
 
 **Titles.** `KosmicTitleGenerator.spaceTitle`: single word 15%, part number 15%, two coined words
 12%, French phrase 12%, Jarre templates 12%, long-running series 4%, gear jokes 4%, the earlier
