@@ -899,6 +899,8 @@ final class AppState: ObservableObject {
             case (kTrackBass,    .kosmic,  "Moog"):          return 80
             case (kTrackBass,    .kosmic,  "Mono Synth"):    return 80
             case (kTrackBass,    .kosmic,  "Synth Bass 3"):  return 80
+            // Mean Saw Bass, Space only, sat a little forward of the rest of the pool (Zack, 2026-11-07).
+            case (kTrackBass,    .kosmic,  "Mean Saw Bass"): return 85
             // Synth Chime cuts through Kosmic's sustained texture more than the other rhythm
             // patches, which are pads and organs sitting further back.
             case (kTrackRhythm,  .kosmic,  "Synth Chime"):   return 80
