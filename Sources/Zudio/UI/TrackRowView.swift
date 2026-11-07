@@ -348,7 +348,6 @@ struct TrackRowView: View {
             return isKosmic ? [.vibrato, .delay, .space] : [.air, .delay, .reverb]
         case kTrackPads:
             if isChill   { return [.space, .sweep, .boost] }
-            if activeStyle == .kosmic && appState.songState?.isKosmicSpace == true { return [.sweep, .pan, .delay, .space] }
             return isAmbient ? [.sweep, .tremolo, .space] : [.sweep, .delay, .space]
         case kTrackRhythm:
             if isChill                 { return [.tremolo, .space, .compression] }

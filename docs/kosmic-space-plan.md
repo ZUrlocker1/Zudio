@@ -449,7 +449,7 @@ instruments; the saved file keeps program numbers and its format is unchanged.
 
 **Effects and stereo.**
 - **Pads** — `sweep`, Space's reverb and delay, and a very slow, shallow auto-pan (about ±25%, one
-  sweep per 8 bars) with a Pan chip.
+  sweep per 8 bars); the pan has no chip, like Texture's sweep.
 - **Texture** — `sweep`, delay, Space's reverb and a slow auto-pan (one sweep per 2, 4 or 8 bars,
   25/50/25).
 - **Rhythm** — delay echoing on three 16ths (0.75 beat) against the sequencer's eighths and
