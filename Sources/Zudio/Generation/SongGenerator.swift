@@ -2758,13 +2758,6 @@ struct SongGenerator {
         case "MOT-DRUM-012": return "Sparse Fills"
         case "MOT-DRUM-013": return "Sequenced Timekeeper"
         case "MOT-DRUM-014": return "Sparse Accents"
-        // Kosmic drum rules (shared lookup for regen log)
-        case "KOS-DRUM-001": return "JMJ Mini Pops"
-        case "KOS-DRUM-002": return "Basic Channel minimal dub"
-        case "KOS-DRUM-000": return "No percussion"
-        case "KOS-DRUM-004": return "Electric Buddha groove"
-        case "KOS-DRUM-005": return "Electric Buddha Pulse"
-        case "KOS-DRUM-006": return "Electric Buddha restrained"
         default:             return ruleID
         }
     }

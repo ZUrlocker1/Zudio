@@ -203,15 +203,7 @@ struct KosmicMusicalFrameGenerator {
     /// Space tempo: triangular, min 96, peak 118, max 128 (widened for Magnetic Fields and
     /// Equinoxe, Zack, 2026-11-06). The Oxygene pieces run 100, 110, 121.
     private static func pickSpaceTempo(rng: inout SeededRNG) -> Int {
-        let minT = 96.0, peakT = 118.0, maxT = 128.0
-        let r  = rng.nextDouble()
-        let fc = (peakT - minT) / (maxT - minT)
-        let raw: Double
-        if r < fc {
-            raw = minT + Foundation.sqrt(r * (maxT - minT) * (peakT - minT))
-        } else {
-            raw = maxT - Foundation.sqrt((1 - r) * (maxT - minT) * (maxT - peakT))
-        }
+        let raw = rng.triangular(min: 96, peak: 118, max: 128)
         return Swift.max(96, Swift.min(128, Int(raw.rounded())))
     }
 
@@ -258,14 +250,7 @@ struct KosmicMusicalFrameGenerator {
         let minT: Double  = useDriverMode ? 115.0 : 108.0
         let peakT: Double = useDriverMode ? 120.0 : 113.0
         let maxT: Double  = useDriverMode ? 126.0 : 118.0
-        let r = rng.nextDouble()
-        let fc = (peakT - minT) / (maxT - minT)
-        let raw: Double
-        if r < fc {
-            raw = minT + Foundation.sqrt(r * (maxT - minT) * (peakT - minT))
-        } else {
-            raw = maxT - Foundation.sqrt((1 - r) * (maxT - minT) * (maxT - peakT))
-        }
+        let raw = rng.triangular(min: minT, peak: peakT, max: maxT)
         return Swift.max(20, Swift.min(200, Int(raw.rounded())))
     }
 
@@ -326,14 +311,7 @@ struct KosmicMusicalFrameGenerator {
         let minS: Double  = 225.0
         let peakS: Double = 250.0
         let maxS: Double  = 270.0
-        let r = rng.nextDouble()
-        let fc = (peakS - minS) / (maxS - minS)
-        let secs: Double
-        if r < fc {
-            secs = minS + Foundation.sqrt(r * (maxS - minS) * (peakS - minS))
-        } else {
-            secs = maxS - Foundation.sqrt((1 - r) * (maxS - minS) * (maxS - peakS))
-        }
+        let secs = rng.triangular(min: minS, peak: peakS, max: maxS)
         let secondsPerBar = 60.0 / Double(tempo) * 4.0
         let rawBars = Int((secs / secondsPerBar).rounded())
         return Swift.max(8, (rawBars / 4) * 4)

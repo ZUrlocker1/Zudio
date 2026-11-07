@@ -202,7 +202,7 @@ struct KosmicArpeggioGenerator {
             let onsets = bSteps[bar]!
             var total = onsets.values.reduce(0, +)
             guard total > target else { continue }
-            let ordered = onsets.keys.map { (step: $0, tie: rng.next()) }
+            let ordered = onsets.keys.sorted().map { (step: $0, tie: rng.next()) }
                 .sorted { rank($0.step) != rank($1.step) ? rank($0.step) < rank($1.step) : $0.tie < $1.tie }
             var remaining = onsets.count
             for item in ordered where total - onsets[item.step]! >= target && remaining > 1 {

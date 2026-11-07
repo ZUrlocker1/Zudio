@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Zack Urlocker
 // Same seed + same controls => same output. Do not substitute arc4random or SystemRandomNumberGenerator.
 
+import Foundation
+
 struct SeededRNG: Sendable {
     private var state: UInt64
 
@@ -52,6 +54,21 @@ extension SeededRNG {
     static func effectiveSeed(songState: SongState, trackIndex: Int) -> UInt64 {
         if let override = songState.trackOverrides[trackIndex] { return override }
         return trackSeed(globalSeed: songState.globalSeed, trackIndex: trackIndex)
+    }
+}
+
+// MARK: - Triangular draw
+
+extension SeededRNG {
+    /// A value from a triangular distribution over `lo ... hi` with its mode at `peak`. One
+    /// `nextDouble()` per call. This was the same six-line inverse-CDF block in eleven places across
+    /// the frame generators; the arithmetic is unchanged, so every seed draws what it drew before.
+    mutating func triangular(min lo: Double, peak: Double, max hi: Double) -> Double {
+        let r  = nextDouble()
+        let fc = (peak - lo) / (hi - lo)
+        return r < fc
+            ? lo + Foundation.sqrt(r * (hi - lo) * (peak - lo))
+            : hi - Foundation.sqrt((1 - r) * (hi - lo) * (hi - peak))
     }
 }
 
