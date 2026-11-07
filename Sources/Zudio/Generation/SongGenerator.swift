@@ -437,7 +437,8 @@ struct SongGenerator {
             drumRules: drumRules, bassRules: bassRules,
             padRules: padRules, lead1Rules: lead1Rules, lead2Rules: lead2Rules,
             rhythmRules: rhythmRules, texRules: texRules, isNoir: isNoir, isArcade: isArcade,
-            sync: motorikSync, syncLead2Partners: syncLead2Partners
+            sync: motorikSync, syncLead2Partners: syncLead2Partners,
+            breakdown: !breakdowns.isEmpty
         )
 
         // Base Motorik hands the log the drum pass's own fill bars, so it reports the fills that
@@ -2513,7 +2514,8 @@ struct SongGenerator {
         isNoir: Bool = false,
         isArcade: Bool = false,
         sync: MotorikSync = .none,
-        syncLead2Partners: Bool = false
+        syncLead2Partners: Bool = false,
+        breakdown: Bool = false
     ) -> [GenerationLogEntry] {
         var log: [GenerationLogEntry] = []
 
@@ -2541,7 +2543,7 @@ struct SongGenerator {
         }
 
         // Structure form rule
-        log.append(GenerationLogEntry(tag: "Form", description: formLabel(form)))
+        log.append(GenerationLogEntry(tag: "Form", description: formLabel(form) + (breakdown ? " + breakdown" : "")))
 
         // Chord progression — key/mode + progression family
         let progLabel = progressionFamilyLabel(frame.progressionFamily)
@@ -3838,8 +3840,8 @@ struct SongGenerator {
 
         // Base Motorik breakdown: the leads and Rhythm leave together and come back together.
         for window in motorikBreakdowns {
-            fireBar(window.lowerBound, tag: "Breakdown", desc: "Leads and Rhythm drop out for \(window.count) bars")
-            fireBar(window.upperBound, tag: "Breakdown", desc: "Leads and Rhythm return")
+            fireBar(window.lowerBound, tag: "Breakdown", desc: "Leads, Rhythm drop - \(window.count) bars")
+            fireBar(window.upperBound, tag: "Breakdown", desc: "Leads, Rhythm return")
         }
 
         // 4. Track spotlight entrances and departures.
