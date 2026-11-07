@@ -169,7 +169,7 @@ Anticipated Strings' early notes take the chord they belong to. `HarmonicMinor` 
 ## Structure and arrangement
 
 **Forms:** ab 25%, aba 30%, abab 30%, abba 15%. No `single_evolving`: without a B section the riff
-never plays. Base Kosmic's bridge sections are off in Space; Space has its own bridge below.
+never plays. Space does have bridges: its own mute-schedule bridge (see "Bridge" below) appears in about 30% of ab and aba songs. Only base Kosmic's bridge sections and their drum, call-and-response and whistle material are off.
 
 **`KosmicSpaceArrangement`** builds the break schedule per song from the structure and the seed
 alone, so a regenerated track rebuilds it without storing it. Every edge falls on a body section's
@@ -398,7 +398,7 @@ Drift): drums KOS-DRUM-002 to 008; every bass rule except 001; Rhythm KOS-RTHM-0
 002 and 005; Lead 1 every KOS-LEAD rule except 004 and 006, and KOS-LD1-010 to 012; every base Pads
 rule except 001; Texture KOS-TEXT-001 to 004.
 
-**Switched off in Space:** base bridges and the X-Files whistle; bass sub-layers (KOS-RULE-17 and
+**Switched off in Space:** base Kosmic's own bridge sections (Space's separate bridge stays) and the X-Files whistle; bass sub-layers (KOS-RULE-17 and
 23); base drum fills and cold-start pickups; Lead 1 B-section escalation; Lead 2 lag and sparse
 escalation; the automatic filter sweep; forced base rules (the curated first Kosmic song is
 ignored). `ArrangementFilter` exempts Rhythm, Lead 1, Lead 2 and Pads.
