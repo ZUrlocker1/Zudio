@@ -533,16 +533,20 @@ struct DrumGenerator {
         }
 
         // 4-on-the-floor kick (all 4 beats) — the defining Arcade character
-        events.append(MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue, velocity: 105, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue, velocity: 92,  durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 90,  durationSteps: 1))
-
-        // Snare on beats 2+4 — shared accent with kick on those steps
-        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 95, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 92, durationSteps: 1))
+        events += fourOnFloorKickAndSnare(barStart: barStart)
 
         return events
+    }
+
+    /// The four-on-the-floor kick with a snare on beats 2 and 4, shared by Four on the Floor, Machine
+    /// Step and Mostly Motorik. The snare velocities are the only thing that differs between them.
+    private static func fourOnFloorKickAndSnare(barStart: Int, snare: (UInt8, UInt8) = (95, 92)) -> [MIDIEvent] {
+        [MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue,  velocity: 105,      durationSteps: 1),
+         MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue,  velocity: 92,       durationSteps: 1),
+         MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue,  velocity: 100,      durationSteps: 1),
+         MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue,  velocity: 90,       durationSteps: 1),
+         MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: snare.0,  durationSteps: 1),
+         MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: snare.1,  durationSteps: 1)]
     }
 
     private static func fourOnFloorSparseBar(barStart: Int) -> [MIDIEvent] {
@@ -592,14 +596,7 @@ struct DrumGenerator {
         events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.closedHat.rawValue, velocity: 54, durationSteps: 1))
 
         // 4-on-the-floor kick — same as Four-on-Floor
-        events.append(MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue, velocity: 105, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue, velocity: 92,  durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 90,  durationSteps: 1))
-
-        // Snare on beats 2+4
-        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 95, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 92, durationSteps: 1))
+        events += fourOnFloorKickAndSnare(barStart: barStart)
 
         return events
     }
@@ -684,14 +681,7 @@ struct DrumGenerator {
         }
 
         // 4-on-the-floor kick (all 4 beats) — what makes this "almost" rather than classic Motorik
-        events.append(MIDIEvent(stepIndex: barStart + 0,  note: GMDrum.kick.rawValue, velocity: 105, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.kick.rawValue, velocity: 92,  durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 8,  note: GMDrum.kick.rawValue, velocity: 100, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.kick.rawValue, velocity: 90,  durationSteps: 1))
-
-        // Snare 2+4 (overlaps kick on those beats — classic dance/rock hybrid)
-        events.append(MIDIEvent(stepIndex: barStart + 4,  note: GMDrum.snare.rawValue, velocity: 94, durationSteps: 1))
-        events.append(MIDIEvent(stepIndex: barStart + 12, note: GMDrum.snare.rawValue, velocity: 91, durationSteps: 1))
+        events += fourOnFloorKickAndSnare(barStart: barStart, snare: (94, 91))
 
         // High intensity: add open hat on "and of 4" (step 14)
         if intensity == .high && bar % 2 == 1 {

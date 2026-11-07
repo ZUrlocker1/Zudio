@@ -3704,7 +3704,7 @@ struct LeadGenerator {
         for s in 0..<statements {
             let slotStart = bodyStart + s * slot
             // Jitter the entry so the statements do not arrive on a grid.
-            var step = slotStart + rng.nextInt(upperBound: max(1, slot / 4))
+            let step = slotStart + rng.nextInt(upperBound: max(1, slot / 4))
             // The run fills roughly half its slot, but is capped at 14 bars however long the
             // slot is. Uncapped, a long song gave 15-25 bar runs — too much unbroken presence
             // for a rule whose character is a statement followed by silence.

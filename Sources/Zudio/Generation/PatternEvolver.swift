@@ -225,6 +225,11 @@ struct PatternEvolver {
                     rotateAccum -= rotateDir
                 }
                 if rotateAccum != 0 {
+                    // Odd steps rotate onto even ones, and a note never lands on an onset that is
+                    // already there: Moroder Chase's echo layer fills every odd step, so its echoes
+                    // were rotated on top of the main notes, doubling them or adding a second pitch
+                    // to a monophonic bass.
+                    let occupied = Set(barEvents.map { $0.stepIndex - barStart }.filter { $0 % 2 == 0 })
                     barEvents = barEvents.map { ev in
                         let off = ev.stepIndex - barStart
                         // Protect beat 1 (step 0) and beat 3 (step 8) — kick-drum anchors.
@@ -236,6 +241,7 @@ struct PatternEvolver {
                         // Only rotate events that are already at syncopated 16th positions.
                         guard off % 2 != 0 else { return ev }
                         let newOff = max(1, min(15, off + rotateAccum))
+                        guard !occupied.contains(newOff) else { return ev }
                         return MIDIEvent(stepIndex: barStart + newOff, note: ev.note,
                                         velocity: ev.velocity, durationSteps: ev.durationSteps)
                     }
