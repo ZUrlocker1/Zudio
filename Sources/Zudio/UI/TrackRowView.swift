@@ -482,7 +482,7 @@ struct TrackRowView: View {
             case kTrackLead1:    [.delay, .space]
             // Square Lead 2 (pool index 7) is too harsh dry, so it always takes tremolo
             case kTrackLead2:    appState.instrumentOverrides[kTrackLead2] == 7 ? [.space, .tremolo] : [.space]
-            case kTrackPads:     [.space, .delay, .sweep, .pan]
+            case kTrackPads:     [.space, .delay, .sweep]
             case kTrackTexture:  [.delay, .space, .sweep, .pan]
             case kTrackRhythm:   [.delay, .pan]
             default:             []

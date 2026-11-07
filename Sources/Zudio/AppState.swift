@@ -4536,7 +4536,7 @@ final class AppState: ObservableObject {
                 case kTrackLead1:   [.delay, .space]
                 // Square Lead 2 (pool index 7) is too harsh dry, so it always takes tremolo
                 case kTrackLead2:   instrumentOverrides[kTrackLead2] == 7 ? [.space, .tremolo] : [.space]
-                case kTrackPads:    [.space, .delay, .sweep, .pan]
+                case kTrackPads:    [.space, .delay, .sweep]
                 case kTrackTexture: [.delay, .space, .sweep, .pan]
                 // A KOS-LD2-001 stereo twin pans Rhythm statically opposite its twin
                 case kTrackRhythm:  songState?.isSpaceStereoTwin == true ? [.delay] : [.delay, .pan]
