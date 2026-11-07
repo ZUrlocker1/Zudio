@@ -1198,6 +1198,16 @@ final class AppState: ObservableObject {
         stylesWithGeneratedSongs = Set(persistedHistory.map { $0.style })
         hasHadSohoSong = persistedHistory.contains { $0.displaySubstyleName == "Chill Soho" }
         preloadPersistedSongs()
+        #if os(macOS)
+        // Batch export for A/B listening tests: ZUDIO_BATCH_EXPORT=<folder> loads every .zudio in
+        // the folder (ZUDIO_BATCH_MATCH narrows by filename) and fast-exports it beside itself as
+        // .m4a, then quits. Songs loaded this way stay out of the saved history.
+        if let dir = ProcessInfo.processInfo.environment["ZUDIO_BATCH_EXPORT"] {
+            isBatchExporting = true
+            let match = ProcessInfo.processInfo.environment["ZUDIO_BATCH_MATCH"]
+            Task { @MainActor [weak self] in await self?.runBatchExport(dir: dir, match: match) }
+        }
+        #endif
         // Sleep timer arms when playback actually starts (see prepareSleepTimerForPlayback()),
         // not at app launch — a countdown with nothing playing isn't meaningful.
 
@@ -3861,7 +3871,7 @@ final class AppState: ObservableObject {
                     }
                     self.sessionInstrumentOverrides[state.globalSeed] = self.instrumentOverrides
                 }
-                self.appendPersistedSong(from: state)   // after the instruments, as in generateNew
+                if !self.isBatchExporting { self.appendPersistedSong(from: state) }   // after the instruments, as in generateNew
                 self.songGenerationCount += 1
                 self.stylesWithGeneratedSongs.insert(style)
                 self.muteState = Array(repeating: false, count: kTrackCount)
@@ -4720,6 +4730,39 @@ final class AppState: ObservableObject {
         }
         #endif
     }
+
+    private var isBatchExporting = false
+
+    #if os(macOS)
+    private func runBatchExport(dir: String, match: String?) async {
+        func pause(_ seconds: Double) async { try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) }
+        await pause(3)
+        let folder = URL(fileURLWithPath: dir)
+        let files = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "zudio" && (match.map($0.lastPathComponent.contains) ?? true) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        print("BATCH \(files.count) files")
+        for file in files {
+            let out = file.deletingPathExtension().appendingPathExtension("m4a")
+            if FileManager.default.fileExists(atPath: out.path) { print("BATCH skip \(out.lastPathComponent)"); continue }
+            let count = songGenerationCount
+            loadFromLogURL(file)
+            var waited = 0.0
+            while (songGenerationCount == count || isGenerating) && waited < 60 { await pause(0.2); waited += 0.2 }
+            await pause(2)   // instruments finish loading
+            guard let song = songState, songGenerationCount != count else { print("BATCH load failed \(file.lastPathComponent)"); continue }
+            launchFastExport(song: song, url: out)
+            await pause(0.5)
+            waited = 0
+            while isFastExporting && waited < 600 { await pause(0.5); waited += 0.5 }
+            let ok = FileManager.default.fileExists(atPath: out.path)
+            print("BATCH \(ok ? "done" : "FAILED") \(out.lastPathComponent) \(fastExportErrorMessage ?? "")")
+            fastExportErrorMessage = nil
+        }
+        print("BATCH finished")
+        exit(0)
+    }
+    #endif
 
     private func launchFastExport(song: SongState, url: URL, separateTracks: Bool = false) {
         var programs        = (0..<kTrackCount).map { playback.loadedProgram(forTrack: $0) }
