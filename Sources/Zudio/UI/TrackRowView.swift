@@ -348,6 +348,7 @@ struct TrackRowView: View {
             return isKosmic ? [.vibrato, .delay, .space] : [.air, .delay, .reverb]
         case kTrackPads:
             if isChill   { return [.space, .sweep, .boost] }
+            if activeStyle == .kosmic && appState.songState?.isKosmicSpace == true { return [.sweep, .pan, .delay, .space] }
             return isAmbient ? [.sweep, .tremolo, .space] : [.sweep, .delay, .space]
         case kTrackRhythm:
             if isChill                 { return [.tremolo, .space, .compression] }
@@ -482,7 +483,7 @@ struct TrackRowView: View {
             case kTrackLead1:    [.delay, .space]
             // Square Lead 2 (pool index 7) is too harsh dry, so it always takes tremolo
             case kTrackLead2:    appState.instrumentOverrides[kTrackLead2] == 7 ? [.space, .tremolo] : [.space]
-            case kTrackPads:     [.space, .delay, .sweep]
+            case kTrackPads:     [.space, .delay, .sweep, .pan]
             case kTrackTexture:  [.delay, .space, .sweep, .pan]
             case kTrackRhythm:   [.delay, .pan]
             default:             []

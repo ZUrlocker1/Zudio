@@ -447,7 +447,8 @@ Per-instrument level trims were set by ear and live in code (`spaceCC7Trim` in A
 the per-program gain tables); they are not restated here. The on-screen Instruments line names
 instruments; the saved file keeps program numbers and its format is unchanged.
 
-**Effects and stereo.** Pads take `sweep` plus Space's reverb; Texture takes `sweep` and a slow
+**Effects and stereo.** Pads take `sweep`, Space's reverb and a very slow, shallow auto-pan (about ±25%,
+one sweep per 8 bars); Rhythm's delay echoes on three 16ths (0.75 beat) against its eighths and sixteenths; Texture takes `sweep` and a slow
 auto-pan (one sweep per 2, 4 or 8 bars, 25/50/25); Rhythm auto-pans ±40% around +0.22; Lead 1 at
 −0.10, Lead 2 at −0.20; Bass and Drums centre. The stereo Twin overrides the Rhythm and Lead 2 pans.
 

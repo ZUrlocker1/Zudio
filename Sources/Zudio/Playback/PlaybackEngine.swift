@@ -1873,6 +1873,12 @@ final class PlaybackEngine: ObservableObject {
                 break
             }
             delays[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
+            // Kosmic Space Rhythm echoes on three 16ths against its steady eighths and
+            // sixteenths, the cross-rhythm of Jarre's sequencers; base Kosmic keeps the 8th.
+            if kosmicStyle && trackIndex == kTrackRhythm && songState?.isKosmicSpace == true {
+                let beatSecs = 60.0 / Double(songState?.frame.tempo ?? 120)
+                delays[trackIndex].delayTime = Swift.min(2.0, beatSecs * 0.75)
+            }
             if ambientMode, trackIndex < ambientDelayWet.count, ambientDelayWet[trackIndex] >= 0 {
                 let wet: Float = (trackIndex == kTrackLead1 && songState?.isAmbientPiano == true)
                     ? 14   // piano needs a touch of thickening, not an audible repeating echo
@@ -1902,6 +1908,9 @@ final class PlaybackEngine: ObservableObject {
                         ? Double(KosmicMusicalFrameGenerator.spaceTexturePanBars(seed: songState?.globalSeed ?? 0))
                         : 4.0
                     hz = bpm / (240.0 * bars)
+                } else if kosmicStyle && trackIndex == kTrackPads && songState?.isKosmicSpace == true {
+                    // Kosmic Space Pads: one very slow, shallow sweep per 8 bars.
+                    hz = Double(songState?.frame.tempo ?? 120) / (240.0 * 8.0)
                 } else {
                     hz = 0.5
                 }
@@ -2273,7 +2282,9 @@ final class PlaybackEngine: ObservableObject {
         panEnabled[i]  = true
         panPhase[i]    = 0.0
         panPhaseInc[i] = 2.0 * Double.pi * hz / 20.0  // increment per 20fps tick
-        panDepth[i]    = (kosmicStyle && i == kTrackRhythm && songState?.isKosmicSpace == true) ? 0.4 : 1.0
+        let spaceSong  = kosmicStyle && songState?.isKosmicSpace == true
+        // Space: Rhythm swings about +-40%, Pads only about +-25% (a string machine's chorus drifting)
+        panDepth[i]    = (spaceSong && i == kTrackRhythm) ? 0.4 : (spaceSong && i == kTrackPads) ? 0.25 : 1.0
         anyLFOActive   = true
         startSharedLFO()
     }
