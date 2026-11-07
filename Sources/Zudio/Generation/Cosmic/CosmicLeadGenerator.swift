@@ -553,13 +553,21 @@ struct KosmicLeadGenerator {
     //   fall, 4 bars  — four falling cells from the top, the third bouncing back up
     //   hold          — one chord tone a step above the fall's end, held a bar
     // The source cycle, 16 bars: climb, climb, fall, hold, three bars of rest. Register MIDI 58–84.
+    // Chord tones on the long notes (Zack, 2026-11-07: stepwise cells held passing tones for 3/8 of
+    // the bar and did not sit on the chord): the first two notes of a cell are chord tones, the
+    // third is a scale step on when it is short (steps 12–15) and another chord tone when it is long.
     // Homage draws per song:
-    //   chromatic approach — the first cell of each climb opens a semitone below its chord tone,
-    //                        as the source's F#-G-A does, 60%
+    //   chromatic approach — each climb is led in by a 16th a semitone below its first note on
+    //                        step 15 of the bar before, as the source's F#-G-A does, 60%
     //   rhythm — the source 60%, or steps 0, 6 and 10 (held 6, 4 and 6) 40%
     //   cycle — the source 60%, or an 8-bar climb and fall with no hold or rest 40%
+    // Within-song development: passes 1 and 2 of the cycle are plain, then each pass starts its
+    // climbs a chord tone lower or higher, or plays the reshaped cycle (the neighbour cell third in
+    // the climb, no bounce in the fall), never the same variant twice running; every fourth pass is
+    // plain. The pass draws use a copy of the RNG, so the draws after this rule are unchanged.
 
     private enum RisingCell { case up, neighbour, down, hold, rest }
+    private enum RisingVariant { case plain, lower, higher, reshaped }
 
     private static func generateOxygeneRisingStrings(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
@@ -568,19 +576,37 @@ struct KosmicLeadGenerator {
         let approach = rng.nextDouble() < 0.60
         let onsets: [(step: Int, dur: Int)] = rng.nextDouble() < 0.40
             ? [(0, 6), (6, 4), (10, 6)] : [(0, 6), (6, 6), (12, 4)]
-        let climb: [RisingCell] = [.up, .neighbour, .up, .up]
-        let fall:  [RisingCell] = [.down, .down, .down, .down]
-        let cycle: [RisingCell] = rng.nextDouble() < 0.40
-            ? climb + fall
-            : climb + climb + fall + [.hold, .rest, .rest, .rest]
+        let longCycle = rng.nextDouble() >= 0.40
+        var peek = rng
+        var passRNG = SeededRNG(seed: peek.next() ^ 0x0E06_A5C3_1976_0016)
+        func cycle(_ v: RisingVariant) -> [RisingCell] {
+            let climb: [RisingCell] = v == .reshaped ? [.up, .up, .neighbour, .up] : [.up, .neighbour, .up, .up]
+            let fall:  [RisingCell] = [.down, .down, .down, .down]
+            return longCycle ? climb + climb + fall + [.hold, .rest, .rest, .rest] : climb + fall
+        }
+        let cycleLength = longCycle ? 16 : 8
+        let thirdIsShort = onsets[2].dur <= 4
         let scalePCs = frame.scalePCs
 
         var events: [MIDIEvent] = []
+        var pass = -1
+        var variant = RisingVariant.plain
+        var lastVariant = RisingVariant.plain
         for section in structure.sections where section.label == .A {
             var last = 62
             for bar in section.startBar..<section.endBar {
-                let pos = (bar - section.startBar) % cycle.count
-                let cell = cycle[pos]
+                let pos = (bar - section.startBar) % cycleLength
+                if pos == 0 {
+                    pass += 1
+                    if pass < 2 || pass % 4 == 3 {
+                        variant = .plain
+                    } else {
+                        let options = [RisingVariant.lower, .higher, .reshaped].filter { $0 != lastVariant }
+                        variant = options[passRNG.nextInt(upperBound: options.count)]
+                        lastVariant = variant
+                    }
+                }
+                let cell = cycle(variant)[pos]
                 guard cell != .rest, let entry = tonalMap.entry(atBar: bar) else { continue }
                 let root = spaceChordRootPC(entry, frame: frame) + 60
                 let tones = Set([root, scaleStep(root, by: 2, scalePCs: scalePCs),
@@ -589,31 +615,62 @@ struct KosmicLeadGenerator {
                 func toneBelow(_ t: Int) -> Int { stride(from: t, through: t - 12, by: -1).first { tones.contains($0 % 12) } ?? t }
                 func step(_ m: Int, _ by: Int) -> Int { scaleStep(m, by: by, scalePCs: scalePCs) }
 
+                // Where a climb opens: the chord tone at or above D4, or one chord tone either side.
+                let climbStart: Int
+                switch variant {
+                case .lower:  climbStart = toneBelow(toneAbove(62) - 1)
+                case .higher: climbStart = toneAbove(toneAbove(62) + 1)
+                default:      climbStart = toneAbove(62)
+                }
+                let bounce = variant != .reshaped
+
                 // The cell's first chord tone, placed against where the last cell ended. An up cell
                 // on a 4-bar boundary always opens a climb, which starts again from the bottom.
                 var start: Int
                 switch (cell, pos % 4) {
-                case (.hold, _):        start = toneAbove(step(last, 1))
-                case (.up, 0):          start = toneAbove(62)
-                case (.neighbour, _):   start = toneAbove(step(last, 1))
-                case (.up, 2):          start = toneAbove(step(last, -1))
-                case (.up, _):          start = toneAbove(step(last, 1))
-                case (.down, 0):        start = toneBelow(last)
-                case (.down, 2):        start = toneAbove(step(last, 2))
-                default:                start = toneBelow(step(last, -1))
+                case (.hold, _):              start = toneAbove(step(last, 1))
+                case (.up, 0):                start = climbStart
+                case (.neighbour, _):         start = toneAbove(step(last, 1))
+                case (.up, 2):                start = toneAbove(step(last, -1))
+                case (.up, _):                start = toneAbove(step(last, 1))
+                case (.down, 0):              start = toneBelow(last)
+                case (.down, 2) where bounce: start = toneAbove(step(last, 2))
+                default:                      start = toneBelow(step(last, -1))
                 }
                 if start > 79 { start = toneBelow(start - 12) }
                 if start < 58 { start = toneAbove(start + 12) }
 
-                let notes: [Int]
+                var notes: [Int]
                 switch cell {
-                case .up where pos % 4 == 0 && approach: notes = [start - 1, start, step(start, 1)]
-                case .up:        notes = [start, step(start, 1), step(start, 2)]
-                case .neighbour: notes = [start, step(start, -1), start]
-                case .down:      notes = [start, step(start, -1), step(start, -2)]
-                default:         notes = [start]
+                case .up:
+                    let second = toneAbove(start + 1)
+                    notes = [start, second, thirdIsShort ? step(second, 1) : toneAbove(second + 1)]
+                case .neighbour:
+                    notes = [start, toneBelow(start - 1), start]
+                case .down:
+                    let second = toneBelow(start - 1)
+                    notes = [start, second, thirdIsShort ? step(second, -1) : toneBelow(second - 1)]
+                default:
+                    notes = [start]
                 }
+                // A cell reaching past the register turns back at its edge onto the nearest chord
+                // tone inside it, so the line bends there rather than jumping an octave.
+                notes = notes.map { $0 < 58 ? toneAbove(58) : $0 > 84 ? toneBelow(84) : $0 }
                 let end = section.endBar * 16
+                // The chromatic lead-in, a 16th before the climb, cutting short any note under it; none when
+                // the note before already is that pitch.
+                if cell == .up && pos % 4 == 0 && approach && bar > section.startBar,
+                   !events.contains(where: { $0.stepIndex == bar * 16 - 4 && Int($0.note) == start - 1 }) {
+                    let pickup = bar * 16 - 1
+                    events = events.map { ev in
+                        ev.stepIndex < pickup && ev.stepIndex + ev.durationSteps > pickup
+                            ? MIDIEvent(stepIndex: ev.stepIndex, note: ev.note, velocity: ev.velocity,
+                                        durationSteps: pickup - ev.stepIndex)
+                            : ev
+                    }
+                    events.append(MIDIEvent(stepIndex: pickup, note: UInt8(start - 1), velocity: 58,
+                                            durationSteps: 1))
+                }
                 if cell == .hold {
                     events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(start), velocity: 62,
                                             durationSteps: Swift.min(16, end - bar * 16)))

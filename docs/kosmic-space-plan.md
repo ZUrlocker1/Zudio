@@ -322,9 +322,15 @@ A sections draw one of five rules, 20% each. B sections draw one of three, a thi
   transposed to the current chord, opening note dropped, or the final root replaced by the 5th.
   Every fourth statement exact; one in four replaced by 2 bars of rest. Top note in 72–84.
 - **KOS-LD1-016 Oxygene 6 Rising Strings** (A) — three long notes a bar on steps 0, 6, 12, each bar
-  a 3-note cell on the current chord. A climb rises about an octave; a fall is four falling cells.
-  Source cycle: climb, climb, fall, a held note, three bars of rest. Register 58–84. Draws:
-  chromatic approach into each climb (60%), rhythm 0, 6, 10 (40%), 8-bar climb-and-fall cycle (40%).
+  a 3-note cell on the current chord. The two long notes are chord tones; the third is a scale step
+  on when it is short and a chord tone when it is long. A climb rises about an octave; a fall is
+  four falling cells. Source cycle: climb, climb, fall, a held note, three bars of rest. Register
+  58–84; a note past the edge turns back onto the nearest chord tone inside it. Draws: chromatic
+  approach, a 16th pickup a semitone below each climb on step 15 of the bar before (60%), rhythm 0,
+  6, 10 (40%), 8-bar climb-and-fall cycle (40%). Passes 1 and 2 are plain; then each pass starts its
+  climbs a chord tone lower or higher, or plays a reshaped cycle (neighbour cell third in the climb,
+  no bounce in the fall), never the same twice running; every fourth pass is plain. The pass draws
+  use a copy of the RNG, so later Lead 1 draws are unchanged.
 - **KOS-LD1-017 Oxygene 8 Offbeat Climb** (A) — statements fill one bar and the next is silent,
   entering on step 2: climb, leap and turn from the current chord root, MIDI 62–73, legato. A
   16-bar phrase per A section, every third phrase a 2-bar arch figure with 7 bars of rest. Draws:
