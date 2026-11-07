@@ -1029,14 +1029,16 @@ final class AppState: ObservableObject {
     }
 
     /// Kosmic Space volume trims on top of the shared Kosmic pool values (Zack, 2026-11-06):
-    /// Moog bass a little lower, Bright Saw on Lead 1 a little higher. Base Kosmic and Drift
+    /// Moog bass a little lower (raised again 2026-11-07), Bright Saw on Lead 1 a little higher,
+    /// Synth Bass 101 a little higher. Base Kosmic and Drift
     /// are untouched because the trim applies only when the song is Space.
     private func spaceCC7Trim(_ cc7: Int, trackIndex: Int, poolIdx: Int, style: MusicStyle) -> Int {
         guard style == .kosmic, songState?.isKosmicSpace == true else { return cc7 }
         let names = Self.instrumentPoolNames(trackIndex: trackIndex, style: style)
         guard poolIdx < names.count else { return cc7 }
         switch (trackIndex, names[poolIdx]) {
-        case (kTrackBass,  "Moog"):       return cc7 - 8
+        case (kTrackBass,  "Moog"):       return cc7 - 3   // was -8; raised 2026-11-07
+        case (kTrackBass,  "Synth Bass 101"): return min(127, cc7 + 5)
         case (kTrackLead1, "Bright Saw"): return min(127, cc7 + 10)
         default:                          return cc7
         }
