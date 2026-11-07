@@ -37,8 +37,13 @@ struct KosmicBassGenerator {
             // he wanted 10-15%): KOS-BASS-018 Oxygene Falling Walk and KOS-BASS-020 Oxygene 8 Pump
             // 24% each, KOS-BASS-001 Berlin School drone 17%. Neither pump is drawn under the busy
             // Space rhythms in `spaceBusyRhythms`: the walk takes their share.
-            rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001", "KOS-BASS-019"]
-            weights = spaceBusyRhythm ? [0.75, 0.0, 0.25, 0.0] : [0.24, 0.24, 0.17, 0.35]
+            // KOS-BASS-021 Magnetic Triad Walk (2026-11-06) joins at the average weight of the others in
+            // each case, rescaled to sum to 1: 20% where a pump may play (the others 19.2, 19.2, 13.6,
+            // 28), a third under a busy rhythm (walk 50, drone 16.7). As a sparse line it may play
+            // under a busy rhythm.
+            rules   = ["KOS-BASS-018", "KOS-BASS-020", "KOS-BASS-001", "KOS-BASS-019", "KOS-BASS-021"]
+            weights = spaceBusyRhythm ? [0.50, 0.0, 1.0 / 6.0, 0.0, 1.0 / 3.0]
+                                      : [0.192, 0.192, 0.136, 0.28, 0.20]
         } else if isKosmicDrift {
             if isDriftDreamscape {
                 // Dreamscape forces Four-Bar Hold
@@ -183,6 +188,28 @@ struct KosmicBassGenerator {
         // KOS-BASS-020: 30% of songs drop the b7 and pump bare octaves
         let pumpSeventh: Bool? = ruleID == "KOS-BASS-020" ? rng.nextDouble() >= 0.30 : nil
         let magneticPump = ruleID == "KOS-BASS-019" ? magneticPumpDraws(rng: &rng) : nil
+        let triadWalk = ruleID == "KOS-BASS-021" ? magneticTriadDraws(rng: &rng) : nil
+        // KOS-BASS-021 displaced bars: the half-bar shift, from an 8-bar point
+        var triadShiftBars = Set<Int>()
+        if let walk = triadWalk {
+            let body = structure.sections.filter { $0.label == .A || $0.label == .B }
+            let hasB = body.contains { $0.label == .B }
+            for (i, sec) in body.enumerated() {
+                switch walk.shift {
+                case .bSections where hasB:
+                    if sec.label == .B { triadShiftBars.formUnion(sec.startBar..<sec.endBar) }
+                case .lastSection:
+                    if i == body.count - 1, sec.lengthBars >= 8 {
+                        triadShiftBars.formUnion((sec.startBar + 8)..<sec.endBar)
+                    }
+                default:
+                    // The second half of each section of 16 bars or more, from an 8-bar point
+                    if sec.lengthBars >= 16 {
+                        triadShiftBars.formUnion((sec.startBar + sec.lengthBars / 16 * 8)..<sec.endBar)
+                    }
+                }
+            }
+        }
         // KOS-BASS-020 fifth-voicing bars: the turnaround of each 8-bar chord loop — a non-tonic window
         // that hands back to the tonic and ends on an 8-bar point of its section. In Oxygene 8 these are
         // the iv chord's 2 bars in every 8; here the Aeolian Cycle's iv, the Dorian Vamp's last window
@@ -361,7 +388,7 @@ struct KosmicBassGenerator {
             // sub-layers. Both thin over the arrangement's bass stretches, whose edges are annotated as
             // "pattern evolving" through bassEvolutionBars, and both vary on the same bars: a turn in
             // the last bar before a new body section, a breath in the second bar of each 8.
-            if fallingWalk != nil || pumpSeventh != nil || magneticPump != nil {
+            if fallingWalk != nil || pumpSeventh != nil || magneticPump != nil || triadWalk != nil {
                 let thin = spaceArrangement?.bassThins(atBar: bar) == true
                 if section.label == .A || section.label == .B,
                    thin != (spaceArrangement?.bassThins(atBar: bar - 1) == true) {
@@ -398,6 +425,21 @@ struct KosmicBassGenerator {
                                               thin: thin, variant: variant,
                                               lateEntry: bar == section.startBar && bar != firstBodyStart,
                                               lift: section.lengthBars >= 16 && bar >= section.endBar - 8)
+                } else if let walk = triadWalk {
+                    // The displacement switches in and out at 8-bar points, so it is annotated as the
+                    // bass pattern evolving, as the thin stretches are.
+                    let shifted = triadShiftBars.contains(bar)
+                    if shifted != triadShiftBars.contains(bar - 1), !bassEvolutionBars.contains(bar) {
+                        bassEvolutionBars.append(bar)
+                    }
+                    let variant: TriadVariant = turn ? .turn
+                        : (bar - section.startBar) % 8 == 7 ? .hold
+                        : breath ? .breath
+                        : .normal
+                    events += magneticTriadBar(barStart: barStart, entry: entry, frame: frame, walk: walk,
+                                               thin: thin, shifted: shifted,
+                                               nextShifted: triadShiftBars.contains(bar + 1), variant: variant,
+                                               lateEntry: bar == section.startBar && bar != firstBodyStart)
                 }
                 continue
             }
@@ -767,6 +809,68 @@ struct KosmicBassGenerator {
         return hits.map {
             MIDIEvent(stepIndex: barStart + $0.step, note: UInt8($0.note),
                       velocity: $0.step == 0 ? 96 : $0.step % 4 == 0 ? 88 : 80, durationSteps: $0.dur)
+        }
+    }
+
+    // MARK: - KOS-BASS-021 Magnetic Triad Walk (Kosmic Space)
+    // Magnetic Fields 5 bass: a slow triad in dotted quarters, root, 3rd and 5th on steps 0, 6 and 12
+    // (6 + 6 + 4 steps), one chord a bar, about 3 notes a bar. In bars 32-49 the source displaces
+    // it, the root on step 8 and the 3rd on 14 with the 5th falling on step 4, then returns. Here the
+    // displaced bar keeps its own chord's tones: 5th on step 4, root on 8, 3rd on 14, each held to
+    // the next. Root in MIDI 29-40. Sparse, so unlike the pumps it may play under a busy rhythm.
+    // Homage draws per song:
+    //   order — root, 3rd, 5th 45% (source), root, 5th, 3rd 30%, root, 5th, octave 25%
+    //   shift — where the displacement plays: the B sections 40% (the second half of long sections
+    //           when there is no B), the second half of each section of 16 bars or more 35%, or the
+    //           last body section after its first 8 bars 25%
+    // Variation over the song, as the Pumps: a thin bar holds the root; the last bar of each 8 holds
+    // the root for the bar (source bar 24); a breath drops the last note in the second bar of each 8;
+    // a turn climbs root, 3rd, 5th, octave before a new body section; each body section after the
+    // first enters late, on step 6.
+
+    enum TriadShift { case bSections, longSections, lastSection }
+    enum TriadVariant { case normal, hold, breath, turn }
+
+    struct MagneticTriad {
+        let order: [Int]     // scale steps above the root
+        let shift: TriadShift
+    }
+
+    private static func magneticTriadDraws(rng: inout SeededRNG) -> MagneticTriad {
+        let order = [[0, 2, 4], [0, 4, 2], [0, 4, 7]][rng.weightedPick([0.45, 0.30, 0.25])]
+        let shift: TriadShift = [.bSections, .longSections, .lastSection][rng.weightedPick([0.40, 0.35, 0.25])]
+        return MagneticTriad(order: order, shift: shift)
+    }
+
+    private static func magneticTriadBar(
+        barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame, walk: MagneticTriad,
+        thin: Bool, shifted: Bool, nextShifted: Bool, variant: TriadVariant, lateEntry: Bool
+    ) -> [MIDIEvent] {
+        let scalePCs = frame.scalePCs
+        let root = clampToRegister(spaceChordRootPC(entry, frame: frame) + 36, low: 29, high: 40)
+        let tones = walk.order.map { scaleStep(root, by: $0, scalePCs: scalePCs) }
+        // (step, note, duration)
+        var hits: [(step: Int, note: Int, dur: Int)]
+        if thin || variant == .hold {
+            hits = [(0, root, 16)]
+        } else if variant == .turn {
+            hits = [(0, root, 6), (6, tones[1], 4), (10, scaleStep(root, by: 4, scalePCs: scalePCs), 2), (12, root + 12, 4)]
+        } else if shifted {
+            // The 3rd on step 14 is held to the next displaced bar's step 4, or to the bar line
+            hits = [(4, tones[2], 4), (8, tones[0], 6), (14, tones[1], nextShifted ? 6 : 2)]
+        } else {
+            hits = [(0, tones[0], 6), (6, tones[1], 6), (12, tones[2], 4)]
+        }
+        if variant == .breath && hits.count > 1 {
+            hits.removeLast()
+            hits[hits.count - 1].dur = 16 - hits[hits.count - 1].step
+        }
+        if lateEntry && hits.first?.step == 0 {
+            if hits.count == 1 { hits[0] = (6, root, 10) } else { hits.removeFirst() }
+        }
+        return hits.map {
+            MIDIEvent(stepIndex: barStart + $0.step, note: UInt8($0.note),
+                      velocity: $0.step == 0 ? 96 : 88, durationSteps: $0.dur)
         }
     }
 

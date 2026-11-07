@@ -590,7 +590,8 @@ struct SongGenerator {
                 rng: &lead2RNG, usedRuleIDs: &lead2Rules,
                 lead1BaseRuleID: lead1BaseRule,
                 xFilesBars: xFilesBars,
-                isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement
+                isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement,
+                rhythmEvents: trackEvents[kTrackRhythm]
             )
         }
 
@@ -1713,7 +1714,8 @@ struct SongGenerator {
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1],
                     rng: &rng, usedRuleIDs: &usedRules, isKosmicSpace: isSpace,
-                    spaceArrangement: regenArrangement)
+                    spaceArrangement: regenArrangement,
+                    rhythmEvents: songState.trackEvents[kTrackRhythm])
             } else if isChill {
                 // Derive lead1Onsets from current Lead 1 events so Lead 2 avoids overlapping
                 let lead1Evts = songState.trackEvents[kTrackLead1]
@@ -1962,6 +1964,12 @@ struct SongGenerator {
             updated = updated.withAmbientAudioTexture(regenAmbientAudioTexture, offset: regenAmbientAudioOffset)
         }
         updated.trackOverrides[trackIndex] = newTrackSeed
+        // Kosmic Space: a KOS-LD2-001 stereo twin follows a regenerated Rhythm, so it stays a twin.
+        // Reload replays Lead 2's override before Rhythm's, so this also keeps a reloaded twin in step.
+        if isSpace, trackIndex == kTrackRhythm, songState.isSpaceStereoTwin {
+            updated = updated.replacingEvents(KosmicLeadGenerator.spaceStereoTwin(rhythm: events),
+                                              forTrack: kTrackLead2)
+        }
         // A regenerated Kosmic Lead 1 takes its Lead Synth doubling with it; the Polysynth had kept
         // doubling the old line under the new one (found 2026-11-03).
         if isKosmic && trackIndex == kTrackLead1 {
@@ -2264,6 +2272,8 @@ struct SongGenerator {
         for token in [" i ", " ♭", " sus4", " bVI", " bVII", " bII", " bIII", " bV"] {
             if let r = label.range(of: token) { label = String(label[..<r.lowerBound]); break }
         }
+        // Name the mode once: drop it from the family label when the key and mode already show it.
+        label = label.split(separator: " ").filter { $0 != Substring(mode.rawValue) }.joined(separator: " ")
         return "\(key) \(modeStr) \(label.trimmingCharacters(in: .whitespaces))"
     }
 
@@ -2873,7 +2883,7 @@ struct SongGenerator {
         case "KOS-DRUM-008": return "Half-time lope"
         case "KOS-DRUM-009": return "Oxygene Preset Box"
         case "KOS-DRUM-012": return "Oxygene 6 Hand Percussion"
-        case "KOS-DRUM-010": return "Magnetic Fields Rhythm Box"
+        case "KOS-DRUM-010": return "Magnetic Rhythm Box"
         default:                 return ruleID
         }
     }
@@ -2899,7 +2909,8 @@ struct SongGenerator {
         case "KOS-BASS-017":  return "Four-bar hold root sustain"
         case "KOS-BASS-018":  return "Oxygene Falling Walk"
         case "KOS-BASS-020":  return "Oxygene 8 Pump"
-        case "KOS-BASS-019":  return "Magnetic Fields Octave Pump"
+        case "KOS-BASS-019":  return "Magnetic Octave Pump"
+        case "KOS-BASS-021":  return "Magnetic Triad Walk"
         case "BASS-EVOL":     return "Evolving pattern"
         case "BASS-DEVOL":    return "Devolving pattern"
         default:              return ruleID.hasPrefix("KOS-") ? ruleID : "Unknown bass rule"
@@ -2938,9 +2949,12 @@ struct SongGenerator {
         case "KOS-LD1-013": return "Oxygene Falling Theme"
         case "KOS-LD1-014": return "Oxygene See-Saw Riff"
         case "KOS-LD1-016": return "Oxygene 6 Rising Strings"
-        case "KOS-LD1-015": return "Magnetic Fields Turn Melody"
+        case "KOS-LD1-015": return "Magnetic Turn Melody"
+        case "KOS-LD1-018": return "Magnetic Call and Hold"
+        case "KOS-LD1-019": return "Equinoxe Thirds Riff"
         case "KOS-LD1-017": return "Oxygene 8 Offbeat Climb"
         case "KOS-LD2-000":  return "No lead 2"
+        case "KOS-LD2-001":  return "Magnetic Twin"
         default:             return ruleID
         }
     }
@@ -2964,7 +2978,7 @@ struct SongGenerator {
         case "KOS-RTHM-015": return "Downbeat chord"
         case "KOS-RTHM-016": return "Oxygene Octave Sequencer"
         case "KOS-RTHM-017": return "Equinoxe Fifth Triplets"
-        case "KOS-RTHM-018": return "Magnetic Fields Leading-Tone Cell"
+        case "KOS-RTHM-018": return "Magnetic Leading-Tone Cell"
         case "KOS-RTHM-021": return "Oxygene 8 Offbeat Pedal"
         default:            return ruleID
         }
@@ -2991,10 +3005,10 @@ struct SongGenerator {
         case .oxygeneDorianVamp:     return "Oxygene Dorian Vamp i ii"
         case .oxygeneAeolianCycle:   return "Oxygene Aeolian Cycle i bVII iv"
         case .oxygeneTwoChordSway:   return "Oxygene Two-Chord Sway i v"
-        case .magneticArc:           return "Magnetic Fields Arc i bVI iv V"
-        case .magneticTurn:          return "Magnetic Fields Turn i V bVI bVII"
+        case .magneticArc:           return "Magnetic Arc i bVI iv V"
+        case .magneticTurn:          return "Magnetic Turn i V bVI bVII"
         case .equinoxePhrygian:      return "Equinoxe Phrygian i iv bII"
-        case .magneticDescent:       return "Magnetic Fields Descent I vi V IV"
+        case .magneticDescent:       return "Magnetic Descent I vi V IV"
         }
     }
 

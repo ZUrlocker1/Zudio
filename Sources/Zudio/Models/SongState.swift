@@ -120,6 +120,18 @@ struct SongState: Sendable {
         return style.rawValue.capitalized
     }
 
+    /// Kosmic Space KOS-LD2-001 Magnetic Twin's stereo variant: Lead 2 replays Rhythm's notes. Found
+    /// from the notes rather than the log, so it holds after a regen and a reload; the harmonic filter
+    /// may drop a few of the twin's notes, hence the 80 and 90% thresholds. The late-octave variant
+    /// doubles Lead 1 and shares few onsets with Rhythm.
+    var isSpaceStereoTwin: Bool {
+        guard isKosmicSpace, trackEvents.count > kTrackRhythm else { return false }
+        let twin = trackEvents[kTrackLead2], rhythm = trackEvents[kTrackRhythm]
+        guard twin.count >= 16, twin.count * 10 >= rhythm.count * 8 else { return false }
+        let onsets = Set(rhythm.map(\.stepIndex))
+        return twin.filter { onsets.contains($0.stepIndex) }.count * 10 >= twin.count * 9
+    }
+
     // MARK: - Custom init (default values for Ambient fields preserve all existing call sites)
 
     init(

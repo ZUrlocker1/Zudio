@@ -8,8 +8,9 @@ base Kosmic's JMJ rules and five more Oxygene rules, each track drawn independen
 macOS and iOS. No test suite has been run. See "Phase 1 as built" below for where the code had to
 interpret this plan, and its sections "Breaks" and "More Oxygene rules" for what came after.
 Phase 2 (Magnetic) began on 2026-11-06: its harmony families and its drum, bass, sequencer and
-Lead 1 rules are built; see "Phase 2 as built". Still to come: KOS-LD2-001 Magnetic Fields Twin,
-the See-Saw thirds variant and the breakdown. Phase 3 is designed but
+Lead 1 rules are built; see "Phase 2 as built". Later the same day KOS-LD2-001 Magnetic Twin, the
+See-Saw thirds variant (as KOS-LD1-019) and two rules from the corpus were added, KOS-LD1-018 and
+KOS-BASS-021 (see "More Magnetic rules"). Still to come: the breakdown. Phase 3 is designed but
 waits for listening. The open scoping question is whether the Phase 2 breakdown becomes the
 existing bridge's in-section form (see "Open questions").
 
@@ -762,7 +763,10 @@ Phase 2, six rule IDs; five built 2026-11-06:
 - `KOS-LD1-015` Magnetic Fields Turn Melody — built
 - `KOS-RTHM-017` Equinoxe Fifth Triplets (a preset of the sequencer engine) — built
 - `KOS-RTHM-018` Magnetic Fields Leading-Tone Cell (a preset) — built
-- `KOS-LD2-001` Magnetic Fields Twin — not built yet
+- `KOS-LD2-001` Magnetic Twin — built
+- `KOS-LD1-018` Magnetic Call and Hold and `KOS-BASS-021` Magnetic Triad Walk, from the corpus,
+  and `KOS-LD1-019` Equinoxe Thirds Riff, the See-Saw thirds variant — built (see "More Magnetic
+  rules")
 
 Phase 3, three rule IDs and one-and-a-half implementations:
 
@@ -1286,6 +1290,53 @@ Measured over 600 seeds (479 Space songs): 304 Space songs held at least one Mag
 a bar: Rhythm Box 24.9 drum hits, Fifth Triplets 11.9, Leading-Tone Cell 11.3, Octave Pump 8.6.
 Every pitched note stayed in its chord's scale but for the Oxygene 8 Pump's deliberate raised
 leading tone in its turn bar.
+
+### More Magnetic rules (2026-11-06, later)
+
+Zack: three Oxygene A-section rules against one Magnetic, no Magnetic Lead 2 and one rare Magnetic
+bass was too little Magnetic. He asked for another Lead 1 and bass rule, each sounding unlike the
+existing rules, varying per song and evolving within the song, plus the Twin. The plan had no
+second Lead 1 or bass rule (the broken-chord lead was dropped), so both come from parts no rule
+used: the Magnetic Fields 4 lead and the Magnetic Fields 5 bass. Zack also approved the See-Saw
+thirds variant. Each joins at equal weight.
+
+- **KOS-LD1-018 Magnetic Call and Hold** — Magnetic Fields 4 lead, bars 2–8 and 21–28. An 8-bar
+  phrase: call (one note repeated on steps 2, 4, 5, 7, then a 3-note tail on 10, 12, 13), answer
+  (two held half notes a step apart on the next chord), call, answer a step higher, trill call
+  (repeated note, then rocking with the step below on 12–15), answer, cadence (two notes falling onto
+  the chord root, held into the 8th bar), rest. The octave phase bounces the chord root between
+  octaves on fixed 16th rhythms, 4 + 3 + 1 bars. Legato. Draws: call note root 30, 3rd 35, 5th 35;
+  call rhythm source 50, 0-2-3-6 or 2-3-5-7 25 each; tail [-1 -2 +1] 40 or one of three others 20
+  each; answer down 60 or up 40; octave phase in 60% of songs, every third 8-bar block of the A
+  sections. Songs without it call from the next chord tone up in every second phrase. The fifth
+  A-section rule, drawn last at 20%, so the five share A sections evenly (measured 17–22% each).
+  Notes 54–88 after the lead filter, 5.4 a bar where it plays.
+- **KOS-LD1-019 Equinoxe Thirds Riff** — the See-Saw riff (generateOxygeneSeeSawRiff with
+  equinoxeThirds) with the pivot a scale third away and the rhythm 3+3+2 on steps 0, 2, 5, 8, 10, 13,
+  legato. In Phrygian songs the pivot is bII over the tonic in the last bar of every 4. Logged under
+  its own ID so the log shows it. A third of songs with a B section, drawn last, so the riff, the
+  Phrase Loop and this share B sections evenly.
+- **KOS-BASS-021 Magnetic Triad Walk** — Magnetic Fields 5 bass: root, 3rd, 5th in dotted quarters
+  on steps 0, 6, 12, root in MIDI 29–40. The displaced bar (source bars 32–49) plays the 5th on step
+  4, root on 8, 3rd on 14, held to the next. Draws: order root-3rd-5th 45, root-5th-3rd 30,
+  root-5th-octave 25; displacement in the B sections 40, the second half of each section of 16 bars
+  or more 35, or the last body section after 8 bars 25. Varies as the Pumps: thin bars and the last
+  bar of each 8 hold the root, breath, turn, late entry. Not busy, so it plays under busy rhythms
+  too. Weights: 20% where a pump may play (Falling Walk and Oxygene 8 Pump 19.2 each, drone 13.6,
+  Octave Pump 28), a third under a busy rhythm (walk 50, drone 16.7). weightedPick does not
+  normalise, so each list sums to 1. Measured in 32% of Space songs, 2.3 notes a bar, MIDI 28–52.
+  Magnetic bass overall is about 42% of Space songs.
+- **KOS-LD2-001 Magnetic Twin** — as designed. Space Lead 2 is Echo melody, Twin and No lead 2, a
+  third each. Stereo twin (50%): Rhythm's notes on Lead 2, 6 velocity lower; static pans Rhythm
+  +0.45, Lead 2 −0.45; Rhythm's auto-pan is off by default and, if switched on, holds still.
+  SongState.isSpaceStereoTwin finds the variant from the notes (Lead 2 at least 80% of Rhythm's
+  count, 90% on Rhythm's onsets), so it survives regen and reload, and a Rhythm regen carries the
+  twin with it, in SongGenerator.regenerateTrack and in AppState for the live song. Late octave
+  (50%): Lead 1 an octave up from the first 8-bar point of the last third, a note above 88 in
+  unison.
+
+Measured over 600 seeds (486 Space songs): 447 hold at least one Magnetic rule, up from about 3 in
+5. Not heard yet.
 
 ### Space levels and bridge share (2026-11-06)
 

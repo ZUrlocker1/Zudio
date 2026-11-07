@@ -1884,6 +1884,10 @@ final class AppState: ObservableObject {
             }
             var updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries,
                                                   replacingStepAnnotations: newAnnotations)
+            // Kosmic Space: a regenerated Rhythm takes its KOS-LD2-001 stereo twin with it
+            if trackIndex == kTrackRhythm, current.isSpaceStereoTwin, evolveBodyEndStep == nil {
+                updated = updated.replacingEvents(regen.trackEvents[kTrackLead2], forTrack: kTrackLead2)
+            }
             // Keep the regen's track seed. Without it a saved file or history entry replays the
             // old seed and rebuilds the track as it was before ⚡REGEN, and bass slides (seeded
             // from this override) play the old track's slides over the new bass.
@@ -4515,7 +4519,8 @@ final class AppState: ObservableObject {
                 case kTrackLead2:   instrumentOverrides[kTrackLead2] == 7 ? [.space, .tremolo] : [.space]
                 case kTrackPads:    [.space, .delay, .sweep]
                 case kTrackTexture: [.delay, .space, .sweep, .pan]
-                case kTrackRhythm:  [.delay, .pan]
+                // A KOS-LD2-001 stereo twin pans Rhythm statically opposite its twin
+                case kTrackRhythm:  songState?.isSpaceStereoTwin == true ? [.delay] : [.delay, .pan]
                 default:            []
                 }
                 break

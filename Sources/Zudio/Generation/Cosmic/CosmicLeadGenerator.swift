@@ -96,6 +96,24 @@ struct KosmicLeadGenerator {
                 usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-016", "KOS-LD1-017"])
                 usedRuleIDs.insert("KOS-LD1-015")
             }
+            // In a fifth of songs KOS-LD1-018 Magnetic Call and Hold plays the A sections instead, so
+            // the five A-section rules share them evenly. Drawn last, as above.
+            if rng.nextDouble() < 0.20 {
+                theme = generateMagneticCallAndHold(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                    rng: &rng)
+                lead1BaseRule = "KOS-LD1-018"
+                usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-015", "KOS-LD1-016", "KOS-LD1-017"])
+                usedRuleIDs.insert("KOS-LD1-018")
+            }
+            // In a third of songs with a B section KOS-LD1-019 Equinoxe Thirds Riff plays the B sections
+            // in place of the riff or the Phrase Loop, so the three B-section rules share them evenly.
+            if structure.sections.contains(where: { $0.label == .B }), rng.nextDouble() < 1.0 / 3.0 {
+                riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
+                                                 rng: &rng, equinoxeThirds: true)
+                phrase = []
+                usedRuleIDs.subtract(["KOS-LD1-014", "KOS-LEAD-006"])
+                usedRuleIDs.insert("KOS-LD1-019")
+            }
             var lead = theme + riff + phrase
             // Theme return (Zack, 2026-11-03): a song that ends on B (ab, abab) never hears its A theme
             // again, so 8 bars two thirds into the last B replay the first A section's opening 8 bars
@@ -282,18 +300,26 @@ struct KosmicLeadGenerator {
         lead1BaseRuleID: String? = nil,
         xFilesBars: [Int] = [],
         isKosmicSpace: Bool = false,
-        spaceArrangement: KosmicSpaceArrangement? = nil
+        spaceArrangement: KosmicSpaceArrangement? = nil,
+        rhythmEvents: [MIDIEvent] = []
     ) -> [MIDIEvent] {
 
         let baseRule = pickLeadRule2(rng: &rng)
-        // Kosmic Space: KOS-LD2-000 No lead 2 50%, KOS-LEAD-004 Echo melody 50%. Lead 1 never plays
-        // 004 in Space, so the same-rule lag never applies, and 004 is not sparse, so it is never
-        // escalated either.
+        // Kosmic Space: KOS-LEAD-004 Echo melody, KOS-LD2-001 Magnetic Twin and KOS-LD2-000 No lead 2,
+        // a third each. Lead 1 never plays 004 in Space, so the same-rule lag never applies, and 004 is
+        // not sparse, so it is never escalated either.
         let rule: String
         if isKosmicSpace {
-            guard rng.nextDouble() < 0.50 else {
+            let r = rng.nextDouble()
+            if r >= 2.0 / 3.0 {
                 usedRuleIDs.insert("KOS-LD2-000")
                 return []
+            }
+            if r >= 1.0 / 3.0 {
+                usedRuleIDs.insert("KOS-LD2-001")
+                return rng.nextDouble() < 0.50
+                    ? spaceStereoTwin(rhythm: rhythmEvents)
+                    : magneticLateOctave(lead1: lead1Events, totalBars: frame.totalBars)
             }
             rule = "KOS-LEAD-004"
         } else {
@@ -768,6 +794,159 @@ struct KosmicLeadGenerator {
         return events
     }
 
+    // MARK: - KOS-LD2-001 Magnetic Twin (Kosmic Space)
+    // One rule, two variants, a half each. It generates no rhythm of its own.
+    //   stereo twin — Rhythm's notes exactly, on Lead 2's instrument, panned opposite Rhythm, whose
+    //                 auto-pan is off (Magnetic Fields 1, whose two sequencers are identical). The
+    //                 playback side finds it with SongState.isSpaceStereoTwin.
+    //   late octave — Lead 1 an octave up from the first 8-bar point of the song's last third
+    //                 (Magnetic Fields 2); a note that would pass MIDI 88 doubles in unison instead.
+
+    /// The stereo twin of a Space Rhythm part. Also used to refresh the twin after a Rhythm regen.
+    static func spaceStereoTwin(rhythm: [MIDIEvent]) -> [MIDIEvent] {
+        rhythm.map {
+            MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
+                      velocity: UInt8(max(20, Int($0.velocity) - 6)), durationSteps: $0.durationSteps)
+        }
+    }
+
+    private static func magneticLateOctave(lead1: [MIDIEvent], totalBars: Int) -> [MIDIEvent] {
+        let startBar = (totalBars * 2 / 3 + 7) / 8 * 8
+        return lead1.filter { $0.stepIndex >= startBar * 16 }.map {
+            let up = Int($0.note) + 12
+            return MIDIEvent(stepIndex: $0.stepIndex, note: UInt8(up > 88 ? up - 12 : up),
+                             velocity: UInt8(max(20, Int($0.velocity) - 10)), durationSteps: $0.durationSteps)
+        }
+    }
+
+    // MARK: - KOS-LD1-018 Magnetic Call and Hold (Kosmic Space, A sections)
+    // Magnetic Fields 4 lead, bars 2-8 and 21-28. An 8-bar phrase of call bars and answer bars:
+    //   call   — one note repeated on the off-beat 16ths (steps 2, 4, 5, 7 in the source), then a
+    //            3-note tail on steps 10, 12 and 13 (C C C C, Bb G Ab)
+    //   answer — two held half notes a step apart, on the next chord (F, Eb)
+    //   bars   — call, answer, call, answer a step higher, trill call (the note repeated, then rocking
+    //            with the step below on 12-15), answer, cadence (two notes falling onto the chord root,
+    //            held into the 8th bar), rest
+    // The source's second idea, the octave phase, bounces the chord root between two octaves on a
+    // fixed 16th rhythm: 4 bars of one rhythm, 3 of a second and a bar of 16th pairs. Every note is
+    // held to the next. The call sits on the current chord, nearest a tonic in MIDI 62-73, and a block
+    // that leaves 57-84 moves an octave whole.
+    // Homage draws per song:
+    //   call note — the chord's root 30%, 3rd 35% or 5th 35%
+    //   call rhythm — the source's steps 2, 4, 5, 7 50%, or 0, 2, 3, 6 or 2, 3, 5, 7 25% each
+    //   tail — the source's [-1 -2 +1] 40%, or [-1 -1 -1], [+1 -1 -2] or [-2 +1 -1] 20% each
+    //   answer — stepping down 60% (source) or up 40%
+    //   octave phase — in 60% of songs, every third 8-bar block of the A sections
+    // Within song: the octave phase, and in songs without it every second phrase calls from the next
+    // chord tone up, so the line rises as the song goes on.
+
+    private static func generateMagneticCallAndHold(
+        frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        let callDegree = [0, 2, 4][rng.weightedPick([0.30, 0.35, 0.35])]
+        let callRhythm = [[2, 4, 5, 7], [0, 2, 3, 6], [2, 3, 5, 7]][rng.weightedPick([0.50, 0.25, 0.25])]
+        let tail = [[-1, -2, 1], [-1, -1, -1], [1, -1, -2], [-2, 1, -1]][rng.weightedPick([0.40, 0.20, 0.20, 0.20])]
+        let answerDown = rng.nextDouble() < 0.60
+        let octavePhase = rng.nextDouble() < 0.60
+        let scalePCs = frame.scalePCs
+        let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
+                                    low: 62, high: 73)
+        func step(_ m: Int, _ by: Int) -> Int { scaleStep(m, by: by, scalePCs: scalePCs) }
+        // The chord root nearest the tonic, from a fourth below to a fifth above
+        func rootNearTonic(_ entry: TonalGovernanceEntry) -> Int {
+            var offset = (spaceChordRootPC(entry, frame: frame) - tonic % 12 + 12) % 12
+            if offset > 7 { offset -= 12 }
+            return tonic + offset
+        }
+        func chordToneAtOrBelow(_ m: Int, _ entry: TonalGovernanceEntry) -> Int {
+            let root = rootNearTonic(entry)
+            let tones = Set([root, step(root, 2), step(root, 4)].map { $0 % 12 })
+            return stride(from: m, through: m - 12, by: -1).first { tones.contains($0 % 12) } ?? m
+        }
+
+        var events: [MIDIEvent] = []
+        var block = 0
+        var phrase = 0
+        for section in structure.sections where section.label == .A {
+            let end = section.endBar * 16
+            for blockStart in stride(from: section.startBar, to: section.endBar, by: 8) {
+                defer { block += 1 }
+                // (onset, pitch, velocity); durations come from the next onset
+                var notes: [(onset: Int, pitch: Int, vel: Int)] = []
+                var holdLast = 6
+                if octavePhase && block % 3 == 2 {
+                    let rhythms: [(low: [Int], high: [Int])] = [
+                        ([0, 7], [2, 4, 6, 9, 11, 12, 13, 14]),
+                        ([0, 2, 9], [4, 5, 7, 11, 13, 15]),
+                        ([0, 1, 2, 3, 8, 9, 10, 11], [4, 6, 12, 14]),
+                    ]
+                    for k in 0..<8 {
+                        let bar = blockStart + k
+                        guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                        var low = rootNearTonic(entry)
+                        while low > 71 { low -= 12 }
+                        while low < 60 { low += 12 }
+                        let r = rhythms[k < 4 ? 0 : k < 7 ? 1 : 2]
+                        for s in (r.low + r.high).sorted() {
+                            let isLow = r.low.contains(s)
+                            notes.append((bar * 16 + s, isLow ? low : low + 12, isLow ? 58 : 62))
+                        }
+                    }
+                    holdLast = 2
+                } else {
+                    let lift = !octavePhase && phrase % 2 == 1 ? 2 : 0
+                    phrase += 1
+                    var lastCall = tonic
+                    for k in 0..<7 {
+                        let bar = blockStart + k
+                        guard let entry = tonalMap.entry(atBar: bar) else { continue }
+                        let call = step(rootNearTonic(entry), callDegree + lift)
+                        switch k {
+                        case 0, 2:
+                            lastCall = call
+                            for (i, s) in callRhythm.enumerated() { notes.append((bar * 16 + s, call, i == 0 ? 68 : 62)) }
+                            var p = call
+                            for (s, by) in zip([10, 12, 13], tail) {
+                                p = step(p, by)
+                                notes.append((bar * 16 + s, p, 60))
+                            }
+                        case 4:
+                            lastCall = call
+                            for (i, s) in [2, 4, 5, 7, 9, 11].enumerated() { notes.append((bar * 16 + s, call, i == 0 ? 68 : 62)) }
+                            for s in 12...15 { notes.append((bar * 16 + s, s % 2 == 0 ? step(call, -1) : call, 60)) }
+                        case 6:
+                            // The chord root in the octave below the last call
+                            var land = rootNearTonic(entry)
+                            while land >= lastCall { land -= 12 }
+                            while land < lastCall - 12 { land += 12 }
+                            notes.append((bar * 16 + 3, step(land, 2), 62))
+                            notes.append((bar * 16 + 4, step(land, 1), 64))
+                            notes.append((bar * 16 + 8, land, 66))
+                            holdLast = 24
+                        default:
+                            // Answer: two held notes a step apart, below the call, on this bar's chord;
+                            // the second answer of the phrase sits a step higher, as the source's does
+                            let first = chordToneAtOrBelow(step(lastCall, k == 3 ? -3 : -4), entry)
+                            notes.append((bar * 16, first, 64))
+                            notes.append((bar * 16 + 8, step(first, answerDown ? -1 : 1), 60))
+                        }
+                    }
+                }
+                guard !notes.isEmpty else { continue }
+                let hi = notes.map(\.pitch).max()!, lo = notes.map(\.pitch).min()!
+                let shift = hi > 84 ? -12 : lo < 57 ? 12 : 0
+                for (i, n) in notes.enumerated() where n.onset < end {
+                    let next = i + 1 < notes.count ? notes[i + 1].onset : n.onset + holdLast
+                    events.append(MIDIEvent(stepIndex: n.onset, note: UInt8(n.pitch + shift),
+                                            velocity: UInt8(n.vel),
+                                            durationSteps: Swift.min(next - n.onset, end - n.onset)))
+                }
+            }
+        }
+        return events
+    }
+
     // MARK: - KOS-LD1-014 Oxygene See-Saw Riff (Kosmic Space, B sections)
     // Oxygene 4 riff, both transcriptions. Six notes rocking between an anchor (the current chord
     // root) and a pivot a fixed interval above it: anchor on steps 0, 2, 5, pivot on 1, 4, 6, step 3
@@ -786,18 +965,29 @@ struct KosmicLeadGenerator {
     // In the last B section every second statement may drop to a single 3-note group (50%),
     // thinning the riff towards the outro.
 
+    // KOS-LD1-019 Equinoxe Thirds Riff (equinoxeThirds) is this riff as Equinoxe plays it: the pivot a
+    // third away (a minor or major third, whichever the scale gives, [-3 +3 -3]) and the 3+3+2 rhythm
+    // across the whole bar on steps 0, 2, 5, 8, 10 and 13, each note held to the next. In Phrygian
+    // songs the pivot lands on bII over the tonic chord in the last bar of every 4. The same draws are
+    // taken, so the anchor's side and the thinning still vary per song.
+
     private static func generateOxygeneSeeSawRiff(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG, equinoxeThirds: Bool = false
     ) -> [MIDIEvent] {
         let intervals: [(steps: Int, name: String)] = [(3, "fourth"), (5, "sixth"), (7, "octave"), (4, "fifth")]
-        let interval = intervals[rng.weightedPick([0.30, 0.30, 0.20, 0.20])]
+        var interval = intervals[rng.weightedPick([0.30, 0.30, 0.20, 0.20])]
         let groupings: [(steps: [Int], name: String)] = [([0, 1, 2, 4, 5, 6], "3+3"),
                                                          ([0, 1, 3, 4, 6, 7], "2+2+2"),
                                                          ([0, 1, 2, 4, 5],    "3+2")]
-        let grouping = groupings[rng.weightedPick([0.40, 0.30, 0.30])]
-        let offset = rng.nextDouble() < 0.60 ? 0 : 8
+        var grouping = groupings[rng.weightedPick([0.40, 0.30, 0.30])]
+        var offset = rng.nextDouble() < 0.60 ? 0 : 8
         let anchorAbove = rng.nextDouble() >= 0.60
+        if equinoxeThirds {
+            interval = (2, "third")
+            grouping = ([0, 2, 5, 8, 10, 13], "3+3+2")
+            offset = 0
+        }
 
         let scalePCs = frame.scalePCs
         let lastB = structure.sections.last(where: { $0.label == .B })
@@ -810,6 +1000,10 @@ struct KosmicLeadGenerator {
                 if barInSection % 8 == 5 { anchor = scaleStep(anchor, by: 3, scalePCs: scalePCs) }
                 var pivot = scaleStep(anchor, by: anchorAbove ? -interval.steps : interval.steps,
                                       scalePCs: scalePCs)
+                if equinoxeThirds, frame.mode == .Phrygian, barInSection % 4 == 3,
+                   spaceChordRootPC(entry, frame: frame) == keySemitone(frame.key) % 12 {
+                    pivot = anchor + 1
+                }
                 while Swift.max(anchor, pivot) > 84 { anchor -= 12; pivot -= 12 }
                 while Swift.max(anchor, pivot) < 73 { anchor += 12; pivot += 12 }
                 var steps = grouping.steps
@@ -823,9 +1017,11 @@ struct KosmicLeadGenerator {
                 for (i, step) in steps.enumerated() {
                     let isLast = i == steps.count - 1
                     let pitch  = i % 2 == 0 ? anchor : pivot
+                    // The thirds riff is legato, each note held to the next
+                    let dur = isLast ? 16 - offset - step : equinoxeThirds ? steps[i + 1] - step : 1
                     events.append(MIDIEvent(stepIndex: bar * 16 + offset + step, note: UInt8(pitch),
                                             velocity: i % 2 == 0 ? 64 : 58,
-                                            durationSteps: isLast ? 16 - offset - step : 1))
+                                            durationSteps: dur))
                 }
             }
         }

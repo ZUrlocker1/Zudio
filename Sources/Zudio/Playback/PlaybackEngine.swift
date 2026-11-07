@@ -144,6 +144,7 @@ final class PlaybackEngine: ObservableObject {
     // Kosmic: wider lead spread; Motorik: tighter. Rhythm/Texture offset for separation.
     // stopPan() restores to these values when auto-pan LFO is disabled.
     private var trackStaticPan   = Array(repeating: Float(0), count: kTrackCount)
+    private var cachedSpaceStereoTwin = false
     // Tracks whether the user's +4.6 dB boost EFFECT is on — separate from boosts[i].outputVolume
     // which is also used as a dynamic animator (Chill pads fade, Kosmic/Ambient drone fades).
     private var boostEffectEnabled  = Array(repeating: false,   count: kTrackCount)
@@ -471,8 +472,12 @@ final class PlaybackEngine: ObservableObject {
     /// Track order: Lead1=0, Lead2=1, Pads=2, Rhythm=3, Texture=4, Bass=5, Drums=6, LeadSynth=7.
     nonisolated static func staticPans(kosmic: Bool, motorik: Bool, ambient: Bool,
                                        chillPads: Bool, chillSoho: Bool,
-                                       kosmicSpace: Bool = false) -> [Float] {
-        if kosmic && kosmicSpace {
+                                       kosmicSpace: Bool = false, spaceStereoTwin: Bool = false) -> [Float] {
+        if kosmic && kosmicSpace && spaceStereoTwin {
+            // KOS-LD2-001 stereo twin: Rhythm and its twin on Lead 2 wide apart on either side, as
+            // Magnetic Fields 1's two sequencers; Rhythm's auto-pan holds still.
+            return [-0.10, -0.45, 0, 0.45, -0.22, 0, 0, 0]
+        } else if kosmic && kosmicSpace {
             // Kosmic Space: Lead 1 about 10% off centre, Lead 2 about 20% on the side opposite
             // Rhythm's home position (Rhythm auto-pans around it), Bass and Drums hard centre,
             // Texture as base Kosmic.
@@ -500,7 +505,9 @@ final class PlaybackEngine: ObservableObject {
         trackStaticPan = Self.staticPans(kosmic: kosmicStyle, motorik: motorikStyle,
                                          ambient: ambientMode, chillPads: chillPadsMode,
                                          chillSoho: chillSohoMode,
-                                         kosmicSpace: songState?.isKosmicSpace == true)
+                                         kosmicSpace: songState?.isKosmicSpace == true,
+                                         spaceStereoTwin: kosmicStyle && songState?.isSpaceStereoTwin == true)
+        cachedSpaceStereoTwin = kosmicStyle && songState?.isSpaceStereoTwin == true
         for i in 0..<boosts.count {
             boosts[i].pan = trackStaticPan[i]
         }
@@ -2087,6 +2094,8 @@ final class PlaybackEngine: ObservableObject {
         // Skip Bass when the Kosmic intro bass pan is running — it owns that node.
         for i in 0..<kTrackCount where panEnabled[i] {
             panPhase[i] += panPhaseInc[i]
+            // A Space stereo twin's Rhythm holds its side: the pair is the stereo image.
+            if i == kTrackRhythm && cachedSpaceStereoTwin { boosts[i].pan = trackStaticPan[i]; continue }
             boosts[i].pan = Float(sin(panPhase[i])) * panDepth[i]
         }
 
