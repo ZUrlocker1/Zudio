@@ -434,6 +434,7 @@ enum PercussionStyle: String, Codable, Sendable {
     case spaceOxygenePresetBox       // Space: the Oxygene 4 Minipops pattern, unvarying (KOS-DRUM-009)
     case spaceOxygeneHandPercussion  // Space: the Oxygene 6 hand percussion, no kick or hats (KOS-DRUM-012)
     case spaceMagneticRhythmBox      // Space: the Magnetic Fields rhythm box, 16th ride or hats (KOS-DRUM-010)
+    case spaceBuddhaPulse            // Space: Electric Buddha Pulse, quarter hats and a half-time or backbeat snare (KOS-DRUM-005)
 }
 
 // MARK: - Kosmic song forms

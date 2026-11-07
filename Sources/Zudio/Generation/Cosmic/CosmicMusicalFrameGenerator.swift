@@ -215,17 +215,18 @@ struct KosmicMusicalFrameGenerator {
         return Swift.max(96, Swift.min(128, Int(raw.rounded())))
     }
 
-    /// Space drum rule pool. KOS-DRUM-010 Magnetic Gallop takes the average weight of the
-    /// four older choices, 20%, and they keep their shape (Zack, 2026-11-06): KOS-DRUM-009 Oxygene
-    /// Preset Box 30.4%, KOS-DRUM-001 JMJ Mini Pops 27.2%, KOS-DRUM-012 Oxygene 6 Hand Percussion
-    /// 10.4% (distinctive, so rare; Zack, 2026-11-03) and KOS-DRUM-000 no percussion 12%.
+    /// Space drum rule pool (Zack, 2026-11-07): KOS-DRUM-009 Oxygene Preset Box 26%, KOS-DRUM-001
+    /// JMJ Mini Pops 20%, KOS-DRUM-012 Oxygene 6 Hand Percussion 15% and KOS-DRUM-010 Magnetic
+    /// Gallop 15% (the last two are distinctive, so held back), KOS-DRUM-005 Electric Buddha Pulse
+    /// 12% (a plain beat to take load off the Preset Box) and KOS-DRUM-000 no percussion 12%.
     static func pickSpacePercussionStyle(rng: inout SeededRNG) -> PercussionStyle {
         let r = rng.nextDouble()
-        return r < 0.304 ? .spaceOxygenePresetBox
-             : r < 0.576 ? .minimal
-             : r < 0.680 ? .spaceOxygeneHandPercussion
-             : r < 0.800 ? .absent
-             : .spaceMagneticRhythmBox
+        return r < 0.26 ? .spaceOxygenePresetBox
+             : r < 0.46 ? .minimal
+             : r < 0.61 ? .spaceOxygeneHandPercussion
+             : r < 0.73 ? .absent
+             : r < 0.88 ? .spaceMagneticRhythmBox
+             : .spaceBuddhaPulse
     }
 
     /// Drift drum rule pool — evenly weighted regardless of tempo.

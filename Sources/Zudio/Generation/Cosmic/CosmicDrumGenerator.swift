@@ -80,6 +80,14 @@ struct KosmicDrumGenerator {
             return markSpaceBridge(box, arrangement: spaceArrangement, totalBars: frame.totalBars,
                                    returnFill: .presetBox)
 
+        case .spaceBuddhaPulse:
+            usedRuleIDs.insert("KOS-DRUM-005")
+            let pulse = generateSpaceBuddhaPulse(frame: frame, structure: structure, rng: &rng,
+                                                 fillBars: spaceArrangement?.fillBars ?? [],
+                                                 arrangement: spaceArrangement)
+            return markSpaceBridge(pulse, arrangement: spaceArrangement, totalBars: frame.totalBars,
+                                   returnFill: .presetBox)
+
         case .spaceOxygeneHandPercussion:
             usedRuleIDs.insert("KOS-DRUM-012")
             // Thins to its sparse core through the breakdown and is silent through the solo.
@@ -321,6 +329,81 @@ struct KosmicDrumGenerator {
         if let bridge = arrangement?.bridge, bridge.kind == .sequencerSolo {
             events.removeAll { bridge.range.contains($0.stepIndex / 16) && $0.stepIndex < bridge.returnFillStep }
         }
+    }
+
+    // MARK: - KOS-DRUM-005 Electric Buddha Pulse (Kosmic Space)
+    // Base Kosmic's quarter-note-hat beat, kept in Space as a plain alternative to the boxes
+    // (Zack, 2026-11-07). Same groove as generateElectricBuddhaPulse: quarter hats accented on 1 and
+    // 3, kick on beat 1 (beat 3 as well in 45% of songs), snare half-time on beat 3 (65%) or on 2 and
+    // 4 (35%), both re-rolled every 8 bars, an open hat on the last 8th of every fourth bar. Space
+    // changes: it plays through the intro and outro with no cold start or base transition fills, the
+    // snare is the electric snare (40) so the fill log never mistakes a backbeat for a fill, the
+    // simpler stretches drop to the kick on beat 1 and quarter hats, the breakdown to the kick on
+    // beats 1 and 3, and the box takes the shared Space fills.
+    private static func generateSpaceBuddhaPulse(
+        frame: GlobalMusicalFrame,
+        structure: SongStructure,
+        rng: inout SeededRNG,
+        fillBars: [Int],
+        arrangement: KosmicSpaceArrangement?
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        var halfTimeSnare = rng.nextDouble() < 0.65
+        var addKickBeat3  = rng.nextDouble() < 0.45
+        var nextChange    = 0
+        for bar in 0..<frame.totalBars {
+            let barStart = bar * 16
+            if bar >= nextChange {
+                halfTimeSnare = rng.nextDouble() < 0.65
+                addKickBeat3  = rng.nextDouble() < 0.45
+                nextChange    = bar + 8
+            }
+            if let bridge = arrangement?.bridge, bridge.kind == .breakdown, bridge.range.contains(bar) {
+                events.append(MIDIEvent(stepIndex: barStart, note: GMDrum.kick.rawValue,
+                                        velocity: 96, durationSteps: 1))
+                events.append(MIDIEvent(stepIndex: barStart + 8, note: GMDrum.kick.rawValue,
+                                        velocity: 88, durationSteps: 1))
+                continue
+            }
+            let section = structure.section(atBar: bar)
+            let thin = arrangement?.drumThin(atBar: bar) != nil
+            var outroScale = 1.0
+            if let sec = section, sec.label == .outro {
+                let len = max(1, sec.endBar - sec.startBar)
+                outroScale = max(0.25, 1.0 - Double(bar - sec.startBar) / Double(len) * 0.75)
+            }
+            let barInSection = bar - (section?.startBar ?? 0)
+
+            for i in 0..<4 {
+                let step = i * 4
+                let base = step % 8 == 0 ? 72 + rng.nextInt(upperBound: 18) : 38 + rng.nextInt(upperBound: 24)
+                events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.closedHat.rawValue,
+                                        velocity: UInt8(max(14, Int(Double(base) * outroScale))), durationSteps: 1))
+            }
+            if !thin && barInSection % 4 == 3 && outroScale > 0.4 {
+                let vel = UInt8(max(20, Int(Double(60 + rng.nextInt(upperBound: 16)) * outroScale)))
+                events.append(MIDIEvent(stepIndex: barStart + 14, note: GMDrum.openHat.rawValue,
+                                        velocity: vel, durationSteps: 2))
+            }
+            if outroScale >= 0.5 {
+                for step in (addKickBeat3 && !thin) ? [0, 8] : [0] {
+                    let vel = UInt8(max(20, Int(Double(66 + rng.nextInt(upperBound: 14)) * outroScale)))
+                    events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.kick.rawValue,
+                                            velocity: vel, durationSteps: 1))
+                }
+            }
+            if !thin && outroScale >= 0.3 {
+                for step in halfTimeSnare ? [8] : [4, 12] {
+                    let vel = UInt8(max(20, Int(Double(74 + rng.nextInt(upperBound: 18)) * outroScale)))
+                    events.append(MIDIEvent(stepIndex: barStart + step, note: GMDrum.snare2.rawValue,
+                                            velocity: vel, durationSteps: 1))
+                }
+            }
+        }
+        let thinEnds = (arrangement?.drumThins ?? []).map { $0.range.upperBound - 1 }
+        addSpaceBoxFills(&events, frame: frame, rng: &rng, fillBars: fillBars + thinEnds,
+                         arrangement: arrangement, oneBeat: false)
+        return events
     }
 
     // MARK: - KOS-DRUM-010 Magnetic Gallop (Kosmic Space)

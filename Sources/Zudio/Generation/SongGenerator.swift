@@ -494,7 +494,7 @@ struct SongGenerator {
         // Space keeps to its own drum pool: a forced base style (the curated first Kosmic song
         // forces the Electric Buddha groove) is ignored, as Drift's bass ignores forced base rules.
         let spacePercussion: Set<PercussionStyle> = [.spaceOxygenePresetBox, .minimal, .spaceOxygeneHandPercussion, .absent,
-                                                       .spaceMagneticRhythmBox]
+                                                       .spaceMagneticRhythmBox, .spaceBuddhaPulse]
         let percussionStyle = isKosmicSpace
             ? (forcePercussionStyle.flatMap { spacePercussion.contains($0) ? $0 : nil } ?? percussionStylePicked)
             : (forcePercussionStyle ?? percussionStylePicked)
@@ -2029,7 +2029,7 @@ struct SongGenerator {
     static func appendSpaceDrumLines(_ notes: inout [Int: [GenerationLogEntry]],
                                      _ arr: KosmicSpaceArrangement, drumRules: Set<String>) {
         let calls: [(range: Range<Int>, start: String)]
-        if drumRules.contains("KOS-DRUM-009") || drumRules.contains("KOS-DRUM-010") { calls = arr.drumThins.map { ($0.range, "Drums simplify") } }
+        if drumRules.contains("KOS-DRUM-009") || drumRules.contains("KOS-DRUM-010") || drumRules.contains("KOS-DRUM-005") { calls = arr.drumThins.map { ($0.range, "Drums simplify") } }
         else if drumRules.contains("KOS-DRUM-001") { calls = arr.miniPopsDropouts.map { ($0, "Drums drop out") } }
         else if drumRules.contains("KOS-DRUM-012") { calls = arr.thinRanges.map { ($0, "Drums simplify") } }
         else { calls = [] }
@@ -2182,7 +2182,7 @@ struct SongGenerator {
                                structure: SongStructure, totalBars: Int) -> [Int: [GenerationLogEntry]] {
         let hands = drumRules.contains("KOS-DRUM-012")
         guard hands || drumRules.contains("KOS-DRUM-001") || drumRules.contains("KOS-DRUM-009")
-                || drumRules.contains("KOS-DRUM-010") else { return [:] }
+                || drumRules.contains("KOS-DRUM-010") || drumRules.contains("KOS-DRUM-005") else { return [:] }
         let toms = Set([GMDrum.hiTom, .hiMidTom, .lowMidTom, .highFloorTom, .lowFloorTom].map(\.rawValue))
         let voices: Set<UInt8> = hands ? [GMDrum.highBongo.rawValue]
                                        : toms.union([GMDrum.snare.rawValue, GMDrum.claves.rawValue])
@@ -3715,7 +3715,7 @@ struct SongGenerator {
         let spaceFills = hasDrums && kTrackDrums < trackEvents.count
             ? spaceFillLines(drums: trackEvents[kTrackDrums], drumRules: drumRules, structure: structure, totalBars: totalBars)
             : [:]
-        let isSpaceKit = ["KOS-DRUM-001", "KOS-DRUM-009", "KOS-DRUM-010", "KOS-DRUM-012"].contains { drumRules.contains($0) }
+        let isSpaceKit = ["KOS-DRUM-001", "KOS-DRUM-005", "KOS-DRUM-009", "KOS-DRUM-010", "KOS-DRUM-012"].contains { drumRules.contains($0) }
         for (step, lines) in spaceFills.sorted(by: { $0.key < $1.key }) { out[step, default: []] += lines }
         for fillBar in allFillBars.sorted() where fillBar < outroStartBar && hasDrums && !isSpaceKit {
             guard let sec = structure.section(atBar: fillBar),

@@ -1,6 +1,6 @@
 # Kosmic Space — Design Document
 
-Status (2026-11-06): **built on `main` as version 2.9, a work in progress, tuned by ear.** Phase 1
+Status (2026-11-07): **built on `main` as version 2.9, a work in progress, tuned by ear.** Phase 1
 (Oxygene), Phase 2 (Magnetic) and the first Phase 3 piece (Chronologie Pop Loop and Anticipated
 Strings) are in. Builds on macOS and iOS. The Magnetic rules and the last two additions sound good
 on first listens; tuning continues. Items not built are under "On hold" at the end.
@@ -229,8 +229,10 @@ fold by octaves. Weights are shares of Space songs on that track.
 
 ### Drums
 
-KOS-DRUM-009 Preset Box 30.4%, KOS-DRUM-001 Mini Pops 27.2%, KOS-DRUM-010 Magnetic Gallop
-20%, KOS-DRUM-012 Hand Percussion 10.4%, no percussion 12%. Kits: 808 Kit 75%, Machine Kit 25%,
+KOS-DRUM-009 Preset Box 26%, KOS-DRUM-001 Mini Pops 20%, KOS-DRUM-010 Magnetic Gallop 15%,
+KOS-DRUM-012 Hand Percussion 15%, KOS-DRUM-005 Electric Buddha Pulse 12%, no percussion 12%. The
+Gallop and Hand Percussion are distinctive, so they are held to 15%; the Pulse takes load off the
+Preset Box. Kits: 808 Kit 75%, Machine Kit 25%,
 playing its own synth toms in fills; its electric snare (40) plays as the plain snare.
 
 **KOS-DRUM-009 Oxygene Preset Box** — the Minipops pattern of Oxygene 4. Closed hat on steps 0, 1,
@@ -243,6 +245,13 @@ hats (60%) or go to quarter hats with kick on 0 and 10 and no open hat (40%).
 
 **KOS-DRUM-001 JMJ Mini Pops** — base Kosmic's rule, in the pool for variety. Drops out in the first
 two drum stretches and returns on a 1- or 2-beat tom roll.
+
+**KOS-DRUM-005 Electric Buddha Pulse** — base Kosmic's rule, in the pool as a plain beat. Quarter
+hats accented on 1 and 3, kick on beat 1 (and beat 3 in 45% of 8-bar phrases), snare on beat 3
+(65%) or on 2 and 4 (35%), re-drawn every 8 bars; an open hat on the last 8th of every fourth bar.
+In Space it plays through intro and outro without a cold start, its snare is the electric snare so
+the fill log never reads the backbeat as a fill, simpler stretches drop to the kick on beat 1 under
+quarter hats, the breakdown plays the kick on beats 1 and 3, and it takes the Preset Box's fills.
 
 **KOS-DRUM-010 Magnetic Gallop** — Magnetic Fields 1, 2 and 4. Kick pairs lead into each beat on steps 0, 2, 3, 6, 7, 10, 11, 14, 15 (Magnetic Fields 1's pairs straddle the beat, which put a kick a 16th after about a third of the 8th-note bass notes; this figure measured 0% there under the drone, Falling Walk and Triad Walk), under a ride or closed hat (50/50) on every 16th. Snare off, or on steps 2, 3, 6, 10, 11, 14 (50/50), on the electric snare so the fill log never mistakes it for a fill. An agogo on the quarters in 30% of songs. Simpler stretches drop to the kick on beats 1 and 3. Full B bars lighten: 8th tops, a ride bell on the beats, the snare on its off-beats only, and an open hat on the last 8th of every second bar; when the bass is the drone, Falling Walk or Triad Walk the B kick is the plainer 0, 6, 8, 14 of Magnetic Fields 2 and 4 (the Pumps keep the gallop kick).
 
@@ -399,10 +408,12 @@ only. The automatic Kosmic filter sweep is off in Space.
 
 **Reused unchanged:** KOS-PADS-001, KOS-BASS-001, KOS-LEAD-004, KOS-LD2-000, KOS-DRUM-000. Base
 Kosmic's JMJ rules KOS-DRUM-001, KOS-RTHM-002, KOS-RTHM-005 and KOS-LEAD-006 are in the pool
-because Zack wanted the variety, though they match no transcription.
+because Zack wanted the variety, though they match no transcription. KOS-DRUM-005 Electric Buddha
+Pulse, an Electric Buddha Band rule, is in the drum pool as a plain beat, with Space's own fills
+and thinning.
 
 **Excluded from Space** (base Kosmic keeps all of them; nothing is removed from base Kosmic or
-Drift): drums KOS-DRUM-002 to 008; every bass rule except 001; Rhythm KOS-RTHM-001 to 015 except
+Drift): drums KOS-DRUM-002 to 004 and 006 to 008; every bass rule except 001; Rhythm KOS-RTHM-001 to 015 except
 002 and 005; Lead 1 every KOS-LEAD rule except 004 and 006, and KOS-LD1-010 to 012; every base Pads
 rule except 001; Texture KOS-TEXT-001 to 004.
 
