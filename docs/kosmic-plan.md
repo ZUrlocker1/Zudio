@@ -1113,7 +1113,7 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
 - KOS-TEXT-003 (Spatial Sweep) excluded from quartal_stack and suspended_resolution progressions — its chromatic passing notes clash with quartal harmony.
 - KOS-TEXT-001 fires on 70% of bars (was 100%) to prevent 320–480 note accumulation in long songs.
 - KOS-RTHM-002 and KOS-RTHM-003 capped at 6 notes/bar, matching the existing KOS-RTHM-004 guard.
-- Kosmic density pass: if Rhythm note count > 2× Lead 1, Rhythm thinned to 65% retention (downbeats preserved).
+- Kosmic density pass: if Rhythm note count > 2× Lead 1, Rhythm gives way to the lead (borrowed from Kosmic Space, 2026-11-07). Body bars where Lead 1 sounds keep 45% of their Rhythm notes, intro bars 65%, and the gaps between lead phrases and the outro play the full figure, so the sequencer steps back under the lead and swells when it rests. Notes go by whole onsets in metric order (off-beat 16ths, then 8ths, quarter notes last; the downbeat never), so the figure stays the same from bar to bar. No draws. Drift keeps the older random 65% thinning across the song (`KosmicArpeggioGenerator.baseKosmicGiveWayToLead`).
 - Static drone + songs > 80 bars: B sections forced to sus2 or power chord type for at least one textural shift.
 - A-B-B-A second B: Rhythm at 60% retention, Texture silent for first 8 bars, Pads at 85% velocity for first half — stripped-back feel before the A return.
 - KOS-LEAD-004 weight reduced 0.16→0.10 (was appearing in 4/5 songs); redistributed to KOS-LEAD-002 and KOS-LEAD-007.

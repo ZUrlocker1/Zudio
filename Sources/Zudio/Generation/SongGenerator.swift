@@ -668,7 +668,12 @@ struct SongGenerator {
         // to 65% retention to prevent it from burying the lead. Downbeats are always kept.
         let lead1Count  = trackEvents[kTrackLead1].count
         let rhythmCount = trackEvents[kTrackRhythm].count
-        if !isKosmicSpace && lead1Count > 0 && rhythmCount > lead1Count * 2 {
+        // Base Kosmic (not Drift) thins only under Lead 1, by metric order, borrowed from Space
+        // (Zack, 2026-11-07); Drift keeps the random guard.
+        if !isKosmicSpace && !isKosmicDrift && lead1Count > 0 && rhythmCount > lead1Count * 2 {
+            trackEvents[kTrackRhythm] = KosmicArpeggioGenerator.baseKosmicGiveWayToLead(
+                trackEvents[kTrackRhythm], lead1: trackEvents[kTrackLead1], structure: structure)
+        } else if !isKosmicSpace && lead1Count > 0 && rhythmCount > lead1Count * 2 {
             var densityRNG = SeededRNG(seed: seed &+ 0xD0)
             trackEvents[kTrackRhythm] = trackEvents[kTrackRhythm].filter { ev in
                 ev.stepIndex % 16 == 0 || densityRNG.nextDouble() < 0.65

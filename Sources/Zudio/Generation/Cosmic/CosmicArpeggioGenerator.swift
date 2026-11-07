@@ -214,6 +214,46 @@ struct KosmicArpeggioGenerator {
         return events.filter { !dropped.contains($0.stepIndex) }
     }
 
+    // MARK: - Base Kosmic: Rhythm gives way to Lead 1
+    // Borrowed from Kosmic Space (Zack, 2026-11-07): the sequencer steps back under Lead 1 and
+    // plays its full figure where Lead 1 rests, so the lead stands out. Replaces base Kosmic's
+    // density guard, which dropped 35% of Rhythm notes at random across the whole song, and fires
+    // under the same condition (Rhythm more than twice Lead 1). Body bars where Lead 1 sounds keep
+    // 45% of their notes; intro bars keep 65%, as before; gaps and the outro play in full. Notes go
+    // by whole onsets in metric order: off-beat 16ths first, then 8ths, quarter-note onsets last,
+    // later steps before earlier ones, the downbeat never. No draws.
+    static func baseKosmicGiveWayToLead(_ rhythm: [MIDIEvent], lead1: [MIDIEvent], structure: SongStructure,
+                                        underLead: Double = 0.45, intro: Double = 0.65) -> [MIDIEvent] {
+        var leadBars = Set<Int>()
+        for ev in lead1 {
+            let first = ev.stepIndex / 16, last = (ev.stepIndex + max(1, ev.durationSteps) - 1) / 16
+            for b in first...max(first, last) { leadBars.insert(b) }
+        }
+        var onsets: [Int: [Int: Int]] = [:]   // bar -> step -> note count
+        var retention: [Int: Double] = [:]
+        for ev in rhythm {
+            let bar = ev.stepIndex / 16
+            guard let label = structure.section(atBar: bar)?.label, label != .outro else { continue }
+            if label == .intro { retention[bar] = intro }
+            else if leadBars.contains(bar) { retention[bar] = underLead }
+            else { continue }
+            onsets[bar, default: [:]][ev.stepIndex, default: 0] += 1
+        }
+        func rank(_ step: Int) -> Int { step % 4 == 0 ? 2 : step % 2 == 0 ? 1 : 0 }
+        var dropped = Set<Int>()
+        for (bar, steps) in onsets {
+            var total = steps.values.reduce(0, +)
+            let target = max(1, Int((Double(total) * retention[bar]!).rounded(.up)))
+            let ordered = steps.keys.filter { $0 % 16 != 0 }
+                .sorted { rank($0 % 16) != rank($1 % 16) ? rank($0 % 16) < rank($1 % 16) : $0 > $1 }
+            for step in ordered where total > target {
+                dropped.insert(step)
+                total -= steps[step]!
+            }
+        }
+        return rhythm.filter { !dropped.contains($0.stepIndex) }
+    }
+
     // MARK: - Jarre step-sequencer engine (Kosmic Space)
     // One engine for every Space sequencer rule in every phase; later rules are new patterns.
     // A pattern is 16 steps, each a rest (nil) or a slot, chosen per bar by the caller (nil for a
