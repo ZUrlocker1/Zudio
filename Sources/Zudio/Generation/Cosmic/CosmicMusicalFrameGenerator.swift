@@ -32,12 +32,6 @@ enum KosmicSpaceStream: UInt64 {
 
 struct KosmicMusicalFrameGenerator {
 
-    // Shadow root semitone: tritone partner (KOS-RULE-14)
-    // Not stored in frame — derived at generation time and passed to generators that need it.
-    static func shadowRoot(frame: GlobalMusicalFrame) -> Int {
-        (frame.keySemitoneValue + 6) % 12
-    }
-
     // MARK: - Substyle shares
 
     /// Shares of the one roll that picks Kosmic Drift, Kosmic Space or base Kosmic.

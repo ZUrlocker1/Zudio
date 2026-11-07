@@ -308,7 +308,6 @@ struct KosmicTextureGenerator {
         let oct = inLiftWindow ? 5 : 4   // oct=4 → MIDI 48–59; oct=5 → 60–71
 
         let noteCount  = noteCounts[phraseIndex % noteCounts.count]
-        let rootPC     = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
         let intervals  = entry.sectionMode.intervals
         let degreeOffset = phraseIndex % intervals.count  // rotates through scale tones per phrase
 

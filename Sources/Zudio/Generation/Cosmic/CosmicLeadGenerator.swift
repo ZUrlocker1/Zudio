@@ -238,37 +238,8 @@ struct KosmicLeadGenerator {
                                                                rng: &rng)
                 if rng.nextDouble() < 0.25 {
                     // X-Files appears symmetrically: bookend (first+last) or middle-pair (two bars with a gap).
-                    let bridgeLen = section.endBar - section.startBar
-                    let xBars: [Int]
-                    if rng.nextDouble() < 0.50 {
-                        // Bookend: opening bar and closing bar mirror each other
-                        xBars = bridgeLen >= 2
-                            ? [section.startBar, section.endBar - 1]
-                            : [section.startBar]
-                    } else {
-                        // Middle pair: spaced ~1/3 and ~2/3 through the bridge
-                        let a = section.startBar + max(1, bridgeLen / 3)
-                        let b = section.startBar + max(2, (bridgeLen * 2) / 3)
-                        xBars = (b > a) ? [a, b] : [a]
-                    }
-                    // Collect whistle events separately so per-bar silence filters only affect
-                    // the generated melody and never clip notes from a prior whistle phrase.
-                    var whistleEvents: [MIDIEvent] = []
-                    for xBar in xBars {
-                        let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
-                        guard !barEvs.isEmpty else { continue }
-                        xFilesBars.append(xBar)
-                        let xStart = xBar * 16
-                        // Whistle: pickup at xStart+12, last note ends at xStart+40 (half note at step 32).
-                        // Silence: 6 beats (24 steps) before pickup; 2 beats (8 steps) after last held note.
-                        let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
-                        let postPadEnd  = xBar < section.endBar - 1   ? xStart + 48 : xStart + 40
-                        melodyEvents = melodyEvents.filter {
-                            $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
-                        }
-                        whistleEvents += barEvs
-                    }
-                    melodyEvents += whistleEvents
+                    addXFilesWhistles(to: &melodyEvents, section: section, frame: frame, tonalMap: tonalMap,
+                                           rng: &rng, xFilesBars: &xFilesBars)
                 }
                 events += melodyEvents
                 continue
@@ -1136,6 +1107,46 @@ struct KosmicLeadGenerator {
         return candidates[rng.nextInt(upperBound: candidates.count)]
     }
 
+    /// X-Files whistle on a melody bridge, after the 25% roll has passed. It appears symmetrically:
+    /// a bookend (first and last bar) or a middle pair (about a third and two thirds in). The melody is
+    /// silenced around each phrase and the whistle events are added last, so the silence filters never
+    /// clip a prior whistle phrase.
+    private static func addXFilesWhistles(to melodyEvents: inout [MIDIEvent], section: SongSection,
+                                          frame: GlobalMusicalFrame, tonalMap: TonalGovernanceMap,
+                                          rng: inout SeededRNG, xFilesBars: inout [Int]) {
+        let bridgeLen = section.endBar - section.startBar
+        let xBars: [Int]
+        if rng.nextDouble() < 0.50 {
+            // Bookend: opening bar and closing bar mirror each other
+            xBars = bridgeLen >= 2
+                ? [section.startBar, section.endBar - 1]
+                : [section.startBar]
+        } else {
+            // Middle pair: spaced ~1/3 and ~2/3 through the bridge
+            let a = section.startBar + max(1, bridgeLen / 3)
+            let b = section.startBar + max(2, (bridgeLen * 2) / 3)
+            xBars = (b > a) ? [a, b] : [a]
+        }
+        // Collect whistle events separately so per-bar silence filters only affect
+        // the generated melody and never clip notes from a prior whistle phrase.
+        var whistleEvents: [MIDIEvent] = []
+        for xBar in xBars {
+            let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
+            guard !barEvs.isEmpty else { continue }
+            xFilesBars.append(xBar)
+            let xStart = xBar * 16
+            // Whistle: pickup at xStart+12, last note ends at xStart+40 (half note at step 32).
+            // Silence: 6 beats (24 steps) before pickup; 2 beats (8 steps) after last held note.
+            let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
+            let postPadEnd  = xBar < section.endBar - 1   ? xStart + 48 : xStart + 40
+            melodyEvents = melodyEvents.filter {
+                $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
+            }
+            whistleEvents += barEvs
+        }
+        melodyEvents += whistleEvents
+    }
+
     /// Generate a bridge melody for Archetype B (Melody Bridge).
     ///
     /// Generates a repeating 2-bar phrase with actual note density — quarter-note to dotted-quarter
@@ -1630,35 +1641,8 @@ struct KosmicLeadGenerator {
                         }
                     }
                 } else if rng.nextDouble() < 0.25 {
-                    let bridgeLen = section.endBar - section.startBar
-                    let xBars: [Int]
-                    if rng.nextDouble() < 0.50 {
-                        xBars = bridgeLen >= 2
-                            ? [section.startBar, section.endBar - 1]
-                            : [section.startBar]
-                    } else {
-                        let a = section.startBar + max(1, bridgeLen / 3)
-                        let b = section.startBar + max(2, (bridgeLen * 2) / 3)
-                        xBars = (b > a) ? [a, b] : [a]
-                    }
-                    // Collect whistle events separately so per-bar silence filters only affect
-                    // the generated melody and never clip notes from a prior whistle phrase.
-                    var whistleEvents: [MIDIEvent] = []
-                    for xBar in xBars {
-                        let barEvs = xFilesWhistleBar(bar: xBar, frame: frame, tonalMap: tonalMap, rng: &rng)
-                        guard !barEvs.isEmpty else { continue }
-                        xFilesBars.append(xBar)
-                        let xStart = xBar * 16
-                        // Whistle: pickup at xStart+12, last note ends at xStart+40 (half note at step 32).
-                        // Silence: 6 beats (24 steps) before pickup; 2 beats (8 steps) after last held note.
-                        let prePadStart = xBar > section.startBar     ? xStart - 24 : xStart
-                        let postPadEnd  = xBar < section.endBar - 1   ? xStart + 48 : xStart + 40
-                        melodyEvents = melodyEvents.filter {
-                            $0.stepIndex < prePadStart || $0.stepIndex >= postPadEnd
-                        }
-                        whistleEvents += barEvs
-                    }
-                    melodyEvents += whistleEvents
+                    addXFilesWhistles(to: &melodyEvents, section: section, frame: frame, tonalMap: tonalMap,
+                                           rng: &rng, xFilesBars: &xFilesBars)
                 }
                 events += melodyEvents
                 continue
@@ -2113,7 +2097,6 @@ struct KosmicLeadGenerator {
                 let mode   = entry.sectionMode
                 let third  = mode.nearestInterval(3)
                 let fifth  = 7
-                let second = mode.nearestInterval(2)
                 let fourth = 5   // exact — no scale snapping for X-Files intervals
                 let flat7  = 10  // exact — no scale snapping for X-Files intervals
 
@@ -2218,7 +2201,7 @@ struct KosmicLeadGenerator {
 
         var bar = bodyStart + (spacing / 2)  // first appearance partway in
         while bar < bodyEnd - 4 {
-            guard let entry = tonalMap.entry(atBar: bar) else { bar += spacing; continue }
+            guard tonalMap.entry(atBar: bar) != nil else { bar += spacing; continue }
 
             // Velocity arc: low at start, peak at peak note, low again at end
             var step = bar * 16
