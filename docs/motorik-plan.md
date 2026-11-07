@@ -383,6 +383,9 @@ the groove, so the drop reads as a section change and Lead 1's return is the str
 - Measured: 58% of base songs take one, 1.9 windows on average, 5.7 bars mean length
 - Not re-applied when a single track is regenerated, like the spotlight filter
 
+By ear, the fill reduction and the breakdown are a minor improvement. Use the batch audio export
+in `implementation.md` (Test Mode) for any further A/B listening.
+
 **Fill lengths:** 1 beat (60%), 2 beats (30%), 1 bar (10%). Most fills are 1-beat subtle variants
 (Ghost Whisper or Sidestick Flam) — groove remains intact.
 

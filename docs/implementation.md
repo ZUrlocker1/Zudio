@@ -573,6 +573,15 @@ Test Mode is a developer feature (⌘T) that:
 - Toggling Test Mode off and on resets all counters; each style restarts from its most recent rule
 - TEST badge appears in the logo area when active (visible reminder that test mode is on)
 
+### Batch audio export (Mac, for A/B listening)
+
+Launch the built Mac app binary with `ZUDIO_BATCH_EXPORT=<folder under ~/Downloads>` (optionally
+`ZUDIO_BATCH_MATCH=<filename substring>`). It fast-exports every `.zudio` in the folder to a
+same-named `.m4a`, skipping existing ones, keeps them out of the history, prints `BATCH done`
+lines and quits, about 10–14 s a song. The folder must be under `~/Downloads` because the app is
+sandboxed. A `.zudio` regenerates with the current code, so a before/after A/B needs a build of
+the older commit for the "before" files.
+
 ---
 
 ## Future Development
