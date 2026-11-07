@@ -231,7 +231,7 @@ fold by octaves. Weights are shares of Space songs on that track.
 
 KOS-DRUM-009 Preset Box 30.4%, KOS-DRUM-001 Mini Pops 27.2%, KOS-DRUM-010 Magnetic Rhythm Box
 20%, KOS-DRUM-012 Hand Percussion 10.4%, no percussion 12%. Kits: 808 Kit 75%, Machine Kit 25%,
-playing its own synth toms in fills.
+playing its own synth toms in fills; its electric snare (40) plays as the plain snare.
 
 **KOS-DRUM-009 Oxygene Preset Box** — the Minipops pattern of Oxygene 4. Closed hat on steps 0, 1,
 4, 5, 6, 8, 9, 10, 12, 13, 14; kick 0, 2, 6, 10; clap 4, 12 (in about 10% of songs only, in one or

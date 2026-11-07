@@ -846,6 +846,12 @@ final class PlaybackEngine: ObservableObject {
                 case 49:         fireNote = GMDrum.ride.rawValue;    wasRemapped = true
                 default:         fireNote = ev.note;                  wasRemapped = false
                 }
+            } else if trackIndex == kTrackDrums && cachedDrumProgram == 24 && cachedIsKosmicSpace
+                        && ev.note == GMDrum.snare2.rawValue {
+                // Kosmic Space on Machine Kit (Zack, 2026-11-07, Empyrion-Axolotl): the electric snare
+                // slot (40) that Magnetic Rhythm Box uses sounds harsh and mechanical, so it plays the
+                // plain snare. The toms, ride and everything else stay native.
+                fireNote = GMDrum.snare.rawValue; wasRemapped = true
             } else {
                 fireNote = ev.note; wasRemapped = false
             }
