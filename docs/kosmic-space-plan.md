@@ -575,9 +575,10 @@ busy parts, as the Pump and the Octave Sequencer. Tempo is the one Space range, 
 The "Phase 2 pools" below list the rules each track gains rather than separate Magnetic and
 Oxygene pools.
 
-### Breakdown
+### Breakdown (dropped 2026-11-06, kept here as designed)
 
-The one structural addition. It is a **mute schedule**, built the way Motorik Europe's section
+Not built: the bridge, thinning and the sequencer solo cover it (see "Chronologie Pop Loop,
+Anticipated Strings and the breakdown decision"). The one structural addition it would have been. It is a **mute schedule**, built the way Motorik Europe's section
 dropout is:
 
 - One breakdown per song, at a single share for all Space songs. 8 or 12 bars,
@@ -705,7 +706,7 @@ same single pool. Tempo 108–136, peak 122.
 - **Chronologie Andalusian Descent** — i ×2, bVII ×2, bVI ×2, v ×2. Aeolian. *Chronologie 2,
   the unnumbered Oxygene.* B-cycle: a chromatic bass climb from i to v over a held tonic, 4
   bars, as a transition (*Chronologie 2*).
-- **Chronologie Pop Loop** — I ×2, V ×2, ii ×2, IV ×2, alternating with I ×2, IV ×2, vi ×4.
+- **Chronologie Pop Loop** (built 2026-11-06) — I ×2, V ×2, ii ×2, IV ×2, alternating with I ×2, IV ×2, vi ×4.
   Ionian. *Chronologie 4.*
 - **Zoolook Pedal** — one chord for 16 bars, then i ×4, bVII ×4, v ×8. Aeolian or Mixolydian.
   *Arpegiator, Rendez-Vous 2.*
@@ -772,13 +773,13 @@ Phase 3, three rule IDs and one-and-a-half implementations:
 
 - `KOS-DRUM-011` Chronologie Four-on-the-Floor
 - `KOS-RTHM-019` Zoolook Pedal Arpeggiator (a preset)
-- `KOS-PADS-009` Oxygene 7–13 Anticipated Strings (a wrapper around `KOS-PADS-001`)
+- `KOS-PADS-009` Oxygene 7–13 Anticipated Strings (a wrapper around `KOS-PADS-001`) — built 2026-11-06
 
 New infrastructure:
 
 - Phase 1 — the chord-cycle builder, the Space flag and its plumbing
 - Phase 2 — the chord's own scale and the fit pass (spaceChordScale, fitSpaceChordScale), built;
-  the breakdown mute schedule, not built
+  the breakdown mute schedule, dropped 2026-11-06
 
 ### Reused unchanged
 
@@ -1338,6 +1339,39 @@ thirds variant. Each joins at equal weight.
 Measured over 600 seeds (486 Space songs): 447 hold at least one Magnetic rule, up from about 3 in
 5. Not heard yet.
 
+### Chronologie Pop Loop, Anticipated Strings and the breakdown decision (2026-11-06, later)
+
+Zack, after hearing the Magnetic rules: they sound good. The breakdown is **dropped**: the bridge,
+the thinning bass and drums and the sequencer solo already break a song three ways, and a fourth
+form would repeat them. The Pedal Rise and the effects-only interlude stay in reserve.
+
+- **Chronologie Pop Loop** (chronologiePopLoop, appended to KosmicProgressionFamily), the first
+  Phase 3 piece, from Chronologie 4. Ionian. A cycle I, V, ii, IV ×2 each; B cycle I ×2, IV ×2,
+  vi ×4; bridge chords IV ×4, V ×4 (12 bars: vi, IV, V), the V resolving onto the return's I. Log
+  label "Chronologie Pop Loop I V ii IV". It joins the single harmony pool at an average family's
+  weight, so the pool is now eight families: Oxygene Dorian Vamp 20.6, Aeolian Cycle 11.3, Two-Chord
+  Sway 5.6, and 12.5% for each of Arc, Turn, Equinoxe Phrygian, Descent and Pop Loop (still one
+  draw; the Oxygene three keep their 55 / 30 / 15 shape). Measured over 600 seeds: 58 Pop Loop
+  songs, all Ionian.
+- **KOS-PADS-009 Oxygene 7-13 Anticipated Strings** — a wrapper on KOS-PADS-001. Every attack
+  moves one 16th early, so each chord change lands on step 15 of the bar before and the strings
+  lean into the change while bass and sequencer still play the old chord for that 16th. Release
+  stays on its grid (duration plus one). The shift runs after the arrangement's silences, so a
+  silenced bar leaks no note. fitSpaceChordScale takes a lookAheadSteps for the pads track
+  (spacePadsAnticipation, 1), so the early note is fitted to the chord it belongs to; no other
+  Space pad rule attacks on step 15, so nothing else changes. Pool: KOS-PADS-001 36%, Staggered
+  Bloom 36%, Anticipated Strings 28% (Zack: slightly less often than the others), one draw as
+  before. Measured: 135 Strings songs in 600 seeds, no attack left on a bar line after bar 0.
+- **Not built, and why.** KOS-RTHM-019 Zoolook Pedal Arpeggiator, a 3-step cell on a root pedal,
+  sits too close to Fifth Triplets (also grouped in threes) and the Leading-Tone Cell (same lower
+  neighbour); it would earn its place only beside the Zoolook Pedal harmony family, a 16-bar single
+  chord. KOS-DRUM-011 Chronologie Four-on-the-Floor waits for listening. Phase 3 stays open.
+- **Chords log line.** Space keeps the Roman numerals on every family (chordsDescription takes
+  keepNumerals; other styles still trim them). "A Phrygian Equinoxe i iv bII", "E Ionian Magnetic
+  Descent I vi V IV".
+
+---
+
 ### Space levels and bridge share (2026-11-06)
 
 spaceBridgeShare is 0.30, its release value: a bridge in about 30% of Space songs in ab and aba
@@ -1398,6 +1432,7 @@ does):
   on beat 4, rising into the downbeat, and the preset box always lands it on a crash. Same weight
   and draw. The claves accent on step 12 is unchanged.
 
+- **Breakdown** — dropped 2026-11-06 (Zack): bridges, thinning and the sequencer solo are enough.
 - **Bridges in Space** — built 2026-11-03 (see "Bridges" under "Phase 1 as built"); the release
   share is 0.30. Still open: whether the Phase 2 breakdown becomes the in-section form of the
   Magnetic Fields Breakdown rather than a second build. Not built and kept in reserve: a Pedal Rise

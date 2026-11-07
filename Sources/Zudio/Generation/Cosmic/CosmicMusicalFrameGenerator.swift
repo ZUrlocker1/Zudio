@@ -173,15 +173,17 @@ struct KosmicMusicalFrameGenerator {
 
     // MARK: - Kosmic Space (Phase 1: Oxygene)
 
-    /// Space harmony families, every one in one pool. Each Magnetic family takes the average
-    /// Oxygene family's weight (Zack, 2026-11-06), and the Oxygene three keep their 55/30/15 shape:
-    /// Dorian Vamp 23.6%, Aeolian Cycle 12.8%, Two-Chord Sway 6.4% (Oxygene 4, 8 and 3); Magnetic
-    /// Fields Arc, Magnetic Fields Turn, Equinoxe Phrygian and Magnetic Fields Descent 14.3% each.
+    /// Space harmony families, every one in one pool. Each later family takes the average weight
+    /// (Zack, 2026-11-06), and the Oxygene three keep their 55/30/15 shape: Dorian Vamp 20.6%,
+    /// Aeolian Cycle 11.3%, Two-Chord Sway 5.6% (Oxygene 4, 8 and 3); Magnetic Fields Arc, Magnetic
+    /// Fields Turn, Equinoxe Phrygian, Magnetic Fields Descent and Chronologie Pop Loop 12.5% each.
     private static func pickSpaceFamily(rng: inout SeededRNG) -> KosmicProgressionFamily {
         let families: [KosmicProgressionFamily] = [.oxygeneDorianVamp, .oxygeneAeolianCycle, .oxygeneTwoChordSway,
-                                                   .magneticArc, .magneticTurn, .equinoxePhrygian, .magneticDescent]
-        let weights:  [Double]                  = [0.236,              0.128,                0.064,
-                                                   0.143,        0.143,         0.143,             0.143]
+                                                   .magneticArc, .magneticTurn, .equinoxePhrygian, .magneticDescent,
+                                                   .chronologiePopLoop]
+        let weights:  [Double]                  = [0.206,              0.113,                0.056,
+                                                   0.125,        0.125,         0.125,             0.125,
+                                                   0.125]
         return families[rng.weightedPick(weights)]
     }
 
@@ -193,7 +195,7 @@ struct KosmicMusicalFrameGenerator {
         case .oxygeneDorianVamp:   return .Dorian
         case .oxygeneAeolianCycle, .magneticArc, .magneticTurn: return .Aeolian
         case .equinoxePhrygian:    return .Phrygian
-        case .magneticDescent:     return .Ionian
+        case .magneticDescent, .chronologiePopLoop: return .Ionian
         default:                   return rng.nextDouble() < 0.50 ? .Aeolian : .Dorian
         }
     }

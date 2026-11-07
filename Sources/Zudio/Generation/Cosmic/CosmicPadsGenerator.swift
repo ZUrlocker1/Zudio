@@ -27,12 +27,14 @@ struct KosmicPadsGenerator {
         let padWeights: [Double] = [0.18,           0.20,           0.18,           0.13,           0.13,            0.18]
 
         // forceRuleID > quartal_stack/suspended_resolution constraints > weighted pick
-        // Kosmic Space: KOS-PADS-001 and KOS-PADS-010 Oxygene 4 Staggered Bloom, 50% each. Both
+        // Kosmic Space: KOS-PADS-001, KOS-PADS-010 Oxygene 4 Staggered Bloom and KOS-PADS-009
+        // Anticipated Strings, 36, 36 and 28% (Zack: the Strings slightly less often). All three
         // re-attack every 2 bars on the current chord, so with Space's 2- and 4-bar chord windows they
-        // follow every change — the Oxygene string machine.
+        // follow every change — the Oxygene string machine. One draw, as before.
         let primaryRule: String
         if isKosmicSpace {
-            primaryRule = rng.nextDouble() < 0.50 ? "KOS-PADS-001" : "KOS-PADS-010"
+            let r = rng.nextDouble()
+            primaryRule = r < 0.36 ? "KOS-PADS-001" : (r < 0.72 ? "KOS-PADS-010" : "KOS-PADS-009")
         } else if let forced = forceRuleID {
             primaryRule = forced
         } else if kosmicProgFamily == .quartal_stack {
@@ -275,7 +277,8 @@ struct KosmicPadsGenerator {
             let primaryCountBefore = events.count
 
             switch primaryRule {
-            case "KOS-PADS-001":
+            case "KOS-PADS-001", "KOS-PADS-009":
+                // 009 is 001 with every attack moved early after the bar loop, below.
                 events += longDroneBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
             case "KOS-PADS-002":
                 events += swellChordBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame, rng: &rng)
@@ -323,7 +326,17 @@ struct KosmicPadsGenerator {
         }
 
         // Kosmic Space: the sequencer solo bridge leaves the pads out in half of its songs.
-        return silenceBars(events, spaceArrangement?.padsSilences ?? [])
+        let silenced = silenceBars(events, spaceArrangement?.padsSilences ?? [])
+        // KOS-PADS-009 Oxygene 7-13 Anticipated Strings: every attack one 16th early, so each chord
+        // change lands on step 15 of the bar before. Done after the silences so a silenced bar does
+        // not leak a note, and the release stays on its grid. fitSpaceChordScale reads the pads one
+        // step ahead (spacePadsAnticipation) so the early note is fitted to the chord it belongs to.
+        guard primaryRule == "KOS-PADS-009" else { return silenced }
+        return silenced.map { ev in
+            guard ev.stepIndex > 0 else { return ev }
+            return MIDIEvent(stepIndex: ev.stepIndex - spacePadsAnticipation, note: ev.note,
+                             velocity: ev.velocity, durationSteps: ev.durationSteps + spacePadsAnticipation)
+        }
     }
 
     // MARK: - KOS-PAD-001: Long Drone

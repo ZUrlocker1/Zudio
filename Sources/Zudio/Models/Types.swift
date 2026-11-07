@@ -466,6 +466,7 @@ enum KosmicProgressionFamily: String, Codable, Sendable {
     case magneticTurn           // Magnetic Fields 2: i, V, bVI, bVII ×2 each. Aeolian, V major.
     case equinoxePhrygian       // Equinoxe: i ×8, iv, bII, bvii, i ×2 each. Phrygian.
     case magneticDescent        // Magnetic Fields 4: I, vi, V, IV ×2 each. Ionian.
+    case chronologiePopLoop     // Chronologie 4: I, V, ii, IV ×2 each. Ionian.
 }
 
 // MARK: - Ambient progression families

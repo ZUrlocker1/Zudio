@@ -642,7 +642,8 @@ struct SongGenerator {
         // Kosmic Space: notes the chord under them has altered move onto the chord's scale.
         if isKosmicSpace {
             for t in 0..<kTrackDrums {
-                trackEvents[t] = fitSpaceChordScale(trackEvents[t], structure: structure, frame: frame)
+                trackEvents[t] = fitSpaceChordScale(trackEvents[t], structure: structure, frame: frame,
+                                                    lookAheadSteps: t == kTrackPads ? spacePadsAnticipation : 0)
             }
         }
 
@@ -1860,7 +1861,8 @@ struct SongGenerator {
         }
 
         if isSpace && trackIndex != kTrackDrums {
-            events = fitSpaceChordScale(events, structure: songState.structure, frame: songState.frame)
+            events = fitSpaceChordScale(events, structure: songState.structure, frame: songState.frame,
+                                        lookAheadSteps: trackIndex == kTrackPads ? spacePadsAnticipation : 0)
         }
 
         // A regenerated Kosmic lead gets the harmonic filter a generated song's leads get, the clash
@@ -2261,7 +2263,7 @@ struct SongGenerator {
 
     /// Builds the Chords log description: key + abbreviated mode + cleaned family label.
     /// Strips "Static " prefix and chord annotations (i ♭VII, sus4 etc.) from family labels.
-    private static func chordsDescription(key: String, mode: Mode, familyLabel: String) -> String {
+    private static func chordsDescription(key: String, mode: Mode, familyLabel: String, keepNumerals: Bool = false) -> String {
         let modeStr: String
         switch mode {
         case .MajorPentatonic: modeStr = "Maj Pentatonic"
@@ -2269,7 +2271,8 @@ struct SongGenerator {
         default:               modeStr = mode.rawValue
         }
         var label = familyLabel.hasPrefix("Static ") ? String(familyLabel.dropFirst(7)) : familyLabel
-        for token in [" i ", " ♭", " sus4", " bVI", " bVII", " bII", " bIII", " bV"] {
+        // Kosmic Space keeps the Roman numerals on every family (Zack, 2026-11-06).
+        for token in keepNumerals ? [] : [" i ", " ♭", " sus4", " bVI", " bVII", " bII", " bIII", " bV"] {
             if let r = label.range(of: token) { label = String(label[..<r.lowerBound]); break }
         }
         // Name the mode once: drop it from the family label when the key and mode already show it.
@@ -2927,6 +2930,7 @@ struct SongGenerator {
         case "KOS-PADS-006":  return "Electric Buddha shimmer"
         case "KOS-PADS-007":  return "Probabilistic gated chord pulse"
         case "KOS-PADS-008":  return "bIII colour chord layer"
+        case "KOS-PADS-009":  return "Oxygene 7-13 Anticipated Strings"
         case "KOS-PADS-010":  return "Oxygene 4 Staggered Bloom"
         default:              return ruleID
         }
@@ -3009,6 +3013,7 @@ struct SongGenerator {
         case .magneticTurn:          return "Magnetic Turn i V bVI bVII"
         case .equinoxePhrygian:      return "Equinoxe Phrygian i iv bII"
         case .magneticDescent:       return "Magnetic Descent I vi V IV"
+        case .chronologiePopLoop:    return "Chronologie Pop Loop I V ii IV"
         }
     }
 
@@ -3064,7 +3069,7 @@ struct SongGenerator {
 
         // Chord progression — key/mode + progression family
         let progFamilyLabel = kosmicProgressionFamilyLabel(kosmicProgFamily)
-        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progFamilyLabel)))
+        log.append(GenerationLogEntry(tag: "Chords", description: chordsDescription(key: frame.key, mode: frame.mode, familyLabel: progFamilyLabel, keepNumerals: isKosmicSpace)))
 
         // Arpeggio (Rhythm track)
         for ruleID in rhythmRules.sorted() {

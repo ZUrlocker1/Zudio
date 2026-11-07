@@ -85,10 +85,15 @@ func spaceChordScale(chordTones: Set<Int>, frame: GlobalMusicalFrame) -> Set<Int
 // notes the chord under them has swapped out (the minor 3rd over a major V becomes the major 3rd)
 // and leaves every other note alone, so it never moves a note twice. Run once per pitched track,
 // after generation and after a regen.
+// KOS-PADS-009 plays each pad attack one 16th early. The Space pads track is therefore fitted
+// by the chord one step ahead: no other Space pad rule attacks on step 15, so this changes nothing
+// for them.
+let spacePadsAnticipation = 1
+
 func fitSpaceChordScale(_ events: [MIDIEvent], structure: SongStructure,
-                        frame: GlobalMusicalFrame) -> [MIDIEvent] {
+                        frame: GlobalMusicalFrame, lookAheadSteps: Int = 0) -> [MIDIEvent] {
     events.map { ev in
-        guard let cw = structure.chordWindow(atBar: ev.stepIndex / 16),
+        guard let cw = structure.chordWindow(atBar: (ev.stepIndex + lookAheadSteps) / 16),
               let to = spaceChordAlterations(chordTones: cw.chordTones,
                                              scalePCs: frame.scalePCs)[Int(ev.note) % 12]
         else { return ev }
