@@ -215,7 +215,7 @@ struct DrumVariationEngine {
 
     // MARK: - Fill bar detection (shared)
 
-    private static func computeFillBars(
+    static func computeFillBars(
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
@@ -248,23 +248,20 @@ struct DrumVariationEngine {
             prevSectionLabel = sec.label
         }
 
-        // Instrument entrance fills: non-drum track comes in after ≥2 silent bars.
+        // Lead entrance fills: Lead 1 comes back after a real rest of 4+ bars — the "here comes
+        // the lead" cue a band actually plays. Other parts returning are not cued: a fill for every
+        // part after two silent bars put a fill in one body bar in three, most of them for a
+        // Texture note or a Lead 2 phrase coming back.
         // Skipped in chillMode, noirVariation, arcadeVariation — all prioritise the locked grid.
-        //
         if !chillMode && !noirVariation && !arcadeVariation {
-            for trackIdx in 0..<kTrackDrums {
-                let tEvents = trackEvents[trackIdx]
-                let presence: [Bool] = (0..<frame.totalBars).map { bar in
-                    let bs = bar * 16
-                    return tEvents.contains { $0.stepIndex >= bs && $0.stepIndex < bs + 16 }
-                }
-                for bar in 2..<frame.totalBars {
-                    guard presence[bar] && !presence[bar - 1] && !presence[bar - 2] else { continue }
-                    let fillBar = bar - 1
-                    guard let sec = structure.section(atBar: fillBar),
-                          sec.label != .intro && sec.label != .outro else { continue }
-                    fillBars.insert(fillBar)
-                }
+            let present = Set(trackEvents[kTrackLead1].map { $0.stepIndex / 16 })
+            for bar in 4..<max(4, frame.totalBars) {
+                guard present.contains(bar),
+                      !(bar - 4..<bar).contains(where: { present.contains($0) }) else { continue }
+                let fillBar = bar - 1
+                guard let sec = structure.section(atBar: fillBar),
+                      sec.label != .intro && sec.label != .outro else { continue }
+                fillBars.insert(fillBar)
             }
         }
 

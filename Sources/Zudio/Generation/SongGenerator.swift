@@ -342,10 +342,21 @@ struct SongGenerator {
         // Step 12 — Pattern evolver: gradual bass mutation across evolution windows
         trackEvents = PatternEvolver.apply(trackEvents: trackEvents, frame: frame, structure: structure, tonalMap: tonalMap, seed: seed, skipForKraftwerkBass: bassRules.contains("MOT-BASS-026"))
 
-        // Step 13 — Drum variation engine: fills at section transitions and instrument entrances,
+        // Step 12.5 — Base Motorik breakdown: Lead 1, Lead 2 and Rhythm drop out together while
+        // drums, bass, pads and texture carry the groove. Applied before the drum pass so the
+        // fills see it. A sync has its own dropout; Noir and Arcade take none.
+        let isBaseMotorik = !isNoir && !isArcade && !motorikSync.isActive
+        let breakdowns = isBaseMotorik
+            ? breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: ld1SoloRange) : []
+        let breakdownSteps = breakdowns.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
+        for track in [kTrackLead1, kTrackLead2, kTrackRhythm] {
+            trackEvents[track].removeAll { ev in breakdownSteps.contains { $0.contains(ev.stepIndex) } }
+        }
+
+        // Step 13 — Drum variation engine: fills at section transitions and Lead 1 entrances,
         //            plus cymbal variations on 16+-bar identical runs
-        // A fill on the bar before the sync leaves, and on the bar before it returns.
-        let syncSeamBars = syncWindows.flatMap { [$0.lowerBound - 1, $0.upperBound - 1] }
+        // A fill on the bar before the sync or the breakdown leaves, and on the bar before it returns.
+        let syncSeamBars = (syncWindows + breakdowns).flatMap { [$0.lowerBound - 1, $0.upperBound - 1] }
         trackEvents = DrumVariationEngine.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, noirVariation: isNoir, arcadeVariation: isArcade, kraftwerkSync: motorikSync.isActive, syncBoundaryBars: syncSeamBars, syncBassIsLocked: motorikSync.includes(kTrackBass))
 
         // Step 13.5 — Kraftwerk sync section dropout: the whole sync leaves together for
@@ -429,7 +440,13 @@ struct SongGenerator {
             sync: motorikSync, syncLead2Partners: syncLead2Partners
         )
 
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.sorted().first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }), kraftwerkSync: motorikSync.isActive)
+        // Base Motorik hands the log the drum pass's own fill bars, so it reports the fills that
+        // were played rather than re-deriving them.
+        let baseFillBars: Set<Int>? = isBaseMotorik
+            ? DrumVariationEngine.computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure)
+                .union(syncSeamBars)
+            : nil
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.sorted().first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }), kraftwerkSync: motorikSync.isActive, motorikFillBars: baseFillBars, motorikBreakdowns: breakdowns)
 
         var forced: [String: String] = [:]
         if let r = forceBassRuleID   { forced["Bass"]   = r }
@@ -2357,6 +2374,25 @@ struct SongGenerator {
         return windows
     }
 
+    /// Base Motorik breakdown windows, borrowed from the Europe dropout. Half of base songs take
+    /// one; each is placed near a quarter and two thirds of the way through, snapped to 8 bars,
+    /// 4 to 8 bars long, never in the first 16 bars or the last 8, and never over Lead 1's solo.
+    /// Drawn on its own stream so no other decision in the song shifts.
+    static func breakdownWindows(totalBars: Int, seed: UInt64, avoiding solo: Range<Int>?) -> [Range<Int>] {
+        var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 76))
+        guard rng.nextDouble() < 0.5 else { return [] }
+        var windows: [Range<Int>] = []
+        for fraction in [0.25, 0.65] {
+            let length = 4 + rng.nextInt(upperBound: 5)                     // 4...8 bars
+            let start  = max((Int(Double(totalBars) * fraction) / 8) * 8, 16)
+            let window = start..<(start + length)
+            guard window.upperBound <= totalBars - 8, !(solo?.overlaps(window) ?? false) else { continue }
+            if let previous = windows.last, start < previous.upperBound + 8 { continue }
+            windows.append(window)
+        }
+        return windows
+    }
+
     /// Sync section dropout — the most distinctive measured feature in the corpus, and it
     /// spans tracks, so it belongs to the sync rather than to any single rule.
     ///
@@ -3344,7 +3380,9 @@ struct SongGenerator {
         bluesIVVDesc: String = "",
         driftBridgeLabels: [Int: String] = [:],
         chillRhythmSwitch: (bar: Int, ruleID: String)? = nil,
-        kraftwerkSync: Bool = false
+        kraftwerkSync: Bool = false,
+        motorikFillBars: Set<Int>? = nil,
+        motorikBreakdowns: [Range<Int>] = []
     ) -> [Int: [GenerationLogEntry]] {
         var out: [Int: [GenerationLogEntry]] = [:]
         let totalBars = frame.totalBars
@@ -3592,6 +3630,7 @@ struct SongGenerator {
                 evs.contains { Self.kraftwerkFillMarkerNotes.contains($0.note) } ? bar : nil
             }) as [Int])
         }
+        if let motorikFillBars { allFillBars = motorikFillBars }
 
         // Turnarounds — the four-bar chord detour inside the groove. It is not a section, so
         // nothing in the structure marks it; the performance log is where it belongs (Zack,
@@ -3795,6 +3834,12 @@ struct SongGenerator {
                     prevCymbalMode = mode
                 }
             }
+        }
+
+        // Base Motorik breakdown: the leads and Rhythm leave together and come back together.
+        for window in motorikBreakdowns {
+            fireBar(window.lowerBound, tag: "Breakdown", desc: "Leads and Rhythm drop out for \(window.count) bars")
+            fireBar(window.upperBound, tag: "Breakdown", desc: "Leads and Rhythm return")
         }
 
         // 4. Track spotlight entrances and departures.

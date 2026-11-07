@@ -356,12 +356,31 @@ Pattern selection by section intensity: low → sparse, medium → core_a, high 
 - Hat/cymbal: 8th-note positions with closed hat; open hat or ride for accent variants
 - Crash accents mainly at phrase/section starts
 
-**Fill sources (three independent triggers):**
+**Fill sources in base Motorik:**
 
 - Section transitions: bar before each new body section
-- Instrument entrances: bar before a non-drum track entering after ≥2 bars of silence
-- Periodic body cadence: bars 3, 7, 11, 15… within each body section; crash lands on next phrase
+- Lead 1 entrances: bar before Lead 1 returns after a rest of 4 bars or more. Other parts
+  returning are not cued.
+- Periodic body cadence: bars 8, 16, 24… within each body section; crash lands on next phrase
   downbeat. Skip if bar already tagged by another source.
+- Breakdown edges: bar before the breakdown and bar before its return.
+
+Measured over 235 base songs: about 20 fills a song, about 1.5 per 8 body bars, and never more
+than 8 bars without one. Noir and Arcade fill only at section transitions; Motorik Europe only
+at its dropout edges.
+
+**Breakdown (base Motorik only).** Borrowed from Motorik Europe's section dropout. In half of
+base songs, Lead 1, Lead 2 and Rhythm drop out together while drums, bass, pads and texture keep
+the groove, so the drop reads as a section change and Lead 1's return is the strong moment.
+
+- Two candidate windows, near 25% and 65% of the song, snapped to 8 bars, 4 to 8 bars long
+- Never in the first 16 bars or the last 8, never over a Lead 1 solo window, at least 8 bars
+  between windows
+- Drawn on its own seeded stream (`SongGenerator.breakdownWindows`), applied before the drum
+  pass so the fills see it
+- The playback log shows `Breakdown` at the drop and at the return
+- Measured: 58% of base songs take one, 1.9 windows on average, 5.7 bars mean length
+- Not re-applied when a single track is regenerated, like the spotlight filter
 
 **Fill lengths:** 1 beat (60%), 2 beats (30%), 1 bar (10%). Most fills are 1-beat subtle variants
 (Ghost Whisper or Sidestick Flam) — groove remains intact.
