@@ -358,15 +358,15 @@ Chill Blues.
 
 ## Lead Rules
 
-**Lead 1 — rule weights for Chill Blues (current, 2026-11-07):**
+**Lead 1 — rule weights for Chill Blues (work in progress, 2026-11-07):**
 - CHL-LD1-002 (Miles Punch) — 20%. Derived from Miles Davis *All Blues*. Syncopated off-beat hits in the lower register are textbook slow blues phrasing. Plays in Chill Blues only.
-- CHL-LD1-009 (Jazzy blues lead) — 18%.
-- CHL-LD1-004 (Blues Lead) — 18%. Blues scale emphasis, descending phrases, saxophone idiom.
-- CHL-LD1-013 (Moanin' call and response) — 18%. Bobby Timmons' two-bar call and the horns' amen. Chill Blues only.
+- CHL-LD1-004 (Blues Lead) — 20%. Blues scale emphasis, descending phrases, saxophone idiom. Chill Blues only (Soho still reuses it).
+- CHL-LD1-013 (Moanin' call and response) — 20%. Bobby Timmons' two-bar call and the horns' amen. Chill Blues only.
 - CHL-LD1-014 (Cantaloupe Island hook) — 12%. Herbie Hancock's hook, restated, then solo licks and stabs. Also plays in regular Chill.
-- CHL-LD1-003 (Chet Sparse Melody) — 14%. Jazz-blues crossover feel at slow tempo. Chill Blues only.
+- CHL-LD1-003 (Chet Sparse Melody) — 15%. Jazz-blues crossover feel at slow tempo. Chill Blues only.
+- CHL-LD1-009 (Jazzy blues lead) — 13%. Also plays in regular Chill.
 - CHL-LD1-001 (St Germain Long Phrase) — 0%. Excluded. The flowing, resolved European jazz flute phrasing is wrong for blues character.
-- Before 2026-11-07: 004 55%, 002 25%, 003 20% in the original design; the code ran 009 35, 004 35, 002 20, 003 10. The jazz rules (013, 014) are lick banks; see `docs/chill-jazz-leads-plan.md`.
+- The jazz rules (013, 014) are lick banks taken from jazz tunes; see `docs/chill-jazz-leads-plan.md`.
 
 **Returning phrases.** Blues leads use base Chill's seed replay (see the Lead 1 section of the
 Chill plan), with one rule of their own: seeds are replayed only over the I chord, in the first
@@ -434,8 +434,8 @@ pass when there are three or more. At most two phrases per window; about 15% of 
 dropped for looseness. It is limited to songs where it sounds good:
 - Lead 1 must be CHL-LD1-004 (Blues Lead) or CHL-LD1-003 (Chet Sparse Melody): the longer, unhurried lines.
   CHL-LD1-009 (busy jazz idiom, 45% of notes under 3 steps) and CHL-LD1-002 (short punches) never get it.
-  The jazz lick rules (CHL-LD1-013, CHL-LD1-014) never get it either; the harmony pass was not
-  changed for them (2026-11-07). That leaves it to CHL-LD1-004 and CHL-LD1-003, 32% of Blues songs.
+  The jazz lick rules (CHL-LD1-013, CHL-LD1-014) never get it either. That leaves it to
+  CHL-LD1-004 and CHL-LD1-003, 35% of Blues songs.
 - Lead 2 must not be a vibraphone. A vibraphone doubling reads as an echo, not a section, so
   it plays its normal Lead 2 part. Soprano sax and trombone are eligible; no horn is forced.
 - About 27% of Blues songs pass both tests (measured over 791 songs); a 0.55 roll gives

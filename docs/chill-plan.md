@@ -1868,31 +1868,20 @@ enters before Lead 1 finishes, Lead 2 defers to the next rest window.
 - Register bias by instrument: flute MIDI 65–85; trumpet MIDI 55–75; vibraphone MIDI 60–80;
   saxophone MIDI 50–70
 
-**Jazz lick rules (2026-11-07, tuned by ear)** — three rules play licks taken from jazz tunes,
-reworked per song rather than copied. Design, sources and as-built notes are in
-`docs/chill-jazz-leads-plan.md`. A lick is written in minor blues terms from the chord root
-under the phrase, then moved to that root and fitted note by note to the song's scale and
-chords, so they play in the major modes too. Phrases come from `jazzCellPhrase` in place of
-`buildPhrase`; intro silence, lay-outs, handoffs, Blues seams, seed returns and the turnaround
-lick run as before, and the blue-note overlay is skipped because the licks carry their own.
-- **CHL-LD1-013 Moanin' call and response** (Chill Blues only) — Bobby Timmons: a two-bar call
-  that climbs and falls through the blue note, answered by the horns' amen; a bridge-shaped
-  phrase over IV.
-- **CHL-LD1-014 Cantaloupe Island hook** (Chill and Chill Blues) — Herbie Hancock: the four-bar
-  hook, a restatement, then fragments, solo licks and horn stabs, with the full hook back in the
-  last fifth.
-- **CHL-LD1-015 Blue Monk riff** (regular Chill only) — Thelonious Monk: a chromatic climb into
-  a held fifth with a falling answer or a short tail.
+**Jazz lick rules (work in progress, 2026-11-07)** — three rules play licks taken from jazz tunes,
+reworked per song rather than copied. Design, sources and build notes are in
+`docs/chill-jazz-leads-plan.md`. They fit the song's scale and chords, so they play in the major
+modes too. Seed returns and the turnaround lick still apply; the blue-note overlay is skipped.
+- **CHL-LD1-013 Moanin' call and response** (Chill Blues only) — Bobby Timmons.
+- **CHL-LD1-014 Cantaloupe Island hook** (both) — Herbie Hancock.
+- **CHL-LD1-015 Blue Monk riff** (regular Chill only) — Thelonious Monk.
 
-**Current Lead 1 shares, as a share of all songs** (the per-rule percentages above are the
-original design and are out of date):
-- Chill: CHL-LD1-005 18 (staccato roll 70% on the St Germain beat, 5% on the other beats, was
-  85/15), 014 15, 015 15, 001 14, 007 11, 008 11, 004 9, 009 7. CHL-LD1-002 and CHL-LD1-003 no
-  longer play in regular Chill.
-- Chill Blues: 002 20, 009 18, 004 18, 013 18, 014 12, 003 14.
-- Original weights for restoring: Chill 001 20, 002 20, 003 15, 004 13, 007 12, 008 12, 009 8
-  of the pool, staccato roll 85/15; Blues 009 35, 004 35, 002 20, 003 10. Restore steps are in
-  the code comment above the pool draw in `generateLead1`.
+**Lead 1 shares, as a share of all songs** (the per-rule percentages above are the original
+design and are out of date):
+- Chill: CHL-LD1-005 18 (staccato roll 70% on the St Germain beat, 5% on the other beats),
+  015 17, 001 17, 014 15, 007 13, 008 13, 009 7. CHL-LD1-002, CHL-LD1-003 and CHL-LD1-004 play in
+  Chill Blues only (Soho still reuses 004 and 001).
+- Chill Blues: 002 20, 004 20, 013 20, 003 15, 009 13, 014 12.
 
 **Lead 1 instrument pool:**
 - Flute (program 73) — **default for Bright/Free**

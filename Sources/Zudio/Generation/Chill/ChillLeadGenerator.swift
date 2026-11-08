@@ -51,22 +51,18 @@ struct ChillLeadGenerator {
         // Rule selection is independent of instrument — instrument controls timbre/register,
         // rule controls phrasing behavior.
         //
-        // Blues pool: 009 35%, 004 35%, 002 20%, 003 10%.
-        // (001 "St Germain Long Phrase" and 005 "St Germain Staccato Burst" excluded —
-        //  European jazz flute phrasing and staccato club feel are wrong for blues character.)
+        // Shares of all songs (work in progress, fine-tuned by ear):
+        //   Blues: 013 20, 004 20, 002 20, 003 15, 009 13, 014 12
+        //   Chill: 005 18, 015 17, 001 17, 014 15, 007 13, 008 13, 009 7
+        // 005 St Germain staccato is a separate roll above (70% on the St Germain beat, 5% on the
+        // others) and never plays in Blues. 002, 003, 004 and 013 are Blues only; 015 is Chill only;
+        // 014 and 009 play in both. 001 is excluded from Blues (flowing European flute phrasing).
         //
-        // Regular Chill pool: 001 20%, 002 20%, 003 15%, 004 13%, 007 12%, 008 12%, 009 8%.
-        // (005 "St Germain Staccato Burst" handled by separate staccato path above.)
-        //
-        // Jazz cell rules (2026-11-07, tuned by ear): CHL-LD1-013 Moanin' (Blues only),
-        // CHL-LD1-014 Cantaloupe Island (both) and CHL-LD1-015 Blue Monk (Chill only). A first draw
-        // picks a jazz rule; otherwise the old rules run on their own draw. To restore the original
-        // weights, delete the two `j <` branches and use the weights below. Original weights:
+        // A first draw picks a jazz rule (Blues 32%, Chill 39% of the pool); otherwise the other
+        // rules run on their own draw, with their shares rescaled to the rest.
+        // Original weights before the jazz rules, to restore: delete the two `j <` branches and use
         //   Blues: 009 35, 004 35, 002 20, 003 10
         //   Chill: 001 20, 002 20, 003 15, 004 13, 007 12, 008 12, 009 8, staccato roll 85/15
-        // Now, as a share of all songs:
-        //   Blues: 013 18, 014 12, 009 18, 004 18, 002 20, 003 14
-        //   Chill: 005 18, 014 15, 015 15, 001 14, 007 11, 008 11, 004 9, 009 7 (002, 003 Blues only)
         let jazzRules = ["CHL-LD1-013", "CHL-LD1-014", "CHL-LD1-015"]
         let ruleID: String
         if bluesVariation {
@@ -74,32 +70,32 @@ struct ChillLeadGenerator {
                              "CHL-LD1-013","CHL-LD1-014"]
             if let forced = forceRuleID, bluesPool.contains(forced) {
                 ruleID = forced
-            } else if case let j = rng.nextDouble(), j < 0.30 {
-                ruleID = j < 0.18 ? "CHL-LD1-013" : "CHL-LD1-014"
+            } else if case let j = rng.nextDouble(), j < 0.32 {
+                ruleID = j < 0.20 ? "CHL-LD1-013" : "CHL-LD1-014"
             } else {
                 let r = rng.nextDouble()
-                ruleID = r < 0.257 ? "CHL-LD1-009"
-                       : r < 0.514 ? "CHL-LD1-004"
-                       : r < 0.80  ? "CHL-LD1-002"
+                ruleID = r < 0.191 ? "CHL-LD1-009"
+                       : r < 0.485 ? "CHL-LD1-004"
+                       : r < 0.779 ? "CHL-LD1-002"
                        :             "CHL-LD1-003"
             }
         } else {
-            let chillPool = ["CHL-LD1-001","CHL-LD1-004","CHL-LD1-007","CHL-LD1-008","CHL-LD1-009",
+            let chillPool = ["CHL-LD1-001","CHL-LD1-007","CHL-LD1-008","CHL-LD1-009",
                              "CHL-LD1-014","CHL-LD1-015"]
             if let forced = forceRuleID, chillPool.contains(forced) {
                 ruleID = forced
             } else if forceRuleID != nil {
                 ruleID = forceRuleID!   // allow 005 and other overrides to pass through
-            } else if case let j = rng.nextDouble(), j < 0.366 {
+            } else if case let j = rng.nextDouble(), j < 0.390 {
                 ruleID = j < 0.183 ? "CHL-LD1-014" : "CHL-LD1-015"
             } else {
-                // 002 Miles punch and 003 Chet sparse are Chill Blues only (Zack, 2026-11-07).
+                // 002 Miles punch, 003 Chet sparse and 004 Blues lead are Chill Blues only
+                // (Zack, 2026-11-07); Soho still reaches 004 through forceRuleID.
                 let r = rng.nextDouble()
-                ruleID = r < 0.269 ? "CHL-LD1-001"
-                       : r < 0.442 ? "CHL-LD1-004"
-                       : r < 0.654 ? "CHL-LD1-007"
-                       : r < 0.865 ? "CHL-LD1-008"
-                       :             "CHL-LD1-009"
+                ruleID = r < 0.34 ? "CHL-LD1-001"
+                       : r < 0.60 ? "CHL-LD1-007"
+                       : r < 0.86 ? "CHL-LD1-008"
+                       :            "CHL-LD1-009"
             }
         }
         let useJazzIdioms   = (ruleID == "CHL-LD1-009")
