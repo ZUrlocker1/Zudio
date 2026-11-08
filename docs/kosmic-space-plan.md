@@ -49,10 +49,10 @@ and Chronologie (1993, Oxygene 7–13). There is no per-song flavour: every trac
 independently from a pool holding the rules of every era, so a song can pair Magnetic Fields
 harmony with an Oxygene sequencer. The generation log names each rule by its album.
 
-**Share of Kosmic.** One roll shared with Drift. The testing split is Drift 10 / Space 80 / base
-10, kept as named constants. The intended release split is Drift 30 / Space 25 / base 45, to be
-confirmed by listening. Under the testing split Drift's threshold moved from 0.30 to 0.10, so some
-existing Drift seeds generate differently until the release split is restored.
+**Share of Kosmic.** One roll shared with Drift. The tuning split (2026-11-07) is Drift 25 / Space 50 / base 25, kept as named constants. At release
+Drift and base stay at 25 each and Space is lowered to its final share, with base taking the
+remainder. Drift's threshold moved from 0.30 to 0.25, so some existing Drift seeds generate
+differently.
 
 ---
 
@@ -497,7 +497,7 @@ pass; the stereo-twin detector.
 
 ## Release checklist
 
-- Restore the release split (Drift 30 / Space 25 / base 45) after testing. Existing tests that
+- Set the release split after tuning (Drift 25, base 25, Space lowered to its final share). Existing tests that
   read the old 30% Drift share or base-Kosmic fingerprints disagree under the testing split until
   then (`KosmicDriftCompareTests`, possibly `KosmicAutoSweepTests`, the Kosmic `DeterminismTests`
   seeds).

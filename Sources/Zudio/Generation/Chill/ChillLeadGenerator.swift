@@ -37,7 +37,8 @@ struct ChillLeadGenerator {
         }
         // CHL-LD1-005: St Germain staccato style — suppressed in blues (blues needs sustained phrases).
         let forceNonStaccato = bluesVariation || (forceRuleID != nil && forceRuleID != "CHL-LD1-005")
-        let staccatoProb: Double = forceNonStaccato ? 0.0 : (beatStyle == .stGermain ? 0.85 : 0.15)
+        // 70% on the St Germain beat, 5% on the other four: about 18% of Chill songs (was 85/15, 29%).
+        let staccatoProb: Double = forceNonStaccato ? 0.0 : (beatStyle == .stGermain ? 0.70 : 0.05)
         if rng.nextDouble() < staccatoProb {
             usedRuleIDs.insert("CHL-LD1-005")
             let events = stGermainStaccato(frame: frame, structure: structure,
@@ -56,40 +57,61 @@ struct ChillLeadGenerator {
         //
         // Regular Chill pool: 001 20%, 002 20%, 003 15%, 004 13%, 007 12%, 008 12%, 009 8%.
         // (005 "St Germain Staccato Burst" handled by separate staccato path above.)
+        //
+        // Jazz cell rules (2026-11-07, tuned by ear): CHL-LD1-013 Moanin' (Blues only),
+        // CHL-LD1-014 Cantaloupe Island (both) and CHL-LD1-015 Blue Monk (Chill only). A first draw
+        // picks a jazz rule; otherwise the old rules run on their own draw. To restore the original
+        // weights, delete the two `j <` branches and use the weights below. Original weights:
+        //   Blues: 009 35, 004 35, 002 20, 003 10
+        //   Chill: 001 20, 002 20, 003 15, 004 13, 007 12, 008 12, 009 8, staccato roll 85/15
+        // Now, as a share of all songs:
+        //   Blues: 013 18, 014 12, 009 18, 004 18, 002 20, 003 14
+        //   Chill: 005 18, 014 15, 015 15, 001 14, 007 11, 008 11, 004 9, 009 7 (002, 003 Blues only)
+        let jazzRules = ["CHL-LD1-013", "CHL-LD1-014", "CHL-LD1-015"]
         let ruleID: String
         if bluesVariation {
-            let bluesPool = ["CHL-LD1-004","CHL-LD1-009","CHL-LD1-002","CHL-LD1-003"]
+            let bluesPool = ["CHL-LD1-004","CHL-LD1-009","CHL-LD1-002","CHL-LD1-003",
+                             "CHL-LD1-013","CHL-LD1-014"]
             if let forced = forceRuleID, bluesPool.contains(forced) {
                 ruleID = forced
+            } else if case let j = rng.nextDouble(), j < 0.30 {
+                ruleID = j < 0.18 ? "CHL-LD1-013" : "CHL-LD1-014"
             } else {
                 let r = rng.nextDouble()
-                ruleID = r < 0.35 ? "CHL-LD1-009"
-                       : r < 0.70 ? "CHL-LD1-004"
-                       : r < 0.90 ? "CHL-LD1-002"
-                       :            "CHL-LD1-003"
+                ruleID = r < 0.257 ? "CHL-LD1-009"
+                       : r < 0.514 ? "CHL-LD1-004"
+                       : r < 0.80  ? "CHL-LD1-002"
+                       :             "CHL-LD1-003"
             }
         } else {
-            let chillPool = ["CHL-LD1-001","CHL-LD1-002","CHL-LD1-003","CHL-LD1-004",
-                             "CHL-LD1-007","CHL-LD1-008","CHL-LD1-009"]
+            let chillPool = ["CHL-LD1-001","CHL-LD1-004","CHL-LD1-007","CHL-LD1-008","CHL-LD1-009",
+                             "CHL-LD1-014","CHL-LD1-015"]
             if let forced = forceRuleID, chillPool.contains(forced) {
                 ruleID = forced
             } else if forceRuleID != nil {
                 ruleID = forceRuleID!   // allow 005 and other overrides to pass through
+            } else if case let j = rng.nextDouble(), j < 0.366 {
+                ruleID = j < 0.183 ? "CHL-LD1-014" : "CHL-LD1-015"
             } else {
+                // 002 Miles punch and 003 Chet sparse are Chill Blues only (Zack, 2026-11-07).
                 let r = rng.nextDouble()
-                ruleID = r < 0.20 ? "CHL-LD1-001"
-                       : r < 0.40 ? "CHL-LD1-002"
-                       : r < 0.55 ? "CHL-LD1-003"
-                       : r < 0.68 ? "CHL-LD1-004"
-                       : r < 0.80 ? "CHL-LD1-007"
-                       : r < 0.92 ? "CHL-LD1-008"
-                       :            "CHL-LD1-009"
+                ruleID = r < 0.269 ? "CHL-LD1-001"
+                       : r < 0.442 ? "CHL-LD1-004"
+                       : r < 0.654 ? "CHL-LD1-007"
+                       : r < 0.865 ? "CHL-LD1-008"
+                       :             "CHL-LD1-009"
             }
         }
         let useJazzIdioms   = (ruleID == "CHL-LD1-009")
         let useBluesRuns    = (ruleID == "CHL-LD1-004")   // CHL-LD1-004: occasional fast blues runs
         let isShortPunch    = (ruleID == "CHL-LD1-002")   // CHL-LD1-002: compact staccato punches
         let isSparseMelodic = (ruleID == "CHL-LD1-003")   // CHL-LD1-003: sparse phrasing, per-bar density
+        // CHL-LD1-013/014/015: phrases come from a lick bank (jazzCellPhrase) instead of buildPhrase.
+        var jazzState: JazzCellState? = jazzRules.contains(ruleID)
+            ? JazzCellState(ruleID: ruleID, regLow: register(for: leadInstrument).low,
+                            regHigh: register(for: leadInstrument).high,
+                            keyPC: frame.keySemitoneValue, rng: &rng)
+            : nil
         usedRuleIDs.insert(ruleID)
 
         var events: [MIDIEvent] = []
@@ -118,6 +140,12 @@ struct ChillLeadGenerator {
             let blueRoll = rng.nextDouble()
             let phraseEndChord   = structure.chordWindow(atBar: bar + bars - 1)
             let phraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
+            if jazzState != nil {
+                return jazzCellPhrase(state: &jazzState!, frame: frame, structure: structure,
+                                      bar: bar, bars: bars, section: label,
+                                      leadInstrument: leadInstrument,
+                                      regLow: regLow, regHigh: regHigh, rng: &rng)
+            }
             let phrase = buildPhrase(frame: frame, bar: bar, bars: bars,
                                leadInstrument: leadInstrument,
                                pentatonic: pentatonic, scale: scale,
@@ -332,8 +360,8 @@ struct ChillLeadGenerator {
                 }
             }
 
-            // Phrase length: instrument-specific
-            let phraseLen: Int
+            // Phrase length: instrument-specific (the jazz cell rules set their own, below)
+            var phraseLen: Int
             switch leadInstrument {
             case .flute:         phraseLen = 3 + rng.nextInt(upperBound: 2)   // 3–4 bars
             case .recorder:      phraseLen = 3 + rng.nextInt(upperBound: 2)   // 3–4 bars, as the flute
@@ -347,6 +375,7 @@ struct ChillLeadGenerator {
             case .trombone:      phraseLen = 2 + rng.nextInt(upperBound: 3)   // 2–4 bars (smooth, longer lines)
             case .synthBrass:    phraseLen = 2 + rng.nextInt(upperBound: 2)   // 2–3 bars
             }
+            if let js = jazzState { phraseLen = js.phraseBars }
 
             // Clamp phrase to section boundary; intro/outro phrases max 2 bars to keep density low
             let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars
@@ -1649,5 +1678,218 @@ struct ChillLeadGenerator {
         }
         onsets.append((startBar: start, endBar: prev + 1))
         return onsets
+    }
+}
+
+// MARK: - Jazz cell rules: CHL-LD1-013 Moanin', CHL-LD1-014 Cantaloupe Island, CHL-LD1-015 Blue Monk
+//
+// Each rule plays licks from a small bank taken from a real tune (sources and analysis in
+// docs/chill-jazz-leads-plan.md), reworked as homage. The seed picks the order, the rhythmic
+// placement and the answer, and the licks change as the song goes on. A lick is written in minor
+// blues terms, as semitones from the chord root under the phrase's first bar. It is moved to that
+// root and fitted to the song's scale and chords, so one bank serves Dorian Blues and the major
+// modes of regular Chill.
+
+/// One note of a lick: step from the phrase start, semitones from the chord root, length in steps.
+typealias JazzNote = (step: Int, iv: Int, dur: Int)
+
+/// Per-song choices for a jazz cell rule, drawn once when the rule is picked.
+struct JazzCellState {
+    let ruleID: String
+    /// Phrases played so far; the licks change as this grows.
+    var statements = 0
+    /// Cantaloupe Island: the full hook has come back in the last fifth of the song.
+    var finalHookDone = false
+    /// Moanin': the order the three calls climb through, as the head does (A, B, C, A).
+    let ladder: [Int]
+    /// Rhythmic placement in steps: Moanin' pickup on beat 2 or beat 1, Blue Monk riff on the
+    /// downbeat or an 8th late, Cantaloupe solo licks on the beat or a beat late.
+    let shift: Int
+    /// Moanin': the amen answers b7 to 5 instead of 4 to b3.
+    let altAmen: Bool
+    /// The key-root MIDI note the phrases sit around.
+    let anchor: Int
+
+    var phraseBars: Int { ruleID == "CHL-LD1-014" ? 3 : 2 }
+
+    init(ruleID: String, regLow: Int, regHigh: Int, keyPC: Int, rng: inout SeededRNG) {
+        self.ruleID = ruleID
+        let ladders = [[0, 1, 2, 0], [0, 2, 1, 0], [1, 0, 2, 0]]
+        ladder = ladders[rng.nextInt(upperBound: ladders.count)]
+        switch ruleID {
+        case "CHL-LD1-013": shift = rng.nextDouble() < 0.65 ? 0 : -4
+        case "CHL-LD1-015": shift = rng.nextDouble() < 0.65 ? 0 : 2
+        default:            shift = rng.nextDouble() < 0.65 ? 0 : 4
+        }
+        altAmen = rng.nextDouble() < 0.30
+        // The key root a few semitones under the middle of the register, so climbing licks fit.
+        let target = (regLow + regHigh) / 2 - 3
+        let below = target - ((target - keyPC) % 12 + 12) % 12
+        anchor = (target - below > 6) ? below + 12 : below
+    }
+}
+
+extension ChillLeadGenerator {
+
+    // Moanin' (Bobby Timmons, from Art Blakey's Moanin', 1958): a two-bar call and response.
+    private static let moaninCalls: [[JazzNote]] = [
+        // A: pickup, climbs to b3, drops to the 5 and b7 below, lands on the root
+        [(4, 0, 2), (7, 0, 1), (8, 3, 3), (11, 3, 1), (12, 0, 3), (15, -5, 1), (16, -2, 3), (20, 0, 4)],
+        // B: climbs to 4, falls through the blue note, #4-4-b3, to the root
+        [(4, 0, 2), (7, 0, 1), (8, 3, 3), (12, 5, 4), (16, 6, 1), (17, 5, 1), (18, 3, 2), (20, 0, 4)],
+        // C: climbs to 5 and b7, the same blue-note fall
+        [(4, 0, 2), (7, 0, 1), (8, 7, 3), (12, 10, 4), (16, 6, 1), (17, 5, 1), (18, 3, 2), (20, 0, 4)],
+    ]
+    /// The horns' "A-men", the top voice of the IV-to-I answer: 4 held, then b3.
+    private static let moaninAmen: [JazzNote]     = [(24, 5, 6), (30, 3, 2)]
+    private static let moaninAmenAlt: [JazzNote]  = [(24, 10, 6), (30, 7, 2)]
+    /// A longer amen that comes home: 4, b3, root.
+    private static let moaninAmenHome: [JazzNote] = [(24, 5, 3), (28, 3, 2), (30, 0, 2)]
+    /// Over other chords, the shape of the bridge: a held 5 slipping down, then b3 settling home.
+    private static let moaninBridge: [JazzNote] =
+        [(0, 7, 7), (8, 6, 1), (9, 5, 2), (11, 0, 1), (12, 5, 3),
+         (16, 3, 7), (24, -2, 3), (27, -5, 1), (28, -2, 2), (30, 0, 2)]
+
+    // Cantaloupe Island (Herbie Hancock, Empyrean Isles, 1964).
+    /// The hook: 1 1 . 1 b3 4, then 4 held, b3 4 5, then the b7 below and a long root.
+    private static let cantaloupeHook: [JazzNote] =
+        [(0, 0, 2), (2, 0, 2), (10, 0, 2), (12, 3, 2), (14, 5, 2),
+         (16, 5, 10), (26, 3, 2), (28, 5, 3), (31, 7, 2), (33, -2, 3), (36, 0, 12)]
+    /// The second statement: a ghost octave on the second note and a 5-b7 tag at the end.
+    private static let cantaloupeRestate: [JazzNote] =
+        [(0, 0, 2), (2, 12, 1), (10, 0, 2), (12, 3, 2), (14, 5, 2),
+         (16, 5, 10), (26, 3, 2), (28, 5, 3), (31, 7, 2), (33, -2, 3), (36, 0, 8), (44, 7, 2), (46, 10, 2)]
+    /// The top voice of the horn stabs: hits on steps 6, 9, 12 and 14, then one hit a bar later.
+    private static let cantaloupeStabs: [JazzNote] = [(6, 0, 1), (9, 0, 1), (12, 0, 2), (14, 3, 2), (26, 0, 2)]
+    /// 8th-note lines in the manner of Freddie Hubbard's solo, with the #4 blue note.
+    private static let cantaloupeSolos: [[JazzNote]] = [
+        [(0, 5, 2), (2, 3, 2), (4, 5, 2), (6, 3, 2), (8, 0, 2), (10, 3, 2), (12, 5, 1), (13, 6, 1),
+         (14, 5, 2), (16, 3, 2), (18, 0, 6)],
+        [(0, 7, 2), (2, 5, 2), (4, 3, 2), (6, 2, 2), (8, 0, 4), (16, 2, 2), (18, 5, 2), (20, 7, 1),
+         (21, 7, 3), (24, 6, 2), (26, 6, 2), (28, 5, 1), (29, 3, 1), (30, 0, 2)],
+    ]
+
+    // Blue Monk (Thelonious Monk, 1954): a one-bar riff, a chromatic climb into a held 5.
+    /// The source climbs 3-4-#4-5 over a major chord; in minor blues terms it is b3-4-#4-5.
+    private static let monkRiff: [JazzNote]   = [(0, 3, 2), (2, 5, 2), (4, 6, 2), (6, 7, 10)]
+    /// The falling answer: 5 6 5 #4 4, the 5 below, then 2 rising to b3.
+    private static let monkAnswer: [JazzNote] =
+        [(16, 7, 2), (18, 9, 2), (20, 7, 2), (22, 6, 2), (24, 5, 2), (26, -5, 2), (28, 2, 2), (30, 3, 2)]
+    /// The short tail: b3, then 2 held.
+    private static let monkTail: [JazzNote]   = [(18, 3, 4), (22, 2, 8)]
+
+    /// One phrase for a jazz cell rule. Picks a lick for this point in the song, moves it to the
+    /// chord root under the phrase's first bar, and fits it to the scale and the register.
+    static func jazzCellPhrase(state: inout JazzCellState, frame: GlobalMusicalFrame,
+                               structure: SongStructure, bar: Int, bars: Int,
+                               section: SectionLabel, leadInstrument: ChillLeadInstrument,
+                               regLow: Int, regHigh: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        let k = state.statements
+        state.statements += 1
+        let degree  = structure.chordWindow(atBar: bar)?.chordRoot ?? "1"
+        let onTonic = degree == "1"
+        let late    = bar >= frame.totalBars * 4 / 5   // the last fifth plays the licks plain
+        let shift   = state.shift
+
+        var cell: [JazzNote]
+        switch state.ruleID {
+        case "CHL-LD1-013":   // Moanin'
+            if !onTonic && rng.nextDouble() < 0.50 {
+                cell = moaninBridge
+            } else {
+                cell = moaninCalls[state.ladder[k % state.ladder.count]].map {
+                    (step: $0.step < 16 ? $0.step + shift : $0.step, iv: $0.iv, dur: $0.dur)
+                }
+                // The first four calls are always answered; later the answer varies or drops out.
+                let answer = rng.nextDouble()
+                if late || k < 4 || answer >= 0.55 {
+                    cell += state.altAmen ? moaninAmenAlt : moaninAmen
+                } else if answer >= 0.25 {
+                    cell += moaninAmenHome
+                }
+            }
+        case "CHL-LD1-014":   // Cantaloupe Island
+            if k < 2 {
+                cell = k == 0 ? cantaloupeHook : cantaloupeRestate
+            } else if late && !state.finalHookDone {
+                cell = cantaloupeHook
+                state.finalHookDone = true
+            } else {
+                let r = rng.nextDouble()
+                let fragment = cantaloupeHook.filter { $0.step < 32 }
+                if !onTonic {
+                    cell = r < 0.50 ? fragment : cantaloupeStabs
+                } else if r < 0.30 {
+                    cell = fragment
+                } else if r < 0.80 {
+                    cell = cantaloupeSolos[rng.nextInt(upperBound: cantaloupeSolos.count)].map {
+                        (step: $0.step + shift, iv: $0.iv, dur: $0.dur)
+                    }
+                } else {
+                    cell = cantaloupeStabs
+                }
+            }
+        default:              // CHL-LD1-015 Blue Monk
+            var riff: [JazzNote] = monkRiff.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
+            // Later on the riff sometimes cuts its held note short, leaving air.
+            if k >= 3 && !late && rng.nextDouble() < 0.30 { riff[riff.count - 1].dur = 4 }
+            let answer: [JazzNote]
+            if k == 0 || late           { answer = monkAnswer }
+            else if k == 1 || !onTonic  { answer = monkTail }
+            else                        { answer = rng.nextDouble() < 0.50 ? monkAnswer : monkTail }
+            cell = riff + answer
+        }
+
+        // Fit to the phrase: drop what runs past its end, and keep the line to one note at a time.
+        let span = bars * 16
+        cell = cell.filter { $0.step >= 0 && $0.step < span }.sorted { $0.step < $1.step }
+        guard !cell.isEmpty else { return [] }
+        for i in cell.indices {
+            let end = i + 1 < cell.count ? cell[i + 1].step : span
+            cell[i].dur = Swift.max(1, Swift.min(cell[i].dur, end - cell[i].step))
+        }
+
+        // Move to the chord root, in the octave nearest the song's anchor where the whole lick fits.
+        let rootPC = (frame.keySemitoneValue + degreeSemitone(degree)) % 12
+        let lo = cell.map { $0.iv }.min()!, hi = cell.map { $0.iv }.max()!
+        let roots = Array(stride(from: 24 + rootPC, through: 108, by: 12))
+        let fitting = roots.filter { $0 + lo >= regLow && $0 + hi <= regHigh }
+        let root = (fitting.isEmpty ? roots : fitting)
+            .min { Swift.abs($0 - state.anchor) < Swift.abs($1 - state.anchor) }!
+
+        let mutedTrumpetBoost = leadInstrument == .mutedTrumpet ? 22 : 0
+        let velBase: Int
+        switch section {
+        case .intro, .outro: velBase = 47 + mutedTrumpetBoost
+        case .B:             velBase = 72 + mutedTrumpetBoost
+        default:             velBase = 67 + mutedTrumpetBoost
+        }
+        let scale = frame.scalePCs
+        var events: [MIDIEvent] = []
+        for (i, n) in cell.enumerated() {
+            let at = bar * 16 + n.step
+            let tones = structure.chordWindow(atBar: at / 16)?.chordTones ?? []
+            let allowed = scale.union(tones)
+            var pitch = root + n.iv
+            if !allowed.contains(pitch % 12) {
+                // A short note a semitone from the next one is a passing tone (the blue note, or a
+                // chromatic approach) and stays. Anything else moves to the nearest allowed note,
+                // a chord tone first, then the lower one.
+                let next = i + 1 < cell.count ? root + cell[i + 1].iv : nil
+                let passing = n.dur <= 2 && next.map { Swift.abs($0 - pitch) == 1 } == true
+                if !passing {
+                    let options = [pitch - 1, pitch + 1, pitch - 2, pitch + 2]
+                        .filter { allowed.contains($0 % 12) }
+                    pitch = options.first { tones.contains($0 % 12) } ?? options.first ?? pitch
+                }
+            }
+            while pitch < regLow  { pitch += 12 }
+            while pitch > regHigh { pitch -= 12 }
+            let accent = n.step % 4 == 0 ? 4 : 0
+            let vel = Swift.max(30, Swift.min(120, velBase + accent + rng.nextInt(upperBound: 9) - 4))
+            events.append(MIDIEvent(stepIndex: at, note: UInt8(pitch), velocity: UInt8(vel),
+                                    durationSteps: n.dur))
+        }
+        return events
     }
 }

@@ -35,12 +35,13 @@ struct KosmicMusicalFrameGenerator {
     // MARK: - Substyle shares
 
     /// Shares of the one roll that picks Kosmic Drift, Kosmic Space or base Kosmic.
-    /// TESTING split: Drift 10 / Space 80 / base 10, so a listening batch is mostly Space.
-    /// Release split, to be confirmed by listening: Drift 0.30 / Space 0.25 / base 0.45.
+    /// TUNING split (Zack, 2026-11-07): Drift 25 / Space 50 / base 25. Space is held high
+    /// while it is tuned; Zack's release target is Drift 25 / base 25, with Space lowered
+    /// to its final share (base gets the remainder, so lowering Space raises base).
     /// Moving `driftShare` changes which existing seeds roll Drift; the determinism
     /// fingerprint is pinned against the release values once they are restored.
-    static let driftShare = 0.10
-    static let spaceShare = 0.80
+    static let driftShare = 0.25
+    static let spaceShare = 0.50
     /// Share of Space songs in ab and aba forms that take a bridge (`SpaceBridge`).
     /// Release value 0.30 (Zack, 2026-11-06): about 1 Space song in 6. Testing used 0.80.
     static let spaceBridgeShare = 0.30
