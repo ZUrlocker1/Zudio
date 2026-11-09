@@ -1,8 +1,8 @@
 # Zudio Change Log
 
-## V 2.9 (Build 135) — Kosmic Space (work in progress)
+## V 2.9 (Build 135) — Kosmic Space
 
-In the source on `main` (merged 2026-11-02). Published 2026-11-03 as the 2.9 download, a work-in-progress build for testing Kosmic Space. Still being tuned by ear.
+In the source on `main` (merged 2026-11-02). Published 2026-11-03 as the 2.9 download; finished 2026-11-09 (Kosmic split Drift 25 / Space 35 / base 40) and headed for the App Store after a few days of listening.
 
 - **New Kosmic Space substyle** — (2026-11-02) A Jean-Michel Jarre substyle of Kosmic, built from rules measured on 16 MIDI transcriptions of his music. This first phase models *Oxygene*. A locked root-and-octave sequencer runs over fast minor chord cycles of 2- and 4-bar chords, with the Minipops preset rhythm box, a falling Oxygene bass, a slow falling theme in the A sections and a see-saw riff in the B sections, string-machine pads and white-noise surf sweeps into the section changes. Every rule varies its source figure per song, so no song copies the original. Six new rules: KOS-DRUM-009 Oxygene Preset Box, KOS-BASS-018 Oxygene Falling Walk, KOS-RTHM-016 Oxygene Octave Sequencer, KOS-LD1-013 Oxygene Falling Theme, KOS-LD1-014 Oxygene See-Saw Riff and KOS-TEXT-005 Oxygene Surf Sweep.
 - **Space tuning after listening** — (2026-11-03) The first stretch where the drums thin always takes the bass with it. The Falling Walk bass gains a breath bar (second bar of each 8, last short note drops) and a turn (last bar before a new section, final note lifts), lighter than the Pump's variations. JMJ Mini Pops drops out completely in the first two thin stretches and returns on a 1 or 2 beat tom roll. Hand Percussion thins over every bass or drum stretch, never plays the guiro there, and is now 13% of Space songs (Preset Box 38, Mini Pops 34, none 15); its guiro is quieter. Lead 2 Saw Lead and Square Lead 2, Rhythm Moog and Lead 1 Synth Brass 2 are trimmed again. The redundant `Space Oxygene, ...` generation log line is gone.
