@@ -39,10 +39,10 @@ struct MIDILaneView: View {
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
         let version   = cacheVersion
-        // Adaptive fps: at wide zoom the playhead moves <1px/frame at 15fps — no
+        // Adaptive fps: at wide zoom the playhead moves <1px/frame at 20fps — no
         // visible difference, so run fewer redraws to save CPU.
-        // ≤8 bars → 15fps  |  9–32 bars → 8fps  |  ≥33 bars → 4fps
-        let playheadFPS: Double = visibleBars <= 8 ? 15 : visibleBars <= 32 ? 8 : 4
+        // ≤8 bars → 20fps (fractional position, glides between steps)  |  9–32 bars → 8fps  |  ≥33 bars → 4fps
+        let playheadFPS: Double = visibleBars <= 8 ? 20 : visibleBars <= 32 ? 8 : 4
 
         ZStack {
             // Note layer — Equatable, skipped on every tick. O(N) note draw
@@ -68,12 +68,12 @@ struct MIDILaneView: View {
             if playback.isPlaying {
                 TimelineView(.periodic(from: .now, by: 1.0 / playheadFPS)) { _ in
                     Canvas { ctx, size in
-                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockStep)
+                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockPosition)
                     }
                 }
             } else {
                 Canvas { ctx, size in
-                    drawPlayhead(ctx: ctx, size: size, currentStep: playback.displayStep)
+                    drawPlayhead(ctx: ctx, size: size, currentStep: Double(playback.displayStep))
                 }
             }
 
@@ -122,7 +122,7 @@ struct MIDILaneView: View {
 
     // MARK: - Playhead draw (O(1): only called by the playhead Canvas)
 
-    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Int) {
+    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Double) {
         let w = size.width
         let h = size.height
         let clampedVisible = max(1, min(visibleBars, totalBars))
@@ -130,8 +130,8 @@ struct MIDILaneView: View {
         let visibleSteps   = clampedVisible * 16
         let startStep      = clampedOffset * 16
 
-        guard currentStep >= startStep && currentStep < startStep + visibleSteps else { return }
-        let px = CGFloat(currentStep - startStep) / CGFloat(visibleSteps) * w
+        guard currentStep >= Double(startStep) && currentStep < Double(startStep + visibleSteps) else { return }
+        let px = CGFloat(currentStep - Double(startStep)) / CGFloat(visibleSteps) * w
         ctx.fill(Path(CGRect(x: px, y: 0, width: 2, height: h)),
                  with: .color(.white.opacity(0.9)))
         if showPlayheadHandle {

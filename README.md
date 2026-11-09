@@ -45,6 +45,7 @@ The download is `2.9` (build 135), the finished release with Kosmic Space (below
 - **Guitar-led rhythm** — Nylon, Jazz and Funk guitar carry most of the comping, with Rhodes and piano
 - **Blue notes in Chill Blues** — in some songs the soloist slips a blue note between the 4th and 5th, rarely and over the home chord, and the log reports "blues scale"
 - **Lower CPU use** — on a Mac Zudio now typically uses 15–20% CPU, and 5–10% in the compact view with no visualizer
+- **Smoother animation in track view**
 - **Bug fixes** — audio textures, saved songs, and Endless and Evolve playback, including a dropout when Evolve changes phase on Chill Blues and Soho songs
 
 

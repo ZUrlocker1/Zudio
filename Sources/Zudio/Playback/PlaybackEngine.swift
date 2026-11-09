@@ -62,6 +62,15 @@ final class PlaybackEngine: ObservableObject {
         return max(0, min(step, playbackTotalSteps - 1))
     }
 
+    /// Fractional version of wallClockStep for the playhead drawing: glides between steps
+    /// instead of jumping a whole 16th at a time.
+    var wallClockPosition: Double {
+        guard isPlaying && playbackSecondsPerStep > 0 else { return Double(displayStep) }
+        let elapsed = Date().timeIntervalSince(playbackStartWallTime)
+        let pos = Double(playbackStartStep) + elapsed / playbackSecondsPerStep
+        return max(0, min(pos, Double(playbackTotalSteps) - 0.001))
+    }
+
     private func recordPlaybackStart(step: Int, state: SongState) {
         playbackStartWallTime   = Date()
         playbackStartStep       = step

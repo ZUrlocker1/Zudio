@@ -29,7 +29,7 @@ struct AudioWaveformView: View {
         // displayStep is intentionally NOT read here — playhead uses wallClockStep
         // inside TimelineView so this body never re-evaluates on step ticks.
         // Adaptive fps: same logic as MIDILaneView.
-        let playheadFPS: Double = visibleBars <= 8 ? 15 : visibleBars <= 32 ? 8 : 4
+        let playheadFPS: Double = visibleBars <= 8 ? 20 : visibleBars <= 32 ? 8 : 4
 
         ZStack {
             WaveformLayerView(
@@ -47,12 +47,12 @@ struct AudioWaveformView: View {
             if playback.isPlaying {
                 TimelineView(.periodic(from: .now, by: 1.0 / playheadFPS)) { _ in
                     Canvas { ctx, size in
-                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockStep)
+                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockPosition)
                     }
                 }
             } else {
                 Canvas { ctx, size in
-                    drawPlayhead(ctx: ctx, size: size, currentStep: playback.displayStep)
+                    drawPlayhead(ctx: ctx, size: size, currentStep: Double(playback.displayStep))
                 }
             }
 
@@ -163,15 +163,15 @@ struct AudioWaveformView: View {
 
     // MARK: - Playhead (identical to MIDILaneView)
 
-    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Int) {
+    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Double) {
         let w = size.width
         let h = size.height
         let clampedVisible = max(1, min(visibleBars, totalBars))
         let clampedOffset  = max(0, min(barOffset, totalBars - clampedVisible))
         let visibleSteps   = clampedVisible * 16
         let startStep      = clampedOffset * 16
-        guard currentStep >= startStep && currentStep < startStep + visibleSteps else { return }
-        let px = CGFloat(currentStep - startStep) / CGFloat(visibleSteps) * w
+        guard currentStep >= Double(startStep) && currentStep < Double(startStep + visibleSteps) else { return }
+        let px = CGFloat(currentStep - Double(startStep)) / CGFloat(visibleSteps) * w
         ctx.fill(Path(CGRect(x: px, y: 0, width: 2, height: h)),
                  with: .color(.white.opacity(0.9)))
     }
