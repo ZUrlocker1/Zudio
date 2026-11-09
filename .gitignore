@@ -29,3 +29,4 @@ zudio-handler-diagnosis.pdf
 
 # fpcheck.sh transient output (the baseline is committed, the run is not)
 tools/fingerprints/all_now.txt
+docs/midi-analysis/eno/

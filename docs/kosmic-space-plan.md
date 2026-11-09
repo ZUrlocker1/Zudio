@@ -1,9 +1,9 @@
 # Kosmic Space — Design Document
 
-Status (2026-11-07): **built on `main` as version 2.9, a work in progress, tuned by ear.** Phase 1
+Status (2026-11-09): **built on `main` as version 2.9; testing finished, release split set (Drift 25 / Space 35 / base 40).** Phase 1
 (Oxygene), Phase 2 (Magnetic) and the first Phase 3 piece (Chronologie Pop Loop and Anticipated
 Strings) are in. Builds on macOS and iOS. The Magnetic rules and the last two additions sound good
-on first listens; tuning continues. Items not built are under "On hold" at the end.
+on first listens. Testing is finished. Unbuilt rule ideas are marked closed (not needed) under "On hold and closed" at the end; other unbuilt items are on hold.
 
 This is the single document for Kosmic Space and says where the design stands. How it got here is
 in git history and `docs/change-log.md`. Work happens on `main`; Zack is the only user of the repo.
@@ -22,7 +22,7 @@ in git history and `docs/change-log.md`. Work happens on `main`; Zack is the onl
 - Instruments, effects, titles and log
 - Rule ledger
 - Release checklist
-- On hold
+- On hold and closed
 
 ---
 
@@ -49,10 +49,7 @@ and Chronologie (1993, Oxygene 7–13). There is no per-song flavour: every trac
 independently from a pool holding the rules of every era, so a song can pair Magnetic Fields
 harmony with an Oxygene sequencer. The generation log names each rule by its album.
 
-**Share of Kosmic.** One roll shared with Drift. The tuning split (2026-11-07) is Drift 25 / Space 50 / base 25, kept as named constants. At release
-Drift and base stay at 25 each and Space is lowered to its final share, with base taking the
-remainder. Drift's threshold moved from 0.30 to 0.25, so some existing Drift seeds generate
-differently.
+**Share of Kosmic.** One roll shared with Drift. The final split (Zack, 2026-11-09) is Drift 25 / Space 35 / base 40, kept as named constants (`driftShare`, `spaceShare`; base takes the remainder). Testing is finished and Space is a favourite, so it stays in high rotation. Drift's threshold moved from 0.30 to 0.25 earlier, so some existing Drift seeds generate differently. Lowering Space from 0.50 to 0.35 moves seeds that roll between 0.60 and 0.75 from Space to base Kosmic.
 
 ---
 
@@ -497,18 +494,20 @@ pass; the stereo-twin detector.
 
 ## Release checklist
 
-- Set the release split after tuning (Drift 25, base 25, Space lowered to its final share). Existing tests that
-  read the old 30% Drift share or base-Kosmic fingerprints disagree under the testing split until
-  then (`KosmicDriftCompareTests`, possibly `KosmicAutoSweepTests`, the Kosmic `DeterminismTests`
-  seeds).
+- Release split set (2026-11-09): Drift 25, Space 35, base 40. Existing tests that read the old 30% Drift
+  share or the testing split may still disagree (`KosmicDriftCompareTests`, possibly
+  `KosmicAutoSweepTests`, the Kosmic `DeterminismTests` seeds). Not yet run or updated.
 - Keep testing light: build both apps, then listen. Fingerprint diffs only for changes that should
   be same-output.
 
 ---
 
-## On hold
+## On hold and closed
 
-Not built, and not discussed in detail. Each waits for listening to the current build.
+Closed means judged unnecessary on 2026-11-09 (Zack): Space sounds great without them. The notes stay
+here in full in case we decide to add them later. On hold means not built and not discussed in detail.
+
+### Closed: additional Space rules (unnecessary, kept for future consideration)
 
 - **Phase 3 Chronologie, the rest.** KOS-DRUM-011 Chronologie Four-on-the-Floor; the Chronologie
   Andalusian Descent family (i ×2, bVII ×2, bVI ×2, v ×2, Aeolian); the Zoolook Pedal family (one
@@ -522,6 +521,9 @@ Not built, and not discussed in detail. Each waits for listening to the current 
   Octaves with the Oxygene 6 paired-8th descent, an Oxygene 8 Phasing Cell, an Oxygene 6
   paired-descent rhythm, Oxygene 6 Close Chords pads, an Oxygene 8 Four Pulse drum, an Oxygene
   Half-Time drum. IDs are not reserved.
+
+### On hold
+
 - **Pedal Rise.** One non-tonic chord held 8 bars, drums out, a long swell into the return.
 - **Effects-only interlude.** Pads and a held Texture effect, as the endings of Oxygene 3 and 6.
 - **A Solina-type string sample.** Only if the string pads turn out not to sound like a string
