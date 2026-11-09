@@ -420,8 +420,8 @@ struct KosmicDrumGenerator {
     // Jarre plays no fills here, but a hundred bars of it unbroken is dull (Zack, 2026-11-06), so the
     // box takes short 1-beat Space fills at every body section change and on each side of its simpler
     // stretches, as well as the arrangement's break fills. B sections add an open hat on the last
-    // 8th of every second bar. The simpler stretches drop the gallop for the kick alone on beats 1
-    // and 3, under 8th or quarter tops, so a long song gets relief from it. When the bass is the
+    // 8th of every second bar. The simpler stretches drop the kick but keep the gallop's shape (soft
+    // 16th tops, or quarter tops with snare ghosts on the pairs), so a long song gets relief from it. When the bass is the
     // Berlin School drone, Falling Walk or Magnetic Triad Walk, B sections play the plainer kick of
     // Magnetic Fields 2 and 4 on steps 0, 6, 8 and 14, which lands on those basses' 8ths; under the
     // two Pumps, whose 16ths it misses, B keeps the gallop. Repeat guard: the top's last 16th drops
@@ -459,17 +459,23 @@ struct KosmicDrumGenerator {
                 }
                 continue
             }
-            // Simpler stretches: the kick on beats 1 and 3 only; variant 0 has 8th tops, variant 1
-            // quarter tops; no snare, agogo or open hat.
+            // Simpler stretches keep the gallop but lose the kick (Zack, 2026-11-09, Ionique VIII Part 7:
+            // the kick on beats 1 and 3 alone had lost the character). Variant 0 keeps the top on every
+            // 16th, softer; variant 1 keeps quarter tops and carries the gallop's pairs on steps 2-3,
+            // 6-7, 10-11 and 14-15 as quiet snare ghosts. No agogo or open hat; no new draws.
             let thin = arrangement?.drumThin(atBar: bar)?.variant
             let inB = structure.section(atBar: bar)?.label == .B
             // Full B bars lighten: 8th tops under a ride bell on the beats, and the snare keeps only its
             // off-beats (Zack, 2026-11-07).
-            let topStep = thin == nil ? (inB ? 2 : 1) : thin == 0 ? 2 : 4
+            let topStep = thin == nil ? (inB ? 2 : 1) : thin == 0 ? 1 : 4
             for step in stride(from: 0, to: 16, by: topStep) where !(bar % 8 == 7 && step == 15) {
-                hit(barStart + step, top, step % 4 == 0 ? 66 : 48)
+                let vel: UInt8 = thin == 0 ? (step % 4 == 0 ? 58 : 38) : (step % 4 == 0 ? 66 : 48)
+                hit(barStart + step, top, vel)
             }
-            let kicks = thin != nil ? [0, 8] : inB && walkingBass ? pulseSteps : kickSteps
+            if thin == 1 {
+                for step in [2, 3, 6, 7, 10, 11, 14, 15] { hit(barStart + step, .snare2, step % 4 == 3 ? 36 : 32) }
+            }
+            let kicks = thin != nil ? [] : inB && walkingBass ? pulseSteps : kickSteps
             for step in kicks { hit(barStart + step, .kick, step % 8 == 0 ? 96 : 84) }
             if thin == nil {
                 for step in snareSteps where !(inB && step % 4 == 3) { hit(barStart + step, .snare2, step % 4 == 2 ? 72 : 60) }
