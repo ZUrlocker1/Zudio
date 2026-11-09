@@ -467,3 +467,20 @@ struct ZudioApp: App {
         #endif
     }
 }
+
+#if os(macOS) && arch(x86_64)
+// Xcode 27's libclang_rt.osx.a has no x86_64 slice, so the Intel half of the universal
+// Release build cannot find ___isPlatformVersionAtLeast, which the compiler emits for
+// availability checks against newer SDKs (SwiftUI's tag opaque types, for one). This is the
+// same check, answered by dyld. The arm64 half links the toolchain library instead
+// (OTHER_LDFLAGS[arch=arm64] on the Mac Release configuration). Remove both when Xcode
+// ships an x86_64 runtime again.
+@_silgen_name("_availability_version_check")
+private func dyldAvailabilityVersionCheck(_ count: UInt32, _ versions: UnsafePointer<UInt32>) -> Bool
+
+@_cdecl("__isPlatformVersionAtLeast")
+func zudioIsPlatformVersionAtLeast(_ platform: UInt32, _ major: UInt32, _ minor: UInt32, _ subminor: UInt32) -> Int32 {
+    let versions: [UInt32] = [platform, (major << 16) | (minor << 8) | subminor]
+    return dyldAvailabilityVersionCheck(1, versions) ? 1 : 0
+}
+#endif

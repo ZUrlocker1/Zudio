@@ -1271,6 +1271,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = NO;
+				"OTHER_LDFLAGS[arch=arm64]" = (
+					"$(inherited)",
+					"$(TOOLCHAIN_DIR)/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.zudio.app;
 				PRODUCT_NAME = Zudio;
 				SDKROOT = macosx;
