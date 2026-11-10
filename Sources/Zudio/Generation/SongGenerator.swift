@@ -728,6 +728,18 @@ struct SongGenerator {
                                            skipLead1ClashFilter: isKosmicHook,
                                            uniformLead1Lift: isKosmicHook)
 
+        // Base Kosmic Lead 2 gap answers (KOS-LD2-002 to 004), written from the Lead 1 the listener
+        // hears, after ArrangementFilter and HarmonicFilter, as Motorik's step 12.6 does. Lead 2
+        // held only the bridge A-2 figure until now, so neither filter thinned an answer. The
+        // answers get their own HarmonicFilter pass inside the engine.
+        if let gapRule = lead2Rules.first(where: GapAnswerEngine.isKosmicGapRule) {
+            trackEvents[kTrackLead2] += GapAnswerEngine.generate(
+                ruleID: gapRule, lead1: trackEvents[kTrackLead1], lead1RuleIDs: lead1Rules,
+                frame: frame, structure: structure, tonalMap: tonalMap,
+                blockedBars: [], pads: trackEvents[kTrackPads], rng: &lead2RNG)
+            trackEvents[kTrackLead2].sort { $0.stepIndex < $1.stepIndex }
+        }
+
         // Kosmic density guard: if Rhythm is more than 2× as dense as Lead 1, thin Rhythm
         // to 65% retention to prevent it from burying the lead. Downbeats are always kept.
         let lead1Count  = trackEvents[kTrackLead1].count
@@ -1601,6 +1613,7 @@ struct SongGenerator {
             : nil
 
         var events: [MIDIEvent]
+        var kosmicGapAnswers: [MIDIEvent] = []   // base Kosmic Lead 2 gap answers, joined after the regen filter
         var chillLead1Returns: Set<Int>? = nil   // Chill Lead 1 regenerated: its returns to form
         let isKosmic  = songState.style == .kosmic
         let isAmbient = songState.style == .ambient
@@ -1794,6 +1807,15 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules, isKosmicSpace: isSpace,
                     spaceArrangement: regenArrangement,
                     rhythmEvents: songState.trackEvents[kTrackRhythm])
+                // A gap-answer rule is written as generation writes it, from the Lead 1 now
+                // playing; it is added after the regen filter below, which it has already had.
+                if !isSpace, let gapRule = usedRules.first(where: GapAnswerEngine.isKosmicGapRule) {
+                    kosmicGapAnswers = GapAnswerEngine.generate(
+                        ruleID: gapRule, lead1: songState.trackEvents[kTrackLead1],
+                        lead1RuleIDs: currentKosmicHookRules(songState.generationLog),
+                        frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap,
+                        blockedBars: [], pads: songState.trackEvents[kTrackPads], rng: &rng)
+                }
             } else if isChill {
                 // Derive lead1Onsets from current Lead 1 events so Lead 2 avoids overlapping
                 let lead1Evts = songState.trackEvents[kTrackLead1]
@@ -1965,11 +1987,19 @@ struct SongGenerator {
 
         // A regenerated Kosmic lead gets the harmonic filter a generated song's leads get, the clash
         // guard, the lift above the pads and the velocity arc; regen had skipped it (found 2026-11-03).
+        // A Kosmic hook Lead 1 skips the clash guard and gets one octave decision, as generation
+        // gives it (found 2026-11-10). Gap answers had their own pass and join afterwards.
         if isKosmic, trackIndex == kTrackLead1 || trackIndex == kTrackLead2 {
+            let hook = trackIndex == kTrackLead1 && usedRules.contains(where: HookLeadEngine.isKosmicHookRule)
             events = HarmonicFilter.filterLead(events, track: trackIndex,
                                                pads: songState.trackEvents[kTrackPads],
                                                frame: songState.frame, structure: songState.structure,
-                                               bounds: kRegisterBounds[trackIndex] ?? RegisterBounds(low: 55, high: 88))
+                                               skipClashFilter: hook,
+                                               bounds: kRegisterBounds[trackIndex] ?? RegisterBounds(low: 55, high: 88),
+                                               uniformLift: hook)
+            if trackIndex == kTrackLead2 && !kosmicGapAnswers.isEmpty {
+                events = (events + kosmicGapAnswers).sorted { $0.stepIndex < $1.stepIndex }
+            }
         }
 
         // A regenerated Drift track gets its bridge treatment, as generation gives it, replayed on a
@@ -2442,6 +2472,20 @@ struct SongGenerator {
     /// 4 to 8 bars long, never in the first 16 bars or the last 8, and never over Lead 1's solo.
     /// Drawn on its own stream so no other decision in the song shifts.
     /// The Motorik Lead 1 rules now playing: the song's own, or those of the latest Lead 1 regen.
+    /// The Kosmic hook rule Lead 1 plays now, from the log: KOS-LD2-003 pairs its cell with it.
+    /// Only the hook IDs are read, because Lead 2's old rules share the KOS-LEAD- prefix.
+    private static func currentKosmicHookRules(_ log: [GenerationLogEntry]) -> Set<String> {
+        var rules: Set<String> = []
+        for entry in log {
+            if entry.tag == "⚡ REGEN" {
+                if entry.description == kTrackNames[kTrackLead1] { rules = [] }
+            } else if HookLeadEngine.isKosmicHookRule(entry.tag) {
+                rules.insert(entry.tag)
+            }
+        }
+        return rules
+    }
+
     private static func currentMotorikLead1Rules(_ log: [GenerationLogEntry]) -> Set<String> {
         var rules: Set<String> = []
         for entry in log {
@@ -3095,6 +3139,9 @@ struct SongGenerator {
         case "KOS-LD1-017": return "Oxygene 8 Offbeat Climb"
         case "KOS-LD2-000":  return "No lead 2"
         case "KOS-LD2-001":  return "Magnetic Twin"
+        case "KOS-LD2-002":  return "Slow echo answer"
+        case "KOS-LD2-003":  return "Slow answer cell"
+        case "KOS-LD2-004":  return "Gap reply melody"
         default:             return ruleID
         }
     }

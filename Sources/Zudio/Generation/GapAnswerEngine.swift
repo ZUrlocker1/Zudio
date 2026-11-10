@@ -28,6 +28,25 @@ enum GapAnswerEngine {
 
     static func isGapRule(_ id: String) -> Bool { ruleIDs.contains(id) }
 
+    // Base Kosmic Lead 2 (phase 5). The same engine with Kosmic data: a register under Lead 1,
+    // slower answers, cells paired with the Kosmic hooks, and Lead 2 starting on bar lines.
+    static let kosmicEcho  = "KOS-LD2-002"   // Slow echo answer
+    static let kosmicCell  = "KOS-LD2-003"   // Slow answer cell
+    static let kosmicReply = "KOS-LD2-004"   // Gap reply melody
+    static let kosmicRuleIDs: Set<String> = [kosmicEcho, kosmicCell, kosmicReply]
+
+    static func isKosmicGapRule(_ id: String) -> Bool { kosmicRuleIDs.contains(id) }
+
+    /// Kosmic Lead 2's register, mostly under Lead 1's 56 to 84. Wider than an octave: at 55 to 67
+    /// a two-note figure straddling the edge folded one note down an octave (Lone Spectrum, a
+    /// step became a seventh).
+    static let kosmicRegister = RegisterBounds(low: 52, high: 69)
+    /// Kosmic cells span up to an octave and a half (Beach Scene's IV and V arpeggio covers 12
+    /// semitones), so they get room to keep their shape in any key.
+    private static let kosmicCellRegister = RegisterBounds(low: 52, high: 69)
+    /// Kosmic harmony windows sit with Lead 1, a third under it or in unison, so they follow it up.
+    private static let kosmicHarmonyRegister = RegisterBounds(low: 52, high: 79)
+
     /// Lead 2's register on this path, below Lead 1's 52 to 79. HarmonicFilter gets it as the
     /// track's bounds, so Pass B can't lift an answer back above 67.
     static let register = RegisterBounds(low: 50, high: 67)
@@ -66,6 +85,27 @@ enum GapAnswerEngine {
         [n(0, 0, 8, 70)],
     ]
 
+    /// KOS-LD2-003's cells for the Kosmic hooks, in semitones from the song tonic, with the
+    /// homage operations that keep each one recognisable. KOS-LEAD-010 Blade Runner theme has no
+    /// stored cell: its answer is Lead 1's own held last note, a third lower (see `generate`).
+    private static let kosmicPairedCells: [String: (cell: [HookBar], homage: [Double])] = [
+        // Pulstar's rising riff, a native 16th figure: 1 2 flat 3 into 4 on the bar, 5, then
+        // back to 1, held. Only a dropped middle note keeps it a rising run.
+        "KOS-LEAD-011": ([[n(13, 0, 1, 58), n(14, 2, 1, 60), n(15, 3, 1, 62)],
+                          [n(0, 5, 2, 66), n(2, 7, 1, 62), n(3, 0, 9, 64)]],
+                         [0, 1, 0, 0, 0]),
+        // Beach Scene's answer: rising arpeggios on IV and V in 8ths, landing on the root.
+        "KOS-LEAD-012": ([[n(0, -12, 2, 60), n(2, -7, 2, 62), n(4, -3, 4, 64),
+                           n(8, -10, 2, 60), n(10, -5, 2, 62), n(12, -1, 4, 64)],
+                          [n(0, 0, 12, 66)]],
+                         [0.5, 0.5, 0, 0, 0]),
+    ]
+
+    /// KOS-LD2-003 under every other Kosmic Lead 1 rule: KOS-LEAD-004's two-on, two-off echo cell,
+    /// two held notes a step apart, the fifth rising to the sixth. Every other answer plays it a
+    /// third lower, as the old rule's echo did.
+    private static let kosmicPairCell: [HookBar] = [[n(0, 7, 14, 62)], [n(0, 9, 14, 58)]]
+
     // MARK: - Phrase map
 
     struct Phrase {
@@ -101,7 +141,9 @@ enum GapAnswerEngine {
     /// `steps` moves a cell note by scale steps after its pitch is worked out.
     private struct ANote { var at: Int; var src: Int; var len: Int; var vel: Int; var steps = 0 }
 
-    private enum Transform { case echo, stepDown, invert, cell, cellInverted }
+    /// `steps` moves Lead 1's own note by the ANote's scale steps (the Kosmic reply and the
+    /// Blade Runner answer).
+    private enum Transform { case echo, stepDown, invert, cell, cellInverted, steps }
 
     /// The forms an MOT-LD2-015 answer takes. The first and last answers of a song are the full
     /// cell; the others are drawn: full 35, the head alone 30, inverted around its last note 20,
@@ -125,6 +167,14 @@ enum GapAnswerEngine {
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var r = SeededRNG(seed: rng.next() ^ 0x4741_5041_4E53_5752)   // "GAPANSWR"
+        // Kosmic (KOS-LD2-002 to 004) runs the same draws in the same order with its own data, so
+        // the Motorik rules are untouched.
+        let kosmic = isKosmicGapRule(ruleID)
+        let echoRole = ruleID == echoAnswer || ruleID == statementHarmony || ruleID == kosmicEcho
+        let cellRole = ruleID == answerCell || ruleID == kosmicCell
+        let echoReg = kosmic ? kosmicRegister : register
+        let cellReg = kosmic ? kosmicCellRegister : cellRegister
+        let velBase = kosmic ? 62 : 70
         let phrases = phraseMap(lead1)
         guard !phrases.isEmpty else { return [] }
         let totalSteps = frame.totalBars * 16
@@ -133,13 +183,21 @@ enum GapAnswerEngine {
 
         // Drawn once per song.
         let target    = [4, 5, 6][r.weightedPick([0.30, 0.40, 0.30])]   // appearances in the body
-        let tailSteps = r.nextDouble() < 0.5 ? 2 : 4            // silence after a phrase ends
+        let tailDraw  = r.nextDouble() < 0.5                    // silence after a phrase ends
+        let tailSteps = kosmic ? (tailDraw ? 4 : 8) : (tailDraw ? 2 : 4)
         let echoKind  = r.weightedPick([0.45, 0.25, 0.30])      // a third, sixth or octave lower
         let harmonyOffset = r.nextInt(upperBound: 3)
-        let cellSource = lead1RuleIDs.sorted().compactMap { pairedCells[$0] }.first ?? descentCell
-        let cell = HookLeadEngine.homage(cellSource, count: r.nextDouble() < 0.5 ? 1 : 2, rng: &r)
-        // Half the songs let a middle Answer cell drop an octave now and then.
-        let octaveDropSong = r.nextDouble() < 0.50
+        let kosmicPaired = lead1RuleIDs.sorted().compactMap { kosmicPairedCells[$0] }.first
+        let cellSource = kosmic ? (kosmicPaired?.cell ?? kosmicPairCell)
+            : lead1RuleIDs.sorted().compactMap { pairedCells[$0] }.first ?? descentCell
+        let cell = HookLeadEngine.homage(cellSource, count: r.nextDouble() < 0.5 ? 1 : 2,
+                                         weights: kosmic ? kosmicPaired?.homage : nil, rng: &r)
+        // Half the songs let a middle Answer cell drop an octave now and then. Never in Kosmic.
+        let octaveDropSong = r.nextDouble() < 0.50 && !kosmic
+        // KOS-LD2-003 under KOS-LEAD-010 Blade Runner theme answers with Lead 1's held last note.
+        let bladeRunner = ruleID == kosmicCell && lead1RuleIDs.contains("KOS-LEAD-010")
+        // KOS-LEAD-004's two-on, two-off cell: every other answer a third lower.
+        let pairCell = kosmic && kosmicPaired == nil
 
         func scale(atBar bar: Int) -> Set<Int> {
             guard let mode = tonalMap.entry(atBar: bar)?.sectionMode else { return [] }
@@ -172,7 +230,7 @@ enum GapAnswerEngine {
         func shapeFromLead1(_ src: [MIDIEvent]) -> [ANote] {
             let mean = src.map { Int($0.velocity) }.reduce(0, +) / Swift.max(1, src.count)
             return src.map { ANote(at: $0.stepIndex, src: Int($0.note), len: $0.durationSteps,
-                                   vel: 70 + (Int($0.velocity) - mean) / 2) }
+                                   vel: velBase + (Int($0.velocity) - mean) / 2) }
         }
         let cellShape: [ANote] = cell.enumerated().flatMap { bi, bar in
             bar.map { ANote(at: bi * 16 + $0.step, src: $0.deg, len: $0.len, vel: $0.vel) }
@@ -205,24 +263,37 @@ enum GapAnswerEngine {
                 .filter({ lo + $0 >= cellRegister.low && hi + $0 <= cellRegister.high }).max() {
                 return high
             }
-            return fitShift(ps, in: register, keepIfFits: false)
+            return fitShift(ps, in: kosmic ? cellReg : register, keepIfFits: false)
         }()
 
         /// Places a shape after `earliest`, keeping its beat positions, and fits it to the grid.
         /// The answer ends by `limit`, at most `maxSpan` steps long; nil if it no longer fits.
-        func place(_ shape: [ANote], earliest: Int, limit: Int, maxSpan: Int = 32) -> [ANote]? {
+        /// A Kosmic cell (`barAligned`) keeps its place in the bar, moving by whole bars, and keeps
+        /// its own rhythm, which is written on the grid or, for Pulstar's riff, in native 16ths.
+        func place(_ shape: [ANote], earliest: Int, limit: Int, maxSpan: Int = 32,
+                   minNotes: Int = 2, barAligned: Bool = false) -> [ANote]? {
             guard let first = shape.first else { return nil }
-            var d = ((earliest - first.at) + 3).quotientRoundingDown(by: 4) * 4
-            // A half-bar start reads more clearly, when it still fits.
-            if (first.at + d) % 8 != 0,
-               let last = shape.last, last.at + d + 4 + Swift.min(last.len, 4) <= limit { d += 4 }
+            var d: Int
+            if barAligned {
+                d = ((earliest - first.at) + 15).quotientRoundingDown(by: 16) * 16
+            } else {
+                d = ((earliest - first.at) + 3).quotientRoundingDown(by: 4) * 4
+                // A half-bar start reads more clearly, when it still fits.
+                if (first.at + d) % 8 != 0,
+                   let last = shape.last, last.at + d + 4 + Swift.min(last.len, 4) <= limit { d += 4 }
+            }
             var notes = shape.map { ANote(at: $0.at + d, src: $0.src, len: $0.len, vel: $0.vel, steps: $0.steps) }
-            notes = gridFit(notes, limit: limit)
+            if barAligned {
+                notes.removeAll { $0.at >= limit }
+                if !notes.isEmpty { notes[notes.count - 1].len = Swift.min(notes[notes.count - 1].len, limit - notes[notes.count - 1].at) }
+            } else {
+                notes = gridFit(notes, limit: limit)
+            }
             notes.removeAll { $0.at < earliest }
-            while notes.count > 2, let f = notes.first, let l = notes.last, l.at + l.len - f.at > maxSpan {
+            while notes.count > minNotes, let f = notes.first, let l = notes.last, l.at + l.len - f.at > maxSpan {
                 notes.removeFirst()
             }
-            guard notes.count >= 2, let l = notes.last, l.at + l.len <= limit,
+            guard notes.count >= minNotes, let l = notes.last, l.at + l.len <= limit,
                   let f = notes.first, l.at + l.len - f.at <= maxSpan else { return nil }
             return notes
         }
@@ -250,6 +321,8 @@ enum GapAnswerEngine {
                     guard let mode = tonalMap.entry(atBar: nt.at / 16)?.sectionMode else { return tonicPC + 48 + nt.src }
                     let p = HookLeadEngine.pitch(for: nt.src, base: tonicPC + 48, mode: mode, scale: sc)
                     return shift(p, by: nt.steps, in: sc)
+                case .steps:
+                    return shift(snap(nt.src, to: sc), by: nt.steps, in: sc)
                 }
             }
             if transform == .cellInverted, let pivot = pitches.last, let lastNote = notes.last {
@@ -260,8 +333,8 @@ enum GapAnswerEngine {
             }
             let isCell = transform == .cell || transform == .cellInverted
             var blockShift = isCell ? cellHomeShift
-                : fitShift(pitches, in: register, keepIfFits: transform == .echo)
-            var reg = isCell ? cellRegister : register
+                : fitShift(pitches, in: echoReg, keepIfFits: transform == .echo || transform == .steps)
+            var reg = isCell ? cellReg : echoReg
             // An octave below the cell's home, only where the whole figure fits above 47.
             if octaveDown, let lo = pitches.min(), lo + blockShift - 12 >= dropRegister.low {
                 blockShift -= 12
@@ -280,15 +353,53 @@ enum GapAnswerEngine {
 
         /// One answer in the gap after `ph`, of the rule's kind, or nil.
         func answer(after ph: Phrase, earliest: Int, limit: Int, outro: Bool,
-                    form: CellForm = .full, octaveDown: Bool = false,
+                    form: CellForm = .full, octaveDown: Bool = false, turn: Int = 0,
                     rng: inout SeededRNG) -> [MIDIEvent]? {
-            if outro || ruleID == echoAnswer || ruleID == statementHarmony {
+            if outro || echoRole {
                 guard ph.notes.count >= 2 else { return nil }
                 let count = Swift.min(ph.notes.count, outro ? 2 + rng.nextInt(upperBound: 2) : 2 + rng.nextInt(upperBound: 3))
-                guard let placed = place(shapeFromLead1(Array(ph.notes.suffix(count))),
-                                         earliest: earliest, limit: limit),
-                      free(placed, outro: outro) else { return nil }
-                return realise(placed, .echo, velOffset: outro ? -8 : 0, rng: &rng)
+                guard kosmic else {
+                    guard let placed = place(shapeFromLead1(Array(ph.notes.suffix(count))),
+                                             earliest: earliest, limit: limit),
+                          free(placed, outro: outro) else { return nil }
+                    return realise(placed, .echo, velOffset: outro ? -8 : 0, rng: &rng)
+                }
+                // KOS-LD2-002 Slow echo answer: a figure that fits in a bar is played at half
+                // speed, so the echo moves in long notes. Fewer notes are taken if it won't fit.
+                for c in stride(from: count, through: 2, by: -1) {
+                    var shape = shapeFromLead1(Array(ph.notes.suffix(c)))
+                    if let f = shape.first, let l = shape.last, l.at + l.len - f.at <= 16 {
+                        shape = shape.map { ANote(at: f.at + ($0.at - f.at) * 2, src: $0.src,
+                                                  len: $0.len * 2, vel: $0.vel) }
+                    }
+                    if let placed = place(shape, earliest: earliest, limit: limit, maxSpan: 64),
+                       free(placed, outro: outro) {
+                        return realise(placed, .echo, velOffset: outro ? -8 : 0, rng: &rng)
+                    }
+                }
+                return nil
+            }
+            if bladeRunner {
+                // Lead 1's held last note, a diatonic third lower, a bar after it starts and
+                // never before the phrase has ended, held for up to two bars.
+                guard let last = ph.notes.last else { return nil }
+                let at = ((Swift.max(earliest, last.stepIndex + 16) + 15) / 16) * 16
+                let len = Swift.min(32, limit - at)
+                guard len >= 8 else { return nil }
+                let shape = [ANote(at: at, src: Int(last.note), len: len, vel: velBase, steps: -2)]
+                guard free(shape, outro: false) else { return nil }
+                return realise(shape, .steps, rng: &rng)
+            }
+            if ruleID == kosmicReply {
+                // KOS-LD2-004 Gap reply melody: KOS-LEAD-004's two held notes a step apart, from
+                // the note Lead 1 ended on; every other reply a third lower, as its echo was.
+                guard let last = ph.notes.last else { return nil }
+                let base = turn % 2 == 1 ? -2 : 0
+                let shape = [ANote(at: 0, src: Int(last.note), len: 14, vel: velBase, steps: base),
+                             ANote(at: 16, src: Int(last.note), len: 14, vel: velBase - 4, steps: base + 1)]
+                guard let placed = place(shape, earliest: earliest, limit: limit, minNotes: 1, barAligned: true),
+                      free(placed, outro: false) else { return nil }
+                return realise(placed, .steps, rng: &rng)
             }
             if ruleID == hookFragment {
                 guard ph.notes.count >= 2 else { return nil }
@@ -306,10 +417,12 @@ enum GapAnswerEngine {
                 guard let placed = best, free(placed, outro: false) else { return nil }
                 return realise(placed, transform, rng: &rng)
             }
-            if ruleID == answerCell {
-                let shape = form == .short ? cellHead : form == .long ? cellLong : cellShape
+            if cellRole {
+                var shape = form == .short ? cellHead : form == .long ? cellLong : cellShape
+                if pairCell && turn % 2 == 1 { shape = shape.map { var a = $0; a.steps -= 2; return a } }
                 guard let placed = place(shape, earliest: earliest, limit: limit,
-                                         maxSpan: form == .long ? 48 : 32),
+                                         maxSpan: form == .long ? 48 : 32,
+                                         minNotes: kosmic ? 1 : 2, barAligned: kosmic),
                       free(placed, outro: false) else { return nil }
                 let out = realise(placed, form == .inverted ? .cellInverted : .cell,
                                   octaveDown: octaveDown, rng: &rng)
@@ -440,19 +553,65 @@ enum GapAnswerEngine {
             let s = slots[idx]
             var form = CellForm.full
             var down = false
-            if ruleID == answerCell && k > 0 && k < chosen.count - 1 {
+            if cellRole && k > 0 && k < chosen.count - 1 {
                 form = CellForm.allCases[r.weightedPick(cellFormWeights)]
                 if octaveDropSong && drops < 2 && !droppedLast && r.nextDouble() < 0.40 { down = true }
             }
             let ph = phrases[s.phrase]
             if let a = answer(after: ph, earliest: s.earliest, limit: s.limit, outro: false,
-                              form: form, octaveDown: down, rng: &r)
+                              form: form, octaveDown: down, turn: k, rng: &r)
                 ?? answer(after: ph, earliest: s.earliest, limit: s.limit, outro: false,
-                          form: .short, octaveDown: down, rng: &r) {
+                          form: .short, octaveDown: down, turn: k, rng: &r) {
                 events += a
             }
             if down { drops += 1 }
             droppedLast = down
+        }
+
+        // Kosmic: now and then Lead 2 joins Lead 1 for four bars, a third under it (65%) or in
+        // unison (35%), drawn per window (Zack, 2026-11-10). Two windows a song, one more when
+        // Lead 1 left room for under four answers, and one more when Lead 1 plays through more
+        // than 60% of the body, as KOS-LEAD-006 does. A song whose Lead 2 would still have under
+        // 24 notes, under a Lead 1 of long notes, takes more, up to six. Windows sit on a four-bar
+        // grid from the body's start, where Lead 1 has two or more 8th-grid onsets and Lead 2 is
+        // silent, and are spread evenly over the candidates. Drawn last, so no earlier draw moves.
+        if kosmic {
+            let bodyBars = (0..<frame.totalBars).filter { isBody($0) && !blockedBars.contains($0) }
+            let lead1Bars = Set(lead1.map { $0.stepIndex / 16 })
+            let coverage = Double(bodyBars.filter(lead1Bars.contains).count) / Double(Swift.max(1, bodyBars.count))
+            var windowCount = 2
+            if chosen.count < 4 { windowCount += 1 }
+            if coverage > 0.60 { windowCount += 1 }
+            let lead2Bars = Set(events.flatMap { e in (e.stepIndex / 16)...((e.stepIndex + Swift.max(1, e.durationSteps) - 1) / 16) })
+            let bodySet = Set(bodyBars)
+            let firstBody = bodyBars.first ?? 0
+            var candidates: [Int] = []
+            var onsetCount: [Int: Int] = [:]
+            for start in stride(from: firstBody, to: frame.totalBars - 3, by: 4) {
+                let bars = start..<(start + 4)
+                guard bars.allSatisfy({ bodySet.contains($0) && !lead2Bars.contains($0) }) else { continue }
+                let onsets = lead1.filter { bars.contains($0.stepIndex / 16) && $0.stepIndex % 2 == 0 }
+                if onsets.count >= 2 { candidates.append(start); onsetCount[start] = onsets.count }
+            }
+            func spread(_ c: Int) -> [Int] {
+                (0..<c).map { candidates[Int((Double($0) + 0.5) * Double(candidates.count) / Double(c))] }
+            }
+            var count = Swift.min(windowCount, candidates.count)
+            while count < Swift.min(6, candidates.count),
+                  events.count + spread(count).reduce(0, { $0 + (onsetCount[$1] ?? 0) }) < 24 {
+                count += 1
+            }
+            for start in spread(count) {
+                let lo = start * 16, hi = (start + 4) * 16
+                let src = lead1.filter { $0.stepIndex >= lo && $0.stepIndex < hi }
+                    .sorted { $0.stepIndex != $1.stepIndex ? $0.stepIndex < $1.stepIndex : $0.note > $1.note }
+                var notes: [MIDIEvent] = []
+                for e in src where notes.last?.stepIndex != e.stepIndex { notes.append(e) }
+                guard let f = notes.first, let l = notes.last else { continue }
+                let ph = Phrase(notes: notes, start: f.stepIndex, end: Swift.min(hi, l.stepIndex + l.durationSteps))
+                let steps = r.nextDouble() < 0.65 ? -2 : 0
+                events += harmony(ph, scale: scale, register: kosmicHarmonyRegister, steps: steps, rng: &r)
+            }
         }
 
         events.sort { $0.stepIndex < $1.stepIndex }
@@ -461,7 +620,8 @@ enum GapAnswerEngine {
         // bed is bounded by its own ceiling, so it is never lifted out of 50 to 60.
         return HarmonicFilter.filterLead(events, track: kTrackLead2, pads: pads,
                                          frame: frame, structure: structure,
-                                         bounds: ruleID == lowBed ? bedRegister : register,
+                                         bounds: kosmic ? (cellRole ? kosmicCellRegister : kosmicRegister)
+                                             : ruleID == lowBed ? bedRegister : register,
                                          uniformLift: true)
     }
 
@@ -470,13 +630,13 @@ enum GapAnswerEngine {
     /// MOT-LD2-016: a whole Lead 1 statement a diatonic third below, in Lead 1's rhythm. Only Lead
     /// 1's 8th-grid onsets are harmonised; each harmony note holds through any 16th in between.
     private static func harmony(_ ph: Phrase, scale: (Int) -> Set<Int>, register: RegisterBounds,
-                                rng: inout SeededRNG) -> [MIDIEvent] {
+                                steps: Int = -2, rng: inout SeededRNG) -> [MIDIEvent] {
         let src = ph.notes.filter { $0.stepIndex % 2 == 0 }
         guard src.count >= 2 else { return [] }
         let mean = src.map { Int($0.velocity) }.reduce(0, +) / src.count
         let pitches = src.map { e -> Int in
             let sc = scale(e.stepIndex / 16)
-            return shift(snap(Int(e.note), to: sc), by: -2, in: sc)
+            return shift(snap(Int(e.note), to: sc), by: steps, in: sc)
         }
         let blockShift = fitShift(pitches, in: register, keepIfFits: true)
         return src.indices.map { i in

@@ -17,6 +17,7 @@ struct GenerationLogEntry: Sendable {
         "MOT-LD1-007", "MOT-LD1-008",
         "MOT-LD2-013", "MOT-LD2-014", "MOT-LD2-015", "MOT-LD2-016", "MOT-LD2-017",
         "KOS-LEAD-010", "KOS-LEAD-011", "KOS-LEAD-012",
+        "KOS-LD2-002", "KOS-LD2-003", "KOS-LD2-004",
     ]
 
     init(tag: String, description: String, isTitle: Bool = false) {

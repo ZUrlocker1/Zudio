@@ -235,11 +235,13 @@ enum HookLeadEngine {
                                        [n(0, -5, 32, 70)],
                                        []]),
         ],
-        spacings: [12, 16, 20],
+        // 4 to 6 statements (Zack, 2026-11-10): three left long silences in a 118-bar body.
+        // The shorter answer-only form, the octave-up half, is drawn more often than the others.
+        spacings: [12, 14, 16],
         spacingWeights: [0.35, 0.40, 0.25],
         scaleSteps: false, gentle: true, homageWeights: [0, 0, 0, 0, 1],
-        minStatements: 3, maxStatements: [3, 4], maxStatementWeights: [0.55, 0.45],
-        formWeights: [0, 0, 0.25, 0.30, 0.45],
+        minStatements: 4, maxStatements: [4, 5, 6], maxStatementWeights: [0.35, 0.40, 0.25],
+        formWeights: [0, 0, 0.35, 0.20, 0.45],
         register: pulstarRegister
     )
 

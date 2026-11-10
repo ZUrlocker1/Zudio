@@ -314,6 +314,13 @@ struct KosmicLeadGenerator {
         }
         usedRuleIDs.insert(rule)
 
+        // A gap-answer rule is written later by SongGenerator, from the Lead 1 the listener hears
+        // after the filters. Only the bridge A-2 response figure is written here.
+        if GapAnswerEngine.isKosmicGapRule(rule) {
+            return generateBridgeAltLead2(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
+                                          xFilesBars: xFilesBars)
+        }
+
         // Technique D equivalent for Lead 2: if the rule is sparse and we're in a B section,
         // escalate to KOS-LEAD-004 (Echo Melody) which has more phrase activity.
         let lead2SparseRules: Set<String> = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003"]
@@ -1085,10 +1092,13 @@ struct KosmicLeadGenerator {
     }
 
     private static func pickLeadRule2(rng: inout SeededRNG) -> String {
-        // Lead 2 is a counter-melody — sparse ambient rules only; KOS-LEAD-006 excluded
-        // so Lead 2 never carries the main JMJ phrase loop that belongs to Lead 1
-        let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005"]
-        let weights: [Double] = [0.15,           0.30,           0.20,           0.25,           0.10]
+        // Base Kosmic Lead 2 answers Lead 1 in its gaps (GapAnswerEngine, phase 5). The old
+        // counter-melody rules sit at the end at 0%, so restoring one is a weight change.
+        // Kosmic Space calls this, ignores the result and draws again: it must stay one draw.
+        let rules:   [String] = ["KOS-LD2-002", "KOS-LD2-003", "KOS-LD2-004",
+                                 "KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005"]
+        let weights: [Double] = [0.35,          0.40,          0.25,
+                                 0,              0,              0,              0,              0]
         return rules[rng.weightedPick(weights)]
     }
 

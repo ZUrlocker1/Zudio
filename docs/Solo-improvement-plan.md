@@ -2,8 +2,8 @@
 
 Status (2026-11-10): phases 1 to 3 are built and committed. They are the four Motorik Lead 1 hook
 rules MOT-LD1-023 to 026 and the five Motorik Lead 2 gap-answer rules MOT-LD2-013 to 017. Phase 4,
-the three Kosmic Lead 1 hook rules KOS-LEAD-010 to 012, is built and waiting for Zack's ear before
-it is committed. Phases 5 and 6 (Kosmic Lead 2, docs) follow.
+the three Kosmic Lead 1 hook rules KOS-LEAD-010 to 012, is committed. Phase 5, the Kosmic Lead 2
+gap answers KOS-LD2-002 to 004, is built and waiting for Zack's ear. Phase 6, docs, follows.
 
 ## What this is
 
@@ -258,8 +258,10 @@ hooks. The cells are in `HookLeadEngine.swift` (`kosmicRules`); the source cells
 - **KOS-LEAD-011 Pulstar theme**, 12%, takes KOS-LEAD-001 Slow Arc's slot. A pickup F F F G into
   the tonic, then four whole notes C Bb F G, said again an octave up (`answerShift` 7). Its
   homage turns a repeated pickup note into a neighbour. In a key with no room for both octaves
-  the repeat comes down to a fifth, then to the same octave. It uses MIDI 52 to 84. It states 3
-  or 4 times. Source variants: no pickup, and the last note held across two bars.
+  the repeat comes down to a fifth, then to the same octave. It uses MIDI 52 to 84. It states 4
+  to 6 times, drawn 35, 40 and 25%, every 12 to 16 bars, with the shorter answer-only form, the
+  octave-up half, at 35% of the varied statements. Source variants: no pickup, and the last note
+  held across two bars.
 - **KOS-LEAD-012 Beach Scene sigh**, 7%, takes KOS-LEAD-005 Arpeggio Highlight's slot. A
   three-bar call, the sigh with its long held sixth, and a two-bar answer of rising arpeggios on
   IV and V landing on the root. One source variant falls to the fifth before rising. It states 3
@@ -285,7 +287,7 @@ How they differ from the Motorik hooks, all as data on `HookRule`:
   makes no Technique D draw, so its B section never switches rule.
 - **Forms.** No head or loop forms: those cut a one-note bar. Answer only 25%, sequence 30 to 35%
   and varied 40 to 45%. Blade Runner's sequence always steps down.
-- **Count.** Per rule, as above, with a minimum of 3. How many statements a Kosmic song should
+- **Count.** Per rule, as above, with a minimum of 3, and 4 for Pulstar. How many statements a Kosmic song should
   have is still Zack's call.
 - **Homage.** One change per cell. Blade Runner and Pulstar restrict the operations, because a
   dropped note empties a bar of the staircase and a swap trades Pulstar's tonic with its pickup.
@@ -302,25 +304,61 @@ Space or Drift: every hook song starts with the star, Blade Runner states 3 or 4
 to 5 and Beach Scene 3 to 6, and Lead 1 averages about 64 notes a song. Moves of more than an
 octave between notes less than a bar apart occur in 5 of 135 songs. Not yet heard.
 
-### Phase 5: Kosmic Lead 2
+### Built: Kosmic Lead 2 (phase 5)
 
-Base Kosmic Lead 2 gets its own functions. Do not edit `emitLeadBar` or the bar functions, which
-Kosmic Lead 1, Drift Lead 1 and the bridge melody share. Gate on not Space. Drift has no Lead 2.
+Base Kosmic Lead 2 is the gap-answer design. It runs on `GapAnswerEngine` with Kosmic data: the
+same draws in the same order, so Motorik is unchanged. Kosmic Space and Drift are untouched.
 
-- **KOS-LD2-002 Slow echo answer**, 35%: as MOT-LD2-013, in long notes.
-- **KOS-LD2-003 Slow answer cell**, 40%, paired with Lead 1's rule:
-  - KOS-LEAD-010 Blade Runner theme: Lead 1's held last note echoed a diatonic third lower, one
-    bar later, held.
-  - KOS-LEAD-011 Pulstar theme: the rising riff, 1 2 flat 3 4 5 then 1.
-  - KOS-LEAD-012 Beach Scene sigh: the IV and V arpeggio answer landing on the root.
-  - Kept Lead 1 rules: the KOS-LEAD-004 two-on, two-off echo cell.
-- **KOS-LD2-004 Gap reply melody**, 25%: KOS-LEAD-004's shape re-gridded to start in Lead 1's
-  gaps, not on `bar % 8`.
-- Register 55 to 67. Silent while Lead 1 plays a phrase. Removed in base: the two-step collision
-  shift, the random held-note fill after four silent bars, and the forced B escalation to
-  KOS-LEAD-004.
-- Kosmic Space calls `pickLeadRule2`, ignores the result, then draws again. Leave that call
-  alone, because Space depends on it being one draw. This is from an audit and is not rechecked.
+- **The pool.** `pickLeadRule2` is still one draw. KOS-LD2-002, 003 and 004 take 35, 40 and 25%,
+  and KOS-LEAD-001 to 005 sit at the end at 0%. Space calls it, ignores the result and draws again.
+- **KOS-LD2-002 Slow echo answer**: as MOT-LD2-013, Lead 1's last 2 to 4 notes a third, sixth or
+  octave lower, but a figure that fits in a bar plays at half speed, so the echo moves in long
+  notes. It takes fewer notes when the gap is short, and may run to four bars.
+- **KOS-LD2-003 Slow answer cell**, paired with Lead 1's rule:
+  - KOS-LEAD-010 Blade Runner theme: Lead 1's held last note a diatonic third lower, on the bar
+    line a bar after it starts and never before the phrase ends, held up to two bars.
+  - KOS-LEAD-011 Pulstar theme: the rising riff 1 2 flat 3 into 4 on the bar, 5, then 1 held, in
+    native 16ths. Its homage only drops a middle note, so it stays a rising run.
+  - KOS-LEAD-012 Beach Scene sigh: the IV and V arpeggios in 8ths landing on the root. Its homage
+    adds a passing note or drops one.
+  - Every other Lead 1 rule: KOS-LEAD-004's two-on, two-off cell, the fifth held into the sixth,
+    every other answer a third lower.
+  - The cells keep their place in the bar, moving by whole bars, and take the same forms as
+    MOT-LD2-015, without the octave drop.
+- **KOS-LD2-004 Gap reply melody**: KOS-LEAD-004's two held notes a step apart, started from the
+  note Lead 1 ended on, on a bar line in Lead 1's gap; every other reply a third lower.
+- **Harmony windows**, every Kosmic rule: Lead 2 joins Lead 1 for four bars, a diatonic third
+  under it 65% of the time and in unison 35%, drawn per window, in MIDI 52 to 79. Two windows a
+  song, one more when Lead 1 left room for under four answers, one more when Lead 1 plays
+  through more than 60% of the body, and more, up to six, while Lead 2 would have under 24
+  notes. Windows sit on a four-bar grid from the body's start where Lead 1 has two or more
+  8th-grid onsets and Lead 2 is silent, spread evenly. They are drawn after everything else.
+- **Behaviour** otherwise as Motorik Lead 2: silent through Lead 1's phrases outside the harmony
+  windows, 4 to 6 answers in the body,
+  one outro echo, a tail of 4 or 8 steps after a phrase. Register 52 to 69; at 55 to 67, one octave, a
+  figure straddling the edge folded a note down an octave.
+- **Wiring.** `generateLead2` records the rule and writes only the bridge A-2 figure.
+  `SongGenerator.generateKosmic` writes the answers after `ArrangementFilter` and
+  `HarmonicFilter`, from the Lead 1 the listener hears. Regen does the same, reading the hook
+  rule from the log, and adds the answers after its own Lead 2 filter pass. The collision shift,
+  the held-note fill and the B escalation stay on the old path only.
+- **Regen fix found here.** A regenerated Kosmic hook Lead 1 now skips the clash guard and gets
+  one octave decision, as generation gives it.
+- Names are in `kosmicLeadRuleDescription`; all three IDs are in `testingMarkedRules`.
+
+Measured over Kosmic seeds 1 to 300, on the 114 base songs:
+
+- No Lead 2 onset inside a Lead 1 phrase before the harmony windows were added; now only the
+  harmony notes sit inside one.
+- No off-grid notes outside the Pulstar riff.
+- Range 52 to 69.
+- Every song shows the star.
+- 4 to 6 answers in nearly every song.
+- Lead 2 notes per song, with the harmony windows: 20 to 53 by Lead 1 rule, most 24 to 30. The
+  old Lead 2 averaged about 60.
+
+Fingerprints against HEAD on seeds 1 to 120: every Motorik track, and every track of the 74
+Space and Drift songs, is identical.
 
 ### Source cells for the Kosmic rules
 
@@ -362,8 +400,8 @@ Zack's approval before the commit.
 1. Hook engine and MOT-LD1-023. Done.
 2. MOT-LD1-024 to 026 and the base weights. Done.
 3. Motorik Lead 2, MOT-LD2-013 to 017. Done.
-4. Kosmic Lead 1, KOS-LEAD-010 to 012. Built, waiting for Zack's ear.
-5. Kosmic Lead 2, KOS-LD2-002 to 004, and the Space gate.
+4. Kosmic Lead 1, KOS-LEAD-010 to 012. Done.
+5. Kosmic Lead 2, KOS-LD2-002 to 004, and the Space gate. Built, waiting for Zack's ear.
 6. Docs.
 
 Checks stay light:
