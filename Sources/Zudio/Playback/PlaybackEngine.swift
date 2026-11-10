@@ -336,6 +336,16 @@ final class PlaybackEngine: ObservableObject {
         componentFlags: 0, componentFlagsMask: 0
     )
     private static let distCompGain: Float = 0.707  // −3 dB post-distortion output compensation
+
+    /// SoftClipGain in dB and FinalMix in percent for a track's distortion chip. Motorik Noir
+    /// Rhythm gets a lighter setting than every other track: at +6 dB and 50% it was too much
+    /// (Zack, 2026-11-10).
+    nonisolated static func distortionSettings(noirRhythm: Bool) -> (gainDB: Float, mix: Float) {
+        noirRhythm ? (3.0, 30.0) : (6.0, 50.0)
+    }
+    private func isNoirRhythm(_ trackIndex: Int) -> Bool {
+        trackIndex == kTrackRhythm && songState?.motorikNoirVariation == true
+    }
     private var scheduler: StepScheduler?
 
     // MARK: - Song state
@@ -1285,7 +1295,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackBass && motorikStyle && program == 12038 {
                 vol = 0.78   // Mean Saw Bass runs hot on Motorik Arcade bass — pull back
             } else if trackIndex == kTrackBass && motorikStyle && program == 87 {
-                vol = 0.30   // Lead Bass runs hot on Motorik bass — pull back
+                vol = 0.22   // Lead Bass runs hot on Motorik bass — pull back (0.30 until 2026-11-10, then about 2.7 dB lower)
             } else if trackIndex == kTrackBass && program == 87 {
                 vol = 0.56   // Lead Bass runs hot
             } else if trackIndex == kTrackLead2 && program == 86 {
@@ -1432,10 +1442,10 @@ final class PlaybackEngine: ObservableObject {
             // rather than AVAudioUnitSampler.volume, which is clamped to [0, 1] by Apple.
             if trackIndex == kTrackLead1 {
                 // Stereo Piano needs boost above unity. Motorik Synth Lead and Saw Stack sat under the
-                // band (Zack, 2026-11-10): Saw Stack is already at the CC7 ceiling, so the lift goes
-                // through the boost node, about +2.3 dB.
+                // band (Zack, 2026-11-10), and so did Polysynth: Saw Stack is already at the CC7 ceiling,
+                // so the lift goes through the boost node, about +2.3 dB.
                 let mult: Float = (program == 61001) ? 8.0
-                                : (motorikStyle && (program == 87 || program == 11100)) ? 1.3 : 1.0
+                                : (motorikStyle && (program == 87 || program == 11100 || program == 90)) ? 1.3 : 1.0
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
             } else if trackIndex == kTrackRhythm {
@@ -1475,6 +1485,8 @@ final class PlaybackEngine: ObservableObject {
         var delayBypassed: Bool
         var compBypassed: Bool
         var distortionBypassed: Bool
+        var distortionGainDB: Float = 6.0           // SoftClipGain
+        var distortionMix: Float = 50.0             // FinalMix %
         var lowShelfBypassed: Bool
         var airEnabled: Bool
         var hpfEnabled: Bool
@@ -1542,6 +1554,8 @@ final class PlaybackEngine: ObservableObject {
                 delayBypassed:      delays[i].auAudioUnit.shouldBypassEffect,
                 compBypassed:       comps[i].auAudioUnit.shouldBypassEffect,
                 distortionBypassed: distortions[i].auAudioUnit.shouldBypassEffect,
+                distortionGainDB:   Self.distortionSettings(noirRhythm: isNoirRhythm(i)).gainDB,
+                distortionMix:      Self.distortionSettings(noirRhythm: isNoirRhythm(i)).mix,
                 lowShelfBypassed:   lowEQs[i].auAudioUnit.shouldBypassEffect,
                 airEnabled:         airEnabled[i],
                 hpfEnabled:        !lowEQs[i].bands[1].bypass,
@@ -1935,6 +1949,11 @@ final class PlaybackEngine: ObservableObject {
         case .compression:
             comps[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
         case .distortion:
+            if enabled {
+                let d = Self.distortionSettings(noirRhythm: isNoirRhythm(trackIndex))
+                AudioUnitSetParameter(distortions[trackIndex].audioUnit, 14, kAudioUnitScope_Global, 0, d.gainDB, 0)
+                AudioUnitSetParameter(distortions[trackIndex].audioUnit, 15, kAudioUnitScope_Global, 0, d.mix, 0)
+            }
             distortions[trackIndex].auAudioUnit.shouldBypassEffect = !enabled
             // Post-distortion gain reduction on the V3-native fanMixer (sits after dist in chain).
             // Compensates for the loudness increase from soft-clip harmonic generation.

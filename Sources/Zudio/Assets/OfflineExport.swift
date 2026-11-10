@@ -309,8 +309,8 @@ enum OfflineExport {
             comp.auAudioUnit.shouldBypassEffect = snap.compBypassed
 
             let dist = AVAudioUnitEffect(audioComponentDescription: distDesc)
-            AudioUnitSetParameter(dist.audioUnit, 14, kAudioUnitScope_Global, 0,  6.0, 0) // SoftClipGain dB
-            AudioUnitSetParameter(dist.audioUnit, 15, kAudioUnitScope_Global, 0, 50.0, 0) // FinalMix %
+            AudioUnitSetParameter(dist.audioUnit, 14, kAudioUnitScope_Global, 0, snap.distortionGainDB, 0) // SoftClipGain dB
+            AudioUnitSetParameter(dist.audioUnit, 15, kAudioUnitScope_Global, 0, snap.distortionMix, 0) // FinalMix %
             dist.auAudioUnit.shouldBypassEffect = snap.distortionBypassed
 
             let eq = AVAudioUnitEQ(numberOfBands: 2)
@@ -609,8 +609,8 @@ enum OfflineExport {
                 comp.auAudioUnit.shouldBypassEffect = snap.compBypassed
 
                 let dist = AVAudioUnitEffect(audioComponentDescription: distDesc)
-                AudioUnitSetParameter(dist.audioUnit, 14, kAudioUnitScope_Global, 0,  6.0, 0) // SoftClipGain dB
-                AudioUnitSetParameter(dist.audioUnit, 15, kAudioUnitScope_Global, 0, 50.0, 0) // FinalMix %
+                AudioUnitSetParameter(dist.audioUnit, 14, kAudioUnitScope_Global, 0, snap.distortionGainDB, 0) // SoftClipGain dB
+                AudioUnitSetParameter(dist.audioUnit, 15, kAudioUnitScope_Global, 0, snap.distortionMix, 0) // FinalMix %
                 dist.auAudioUnit.shouldBypassEffect = snap.distortionBypassed
 
                 let eq = AVAudioUnitEQ(numberOfBands: 2)
