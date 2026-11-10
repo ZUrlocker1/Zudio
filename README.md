@@ -23,6 +23,8 @@ The download is `2.9` (build 135), the finished release with Kosmic Space (below
 
 **v2.9 Kosmic Space:** A new Kosmic substyle modelled on Jean-Michel Jarre. It has a locked sequencer over fast minor chord cycles, the Minipops preset rhythm box, a falling theme answered by a see-saw riff, string-machine pads and white-noise surf sweeps. Each part draws from several rules derived from his songs. Details are in the [Kosmic Space plan](docs/kosmic-space-plan.md).
 
+**In progress — Motorik hook leads:** Four new Motorik Lead 1 rules play hooks taken from real records, reworked per song rather than copied, and replace the weakest older rules: MOT-LD1-023 Hallogallo hook replaces MOT-LD1-001 Neu! motif first, MOT-LD1-024 Radioactive riff replaces MOT-LD1-002 Pentatonic cell, MOT-LD1-025 Model riff replaces MOT-LD1-006 Long arc solo and MOT-LD1-026 Tour de France riff replaces MOT-LD1-003 Punch solo. Details are in the [Solo improvement plan](docs/Solo-improvement-plan.md).
+
 **What's new — v2.8 iPhone Duo:** Zudio now has a layout made for the iPhone Duo, the foldable iPhone. Tested on a real Duo. Folded, it is the iPhone player it always was. Unfolded, it is the iPad layout, opening on Visuals with the track view one tap away on the Tracks tab. Fold and unfold mid-song and playback carries on.
 
 - **Fits the unfolded screen in portrait** — the top bar drops Mood and Key, moves Reset beside BPM, and puts Help, About, Sleep and Share in a row under it, so every control is on screen and Ambient is spelled out in full. The track rows give the MIDI lane the room back
@@ -70,6 +72,7 @@ Earlier releases are covered in the [change log](docs/change-log.md).
 - [motorik-plan.md](docs/motorik-plan.md) — Motorik style: genre research, song analysis, universal rules, and complete implemented specification (drums, bass, pads, leads, voicings).
 - [kosmic-plan.md](docs/kosmic-plan.md) — Kosmic style: genre research, artist-by-artist analysis, universal rules, MIDI analysis findings, and complete implemented specification.
 - [kosmic-space-plan.md](docs/kosmic-space-plan.md) — Kosmic Space: the Jean-Michel Jarre substyle, its corpus measurements, harmony families, rules by track, and the ideas closed or on hold.
+- [Solo-improvement-plan.md](docs/Solo-improvement-plan.md) — Hook-based Lead 1 and gap-answer Lead 2 rules for base Motorik and Kosmic: what is built, what is next, and the source cells.
 - [ambient-plan.md](docs/ambient-plan.md) — Ambient style: genre research, artist-by-artist analysis, universal rules, generator design, and MIDI analysis.
 - [chill-plan.md](docs/chill-plan.md) — Chill style: genre research, artist-by-artist analysis (St Germain, Moby, Air, DJ Cam Quartet, Electric Buddha Band), universal rules, generator design, and MIDI analysis.
 

@@ -1,5 +1,22 @@
 # Zudio Change Log
 
+## V 2.9 (Build 136) — Motorik hook leads (work in progress)
+
+In the source on `main`, not yet released. Build 135 went to the App Store before these changes.
+
+- **Four new Motorik Lead 1 rules** — (2026-11-10) Each plays a short phrase taken from a real record, mapped to the song's mode and reworked per song, so no song plays the source as written. They replace the weakest base rules in every pool that used them, including Noir, Arcade and the Europe songs whose Lead 1 is not in the sync:
+  - MOT-LD1-023 Hallogallo hook (Neu!) replaces MOT-LD1-001 Neu! motif first.
+  - MOT-LD1-024 Radioactive riff (Kraftwerk) replaces MOT-LD1-002 Pentatonic cell.
+  - MOT-LD1-025 Model riff (Kraftwerk) replaces MOT-LD1-006 Long arc solo.
+  - MOT-LD1-026 Tour de France riff (Kraftwerk) replaces MOT-LD1-003 Punch solo.
+  - The retired rules stay in the code at 0%. MOT-LD1-005 Call and answer is kept.
+- **How a hook plays** — The song states its hook 3, 4 or 5 times in the body, plus a soft outro statement about 3 songs in 10. The first statement is the full hook and the last, near the end, is the full hook with its last note ringing. Between them a statement is the full hook again or a real variation: the head alone, the head said twice, the answer alone, the call as a sequence a scale step up or down, or the hook with a dropped note, an alternate ending, a held-over last note or the answer withheld. After a variation the full hook returns often. At least one statement always falls in the last third.
+- **On the beat** — Every hook note sits on the 8th-note grid with the held notes on beats, so the line locks to the kick and snare. Variations keep to the grid. The Radioactive riff is a 16th-note riff and keeps its off-beat 16ths.
+- **Placed around the arrangement** — Statements avoid Lead 1's rest windows and the base Motorik breakdowns. The arrangement filter only softens a hook lead and never silences a block of it.
+- **Steadier register** — A hook stays in one octave for the whole song.
+- **Testing marker** — While the rules are being tuned, the generation log prints a star before each new rule's name.
+- **Motorik mix** — Moog and Synth Bass 3 on the bass are about 1.8 dB quieter. Synth Lead and Saw Stack on Lead 1 are about 2.3 dB louder.
+
 ## V 2.9 (Build 135) — Kosmic Space
 
 In the source on `main` (merged 2026-11-02). Published 2026-11-03 as the 2.9 download; finished 2026-11-09 (Kosmic split Drift 25 / Space 35 / base 40) and headed for the App Store after a few days of listening.
