@@ -715,9 +715,18 @@ struct SongGenerator {
         // and Pads are exempt too (Zack, 2026-11-03): their rests come from `KosmicSpaceArrangement`,
         // and the filter's random blocks would cut leads across section edges. It never fired on them
         // when measured, so no song changed; it guards against Phase 2's denser Lead 2.
+        // A transcription hook (KOS-LEAD-010 to 012) is softened, never thinned or rested, and gets
+        // one octave decision for the song, as the Motorik hooks do.
+        let isKosmicHook = lead1Rules.contains(where: HookLeadEngine.isKosmicHookRule)
+        // KOS-LEAD-008 and 009 play in two or three short windows; a rested block took whole
+        // windows (Polar Perihelion kept 5 Lead 1 notes), so they are never rested, only softened.
+        let isKosmicWindowSolo = lead1Rules.contains("KOS-LEAD-008") || lead1Rules.contains("KOS-LEAD-009")
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed,
-                                              exemptTracks: isKosmicSpace ? [kTrackRhythm, kTrackLead1, kTrackLead2, kTrackPads] : [])
-        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure)
+                                              exemptTracks: isKosmicSpace ? [kTrackRhythm, kTrackLead1, kTrackLead2, kTrackPads] : [],
+                                              phraseTracks: (isKosmicHook || isKosmicWindowSolo) ? [kTrackLead1] : [])
+        trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure,
+                                           skipLead1ClashFilter: isKosmicHook,
+                                           uniformLead1Lift: isKosmicHook)
 
         // Kosmic density guard: if Rhythm is more than 2× as dense as Lead 1, thin Rhythm
         // to 65% retention to prevent it from burying the lead. Downbeats are always kept.
@@ -3071,6 +3080,9 @@ struct SongGenerator {
         case "KOS-LEAD-007": return "TD skip sequence"
         case "KOS-LEAD-008": return "Caligari solo"
         case "KOS-LEAD-009": return "Dark Sun solo"
+        case "KOS-LEAD-010": return "Blade Runner theme"
+        case "KOS-LEAD-011": return "Pulstar theme"
+        case "KOS-LEAD-012": return "Beach Scene sigh"
         case "KOS-LD1-010": return "Tycho rise and fall"
         case "KOS-LD1-011": return "Drift memory"
         case "KOS-LD1-012": return "Sigur Ros late entry float"

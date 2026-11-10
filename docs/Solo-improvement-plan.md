@@ -1,9 +1,9 @@
 # Solo improvement plan: Motorik and Kosmic leads
 
-Status (2026-11-10): phases 1 and 2 are built, committed and approved by ear. They are the four
-Motorik Lead 1 hook rules MOT-LD1-023 to 026. Phase 3, Motorik Lead 2 as gap answers
-(MOT-LD2-013 to 017), is built and waiting for Zack's ear before it is committed. Phases 4 to 6
-(Kosmic leads, docs) follow.
+Status (2026-11-10): phases 1 to 3 are built and committed. They are the four Motorik Lead 1 hook
+rules MOT-LD1-023 to 026 and the five Motorik Lead 2 gap-answer rules MOT-LD2-013 to 017. Phase 4,
+the three Kosmic Lead 1 hook rules KOS-LEAD-010 to 012, is built and waiting for Zack's ear before
+it is committed. Phases 5 and 6 (Kosmic Lead 2, docs) follow.
 
 ## What this is
 
@@ -121,9 +121,9 @@ out the whole song in one call and returns early, owning both A and B sections.
 - Motorik Arcade Lead 2 regular pool: MOT-LD2-001, 003 and 005. Done in phase 3.
 - Motorik Europe base Lead 2, when Lead 2 is not in the sync. Done in phase 3.
 - Kosmic B sections and bridge melodies, base and Drift: `pickBSectionRule` and
-  `pickLeadRuleDifferentFrom` can draw KOS-LEAD-001, 005 and 007. Phase 4. Those are per-bar
-  contexts and hook rules are whole-song, so the retired rules come out of the candidate lists
-  rather than being replaced.
+  `pickLeadRuleDifferentFrom` could draw KOS-LEAD-001, 005 and 007. Done in phase 4. Those are
+  per-bar contexts and hook rules are whole-song, so the retired rules came out of the candidate
+  lists rather than being replaced.
 - Kosmic Space does not use them. Its Lead 2 plays KOS-LEAD-004, which is kept.
 
 ## Built: Motorik Lead 2 (phase 3)
@@ -245,27 +245,62 @@ One is drawn per song. The cell data and the engine are in
 
 ## Next: phases 4 and 5, Kosmic
 
-### Phase 4: Kosmic Lead 1
+### Built: Kosmic Lead 1 (phase 4)
 
-Three hook rules replace the three weakest base rules. They share the hook engine; the engine
-needs a flag for scale-step degrees for Blade Runner.
+Three hook rules replace the three weakest base rules and share `HookLeadEngine` with the Motorik
+hooks. The cells are in `HookLeadEngine.swift` (`kosmicRules`); the source cells are listed below.
 
-- **KOS-LEAD-010 Blade Runner theme**, 14%, takes KOS-LEAD-007 TD Skip Sequence's slot.
-- **KOS-LEAD-011 Pulstar theme**, 12%, takes KOS-LEAD-001 Slow Arc's slot.
-- **KOS-LEAD-012 Beach Scene sigh**, 7%, takes KOS-LEAD-005 Arpeggio Highlight's slot.
-- KOS-LEAD-001, 005 and 007 go to 0% in `pickLeadRule` and come out of the `pickBSectionRule`,
-  `pickLeadRuleDifferentFrom` and bridge lists, which would otherwise hand whole-song rules to
-  per-bar contexts. KOS-LEAD-001 is also in `sparseLeadRules`, which forces the B section to
-  escalate; keep those lists valid for Lead 2 and the bridge melody.
-- Kosmic Lead 1 register is 60 to 84, which is claimed, not checked.
-- The Kosmic path needs the same filter exemptions as Motorik: a hook lead is softened, not
-  thinned or silenced, and gets one octave decision per song. The Kosmic calls are near
-  `SongGenerator.swift` lines 684 and 691.
-- Kosmic phrases are long, so statements start every 8 or 12 bars, and Blade Runner's 12-bar
-  line plays at most twice per A section. How many statements a Kosmic song should have is not
-  decided.
-- Kept: KOS-LEAD-002 Floating tones, KOS-LEAD-003 Pentatonic drift, KOS-LEAD-006 JMJ Phrase
-  Loop, KOS-LEAD-008 Caligari Solo and KOS-LEAD-009 Dark Sun Solo.
+- **KOS-LEAD-010 Blade Runner theme**, 14%, takes KOS-LEAD-007 TD Skip Sequence's slot. The 12-bar
+  line is stored as scale steps (the `scaleSteps` flag), so it keeps its shape in any mode. The
+  call is the first four bars and ends on the held fourth below; the answer is phrases 2 and 3,
+  the second a step lower and the third the cadence to the long low tonic. Its homage is one
+  added upper-neighbour note per cell. It states 3 or 4 times.
+- **KOS-LEAD-011 Pulstar theme**, 12%, takes KOS-LEAD-001 Slow Arc's slot. A pickup F F F G into
+  the tonic, then four whole notes C Bb F G, said again an octave up (`answerShift` 7). Its
+  homage turns a repeated pickup note into a neighbour. In a key with no room for both octaves
+  the repeat comes down to a fifth, then to the same octave. It uses MIDI 52 to 84. It states 3
+  or 4 times. Source variants: no pickup, and the last note held across two bars.
+- **KOS-LEAD-012 Beach Scene sigh**, 7%, takes KOS-LEAD-005 Arpeggio Highlight's slot. A
+  three-bar call, the sigh with its long held sixth, and a two-bar answer of rising arpeggios on
+  IV and V landing on the root. One source variant falls to the fifth before rising. It states 3
+  to 5 times.
+- KOS-LEAD-001, 005 and 007 sit at the end of `pickLeadRule` at 0%, and 001, 005 and 007 are out of
+  `pickBSectionRule` (now 002, 003 and 004) and `pickLeadRuleDifferentFrom`. `sparseLeadRules`
+  and Lead 2's pool still hold 001 and 005; phase 5 replaces Lead 2.
+- Kept: KOS-LEAD-002 Floating tones, 003 Pentatonic drift, 006 JMJ Phrase Loop, 008 Caligari Solo
+  and 009 Dark Sun Solo.
+- Fixes to the kept window solos, found by ear:
+  - KOS-LEAD-008 and 009 are passed as `phraseTracks` to `ArrangementFilter`, so a block is
+    softened but never rested; a rested block had taken whole windows.
+  - KOS-LEAD-008 Caligari Solo widens its pool to the whole scale, chord tones weighted double,
+    when fewer than four chord tones fit the register, as with a minor chord on flat 7 whose third
+    lies outside the mode. It never repeats the previous note and prefers steps to leaps.
+  - KOS-LEAD-009 Dark Sun Solo plays at least twice: when only one ten-bar window fits, a
+    five-bar return is added four bars clear of it.
+
+How they differ from the Motorik hooks, all as data on `HookRule`:
+
+- **Entry and sections.** The hook enters four bars into the first A section and owns the A and B
+  sections. The bridges and X-Files whistles stay with the existing Kosmic code. A hook rule
+  makes no Technique D draw, so its B section never switches rule.
+- **Forms.** No head or loop forms: those cut a one-note bar. Answer only 25%, sequence 30 to 35%
+  and varied 40 to 45%. Blade Runner's sequence always steps down.
+- **Count.** Per rule, as above, with a minimum of 3. How many statements a Kosmic song should
+  have is still Zack's call.
+- **Homage.** One change per cell. Blade Runner and Pulstar restrict the operations, because a
+  dropped note empties a bar of the staircase and a swap trades Pulstar's tonic with its pickup.
+- **Filters.** `SongGenerator` passes `phraseTracks: [Lead 1]` to `ArrangementFilter`, and
+  `skipLead1ClashFilter` and `uniformLead1Lift` to `HarmonicFilter`, when Lead 1 is a Kosmic hook.
+- **Rhythm.** The base Kosmic density guard thins the arpeggio under Lead 1 whenever the arpeggio
+  is more than twice as dense, so a sparse hook thins it the way the other sparse rules do.
+- **Names and star.** Log names are in `kosmicLeadRuleDescription`; all three IDs are in
+  `testingMarkedRules`.
+- Kosmic Space, Drift and Drift Dreamscape never draw these rules.
+
+Measured over Kosmic seeds 1 to 120 with each rule forced, on the 45 songs per rule that are not
+Space or Drift: every hook song starts with the star, Blade Runner states 3 or 4 times, Pulstar 3
+to 5 and Beach Scene 3 to 6, and Lead 1 averages about 64 notes a song. Moves of more than an
+octave between notes less than a bar apart occur in 5 of 135 songs. Not yet heard.
 
 ### Phase 5: Kosmic Lead 2
 
@@ -326,8 +361,8 @@ Zack's approval before the commit.
 
 1. Hook engine and MOT-LD1-023. Done.
 2. MOT-LD1-024 to 026 and the base weights. Done.
-3. Motorik Lead 2, MOT-LD2-013 to 017. Built, waiting for Zack's ear.
-4. Kosmic Lead 1, KOS-LEAD-010 to 012.
+3. Motorik Lead 2, MOT-LD2-013 to 017. Done.
+4. Kosmic Lead 1, KOS-LEAD-010 to 012. Built, waiting for Zack's ear.
 5. Kosmic Lead 2, KOS-LD2-002 to 004, and the Space gate.
 6. Docs.
 
@@ -378,6 +413,5 @@ Checks stay light:
 - `DensitySimplifier.thin` is still buggy for Arcade's arp rules and the synced Europe Lead 2.
   The gap-answer Lead 2 is written after it runs, so it never reaches the new rules. Fix the rest
   only if Zack asks.
-- KOS-LEAD-004 Echo Melody as a Lead 1 rule is a possible later round.
 - Is Zack willing to play or tap a short hook for a La Dusseldorf or Harmonia piece if no file
   exists?

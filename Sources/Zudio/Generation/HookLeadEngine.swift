@@ -50,6 +50,27 @@ struct HookRule: Sendable {
     /// states its hook 3 to 5 times in the body, so these run 8 to 20 bars.
     var spacings: [Int]
     var spacingWeights: [Double]
+    /// `deg` is a scale step from the tonic, not a semitone: Blade Runner's line steps down the
+    /// scale, so it keeps its shape in any mode.
+    var scaleSteps = false
+    /// Homage changes one note instead of two or three, for cells of a few long notes.
+    var gentle = false
+    /// Weights for add passing, drop, move onset, swap and neighbour, where the defaults would
+    /// break the cell: a drop leaves a bar of Blade Runner's staircase empty, and a swap trades
+    /// Pulstar's tonic with the pickup before it.
+    var homageWeights: [Double]? = nil
+    /// Body statements a song may have: the cap is drawn from `maxStatements`, and a song with
+    /// fewer than `minStatements` gets one more placed.
+    var minStatements = 3
+    var maxStatements = [3, 4, 5]
+    var maxStatementWeights = [0.20, 0.40, 0.40]
+    /// Weights for head, loop, answer only, sequence and varied, when the defaults don't suit.
+    var formWeights: [Double]? = nil
+    /// A call sequenced as a statement of its own, or as a variation, goes up a scale step this
+    /// often and down otherwise.
+    var sequenceUpChance = 0.70
+    /// The song register the hook sits in, where it differs from Lead 1's.
+    var register: RegisterBounds? = nil
 }
 
 enum HookLeadEngine {
@@ -141,6 +162,116 @@ enum HookLeadEngine {
 
     static func isMotorikHookRule(_ id: String) -> Bool { motorikRules[id] != nil }
 
+    // MARK: - Kosmic rule data
+
+    /// Hooks sit in the Kosmic Lead 1 register, MIDI 56 to 84; the Pulstar line repeats an octave
+    /// up, so it needs the room.
+    static let kosmicRegister = RegisterBounds(low: 56, high: 84)
+    /// Pulstar's line repeats an octave up and spans 19 semitones, so it takes more room below.
+    static let pulstarRegister = RegisterBounds(low: 52, high: 84)
+
+    /// Vangelis, Blade Runner End Titles, track 4 bars 13 to 26, stored as scale steps from the
+    /// tonic. A four-bar unit: a whole note, two half notes and a two-bar hold, each note a scale
+    /// step lower, then the unit again a step lower, twice. The third unit breaks the sequence and
+    /// falls to the long low tonic. Phrases 2 and 3 are the answer, so the full statement is 12
+    /// bars; the call alone is an open question that ends on the held fourth below.
+    static let bladeRunner = HookRule(
+        id: "KOS-LEAD-010",
+        call: [[n(0, 0, 16, 72)],
+               [n(0, -1, 8, 70), n(8, -2, 8, 68)],
+               [n(0, -3, 32, 74)],
+               []],
+        answer: [[n(0, -1, 16, 70)],
+                 [n(0, -2, 8, 68), n(8, -3, 8, 66)],
+                 [n(0, -4, 32, 72)],
+                 [],
+                 [n(0, -2, 16, 68)],
+                 [n(0, -3, 8, 66), n(8, -4, 8, 64)],
+                 [n(0, -7, 24, 70)],
+                 [n(8, -5, 4, 62), n(12, -7, 12, 72)]],
+        sourceVariants: [
+            // The cadence settles on the fifth below instead of the tonic.
+            HookSourceVariant(answer: [[n(0, -1, 16, 70)],
+                                       [n(0, -2, 8, 68), n(8, -3, 8, 66)],
+                                       [n(0, -4, 32, 72)],
+                                       [],
+                                       [n(0, -2, 16, 68)],
+                                       [n(0, -3, 8, 66), n(8, -4, 8, 64)],
+                                       [n(0, -7, 24, 70)],
+                                       [n(8, -5, 4, 62), n(12, -4, 12, 70)]]),
+        ],
+        spacings: [16, 20, 24],
+        spacingWeights: [0.40, 0.35, 0.25],
+        scaleSteps: true, gentle: true, homageWeights: [1, 0, 0, 0, 0],
+        minStatements: 3, maxStatements: [3, 4], maxStatementWeights: [0.50, 0.50],
+        formWeights: [0, 0, 0.25, 0.35, 0.40],
+        sequenceUpChance: 0.0,
+        register: kosmicRegister
+    )
+
+    /// Vangelis, Pulstar, the brass theme (channel 8, bars 119 to 134): a pickup F F F G into C,
+    /// then four whole notes, one a bar, C Bb F G, said again an octave up. The pickup sits in the
+    /// bar before the line. The variants hold the last note across two bars, or drop the pickup.
+    static let pulstar = HookRule(
+        id: "KOS-LEAD-011",
+        call: [[n(-8, -7, 2, 70), n(-6, -7, 2, 72), n(-4, -7, 2, 74), n(-2, -5, 2, 78), n(0, 0, 16, 84)],
+               [n(0, -2, 16, 78)],
+               [n(0, -7, 16, 76)],
+               [n(0, -5, 16, 74)]],
+        answer: [[n(-8, -7, 2, 66), n(-6, -7, 2, 68), n(-4, -7, 2, 70), n(-2, -5, 2, 74), n(0, 0, 16, 80)],
+                 [n(0, -2, 16, 74)],
+                 [n(0, -7, 16, 72)],
+                 [n(0, -5, 16, 70)]],
+        answerShift: 7,
+        sourceVariants: [
+            // The line without its pickup, the first note entering on the bar.
+            HookSourceVariant(call: [[n(0, 0, 16, 84)], [n(0, -2, 16, 78)], [n(0, -7, 16, 76)],
+                                     [n(0, -5, 16, 74)]]),
+            // The last note held across two bars.
+            HookSourceVariant(answer: [[n(-8, -7, 2, 66), n(-6, -7, 2, 68), n(-4, -7, 2, 70),
+                                        n(-2, -5, 2, 74), n(0, 0, 16, 80)],
+                                       [n(0, -2, 16, 74)],
+                                       [n(0, -7, 16, 72)],
+                                       [n(0, -5, 32, 70)],
+                                       []]),
+        ],
+        spacings: [12, 16, 20],
+        spacingWeights: [0.35, 0.40, 0.25],
+        scaleSteps: false, gentle: true, homageWeights: [0, 0, 0, 0, 1],
+        minStatements: 3, maxStatements: [3, 4], maxStatementWeights: [0.55, 0.45],
+        formWeights: [0, 0, 0.25, 0.30, 0.45],
+        register: pulstarRegister
+    )
+
+    /// Tangerine Dream, Beach Scene, the guitar sigh (bars 51 to 66): the root slips to the
+    /// seventh, repeats and sinks to the sixth, then rising arpeggios on IV and V land on the
+    /// root. The variant call falls to the fifth before rising to the sixth.
+    static let beachScene = HookRule(
+        id: "KOS-LEAD-012",
+        call: [[n(0, 0, 2, 70), n(2, -1, 4, 72), n(6, -1, 6, 70), n(12, -1, 4, 72)],
+               [n(0, -1, 4, 72), n(4, -3, 28, 76)],
+               []],
+        answer: [[n(0, -12, 2, 66), n(2, -7, 2, 68), n(4, -3, 4, 72), n(8, -10, 2, 66),
+                  n(10, -5, 2, 68), n(12, -1, 4, 74)],
+                 [n(0, 0, 12, 78)]],
+        sourceVariants: [
+            HookSourceVariant(call: [[n(0, 0, 2, 70), n(2, -1, 4, 72), n(6, -5, 6, 70), n(12, -5, 4, 72)],
+                                     [n(0, -5, 4, 72), n(4, -3, 28, 76)],
+                                     []]),
+        ],
+        spacings: [8, 12, 16],
+        spacingWeights: [0.35, 0.40, 0.25],
+        gentle: true, homageWeights: [0.25, 0.20, 0.10, 0.20, 0.25],
+        minStatements: 3, maxStatements: [3, 4, 5], maxStatementWeights: [0.25, 0.40, 0.35],
+        formWeights: [0, 0, 0.25, 0.30, 0.45],
+        register: kosmicRegister
+    )
+
+    static let kosmicRules: [String: HookRule] = Dictionary(
+        uniqueKeysWithValues: [bladeRunner, pulstar, beachScene].map { ($0.id, $0) })
+
+    static func isKosmicHookRule(_ id: String) -> Bool { kosmicRules[id] != nil }
+
     // MARK: - Homage
 
     private struct FlatNote { var at: Int; var deg: Int; var len: Int; var vel: Int }
@@ -165,7 +296,8 @@ enum HookLeadEngine {
 
     /// Reworks a cell with `count` distinct changes. The first note and the last note never
     /// change, so the shape that makes the hook recognisable survives every version.
-    static func homage(_ bars: [HookBar], count: Int, rng: inout SeededRNG) -> [HookBar] {
+    static func homage(_ bars: [HookBar], count: Int, unit: Int = 2, weights: [Double]? = nil,
+                       rng: inout SeededRNG) -> [HookBar] {
         guard !bars.isEmpty else { return bars }
         var notes = flatten(bars)
         guard notes.count >= 3 else { return bars }
@@ -173,7 +305,7 @@ enum HookLeadEngine {
         var attempts = 0
         while used.count < count && attempts < 12 {
             attempts += 1
-            let opIndex = rng.weightedPick(homageWeights)
+            let opIndex = rng.weightedPick(weights ?? homageWeights)
             guard !used.contains(opIndex) else { continue }
             let last = notes.count - 1
             var applied = false
@@ -186,7 +318,11 @@ enum HookLeadEngine {
                     let i = slots[rng.nextInt(upperBound: slots.count)]
                     let a = notes[i], b = notes[i + 1]
                     let diff = b.deg - a.deg
-                    let deg = abs(diff) >= 3 ? a.deg + diff / 2 : a.deg + (rng.nextDouble() < 0.5 ? 2 : -2)
+                    // A scale-step cell takes the upper neighbour when it falls, so the new note never doubles
+                    // the one that follows; semitone cells keep the random neighbour.
+                    let deg = abs(diff) >= unit + 1 ? a.deg + diff / 2
+                        : unit == 1 && diff != 0 ? a.deg + (diff < 0 ? 1 : -1)
+                        : a.deg + (rng.nextDouble() < 0.5 ? unit : -unit)
                     // On the 8th-note grid, so it sits with the hats; a gap with no 8th between
                     // its neighbours takes no passing note.
                     var at = ((a.at + (b.at - a.at) / 2) / 2) * 2
@@ -233,7 +369,7 @@ enum HookLeadEngine {
                 let repeats = (1..<last).filter { notes[$0].deg == notes[$0 - 1].deg }
                 if !repeats.isEmpty {
                     let i = repeats[rng.nextInt(upperBound: repeats.count)]
-                    notes[i].deg += rng.nextDouble() < 0.6 ? 2 : -2
+                    notes[i].deg += rng.nextDouble() < 0.6 ? unit : -unit
                     applied = true
                 }
             }
@@ -245,15 +381,18 @@ enum HookLeadEngine {
     /// This song's version of the rule: every cell reworked by the seed.
     private static func songVersion(of rule: HookRule, rng: inout SeededRNG) -> HookRule {
         var r = rule
-        r.call = homage(rule.call, count: rng.nextDouble() < 0.6 ? 2 : 3, rng: &rng)
-        r.answer = homage(rule.answer, count: rng.nextDouble() < 0.5 ? 1 : 2, rng: &rng)
+        let unit = rule.scaleSteps ? 1 : 2
+        // A gentle rule changes one note per cell; the draws are the same either way.
+        func count(_ twoOrThree: Int, _ oneOrTwo: Int) -> Int { rule.gentle ? 1 : twoOrThree }
+        r.call = homage(rule.call, count: count(rng.nextDouble() < 0.6 ? 2 : 3, 1), unit: unit, weights: rule.homageWeights, rng: &rng)
+        r.answer = homage(rule.answer, count: count(rng.nextDouble() < 0.5 ? 1 : 2, 1), unit: unit, weights: rule.homageWeights, rng: &rng)
         if let re = rule.restatement {
-            r.restatement = homage(re, count: rng.nextDouble() < 0.5 ? 1 : 2, rng: &rng)
+            r.restatement = homage(re, count: count(rng.nextDouble() < 0.5 ? 1 : 2, 1), unit: unit, weights: rule.homageWeights, rng: &rng)
         }
         r.sourceVariants = rule.sourceVariants.map { v in
             var out = v
-            if let c = v.call { out.call = homage(c, count: 1, rng: &rng) }
-            if let a = v.answer { out.answer = homage(a, count: 1, rng: &rng) }
+            if let c = v.call { out.call = homage(c, count: 1, unit: unit, weights: rule.homageWeights, rng: &rng) }
+            if let a = v.answer { out.answer = homage(a, count: 1, unit: unit, weights: rule.homageWeights, rng: &rng) }
             return out
         }
         return r
@@ -298,10 +437,17 @@ enum HookLeadEngine {
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var r = SeededRNG(seed: rng.next() ^ 0x484F_4F4B_4C45_4144)   // "HOOKLEAD"
-        let rule = songVersion(of: source, rng: &r)
+        let register = source.register ?? register
+        var rule = songVersion(of: source, rng: &r)
         let tonicPC = ((frame.keySemitoneValue % 12) + 12) % 12
         guard let bodyEnd = structure.bodySections.map(\.endBar).max() else { return [] }
 
+        // A rule that repeats itself an octave up needs room for both; in a key that has none, the
+        // repeat comes down to a fifth, then to the same octave, rather than folding notes.
+        while rule.answerShift > 4 && anchorCandidate(rule: rule, tonicPC: tonicPC, register: register) == nil {
+            rule.answerShift = 4
+            if anchorCandidate(rule: rule, tonicPC: tonicPC, register: register) == nil { rule.answerShift = 0 }
+        }
         let base = anchorTonic(rule: rule, tonicPC: tonicPC, register: register)
 
         func plain(_ index: Int) -> Statement {
@@ -353,7 +499,7 @@ enum HookLeadEngine {
             if kinds.contains(.stepUp) {
                 let calls = Array(st.bars.prefix(st.callCount))
                 st.bars.insert(contentsOf: calls, at: st.callCount)
-                st.barShift.insert(contentsOf: st.barShift.prefix(st.callCount).map { $0 + 1 }, at: st.callCount)
+                st.barShift.insert(contentsOf: st.barShift.prefix(st.callCount).map { $0 + (rule.sequenceUpChance < 0.5 ? -1 : 1) }, at: st.callCount)
                 st.callCount *= 2
             }
             // Withholding the answer leaves the question open; pointless if a variant just
@@ -377,7 +523,7 @@ enum HookLeadEngine {
         // variations of it, not tweaks: the head alone, the head said twice, the answer alone, or
         // the call as a sequence a step away.
         enum Form: CaseIterable { case head, loop, answerOnly, sequence, varied }
-        let formWeights: [Double] = [0.28, 0.17, 0.15, 0.15, 0.25]
+        let formWeights: [Double] = rule.formWeights ?? [0.28, 0.17, 0.15, 0.15, 0.25]
 
         /// The first half of a bar, ending on an even step, with the last note held. If cutting
         /// would leave fewer than two notes the whole bar is the head.
@@ -413,7 +559,7 @@ enum HookLeadEngine {
                                  barShift: Array(repeating: rule.answerShift, count: bars.count), callCount: 0)
             case .sequence:
                 var st = plain(index)
-                let up = r.nextDouble() < 0.70 ? 1 : -1
+                let up = r.nextDouble() < rule.sequenceUpChance ? 1 : -1
                 st.bars.insert(contentsOf: Array(st.bars.prefix(st.callCount)), at: st.callCount)
                 st.barShift.insert(contentsOf: st.barShift.prefix(st.callCount).map { $0 + up }, at: st.callCount)
                 st.callCount *= 2
@@ -478,7 +624,7 @@ enum HookLeadEngine {
         // neighbours are closest goes, never the first, the last or the only one in the last
         // third. Under three, the biggest gap takes a statement near its middle.
         // The cap is drawn per song so the count spreads across 3, 4 and 5 (20, 40 and 40%).
-        let maxBody = [3, 4, 5][r.weightedPick([0.20, 0.40, 0.40])]
+        let maxBody = rule.maxStatements[r.weightedPick(rule.maxStatementWeights)]
         while statements.count > maxBody {
             let onlyLate = statements.filter { $0.startBar >= thirdStart }.count == 1
             var best: Int? = nil
@@ -491,7 +637,7 @@ enum HookLeadEngine {
             guard let b = best else { break }
             statements.remove(at: b)
         }
-        while statements.count < 3 && statements.count >= 1 {
+        while statements.count < rule.minStatements && statements.count >= 1 {
             var gapAt = 0
             var gapSize = 0
             for i in 0..<(statements.count - 1) {
@@ -536,7 +682,7 @@ enum HookLeadEngine {
         var events: [MIDIEvent] = []
         for (i, st) in statements.enumerated() {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
-                              tonalMap: tonalMap, register: register, rng: &r)
+                              tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps, rng: &r)
             // The bar after a statement: silence, or about three times in ten the tail.
             guard let tail = rule.tail else { continue }
             let tailBar = st.endBar
@@ -544,12 +690,13 @@ enum HookLeadEngine {
             if i + 1 < statements.count, tailBar < nextStart, isFree(tailBar), r.nextDouble() < 0.30 {
                 let t = Statement(startBar: tailBar, bars: [tail], barShift: [0], callCount: 1)
                 events += realise(t, base: base, tonicPC: tonicPC, structure: structure,
-                                  tonalMap: tonalMap, register: register, legato: false, rng: &r)
+                                  tonalMap: tonalMap, register: register, legato: false,
+                                  scaleSteps: rule.scaleSteps, rng: &r)
             }
         }
         if let st = outroStatement {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
-                              tonalMap: tonalMap, register: register, rng: &r)
+                              tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps, rng: &r)
         }
         return events.filter { $0.stepIndex >= 0 && $0.stepIndex < frame.totalBars * 16 }
     }
@@ -560,21 +707,39 @@ enum HookLeadEngine {
     /// figure stays in one octave. Headroom covers a step-up, a third-up in B, and a shifted
     /// answer.
     private static func anchorTonic(rule: HookRule, tonicPC: Int, register: RegisterBounds) -> Int {
-        var cells = rule.call + rule.answer + (rule.restatement ?? [])
-        if let t = rule.tail { cells.append(t) }
-        for v in rule.sourceVariants { cells += (v.call ?? []) + (v.answer ?? []) }
-        let degs = cells.flatMap { $0 }.map(\.deg)
-        let lo = (degs.min() ?? 0) - (rule.answerShift < 0 ? 4 : 0)
-        let hi = (degs.max() ?? 0) + 3 + (rule.answerShift > 0 ? 4 : 0)
-        let target = Double(register.low + register.high) / 2 - 2      // a little below the middle
-        let candidates = stride(from: tonicPC, through: 127, by: 12)
-            .filter { $0 + lo >= register.low && $0 + hi <= register.high }
-        if let best = candidates.min(by: {
-            abs(Double($0) + Double(lo + hi) / 2 - target) < abs(Double($1) + Double(lo + hi) / 2 - target)
-        }) { return best }
+        if let best = anchorCandidate(rule: rule, tonicPC: tonicPC, register: register) { return best }
+        let (lo, _) = anchorSpan(rule)
         var t = tonicPC
         while t + lo < register.low { t += 12 }
         return t
+    }
+
+    /// The span in semitones the rule's cells cover from the tonic, with headroom.
+    private static func anchorSpan(_ rule: HookRule) -> (lo: Int, hi: Int) {
+        var cells = rule.call + rule.answer + (rule.restatement ?? [])
+        if let t = rule.tail { cells.append(t) }
+        for v in rule.sourceVariants { cells += (v.call ?? []) + (v.answer ?? []) }
+        // A scale step is about 12/7 of a semitone.
+        let degs = cells.flatMap { $0 }.map { rule.scaleSteps ? Int((Double($0.deg) * 12 / 7).rounded()) : $0.deg }
+        // Up to two steps the headroom is the old four semitones; a bigger shift, an octave say,
+        // takes its own size.
+        let shiftSemis = abs(rule.answerShift) <= 2 ? rule.answerShift * 2
+            : Int((Double(rule.answerShift) * 12 / 7).rounded())
+        let lo = (degs.min() ?? 0) - (rule.answerShift < 0 ? -Swift.min(shiftSemis, 0) : 0)
+        let hi = (degs.max() ?? 0) + 3 + (rule.answerShift > 0 ? shiftSemis : 0)
+        return (lo, hi)
+    }
+
+    /// The tonic that puts the whole span inside `register`, nearest a little below its middle, or
+    /// nil if no octave of the tonic does.
+    private static func anchorCandidate(rule: HookRule, tonicPC: Int, register: RegisterBounds) -> Int? {
+        let (lo, hi) = anchorSpan(rule)
+        let target = Double(register.low + register.high) / 2 - 2      // a little below the middle
+        let candidates = stride(from: tonicPC, through: 127, by: 12)
+            .filter { $0 + lo >= register.low && $0 + hi <= register.high }
+        return candidates.min(by: {
+            abs(Double($0) + Double(lo + hi) / 2 - target) < abs(Double($1) + Double(lo + hi) / 2 - target)
+        })
     }
 
     static func scalePCs(_ mode: Mode, tonicPC: Int) -> Set<Int> {
@@ -620,7 +785,7 @@ enum HookLeadEngine {
     private static func realise(
         _ st: Statement, base: Int, tonicPC: Int,
         structure: SongStructure, tonalMap: TonalGovernanceMap,
-        register: RegisterBounds, legato: Bool = true, rng: inout SeededRNG
+        register: RegisterBounds, legato: Bool = true, scaleSteps: Bool = false, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         struct Placed { var step: Int; var pitch: Int; var len: Int; var vel: Int; let bar: Int }
         var notes: [Placed] = []
@@ -630,8 +795,11 @@ enum HookLeadEngine {
             let scale = scalePCs(entry.sectionMode, tonicPC: tonicPC)
             let shift = st.shift + (bi < st.barShift.count ? st.barShift[bi] : 0)
             for n in barNotes {
-                let p = scaleShift(pitch(for: n.deg, base: base, mode: entry.sectionMode, scale: scale),
-                                   by: shift, in: scale)
+                // A scale-step rule moves from the tonic by steps; the others map a semitone.
+                let p = scaleSteps
+                    ? scaleShift(base, by: n.deg + shift, in: scale)
+                    : scaleShift(pitch(for: n.deg, base: base, mode: entry.sectionMode, scale: scale),
+                                 by: shift, in: scale)
                 notes.append(Placed(step: barIdx * 16 + n.step, pitch: p,
                                     len: n.len, vel: n.vel, bar: barIdx))
             }

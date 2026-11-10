@@ -183,8 +183,13 @@ struct KosmicLeadGenerator {
         // (008, 009) must never serve as bRule since emitLeadBar doesn't dispatch them.
         let sparseLeadRules: Set<String> = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003"]
         let hasBSection = structure.sections.contains { $0.label == .B }
+        // A transcription hook (KOS-LEAD-010 to 012) owns both the A and the B sections, so it
+        // makes no Technique D draw.
+        let hook = HookLeadEngine.kosmicRules[aRule]
         let bRule: String
-        if sparseLeadRules.contains(aRule) {
+        if hook != nil {
+            bRule = aRule
+        } else if sparseLeadRules.contains(aRule) {
             // Escalate to a denser rule for B sections.
             // Drift: KOS-LEAD-006 and 007 excluded — escalate to 004 (Echo Melody) only.
             bRule = isKosmicDrift ? "KOS-LEAD-004" : pickDenseLeadRule(rng: &rng)
@@ -227,6 +232,16 @@ struct KosmicLeadGenerator {
         // Bridge A-2: short descending melodic response on odd (non-hit) bars
         events += generateBridgeAltLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
 
+        // The hook rules lay out the whole song in one call. The bridges, and anything else outside
+        // the A and B sections, stay with the code below.
+        if let hook {
+            let aStart = structure.sections.first(where: { $0.label == .A })?.startBar ?? 0
+            events += HookLeadEngine.generate(
+                rule: hook, frame: frame, structure: structure, tonalMap: tonalMap,
+                entryBar: aStart + 4, restBars: [],
+                register: HookLeadEngine.kosmicRegister, rng: &rng)
+        }
+
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
             // Drum bridges handled above — skip in main loop
@@ -246,6 +261,7 @@ struct KosmicLeadGenerator {
             }
             // B sections: use Technique D rule if selected
             let activeRule = (section.label == .B) ? bRule : aRule
+            if hook != nil { continue }
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
@@ -1062,8 +1078,9 @@ struct KosmicLeadGenerator {
     private static func pickLeadRule(rng: inout SeededRNG) -> String {
         // Lead 1 rule pool — 006 reduced to 15% so other rules get more airtime.
         // KOS-LEAD-004 reduced 0.16→0.10 (was appearing in 4/5 songs); redistributed to 002 and 007.
-        let rules:   [String] = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007", "KOS-LEAD-008", "KOS-LEAD-009"]
-        let weights: [Double] = [0.12,           0.12,           0.13,           0.10,           0.07,           0.15,           0.14,           0.09,           0.08]
+        // KOS-LEAD-011, 012 and 010 take the slots of 001, 005 and 007, which sit at the end at 0%.
+        let rules:   [String] = ["KOS-LEAD-011", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-012", "KOS-LEAD-006", "KOS-LEAD-010", "KOS-LEAD-008", "KOS-LEAD-009", "KOS-LEAD-001", "KOS-LEAD-005", "KOS-LEAD-007"]
+        let weights: [Double] = [0.12,           0.12,           0.13,           0.10,           0.07,           0.15,           0.14,           0.09,           0.08,           0.0,            0.0,            0.0]
         return rules[rng.weightedPick(weights)]
     }
 
@@ -1086,7 +1103,9 @@ struct KosmicLeadGenerator {
     private static func pickLeadRuleDifferentFrom(_ current: String,
                                                    excluding: [String] = [],
                                                    rng: inout SeededRNG) -> String {
-        let allRules = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-006", "KOS-LEAD-007", "KOS-LEAD-008", "KOS-LEAD-009"]
+        // The retired 001, 005 and 007 are out: a bridge melody is a per-bar context, which the
+        // hook rules that replaced them are not.
+        let allRules = ["KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-006", "KOS-LEAD-008", "KOS-LEAD-009"]
         let excluded = Set(excluding + [current])
         let candidates = allRules.filter { !excluded.contains($0) }
         guard !candidates.isEmpty else { return current }
@@ -1094,14 +1113,12 @@ struct KosmicLeadGenerator {
     }
 
     /// Pick a B-section rule for Technique D. Restricted to per-bar-compatible rules only.
-    /// Drift excludes KOS-LEAD-006 (JMJ Phrase, bypasses emitLeadBar) and KOS-LEAD-007
-    /// (TD Skip Sequence, wrong character for Drift).
+    /// Only 002, 003 and 004 qualify: 001, 005 and 007 are retired, and 006 bypasses emitLeadBar.
     private static func pickBSectionRule(excluding current: String,
                                           isKosmicDrift: Bool = false,
                                           rng: inout SeededRNG) -> String {
-        let perBarRules: [String] = isKosmicDrift
-            ? ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005"]
-            : ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005", "KOS-LEAD-007"]
+        // 001, 005 and 007 are retired; the hook rules that replaced them are whole-song rules.
+        let perBarRules: [String] = ["KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004"]
         let candidates = perBarRules.filter { $0 != current }
         guard !candidates.isEmpty else { return current }
         return candidates[rng.nextInt(upperBound: candidates.count)]
@@ -1765,6 +1782,7 @@ struct KosmicLeadGenerator {
                                       minGap: 6, rng: &rng)
 
         for window in windows {
+            var lastNote: Int? = nil
             for bar in window {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
@@ -1772,7 +1790,30 @@ struct KosmicLeadGenerator {
                 guard !allNotes.isEmpty else { continue }
                 let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
                 let chordNotes   = allNotes.filter { chordTonePCs.contains($0 % 12) }
-                let pool = chordNotes.isEmpty ? allNotes : chordNotes
+                // A minor chord whose third lies outside the mode (Gb minor in Ab Aeolian) leaves only
+                // two chord tones in the register, and the line shuttled between them. With fewer
+                // than four, the whole scale is the pool and chord tones are weighted up.
+                let pool = chordNotes.count >= 4 ? chordNotes : allNotes
+                func pickNext() -> Int {
+                    let cands = pool.filter { $0 != lastNote }
+                    let list = cands.isEmpty ? pool : cands
+                    var weights: [Double] = list.map { n in
+                        var w = 1.0
+                        if let l = lastNote {
+                            let d = abs(n - l)
+                            w = d <= 4 ? 3.0 : (d <= 7 ? 2.0 : (d <= 12 ? 1.0 : 0.2))
+                        }
+                        return chordTonePCs.contains(n % 12) ? w * 2.0 : w
+                    }
+                    let total = weights.reduce(0, +)
+                    weights = weights.map { $0 / total }
+                    var r = rng.nextDouble()
+                    for (i, w) in weights.enumerated() {
+                        if r < w { return list[i] }
+                        r -= w
+                    }
+                    return list[list.count - 1]
+                }
 
                 // First note: offset 0, 1, or 1.5 beats (0, 4, or 6 steps)
                 let offsets = [0, 4, 6]
@@ -1780,7 +1821,8 @@ struct KosmicLeadGenerator {
                 let dur1      = 8 + rng.nextInt(upperBound: 7)     // 8–14 steps (2–3.5 beats)
                 let playedDur1 = min(dur1, 16 - offset1)           // actual duration after bar clamp
                 let vel1      = UInt8(50 + rng.nextInt(upperBound: 19))
-                let note1     = pool[rng.nextInt(upperBound: pool.count)]
+                let note1     = pickNext()
+                lastNote = note1
                 events.append(MIDIEvent(stepIndex: barStart + offset1, note: UInt8(note1),
                                         velocity: vel1, durationSteps: playedDur1))
 
@@ -1788,7 +1830,8 @@ struct KosmicLeadGenerator {
                 if rng.nextDouble() < 0.55 {
                     let offset2 = offset1 + playedDur1   // use actual played duration, not requested
                     guard offset2 < 15 else { continue }
-                    let note2 = pool[rng.nextInt(upperBound: pool.count)]
+                    let note2 = pickNext()
+                    lastNote = note2
                     let vel2  = UInt8(48 + rng.nextInt(upperBound: 17))
                     let dur2  = 6 + rng.nextInt(upperBound: 7)    // 6–12 steps
                     events.append(MIDIEvent(stepIndex: barStart + offset2, note: UInt8(note2),
@@ -1815,8 +1858,30 @@ struct KosmicLeadGenerator {
         events += generateBridgeAltLead(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
 
         let windowCount = 2 + rng.nextInt(upperBound: 2)   // 2 or 3 windows
-        let windows = pickSoloWindows(structure: structure, soloLength: 10, windowCount: windowCount,
+        var windows = pickSoloWindows(structure: structure, soloLength: 10, windowCount: windowCount,
                                       minGap: 8, rng: &rng)
+
+        // The solo always comes back at least once. When only one full window fits, a shortened
+        // five-bar return is added that clears the first by four bars; it starts from its own
+        // random direction and start note, so it is a variation, not a copy.
+        if windows.count == 1 {
+            let first = windows[0]
+            var body = Set<Int>()
+            for section in structure.sections {
+                guard section.label != .intro && section.label != .outro else { continue }
+                guard !section.label.isBridge && section.label != .bridgeMelody else { continue }
+                for b in section.startBar..<section.endBar { body.insert(b) }
+            }
+            let starts = body.sorted().filter { start in
+                (start..<(start + 5)).allSatisfy { body.contains($0) }
+                    && (start >= first.upperBound + 4 || start + 5 + 4 <= first.lowerBound)
+            }
+            if !starts.isEmpty {
+                let start = starts[rng.nextInt(upperBound: starts.count)]
+                windows.append(start..<(start + 5))
+                windows.sort { $0.lowerBound < $1.lowerBound }
+            }
+        }
 
         for window in windows {
             guard !window.isEmpty, let firstEntry = tonalMap.entry(atBar: window.lowerBound) else { continue }

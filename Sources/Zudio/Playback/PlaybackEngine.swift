@@ -1368,7 +1368,7 @@ final class PlaybackEngine: ObservableObject {
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 11039 {
                 vol = 1.4    // Pulse Bass runs soft against Moog on Space Rhythm
             } else if trackIndex == kTrackBass && kosmicStyle && program == 81 {
-                vol = 0.17   // Mono Synth on Kosmic bass — pull back further
+                vol = 0.14   // Mono Synth on Kosmic bass — pull back further (0.17 to 0.14, Zack 2026-11-10)
             } else if trackIndex == kTrackLead2 && ambientMode && program == 8 {
                 vol = 1.6    // Celesta runs soft on Ambient Lead 2 — boost for presence
             } else if trackIndex == kTrackLead2 && chillPadsMode {
@@ -1397,6 +1397,8 @@ final class PlaybackEngine: ObservableObject {
                 vol = 0.38   // Moog on Space Rhythm ran loud (Zack, 2026-11-03, trimmed twice); base Kosmic keeps 0.65
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 11088 && songState?.isKosmicSpace == true {
                 vol = 0.50   // Harpsi Pad on Space Rhythm ran loud (Zack, 2026-11-03); base Kosmic keeps 0.75
+            } else if trackIndex == kTrackRhythm && kosmicStyle && program == 11088 {
+                vol = 0.55   // Harpsi Pad on base Kosmic and Drift Rhythm, 0.75 to 0.55 (Zack, 2026-11-10); Space keeps 0.50
             } else if trackIndex == kTrackRhythm && kosmicStyle && program == 39 {
                 vol = 0.65   // Moog Lead on Kosmic rhythm — pull back
             // Drift Rhythm calibrations must sit before the general kosmicStyle catch below
