@@ -218,7 +218,7 @@ struct SongGenerator {
         // Step 8 — Lead 2
         // Noir always suppresses Lead 2 — skip generation entirely (lead2RNG is not consumed elsewhere)
         if !isNoir {
-            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody)
+            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, lead1RuleIDs: lead1Rules)
         }
 
         // Step 8 — Rhythm
@@ -312,7 +312,8 @@ struct SongGenerator {
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
 
         // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
-        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, arcadeVariation: isArcade, exemptTracks: motorikSync.isActive ? motorikSync.tracks + [kTrackLead2] : [])
+        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, arcadeVariation: isArcade, exemptTracks: motorikSync.isActive ? motorikSync.tracks + [kTrackLead2] : [],
+                                              phraseTracks: lead1Rules.contains(where: HookLeadEngine.isMotorikHookRule) ? [kTrackLead1] : [])
 
         // Step 10.7 — Pads gate: when Lead 1 is on a solo rule (< 30 notes), thin pads outside
         // the solo window to avoid a dense shimmer wall with nothing cutting through it.
@@ -2835,6 +2836,7 @@ struct SongGenerator {
         case "MOT-LD1-020": return "Synth Hook"
         case "MOT-LD1-021": return "Short Statement"
         case "MOT-LD1-022": return "Long Run"
+        case "MOT-LD1-023": return "Hallogallo hook"
         default:            return ruleID
         }
     }

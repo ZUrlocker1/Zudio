@@ -125,11 +125,16 @@ struct LeadGenerator {
         let bRuleCandidate = pickLd1Rule(rng: &rng, noir: noirVariation, arcade: arcadeVariation)
         let aRule: String  = forceLeadRuleID.flatMap { $0.hasPrefix("MOT-LD1-") ? $0 : nil } ?? pickedA
         // Technique D: LD1-003 Punch Solo handles its own silence via punchNextSoloBar; escalate to an active rule for B sections.
-        let bRule: String
+        var bRule: String
         if aRule == "MOT-LD1-003" {
             bRule = (rng.nextDouble() < 0.60) ? "MOT-LD1-001" : "MOT-LD1-004"
         } else {
             bRule = (rng.nextDouble() < 0.70) ? aRule : bRuleCandidate
+        }
+        // Hook rules own the whole song, so one can only arrive as the A rule. A hook drawn
+        // for B alone keeps the A rule instead; no extra draw.
+        if HookLeadEngine.isMotorikHookRule(bRule) && !HookLeadEngine.isMotorikHookRule(aRule) {
+            bRule = aRule
         }
         usedRuleIDs.insert(aRule)
 
@@ -261,6 +266,16 @@ struct LeadGenerator {
         let ld1RestBars: Set<Int> = !isSoloRule
             ? buildRestBars(entryBar: entryBar, totalBars: frame.totalBars, rng: &rng, arcade: arcadeVariation)
             : []
+
+        // Transcription hook rules (MOT-LD1-023 onward) generate the whole song in one call,
+        // after the entry bar and rest windows are drawn, and own both A and B sections.
+        if let hook = HookLeadEngine.motorikRules[aRule] {
+            let events = HookLeadEngine.generate(
+                rule: hook, frame: frame, structure: structure, tonalMap: tonalMap,
+                entryBar: entryBar, restBars: ld1RestBars,
+                register: kRegisterBounds[kTrackLead1]!, rng: &rng)
+            return (events, nil)
+        }
 
         var events: [MIDIEvent] = []
 
@@ -602,7 +617,8 @@ struct LeadGenerator {
         usedRuleIDs: inout Set<String>,
         soloRange: Range<Int>? = nil,
         arcadeVariation: Bool = false,
-        arcadeDenseMelody: Bool = false
+        arcadeDenseMelody: Bool = false,
+        lead1RuleIDs: Set<String> = []
     ) -> [MIDIEvent] {
         // Arcade uses a restricted regular pool — Sustained Drone (002) and Neu! counter melody (004) excluded.
         let ld2Rules:   [String] = arcadeVariation
@@ -635,6 +651,9 @@ struct LeadGenerator {
         // LD2-006 (Diatonic Shadow) requires Lead 1 notes to harmonize — if Lead 1 is on a solo rule
         // with a sparse window, Lead 2 would be silent for the whole song. Redirect to Counter Response.
         if soloRange != nil && ruleID == "MOT-LD2-006" { ruleID = "MOT-LD2-001" }
+        // Lead 1's Hallogallo hook states the Guitar 2 riff whole; MOT-LD2-004 scatters the same
+        // riff as blips, and the two blur each other. Take the descending line instead.
+        if lead1RuleIDs.contains("MOT-LD1-023") && ruleID == "MOT-LD2-004" { ruleID = "MOT-LD2-005" }
         usedRuleIDs.insert(ruleID)
 
         let lead1StepSet = Set(lead1Events.map(\.stepIndex))
@@ -2894,24 +2913,32 @@ struct LeadGenerator {
             // High-density rules (002 Pentatonic Cell, 003 Ratchet, 004 Syncopated) are suppressed.
             // MOT-LD1-007 (Vanishing Solo) excluded: its major-key melodic arc feels tonally out of place
             // even with minor-scale adjustment; its 4% redistributed 1% each to 010/011/013/014.
-            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-001","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014"]
-            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15]
+            // Retired base rules are replaced in every pool that used them (Zack, 2026-11-10):
+            // MOT-LD1-023 Hallogallo hook takes MOT-LD1-001's slot, and 001 sits at the end at 0%.
+            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-023","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014","MOT-LD1-001"]
+            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15,         0.00]
             return rules[rng.weightedPick(weights)]
         }
         if arcade {
             // Arcade: staccato mechanical leads dominant. Arpeggio rules 018/019 together ~37% of picks.
             // 020 (Synth Hook) is melodic but not an arp — gives Bass/Lead 2 full weights via coordination layer.
             // 017 (Pentatonic Blitz) fires only when BPM ≥ 143 — handled inside the bar generator.
-            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-001","MOT-LD1-002"]
-            let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02]
+            // MOT-LD1-023 Hallogallo hook takes MOT-LD1-001's slot, and 001 sits at the end at 0%.
+            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-023","MOT-LD1-002","MOT-LD1-001"]
+            let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02,          0.00]
             return rules[rng.weightedPick(weights)]
         }
         // 005 Call and answer down from 0.14 to 0.11, its 3% going to 003, 006 and 007.
         // It is the most recognisable shape in the pool, and because bRule reuses aRule 70% of
         // the time a rule that wins usually carries the whole song — so it registered as more
         // frequent than its share.
-        let rules:   [String] = ["MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008"]
-        let weights: [Double] = [0.15,          0.14,          0.11,          0.15,          0.11,          0.12,          0.12,          0.10]
+        //
+        // Solo improvement (2026-11-10): transcription hook rules take the slots of the rules
+        // they replace, so every song that drew another rule keeps it. A retired rule moves to
+        // the end of the list at 0%; restoring it means swapping it back into its slot.
+        // MOT-LD1-023 Hallogallo hook replaces MOT-LD1-001 Neu! motif first.
+        let rules:   [String] = ["MOT-LD1-023", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008", "MOT-LD1-001"]
+        let weights: [Double] = [0.15,          0.14,          0.11,          0.15,          0.11,          0.12,          0.12,          0.10,          0.00]
         return rules[rng.weightedPick(weights)]
     }
 

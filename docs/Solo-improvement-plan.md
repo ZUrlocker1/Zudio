@@ -1,6 +1,6 @@
 # Solo improvement plan: Motorik and Kosmic Lead 1
 
-Status (2026-11-10): planning finished and approved by Zack. No code has changed yet. The build
+Status (2026-11-10): planning approved by Zack. Phase 1 (hook engine and MOT-LD1-023) is built and approved by ear; see "Phase 1 as built". Next is phase 2. The build
 specification is the section "Build spec" near the end. Everything above it is the reasoning
 and source data it draws on.
 
@@ -19,13 +19,23 @@ the Kosmic Space Oxygene leads. The bar is that each one has a hook you could hu
 
 ## Scope
 
-Base Motorik and base Kosmic Lead 1 pools only. These stay unchanged:
+**A retired rule is replaced everywhere it was used** (Zack, 2026-11-10). The weak rules are
+not left available to any substyle. Wherever a retired rule held a slot, its replacement takes
+that slot. Each substyle's own rules are untouched; only borrowed weak rules change.
 
-- Motorik Noir, which uses MOT-LD1-001 and MOT-LD1-006 at 4% each.
-- Motorik Arcade, which uses MOT-LD1-001 at 3% and MOT-LD1-002 at 2%.
-- Motorik Europe.
-- Kosmic Space and Kosmic Drift.
-- Kosmic Lead 2, which draws KOS-LEAD-001 from its own pool.
+Where the retired rules are used outside the base pools:
+
+- **Motorik Noir Lead 1:** MOT-LD1-001 and MOT-LD1-006, 4% each.
+- **Motorik Arcade Lead 1:** MOT-LD1-001 at 3% and MOT-LD1-002 at 2%.
+- **Motorik Europe Lead 1:** the sequence-lock group (Lead 1 not in sync) draws the whole base
+  pool.
+- **Motorik Arcade Lead 2:** the regular pool uses MOT-LD2-001, MOT-LD2-003 and MOT-LD2-005.
+- **Motorik Europe Lead 2:** base Lead 2 when Lead 2 isn't in the sync.
+- **Kosmic B sections and bridge melodies,** base and Drift: `pickBSectionRule` and
+  `pickLeadRuleDifferentFrom` can draw KOS-LEAD-001, 005 and 007. These are per-bar contexts and
+  the hook rules are whole-song, so there the retired rules are removed from the candidate lists
+  rather than replaced.
+- Kosmic Space doesn't use them. Its Lead 2 plays KOS-LEAD-004, which is kept.
 
 ## Rules to replace (decided by Zack)
 
@@ -463,6 +473,10 @@ Kosmic base Lead 2 reuses Lead 1's bar functions through `emitLeadBar`:
 
 ### Protecting the other substyles
 
+**Superseded in part (2026-11-10):** retired rules are replaced everywhere, so Europe's base Lead 2
+and Arcade's regular Lead 2 pool (MOT-LD2-001, 003, 005) also move to the gap-answer design.
+Arcade's own arp rules (MOT-LD2-007 to 010) stay. Revise the gates below when phase 3 is built.
+
 - **Motorik Europe** songs run base `generateLead2` when Lead 2 isn't in the sync group. Gate the
   new behaviour on no sync; this needs a new parameter.
 - **Arcade** shares the bar loop. Gate on not Arcade.
@@ -590,7 +604,7 @@ next onset is under 8 steps. A gap is the space from one phrase's end to the nex
     sixth or octave lower. Choose once per song.
   - MOT-LD2-014 "Hook fragment", 20%: the first 2–3 notes of Lead 1's last phrase, inverted or
     moved one scale step down.
-  - MOT-LD2-015 "Own cell", 25%: a cell paired with Lead 1's rule, restated in every answer:
+  - MOT-LD2-015 "Answer cell", 25%: a cell paired with Lead 1's rule, restated in every answer:
     - MOT-LD1-023 Hallogallo: the pulse tail, b7 into the root.
     - MOT-LD1-024 Radioactivity: the vocal line, 1 1 1 1 3 2 1.
     - MOT-LD1-025 The Model: the tail, 2 b7 5.
@@ -601,14 +615,14 @@ next onset is under 8 steps. A gap is the space from one phrase's end to the nex
   - MOT-LD2-017 "Low bed", 10%: root or fifth held under Lead 1's long notes, MIDI 50–60, in at
     most half the phrases. The one rule allowed to sound with Lead 1, because it isn't melodic.
 - Base Kosmic:
-  - KOS-LD2-002 "Echo answer", 35%: as MOT-LD2-013, in long notes.
-  - KOS-LD2-003 "Own cell", 40%, paired with Lead 1's rule:
+  - KOS-LD2-002 "Slow echo answer", 35%: as MOT-LD2-013, in long notes.
+  - KOS-LD2-003 "Slow answer cell", 40%, paired with Lead 1's rule:
     - KOS-LEAD-010 Blade Runner: Lead 1's held last note echoed a diatonic third lower, one bar
       later, held.
     - KOS-LEAD-011 Pulstar: the rising riff, 1 2 b3 4 5 then 1.
     - KOS-LEAD-012 Beach Scene: the IV–V arpeggio answer landing on the root.
     - Kept old rules: the KOS-LEAD-004 two-on, two-off echo cell.
-  - KOS-LD2-004 "Gap echo melody", 25%: KOS-LEAD-004's shape re-gridded to start in Lead 1's
+  - KOS-LD2-004 "Gap reply melody", 25%: KOS-LEAD-004's shape re-gridded to start in Lead 1's
     gaps, not on `bar % 8`.
 
 **Shared rules for every answer:**
@@ -640,6 +654,16 @@ next onset is under 8 steps. A gap is the space from one phrase's end to the nex
 
 **Log descriptions:** add each new name to `lead2RuleDescription` in `SongGenerator.swift`.
 
+**Names are unique.** Every new rule has a name no other rule uses, old or new: Echo answer, Hook
+fragment, Answer cell, Statement harmony, Low bed, Slow echo answer, Slow answer cell, Gap reply
+melody. The Lead 1 names are Hallogallo hook, Radioactivity riff, The Model riff, Tour de France
+theme, Blade Runner theme, Pulstar theme and Beach Scene sigh.
+
+**Testing marker.** While Zack is testing, every new or changed rule ID goes in
+`GenerationLogEntry.testingMarkedRules` (`Models/SongState.swift`), which prints "* " before its
+name in the generation log. Empty the set when Zack says testing is done, the rules are final, or
+the build is going to the App Store.
+
 ## Build order
 
 Each phase ends with a macOS and an iOS build, and Zack listening before the next phase.
@@ -663,6 +687,34 @@ Each phase ends with a macOS and an iOS build, and Zack listening before the nex
   Drift are unchanged. Run it with `SWIFT_DETERMINISTIC_HASHING=1`.
 - No `xcodebuild test` and no `run_loop.sh` unless Zack asks.
 
+## Phase 1 as built (2026-11-10, approved by Zack)
+
+- **Engine:** `Sources/Zudio/Generation/HookLeadEngine.swift`. A rule is data: call bars, answer
+  bars, source variants, an optional tail and statement spacings. The engine lays out the whole
+  song after `generateLead1` has drawn the entry bar and `buildRestBars`, then returns early. Its
+  draws come from a derived stream.
+- **MOT-LD1-023 Hallogallo hook** takes MOT-LD1-001's slot in the base pool. MOT-LD1-001 moves to
+  the end of the list at 0%, so every song that drew another rule is unchanged. A hook drawn only
+  for B keeps the A rule.
+- **Noir, Arcade and Europe get it too.** MOT-LD1-023 takes MOT-LD1-001's slot in the Noir
+  pool (4%) and the Arcade pool (3%). Europe's sequence-lock songs use the base pool, so they get
+  it as well.
+- **ArrangementFilter `phraseTracks`.** For a hook-rule Lead 1, the filter's "reduced" treatment
+  softens without thinning, because thinning picked notes out of the hook. Rest blocks still
+  apply.
+- **Lead 2:** when Lead 1 is MOT-LD1-023, a MOT-LD2-004 draw becomes MOT-LD2-005. This holds
+  until phase 3 replaces base Lead 2. Lead 2 regen doesn't apply the swap yet.
+- **Fitting:** the tonic octave is chosen once per song, with the hook's centre just below the
+  middle of MIDI 52–79. Snapping ties go up, so b7 becomes the leading tone in Ionian. Each
+  statement moves as a block to stay in one octave.
+- **Measured over seeds 1–600:** 47 songs moved from MOT-LD1-001 to MOT-LD1-023: 32 base, 9
+  Europe, 4 Noir and 2 Arcade. 3 songs whose B section had drawn MOT-LD1-001 now keep their A
+  rule. Nothing else changed. In base songs, Hallogallo's longest silence has a median of 20.5
+  bars (other rules 16–18), and it sounds in 20% of body bars. The knob is `spacingWeights`; the
+  sketch restated every 4 bars.
+- **Still to do under "replace everywhere":** MOT-LD1-002, 003 and 006 in Noir and Arcade (phase
+  2), Arcade and Europe Lead 2 (phase 3), Kosmic B-section and bridge lists (phase 4).
+
 ## Decisions (2026-11-10)
 
 - All five excerpts Zack heard "sound good". Motorik takes Hallogallo, Radioactivity, The Model
@@ -670,6 +722,10 @@ Each phase ends with a macOS and an iOS build, and Zack listening before the nex
 - Kosmic takes all three candidates: Blade Runner, Pulstar and Beach Scene replace KOS-LEAD-001,
   KOS-LEAD-007 and KOS-LEAD-005. Claude chose the slots, as Zack asked.
 - Base Lead 2 in both styles is replaced by the gap-answer design.
+- Zack listened to phase 1: MOT-LD1-023 Hallogallo hook "sounds good". He also likes
+  MOT-LD1-005 Call and answer: **keep it in every pool and never replace it.**
+- A retired rule is replaced in every substyle that used it, not only in the base pool. This
+  supersedes "protected substyles must not change" for borrowed rules.
 
 ## Open questions
 

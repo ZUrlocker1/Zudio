@@ -7,6 +7,21 @@ struct GenerationLogEntry: Sendable {
     let tag: String
     let description: String
     var isTitle: Bool = false
+
+    /// TESTING ONLY. Rules that are new or changed in the current round, marked with "* " in the
+    /// generation log so Zack can spot them while listening ("MOT-LD1-023 * Hallogallo hook").
+    /// Add each new or changed rule ID as it lands. Empty this set when Zack says testing is
+    /// done, the rules are final, or the build is going to the App Store.
+    static let testingMarkedRules: Set<String> = [
+        "MOT-LD1-023",
+    ]
+
+    init(tag: String, description: String, isTitle: Bool = false) {
+        self.tag = tag
+        self.description = Self.testingMarkedRules.contains(tag) && !description.hasPrefix("* ")
+            ? "* " + description : description
+        self.isTitle = isTitle
+    }
 }
 
 // MARK: - Song state

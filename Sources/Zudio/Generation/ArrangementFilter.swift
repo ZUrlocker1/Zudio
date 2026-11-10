@@ -29,7 +29,8 @@ struct ArrangementFilter {
         seed: UInt64,
         lead1SoloRange: Range<Int>? = nil,   // bars containing LD1-007/008 solo — never rested
         arcadeVariation: Bool = false,        // Arcade: Lead 1 is always protected from block silencing
-        exemptTracks: [Int] = []              // Kraftwerk sync members — see below
+        exemptTracks: [Int] = [],             // Kraftwerk sync members — see below
+        phraseTracks: [Int] = []              // whole-phrase hook leads: never thinned, see below
     ) -> [[MIDIEvent]] {
         var events = trackEvents
 
@@ -107,6 +108,11 @@ struct ArrangementFilter {
                 if roll < 0.45 {
                     // Complete rest — remove all notes in this block
                     events[track] = silence(events[track], startStep: startStep, endStep: endStep)
+                } else if roll < 0.80 && phraseTracks.contains(track) {
+                    // A hook rule (MOT-LD1-023 onward) states whole phrases; thinning picks
+                    // notes out of the hook and leaves fragments. Soften it instead.
+                    events[track] = soften(events[track], startStep: startStep, endStep: endStep,
+                                          reduction: 18)
                 } else if roll < 0.80 {
                     // Reduced — thin to ~35% and soften
                     events[track] = thin(events[track], startStep: startStep, endStep: endStep,
