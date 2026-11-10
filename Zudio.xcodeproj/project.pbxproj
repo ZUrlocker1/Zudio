@@ -42,6 +42,7 @@
 		AA000000000000000000021 /* FirstMouseFix.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000023 /* FirstMouseFix.swift */; };
 		AA000000000000000000022 /* ArrangementFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000024 /* ArrangementFilter.swift */; };
 		AA0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000HOOK1 /* HookLeadEngine.swift */; };
+		AA0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000GAPA1 /* GapAnswerEngine.swift */; };
 		AA000000000000000000023 /* HarmonicFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000025 /* HarmonicFilter.swift */; };
 		AA000000000000000000024 /* PatternEvolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000026 /* PatternEvolver.swift */; };
 		AA000000000000000000025 /* DrumVariationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000027 /* DrumVariationEngine.swift */; };
@@ -140,6 +141,7 @@
 		IS000000000000000000023 /* FirstMouseFix.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000023 /* FirstMouseFix.swift */; };
 		IS000000000000000000024 /* ArrangementFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000024 /* ArrangementFilter.swift */; };
 		IS0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000HOOK1 /* HookLeadEngine.swift */; };
+		IS0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000GAPA1 /* GapAnswerEngine.swift */; };
 		IS000000000000000000025 /* HarmonicFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000025 /* HarmonicFilter.swift */; };
 		IS000000000000000000026 /* PatternEvolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000026 /* PatternEvolver.swift */; };
 		IS000000000000000000027 /* DrumVariationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000027 /* DrumVariationEngine.swift */; };
@@ -281,6 +283,7 @@
 		BB000000000000000000023 /* FirstMouseFix.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstMouseFix.swift; sourceTree = "<group>"; };
 		BB000000000000000000024 /* ArrangementFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrangementFilter.swift; sourceTree = "<group>"; };
 		BB0000000000000000HOOK1 /* HookLeadEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookLeadEngine.swift; sourceTree = "<group>"; };
+		BB0000000000000000GAPA1 /* GapAnswerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GapAnswerEngine.swift; sourceTree = "<group>"; };
 		BB000000000000000000025 /* HarmonicFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HarmonicFilter.swift; sourceTree = "<group>"; };
 		BB000000000000000000026 /* PatternEvolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatternEvolver.swift; sourceTree = "<group>"; };
 		BB000000000000000000027 /* DrumVariationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrumVariationEngine.swift; sourceTree = "<group>"; };
@@ -456,6 +459,7 @@
 				BB00000000000000000000E /* DensitySimplifier.swift */,
 				BB000000000000000000024 /* ArrangementFilter.swift */,
 				BB0000000000000000HOOK1 /* HookLeadEngine.swift */,
+				BB0000000000000000GAPA1 /* GapAnswerEngine.swift */,
 				BB000000000000000000025 /* HarmonicFilter.swift */,
 				BB000000000000000000026 /* PatternEvolver.swift */,
 				BB000000000000000000027 /* DrumVariationEngine.swift */,
@@ -904,6 +908,7 @@
 				AA00000000000000000000E /* DensitySimplifier.swift in Sources */,
 				AA000000000000000000022 /* ArrangementFilter.swift in Sources */,
 				AA0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */,
+				AA0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */,
 				AA000000000000000000023 /* HarmonicFilter.swift in Sources */,
 				AA000000000000000000024 /* PatternEvolver.swift in Sources */,
 				AA000000000000000000025 /* DrumVariationEngine.swift in Sources */,
@@ -1007,6 +1012,7 @@
 				IS00000000000000000000E /* DensitySimplifier.swift in Sources */,
 				IS000000000000000000024 /* ArrangementFilter.swift in Sources */,
 				IS0000000000000000HOOK1 /* HookLeadEngine.swift in Sources */,
+				IS0000000000000000GAPA1 /* GapAnswerEngine.swift in Sources */,
 				IS000000000000000000025 /* HarmonicFilter.swift in Sources */,
 				IS000000000000000000026 /* PatternEvolver.swift in Sources */,
 				IS000000000000000000027 /* DrumVariationEngine.swift in Sources */,

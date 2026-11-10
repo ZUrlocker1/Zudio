@@ -205,7 +205,7 @@ struct SongGenerator {
         // A hook rule has no solo range, so these are the same windows that step computes.
         let earlyBreakdownBars = (!isNoir && !isArcade && !motorikSync.isActive)
             ? Set(breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: nil).flatMap { Array($0) }) : []
-        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, breakdownBars: earlyBreakdownBars)
+        let (lead1Events, ld1SoloRange, ld1ShortSolos) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, breakdownBars: earlyBreakdownBars)
         trackEvents[kTrackLead1] = lead1Events
 
         // When Lead 1 picks a dense arp rule, bias Bass and Lead 2 toward sparse/pulse roles.
@@ -223,7 +223,7 @@ struct SongGenerator {
         // Step 8 — Lead 2
         // Noir always suppresses Lead 2 — skip generation entirely (lead2RNG is not consumed elsewhere)
         if !isNoir {
-            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody, lead1RuleIDs: lead1Rules)
+            trackEvents[kTrackLead2] = LeadGenerator.generateLead2(frame: frame, structure: structure, tonalMap: tonalMap, lead1Events: lead1Events, rng: &lead2RNG, usedRuleIDs: &lead2Rules, soloRange: ld1SoloRange, shortSoloRanges: ld1ShortSolos, arcadeVariation: isArcade, arcadeDenseMelody: arcadeDenseMelody)
         }
 
         // Step 8 — Rhythm
@@ -317,13 +317,16 @@ struct SongGenerator {
         trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
 
         // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
-        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, arcadeVariation: isArcade, exemptTracks: motorikSync.isActive ? motorikSync.tracks + [kTrackLead2] : [],
+        trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, lead1SoloRange: ld1SoloRange, shortSoloRanges: ld1ShortSolos, arcadeVariation: isArcade, exemptTracks: motorikSync.isActive ? motorikSync.tracks + [kTrackLead2] : [],
                                               phraseTracks: lead1Rules.contains(where: HookLeadEngine.isMotorikHookRule) ? [kTrackLead1] : [])
 
         // Step 10.7 — Pads gate: when Lead 1 is on a solo rule (< 30 notes), thin pads outside
         // the solo window to avoid a dense shimmer wall with nothing cutting through it.
-        if let soloWindow = ld1SoloRange, trackEvents[kTrackLead1].count < 30 {
-            let soloSteps = Set(soloWindow.flatMap { bar in (bar * 16)..<(bar * 16 + 16) })
+        // The shorter returns of the solo keep their pads and are left out of the note count, so
+        // a song's gate is the one it had with the full solo alone.
+        if let soloWindow = ld1SoloRange,
+           trackEvents[kTrackLead1].filter({ ev in !ld1ShortSolos.contains { $0.contains(ev.stepIndex / 16) } }).count < 30 {
+            let soloSteps = Set(([soloWindow] + ld1ShortSolos).flatMap { $0.flatMap { bar in (bar * 16)..<(bar * 16 + 16) } })
             var padGateRNG = SeededRNG(seed: seed &+ 0xE1)
             trackEvents[kTrackPads] = trackEvents[kTrackPads].filter { ev in
                 soloSteps.contains(ev.stepIndex) || padGateRNG.nextDouble() < 0.70
@@ -359,6 +362,30 @@ struct SongGenerator {
         let breakdowns = isBaseMotorik
             ? breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: ld1SoloRange) : []
         let breakdownSteps = breakdowns.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
+
+        // Step 12.6 — Lead 2 gap answers (MOT-LD2-013 to 017). Written now, from the Lead 1 the
+        // listener hears: after ArrangementFilter and HarmonicFilter, without the breakdown
+        // windows and, in a sync that includes Lead 1, without the sync dropout windows that
+        // step 13.5 cuts. Lead 2 is not in that sync, so it can answer in them. It stays out of
+        // the breakdowns and a Lead 1 solo. Lead 2 was empty for DensitySimplifier and
+        // ArrangementFilter, so neither thins it, and it gets its own HarmonicFilter pass.
+        if let gapRule = lead2Rules.first(where: GapAnswerEngine.isGapRule) {
+            var silentSteps = breakdownSteps
+            if motorikSync.includes(kTrackLead1) {
+                silentSteps += syncWindows.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
+            }
+            let lead1Heard = trackEvents[kTrackLead1].filter { ev in
+                !silentSteps.contains { $0.contains(ev.stepIndex) }
+            }
+            var blocked = Set(breakdowns.flatMap { Array($0) })
+            if let solo = ld1SoloRange { blocked.formUnion(solo) }
+            for window in ld1ShortSolos { blocked.formUnion(window) }
+            trackEvents[kTrackLead2] = GapAnswerEngine.generate(
+                ruleID: gapRule, lead1: lead1Heard, lead1RuleIDs: lead1Rules,
+                frame: frame, structure: structure, tonalMap: tonalMap,
+                blockedBars: blocked, pads: trackEvents[kTrackPads], rng: &lead2RNG)
+        }
+
         for track in [kTrackLead1, kTrackLead2, kTrackRhythm] {
             trackEvents[track].removeAll { ev in breakdownSteps.contains { $0.contains(ev.stepIndex) } }
         }
@@ -457,7 +484,7 @@ struct SongGenerator {
             ? DrumVariationEngine.computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure)
                 .union(syncSeamBars)
             : nil
-        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, soloRuleID: lead1Rules.sorted().first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }), kraftwerkSync: motorikSync.isActive, motorikFillBars: baseFillBars, motorikBreakdowns: breakdowns)
+        let stepAnnotations = buildStepAnnotations(structure: structure, trackEvents: trackEvents, frame: frame, drumRules: drumRules, soloRange: ld1SoloRange, shortSoloRanges: ld1ShortSolos, soloRuleID: lead1Rules.sorted().first(where: { $0 == "MOT-LD1-007" || $0 == "MOT-LD1-008" }), kraftwerkSync: motorikSync.isActive, motorikFillBars: baseFillBars, motorikBreakdowns: breakdowns)
 
         var forced: [String: String] = [:]
         if let r = forceBassRuleID   { forced["Bass"]   = r }
@@ -1738,7 +1765,7 @@ struct SongGenerator {
                     sohoVariation: songState.chillSohoVariation,
                     rng: &rng, usedRuleIDs: &usedRules, returns: { chillLead1Returns = $0 })
             } else {
-                (events, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                (events, _, _) = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
             }
         case kTrackLead2:
             if isAmbPiano {
@@ -1784,6 +1811,22 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules).events
             } else {
                 events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, arcadeVariation: songState.motorikArcadeVariation)
+                // A gap-answer rule is written as generation writes it, from the Lead 1 now
+                // playing, which already has its breakdowns and dropouts cut, and kept out of the
+                // breakdown windows. The current Lead 1 rule comes from the log.
+                if let gapRule = usedRules.first(where: GapAnswerEngine.isGapRule) {
+                    let isBase = !songState.motorikNoirVariation && !songState.motorikArcadeVariation
+                        && !songState.motorikSync.isActive
+                    let blocked = isBase
+                        ? Set(breakdownWindows(totalBars: songState.frame.totalBars, seed: songState.globalSeed,
+                                               avoiding: nil).flatMap { Array($0) })
+                        : []
+                    events = GapAnswerEngine.generate(
+                        ruleID: gapRule, lead1: songState.trackEvents[kTrackLead1],
+                        lead1RuleIDs: currentMotorikLead1Rules(songState.generationLog),
+                        frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap,
+                        blockedBars: blocked, pads: songState.trackEvents[kTrackPads], rng: &rng)
+                }
             }
         case kTrackRhythm:
             if isAmbPiano {
@@ -2389,6 +2432,19 @@ struct SongGenerator {
     /// one; each is placed near a quarter and two thirds of the way through, snapped to 8 bars,
     /// 4 to 8 bars long, never in the first 16 bars or the last 8, and never over Lead 1's solo.
     /// Drawn on its own stream so no other decision in the song shifts.
+    /// The Motorik Lead 1 rules now playing: the song's own, or those of the latest Lead 1 regen.
+    private static func currentMotorikLead1Rules(_ log: [GenerationLogEntry]) -> Set<String> {
+        var rules: Set<String> = []
+        for entry in log {
+            if entry.tag == "⚡ REGEN" {
+                if entry.description == kTrackNames[kTrackLead1] { rules = [] }
+            } else if entry.tag.hasPrefix("MOT-LD1-") {
+                rules.insert(entry.tag)
+            }
+        }
+        return rules
+    }
+
     static func breakdownWindows(totalBars: Int, seed: UInt64, avoiding solo: Range<Int>?) -> [Range<Int>] {
         var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 76))
         guard rng.nextDouble() < 0.5 else { return [] }
@@ -2870,6 +2926,11 @@ struct SongGenerator {
         case "MOT-LD2-010": return "Blip"
         case "MOT-LD2-011": return "Counter Sequencer"
         case "MOT-LD2-012": return "Octave Unison"
+        case "MOT-LD2-013": return "Echo answer"
+        case "MOT-LD2-014": return "Hook fragment"
+        case "MOT-LD2-015": return "Answer cell"
+        case "MOT-LD2-016": return "Statement harmony"
+        case "MOT-LD2-017": return "Low bed"
         // Ambient Lead 2 rules
         case "AMB-LEAD-005": return "Tonal cell"
         case "AMB-LEAD-006": return "Descending phrase"
@@ -3381,6 +3442,7 @@ struct SongGenerator {
         isAmbient: Bool = false,
         includeDrumFills: Bool = true,
         soloRange: Range<Int>? = nil,
+        shortSoloRanges: [Range<Int>] = [],
         soloRuleID: String? = nil,
         chillBreakdownStyle: ChillBreakdownStyle? = nil,
         chillDrumFillBars: [Int] = [],
@@ -3445,6 +3507,9 @@ struct SongGenerator {
             default:            desc = "Extended solo"
             }
             fireBar(sr.lowerBound, tag: "", desc: desc)
+            for window in shortSoloRanges {
+                fireBar(window.lowerBound, tag: "", desc: desc.replacingOccurrences(of: "Extended solo", with: "Short solo"))
+            }
         }
 
         // Helper: format chord name from degree string + type, respecting flat/sharp key context

@@ -110,14 +110,14 @@ struct LeadGenerator {
         arcadeVariation: Bool = false,
         sync: MotorikSync = .none,
         breakdownBars: Set<Int> = []
-    ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
+    ) -> (events: [MIDIEvent], soloRange: Range<Int>?, shortSoloRanges: [Range<Int>]) {
 
         // Kraftwerk sync (Machine Voice only). No solo range: these rules are announcements
         // separated by silence, not a solo, and the Lead 1 solo machinery would fight them.
         if forceLeadRuleID == nil, sync.includes(kTrackLead1) {
             let ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-LD1-022" : "MOT-LD1-021"
             usedRuleIDs.insert(ruleID)
-            return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), nil)
+            return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), nil, [])
         }
 
         // A: Per-section rule — always consume two draws for RNG determinism across songs.
@@ -275,7 +275,7 @@ struct LeadGenerator {
                 rule: hook, frame: frame, structure: structure, tonalMap: tonalMap,
                 entryBar: entryBar, restBars: ld1RestBars.union(breakdownBars),
                 register: kRegisterBounds[kTrackLead1]!, rng: &rng)
-            return (events, nil)
+            return (events, nil, [])
         }
 
         var events: [MIDIEvent] = []
@@ -574,7 +574,18 @@ struct LeadGenerator {
         if dense.contains(aRule) || dense.contains(bRule) {
             events = capUnbrokenStretch(events, maxBars: 20, totalBars: frame.totalBars, rng: &rng)
         }
-        return (events, soloRange)
+
+        // MOT-LD1-007 and 008 play the full solo once. Shorter versions of it come back later in
+        // the song, spread out from the full one. A pass regen only covers the start of the body,
+        // so it keeps the full solo alone.
+        var shortRanges: [Range<Int>] = []
+        if let main = soloRange, passBodyBars == nil {
+            let reprise = shortSoloReprises(rule: aRule, main: main, structure: structure, frame: frame,
+                                            avoidBars: breakdownBars, rng: &rng)
+            events = (events + reprise.events).sorted { $0.stepIndex < $1.stepIndex }
+            shortRanges = reprise.ranges
+        }
+        return (events, soloRange, shortRanges)
     }
 
     /// Silences a two-to-three bar window inside any stretch of sounding bars longer than
@@ -617,17 +628,27 @@ struct LeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         soloRange: Range<Int>? = nil,
+        shortSoloRanges: [Range<Int>] = [],
         arcadeVariation: Bool = false,
-        arcadeDenseMelody: Bool = false,
-        lead1RuleIDs: Set<String> = []
+        arcadeDenseMelody: Bool = false
     ) -> [MIDIEvent] {
-        // Arcade uses a restricted regular pool — Sustained Drone (002) and Neu! counter melody (004) excluded.
+        // Solo improvement phase 3 (2026-11-10): the gap-answer rules MOT-LD2-013 to 017 replace
+        // MOT-LD2-001 to 006 in every pool that used them, drone included. A new rule takes a
+        // retired rule's slot and the retired rule sits at the end at 0%; restoring one means
+        // swapping it back. Base: 013 takes 001's slot, 017 Low bed takes 002 Sustained Drone's,
+        // 014 takes 003's, 015 takes 004's and 016 takes 006's; 005's slot is gone.
+        // Arcade's regular pool: 013, 014 and 015 take 001, 003 and 005, at the old weights.
+        // Arcade's arp rules MOT-LD2-007 to 010 are drawn below, from the same stream as before.
         let ld2Rules:   [String] = arcadeVariation
-            ? ["MOT-LD2-001", "MOT-LD2-003", "MOT-LD2-005"]
-            : ["MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
+            ? ["MOT-LD2-013", "MOT-LD2-014", "MOT-LD2-015",
+               "MOT-LD2-001", "MOT-LD2-003", "MOT-LD2-005"]
+            : ["MOT-LD2-013", "MOT-LD2-017", "MOT-LD2-014", "MOT-LD2-015", "MOT-LD2-016",
+               "MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-005", "MOT-LD2-006"]
         let ld2Weights: [Double] = arcadeVariation
-            ? [0.45,           0.35,           0.20]
-            : [0.20,           0.20,           0.10,           0.10,           0.20,           0.20]
+            ? [0.45,          0.35,          0.20,
+               0.00,          0.00,          0.00]
+            : [0.30,          0.10,          0.20,          0.25,          0.15,
+               0.00,          0.00,          0.00,          0.00,          0.00,          0.00]
         var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
         if arcadeVariation {
             let arcadeRoll = rng.nextDouble()
@@ -649,13 +670,11 @@ struct LeadGenerator {
                 else if arcadeRoll < 0.75 { ruleID = "MOT-LD2-009" }
             }
         }
-        // LD2-006 (Diatonic Shadow) requires Lead 1 notes to harmonize — if Lead 1 is on a solo rule
-        // with a sparse window, Lead 2 would be silent for the whole song. Redirect to Counter Response.
-        if soloRange != nil && ruleID == "MOT-LD2-006" { ruleID = "MOT-LD2-001" }
-        // Lead 1's Hallogallo hook states the Guitar 2 riff whole; MOT-LD2-004 scatters the same
-        // riff as blips, and the two blur each other. Take the descending line instead.
-        if lead1RuleIDs.contains("MOT-LD1-023") && ruleID == "MOT-LD2-004" { ruleID = "MOT-LD2-005" }
         usedRuleIDs.insert(ruleID)
+        // A gap-answer rule needs the Lead 1 the listener hears, after ArrangementFilter and the
+        // breakdown cut, so SongGenerator writes it later with GapAnswerEngine, continuing this
+        // stream. Nothing is drawn here for it.
+        if GapAnswerEngine.isGapRule(ruleID) { return [] }
 
         let lead1StepSet = Set(lead1Events.map(\.stepIndex))
         var lead1LastNote: UInt8? = nil   // tracks last Lead 1 pitch for LD2 harmonization
@@ -681,6 +700,7 @@ struct LeadGenerator {
 
         for bar in 0..<frame.totalBars {
             if let sr = soloRange, sr.contains(bar) { continue }
+            if shortSoloRanges.contains(where: { $0.contains(bar) }) { continue }
 
             guard let section = structure.section(atBar: bar),
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
@@ -3248,6 +3268,71 @@ struct LeadGenerator {
         // Fallback: place near the first body bar
         let bodyStart = structure.bodySections.first?.startBar ?? 0
         return bodyStart ..< bodyStart + soloLength
+    }
+
+    // MARK: - Shorter returns of the solo
+
+    /// Bars of the full solo that make each shorter version, by length in bars. Every bar is one of
+    /// the full solo's own, so the short version is the same solo cut down: Vanishing solo keeps
+    /// its motif and its peak and ends on the final root; Visiting solo keeps its opening hold, its
+    /// circling phrase and its arpeggio and ends on the low root. Two orderings per length.
+    private static let shortSoloBars: [String: [Int: [[Int]]]] = [
+        "MOT-LD1-007": [4: [[1, 2, 4, 9], [1, 3, 5, 9]],
+                        5: [[1, 2, 3, 5, 9], [1, 2, 3, 6, 9]],
+                        6: [[0, 1, 2, 3, 6, 9], [1, 2, 3, 5, 8, 9]]],
+        "MOT-LD1-008": [4: [[0, 1, 5, 8], [1, 4, 6, 8]],
+                        5: [[0, 1, 4, 6, 8], [1, 4, 5, 6, 8]],
+                        6: [[0, 1, 4, 5, 6, 8], [1, 3, 4, 5, 7, 8]]],
+    ]
+
+    /// One or two shorter versions of the solo, 4 to 6 bars each, placed in the body at least 12
+    /// bars from the full solo and from each other where the song has room, otherwise 8. The
+    /// further a window is from the others the likelier it is. They stay out of the breakdown
+    /// windows, the intro and the last four body bars, and play a little softer than the full
+    /// solo. Draws come after everything else in Lead 1, so the rest of the song is unchanged.
+    private static func shortSoloReprises(
+        rule: String, main: Range<Int>, structure: SongStructure, frame: GlobalMusicalFrame,
+        avoidBars: Set<Int>, rng: inout SeededRNG
+    ) -> (events: [MIDIEvent], ranges: [Range<Int>]) {
+        guard let table = shortSoloBars[rule] else { return ([], []) }
+        let bodyBars = Set(structure.bodySections.flatMap { Array($0.startBar..<$0.endBar) })
+        guard let bodyStart = bodyBars.min(), let bodyEnd = bodyBars.max().map({ $0 + 1 }) else { return ([], []) }
+        let wanted = rng.nextDouble() < 0.40 ? 2 : 1
+        var ranges: [Range<Int>] = []
+        var events: [MIDIEvent] = []
+        var lastChoice = -1
+        for _ in 0..<wanted {
+            let length = [4, 5, 6][rng.weightedPick([0.30, 0.40, 0.30])]
+            let all = [main] + ranges
+            func gap(_ start: Int) -> Int {
+                all.map { max(start - $0.upperBound, $0.lowerBound - (start + length)) }.min() ?? 0
+            }
+            let starts = stride(from: bodyStart, through: bodyEnd - 4 - length, by: 2).filter { s in
+                (s..<(s + length)).allSatisfy { bodyBars.contains($0) && !avoidBars.contains($0) }
+                    && gap(s) >= 8
+            }
+            let spaced = starts.filter { gap($0) >= 12 }
+            let pool = spaced.isEmpty ? starts : spaced
+            guard !pool.isEmpty else { break }
+            let total = Double(pool.map(gap).reduce(0, +))
+            let start = pool[rng.weightedPick(pool.map { Double(gap($0)) / total })]
+            guard let options = table[length] else { break }
+            var choice = rng.nextInt(upperBound: options.count)
+            if choice == lastChoice { choice = (choice + 1) % options.count }
+            lastChoice = choice
+            for (i, soloBar) in options[choice].enumerated() {
+                let barStart = (start + i) * 16
+                let bar = rule == "MOT-LD1-007"
+                    ? generateGuitarSolo007(soloBar: soloBar, barStart: barStart, frame: frame)
+                    : generateMoogSolo008(soloBar: soloBar, barStart: barStart, frame: frame)
+                events += bar.map {
+                    MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
+                              velocity: UInt8(max(40, Int($0.velocity) - 6)), durationSteps: $0.durationSteps)
+                }
+            }
+            ranges.append(start..<(start + length))
+        }
+        return (events, ranges)
     }
 
     // MARK: - Solo note builder (shared by LD1-007 and LD1-008)

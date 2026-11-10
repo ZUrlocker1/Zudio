@@ -1,8 +1,9 @@
 # Solo improvement plan: Motorik and Kosmic leads
 
 Status (2026-11-10): phases 1 and 2 are built, committed and approved by ear. They are the four
-Motorik Lead 1 hook rules MOT-LD1-023 to 026. Phase 3 (Motorik Lead 2 gap answers) is next and
-fully specified below. Phases 4 to 6 (Kosmic leads, docs) follow.
+Motorik Lead 1 hook rules MOT-LD1-023 to 026. Phase 3, Motorik Lead 2 as gap answers
+(MOT-LD2-013 to 017), is built and waiting for Zack's ear before it is committed. Phases 4 to 6
+(Kosmic leads, docs) follow.
 
 ## What this is
 
@@ -104,110 +105,143 @@ out the whole song in one call and returns early, owning both A and B sections.
   skips Pass A for hook rules.
 - Motorik Lead 1 regen does not run HarmonicFilter and does not pass `breakdownBars`, so regen
   and first generation differ.
-- Lead 2 interim: when Lead 1 is MOT-LD1-023, a MOT-LD2-004 draw becomes MOT-LD2-005. Phase 3
-  removes this.
 - `lead1RuleDescription` in `SongGenerator.swift` holds the log names.
 
 ### Mix changes made alongside
 
 - Motorik bass Moog and Synth Bass 3: CC7 90, about 1.8 dB down (`AppState.instrumentPoolVolumeCC7`).
-- Motorik Lead 1 Synth Lead and Saw Stack: boost-node multiplier 1.3, about +2.3 dB
+- Motorik bass Lead Bass: sampler volume 0.22, about 2.7 dB below the old 0.30 (`PlaybackEngine`).
+- Motorik Lead 1 Synth Lead, Saw Stack and Polysynth: boost-node multiplier 1.3, about +2.3 dB
   (`PlaybackEngine`). Saw Stack was already at the CC7 ceiling.
 
 ### Where retired rules were used outside the base pool
 
 - Motorik Noir Lead 1: MOT-LD1-001 and MOT-LD1-006, 4% each. Done.
 - Motorik Arcade Lead 1: MOT-LD1-001 at 3% and MOT-LD1-002 at 2%. Done.
-- Motorik Arcade Lead 2 regular pool: MOT-LD2-001, 003 and 005. Phase 3.
-- Motorik Europe base Lead 2, when Lead 2 is not in the sync. Phase 3.
+- Motorik Arcade Lead 2 regular pool: MOT-LD2-001, 003 and 005. Done in phase 3.
+- Motorik Europe base Lead 2, when Lead 2 is not in the sync. Done in phase 3.
 - Kosmic B sections and bridge melodies, base and Drift: `pickBSectionRule` and
   `pickLeadRuleDifferentFrom` can draw KOS-LEAD-001, 005 and 007. Phase 4. Those are per-bar
   contexts and hook rules are whole-song, so the retired rules come out of the candidate lists
   rather than being replaced.
 - Kosmic Space does not use them. Its Lead 2 plays KOS-LEAD-004, which is kept.
 
-## Next: phase 3, Motorik Lead 2 as gap answers
+## Built: Motorik Lead 2 (phase 3)
 
-### Why Lead 2 is replaced
+### Why Lead 2 was replaced
 
-In base Motorik the two leads overlap and are unrelated, so Lead 2 steps on Lead 1.
+In base Motorik the two leads overlapped and were unrelated. Lead 2 played during Lead 1's
+phrases with random chord or scale notes, in nearly the same register, and it was written before
+`ArrangementFilter` and the breakdowns removed Lead 1 notes, so it answered calls that no longer
+existed.
 
-- Lead 2 plays during Lead 1's phrases. It rests in a bar where Lead 1 plays only on a 50% coin
-  flip, and MOT-LD2-006 skips even that.
-- Most Lead 2 rules pick random chord or scale notes. Only MOT-LD2-006 uses Lead 1's pitches.
-- Lead 1 is MIDI 52 to 79 and Lead 2 is 55 to 81, both centred near 68.
-- Lead 2 is generated before `ArrangementFilter` and the breakdowns remove Lead 1 notes, so it
-  answers calls that no longer exist.
-- `DensitySimplifier.thin` is buggy for Lead 2: windows with fewer than 35 or 55 events are
-  untouched, and a busier one loses its tail rather than being thinned. It is called only from
-  the Motorik path.
+### The five rules
 
-### The retired rules
+One is drawn per song. The cell data and the engine are in
+`Sources/Zudio/Generation/GapAnswerEngine.swift`.
 
-All six base rules go to 0% at the end of their lists, drone included:
-
-- MOT-LD2-001 Counter-response: random chord tones on the off-beat 8ths.
-- MOT-LD2-002 Sustained Drone: root or fifth held in about a fifth of bars, near MIDI 68.
-- MOT-LD2-003 Rhythmic Counter: random two-step scale notes.
-- MOT-LD2-004 Neu! counter melody: the Hallogallo riff as scattered blips.
-- MOT-LD2-005 Descending line: two tonic-anchored notes a bar on an 8-bar descent.
-- MOT-LD2-006 Neu! harmony: Lead 1's rhythm a third below on a random 55% of notes.
-
-MOT-LD2-007 to 010 are Arcade's arp rules and stay.
-
-### The five new rules
-
-One is drawn per song, weights sum to 1. The new rules take the retired rules' slots in the pool
-arrays, and the implementer maps five rules onto six slots. Names are unique.
-
-- **MOT-LD2-013 Echo answer**, 30%: Lead 1's last 2 to 4 notes, same rhythm, a diatonic third,
-  sixth or octave lower. The interval is chosen once per song.
-- **MOT-LD2-014 Hook fragment**, 20%: the first 2 or 3 notes of Lead 1's last phrase, inverted or
-  moved one scale step down.
-- **MOT-LD2-015 Answer cell**, 25%: a cell paired with Lead 1's rule, restated in every answer:
-  - MOT-LD1-023 Hallogallo hook: the pulse tail, flat seventh into the root.
-  - MOT-LD1-024 Radioactive riff: the vocal line, 1 1 1 1 3 2 1.
+- **MOT-LD2-013 Echo answer**, 30% in base: Lead 1's last 2 to 4 notes in the same rhythm, a
+  diatonic third, sixth or octave lower. The interval is drawn once per song, 45, 25 and 30%.
+- **MOT-LD2-014 Hook fragment**, 20%: the first 2 to 5 notes of Lead 1's last phrase, inverted or
+  moved one scale step down, drawn per answer: 2 notes 25%, 3 30%, 4 25%, 5 20%. Lead 1's 16ths
+  fold into the 8th grid, so more of its notes are taken until the placed figure has the drawn
+  count.
+- **MOT-LD2-015 Answer cell**, 25%: a cell paired with Lead 1's rule, reworked once per song as
+  homage. The first and last answers play the full cell; the others take a form drawn per answer:
+  the full cell 35%, the head alone with its last note held 30%, the cell inverted around the note
+  it resolves to 20%, or the cell followed by its head a scale step lower, up to three bars, 15%.
+  Every form plays in the full cell's octave, chosen once per song; an inversion that would
+  leave the register gives way to the head. Half the songs may drop a middle answer an octave,
+  40% of the time, at most twice and never twice running; those songs sit the cell as high as
+  MIDI 69 allows, and a drop plays only where it fits above 47. About one Answer cell song in
+  seven drops, usually once. The cells:
+  - MOT-LD1-023 Hallogallo hook: the pulse tail, flat seventh into the root in 8ths.
+  - MOT-LD1-024 Radioactive riff: the vocal line 1 1 1 1 3 2 1, on 8ths.
   - MOT-LD1-025 Model riff: the tail, 2 flat 7 5.
-  - MOT-LD1-026 Tour de France riff: the cadence, flat 7 flat 3 1.
-  - Kept Lead 1 rules, MOT-LD1-004, 005, 007 and 008: a two-bar descent.
-- **MOT-LD2-016 Statement harmony**, 15%: harmonises one whole Lead 1 statement in three, a
-  diatonic third below. In other gaps it plays an echo answer.
-- **MOT-LD2-017 Low bed**, 10%: root or fifth held under Lead 1's long notes, MIDI 50 to 60, in at
-  most half the phrases. With the harmony rule it is the only one allowed to sound with Lead 1.
+  - MOT-LD1-026 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
+  - Every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
+- **MOT-LD2-016 Statement harmony**, 15%: one Lead 1 statement in three, a diatonic third below
+  in Lead 1's rhythm, from an offset drawn per song. A statement is a body phrase of three notes
+  or more. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
+  between. The harmony sits a third under Lead 1 wherever Lead 1 is, so it may run above 67. In
+  the other gaps it plays echo answers.
+- **MOT-LD2-017 Low bed**, 10%: the chord's root or fifth held under each Lead 1 note of a beat or
+  more, and in any bar of the phrase without one from its first beat for half a bar, MIDI 50 to
+  60, starting on a beat. The song's target of 4 to 6 phrases get a bed, spread evenly over the
+  body. Consecutive beds on one pitch join into one note up to a bar. Once or twice a song, 50% each,
+  the bed also plays alone in one of the longest Lead 1 silences, four bars or more: the chord's
+  root or fifth held for one or two bars, starting on a bar line a bar after the phrase before it
+  and ending half a bar before Lead 1 returns. Two bars only while the chord stays the same. These
+  solo beds are outside the 4 to 6 count. It plays nothing else in the gaps.
+
+### Pools
+
+- Base: 013 takes MOT-LD2-001's slot, 017 takes 002's, 014 takes 003's, 015 takes 004's and 016
+  takes 006's. 005's slot is gone. MOT-LD2-001 to 006 sit at the end at 0%.
+- Motorik Europe draws the base pool when Lead 2 is not in the sync, which is the Rhythm Section
+  group. Sequence Lock and Machine Voice keep MOT-LD2-011 and 012.
+- Motorik Arcade's regular pool: 013, 014 and 015 take 001, 003 and 005 at 45, 35 and 20%. The arp
+  rules MOT-LD2-007 to 010 and the dense-melody "No lead 2" are drawn as before, from the same
+  stream, so those songs are unchanged.
+- Noir has no Lead 2.
 
 ### How they behave
 
-- **Phrase map.** Group Lead 1 onsets into phrases wherever the gap from one note's end to the
+- **Phrase map.** Lead 1's onsets group into phrases wherever the gap from one note's end to the
   next onset is under 8 steps. A gap runs from one phrase's end to the next phrase's start.
-- **When it runs.** After `ArrangementFilter` and the Motorik breakdowns, so Lead 2 only answers
-  calls that survived. The regen paths, `SongGenerator.swift` around lines 1745 and 1776, call
-  the same function with the filtered Lead 1 and pass the new parameters, so regen and first
-  generation agree.
-- Silent while Lead 1 plays a phrase, plus a 2 to 4 step tail.
-- Answers only in gaps of one bar or more, in a share of gaps drawn once per song between 60% and
-  75%. An answer is at most two bars and ends at least two steps before Lead 1 returns.
-- Every answer note sits on the 8th grid, with held notes on beats, so Lead 2 locks to the same
-  kick and snare as Lead 1.
-- Handoff: in Lead 1 rest windows of four bars or more, and in the breakdown windows only if Lead
-  2 is meant to carry them, Lead 2 states its cell once or twice. The breakdown cut removes Lead 2
-  there today, so decide this at build.
-- Silent in the intro. In the outro, at most one echo of the final statement.
-- Register below Lead 1: MIDI 50 to 67, passed through `registerOverrides`
-  (`HarmonicFilter.swift` near line 35) so Pass B cannot lift it back.
-- Removed in base: the 50% bar coin, the forced root fallback after four silent bars, and the
-  Lead 2 branch of `DensitySimplifier`.
+- **Silence.** Lead 2 is silent while Lead 1 plays a phrase and for a tail of 2 or 4 steps after
+  it, drawn per song. Only the harmony and the bed sound with Lead 1.
+- **Answers.** Only in gaps of a bar or more, ending at least two steps before Lead 1 returns, at
+  most two bars long, three for the Answer cell's long form.
+- **Count.** Each song states Lead 2 4, 5 or 6 times in the body, drawn 30, 40 and 30%. The
+  answer straight after a phrase comes first. Over the target, the one whose
+  neighbours are closest goes, never the first or the last. Under it, a Lead 1 silence of four
+  bars or more is a handoff: Lead 2 restates its answer there, every four bars, filling the
+  longest silences first and never within two bars of another answer. The outro echo is outside
+  the count.
+- **Breakdowns.** Lead 2 stays out of the base Motorik breakdown windows and a Lead 1 solo, so the
+  breakdown stays a drop to drums, bass, pads and texture.
+- **Intro and outro.** Silent in the intro. In the outro, at most one echo of the final statement,
+  softer.
+- **Grid.** Every onset is on the 8th grid and held notes start on beats. A Lead 1 note on an odd
+  step moves to the 8th before it. An answer keeps Lead 1's beat positions, starting on a half bar
+  when it still fits. Notes hold to the next onset within 8 steps.
+- **Register.** Answers fit MIDI 50 to 67 as a block, so a figure stays in one octave. An echo
+  keeps its true interval when it fits. The Answer cell uses 50 to 69, and 47 for a drop.
 
-### Gates
+### Wiring
 
-- The new path runs for base Motorik, for Europe songs whose Lead 2 is not in the sync, and for
-  Arcade's regular pool. `generateLead2` needs a sync parameter and an Arcade distinction for
-  this.
-- Arcade's arp rules MOT-LD2-007 to 010 and Europe's synced Lead 2 rules keep their old paths.
-  Noir never calls Lead 2.
-- Remove the interim MOT-LD2-004 to MOT-LD2-005 swap under Hallogallo.
-- Add each new name to `lead2RuleDescription` in `SongGenerator.swift` and star each ID.
-- Check afterwards that Noir, Arcade's arp rules and the Europe sync tracks are otherwise
-  unchanged.
+- `LeadGenerator.generateLead2` draws the rule. For a gap rule it records the ID and returns
+  nothing. The 50% bar coin, the forced root fallback and the MOT-LD2-004 swap under Hallogallo
+  are gone with the old base path.
+- `SongGenerator.generateMotorik`, step 12.6, writes the part with `GapAnswerEngine.generate`,
+  continuing the Lead 2 stream, from the Lead 1 the listener hears: after `ArrangementFilter` and
+  `HarmonicFilter`, without the breakdown windows and, in a sync that includes Lead 1, without the
+  sync dropout windows. Lead 2 is not in that sync, so it may answer in those windows.
+- Lead 2 is empty when `DensitySimplifier` and `ArrangementFilter` run, so neither thins it. It
+  gets its own `HarmonicFilter.filterLead` pass with one octave decision per song, bounded at 67,
+  and at 60 for the bed, so Pass B cannot lift it out of its register.
+- Because Lead 2 is empty when `ArrangementFilter` runs, the filter no longer counts it as an
+  active melodic track in these songs. In base and Arcade songs it now rests or thins Lead 1,
+  Rhythm and Pads less often, and the drum fills that follow Lead 1 can move with them. Noir,
+  Arcade's arp rules and the synced Europe Lead 2 are unchanged.
+- Regen: the Motorik Lead 2 regen calls the same function with the Lead 1 now playing, the base
+  breakdown windows and the Lead 1 rules read from the log, so regen and first generation agree.
+- Names are in `lead2RuleDescription`; all five IDs are in `testingMarkedRules`.
+
+### Measured over Motorik seeds 1 to 600
+
+- Wins in base: 013 30%, 014 18%, 015 22%, 016 21%, 017 9%.
+- Lead 2 onsets inside a Lead 1 phrase: none for 013, 014 and 015; 54% of the harmony rule's
+  notes and all of the bed's, by design.
+- Odd-step Lead 2 notes: none. Held notes off the beat: none, apart from harmony notes that
+  mirror a Lead 1 note held off the beat.
+- Appearances per song: 4 to 6 in the body for nearly every song, plus the outro echo; fewer
+  only where Lead 1 leaves no room, about 3% of songs.
+- Notes per song: 013 about 15, 014 about 13, 015 about 25, 016 about 31, 017 about 10. The old
+  base Lead 2 averaged 84.
+- Fingerprints against HEAD: Noir, Arcade's arp rules and the Sequence Lock and Machine Voice
+  songs are identical on every track.
 
 ## Next: phases 4 and 5, Kosmic
 
@@ -292,8 +326,7 @@ Zack's approval before the commit.
 
 1. Hook engine and MOT-LD1-023. Done.
 2. MOT-LD1-024 to 026 and the base weights. Done.
-3. Motorik Lead 2, MOT-LD2-013 to 017: the phrase map, the post-filter call site, regen, and
-   removing the coin, the fallback and the density branch. Next.
+3. Motorik Lead 2, MOT-LD2-013 to 017. Built, waiting for Zack's ear.
 4. Kosmic Lead 1, KOS-LEAD-010 to 012.
 5. Kosmic Lead 2, KOS-LD2-002 to 004, and the Space gate.
 6. Docs.
@@ -342,8 +375,9 @@ Checks stay light:
 
 - Should MOT-LD1-024 Radioactive riff keep its off-beat 16ths, or snap its held notes onto beats?
 - How many statements should a Kosmic hook song have? Motorik is 3 to 6.
-- `DensitySimplifier.thin` is still buggy for Europe and Arcade Lead 2. Phase 3 removes its base
-  Lead 2 branch only. Fix the rest only if Zack asks.
+- `DensitySimplifier.thin` is still buggy for Arcade's arp rules and the synced Europe Lead 2.
+  The gap-answer Lead 2 is written after it runs, so it never reaches the new rules. Fix the rest
+  only if Zack asks.
 - KOS-LEAD-004 Echo Melody as a Lead 1 rule is a possible later round.
 - Is Zack willing to play or tap a short hook for a La Dusseldorf or Harmonia piece if no file
   exists?

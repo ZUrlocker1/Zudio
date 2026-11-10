@@ -28,6 +28,7 @@ struct ArrangementFilter {
         structure: SongStructure,
         seed: UInt64,
         lead1SoloRange: Range<Int>? = nil,   // bars containing LD1-007/008 solo — never rested
+        shortSoloRanges: [Range<Int>] = [],   // the shorter returns of that solo, protected the same way
         arcadeVariation: Bool = false,        // Arcade: Lead 1 is always protected from block silencing
         exemptTracks: [Int] = [],             // Kraftwerk sync members — see below
         phraseTracks: [Int] = []              // whole-phrase hook leads: never thinned, see below
@@ -99,7 +100,7 @@ struct ArrangementFilter {
             // Lead 1 solo window is protected: never rest or thin a block containing solo bars.
             let soloOverlaps: Bool = {
                 guard let sr = lead1SoloRange else { return false }
-                return sr.overlaps(startBar..<endBar)
+                return sr.overlaps(startBar..<endBar) || shortSoloRanges.contains { $0.overlaps(startBar..<endBar) }
             }()
 
             for track in activeTracks where !spotlight.contains(track) {

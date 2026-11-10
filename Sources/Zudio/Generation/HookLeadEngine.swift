@@ -165,7 +165,7 @@ enum HookLeadEngine {
 
     /// Reworks a cell with `count` distinct changes. The first note and the last note never
     /// change, so the shape that makes the hook recognisable survives every version.
-    private static func homage(_ bars: [HookBar], count: Int, rng: inout SeededRNG) -> [HookBar] {
+    static func homage(_ bars: [HookBar], count: Int, rng: inout SeededRNG) -> [HookBar] {
         guard !bars.isEmpty else { return bars }
         var notes = flatten(bars)
         guard notes.count >= 3 else { return bars }
@@ -577,7 +577,7 @@ enum HookLeadEngine {
         return t
     }
 
-    private static func scalePCs(_ mode: Mode, tonicPC: Int) -> Set<Int> {
+    static func scalePCs(_ mode: Mode, tonicPC: Int) -> Set<Int> {
         Set(mode.intervals.map { (tonicPC + $0) % 12 })
     }
 
@@ -587,7 +587,7 @@ enum HookLeadEngine {
 
     /// The song pitch for a source degree. Seven-note modes map by scale degree; pentatonic
     /// modes snap to the nearest scale pitch, with ties going up.
-    private static func pitch(for deg: Int, base: Int, mode: Mode, scale: Set<Int>) -> Int {
+    static func pitch(for deg: Int, base: Int, mode: Mode, scale: Set<Int>) -> Int {
         let intervals = mode.intervals
         if intervals.count == 7 {
             let oct = deg >= 0 ? deg / 12 : -((-deg + 11) / 12)
@@ -608,7 +608,7 @@ enum HookLeadEngine {
     }
 
     /// Moves a scale pitch by `steps` scale steps.
-    private static func scaleShift(_ pitch: Int, by steps: Int, in scale: Set<Int>) -> Int {
+    static func scaleShift(_ pitch: Int, by steps: Int, in scale: Set<Int>) -> Int {
         guard !scale.isEmpty, steps != 0 else { return pitch }
         var p = pitch
         for _ in 0..<abs(steps) {

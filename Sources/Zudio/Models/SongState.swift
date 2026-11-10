@@ -14,6 +14,8 @@ struct GenerationLogEntry: Sendable {
     /// done, the rules are final, or the build is going to the App Store.
     static let testingMarkedRules: Set<String> = [
         "MOT-LD1-023", "MOT-LD1-024", "MOT-LD1-025", "MOT-LD1-026",
+        "MOT-LD1-007", "MOT-LD1-008",
+        "MOT-LD2-013", "MOT-LD2-014", "MOT-LD2-015", "MOT-LD2-016", "MOT-LD2-017",
     ]
 
     init(tag: String, description: String, isTitle: Bool = false) {

@@ -625,9 +625,14 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 - LD1-007 — Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
   Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 silenced during solo
   window. Status log fires "Extended solo — Vanishing solo" at solo start bar.
+  One or two shorter versions of 4 to 6 bars come back later in the body (40% two), at least 12
+  bars from the full solo and from each other where the song has room, otherwise 8. Each is the
+  full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 stays out of
+  them, and the log fires "Short solo Vanishing solo" at each start bar.
 - LD1-008 — Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
   octave arpeggio motif. Inspired by the synth solo in *Visitor from the Past* (bars 21–30). Lead 2
   silenced during solo window. Status log fires "Extended solo — Visiting solo" at solo start bar.
+  Shorter versions come back in the same way, logged as "Short solo Visiting solo".
 
 ### Lead 2
 
