@@ -890,6 +890,10 @@ final class AppState: ObservableObject {
             case (kTrackLead1,   .motorik, "Synth Lead"):    return 70
             case (kTrackLead1,   .motorik, "Mono Synth"):    return 85
             case (kTrackLead1,   .motorik, "Soft Brass"):    return 80
+            // Moog and Synth Bass 3 sat a little forward on Motorik bass (Zack, 2026-11-10). 90 is
+            // about 1.8 dB down from the untouched 100. Kosmic keeps its own, lower trims below.
+            case (kTrackBass,    .motorik, "Moog"):          return 90
+            case (kTrackBass,    .motorik, "Synth Bass 3"):  return 90
             case (kTrackRhythm,  .motorik, "Charang"):       return 70
             case (kTrackTexture, .motorik, "Interference"):  return 127
             case (kTrackBass,    .kosmic,  "Pulse Bass"):    return 115

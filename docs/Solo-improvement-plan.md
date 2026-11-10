@@ -1,6 +1,6 @@
 # Solo improvement plan: Motorik and Kosmic Lead 1
 
-Status (2026-11-10): planning approved by Zack. Phase 1 (hook engine and MOT-LD1-023) is built and approved by ear; see "Phase 1 as built". Next is phase 2. The build
+Status (2026-11-10): planning approved by Zack. Phases 1 and 2 are built: MOT-LD1-023 to 026. Phase 1 is approved by ear; phase 2 awaits Zack's listen. See "Phase 1 as built" and "Phase 2 as built". The build
 specification is the section "Build spec" near the end. Everything above it is the reasoning
 and source data it draws on.
 
@@ -508,9 +508,9 @@ not normalise.
 **Base Motorik Lead 1** (`pickLd1Rule`, base branch). Noir and Arcade pools are untouched.
 
 - MOT-LD1-023 "Hallogallo hook": 15%, taking MOT-LD1-001's share.
-- MOT-LD1-024 "Radioactivity riff": 14%, taking MOT-LD1-002's share. Strongest hook, biggest share.
-- MOT-LD1-025 "The Model riff": 12%, taking MOT-LD1-006's share.
-- MOT-LD1-026 "Tour de France theme": 11%, taking MOT-LD1-003's share. Longest phrase, smallest share.
+- MOT-LD1-024 "Radioactive riff": 14%, taking MOT-LD1-002's share. Strongest hook, biggest share.
+- MOT-LD1-025 "Model riff": 12%, taking MOT-LD1-006's share.
+- MOT-LD1-026 "Tour de France riff": 11%, taking MOT-LD1-003's share. Longest phrase, smallest share.
 - MOT-LD1-001, 002, 003 and 006 go to 0% in the base pool. MOT-LD1-004, 005, 007 and 008 keep
   their weights. Because 003 can no longer win the A draw, its B-section forcing never fires; leave
   it in place.
@@ -656,8 +656,8 @@ next onset is under 8 steps. A gap is the space from one phrase's end to the nex
 
 **Names are unique.** Every new rule has a name no other rule uses, old or new: Echo answer, Hook
 fragment, Answer cell, Statement harmony, Low bed, Slow echo answer, Slow answer cell, Gap reply
-melody. The Lead 1 names are Hallogallo hook, Radioactivity riff, The Model riff, Tour de France
-theme, Blade Runner theme, Pulstar theme and Beach Scene sigh.
+melody. The Lead 1 names are Hallogallo hook, Radioactive riff, Model riff, Tour de France
+riff, Blade Runner theme, Pulstar theme and Beach Scene sigh.
 
 **Testing marker.** While Zack is testing, every new or changed rule ID goes in
 `GenerationLogEntry.testingMarkedRules` (`Models/SongState.swift`), which prints "* " before its
@@ -714,6 +714,77 @@ Each phase ends with a macOS and an iOS build, and Zack listening before the nex
   sketch restated every 4 bars.
 - **Still to do under "replace everywhere":** MOT-LD1-002, 003 and 006 in Noir and Arcade (phase
   2), Arcade and Europe Lead 2 (phase 3), Kosmic B-section and bridge lists (phase 4).
+
+## Phase 2 as built (2026-11-10, awaiting Zack's listen)
+
+- **Names (Zack):** MOT-LD1-024 Radioactive riff, MOT-LD1-025 Model riff, MOT-LD1-026 Tour de
+  France riff.
+- **Slots.** 024 takes MOT-LD1-002's slot in base (14%) and Arcade (2%). 025 takes MOT-LD1-006's
+  slot in base (12%) and Noir (4%). 026 takes MOT-LD1-003's slot in base (11%). Europe's
+  sequence-lock songs get all of them through the base pool. Retired rules sit at the end of
+  each list at 0%.
+- **Radioactive riff:** the call is the riff; the plain answer is the same riff two scale steps
+  lower (`answerShift`). The vocal line 1 1 1 1 3 2 1 is the source variant answer.
+- **Model riff:** a two-bar call with no answer. The vocal line is a `restatement` that
+  alternates with the riff on plain statements. The source variant ends the riff on the root.
+- **Tour de France riff:** a one-bar call and a two-bar answer. A variant cadence 4 3 1 replaces
+  b7 b3 1.
+- **Homage, not copy (Zack):** each song reworks its cells before use. The call gets two or
+  three changes, the answer and restatement one or two, each variant one. The changes are: add
+  a passing or neighbour note in a gap, drop an interior note, move an interior onset by an 8th
+  or 16th, swap two adjacent notes, turn a repeated note into a neighbour. The first and last
+  notes never change. Hallogallo gets this too, so it no longer plays the sketch exactly.
+- **Degree mapping.** Seven-note modes map source semitones by scale degree, so a major or
+  minor third becomes the song's third. Pentatonic modes snap to the nearest note, ties up.
+- **Register held for the whole song.** HarmonicFilter Pass B lifted each phrase above the
+  pads separately, which put one statement an octave above the next. For hook rules it now
+  lifts the whole part or none (`uniformLead1Lift`). Pass A, the strong-beat clash guard, is
+  skipped for hook rules, because it cut hook notes such as Hallogallo's opening fourth. An
+  avoid-tone move that would leave the register goes the other way. Measured whole-song pitch
+  span: 10–14 semitones median for hook rules, the tightest of any Motorik Lead 1 rule.
+- **Measured over Motorik seeds 1–600:** every change is a retired rule replaced, a Hallogallo
+  song taking its homage version, or a song whose B section had drawn a retired rule keeping its
+  A rule. Coverage is 20–26% of body bars; the median longest silence is 17–21 bars.
+- **Build number 136** (Version.xcconfig), since build 135 went to the App Store.
+
+### Tuning after listening to Trieb Wunderwaffen (2026-11-10, Zack)
+
+Seed 14557789407244643428, MOT-LD1-023. The hook sounded twice in 96 bars (bars 11 and 23), and
+the solo felt off the beat against bass and drums. Three causes, all fixed:
+
+- **Complete rest.** `ArrangementFilter` silenced a whole block of a non-spotlight lead 45% of the
+  time, and it took 6 of the engine's 8 statements. A hook lead is now only ever softened
+  (`phraseTracks` skips the complete rest). The song now has 8 statements, 3 of them in the last
+  third.
+- **Breakdowns.** The base Motorik breakdown at step 12.5 cut Lead 1 after the engine had laid out
+  its statements. `SongGenerator` now computes the breakdown windows before Lead 1 and passes them
+  to the engine as blocked bars (`breakdownBars`), so statements are placed around them.
+- **Last third.** The engine now guarantees at least one statement from two thirds of the way
+  through, on the two-bar grid in the first free slot, and the last-fifth plain statement also
+  looks for a free slot instead of landing in a rest window.
+- **Off the beat.** Drums sit on even steps, with kick on 0 and 8 and snare on 4 and 12. The only odd-step notes in
+  the song were Lead 1's. Hallogallo's held note moved from step 7 to step 8 (beat 3). The homage
+  `moveOnset` now moves only an off-beat 8th onto a beat, never to an odd step, and `addPassing` places its
+  note on an 8th. The `push` variation, which shifted a whole statement a 16th late, is removed.
+- **Not changed.** MOT-LD1-024 Radioactive riff is a 16th-note riff and keeps its odd steps.
+
+### Variation and count after listening to Der Magnet (2026-11-10, Zack)
+
+Seed 15549690564472013210, MOT-LD1-026. The riff played 9 times and all 9 were nearly identical,
+differing only in a cadence note. Zack wants 3 to 6 statements and variations that feel like
+legitimate variations, returning to the original form now and then.
+
+- **Count.** A song states its hook 3, 4 or 5 times in the body (cap drawn 20, 40 and 40%), plus a
+  soft outro statement 30% of the time, so 3 to 6. Spacings are 8 to 20 bars. Over the cap, the
+  statement whose neighbours are closest goes; under 3, the biggest gap gets one.
+- **Forms.** The first statement is the full hook. After that each statement is the full cell
+  again, or one of: the head alone (first half of the call, last note held), the head said twice
+  in one bar, the answer alone, the call as a sequence a scale step up or down, or a full cell with
+  the older small variations (source variants, dropped note, held-over last note, withheld
+  answer). After a varied statement the full cell returns about 45% of the time. The last
+  statement is always the full cell with its last note ringing.
+- **Mix (2026-11-10, Zack, outside the plan).** Motorik bass Moog and Synth Bass 3 take CC7 90.
+  Motorik Lead 1 Synth Lead and Saw Stack get a 1.3 boost-node multiplier, about +2.3 dB.
 
 ## Decisions (2026-11-10)
 

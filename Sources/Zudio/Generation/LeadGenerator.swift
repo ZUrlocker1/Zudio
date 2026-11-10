@@ -108,7 +108,8 @@ struct LeadGenerator {
         passBodyBars: Int? = nil,
         noirVariation: Bool = false,
         arcadeVariation: Bool = false,
-        sync: MotorikSync = .none
+        sync: MotorikSync = .none,
+        breakdownBars: Set<Int> = []
     ) -> (events: [MIDIEvent], soloRange: Range<Int>?) {
 
         // Kraftwerk sync (Machine Voice only). No solo range: these rules are announcements
@@ -272,7 +273,7 @@ struct LeadGenerator {
         if let hook = HookLeadEngine.motorikRules[aRule] {
             let events = HookLeadEngine.generate(
                 rule: hook, frame: frame, structure: structure, tonalMap: tonalMap,
-                entryBar: entryBar, restBars: ld1RestBars,
+                entryBar: entryBar, restBars: ld1RestBars.union(breakdownBars),
                 register: kRegisterBounds[kTrackLead1]!, rng: &rng)
             return (events, nil)
         }
@@ -2915,8 +2916,9 @@ struct LeadGenerator {
             // even with minor-scale adjustment; its 4% redistributed 1% each to 010/011/013/014.
             // Retired base rules are replaced in every pool that used them (Zack, 2026-11-10):
             // MOT-LD1-023 Hallogallo hook takes MOT-LD1-001's slot, and 001 sits at the end at 0%.
-            let rules:   [String] = ["MOT-LD1-006","MOT-LD1-008","MOT-LD1-023","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014","MOT-LD1-001"]
-            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15,         0.00]
+            // MOT-LD1-025 Model riff takes MOT-LD1-006's slot; 006 sits at the end at 0%.
+            let rules:   [String] = ["MOT-LD1-025","MOT-LD1-008","MOT-LD1-023","MOT-LD1-005","MOT-LD1-009","MOT-LD1-010","MOT-LD1-011","MOT-LD1-012","MOT-LD1-013","MOT-LD1-014","MOT-LD1-001","MOT-LD1-006"]
+            let weights: [Double] = [0.04,         0.04,         0.04,         0.04,         0.11,         0.17,         0.17,         0.10,         0.14,         0.15,         0.00,         0.00]
             return rules[rng.weightedPick(weights)]
         }
         if arcade {
@@ -2924,8 +2926,9 @@ struct LeadGenerator {
             // 020 (Synth Hook) is melodic but not an arp — gives Bass/Lead 2 full weights via coordination layer.
             // 017 (Pentatonic Blitz) fires only when BPM ≥ 143 — handled inside the bar generator.
             // MOT-LD1-023 Hallogallo hook takes MOT-LD1-001's slot, and 001 sits at the end at 0%.
-            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-023","MOT-LD1-002","MOT-LD1-001"]
-            let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02,          0.00]
+            // MOT-LD1-024 Radioactive riff takes MOT-LD1-002's slot; 002 sits at the end at 0%.
+            let rules:   [String] = ["MOT-LD1-018","MOT-LD1-019","MOT-LD1-015","MOT-LD1-016","MOT-LD1-020","MOT-LD1-017","MOT-LD1-005","MOT-LD1-023","MOT-LD1-024","MOT-LD1-001","MOT-LD1-002"]
+            let weights: [Double] = [0.17,          0.18,          0.17,          0.13,          0.13,          0.14,          0.03,          0.03,          0.02,          0.00,          0.00]
             return rules[rng.weightedPick(weights)]
         }
         // 005 Call and answer down from 0.14 to 0.11, its 3% going to 003, 006 and 007.
@@ -2936,9 +2939,10 @@ struct LeadGenerator {
         // Solo improvement (2026-11-10): transcription hook rules take the slots of the rules
         // they replace, so every song that drew another rule keeps it. A retired rule moves to
         // the end of the list at 0%; restoring it means swapping it back into its slot.
-        // MOT-LD1-023 Hallogallo hook replaces MOT-LD1-001 Neu! motif first.
-        let rules:   [String] = ["MOT-LD1-023", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-006", "MOT-LD1-007", "MOT-LD1-008", "MOT-LD1-001"]
-        let weights: [Double] = [0.15,          0.14,          0.11,          0.15,          0.11,          0.12,          0.12,          0.10,          0.00]
+        // MOT-LD1-023 Hallogallo hook replaces 001, 024 Radioactive riff replaces 002,
+        // 026 Tour de France riff replaces 003 and 025 Model riff replaces 006.
+        let rules:   [String] = ["MOT-LD1-023", "MOT-LD1-024", "MOT-LD1-026", "MOT-LD1-004", "MOT-LD1-005", "MOT-LD1-025", "MOT-LD1-007", "MOT-LD1-008", "MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-006"]
+        let weights: [Double] = [0.15,          0.14,          0.11,          0.15,          0.11,          0.12,          0.12,          0.10,          0.00,          0.00,          0.00,          0.00]
         return rules[rng.weightedPick(weights)]
     }
 

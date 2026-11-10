@@ -105,12 +105,14 @@ struct ArrangementFilter {
             for track in activeTracks where !spotlight.contains(track) {
                 if track == kTrackLead1 && (soloOverlaps || arcadeVariation) { continue }
                 let roll = rng.nextDouble()
-                if roll < 0.45 {
-                    // Complete rest — remove all notes in this block
+                if roll < 0.45 && !phraseTracks.contains(track) {
+                    // Complete rest — remove all notes in this block. A hook lead is exempt: the
+                    // engine already places its statements around rest windows and breakdowns, and
+                    // a silenced block took most of them (one song kept 2 of 8).
                     events[track] = silence(events[track], startStep: startStep, endStep: endStep)
                 } else if roll < 0.80 && phraseTracks.contains(track) {
-                    // A hook rule (MOT-LD1-023 onward) states whole phrases; thinning picks
-                    // notes out of the hook and leaves fragments. Soften it instead.
+                    // A hook rule (MOT-LD1-023 onward) states whole phrases; thinning or resting
+                    // picks notes out of the hook and leaves fragments. Soften it instead.
                     events[track] = soften(events[track], startStep: startStep, endStep: endStep,
                                           reduction: 18)
                 } else if roll < 0.80 {

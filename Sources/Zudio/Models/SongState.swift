@@ -13,7 +13,7 @@ struct GenerationLogEntry: Sendable {
     /// Add each new or changed rule ID as it lands. Empty this set when Zack says testing is
     /// done, the rules are final, or the build is going to the App Store.
     static let testingMarkedRules: Set<String> = [
-        "MOT-LD1-023",
+        "MOT-LD1-023", "MOT-LD1-024", "MOT-LD1-025", "MOT-LD1-026",
     ]
 
     init(tag: String, description: String, isTitle: Bool = false) {

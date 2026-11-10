@@ -200,7 +200,12 @@ struct SongGenerator {
         // Step 5 — Lead 1 (generated before Bass so bass can react to melodic density)
         var lead1Rules: Set<String> = []
         var lead2Rules: Set<String> = []
-        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync)
+        // The base Motorik breakdown windows are known before Lead 1 is written, so a hook rule can
+        // lay its statements around them instead of losing them to the breakdown cut at step 12.5.
+        // A hook rule has no solo range, so these are the same windows that step computes.
+        let earlyBreakdownBars = (!isNoir && !isArcade && !motorikSync.isActive)
+            ? Set(breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: nil).flatMap { Array($0) }) : []
+        let (lead1Events, ld1SoloRange) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, breakdownBars: earlyBreakdownBars)
         trackEvents[kTrackLead1] = lead1Events
 
         // When Lead 1 picks a dense arp rule, bias Bass and Lead 2 toward sparse/pulse roles.
@@ -329,8 +334,12 @@ struct SongGenerator {
         // LD1-012 (Chromatic Descent) bypasses Pass A: its chromatic passing tones are
         // intentional and would be wiped by the avoidTones filter in chromatic chord contexts.
         let isLD1012 = lead1Rules.contains("MOT-LD1-012")
+        // Hook rules skip Pass A as well: their held notes are already moved off avoid tones, and
+        // the clash guard would cut notes out of the hook, such as Hallogallo's opening fourth.
+        let isHookRule = lead1Rules.contains(where: HookLeadEngine.isMotorikHookRule)
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure,
-                                           skipLead1ClashFilter: isLD1012)
+                                           skipLead1ClashFilter: isLD1012 || isHookRule,
+                                           uniformLead1Lift: isHookRule)
 
         // Step 11.5 — LD1-012 phrase cleanup: rest windows can strand a single held note
         // between silences. Threshold is 2 (not 3) because LD1-012 phrases can be legitimately
@@ -2837,6 +2846,9 @@ struct SongGenerator {
         case "MOT-LD1-021": return "Short Statement"
         case "MOT-LD1-022": return "Long Run"
         case "MOT-LD1-023": return "Hallogallo hook"
+        case "MOT-LD1-024": return "Radioactive riff"
+        case "MOT-LD1-025": return "Model riff"
+        case "MOT-LD1-026": return "Tour de France riff"
         default:            return ruleID
         }
     }

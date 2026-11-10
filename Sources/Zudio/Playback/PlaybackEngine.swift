@@ -1431,7 +1431,11 @@ final class PlaybackEngine: ObservableObject {
             // External SF2 pianos run soft and need gain above unity; route through the boost node
             // rather than AVAudioUnitSampler.volume, which is clamped to [0, 1] by Apple.
             if trackIndex == kTrackLead1 {
-                let mult: Float = (program == 61001) ? 8.0 : 1.0   // Stereo Piano needs boost above unity
+                // Stereo Piano needs boost above unity. Motorik Synth Lead and Saw Stack sat under the
+                // band (Zack, 2026-11-10): Saw Stack is already at the CC7 ceiling, so the lift goes
+                // through the boost node, about +2.3 dB.
+                let mult: Float = (program == 61001) ? 8.0
+                                : (motorikStyle && (program == 87 || program == 11100)) ? 1.3 : 1.0
                 boostBaseMultiplier[kTrackLead1] = mult
                 boosts[kTrackLead1].outputVolume = mult * (boostEffectEnabled[kTrackLead1] ? 1.7 : 1.0)
             } else if trackIndex == kTrackRhythm {

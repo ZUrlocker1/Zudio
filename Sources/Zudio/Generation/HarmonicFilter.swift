@@ -32,7 +32,10 @@ struct HarmonicFilter {
         // Lead 1's track ceiling is 79, and Pass B used to push notes into that gap — 41% of a
         // tenor's notes ended up above its own ceiling, which is where the screech came from
         // (Zack, 2026-10-14).
-        registerOverrides: [Int: RegisterBounds] = [:]
+        registerOverrides: [Int: RegisterBounds] = [:],
+        // Hook rules (MOT-LD1-023 onward) restate one phrase all song. Lifting it window by window
+        // put one statement an octave above the next, so for them Pass B decides once per song.
+        uniformLead1Lift: Bool = false
     ) -> [[MIDIEvent]] {
         var events = trackEvents
         // Each lead is filtered on its own (Passes A, B and C below, in `filterLead`), reading the
@@ -43,7 +46,8 @@ struct HarmonicFilter {
                                        frame: frame, structure: structure,
                                        skipClashFilter: track == kTrackLead1 && skipLead1ClashFilter,
                                        bounds: registerOverrides[track] ?? kRegisterBounds[track]
-                                             ?? RegisterBounds(low: 55, high: 88))
+                                             ?? RegisterBounds(low: 55, high: 88),
+                                       uniformLift: track == kTrackLead1 && uniformLead1Lift)
         }
         for track in [kTrackPads, kTrackRhythm, kTrackTexture] {
             events[track] = velocityArc(events[track], frame: frame, structure: structure)
@@ -58,8 +62,22 @@ struct HarmonicFilter {
     /// Pass C — the song's velocity arc.
     static func filterLead(_ lead: [MIDIEvent], track: Int, pads: [MIDIEvent],
                            frame: GlobalMusicalFrame, structure: SongStructure,
-                           skipClashFilter: Bool = false, bounds: RegisterBounds) -> [MIDIEvent] {
+                           skipClashFilter: Bool = false, bounds: RegisterBounds,
+                           uniformLift: Bool = false) -> [MIDIEvent] {
         var events = skipClashFilter ? lead : removeStrongBeatClashes(lead, structure: structure)
+
+        // One decision for the whole part: up an octave everywhere, or nowhere.
+        if uniformLift {
+            let end = frame.totalBars * 16
+            if let padMedian = medianPitch(pads, startStep: 0, endStep: end),
+               let leadMedian = medianPitch(events, startStep: 0, endStep: end),
+               leadMedian < padMedian + 4,
+               let top = events.map({ Int($0.note) }).max(), top + 12 <= bounds.high {
+                events = events.map { MIDIEvent(stepIndex: $0.stepIndex, note: $0.note + 12,
+                                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
+            }
+            return velocityArc(events, frame: frame, structure: structure)
+        }
 
         let windowBars  = 8
         let totalWindows = (frame.totalBars + windowBars - 1) / windowBars
