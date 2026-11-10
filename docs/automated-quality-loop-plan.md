@@ -214,9 +214,6 @@ Update `tools/run_loop.sh` to add the new style case.
 # Confirm the file is in the project (should print 3 lines)
 grep "AmbientBatchTests" Zudio.xcodeproj/project.pbxproj
 
-# Confirm no Zudio app is running (LSMultipleInstancesProhibited blocks the test runner)
-pgrep -la Zudio  # should return nothing
-
 # Build only first — confirms compilation succeeds before running
 xcodebuild build-for-testing -scheme Zudio -destination 'platform=macOS,arch=arm64' 2>&1 | tail -3
 
@@ -236,10 +233,6 @@ xcodebuild test -scheme Zudio -destination 'platform=macOS,arch=arm64' \
 - **`-only-testing` with 0 tests:** If xcodebuild says "Executed 0 tests" and SUCCEEDED, the
   suite was not compiled into the binary. Go back to Step 2 and verify all four entries were
   added and that the IDs are not duplicates of existing entries.
-
-- **LaunchServices error -1712:** Zudio.app is already running. The app has
-  `LSMultipleInstancesProhibited = true` so the test runner cannot launch a second instance.
-  Quit the app before running tests.
 
 - **Suite-level filter only:** Use `-only-testing:ZudioTests/AmbientBatchTests` (suite name
   only, no slash after). Adding the test function name (e.g. `/generateAmbientBatch`) silently
@@ -744,10 +737,6 @@ cd tools/batch-output/motorik && python3 ../../analyze_zudio.py *.MID
 Or use the orchestration script: `bash tools/run_loop.sh motorik`
 
 Output goes to `tools/batch-output/motorik/`. The test generates 10 songs by default.
-
-**Note:** `LSMultipleInstancesProhibited` is set in the app's Info.plist. If the Zudio app
-is running when you invoke xcodebuild test, the test runner will fail with LaunchServices
-error -1712. Quit the app first.
 
 Generate at least 20 songs per round (Motorik is fast). The golden corpus should include 5
 fixed seeds covering different lead rule IDs and at least one song with an X-Files whistle
