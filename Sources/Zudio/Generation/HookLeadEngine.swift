@@ -103,19 +103,26 @@ enum HookLeadEngine {
     /// pickup on the fifth below, rocking between root and fifth, then a turn through 3 2 1. The
     /// record alternates it with the same shape a third lower, so the plain answer is the riff
     /// moved down two scale steps. The vocal line (1 1 1 1 3 2 1) is the source variant answer.
+    /// Re-gridded onto 8ths 2026-11-10 (Nacht Hamburg, Rein Nacht): the 16th original moved too
+    /// fast to hold in mind. Now pickup 5 | 1 5 1, the root held through beat 2, then 3 2 1 with
+    /// the root held to the bar end, so it fits with the other hooks. Its homage only drops a note
+    /// or swaps a pair: an added passing note filled the held root and undid the change.
     static let radioactive = HookRule(
         id: "MOT-LD1-002",
-        call:   [[n(-1, -5, 1, 74), n(0, 0, 2, 88), n(2, 0, 1, 76), n(3, -5, 1, 72), n(4, 0, 1, 82),
-                  n(5, -5, 2, 74), n(7, 0, 1, 78), n(8, 4, 2, 86), n(10, 2, 1, 80), n(11, 0, 4, 84)]],
-        answer: [[n(-1, -5, 1, 74), n(0, 0, 2, 88), n(2, 0, 1, 76), n(3, -5, 1, 72), n(4, 0, 1, 82),
-                  n(5, -5, 2, 74), n(7, 0, 1, 78), n(8, 4, 2, 86), n(10, 2, 1, 80), n(11, 0, 4, 84)]],
+        call:   [[n(-2, -5, 2, 74), n(0, 0, 2, 88), n(2, -5, 2, 76), n(4, 0, 4, 82),
+                  n(8, 4, 2, 86), n(10, 2, 2, 80), n(12, 0, 4, 84)]],
+        answer: [[n(-2, -5, 2, 74), n(0, 0, 2, 88), n(2, -5, 2, 76), n(4, 0, 4, 82),
+                  n(8, 4, 2, 86), n(10, 2, 2, 80), n(12, 0, 4, 84)]],
         answerShift: -2,
         sourceVariants: [
-            HookSourceVariant(answer: [[n(0, 0, 2, 84), n(2, 0, 2, 76), n(4, 0, 3, 82), n(7, 0, 1, 76),
-                                        n(8, 4, 2, 86), n(10, 2, 1, 80), n(11, 0, 4, 84)]]),
+            // The vocal line 1 1 1 1 3 2 1, on 8ths.
+            HookSourceVariant(answer: [[n(0, 0, 2, 84), n(2, 0, 2, 76), n(4, 0, 2, 82), n(6, 0, 2, 76),
+                                        n(8, 4, 2, 86), n(10, 2, 2, 80), n(12, 0, 4, 84)]]),
         ],
         spacings: [12, 16, 8],
-        spacingWeights: [0.40, 0.35, 0.25]
+        spacingWeights: [0.40, 0.35, 0.25],
+        gentle: true,
+        homageWeights: [0, 0.5, 0, 0.5, 0]
     )
 
     /// The Model's synth riff (track "Synth 2"): a long held root, b3 2 1, then 2 b7 5 5. The

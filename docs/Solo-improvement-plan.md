@@ -49,8 +49,8 @@ Lead 1 in its gaps instead of playing over it.
   tonic at steps 0, 2, 4 and 8, answered by 5, 7, 12, 12, with a source variant that ends on the
   fifth and a soft pulse tail in 8ths. Replaces Neu! motif first: 15% in base, 4% in Noir, 3% in
   Arcade.
-- **MOT-LD1-002 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff, 16th
-  based with a pickup. The plain answer is the same riff two scale steps lower, and the vocal line
+- **MOT-LD1-002 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff with
+  a pickup, re-gridded from 16ths onto 8ths with held roots on 2026-11-10. The plain answer is the same riff two scale steps lower, and the vocal line
   1 1 1 1 3 2 1 is the source variant. Replaces Pentatonic cell: 14% in base, 2% in Arcade.
 - **MOT-LD1-006 Model riff**, Kraftwerk, *The Model*: a two-bar riff with a long held root. The
   vocal line alternates with it as a restatement, and a source variant ends the riff on the root.
@@ -464,7 +464,8 @@ Checks stay light:
 
 ## Open questions
 
-- Should MOT-LD1-002 Radioactive riff keep its off-beat 16ths, or snap its held notes onto beats?
+- MOT-LD1-002 Radioactive riff, 2026-11-10: re-gridded onto 8ths with held roots, homage drop or
+  swap only, on trial by ear. Halving its off-beat 16ths first made too little difference.
 - How many statements should a Kosmic hook song have? Motorik is 3 to 6.
 - `DensitySimplifier.thin` is still buggy for Arcade's arp rules and the synced Europe Lead 2.
   The gap-answer Lead 2 is written after it runs, so it never reaches the new rules. Fix the rest

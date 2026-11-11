@@ -560,9 +560,13 @@ in `Sources/Zudio/Generation/HookLeadEngine.swift`.
 - **MOT-LD1-001 Hallogallo hook**, Neu!, *Hallogallo*: a call 5, 7, 14, 14 semitones from the
   tonic at steps 0, 2, 4 and 8, answered by 5, 7, 12, 12, with a source variant that ends on the
   fifth and a soft pulse tail in 8ths.
-- **MOT-LD1-002 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff, 16th
-  based with a pickup. The plain answer is the same riff two scale steps lower, and the vocal line
-  1 1 1 1 3 2 1 is the source variant. It is a native 16th riff and keeps its off-beat 16ths.
+- **MOT-LD1-002 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff on
+  8ths, pickup 5 | 1 5 1 with the root held through beat 2, then 3 2 1 with the root held to the
+  bar end. The plain answer is the same riff two scale steps lower, and the vocal line
+  1 1 1 1 3 2 1 on 8ths is the source variant. The source is a 16th riff; on 2026-11-10, after
+  Nacht Hamburg and Rein Nacht, it was re-gridded onto 8ths because the 16th version moved too
+  fast to hold in mind (halving its off-beat 16ths first was not enough). Its homage changes one
+  note, by a drop or a swap only, since an added passing note filled the held root.
 - **MOT-LD1-006 Model riff**, Kraftwerk, *The Model*: a two-bar riff with a long held root. The
   vocal line alternates with it as a restatement, and a source variant ends the riff on the root.
 - **MOT-LD1-003 Tour de France riff**, Kraftwerk, *Tour de France*: a rising one-bar call and a
@@ -576,7 +580,7 @@ How a hook plays:
   change.
 - **Fit the beat.** Motorik drums put the kick on steps 0 and 8 and the snare on 4 and 12. Every
   hook note sits on the 8th-note grid, held notes on beats, and no variation shifts a figure a
-  16th late. Only the Radioactive riff is a native 16th figure.
+  16th late. The Radioactive riff, once a native 16th figure, is on 8ths too.
 - **Count.** The body states the hook 3, 4 or 5 times, the cap drawn 20, 40 and 40%, plus a soft
   outro statement 30% of the time, so 3 to 6. Spacings run 8 to 20 bars.
 - **Forms.** The first statement is the full hook. Each later one is the full cell or one of: the
