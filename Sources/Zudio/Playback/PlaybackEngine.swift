@@ -9,7 +9,13 @@ import Combine
 /// Visualizer orb notes, published separately from PlaybackEngine (see activeVisualizerNotes).
 @MainActor
 final class VisualizerFeed: ObservableObject {
-    @Published var notes: [VisualizerNote] = []
+    // Plain var: the visualizer's TimelineView reads it on each 12 fps frame. Publishing it
+    // re-rendered the visualizer on every flush as well, out of phase with the timeline.
+    var notes: [VisualizerNote] = [] {
+        didSet { if hasNotes == notes.isEmpty { hasNotes = !notes.isEmpty } }
+    }
+    // Changes only when the list empties or fills; drives the timeline's pause after Stop.
+    @Published private(set) var hasNotes = false
 }
 
 @MainActor
@@ -27,9 +33,15 @@ final class PlaybackEngine: ObservableObject {
     // stepPublisher replaces the @Published $currentStep Combine publisher.
     // PassthroughSubject: no initial value emitted on subscribe (unlike @Published).
     let stepPublisher = PassthroughSubject<Int, Never>()
-    // Plain var (not @Published): wallClockStep reads it as a fallback when stopped,
-    // but nothing subscribes to it for rendering — TimelineView drives lane redraws now.
-    var displayStep: Int = 0
+    // Plain var (not @Published): wallClockStep reads it as a fallback when stopped.
+    // While stopped, a change moves the lane playheads through playheadSync.
+    var displayStep: Int = 0 {
+        didSet { if !isPlaying && displayStep != oldValue { playheadSync.send() } }
+    }
+    // Fires when the playhead's anchor changes outside a bar change: playback (re)starts its
+    // clock (play, seek, tempo, Evolve pass) or the stopped position moves. The lane playheads
+    // (PlayheadLayerView) re-anchor their Core Animation glide on it; no view re-renders.
+    let playheadSync = PassthroughSubject<Void, Never>()
     // Orb notes live in their own ObservableObject: they change on nearly every step (drum hits
     // included), and publishing them from the engine re-rendered every view observing playback
     // (the whole iPhone player, all MIDI lanes). Only VisualizerView observes the feed.
@@ -76,6 +88,7 @@ final class PlaybackEngine: ObservableObject {
         playbackStartStep       = step
         playbackSecondsPerStep  = state.frame.secondsPerStep
         playbackTotalSteps      = state.frame.totalBars * 16
+        playheadSync.send()
     }
 
     // MARK: - Audio graph
@@ -350,7 +363,13 @@ final class PlaybackEngine: ObservableObject {
 
     // MARK: - Song state
 
-    private(set) var songState: SongState?
+    private(set) var songState: SongState? {
+        didSet {
+            cachedIsBuddhaPulse = songState.map {
+                !SongGenerator.currentRules($0.generationLog, track: kTrackDrums) { $0 == "KOS-DRUM-005" }.isEmpty
+            } ?? false
+        }
+    }
 
     // Incremented each time a new scheduler starts. onStep tasks check this to
     // reject stale callbacks queued before a stop/seek/generate.
@@ -884,6 +903,12 @@ final class PlaybackEngine: ObservableObject {
                    && (fireNote == GMDrum.snare.rawValue || fireNote == GMDrum.snare2.rawValue) {
                 // Standard Kit in Kosmic Drift: snare runs loud — reduce to 55% to sit in the mix
                 fireVelocity = UInt8(max(1, Int(ev.velocity) * 65 / 100))
+            } else if trackIndex == kTrackDrums && cachedDrumProgram == 25 && cachedIsBuddhaPulse
+                   && fireNote == GMDrum.snare2.rawValue {
+                // 808 Kit under Electric Buddha Pulse (Zack, 2026-11-11, Sputnique-Part-2): the Space
+                // version's snare is the electric snare (40), the 808/909 kit's TR-909 snare at 0 dB,
+                // which thumps out on 2 and 4. Base Kosmic's version plays the 808 snare (38), untouched.
+                fireVelocity = UInt8(max(1, Int(ev.velocity) * 75 / 100))
             } else {
                 fireVelocity = ev.velocity
             }
@@ -932,8 +957,8 @@ final class PlaybackEngine: ObservableObject {
             let flushNow = Date()
             if flushNow.timeIntervalSince(self.lastVisualizerFlush) >= (1.0 / 12.0) {
                 self.lastVisualizerFlush = flushNow
-                // Assign only when notes were added or pruned: every assignment re-renders the
-                // visualizer. A step (125-190 ms in Chill) outlasts the 83 ms gate, so this runs per step.
+                // Assign only when notes were added or pruned. The visualizer picks the list up on
+                // its next frame; only an empty/non-empty change re-renders it (VisualizerFeed.hasNotes).
                 let isExpired = { (n: VisualizerNote) in flushNow.timeIntervalSince(n.birthDate) > n.orbLifetime + 0.5 }
                 if !self.pendingVisualizerNotes.isEmpty || self.activeVisualizerNotes.contains(where: isExpired) {
                     var notes = self.activeVisualizerNotes
@@ -941,7 +966,7 @@ final class PlaybackEngine: ObservableObject {
                     self.pendingVisualizerNotes.removeAll(keepingCapacity: true)
                     notes.removeAll(where: isExpired)
                     if notes.count > 80 { notes.removeFirst(notes.count - 80) }
-                    self.activeVisualizerNotes = notes  // single assignment = single objectWillChange
+                    self.activeVisualizerNotes = notes  // single assignment
                 }
             }
             // Ambient per-note attack/decay: fade boost up on note-on, down on note-off.
@@ -1184,6 +1209,8 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedIsAmbientPiano:   Bool  = false
     nonisolated(unsafe) private var cachedIsKosmicDrift:    Bool  = false
     nonisolated(unsafe) private var cachedIsKosmicSpace:    Bool  = false
+    // The song's current drum rule is KOS-DRUM-005 Electric Buddha Pulse (set with songState).
+    nonisolated(unsafe) private var cachedIsBuddhaPulse:    Bool  = false
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
     /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls

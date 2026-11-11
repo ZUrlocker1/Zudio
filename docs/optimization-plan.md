@@ -146,8 +146,21 @@ tools/fingerprints/baseline.txt (pinned at 0dfb880) no longer matches Motorik, K
 
 ### Not done (candidates)
 
-- Per-bar AppState re-render, status log incremental rebuild, one shared playhead overlay.
+- Per-bar AppState re-render, status log incremental rebuild. Both average well under 1%; the per-bar re-render may cause 10 ms spikes. Rule since 2026-11-11: make a CPU change only if it likely saves at least 1%, and on the Mac only for the visible window (macOS already skips drawing a hidden one).
 - Beat Fixup is applied at render-buffer granularity live (0 to about 23 ms on iOS) but sample-accurately in export; a sound decision, not an optimization.
+
+## Third pass (2026-11-11): Track View playhead and visualizer
+
+### Done
+
+- **Lane playhead is a Core Animation layer** (`PlayheadLayerView`, bottom of MIDILaneView.swift; also used by AudioWaveformView). Replaces a TimelineView per lane that redrew a lane-sized Canvas 4, 8 or 20 times a second by zoom. The layer carries one linear `position.x` animation to the window's right edge, which the window server runs at display rate. It re-anchors from `wallClockPosition` on `$isPlaying`, `$currentBar` (each bar, correcting drift), `PlaybackEngine.playheadSync` (sent by `recordPlaybackStart`, so play, seek, tempo and Evolve passes, and by a stopped `displayStep` change), SwiftUI updates (zoom, scroll, song) and layout (resize). This was the "one shared playhead overlay" candidate; per-lane layers cost the app nothing per frame, so a shared overlay is not needed. Zack: much smoother. Not measured; when it is, sample WindowServer as well as Zudio.
+- **Visualizer redraws only on its timeline.** `VisualizerFeed.notes` is a plain var; only `hasNotes` is published (the timeline's pause condition after Stop). Before, each flush re-rendered the visualizer out of phase with its 12 fps timeline, about 20 draws a second in Motorik. The Mac gesture view reads the feed at hit-test time, as iOS does. Not measured with the window visible.
+
+### Considered and not done
+
+- Static background or `drawingGroup()` for the visualizer: judged under 1%.
+- Pausing when hidden, minimised or locked: macOS already skips drawing a hidden window.
+- Note-layer precompute on page flip, status log incremental rebuild, Bar label timer, muted-lane opacity: each well under 1% on average.
 
 ---
 Copyright (c) 2026 Zack Urlocker

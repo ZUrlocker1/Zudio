@@ -6,7 +6,7 @@
 
 import SwiftUI
 
-/// Re-evaluates `content` whenever the visualizer feed publishes.
+/// Re-evaluates `content` when the feed's `hasNotes` flips (the timeline's pause condition).
 private struct VisualizerFeedObserver<Content: View>: View {
     @ObservedObject var feed: VisualizerFeed
     @ViewBuilder var content: () -> Content
@@ -55,7 +55,7 @@ struct VisualizerView: View {
     @State private var errorToastGeneration = 0
 
     var body: some View {
-        // Re-render on orb note changes; PlaybackEngine no longer publishes them itself.
+        // Re-render when the orb list empties or fills; the timeline reads the notes each frame.
         VisualizerFeedObserver(feed: playback.visualizerFeed) { visualizerBody }
             .overlay {
                 Color.red.opacity(errorFlashOpacity).allowsHitTesting(false)
@@ -84,7 +84,7 @@ struct VisualizerView: View {
 
     @ViewBuilder private var visualizerBody: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 12,
-                                paused: !playback.isPlaying && playback.activeVisualizerNotes.isEmpty)) { tl in
+                                paused: !playback.isPlaying && !playback.visualizerFeed.hasNotes)) { tl in
             Canvas { ctx, size in
                 drawBackground(ctx: &ctx, size: size, now: tl.date)
                 drawOrbs(ctx: &ctx, size: size, now: tl.date)
@@ -93,7 +93,7 @@ struct VisualizerView: View {
         #if os(macOS)
         .overlay {
             MacVisualizerGestureView(
-                notes: playback.activeVisualizerNotes,
+                feed: playback.visualizerFeed,
                 onClickOrb:         { handleClickOrb($0) },
                 onDoubleClickOrb:   { handleDoubleClickOrb($0) },
                 onClickEmpty:       { handleClickEmpty() },
@@ -556,7 +556,8 @@ import AppKit
 /// Transparent NSView overlay that handles clicks, right-clicks, and cursor changes
 /// on the Mac visualizer canvas. Mirrors iOS CanvasGestureView hit-test logic.
 private struct MacVisualizerGestureView: NSViewRepresentable {
-    var notes: [VisualizerNote]
+    // Read at hit-test time so clicks see the live orbs; the host view does not re-render per flush.
+    let feed: VisualizerFeed
     var onClickOrb:         (Int) -> Void
     var onDoubleClickOrb:   (Int) -> Void
     var onClickEmpty:       ()    -> Void
@@ -585,7 +586,7 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
 
     // MARK: Coordinator — hit-testing + dispatch
 
-    final class Coordinator: NSObject {
+    @MainActor final class Coordinator: NSObject {
         var parent: MacVisualizerGestureView
         init(parent: MacVisualizerGestureView) { self.parent = parent }
 
@@ -618,7 +619,7 @@ private struct MacVisualizerGestureView: NSViewRepresentable {
         /// Internal so MacGestureNSView can call it for cursor updates.
         func hitOrb(at point: CGPoint, size: CGSize) -> Int? {
             let now = Date()
-            for orb in parent.notes.reversed() {
+            for orb in parent.feed.notes.reversed() {
                 let age = now.timeIntervalSince(orb.birthDate)
                 guard age < orb.orbLifetime else { continue }
                 let pos    = orbPosition(orb: orb, age: age, size: size, now: now)

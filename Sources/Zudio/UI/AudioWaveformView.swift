@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Zack Urlocker
 // Replaces MIDILaneView on kTrackTexture when an audio texture is selected.
 // Same 3-layer ZStack pattern as MIDILaneView: static waveform layer (Equatable,
-// skipped on playhead ticks) + playhead Canvas (O(1) per tick) + drag-to-seek.
+// skipped on playhead ticks) + Core Animation playhead (PlayheadLayerView) + drag-to-seek.
 
 import SwiftUI
 import AVFoundation
@@ -29,11 +29,6 @@ struct AudioWaveformView: View {
     @State private var loadedFilename: String? = nil
 
     var body: some View {
-        // displayStep is intentionally NOT read here — playhead uses wallClockStep
-        // inside TimelineView so this body never re-evaluates on step ticks.
-        // Adaptive fps: same logic as MIDILaneView.
-        let playheadFPS: Double = visibleBars <= 8 ? 20 : visibleBars <= 32 ? 8 : 4
-
         ZStack {
             WaveformLayerView(
                 samples: samples,
@@ -46,19 +41,9 @@ struct AudioWaveformView: View {
             )
             .equatable()
 
-            // Playhead — wall-clock position, O(1). Same approach as MIDILaneView.
-            // When playing: adaptive-fps TimelineView; when stopped: plain Canvas.
-            if playback.isPlaying {
-                TimelineView(.periodic(from: .now, by: 1.0 / playheadFPS)) { _ in
-                    Canvas { ctx, size in
-                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockPosition)
-                    }
-                }
-            } else {
-                Canvas { ctx, size in
-                    drawPlayhead(ctx: ctx, size: size, currentStep: Double(playback.displayStep))
-                }
-            }
+            // Playhead — the same Core Animation layer as MIDILaneView (PlayheadLayerView).
+            PlayheadLayerView(playback: playback, visibleBars: visibleBars, barOffset: barOffset,
+                              totalBars: totalBars, showHandle: false)
 
             // Drag-to-seek
             GeometryReader { geo in
@@ -167,20 +152,6 @@ struct AudioWaveformView: View {
         return (peaks, durationSec, durationBars)
     }
 
-    // MARK: - Playhead (identical to MIDILaneView)
-
-    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Double) {
-        let w = size.width
-        let h = size.height
-        let clampedVisible = max(1, min(visibleBars, totalBars))
-        let clampedOffset  = max(0, min(barOffset, totalBars - clampedVisible))
-        let visibleSteps   = clampedVisible * 16
-        let startStep      = clampedOffset * 16
-        guard currentStep >= Double(startStep) && currentStep < Double(startStep + visibleSteps) else { return }
-        let px = CGFloat(currentStep - Double(startStep)) / CGFloat(visibleSteps) * w
-        ctx.fill(Path(CGRect(x: px, y: 0, width: 2, height: h)),
-                 with: .color(.white.opacity(0.9)))
-    }
 }
 
 // MARK: - WaveformLayerView (Equatable — not re-drawn on playhead ticks)

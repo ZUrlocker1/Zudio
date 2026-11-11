@@ -2609,7 +2609,7 @@ struct SongGenerator {
 
     /// The rule IDs in the log that `isWanted` accepts for `track`, as of now: a regen entry for that
     /// track clears those logged before it. `isWanted` must accept only that track's IDs.
-    private static func currentRules(_ log: [GenerationLogEntry], track: Int,
+    static func currentRules(_ log: [GenerationLogEntry], track: Int,
                                      where isWanted: (String) -> Bool) -> Set<String> {
         var rules: Set<String> = []
         for entry in log {

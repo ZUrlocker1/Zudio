@@ -2,12 +2,12 @@
 // Copyright (c) 2026 Zack Urlocker
 // Drag anywhere in the lane to reposition the playhead.
 //
-// Performance split: note drawing is isolated in NoteLayerView (Equatable).
-// NoteLayerView.body is skipped by SwiftUI when only currentStep changes (every tick),
-// so O(N) note iteration is eliminated from the per-tick hot path.
-// Only the tiny playhead Canvas re-draws on each step tick.
+// Performance split: note drawing is isolated in NoteLayerView (Equatable), and the playhead is a
+// Core Animation layer (PlayheadLayerView), so playback costs the lane no per-frame drawing.
 
 import SwiftUI
+import Combine
+import QuartzCore
 
 struct MIDILaneView: View {
     @EnvironmentObject var playback: PlaybackEngine
@@ -39,10 +39,6 @@ struct MIDILaneView: View {
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
         let version   = cacheVersion
-        // Adaptive fps: at wide zoom the playhead moves <1px/frame at 20fps — no
-        // visible difference, so run fewer redraws to save CPU.
-        // ≤8 bars → 20fps (fractional position, glides between steps)  |  9–32 bars → 8fps  |  ≥33 bars → 4fps
-        let playheadFPS: Double = visibleBars <= 8 ? 20 : visibleBars <= 32 ? 8 : 4
 
         ZStack {
             // Note layer — Equatable, skipped on every tick. O(N) note draw
@@ -61,21 +57,10 @@ struct MIDILaneView: View {
             )
             .equatable()
 
-            // Playhead layer — wall-clock position, O(1).
-            // When playing: TimelineView drives redraws at the adaptive fps so the
-            // position is computed from elapsed time, never lagging or jumping.
-            // When stopped: plain Canvas drawn once; no timer needed.
-            if playback.isPlaying {
-                TimelineView(.periodic(from: .now, by: 1.0 / playheadFPS)) { _ in
-                    Canvas { ctx, size in
-                        drawPlayhead(ctx: ctx, size: size, currentStep: playback.wallClockPosition)
-                    }
-                }
-            } else {
-                Canvas { ctx, size in
-                    drawPlayhead(ctx: ctx, size: size, currentStep: Double(playback.displayStep))
-                }
-            }
+            // Playhead — a Core Animation layer that glides at display rate with no per-frame
+            // work in the app (PlayheadLayerView, below).
+            PlayheadLayerView(playback: playback, visibleBars: visibleBars, barOffset: barOffset,
+                              totalBars: totalBars, showHandle: showPlayheadHandle)
 
             // Drag-to-seek overlay — invisible, covers full lane
             GeometryReader { geo in
@@ -120,29 +105,141 @@ struct MIDILaneView: View {
         }
     }
 
-    // MARK: - Playhead draw (O(1): only called by the playhead Canvas)
+}
 
-    private func drawPlayhead(ctx: GraphicsContext, size: CGSize, currentStep: Double) {
-        let w = size.width
-        let h = size.height
-        let clampedVisible = max(1, min(visibleBars, totalBars))
-        let clampedOffset  = max(0, min(barOffset, totalBars - clampedVisible))
-        let visibleSteps   = clampedVisible * 16
-        let startStep      = clampedOffset * 16
+// MARK: - PlayheadLayerView
 
-        guard currentStep >= Double(startStep) && currentStep < Double(startStep + visibleSteps) else { return }
-        let px = CGFloat(currentStep - Double(startStep)) / CGFloat(visibleSteps) * w
-        ctx.fill(Path(CGRect(x: px, y: 0, width: 2, height: h)),
-                 with: .color(.white.opacity(0.9)))
-        if showPlayheadHandle {
-            let cx = px + 1.0
-            var tri = Path()
-            tri.move(to: CGPoint(x: cx - 6, y: 0))
-            tri.addLine(to: CGPoint(x: cx + 6, y: 0))
-            tri.addLine(to: CGPoint(x: cx,     y: 10))
-            tri.closeSubpath()
-            ctx.fill(tri, with: .color(.white))
+// The lane playhead (2 pt line, plus the ▼ handle on the top lane) as a Core Animation layer.
+// While playing it carries one linear animation to the end of the visible window, which the
+// window server runs at display rate with no per-frame work in the app. It replaced a
+// TimelineView per lane that redrew a lane-sized Canvas 4-20 times a second (2026-11-11).
+// Re-anchored from the wall clock on play/stop, every bar (corrects any drift), seek, tempo
+// change and Evolve pass (PlaybackEngine.playheadSync), and on zoom, scroll and resize.
+struct PlayheadLayerView {
+    let playback: PlaybackEngine
+    let visibleBars: Int
+    let barOffset: Int
+    let totalBars: Int
+    let showHandle: Bool
+}
+
+#if os(macOS)
+extension PlayheadLayerView: NSViewRepresentable {
+    func makeNSView(context: Context) -> PlayheadHostView { PlayheadHostView() }
+    func updateNSView(_ view: PlayheadHostView, context: Context) { view.configure(self) }
+}
+typealias PlayheadBaseView = NSView
+#else
+extension PlayheadLayerView: UIViewRepresentable {
+    func makeUIView(context: Context) -> PlayheadHostView { PlayheadHostView() }
+    func updateUIView(_ view: PlayheadHostView, context: Context) { view.configure(self) }
+}
+typealias PlayheadBaseView = UIView
+#endif
+
+final class PlayheadHostView: PlayheadBaseView {
+    private let line   = CALayer()
+    private let handle = CAShapeLayer()
+    private var spec: PlayheadLayerView?
+    private weak var subscribed: PlaybackEngine?
+    private var cancellables: Set<AnyCancellable> = []
+
+    init() {
+        super.init(frame: .zero)
+        #if os(macOS)
+        wantsLayer = true
+        let root = layer!
+        #else
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+        let root = layer
+        #endif
+        line.anchorPoint = .zero
+        line.backgroundColor = CGColor(gray: 1, alpha: 0.9)
+        line.isHidden = true
+        handle.fillColor = CGColor(gray: 1, alpha: 1)
+        let tri = CGMutablePath()                      // ▼ centred on the 2 pt line
+        tri.move(to: CGPoint(x: 1 - 6, y: 0))
+        tri.addLine(to: CGPoint(x: 1 + 6, y: 0))
+        tri.addLine(to: CGPoint(x: 1, y: 10))
+        tri.closeSubpath()
+        handle.path = tri
+        handle.isHidden = true
+        line.addSublayer(handle)
+        root.addSublayer(line)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    #if os(macOS)
+    override var isFlipped: Bool { true }            // y = 0 at the top, as on iOS
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }   // drags go to the seek overlay
+    override func layout() { super.layout(); sync() }
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        handle.contentsScale = window?.backingScaleFactor ?? 2
+    }
+    #else
+    override func layoutSubviews() { super.layoutSubviews(); sync() }
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        handle.contentsScale = window?.screen.scale ?? 2
+    }
+    #endif
+
+    func configure(_ spec: PlayheadLayerView) {
+        self.spec = spec
+        if subscribed !== spec.playback {
+            subscribed = spec.playback
+            cancellables.removeAll()
+            // @Published fires before the value is stored, so read the engine on the next turn.
+            spec.playback.$isPlaying.receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.sync() }.store(in: &cancellables)
+            spec.playback.$currentBar.removeDuplicates().receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.sync() }.store(in: &cancellables)
+            spec.playback.playheadSync
+                .sink { [weak self] in self?.sync() }.store(in: &cancellables)
         }
+        sync()
+    }
+
+    /// Places the line at the engine's current position and, while playing, sets it gliding
+    /// to the window's right edge at the song's step rate.
+    private func sync() {
+        guard let spec else { return }
+        let pb = spec.playback
+        let w = bounds.width, h = bounds.height
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        line.removeAnimation(forKey: "glide")
+        guard w > 0, h > 0, spec.totalBars > 0 else { line.isHidden = true; return }
+
+        let visible   = max(1, min(spec.visibleBars, spec.totalBars))
+        let offset    = max(0, min(spec.barOffset, spec.totalBars - visible))
+        let startStep = Double(offset * 16)
+        let steps     = Double(visible * 16)
+        let pos       = pb.wallClockPosition
+        guard pos >= startStep && pos < startStep + steps else { line.isHidden = true; return }
+
+        line.isHidden = false
+        line.bounds = CGRect(x: 0, y: 0, width: 2, height: h)
+        handle.isHidden = !spec.showHandle
+        let x = CGFloat((pos - startStep) / steps) * w
+        line.position = CGPoint(x: x, y: 0)
+
+        let secondsPerStep = pb.playbackSecondsPerStep
+        guard pb.isPlaying && secondsPerStep > 0 else { return }
+        let endStep  = min(startStep + steps, Double(pb.playbackTotalSteps))
+        let duration = (endStep - pos) * secondsPerStep
+        guard duration > 0 else { return }
+        let endX = CGFloat((endStep - startStep) / steps) * w
+        let glide = CABasicAnimation(keyPath: "position.x")
+        glide.fromValue = x
+        glide.toValue   = endX
+        glide.duration  = duration
+        glide.timingFunction = CAMediaTimingFunction(name: .linear)
+        line.position = CGPoint(x: endX, y: 0)   // model value: where the glide ends
+        line.add(glide, forKey: "glide")
     }
 }
 
