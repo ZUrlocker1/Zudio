@@ -8,7 +8,8 @@ struct DensitySimplifier {
     static func simplify(
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
-        structure: SongStructure
+        structure: SongStructure,
+        exemptTracks: [Int] = []
     ) -> [[MIDIEvent]] {
         var events = trackEvents
 
@@ -41,6 +42,9 @@ struct DensitySimplifier {
             // Two-stage: moderate imbalance → 55% keepRate; severe imbalance → 35%.
             // Severe case catches sparse Lead 1 rules (Long Arc, Call & Answer) paired with
             // dense Lead 2 rules (Hallogallo, Rhythmic Counter) — seen at 3× imbalance in practice.
+            // A Lead 2 in a Kraftwerk sync doubles Rhythm sectionally; thinning it would break the
+            // lock, so it is exempt here as in ArrangementFilter.
+            if exemptTracks.contains(kTrackLead2) { continue }
             if lead2Density > lead1Density * 1.5 {
                 events[kTrackLead2] = thin(events[kTrackLead2], startStep: startStep, endStep: endStep, keepRate: 0.35)
             } else if lead2Density > lead1Density * 0.6 {
@@ -61,20 +65,17 @@ struct DensitySimplifier {
         return Double(count) / Double(totalSteps)
     }
 
-    /// Keeps `keepRate` fraction of events in the given step range (deterministically via index).
+    /// Keeps about `keepRate` of the two-bar phrases that hold events in the step range, spread
+    /// evenly from the first, and silences the rest, so a thinned arp keeps whole figures and
+    /// rests between them. It used to keep the first `keepRate` share of the events (idx % 100
+    /// with under 100 events), which played the front of each window and left the back silent.
     private static func thin(_ events: [MIDIEvent], startStep: Int, endStep: Int, keepRate: Double) -> [MIDIEvent] {
-        var result: [MIDIEvent] = []
-        var idx = 0
-        for ev in events {
-            if ev.stepIndex >= startStep && ev.stepIndex < endStep {
-                if Double(idx % 100) / 100.0 < keepRate {
-                    result.append(ev)
-                }
-                idx += 1
-            } else {
-                result.append(ev)
-            }
-        }
-        return result
+        let unitSteps = 32
+        let inRange = { (ev: MIDIEvent) in ev.stepIndex >= startStep && ev.stepIndex < endStep }
+        let units = Array(Set(events.filter(inRange).map { ($0.stepIndex - startStep) / unitSteps })).sorted()
+        guard !units.isEmpty else { return events }
+        let keepCount = max(1, Int((Double(units.count) * keepRate).rounded()))
+        let kept = Set((0..<keepCount).map { units[$0 * units.count / keepCount] })
+        return events.filter { !inRange($0) || kept.contains(($0.stepIndex - startStep) / unitSteps) }
     }
 }

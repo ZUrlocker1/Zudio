@@ -511,6 +511,9 @@ measured arrangement.
 `durationSteps`, transposed **+12 or +24** (70/30 per song), on a different instrument. Strict
 unison — no thirds, no offset. The machine quality comes from exact lock.
 
+Neither double is thinned by the density pass, as the arrangement filter already exempts them
+(until 2026-11-11 the density pass could keep only the front of an 8-bar window of the double).
+
 ### Texture
 
 Texture is in **one** of the three groups, Sequence Lock. It is also the one member that plays

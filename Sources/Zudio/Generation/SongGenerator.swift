@@ -314,7 +314,8 @@ struct SongGenerator {
         trackEvents[kTrackTexture] = TextureGenerator.generate(frame: frame, structure: structure, tonalMap: tonalMap, rng: &texRNG, usedRuleIDs: &texRules, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, syncWindows: syncWindows)
 
         // Step 10 — Collision / density simplification pass
-        trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure)
+        trackEvents = DensitySimplifier.simplify(trackEvents: trackEvents, frame: frame, structure: structure,
+                                                 exemptTracks: motorikSync.isActive ? [kTrackLead2] : [])
 
         // Step 10.5 — Arrangement filter: spotlight rotation so 3+ melodic tracks don't all peak together
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed, solo: ld1Solo, arcadeVariation: isArcade, exemptTracks: motorikSync.isActive ? motorikSync.tracks + [kTrackLead2] : [],

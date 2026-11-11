@@ -178,9 +178,12 @@ struct KosmicLeadGenerator {
         // Sparse ambient rules (001, 002, 003) always escalate to a denser rule in B sections
         // so the song has a genuine arc: ambient A → melodic B → return.
         // Other Lead 1 rules keep the original 60% Technique D probability.
-        // bRule must be a per-bar-compatible rule (001–007 only); section-level solo rules
-        // (008, 009) must never serve as bRule since emitLeadBar doesn't dispatch them.
+        // bRule is KOS-LD1-002, 003 or 004 (played by emitLeadBar) or KOS-LD1-006 (played a
+        // section at a time by jmjPhraseSection). The section-level A rules KOS-LD1-006, 008 and
+        // 009 play every section themselves and ignore bRule, so their draw is kept for seed
+        // stability but not logged.
         let sparseLeadRules: Set<String> = ["KOS-LD1-002", "KOS-LD1-003"]
+        let sectionLevelRules: Set<String> = ["KOS-LD1-006", "KOS-LD1-008", "KOS-LD1-009"]
         let hasBSection = structure.sections.contains { $0.label == .B }
         // A transcription hook (KOS-LD1-001, 005 or 007) owns both the A and the B sections, so it
         // makes no Technique D draw.
@@ -195,7 +198,9 @@ struct KosmicLeadGenerator {
             if hasBSection { usedRuleIDs.insert(bRule) }
         } else if rng.nextDouble() < 0.60 {
             bRule = pickBSectionRule(excluding: aRule, isKosmicDrift: isKosmicDrift, rng: &rng)
-            if hasBSection && bRule != aRule { usedRuleIDs.insert(bRule) }
+            if hasBSection && bRule != aRule && !sectionLevelRules.contains(aRule) {
+                usedRuleIDs.insert(bRule)
+            }
         } else {
             bRule = aRule
         }
@@ -261,6 +266,13 @@ struct KosmicLeadGenerator {
             // B sections: use Technique D rule if selected
             let activeRule = (section.label == .B) ? bRule : aRule
             if hook != nil { continue }
+            // KOS-LD1-006 JMJ phrase loop is built a section at a time, so a B section escalated
+            // to it gets the JMJ section phrase instead of the per-bar rules below.
+            if activeRule == "KOS-LD1-006" {
+                events += jmjPhraseSection(section: section, frame: frame, tonalMap: tonalMap,
+                                           sparseMode: false, rng: &rng)
+                continue
+            }
             for bar in section.startBar..<section.endBar {
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
@@ -1494,100 +1506,114 @@ struct KosmicLeadGenerator {
                 events += melodyEvents
                 continue
             }
-            guard let firstEntry = tonalMap.entry(atBar: section.startBar) else { continue }
+            events += jmjPhraseSection(section: section, frame: frame, tonalMap: tonalMap,
+                                       sparseMode: sparseMode, rng: &rng)
+        }
+        return events
+    }
 
-            let scaleNotes = jmjPhraseScaleNotes(entry: firstEntry, frame: frame)
-            guard scaleNotes.count >= 4 else { continue }
+    /// One A or B section of KOS-LD1-006 JMJ phrase loop: a phrase built for the section, played
+    /// 8 bars on and 8 bars off with two one-note variations. The JMJ rule calls it for every
+    /// section; a sparse A rule (KOS-LD1-002, KOS-LD1-003) calls it for its B sections.
+    private static func jmjPhraseSection(
+        section: SongSection, frame: GlobalMusicalFrame,
+        tonalMap: TonalGovernanceMap, sparseMode: Bool,
+        rng: inout SeededRNG
+    ) -> [MIDIEvent] {
+        var events: [MIDIEvent] = []
+        guard let firstEntry = tonalMap.entry(atBar: section.startBar) else { return [] }
 
-            // Build the phrase once per section: 4–6 notes with quarter/8th-note durations.
-            // Arch shape: rises to peak at ~65% through the phrase (slightly later than bridge's 60%),
-            // giving a sense of reach before settling. Final note snapped to a chord tone.
-            let phraseLen  = 4 + rng.nextInt(upperBound: 3)
-            var phraseNotes: [Int] = []
-            var phraseDurs:  [Int] = []
-            var stepAccum = 0
-            let archPeak   = max(1, phraseLen * 2 / 3)
-            let archAscend = rng.nextDouble() < 0.55
-            let snLow  = max(0, scaleNotes.count / 5)
-            let snHigh = min(scaleNotes.count - 1, scaleNotes.count * 4 / 5)
-            let snSpan = max(1, snHigh - snLow)
-            let chordTonePCs = Set(firstEntry.chordWindow.chordTones.map { $0 % 12 })
-            for i in 0..<phraseLen {
-                guard stepAccum < 16 else { break }
-                let archFrac: Double = i < archPeak
-                    ? Double(i) / Double(archPeak)
-                    : Double(phraseLen - i) / Double(max(1, phraseLen - archPeak))
-                let base = archAscend
-                    ? snLow  + Int(Double(snSpan) * archFrac)
-                    : snHigh - Int(Double(snSpan) * archFrac)
-                let jitter = rng.nextInt(upperBound: 3) - 1  // ±1 step for natural variation
-                let noteIdx = max(0, min(scaleNotes.count - 1, base + jitter))
-                phraseNotes.append(scaleNotes[noteIdx])
-                let dur = 4 + rng.nextInt(upperBound: 5)  // 4–8 steps (1–2 beats)
-                phraseDurs.append(dur)
-                stepAccum += dur
-            }
-            guard !phraseNotes.isEmpty else { continue }
-            // Stable landing: snap last phrase note to nearest chord tone in the scale
-            let chordScaleNotes = scaleNotes.filter { chordTonePCs.contains($0 % 12) }
-            if !chordScaleNotes.isEmpty {
-                let lastNote = phraseNotes[phraseNotes.count - 1]
-                let nearest = chordScaleNotes.min(by: { abs($0 - lastNote) < abs($1 - lastNote) }) ?? chordScaleNotes[0]
-                phraseNotes[phraseNotes.count - 1] = nearest
-            }
+        let scaleNotes = jmjPhraseScaleNotes(entry: firstEntry, frame: frame)
+        guard scaleNotes.count >= 4 else { return [] }
 
-            // Which note index shifts and in which direction for each variation
-            let var1Idx   = rng.nextInt(upperBound: phraseNotes.count)
-            let var2Idx   = (var1Idx + 1 + rng.nextInt(upperBound: max(1, phraseNotes.count - 1))) % phraseNotes.count
-            let shift1    = rng.nextDouble() < 0.5 ? 1 : -1
-            let shift2    = rng.nextDouble() < 0.5 ? 1 : -1
+        // Build the phrase once per section: 4–6 notes with quarter/8th-note durations.
+        // Arch shape: rises to peak at ~65% through the phrase (slightly later than bridge's 60%),
+        // giving a sense of reach before settling. Final note snapped to a chord tone.
+        let phraseLen  = 4 + rng.nextInt(upperBound: 3)
+        var phraseNotes: [Int] = []
+        var phraseDurs:  [Int] = []
+        var stepAccum = 0
+        let archPeak   = max(1, phraseLen * 2 / 3)
+        let archAscend = rng.nextDouble() < 0.55
+        let snLow  = max(0, scaleNotes.count / 5)
+        let snHigh = min(scaleNotes.count - 1, scaleNotes.count * 4 / 5)
+        let snSpan = max(1, snHigh - snLow)
+        let chordTonePCs = Set(firstEntry.chordWindow.chordTones.map { $0 % 12 })
+        for i in 0..<phraseLen {
+            guard stepAccum < 16 else { break }
+            let archFrac: Double = i < archPeak
+                ? Double(i) / Double(archPeak)
+                : Double(phraseLen - i) / Double(max(1, phraseLen - archPeak))
+            let base = archAscend
+                ? snLow  + Int(Double(snSpan) * archFrac)
+                : snHigh - Int(Double(snSpan) * archFrac)
+            let jitter = rng.nextInt(upperBound: 3) - 1  // ±1 step for natural variation
+            let noteIdx = max(0, min(scaleNotes.count - 1, base + jitter))
+            phraseNotes.append(scaleNotes[noteIdx])
+            let dur = 4 + rng.nextInt(upperBound: 5)  // 4–8 steps (1–2 beats)
+            phraseDurs.append(dur)
+            stepAccum += dur
+        }
+        guard !phraseNotes.isEmpty else { return [] }
+        // Stable landing: snap last phrase note to nearest chord tone in the scale
+        let chordScaleNotes = scaleNotes.filter { chordTonePCs.contains($0 % 12) }
+        if !chordScaleNotes.isEmpty {
+            let lastNote = phraseNotes[phraseNotes.count - 1]
+            let nearest = chordScaleNotes.min(by: { abs($0 - lastNote) < abs($1 - lastNote) }) ?? chordScaleNotes[0]
+            phraseNotes[phraseNotes.count - 1] = nearest
+        }
 
-            // Precompute the shifted notes once — inputs are constant across all bars in this section.
-            // Avoids O(scaleNotes) firstIndex scans on every bar tick.
-            let shiftedNote1: Int = {
-                let idx = scaleNotes.firstIndex(of: phraseNotes[var1Idx]) ?? (scaleNotes.count / 2)
-                return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift1))]
-            }()
-            let shiftedNote2: Int = {
-                let idx = scaleNotes.firstIndex(of: phraseNotes[var2Idx]) ?? (scaleNotes.count / 2)
-                return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift2))]
-            }()
+        // Which note index shifts and in which direction for each variation
+        let var1Idx   = rng.nextInt(upperBound: phraseNotes.count)
+        let var2Idx   = (var1Idx + 1 + rng.nextInt(upperBound: max(1, phraseNotes.count - 1))) % phraseNotes.count
+        let shift1    = rng.nextDouble() < 0.5 ? 1 : -1
+        let shift2    = rng.nextDouble() < 0.5 ? 1 : -1
 
-            // 8-bar-on / 8-bar-rest breathing cycle — prevents relentless unbroken output.
-            // Per-section RNG offset (0–3) staggers the rest window so it doesn't always
-            // align with the section boundary.
-            let restOffset = sparseMode ? 0 : rng.nextInt(upperBound: 4)
+        // Precompute the shifted notes once — inputs are constant across all bars in this section.
+        // Avoids O(scaleNotes) firstIndex scans on every bar tick.
+        let shiftedNote1: Int = {
+            let idx = scaleNotes.firstIndex(of: phraseNotes[var1Idx]) ?? (scaleNotes.count / 2)
+            return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift1))]
+        }()
+        let shiftedNote2: Int = {
+            let idx = scaleNotes.firstIndex(of: phraseNotes[var2Idx]) ?? (scaleNotes.count / 2)
+            return scaleNotes[max(0, min(scaleNotes.count - 1, idx + shift2))]
+        }()
 
-            for bar in section.startBar..<section.endBar {
-                let posInSection = bar - section.startBar
-                // Sparse mode (Lead 2 doubling JMJ): skip first bar of section; 40% gate elsewhere
-                if sparseMode && posInSection == 0 { continue }
-                if sparseMode && rng.nextDouble() > 0.40 { continue }
-                // Normal mode: 8 bars active, 8 bars silence in each 16-bar window
-                if !sparseMode && (posInSection + restOffset) % 16 >= 8 { continue }
+        // 8-bar-on / 8-bar-rest breathing cycle — prevents relentless unbroken output.
+        // Per-section RNG offset (0–3) staggers the rest window so it doesn't always
+        // align with the section boundary.
+        let restOffset = sparseMode ? 0 : rng.nextInt(upperBound: 4)
 
-                let posInBlock   = posInSection % 8  // 8-bar phrase block
+        for bar in section.startBar..<section.endBar {
+            let posInSection = bar - section.startBar
+            // Sparse mode (Lead 2 doubling JMJ): skip first bar of section; 40% gate elsewhere
+            if sparseMode && posInSection == 0 { continue }
+            if sparseMode && rng.nextDouble() > 0.40 { continue }
+            // Normal mode: 8 bars active, 8 bars silence in each 16-bar window
+            if !sparseMode && (posInSection + restOffset) % 16 >= 8 { continue }
 
-                // Bars 0–3: base phrase. Bars 4–5: shift note 1. Bars 6–7: shift note 2.
-                var activeNotes = phraseNotes
-                if posInBlock >= 4 { activeNotes[var1Idx] = shiftedNote1 }
-                if posInBlock >= 6 { activeNotes[var2Idx] = shiftedNote2 }
+            let posInBlock   = posInSection % 8  // 8-bar phrase block
 
-                let barStart = bar * 16
-                var stepPos  = 0
-                // Sparse mode: use only the first 1–2 notes per bar (subtle punctuation)
-                let noteLimit = sparseMode ? min(2, activeNotes.count) : activeNotes.count
-                for (i, note) in activeNotes.prefix(noteLimit).enumerated() {
-                    guard stepPos < 16 else { break }
-                    let dur = phraseDurs[i]
-                    // Sparse mode: softer velocity (43–57) so Lead 1 stays prominent
-                    let vel = UInt8(sparseMode ? 43 + rng.nextInt(upperBound: 15)
-                                               : 58 + rng.nextInt(upperBound: 15))
-                    events.append(MIDIEvent(stepIndex: barStart + stepPos,
-                                            note: UInt8(note), velocity: vel,
-                                            durationSteps: min(dur, 16 - stepPos)))
-                    stepPos += dur
-                }
+            // Bars 0–3: base phrase. Bars 4–5: shift note 1. Bars 6–7: shift note 2.
+            var activeNotes = phraseNotes
+            if posInBlock >= 4 { activeNotes[var1Idx] = shiftedNote1 }
+            if posInBlock >= 6 { activeNotes[var2Idx] = shiftedNote2 }
+
+            let barStart = bar * 16
+            var stepPos  = 0
+            // Sparse mode: use only the first 1–2 notes per bar (subtle punctuation)
+            let noteLimit = sparseMode ? min(2, activeNotes.count) : activeNotes.count
+            for (i, note) in activeNotes.prefix(noteLimit).enumerated() {
+                guard stepPos < 16 else { break }
+                let dur = phraseDurs[i]
+                // Sparse mode: softer velocity (43–57) so Lead 1 stays prominent
+                let vel = UInt8(sparseMode ? 43 + rng.nextInt(upperBound: 15)
+                                           : 58 + rng.nextInt(upperBound: 15))
+                events.append(MIDIEvent(stepIndex: barStart + stepPos,
+                                        note: UInt8(note), velocity: vel,
+                                        durationSteps: min(dur, 16 - stepPos)))
+                stepPos += dur
             }
         }
         return events

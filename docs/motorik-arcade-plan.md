@@ -109,6 +109,8 @@ Keeps the 4-on-floor palette from feeling relentless across a whole song by phas
 **MOT-DRUM-012 "Sparse Fills"** — 15%
 The most stripped-down option — a single quiet window early in the song with no kick at all, and plain timekeeping everywhere else. Built for songs that need a place to breathe.
 
+An Already playing intro and a Fade or Cold stop outro play the rule's own groove: Light Four with its kick on, Sparse Fills with the song's backbeat or sidestick choice (until 2026-11-11 both fell back to a Classic Motorik beat there).
+
 Fills across every Arcade drum rule are always short and only appear at section transitions — there's no periodic body fill or instrument-entrance flourish.
 
 ### Bass
@@ -193,6 +195,8 @@ A quarter-note bounce between the root and the 5th/octave — the sparsest of th
 
 **MOT-LD2-010 "Blip"**
 An ultra-sparse accent pattern — a root stab and a fifth stab per 2-bar block, then silence — that only ever appears when Lead 1 is already busy and the goal is to leave harmonic space rather than add another voice.
+
+When Lead 2 outweighs Lead 1 in an 8-bar window, the density pass keeps about a third or a half of it, as whole two-bar figures spread through the window with rests between them. Until 2026-11-11 it kept the first notes of the window and silenced the back of it.
 
 In a typical Arcade song, roughly three-quarters of Lead 2's picks land on one of the three dedicated arp rules (Arcade Arp, Gate Arp, Bounce Arp); the rest fall back to the shared base pool above. When Lead 1 is on a busy rule, that balance shifts further toward sparseness — there's a real chance of no Lead 2 at all, and what does play favors Blip and Bounce Arp over the denser options.
 

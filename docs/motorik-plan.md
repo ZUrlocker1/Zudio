@@ -680,8 +680,10 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 - MOT-LD1-001 Hallogallo hook, MOT-LD1-002 Radioactive riff, MOT-LD1-003 Tour de France riff and
   MOT-LD1-006 Model riff: transcription hooks, described under Transcription hook leads above.
 - MOT-LD1-004 Stepwise Sequence: descending sequence development (5→4→2→1 bar A, b7→5→4→2 bar B).
-- MOT-LD1-005 Call and answer: bar A ascends 1→2→b3→5; bar B silent then answers 4→b3. From
-  Hallogallo analysis. Kept in every pool.
+- MOT-LD1-005 Call and answer: bar A ascends 1→2→3→5; bar B silent then answers 4→3, with the
+  mode's own third (b3 in the minor modes, 3 in Ionian, Mixolydian, Lydian and major pentatonic;
+  until 2026-11-11 the major modes played the second instead). From Hallogallo analysis. Kept in
+  every pool.
 - MOT-LD1-004 and 005 gates: a quarter of 4-bar cycles and 15% of single bars are silent, drawn
   independently. After 10 bars with neither rule sounding the gate gives way and the next bar
   plays (2026-11-11), so the coin flips can no longer add up to 30 or 40 bars of silence. Rest

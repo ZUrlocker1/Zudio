@@ -707,8 +707,12 @@ struct LeadGenerator {
             nearestScalePitchClass((rawPC % 12 + 12) % 12, in: scalePCs)
         }
 
+        // The mode's own third. nearestInterval(3) tied 2 and 4 in the major modes and took 2, so
+        // the call played 1-2-2-5 and the answer 4-2.
+        let third = frame.mode.isMajorFlavored ? 4 : 3
+
         if bar % 2 == 0 {
-            let offsets = [0, 2, frame.mode.nearestInterval(3), 7]
+            let offsets = [0, 2, third, 7]
             let durs    = [4, 3, 3, 5]
             let velBump = [0, -6, -3, +2]
             for (i, step) in [0, 4, 8, 12].enumerated() {
@@ -726,7 +730,7 @@ struct LeadGenerator {
                 events.append(MIDIEvent(stepIndex: barStart + 6, note: note, velocity: 65, durationSteps: 2))
                 localPrev = note
             }
-            let answerOffsets = [5, frame.mode.nearestInterval(3)]
+            let answerOffsets = [5, third]
             let answerDurs    = [4, 5]
             for (i, step) in [8, 12].enumerated() {
                 let pc   = snap((rootPC + answerOffsets[i]) % 12)

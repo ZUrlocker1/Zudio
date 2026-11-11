@@ -224,7 +224,8 @@ struct BassGenerator {
             } else if let outroSec = structure.outroSection, outroSec.contains(bar: bar) {
                 barEvents = outroBar(bar: bar, outroSection: outroSec, ruleID: ruleID,
                                      barStart: barStart, entry: entry, frame: frame, rng: &rng,
-                                     mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle)
+                                     mccartney4BarDrive: mccartney4BarDrive, style: structure.outroStyle,
+                                     noirVariation: noirVariation)
             } else {
                 let useVariation = variationBars.contains(bar)
 
@@ -456,8 +457,11 @@ struct BassGenerator {
         switch style {
         case .alreadyPlaying:
             // Play the actual bass pattern at full velocity — PlaybackEngine fades the master.
+            // noirVariation keeps Noir MOT-BASS-007 Hook ascent in its body register (48-72); without
+            // it the intro and outro played an octave below the body.
             return bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
+                           noirVariation: noirVariation)
 
         case .progressiveEntry:
             return simplifiedIntroBar(ruleID: ruleID, barStart: barStart, entry: entry, frame: frame)
@@ -679,7 +683,8 @@ struct BassGenerator {
     private static func outroBar(
         bar: Int, outroSection: SongSection, ruleID: String,
         barStart: Int, entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: OutroStyle
+        rng: inout SeededRNG, mccartney4BarDrive: [Bool], style: OutroStyle,
+        noirVariation: Bool = false
     ) -> [MIDIEvent] {
         let offsetBar = bar - outroSection.startBar
         let totalBars = outroSection.lengthBars
@@ -688,7 +693,8 @@ struct BassGenerator {
         case .fade:
             // Actual bass pattern at full velocity — PlaybackEngine fades the master out.
             return bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
+                           noirVariation: noirVariation)
 
         case .dissolve:
             // Bass plays a simplified anchor in the first half, then drops out — pads hold alone.
@@ -701,7 +707,8 @@ struct BassGenerator {
             // Bass plays body pattern until the final bar; cuts one bar before the drum fill.
             if offsetBar >= totalBars - 1 { return [] }
             return bodyBar(ruleID: ruleID, barStart: barStart, bar: bar, entry: entry,
-                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive)
+                           frame: frame, rng: &rng, mccartney4BarDrive: mccartney4BarDrive,
+                           noirVariation: noirVariation)
         }
     }
 

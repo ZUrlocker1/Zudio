@@ -156,10 +156,12 @@ struct DrumGenerator {
 
             if let intro = structure.introSection, intro.contains(bar: bar) {
                 events += introPattern(bar: bar, introSection: intro, ruleID: ruleID,
-                                       style: structure.introStyle, barStart: barStart, rng: &rng)
+                                       style: structure.introStyle, barStart: barStart,
+                                       sparseFillsBackbeat: s012UseBackbeat, rng: &rng)
             } else if let outro = structure.outroSection, outro.contains(bar: bar) {
                 events += outroPattern(bar: bar, outroSection: outro, ruleID: ruleID,
-                                       style: structure.outroStyle, barStart: barStart, rng: &rng)
+                                       style: structure.outroStyle, barStart: barStart,
+                                       sparseFillsBackbeat: s012UseBackbeat, rng: &rng)
             } else {
                 let intensity = section.subPhaseIntensity(atBar: bar)
                 if isFirstBarOfBodySection {
@@ -212,8 +214,12 @@ struct DrumGenerator {
 
     // MARK: - Pattern routing
 
+    /// One body-style bar of the rule, used by the intro and outro styles that play the groove.
+    /// The main loop plays MOT-DRUM-006, 011 and 012 itself because they keep phase state; here
+    /// MOT-DRUM-011 plays with its kick on and MOT-DRUM-012 with the song's timekeeping choice.
     private static func bodyBar(
-        bar: Int, ruleID: String, intensity: SectionIntensity, barStart: Int, rng: inout SeededRNG
+        bar: Int, ruleID: String, intensity: SectionIntensity, barStart: Int,
+        sparseFillsBackbeat: Bool = true, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         switch ruleID {
         case "MOT-DRUM-002": return openPocketBar(intensity: intensity, barStart: barStart)
@@ -225,6 +231,9 @@ struct DrumGenerator {
         case "MOT-DRUM-008": return tribalBar(bar: bar, intensity: intensity, barStart: barStart)
         case "MOT-DRUM-009": return fourOnFloorBar(bar: bar, intensity: intensity, barStart: barStart)
         case "MOT-DRUM-010": return machineStepBar(bar: bar, intensity: intensity, barStart: barStart)
+        case "MOT-DRUM-011": return lightFourBar(bar: bar, intensity: intensity, barStart: barStart, kickEnabled: true)
+        case "MOT-DRUM-012": return sparseFillsBackbeat ? sparseFillsBackbeatBar(barStart: barStart)
+                                                        : sparseFillsRimshotBar(barStart: barStart)
         default:             return classicMotorikBar(bar: bar, intensity: intensity, barStart: barStart)
         }
     }
@@ -695,7 +704,7 @@ struct DrumGenerator {
 
     private static func introPattern(
         bar: Int, introSection: SongSection, ruleID: String,
-        style: IntroStyle, barStart: Int, rng: inout SeededRNG
+        style: IntroStyle, barStart: Int, sparseFillsBackbeat: Bool, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let offsetBar  = bar - introSection.startBar
         let isLastBar  = bar == introSection.endBar - 1
@@ -713,7 +722,8 @@ struct DrumGenerator {
 
         case .alreadyPlaying:
             // Full groove from bar 0 — PlaybackEngine fades the master in over the intro duration.
-            return withPickup(bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng))
+            return withPickup(bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart,
+                                     sparseFillsBackbeat: sparseFillsBackbeat, rng: &rng))
 
         case .progressiveEntry:
             // Full Motorik sparse groove from bar 0 (kick+snare+hat all present).
@@ -799,7 +809,7 @@ struct DrumGenerator {
 
     private static func outroPattern(
         bar: Int, outroSection: SongSection, ruleID: String,
-        style: OutroStyle, barStart: Int, rng: inout SeededRNG
+        style: OutroStyle, barStart: Int, sparseFillsBackbeat: Bool, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let offsetBar     = bar - outroSection.startBar
         let totalOutroBars = outroSection.lengthBars
@@ -809,7 +819,8 @@ struct DrumGenerator {
 
         case .fade:
             // Full groove at body velocity — PlaybackEngine fades the master out.
-            return bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart, rng: &rng)
+            return bodyBar(bar: bar, ruleID: ruleID, intensity: .low, barStart: barStart,
+                                     sparseFillsBackbeat: sparseFillsBackbeat, rng: &rng)
 
         case .dissolve:
             // Drums strip back progressively; pads hold to the final bar.
@@ -834,7 +845,8 @@ struct DrumGenerator {
             if isLastBar {
                 return coldStopFill(barStart: barStart)
             }
-            return bodyBar(bar: bar, ruleID: ruleID, intensity: .medium, barStart: barStart, rng: &rng)
+            return bodyBar(bar: bar, ruleID: ruleID, intensity: .medium, barStart: barStart,
+                           sparseFillsBackbeat: sparseFillsBackbeat, rng: &rng)
         }
     }
 

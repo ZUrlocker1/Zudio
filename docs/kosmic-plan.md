@@ -1093,6 +1093,12 @@ described in `kosmic-drift-plan.md` and `kosmic-space-plan.md`.
 One Lead 1 rule is selected for A sections. When it is not a hook, Technique D (60% chance) picks
 a different per-bar rule for B sections, creating the "instrument arriving" effect heard in Dark
 Sun and Mister Mosca. A hook rule owns both the A and the B sections and makes no Technique D draw.
+When the A rule is KOS-LD1-002 or KOS-LD1-003, B always escalates: to KOS-LD1-006 JMJ evolving
+phrase 60% of the time (KOS-LD1-004 otherwise, and always in Drift). An escalated JMJ B section is
+built a section at a time, exactly as one section of a JMJ song (`jmjPhraseSection`); until
+2026-11-11 it was logged but played KOS-LD1-002. The section-level rules KOS-LD1-006, 008 and 009
+play every section themselves, so their Technique D draw is kept for seed stability but its rule is
+not logged.
 
 In melody bridges (Archetype B): bridge lead picks a rule not used in A or B; plays upper register
 (MIDI 72–84); generated phrase repeats once to fill the bridge duration. A bridge melody is a

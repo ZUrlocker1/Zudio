@@ -61,7 +61,7 @@ Three Joy Division songs were analyzed (Disorder, Shadowplay, She's Lost Control
 
 **She's Lost Control has zero hi-hat.** The entire groove is built from snare and kick only — no hat of any kind. Kick pattern: steps 2, 4, 12, 14 (syncopated, never on the downbeat). Snare: beats 1+3. Every 4–8 bars the drums switch to a mechanical descending tom cascade: hi-mid tom triplet → low-mid tom triplet → floor tom roll, launched by kick+snare on step 0. The cascade is not a "fill" in the rock sense — it is metronomic, mechanical, and utterly cold. Became DRM-008 "Tribal."
 
-**Peter Hook's bass is the actual lead voice.** On Disorder and She's Lost Control the bass is high-register, melodic, and moving constantly. The guitar provides rhythm/texture. This is the mirror image of standard rock arrangement. In Zudio terms: MOT-BASS-007 Hook Ascent (originally the melodic lead bass rule) was restored to its full high-register range (MIDI 48–72) in Noir context specifically for this reason.
+**Peter Hook's bass is the actual lead voice.** On Disorder and She's Lost Control the bass is high-register, melodic, and moving constantly. The guitar provides rhythm/texture. This is the mirror image of standard rock arrangement. In Zudio terms: MOT-BASS-007 Hook Ascent (originally the melodic lead bass rule) was restored to its full high-register range (MIDI 48–72) in Noir context specifically for this reason. The intro and outro styles that play the body pattern use the same register (until 2026-11-11 they dropped an octave).
 
 **Repetition is the compositional logic.** All three songs are close to through-composed at the pattern level — the groove machine does not vary structurally between sections. Fills are rare and quiet. This reinforced the existing Noir decision to suppress body fills and instrument-entrance cues.
 
@@ -251,7 +251,7 @@ Root hits on all four beats (steps 0, 4, 8, 10, 12), lower pitch (P4 below 40%, 
 Single root pitch on every 8th-note position, 50–82% density (intensity-scaled), accent (+8 velocity) on beats 1 and 3. No dyad — the mechanical one-pitch throb of Joy Division bass lines. 30% of 4-bar groups go completely silent. Pitch: 80% root, 15% P5 below, 5% flat-7, chosen once per bar. Log: "Single-Note Pulse". Noir rhythm weight: 14%. Noir only.
 
 **MOT-RTHM-011 "Three-One Stab"**
-Three quick root+fifth dyad hits at s0, s2, s4 (d2 each), then a shifted chord tone (flat-7 60%, third 40%) at s6 (d4), then root return at s10 (d5). The 3+1+1 rhythmic grouping creates a front-heavy, angular feel. Density gate on each hit. Reference: Keith Levene's Religion guitar (PiL): the 3+1+1 grouping in bars 6/8/10. Log: "Three-One Stab". Noir rhythm weight: 14%. Noir only.
+Three quick root+fifth dyad hits at s0, s2, s4 (d2 each), then a shifted chord tone (flat-7 60%, third 40%) at s6 (d4), then root return at s10 (d5). The 3+1+1 rhythmic grouping creates a front-heavy, angular feel. Density gate on each hit. Reference: Keith Levene's Religion guitar (PiL): the 3+1+1 grouping in bars 6/8/10. Log: "Three-One Stab". Noir rhythm weight: 12%. Noir only.
 
 **MOT-RTHM-012 "Void Stab"**
 Root+fifth (or root+P4) sustained d8 on beat 1, optional beat-3 re-hit (50% chance), optional pickup note at s14 (40% chance). Maximum 3 notes per bar — creates an ambient chord wash rather than a rhythmic pattern. From PiL Albatross T3 guitar: full-bar sustains with sparse melodic fragments. Log: "Void Stab". Noir rhythm weight: 12%. Noir only.
@@ -271,7 +271,7 @@ Staccato single notes on "and" positions only (steps 2, 6, 10, 14), 45% hit prob
 - MOT-RTHM-008 Sparse Stab: 14%
 - MOT-RTHM-009 Interleave: 12%
 - MOT-RTHM-010 Single-Note Pulse: 14%
-- MOT-RTHM-011 Three-One Stab: 14%
+- MOT-RTHM-011 Three-One Stab: 12% (14% until 2026-11-11, when the pool summed to 102% and MOT-RTHM-013 got only 10%)
 - MOT-RTHM-012 Void Stab: 12%
 - MOT-RTHM-013 Levene Drop: 12%
 

@@ -85,11 +85,13 @@ struct RhythmGenerator {
             // Pick pattern type once per section (or use forced value for all sections)
             // Arcade: Arpeggio (idx 5) dominant; Chord Chug (idx 6) from Noir also valid; dense melodic patterns suppressed.
             // Noir: Chord Chug (idx 6) dominates; dense/melodic patterns suppressed.
+            // The Noir row summed to 1.02 and weightedPick doesn't normalise, so MOT-RTHM-013 got 10%;
+            // MOT-RTHM-011 is now 12% (was 14%) and the row sums to 1.
             let patternWeights: [Double] = arcadeVariation
                 // idx:  0     1     2     3     4     5     6     7     8     9     10    11    12
                 ?       [0.20, 0.12, 0.00, 0.00, 0.10, 0.40, 0.18, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
                 : noirVariation
-                ?       [0.04, 0.10, 0.00, 0.00, 0.00, 0.00, 0.10, 0.14, 0.12, 0.14, 0.14, 0.12, 0.12]
+                ?       [0.04, 0.10, 0.00, 0.00, 0.00, 0.00, 0.10, 0.14, 0.12, 0.14, 0.12, 0.12, 0.12]
                 :       [0.30, 0.17, 0.17, 0.13, 0.08, 0.15, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00]
             let patternType = forcedPatternType ?? rng.weightedPick(patternWeights)
             usedRuleIDs.insert(ruleIDs[min(patternType, ruleIDs.count - 1)])

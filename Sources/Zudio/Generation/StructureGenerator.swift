@@ -150,7 +150,9 @@ struct StructureGenerator {
             chordRootDegree: firstBodyChord.chordRoot,
             chordType: firstBodyChord.chordType,
             key: frame.key,
-            mode: introSection.mode
+            // The song's mode, as in buildChordWindows. section.mode is always Dorian in Motorik,
+            // so the intro's tensions and avoid tones were Dorian whatever the key's mode.
+            mode: frame.mode
         )
         return plan.map { window in
             guard window.startBar >= introSection.startBar,
@@ -200,7 +202,9 @@ struct StructureGenerator {
             // so chord roots and scale tension pools are diatonic to the song's real key.
             let rawRoot = pickChordRoot(mode: frame.mode, rng: &rng)
             let root = (section.label == .intro || section.label == .outro) ? "1" : rawRoot
-            let type = pickChordType(mode: frame.mode, rootDegree: rawRoot, rng: &rng)
+            // The type is drawn for the root actually used: drawn for rawRoot, an outro forced to "1"
+            // could take ii's minor and play a tonic minor in a major key. One weightedPick either way.
+            let type = pickChordType(mode: frame.mode, rootDegree: root, rng: &rng)
             let (tones, tensions, avoids) = NotePoolBuilder.build(
                 chordRootDegree: root,
                 chordType: type,
