@@ -11,7 +11,7 @@
 // MOT-LD2-001 Echo answer       — Lead 1's last 2 to 4 notes, same rhythm, a third, sixth or octave lower
 // MOT-LD2-003 Hook fragment     — the first 2 to 5 notes of Lead 1's last phrase, inverted or a step down
 // MOT-LD2-004 Answer cell       — a cell paired with Lead 1's rule, restated in every answer
-// MOT-LD2-006 Statement harmony — one Lead 1 statement in three a third below, echo answers elsewhere
+// MOT-LD2-006 Statement harmony — every second Lead 1 statement a third below, echo answers elsewhere
 // MOT-LD2-002 Low bed           — root or fifth held under Lead 1's long notes, and alone in a long gap
 //
 // Every note sits on the 8th-note grid and held notes start on beats, so Lead 2 locks to the same
@@ -432,13 +432,13 @@ enum GapAnswerEngine {
         }
 
         // MOT-LD2-006: which statements are harmonised. A statement is a body phrase of three
-        // notes or more; one in three, from an offset drawn per song.
+        // notes or more; every second one, starting from the first or the second as drawn per song.
         var harmonised: Set<Int> = []
         if ruleID == statementHarmony {
             var k = 0
             for (i, ph) in phrases.enumerated() where ph.notes.count >= 3 && isBody(ph.start / 16)
                 && !(ph.start / 16...(ph.end - 1) / 16).contains(where: blockedBars.contains) {
-                if k % 3 == harmonyOffset { harmonised.insert(i) }
+                if k % 2 == harmonyOffset % 2 { harmonised.insert(i) }
                 k += 1
             }
         }

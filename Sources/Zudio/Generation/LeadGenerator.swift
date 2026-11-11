@@ -501,6 +501,12 @@ struct LeadGenerator {
             ? [0.45,          0.35,          0.20]
             : [0.225,         0.15,          0.225,         0.25,          0.15]
         var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
+        // MOT-LD2-006 Statement harmony follows Lead 1 statements, and a Lead 1 solo blocks Lead 2
+        // for the whole solo, so in a song with a solo it would have nothing to harmonise. It is
+        // redrawn from the other four rules, in the same proportions.
+        if ruleID == "MOT-LD2-006" && !arcadeVariation && (soloRange != nil || !shortSoloRanges.isEmpty) {
+            ruleID = ld2Rules[rng.weightedPick([0.2647, 0.1765, 0.2647, 0.2941])]
+        }
         if arcadeVariation {
             let arcadeRoll = rng.nextDouble()
             if arcadeDenseMelody {
@@ -2339,7 +2345,16 @@ struct LeadGenerator {
     /// bars from the full solo and from each other where the song has room, otherwise 8. The
     /// further a window is from the others the likelier it is. They stay out of the breakdown
     /// windows, the intro and the last four body bars, and play a little softer than the full
-    /// solo. Draws come after everything else in Lead 1, so the rest of the song is unchanged.
+    /// solo. Draws for those come after everything else in Lead 1, so the rest of the song is
+    /// unchanged.
+    ///
+    /// Then any stretch of the body longer than `maxSilentBars` between one window and the next,
+    /// or after the last one, gets a further short version near its middle, up to three more, so
+    /// Lead 1 never leaves the song empty for long. Each is a different cut or ordering from the
+    /// one before it and, where the table allows, a different length from its neighbour, so it
+    /// reads as the solo coming back changed and not as a copy.
+    private static let maxSilentBars = 24
+
     private static func shortSoloReprises(
         rule: String, main: Range<Int>, structure: SongStructure, frame: GlobalMusicalFrame,
         avoidBars: Set<Int>, rng: inout SeededRNG
@@ -2351,22 +2366,9 @@ struct LeadGenerator {
         var ranges: [Range<Int>] = []
         var events: [MIDIEvent] = []
         var lastChoice = -1
-        for _ in 0..<wanted {
-            let length = [4, 5, 6][rng.weightedPick([0.30, 0.40, 0.30])]
-            let all = [main] + ranges
-            func gap(_ start: Int) -> Int {
-                all.map { max(start - $0.upperBound, $0.lowerBound - (start + length)) }.min() ?? 0
-            }
-            let starts = stride(from: bodyStart, through: bodyEnd - 4 - length, by: 2).filter { s in
-                (s..<(s + length)).allSatisfy { bodyBars.contains($0) && !avoidBars.contains($0) }
-                    && gap(s) >= 8
-            }
-            let spaced = starts.filter { gap($0) >= 12 }
-            let pool = spaced.isEmpty ? starts : spaced
-            guard !pool.isEmpty else { break }
-            let total = Double(pool.map(gap).reduce(0, +))
-            let start = pool[rng.weightedPick(pool.map { Double(gap($0)) / total })]
-            guard let options = table[length] else { break }
+
+        func place(start: Int, length: Int) {
+            guard let options = table[length] else { return }
             var choice = rng.nextInt(upperBound: options.count)
             if choice == lastChoice { choice = (choice + 1) % options.count }
             lastChoice = choice
@@ -2382,7 +2384,54 @@ struct LeadGenerator {
             }
             ranges.append(start..<(start + length))
         }
-        return (events, ranges)
+
+        for _ in 0..<wanted {
+            let length = [4, 5, 6][rng.weightedPick([0.30, 0.40, 0.30])]
+            let all = [main] + ranges
+            func gap(_ start: Int) -> Int {
+                all.map { max(start - $0.upperBound, $0.lowerBound - (start + length)) }.min() ?? 0
+            }
+            let starts = stride(from: bodyStart, through: bodyEnd - 4 - length, by: 2).filter { s in
+                (s..<(s + length)).allSatisfy { bodyBars.contains($0) && !avoidBars.contains($0) }
+                    && gap(s) >= 8
+            }
+            let spaced = starts.filter { gap($0) >= 12 }
+            let pool = spaced.isEmpty ? starts : spaced
+            guard !pool.isEmpty else { break }
+            let total = Double(pool.map(gap).reduce(0, +))
+            let start = pool[rng.weightedPick(pool.map { Double(gap($0)) / total })]
+            guard table[length] != nil else { break }
+            place(start: start, length: length)
+        }
+
+        // Fill the long silences: the widest stretch after the full solo, between two windows or
+        // after the last, that is longer than the cap gets a window near its middle.
+        for _ in 0..<3 {
+            let windows = ([main] + ranges).sorted { $0.lowerBound < $1.lowerBound }
+            var widest: (from: Int, to: Int)? = nil
+            for (i, w) in windows.enumerated() where w.upperBound >= main.upperBound {
+                let to = i + 1 < windows.count ? windows[i + 1].lowerBound : bodyEnd
+                if to - w.upperBound > maxSilentBars,
+                   to - w.upperBound > (widest.map { $0.to - $0.from } ?? 0) {
+                    widest = (w.upperBound, to)
+                }
+            }
+            guard let span = widest else { break }
+            let neighbour = windows.first { $0.upperBound == span.from }.map { $0.count }
+            var lengths = [4, 5, 6]
+            if let n = neighbour, lengths.count > 1 { lengths.removeAll { $0 == n } }
+            let length = lengths[rng.nextInt(upperBound: lengths.count)]
+            let mid = Double(span.from + span.to) / 2
+            let starts = stride(from: bodyStart, through: bodyEnd - 4 - length, by: 2).filter { s in
+                s >= span.from + 8 && s + length <= span.to - (span.to == bodyEnd ? 4 : 8)
+                    && (s..<(s + length)).allSatisfy { bodyBars.contains($0) && !avoidBars.contains($0) }
+            }
+            guard let start = starts.min(by: {
+                abs(Double($0) + Double(length) / 2 - mid) < abs(Double($1) + Double(length) / 2 - mid)
+            }) else { break }
+            place(start: start, length: length)
+        }
+        return (events, ranges.sorted { $0.lowerBound < $1.lowerBound })
     }
 
     // MARK: - Solo note builder (shared by LD1-007 and LD1-008)
