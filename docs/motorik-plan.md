@@ -378,6 +378,11 @@ the groove, so the drop reads as a section change and Lead 1's return is the str
   between windows
 - Drawn on its own seeded stream (`SongGenerator.breakdownWindows`), applied before the drum
   pass so the fills see it
+- No breakdowns in Evolve (2026-11-11, Zack): the leads keep playing and evolve. Regenerated
+  tracks take no breakdown, and the Rhythm pass 1 copies from the song has its breakdown bars
+  filled from a regen on its own seed (`AppState.buildPassState`), the same riff without the cut.
+  In pass 2 the leads are the song's own, so a breakdown overlapping pass 2 leaves only a lead
+  rest under a playing Rhythm
 - The Form log line reads, for example, `Subtle A/B + breakdown`; the playback log shows
   `Breakdown  Leads, Rhythm drop - 6 bars` and `Breakdown  Leads, Rhythm return`
 - Measured: 58% of base songs take one, 1.9 windows on average, 5.7 bars mean length
@@ -617,7 +622,8 @@ How a hook plays:
   harmonic filter (hook and MOT-LD1-012 flags as generation sets them), the MOT-LD1-012 phrase
   cleanup, the pads gate, the velocity arc on Pads, Rhythm and Texture, the breakdown cut, the
   sync dropout and repeat guard. Lead 1 is written around the breakdown windows; Lead 2 takes the
-  song's solo windows. Only the arrangement filter's spotlight is not re-run. Noir Lead 2 regen
+  song's solo windows. An Evolve pass (`passBodyBars` set) takes no breakdown windows at all, so
+  its leads play through. Only the arrangement filter's spotlight is not re-run. Noir Lead 2 regen
   leaves Lead 2 empty. See `SongGenerator.regenerateTrack`.
 - **Log and testing star.** Log names are in `lead1RuleDescription`. While the rules are tuned,
   the generation log prints a star before each new rule, set in

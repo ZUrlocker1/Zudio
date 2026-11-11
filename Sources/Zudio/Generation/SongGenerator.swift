@@ -1589,9 +1589,14 @@ struct SongGenerator {
         let motBase    = isMotorik && !motNoir && !motArcade && !motSync.isActive
         let motSyncWindows = motSync.isActive
             ? syncDropoutWindows(sync: motSync, totalBars: songState.frame.totalBars, seed: songState.globalSeed) : []
+        // An Evolve pass (passBodyBars set) takes no breakdown: its leads are there to evolve, and
+        // pass 1 nearly always spans the song's first breakdown, so the cut silenced the new leads
+        // for 4 to 8 bars (Zack, 2026-11-11). The hook layout and the Lead 2 gap answers then see
+        // no breakdown either.
         func motBreakdowns(_ solo: SoloWindows) -> [Range<Int>] {
-            motBase ? breakdownWindows(totalBars: songState.frame.totalBars, seed: songState.globalSeed,
-                                       avoiding: solo.main) : []
+            motBase && passBodyBars == nil
+                ? breakdownWindows(totalBars: songState.frame.totalBars, seed: songState.globalSeed,
+                                   avoiding: solo.main) : []
         }
         // The fill seams generation passes the drum pass: either side of the sync and the breakdowns.
         let motSeams = (motSyncWindows + motBreakdowns(songState.soloWindows))
@@ -2680,6 +2685,15 @@ struct SongGenerator {
     /// one; each is placed near a quarter and two thirds of the way through, snapped to 8 bars,
     /// 4 to 8 bars long, never in the first 16 bars or the last 8, and never over Lead 1's solo.
     /// Drawn on its own stream so no other decision in the song shifts.
+    /// A song's base Motorik breakdown windows, drawn without the solo: the same draws, so a superset
+    /// of the windows generation cut (a skipped window is only ever one over the solo). Empty for any
+    /// other style or substyle. Used by Evolve, which plays no breakdowns.
+    static func motorikBreakdownWindows(_ song: SongState) -> [Range<Int>] {
+        guard song.style == .motorik, !song.motorikNoirVariation, !song.motorikArcadeVariation,
+              !song.motorikSync.isActive else { return [] }
+        return breakdownWindows(totalBars: song.frame.totalBars, seed: song.globalSeed, avoiding: nil)
+    }
+
     static func breakdownWindows(totalBars: Int, seed: UInt64, avoiding solo: Range<Int>?) -> [Range<Int>] {
         var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 76))
         guard rng.nextDouble() < 0.5 else { return [] }

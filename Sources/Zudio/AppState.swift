@@ -3109,6 +3109,22 @@ final class AppState: ObservableObject {
             source = regen
             regenLog.append(contentsOf: newEntries)
         }
+        // No breakdowns in Evolve (Zack, 2026-11-11). Regenerated tracks take none; a Rhythm copied
+        // from the song (pass 1) has its base Motorik breakdown bars filled from a regen on its own
+        // seed, which writes the same riff without the cut, so it plays straight through.
+        let breakdowns = SongGenerator.motorikBreakdownWindows(anchor)
+        if !breakdowns.isEmpty && fullTracks[kTrackRhythm] == anchor.trackEvents[kTrackRhythm] {
+            let inBreakdown = { (step: Int) in breakdowns.contains { $0.contains(step / 16) } }
+            let seed = anchor.trackOverrides[kTrackRhythm]
+                ?? SeededRNG.trackSeed(globalSeed: anchor.globalSeed, trackIndex: kTrackRhythm)
+            let uncut = SongGenerator.regenerateTrack(kTrackRhythm, songState: anchor, overrideSeed: seed,
+                                                      passBodyBars: passBars).trackEvents[kTrackRhythm]
+            let rhythm = (fullTracks[kTrackRhythm].filter { !inBreakdown($0.stepIndex) }
+                          + uncut.filter { inBreakdown($0.stepIndex) })
+                .sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
+            fullTracks[kTrackRhythm] = rhythm
+            events[kTrackRhythm] = passWindow(rhythm)
+        }
         // A song with no intro opens on a cold-start pickup: its first bar is drums alone (Blues:
         // half a bar of silence, then a fill; Soho: a drum bar) and the band enters on the next
         // downbeat. A pass copies the body from its first bar, so every pass replayed that pickup
