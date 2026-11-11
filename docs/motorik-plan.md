@@ -670,18 +670,18 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 - MOT-LD1-005 Call and answer: bar A ascends 1→2→b3→5; bar B silent then answers 4→b3. From
   Hallogallo analysis. Kept in every pool.
 - MOT-LD1-007 Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
-  Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 silenced during solo
-  window. Status log fires "Extended solo — Vanishing solo" at solo start bar.
+  Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 plays under and between the solo
+  (see Lead 2 below). Status log fires "Extended solo — Vanishing solo" at solo start bar.
   One or two shorter versions of 4 to 6 bars come back later in the body (40% two), at least 12
   bars from the full solo and from each other where the song has room, otherwise 8. Each is the
-  full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 stays out of
-  them, and the log fires "Short solo Vanishing solo" at each start bar.
+  full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 plays in
+  them as in the full solo, and the log fires "Short solo Vanishing solo" at each start bar.
   Any stretch of the body longer than 24 bars with no window, between two windows or after the last, gets a further short
   version near its middle, up to three more. Each is a different cut or ordering from the one before it and, where the
   table allows, a different length from its neighbour, so the solo comes back changed and the song is never left empty for long.
 - MOT-LD1-008 Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
   octave arpeggio motif. Inspired by the synth solo in *Visitor from the Past* (bars 21–30). Lead 2
-  silenced during solo window. Status log fires "Extended solo — Visiting solo" at solo start bar.
+  plays under and between the solo (see Lead 2 below). Status log fires "Extended solo — Visiting solo" at solo start bar.
   Shorter versions come back in the same way, logged as "Short solo Visiting solo".
 - Intro and outro of MOT-LD1-007 and MOT-LD1-008 songs: a motif-first line, so the track is not
   silent before the body.
@@ -691,21 +691,30 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 In base Motorik Lead 2 answers Lead 1 in its gaps instead of playing over it. The cell data and
 the engine are in `Sources/Zudio/Generation/GapAnswerEngine.swift`. One rule is drawn per song.
 
-**The five rules:**
+**The five rules, each with its own flavour** (changed 2026-11-10 so the rules are not all the
+same answer in a different place):
 
-- **MOT-LD2-001 Echo answer**, 22.5% in base: Lead 1's last 2 to 4 notes in the same rhythm, a
-  diatonic third, sixth or octave lower. The interval is drawn once per song, 45, 25 and 30%.
+- **MOT-LD2-001 Echo answer**, 22.5% in base: the delay. Lead 1's last 3 to 6 notes in the same
+  rhythm (fewer if the longer echo doesn't fit), a diatonic third, sixth or octave lower, then 70%
+  of the time the same figure again, 14 velocity softer, a bar or two later. The interval is drawn
+  once per song, 45, 25 and 30%.
 - **MOT-LD2-002 Low bed**, 15%: the chord's root or fifth held under each Lead 1 note of a beat or
   more, and in any bar of the phrase without one from its first beat for half a bar, MIDI 50 to
-  60, starting on a beat. The song's target of 4 to 6 phrases get a bed, spread evenly over the
-  body. Consecutive beds on one pitch join into one note up to a bar. Once or twice a song, 50%
-  each, the bed also plays alone in one of the longest Lead 1 silences, four bars or more, held
-  for one or two bars from a bar line and ending half a bar before Lead 1 returns. These solo beds
-  are outside the 4 to 6 count. It plays nothing else in the gaps.
-- **MOT-LD2-003 Hook fragment**, 22.5%: the first 2 to 5 notes of Lead 1's last phrase, inverted or
-  moved one scale step down, drawn per answer: 2 notes 25%, 3 30%, 4 25%, 5 20%. Lead 1's 16ths
-  fold into the 8th grid, so more of its notes are taken until the placed figure has the drawn
-  count.
+  60, starting on a beat. The song's target of 8 to 10 phrases get a bed, spread evenly over the
+  body. Consecutive beds on one pitch join into one note up to a bar. In every Lead 1 silence of
+  four bars or more the bed also plays alone: from a bar after the phrase ends until half a bar
+  before Lead 1 returns, the chord's root or fifth held two bars, again every four bars and at each
+  chord change. It plays nothing else in the gaps. In a song whose Lead 1 is
+  MOT-LD1-007 or MOT-LD1-008 it also sounds inside the solo windows, the extended solo and each
+  short one: the chord's root or fifth from a bar line, held two bars, again every four bars from
+  the window's start and wherever the chord changes, cut short at a chord change or the window's
+  end. Breakdown bars stay silent. Added 2026-11-10 because Lead 2 was otherwise blocked in every
+  solo and played about three notes in a Visiting solo song (Kalt Feld).
+- **MOT-LD2-003 Hook fragment**, 22.5%: the callback. The first 3 to 6 notes of Lead 1's last
+  phrase, inverted or moved one scale step down, drawn per answer: 3 notes 25%, 4 30%, 5 25%, 6
+  20%. Lead 1's 16ths fold into the 8th grid, so more of its notes are taken until the placed
+  figure has the drawn count. 60% of the time it comes round again, 8 velocity softer: a scale
+  step lower when it was stepped down (a sequence), the same figure when it was inverted.
 - **MOT-LD2-004 Answer cell**, 25%: a cell paired with Lead 1's rule, reworked once per song as
   homage. The first and last answers play the full cell; the others take a form drawn per answer:
   the full cell 35%, the head alone with its last note held 30%, the cell inverted around the note
@@ -718,10 +727,13 @@ the engine are in `Sources/Zudio/Generation/GapAnswerEngine.swift`. One rule is 
   - MOT-LD1-006 Model riff: the tail, 2 flat 7 5.
   - MOT-LD1-003 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
   - Every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
-- **MOT-LD2-006 Statement harmony**, 15%: every second Lead 1 statement, a diatonic third below
-  in Lead 1's rhythm, from an offset drawn per song. A statement is a body phrase of three notes
-  or more. It is not drawn in a song with a Lead 1 solo, which blocks Lead 2, and is redrawn from the other four rules in their proportions, so its share is about 12% of base songs. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
-  between. In the other gaps it plays echo answers.
+- **MOT-LD2-006 Statement harmony**, 15%: the horn section. Every second Lead 1 statement, from
+  an offset drawn per song; a statement is a body phrase of three notes or more, in solo windows
+  too. It is not a copy of Lead 1. Each note sits a diatonic third below, a fifth below or in
+  unison an octave down, whichever lands on a chord tone, trying the last interval first so the
+  line stays smooth. 60% of statements are simplified: only the notes on the beats, the long
+  ones, the first and the last, each held to the next. The rest follow Lead 1's 8th-grid rhythm.
+  In the other gaps it plays echo answers.
 
 **Pools:**
 
@@ -743,11 +755,16 @@ the engine are in `Sources/Zudio/Generation/GapAnswerEngine.swift`. One rule is 
   it, drawn per song. Only the harmony and the bed sound with Lead 1.
 - **Answers.** Only in gaps of a bar or more, ending at least two steps before Lead 1 returns, at
   most two bars long, three for the Answer cell's long form.
-- **Count.** Each song states Lead 2 4, 5 or 6 times in the body, drawn 30, 40 and 30%. Over the
-  target, the answer whose neighbours are closest goes, never the first or last. Under it, a Lead 1
-  silence of four bars or more is a handoff: Lead 2 restates its answer there, every four bars,
-  filling the longest silences first. The outro echo is outside the count.
-- **Breakdowns.** Lead 2 stays out of the base Motorik breakdown windows and a Lead 1 solo.
+- **Count.** Each song states Lead 2 4, 5 or 6 times in the body, drawn 30, 40 and 30%. Echo
+  answer and Hook fragment state it 6, 8 or 10 times, plus one for every 8 bars Lead 1 leaves
+  silent in gaps of four bars or more, up to 6, so a song of long silences such as Call and answer
+  is not left empty. Over the target, the answer whose neighbours are closest goes, never the first
+  or last. Under it, a Lead 1 silence of four bars or more is a handoff: Lead 2 restates its
+  answer there, every four bars, filling the longest silences first. Echo answer and Hook fragment
+  rest between restatements: after an answer to a phrase the next restatement is at least 6 bars
+  on and the one after at least 8, so a long silence has gaps of 4 to 8 bars and more in it. The
+  outro echo is outside the count.
+- **Breakdowns.** Lead 2 stays out of the base Motorik breakdown windows. It no longer stays out of a Lead 1 solo (changed 2026-11-10): every gap-answer rule answers inside the solo windows, in the gaps between Lead 1's phrases, and a solo song's answer count grows by one per solo window, up to four, on top of the 4 to 6. Low bed sounds its own beds there, and Statement harmony harmonises the solo's statements.
 - **Intro and outro.** Silent in the intro. In the outro, at most one softer echo of the final
   statement.
 - **Grid.** Every onset is on the 8th grid and held notes start on beats. Notes hold to the next
@@ -763,7 +780,11 @@ the engine are in `Sources/Zudio/Generation/GapAnswerEngine.swift`. One rule is 
 - **Measured** over Motorik seeds 1 to 600, with the weights then in force: no Lead 2 onset inside
   a Lead 1 phrase for MOT-LD2-001, 003 and 004; no off-grid notes; 4 to 6 appearances a song in the
   body for nearly every song; about 15, 13, 25, 31 and 10 notes a song for Echo answer, Hook
-  fragment, Answer cell, Statement harmony and Low bed.
+  fragment, Answer cell, Statement harmony and Low bed. That was too thin (Lead 2 about 3 notes in
+  Kalt Feld, 12 in Nord-Mundt, 11 in D-Tone). After the 2026-11-10 changes, over seeds 1 to 400,
+  medians in hook songs are about 80, 78, 24, 33 and 31, and in solo songs about 96, 101, 36, 52
+  and 30; Echo answer and Hook fragment then had the rest rule below and came down by about a
+  fifth (mean about 63).
 
 ### Scale and hook rules (Lead 1/2)
 

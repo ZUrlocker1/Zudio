@@ -154,7 +154,9 @@ enum GapAnswerEngine {
     /// The whole Lead 2 part for a gap-answer rule, through HarmonicFilter. `lead1` is the Lead 1
     /// the listener hears: after ArrangementFilter, HarmonicFilter, the breakdown cut and, in a
     /// sync that includes Lead 1, the sync dropout. `blockedBars` are the breakdown windows and
-    /// a Lead 1 solo, where Lead 2 stays out. Every draw here comes from a derived stream.
+    /// a Lead 1 solo. `soloBars` are the solo bars within `blockedBars`: every rule but Low bed
+    /// plays in them, and Low bed places its own beds there (in a song whose Lead 1 is a solo rule). Every draw
+    /// here comes from a derived stream.
     static func generate(
         ruleID: String,
         lead1: [MIDIEvent],
@@ -163,6 +165,7 @@ enum GapAnswerEngine {
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
         blockedBars: Set<Int>,
+        soloBars: Set<Int> = [],
         pads: [MIDIEvent],
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
@@ -182,7 +185,29 @@ enum GapAnswerEngine {
         let bodyEnd = structure.bodySections.map(\.endBar).max() ?? frame.totalBars
 
         // Drawn once per song.
-        let target    = [4, 5, 6][r.weightedPick([0.30, 0.40, 0.30])]   // appearances in the body
+        // Every gap-answer rule answers inside a Lead 1 solo window too; only Low bed keeps the
+        // solo bars blocked, as it places its own beds there. In a solo song the answers also
+        // get one more appearance per solo window, up to four, so Lead 2 is heard with the solos.
+        let soloRuns = soloBars.filter { !soloBars.contains($0 - 1) }.count
+        let blockedBars = ruleID == lowBed ? blockedBars : blockedBars.subtracting(soloBars)
+        // Echo answer and Hook fragment state themselves 6, 8 or 10 times in the body, Low bed
+        // bars 8 to 10 phrases; the other rules 4 to 6 (Kosmic keeps its own 4 to 6).
+        let targetIdx = r.weightedPick([0.30, 0.40, 0.30])
+        var targetBase = [4, 5, 6][targetIdx]
+        if !kosmic {
+            if ruleID == echoAnswer || ruleID == hookFragment {
+                // One more appearance for every 8 bars Lead 1 leaves silent in gaps of 4 bars or
+                // more, up to 6, so a song of long silences (Call and answer) is not left empty.
+                var silent = 0
+                for k in phrases.indices.dropLast() {
+                    let gap = phrases[k + 1].start - phrases[k].end
+                    if gap >= 64 { silent += gap / 16 - 2 }
+                }
+                targetBase = [6, 8, 10][targetIdx] + Swift.min(6, silent / 8)
+            }
+            else if ruleID == lowBed { targetBase += 4 }
+        }
+        let target    = targetBase + (ruleID == lowBed || kosmic ? 0 : Swift.min(soloRuns, 4))   // appearances in the body
         let tailDraw  = r.nextDouble() < 0.5                    // silence after a phrase ends
         let tailSteps = kosmic ? (tailDraw ? 4 : 8) : (tailDraw ? 2 : 4)
         let echoKind  = r.weightedPick([0.45, 0.25, 0.30])      // a third, sixth or octave lower
@@ -202,6 +227,9 @@ enum GapAnswerEngine {
         func scale(atBar bar: Int) -> Set<Int> {
             guard let mode = tonalMap.entry(atBar: bar)?.sectionMode else { return [] }
             return HookLeadEngine.scalePCs(mode, tonicPC: tonicPC)
+        }
+        func chordTones(atBar bar: Int) -> Set<Int> {
+            tonalMap.entry(atBar: bar)?.chordWindow.chordTones ?? []
         }
         func isBody(_ bar: Int) -> Bool {
             guard let label = structure.section(atBar: bar)?.label else { return false }
@@ -351,13 +379,40 @@ enum GapAnswerEngine {
             }
         }
 
+        /// The figure again, softer, a whole number of bars after it starts, if it still fits
+        /// before `limit`; `steps` moves the repeat that many scale steps.
+        func withRepeat(_ placed: [ANote], limit: Int, softer: Int, steps: Int = 0) -> [ANote] {
+            guard let f = placed.first, let l = placed.last else { return placed }
+            let delta = Swift.max(16, ((l.at + l.len - f.at + 15) / 16) * 16)
+            let again = placed.map { ANote(at: $0.at + delta, src: $0.src, len: $0.len,
+                                           vel: $0.vel - softer, steps: $0.steps + steps) }
+            guard let al = again.last, al.at + al.len <= limit, free(again, outro: false) else { return placed }
+            return placed + again
+        }
+
         /// One answer in the gap after `ph`, of the rule's kind, or nil.
         func answer(after ph: Phrase, earliest: Int, limit: Int, outro: Bool,
                     form: CellForm = .full, octaveDown: Bool = false, turn: Int = 0,
                     rng: inout SeededRNG) -> [MIDIEvent]? {
             if outro || echoRole {
                 guard ph.notes.count >= 2 else { return nil }
-                let count = Swift.min(ph.notes.count, outro ? 2 + rng.nextInt(upperBound: 2) : 2 + rng.nextInt(upperBound: 3))
+                // MOT-LD2-001 takes more of the phrase, 3 to 6 notes, falling back to fewer when the
+                // longer one won't fit, and a softer repeat of it a bar or two later when there is
+                // room, as a delay would.
+                let strongEcho = ruleID == echoAnswer && !outro && !kosmic
+                let count = Swift.min(ph.notes.count, outro ? 2 + rng.nextInt(upperBound: 2)
+                                      : strongEcho ? 3 + rng.nextInt(upperBound: 4) : 2 + rng.nextInt(upperBound: 3))
+                if strongEcho {
+                    for c in stride(from: count, through: 2, by: -1) {
+                        if let placed = place(shapeFromLead1(Array(ph.notes.suffix(c))),
+                                              earliest: earliest, limit: limit, maxSpan: 48),
+                           free(placed, outro: false) {
+                            let all = rng.nextDouble() < 0.70 ? withRepeat(placed, limit: limit, softer: 14) : placed
+                            return realise(all, .echo, rng: &rng)
+                        }
+                    }
+                    return nil
+                }
                 guard kosmic else {
                     guard let placed = place(shapeFromLead1(Array(ph.notes.suffix(count))),
                                              earliest: earliest, limit: limit),
@@ -405,7 +460,7 @@ enum GapAnswerEngine {
                 guard ph.notes.count >= 2 else { return nil }
                 // 2 to 5 notes. The grid fit folds a 16th into its neighbour, so more of Lead 1's
                 // notes are taken until the placed figure reaches the drawn count.
-                let want = 2 + rng.weightedPick([0.25, 0.30, 0.25, 0.20])
+                let want = 3 + rng.weightedPick([0.25, 0.30, 0.25, 0.20])
                 let transform: Transform = rng.nextDouble() < 0.5 ? .invert : .stepDown
                 var best: [ANote]?
                 for take in Swift.min(ph.notes.count, want)...Swift.min(ph.notes.count, want + 6) {
@@ -415,7 +470,16 @@ enum GapAnswerEngine {
                     if p.count >= want { break }
                 }
                 guard let placed = best, free(placed, outro: false) else { return nil }
-                return realise(placed, transform, rng: &rng)
+                // 60% of the time the fragment comes round again, softer: a scale step lower when
+                // it was stepped down (a sequence), the same figure when it was inverted.
+                let again = rng.nextDouble() < 0.60
+                if transform == .stepDown {
+                    let down = placed.map { a -> ANote in var b = a; b.steps = -1; return b }
+                    return realise(again ? withRepeat(down, limit: limit, softer: 8, steps: -1) : down,
+                                   .steps, rng: &rng)
+                }
+                return realise(again ? withRepeat(placed, limit: limit, softer: 8) : placed,
+                               .invert, rng: &rng)
             }
             if cellRole {
                 var shape = form == .short ? cellHead : form == .long ? cellLong : cellShape
@@ -454,19 +518,21 @@ enum GapAnswerEngine {
             for k in 0..<count {
                 bedded.insert(candidates[Int((Double(k) + 0.5) * Double(candidates.count) / Double(count))])
             }
-            // One or two beds on their own, in the longest Lead 1 silences of four bars or more.
-            let alone = r.nextDouble() < 0.5 ? 1 : 2
-            let gaps = phrases.indices.dropLast()
-                .filter { phrases[$0 + 1].start - phrases[$0].end >= 64 }
-                .sorted { phrases[$0 + 1].start - phrases[$0].end > phrases[$1 + 1].start - phrases[$1].end }
-            var placed = 0
-            for i in gaps where placed < alone {
-                if let e = standaloneBed(gapStart: phrases[i].end, gapEnd: phrases[i + 1].start,
-                                         tonicPC: tonicPC, tonalMap: tonalMap, blockedBars: blockedBars,
-                                         isBody: isBody, rng: &r) {
-                    events.append(e)
-                    placed += 1
-                }
+            // In every Lead 1 silence of four bars or more the bed carries on by itself: from a
+            // bar after the phrase ends until half a bar before Lead 1 returns, every four bars
+            // and at each chord change.
+            for i in phrases.indices.dropLast() where phrases[i + 1].start - phrases[i].end >= 64 {
+                let first = (phrases[i].end + 15) / 16 + 1
+                let last = (phrases[i + 1].start - 8) / 16 - 1
+                guard first <= last else { continue }
+                events += runBeds(bars: (first...last).filter { isBody($0) && !blockedBars.contains($0) },
+                                  tonicPC: tonicPC, tonalMap: tonalMap, rng: &r)
+            }
+            // Under a Lead 1 solo (MOT-LD1-007 or 008) Lead 2 has nothing else to play, so the bed
+            // sounds in the solo windows too: see soloBeds.
+            if !kosmic && (lead1RuleIDs.contains("MOT-LD1-007") || lead1RuleIDs.contains("MOT-LD1-008")) {
+                events += runBeds(bars: soloBars.filter { isBody($0) }.sorted(), tonicPC: tonicPC,
+                                  tonalMap: tonalMap, rng: &r)
             }
         }
 
@@ -476,7 +542,13 @@ enum GapAnswerEngine {
         var slots: [Slot] = []
         var outroUsed = false
         for (i, ph) in phrases.enumerated() {
-            if harmonised.contains(i) { events += harmony(ph, scale: scale, register: harmonyRegister, rng: &r) }
+            if harmonised.contains(i) {
+                // Horn-section style: 60% of statements are a simplified line, the notes on the
+                // beats and the long ones, the rest the full rhythm.
+                let simplify = r.nextDouble() < 0.60
+                events += hornHarmony(ph, scale: scale, chordTones: chordTones, register: harmonyRegister,
+                                      simplify: simplify, rng: &r)
+            }
             if bedded.contains(i) {
                 events += bed(ph, tonicPC: tonicPC, tonalMap: tonalMap, blockedBars: blockedBars,
                               isBody: isBody, rng: &r)
@@ -543,6 +615,23 @@ enum GapAnswerEngine {
             guard let pick = pool.max(by: { nearestChosen($0) < nearestChosen($1) }) else { break }
             chosen.append(pick)
             chosen.sort { slots[$0].start < slots[$1].start }
+        }
+
+        // Echo answer and Hook fragment rest between restatements: after an answer to a phrase,
+        // the next restatement is at least 6 bars on, the one after at least 8, so a long Lead 1
+        // silence has gaps of 4 to 8 bars and more in it and not a steady run of answers.
+        if ruleID == echoAnswer || ruleID == hookFragment {
+            var kept: [Int] = []
+            var lastStart = Int.min / 2
+            var run = 0
+            for idx in chosen.sorted(by: { slots[$0].start < slots[$1].start }) {
+                if slots[idx].natural {
+                    kept.append(idx); lastStart = slots[idx].start; run = 0
+                } else if slots[idx].start - lastStart >= (run % 2 == 0 ? 96 : 128) {
+                    kept.append(idx); lastStart = slots[idx].start; run += 1
+                }
+            }
+            chosen = kept
         }
 
         // In an octave-drop song, a middle answer drops 40% of the time, at most twice and never
@@ -627,6 +716,50 @@ enum GapAnswerEngine {
 
     // MARK: - Harmony and bed
 
+    /// MOT-LD2-006 for Motorik, as a horn section would play it: not a copy of Lead 1. Each note
+    /// sits a diatonic third below, a fifth below or in unison an octave down, whichever lands on
+    /// a chord tone (the last interval first, so the line stays smooth). A simplified statement
+    /// keeps only the notes on the beats and the long ones, the first and the last, and holds each
+    /// to the next; otherwise it follows Lead 1's 8th-grid rhythm.
+    private static func hornHarmony(_ ph: Phrase, scale: (Int) -> Set<Int>, chordTones: (Int) -> Set<Int>,
+                                    register: RegisterBounds, simplify: Bool,
+                                    rng: inout SeededRNG) -> [MIDIEvent] {
+        var src = ph.notes.filter { $0.stepIndex % 2 == 0 }
+        guard src.count >= 2 else { return [] }
+        if simplify {
+            let kept = src.enumerated().filter { i, e in
+                i == 0 || i == src.count - 1 || e.stepIndex % 4 == 0 || e.durationSteps >= 4
+            }.map { $0.element }
+            if kept.count >= 2 { src = kept }
+        }
+        let mean = src.map { Int($0.velocity) }.reduce(0, +) / src.count
+        var previous = -2
+        var pitches: [Int] = []
+        for e in src {
+            let bar = e.stepIndex / 16
+            let sc = scale(bar)
+            let tones = chordTones(bar)
+            let base = snap(Int(e.note), to: sc)
+            func candidate(_ c: Int) -> Int { c == 0 ? base - 12 : shift(base, by: c, in: sc) }
+            var choice = -2
+            for c in [previous, -2, -4, 0] where tones.contains(((candidate(c) % 12) + 12) % 12) {
+                choice = c
+                break
+            }
+            previous = choice
+            pitches.append(candidate(choice))
+        }
+        let blockShift = fitShift(pitches, in: register, keepIfFits: true)
+        return src.indices.map { i in
+            let e = src[i]
+            let nextAt = i + 1 < src.count ? src[i + 1].stepIndex : ph.end
+            let vel = 62 + (Int(e.velocity) - mean) / 2 + rng.nextInt(upperBound: 5) - 2
+            return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(register.fold(pitches[i] + blockShift)),
+                             velocity: UInt8(Swift.max(36, Swift.min(96, vel))),
+                             durationSteps: Swift.max(1, Swift.min(Swift.min(nextAt, ph.end), e.stepIndex + 16) - e.stepIndex))
+        }
+    }
+
     /// MOT-LD2-006: a whole Lead 1 statement a diatonic third below, in Lead 1's rhythm. Only Lead
     /// 1's 8th-grid onsets are harmonised; each harmony note holds through any 16th in between.
     private static func harmony(_ ph: Phrase, scale: (Int) -> Set<Int>, register: RegisterBounds,
@@ -707,24 +840,38 @@ enum GapAnswerEngine {
         return choice
     }
 
-    /// MOT-LD2-002 on its own: the chord's root or fifth held for one or two bars in a long Lead 1
-    /// silence, with no Lead 1 above it. It starts on a bar line at least a bar after the phrase
-    /// before it ends and finishes half a bar before Lead 1 returns. Two bars only if the chord
-    /// stays the same; nil if the gap can't hold it or isn't all body.
-    private static func standaloneBed(gapStart: Int, gapEnd: Int, tonicPC: Int,
-                                      tonalMap: TonalGovernanceMap, blockedBars: Set<Int>,
-                                      isBody: (Int) -> Bool, rng: inout SeededRNG) -> MIDIEvent? {
-        let at = ((gapStart + 15) / 16) * 16 + 16
-        var len = rng.nextDouble() < 0.5 ? 16 : 32
-        let velocity = 56 + rng.nextInt(upperBound: 7)
-        while len >= 16 && at + len > gapEnd - 8 { len -= 16 }
-        guard len >= 16, let window = tonalMap.entry(atBar: at / 16)?.chordWindow else { return nil }
-        if len > 16, let next = tonalMap.entry(atBar: at / 16 + 1)?.chordWindow,
-           next.chordRoot != window.chordRoot { len = 16 }
-        guard (at / 16...(at + len - 1) / 16).allSatisfy({ isBody($0) && !blockedBars.contains($0) }) else { return nil }
-        let rootPC = (tonicPC + degreeSemitone(window.chordRoot)) % 12
-        guard let pitch = bedPitch(rootPC: rootPC, rng: &rng) else { return nil }
-        return MIDIEvent(stepIndex: at, note: UInt8(pitch), velocity: UInt8(velocity), durationSteps: len)
+    /// MOT-LD2-002 with nothing above it, in a Lead 1 solo window or a long Lead 1 silence: in each
+    /// run of consecutive `bars`, the chord's root or fifth from a bar line, held two bars, again
+    /// every four bars from the run's start and wherever the chord changes. A bed ends where the
+    /// chord changes or the run ends, and a chord-change bed cuts short the one before it.
+    private static func runBeds(bars: [Int], tonicPC: Int, tonalMap: TonalGovernanceMap,
+                                rng: inout SeededRNG) -> [MIDIEvent] {
+        let barSet = Set(bars)
+        var out: [MIDIEvent] = []
+        var runStart = -1
+        var previous = -2
+        for bar in bars {
+            if bar != previous + 1 { runStart = bar }
+            previous = bar
+            guard let window = tonalMap.entry(atBar: bar)?.chordWindow else { continue }
+            var changed = true
+            if let before = tonalMap.entry(atBar: bar - 1)?.chordWindow { changed = before.chordRoot != window.chordRoot }
+            guard bar == runStart || (bar - runStart) % 4 == 0 || changed else { continue }
+            let rootPC = (tonicPC + degreeSemitone(window.chordRoot)) % 12
+            guard let pitch = bedPitch(rootPC: rootPC, rng: &rng) else { continue }
+            // Two bars, one if the next bar is a different chord or outside the run.
+            var len = 32
+            if !barSet.contains(bar + 1) { len = 16 }
+            else if let next = tonalMap.entry(atBar: bar + 1)?.chordWindow, next.chordRoot != window.chordRoot { len = 16 }
+            let at = bar * 16
+            if let last = out.last, last.stepIndex + last.durationSteps > at {
+                out[out.count - 1] = MIDIEvent(stepIndex: last.stepIndex, note: last.note, velocity: last.velocity,
+                                               durationSteps: at - last.stepIndex)
+            }
+            out.append(MIDIEvent(stepIndex: at, note: UInt8(pitch),
+                                 velocity: UInt8(56 + rng.nextInt(upperBound: 7)), durationSteps: len))
+        }
+        return out
     }
 
     // MARK: - Grid and pitch helpers

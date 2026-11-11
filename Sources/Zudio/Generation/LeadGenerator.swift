@@ -501,12 +501,8 @@ struct LeadGenerator {
             ? [0.45,          0.35,          0.20]
             : [0.225,         0.15,          0.225,         0.25,          0.15]
         var ruleID = ld2Rules[rng.weightedPick(ld2Weights)]
-        // MOT-LD2-006 Statement harmony follows Lead 1 statements, and a Lead 1 solo blocks Lead 2
-        // for the whole solo, so in a song with a solo it would have nothing to harmonise. It is
-        // redrawn from the other four rules, in the same proportions.
-        if ruleID == "MOT-LD2-006" && !arcadeVariation && (soloRange != nil || !shortSoloRanges.isEmpty) {
-            ruleID = ld2Rules[rng.weightedPick([0.2647, 0.1765, 0.2647, 0.2941])]
-        }
+        // MOT-LD2-006 Statement harmony is drawn in solo songs too: GapAnswerEngine lets it harmonise
+        // the statements inside a Lead 1 solo window, which block every other Lead 2 rule.
         if arcadeVariation {
             let arcadeRoll = rng.nextDouble()
             if arcadeDenseMelody {

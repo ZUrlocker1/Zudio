@@ -377,13 +377,17 @@ struct SongGenerator {
             let lead1Heard = trackEvents[kTrackLead1].filter { ev in
                 !silentSteps.contains { $0.contains(ev.stepIndex) }
             }
-            var blocked = Set(breakdowns.flatMap { Array($0) })
-            if let solo = ld1SoloRange { blocked.formUnion(solo) }
-            for window in ld1ShortSolos { blocked.formUnion(window) }
+            let breakdownBars = Set(breakdowns.flatMap { Array($0) })
+            var blocked = breakdownBars
+            var soloBars: Set<Int> = []
+            if let solo = ld1SoloRange { soloBars.formUnion(solo) }
+            for window in ld1ShortSolos { soloBars.formUnion(window) }
+            blocked.formUnion(soloBars)
+            soloBars.subtract(breakdownBars)
             trackEvents[kTrackLead2] = GapAnswerEngine.generate(
                 ruleID: gapRule, lead1: lead1Heard, lead1RuleIDs: lead1Rules,
                 frame: frame, structure: structure, tonalMap: tonalMap,
-                blockedBars: blocked, pads: trackEvents[kTrackPads], rng: &lead2RNG)
+                blockedBars: blocked, soloBars: soloBars, pads: trackEvents[kTrackPads], rng: &lead2RNG)
         }
 
         for track in [kTrackLead1, kTrackLead2, kTrackRhythm] {

@@ -2,23 +2,24 @@
 
 ## V 2.9 (Build 136) — Hook leads and gap-answer leads
 
-Build 136 is the finished 2.9 release, with minor tuning expected over a few days of listening and the App Store post likely by mid November. The plan is `docs/Solo-improvement-plan.md`.
+Build 136 is a near final version of 2.9, with minor tuning expected over a few days of listening and the App Store post likely by mid November. The plan is `docs/Solo-improvement-plan.md`.
 
 - **New rules replace the old lead rules** — (2026-11-10) The weakest early Lead 1 and Lead 2 rules in base Motorik and base Kosmic are gone. Each new rule plays material taken from a real record, mapped to the song's mode and reworked per song as homage, and each took the number of the rule it replaced. The old rules are deleted from the code. Songs saved earlier reload with the new rules, and a saved song that forced an old lead ID loads the rule that replaced it.
 - **How much of Zudio changed** — (2026-11-10) A rough count over a few hundred songs: about 76% of base Motorik songs and 56% of base Kosmic songs now use a new or lightly changed Lead 1 rule, and about 41% of base Kosmic songs use one of the three new hooks.
 - **Solo songs stay filled** — (2026-11-10) In a base Motorik song with Vanishing solo or Visiting solo, any stretch of more than 24 bars with no solo gets a further shorter version near its middle, a different cut from the others, so Lead 1 does not vanish for fifty bars.
+- **Lead 2 plays with the solos and fills long silences** — (2026-11-10) Lead 2 used to stay out of every Lead 1 solo, so a Visiting solo song such as Kalt Feld had about 3 Lead 2 notes. Now it plays in the solo windows: Low bed places its own beds there, Statement harmony harmonises the solo, and the answers fit the gaps in it. Motorik Lead 2 rules are also thicker and each has its own flavour: Echo answer takes 3 to 6 notes and repeats them softer, like a delay; Hook fragment comes round again a step lower; Statement harmony is a horn-section part, not a copy; Low bed carries on through every Lead 1 silence of four bars or more. Echo answer and Hook fragment state themselves 6, 8 or 10 times, plus one for every 8 silent bars, and rest 6 to 8 bars between restatements, so a long silence has gaps in it. Hook songs went from about 15 Lead 2 notes to about 60 to 80 for Echo answer and Hook fragment and about 30 for Low bed.
 - **Four new Motorik Lead 1 rules** — Hooks from the records, each replacing a base rule:
   - MOT-LD1-001 Hallogallo hook replaces Neu! motif first.
   - MOT-LD1-002 Radioactive riff replaces Pentatonic cell.
   - MOT-LD1-003 Tour de France riff replaces Punch solo.
   - MOT-LD1-006 Model riff replaces Long arc solo.
   - MOT-LD1-005 Call and answer is kept in every pool.
-- **Five new Motorik Lead 2 rules** — Base Lead 2 now answers Lead 1 in its gaps instead of playing over it. It is silent while Lead 1 plays a phrase and states an answer 4 to 6 times a song. They replace Counter-response, Sustained Drone, Rhythmic Counter, Neu! counter melody, Descending line and Neu! harmony:
+- **Five new Motorik Lead 2 rules** — Base Lead 2 now answers Lead 1 in its gaps instead of playing over it. It is silent while Lead 1 plays a phrase and states an answer 4 to 6 times a song (more for some rules, see the entry below on Lead 2 and the solos). They replace Counter-response, Sustained Drone, Rhythmic Counter, Neu! counter melody, Descending line and Neu! harmony:
   - MOT-LD2-001 Echo answer, Lead 1's last notes a third, sixth or octave lower.
   - MOT-LD2-002 Low bed, the chord's root or fifth held under Lead 1's long notes.
   - MOT-LD2-003 Hook fragment, the opening of Lead 1's last phrase, inverted or a step down.
   - MOT-LD2-004 Answer cell, a short cell paired with Lead 1's rule.
-  - MOT-LD2-006 Statement harmony, every second Lead 1 statement a third below. It is not drawn when Lead 1 is a solo, since a solo blocks Lead 2.
+  - MOT-LD2-006 Statement harmony, every second Lead 1 statement as a horn-section part: a third, a fifth or a unison under it, 60% of statements simplified to the notes on the beats.
   - Arcade's arp rules and the Europe sync rules are unchanged; Arcade's regular pool uses MOT-LD2-001, 003 and 004.
 - **Three new Kosmic Lead 1 rules** — Hooks from Vangelis and Tangerine Dream, each replacing a base rule:
   - KOS-LD1-001 Pulstar theme replaces Slow arc.

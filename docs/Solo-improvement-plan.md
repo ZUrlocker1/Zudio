@@ -201,8 +201,9 @@ One is drawn per song. The cell data and the engine are in
   bars or more is a handoff: Lead 2 restates its answer there, every four bars, filling the
   longest silences first and never within two bars of another answer. The outro echo is outside
   the count.
-- **Breakdowns.** Lead 2 stays out of the base Motorik breakdown windows and a Lead 1 solo, so the
-  breakdown stays a drop to drums, bass, pads and texture.
+- **Breakdowns.** Lead 2 stays out of the base Motorik breakdown windows, so the breakdown stays a
+  drop to drums, bass, pads and texture. (Until 2026-11-10 it also stayed out of a Lead 1 solo; see
+  `docs/motorik-plan.md`, which holds the current rules.)
 - **Intro and outro.** Silent in the intro. In the outro, at most one echo of the final statement,
   softer.
 - **Grid.** Every onset is on the 8th grid and held notes start on beats. A Lead 1 note on an odd
@@ -444,6 +445,13 @@ Checks stay light:
 - Base Lead 2 in both styles is replaced by the gap-answer design, and the Motorik drone and the
   other old Lead 2 rules are deleted.
 - MOT-LD1-005 Call and answer is kept in every pool.
+- 2026-11-10, after phase 5: Lead 2 now plays in Lead 1 solo windows. Low bed places its own beds
+  there, Statement harmony harmonises the solo's statements, and the answer rules fit the gaps in
+  it. MOT-LD2-006 is drawn in solo songs again. Echo answer and Hook fragment state themselves 6,
+  8 or 10 times plus one per 8 silent bars, rest between restatements, and take 3 to 6 notes with
+  a softer repeat. Statement harmony is a horn-section part, chord-tone thirds, fifths and
+  unisons, 60% of statements simplified. Low bed carries on through every Lead 1 silence of four
+  bars or more. The rules are in `docs/motorik-plan.md`.
 - A retired rule is replaced in every substyle that used it, and deleted. The new rule takes its number.
 - Kosmic Lead 1 rules are KOS-LD1 and Lead 2 rules are KOS-LD2, so no ID serves both leads, as in
   the other styles.
