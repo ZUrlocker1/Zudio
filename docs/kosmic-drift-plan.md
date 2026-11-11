@@ -74,7 +74,7 @@ Ten minutes. The sequencer drives the whole song — a slow, locked bass arpeggi
 
 **What stays identical**
 - Sequencer patterns and the arpeggio engine
-- Melodic lead voice (same KOS-LEAD rules, same character)
+- Melodic lead voice (same KOS-LD1 rules, same character)
 - Harmonic language (same modal options, adjusted weights — see below)
 - Pad texture and voicing rules
 - Song structure: intro drone → body → outro
@@ -174,28 +174,24 @@ All rules are applicable in Drift. The slower tempo benefits most of them — lo
 - **KOS-LD1-011 Drift Memory** (new, 18%) — 3–4 note BoC-style looping cell; pentatonic; flat velocity; slowly evolves every 8 bars; the "half-remembered tune" quality
 
 **Applicable existing rules:**
-- **KOS-LEAD-002 Floating Tones** — one note every 2–4 bars; at 75 BPM this has real weight and presence
-- **KOS-LEAD-008 Caligari Solo** — 1–2 held notes per bar, slow lyrical; the Drift lead at its most spacious
-- **KOS-LEAD-009 Dark Sun Solo** — sustained stepwise ascent/descent; long notes feel profound at 75 BPM
-- **KOS-LEAD-003 Pentatonic Drift** — slow pentatonic movement; meditative quality enhanced at slow BPM
-- **KOS-LEAD-004 Echo Melody** — question/answer transposition; works in Drift at lower weight
-- **KOS-LEAD-001 Slow Arc** — 2–4 note phrase; fine but less characteristic; low weight
+- **KOS-LD1-002 Floating Tones** — one note every 2–4 bars; at 75 BPM this has real weight and presence
+- **KOS-LD1-008 Caligari Solo** — 1–2 held notes per bar, slow lyrical; the Drift lead at its most spacious
+- **KOS-LD1-009 Dark Sun Solo** — sustained stepwise ascent/descent; long notes feel profound at 75 BPM
+- **KOS-LD1-003 Pentatonic Drift** — slow pentatonic movement; meditative quality enhanced at slow BPM
+- **KOS-LD1-004 Echo Melody** — question/answer transposition; works in Drift at lower weight
 
 **Excluded from Drift:**
-- **KOS-LEAD-005 Arpeggio Highlight** — picks one note from the arpeggio and holds it; too mechanical and locked to the sequencer; doesn't feel like a lead
-- **KOS-LEAD-006 JMJ Phrase Loop** — looping phrase serves same purpose as KOS-LD1-011 Drift Memory but with a colder, more formal JMJ character that doesn't fit the warmer Drift palette; KOS-LD1-011 supersedes it in Drift
-- **KOS-LEAD-007 TD Skip Sequence** — ascending rhythmic skip pattern; too mechanical and Berlin-School-angular; the most "base Kosmic" of the lead rules; excludes cleanly
+- **KOS-LD1-006 JMJ Phrase Loop** — looping phrase serves same purpose as KOS-LD1-011 Drift Memory but with a colder, more formal JMJ character that doesn't fit the warmer Drift palette; KOS-LD1-011 supersedes it in Drift
 
 **Proposed Drift lead pool weights:**
 - KOS-LD1-010 Tycho Phrase: 20% *(new)*
 - KOS-LD1-011 Drift Memory: 17% *(new)*
 - KOS-LD1-012 Svefn Float: 10% *(new — Dreamscape / most atmospheric)*
-- KOS-LEAD-002 Floating Tones: 13%
-- KOS-LEAD-008 Caligari Solo: 13%
-- KOS-LEAD-009 Dark Sun Solo: 11%
-- KOS-LEAD-003 Pentatonic Drift: 9%
-- KOS-LEAD-004 Echo Melody: 5%
-- KOS-LEAD-001 Slow Arc: 2%
+- KOS-LD1-002 Floating Tones: 13%
+- KOS-LD1-008 Caligari Solo: 13%
+- KOS-LD1-009 Dark Sun Solo: 11%
+- KOS-LD1-003 Pentatonic Drift: 9%
+- KOS-LD1-004 Echo Melody: 5%
 
 ---
 
@@ -559,9 +555,7 @@ The most sparse and atmospheric lead rule in the Drift pool. A single note or tw
 - KOS-RTHM-004 Electric Buddha Groove
 - KOS-RTHM-005 JMJ Dual-Rate (dual-voice density conflicts with loping groove)
 - KOS-RTHM-006 Kraftwerk Locked Pulse
-- KOS-LEAD-005 Arpeggio Highlight
-- KOS-LEAD-006 JMJ Phrase Loop
-- KOS-LEAD-007 TD Skip Sequence
+- KOS-LD1-006 JMJ Phrase Loop
 - Lead 2 track — always silent
 
 ---
@@ -776,7 +770,7 @@ All Kosmic instruments are stored in a single combined pool visible to the user.
 
 - KOS-DRUM-007 and KOS-DRUM-008 are new drum rules (CosmicDrumGenerator)
 - KOS-BASS-014, 015, 016 are new bass rules (CosmicBassGenerator)
-- KOS-LD1-010 and 011 are new lead rules (CosmicLeadGenerator); both require cross-bar phrase state, but this is a solved problem — KOS-LEAD-006 (JMJ Phrase Loop) already uses the same pattern (phrase generated once per section, repeated with per-bar variation across the section) and is the direct implementation template
+- KOS-LD1-010 and 011 are new lead rules (CosmicLeadGenerator); both require cross-bar phrase state, but this is a solved problem — KOS-LD1-006 (JMJ Phrase Loop) already uses the same pattern (phrase generated once per section, repeated with per-bar variation across the section) and is the direct implementation template
 - Pool weight adjustments are table changes in existing switch/array structures
 - Instrument pool switching uses the same pattern already in AppState for other per-state instrument variations
 - Mode and progression weight overrides are simple float substitutions in `CosmicMusicalFrameGenerator`
@@ -864,7 +858,7 @@ Listen for:
 - **Kick ghost**: step 2 and step 10 secondary kicks should be audible but lighter than the primary. If they dominate, reduce their velocity toward 65% of the primary kick.
 - **Mode character**: Dorian and Mixolydian should dominate; verify no Phrygian songs appear.
 - **Progression character**: most songs should feel harmonically locked — static drone or simple two-chord pendulum. Avoid quartal songs feeling too abstract.
-- **Lead 1 character**: at this tempo lead phrases have more room to breathe; KOS-LEAD-008 and 009 should sound particularly well-suited.
+- **Lead 1 character**: at this tempo lead phrases have more room to breathe; KOS-LD1-008 and 009 should sound particularly well-suited.
 - **Lead 2 presence**: always silent in Drift — verify no Lead 2 events appear in any Drift song.
 - **Pad presence**: almost every song should have pads; they should be felt more than noticed.
 - **Sequencer instrument palette**: Moog and Wurlitzer are the core; New Age Pad and Warm Pad as sequencer instruments should create a softer, more pad-like arpeggio texture on some songs.
@@ -916,7 +910,7 @@ Kosmic has a hidden Lead 1 doubling layer (`kTrackLeadSynth`, track 7): **GM 90 
 
 ## What Is Still Missing (Future Work)
 
-- **Tycho-specific lead variation**: Tycho's leads have a sustained "singing" quality — long held notes with subtle vibrato-like expression and phrase endings that trail off rather than cut. A future KOS-LEAD rule could model this explicitly.
+- **Tycho-specific lead variation**: Tycho's leads have a sustained "singing" quality — long held notes with subtle vibrato-like expression and phrase endings that trail off rather than cut. A future KOS-LD1 rule could model this explicitly.
 - **Air-style sequencer bass**: "La Femme d'Argent" has a bass arpeggio that is looser and more chord-like than the standard Kosmic sequencer. A variation could allow the sequencer to arpeggiate a fuller chord voicing (root + 3rd + 5th) rather than just root/fifth cycling.
 - **Groove-aware bass gating**: the 85% gate is a blunt reduction. A smarter version would gate bass hits on beat positions that complement the kick — lock with kick (step 0), open up on steps 6 and 10 where there is more space.
 - **Drift title suffix**: base Kosmic and Motorik Noir have title generation logic. A Drift song title variant — perhaps dropping the multi-word titles toward single evocative words, or adding suffixes like "Drift", "Float", "Current" — could be a small characterful addition.

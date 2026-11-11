@@ -1084,27 +1084,125 @@ One base pattern selected per song; evolves in B sections.
   staggered 1-step attacks; sub-bass register MIDI 21–47; fires every 4 bars; volume cycles
   40%→100%→40% over 16 bars continuously; long hold (62 steps); dissolving underwater texture
 
-### Lead behavior (KOS-LEAD)
+### Lead behavior (KOS-LD1 and KOS-LD2)
 
-One rule selected for A sections. In B sections, Technique D (60% chance) picks a different rule —
-creating the "instrument arriving" effect heard in Dark Sun and Mister Mosca.
+Kosmic Lead 1 rules are KOS-LD1 and Lead 2 rules are KOS-LD2, so no ID serves both tracks, as in
+every other style. KOS-LD1-010 to 012 are Drift rules and KOS-LD1-013 to 019 are Space rules,
+described in `kosmic-drift-plan.md` and `kosmic-space-plan.md`.
 
-In melody bridges (Archetype B): bridge lead picks rule not used in A or B; plays upper register
-(MIDI 72–84); generated phrase repeats once to fill the bridge duration.
+One Lead 1 rule is selected for A sections. When it is not a hook, Technique D (60% chance) picks
+a different per-bar rule for B sections, creating the "instrument arriving" effect heard in Dark
+Sun and Mister Mosca. A hook rule owns both the A and the B sections and makes no Technique D draw.
 
-- KOS-LEAD-004 — Echo Melody: 4-note phrase (2 bars), 2-bar silence, then phrase repeated transposed
-  by a diatonic 3rd (question/answer). Transposition is snapped to the active mode scale so it stays
-  consonant. Classic Vangelis structural device.
-- KOS-LEAD-006 — JMJ evolving phrase loop: 4–6 note melodic phrase generated once per body section
-  and looped throughout; phrase mutates slightly at section boundaries (Jean-Michel Jarre style).
-- KOS-LEAD-007 — TD Skip Sequence: ascending skip pattern through chord tones with rhythmic
-  displacement per bar, inspired by Tangerine Dream sequencer-melody hybrids.
-- KOS-LEAD-008 — Caligari Solo ✓ DONE: slow lyrical chord-tone lead inspired by Caligari Drop
-  bars 10–18. 1–2 held notes per bar, slight rhythmic offset. Plays in 2–3 windows of 8 bars
-  with ≥6-bar gaps. Register MIDI 60–76.
-- KOS-LEAD-009 — Dark Sun Solo ✓ DONE: spacious 70s analog synth lead inspired by Dark Sun
-  bars 21–46. One sustained note per bar, stepwise ascent then descent through scale.
-  Occasional diatonic trill ornament. Register MIDI 60–76.
+In melody bridges (Archetype B): bridge lead picks a rule not used in A or B; plays upper register
+(MIDI 72–84); generated phrase repeats once to fill the bridge duration. A bridge melody is a
+per-bar context, so it never uses a hook.
+
+**Lead 1 rules, base Kosmic** (one draw per song):
+
+- 15% KOS-LD1-001 Pulstar theme: transcription hook, below.
+- 9% KOS-LD1-002 Eno floating tones: single notes every 2–4 bars, held until the next attack.
+- 9% KOS-LD1-003 Pentatonic drift: sparse pentatonic per-bar lead.
+- 7% KOS-LD1-004 Echo Melody: 4-note phrase (2 bars), 2-bar silence, then the phrase repeated
+  transposed by a diatonic 3rd (question/answer). Transposition is snapped to the active mode scale
+  so it stays consonant. Classic Vangelis structural device.
+- 14% KOS-LD1-005 Beach Scene sigh: transcription hook, below.
+- 15% KOS-LD1-006 JMJ evolving phrase: 4–6 note melodic phrase generated once per body section
+  and looped throughout; the phrase mutates slightly at section boundaries (Jean-Michel Jarre
+  style).
+- 14% KOS-LD1-007 Blade Runner theme: transcription hook, below.
+- 9% KOS-LD1-008 Caligari Solo: slow lyrical chord-tone lead inspired by Caligari Drop bars 10–18.
+  1–2 held notes per bar, slight rhythmic offset. Plays in 2–3 windows of 8 bars with ≥6-bar gaps.
+  Register MIDI 60–76. When fewer than four chord tones fit the register, as with a minor chord on
+  flat 7 whose third lies outside the mode, its pool widens to the whole scale with chord tones
+  weighted double; it never repeats the previous note and prefers steps to leaps.
+- 8% KOS-LD1-009 Dark Sun Solo: spacious 70s analog synth lead inspired by Dark Sun bars 21–46.
+  One sustained note per bar, stepwise ascent then descent through scale. Occasional diatonic trill
+  ornament. Register MIDI 60–76. It plays at least twice: when only one ten-bar window fits, a
+  five-bar return is added four bars clear of it.
+- KOS-LD1-008 and KOS-LD1-009 are passed to `ArrangementFilter` as `phraseTracks`, so a block is
+  softened but never rested; a rested block had taken whole windows.
+
+**Transcription hook leads** (KOS-LD1-001, 005 and 007). They replaced the three weakest early
+rules, which are deleted; each took the number of the rule it replaced. They share
+`HookLeadEngine` with the Motorik hooks, and the cells are in `HookLeadEngine.swift`
+(`kosmicRules`). Each is reworked per song as homage, never copied.
+
+- **KOS-LD1-007 Blade Runner theme**, Vangelis, *Blade Runner* End Titles. The 12-bar line is
+  stored as scale steps, so it keeps its shape in any mode. The call is the first four bars and
+  ends on the held fourth below; the answer is phrases 2 and 3, the second a step lower and the
+  third the cadence to the long low tonic. Homage: one added upper-neighbour note per cell. It
+  states 3 or 4 times.
+- **KOS-LD1-001 Pulstar theme**, Vangelis, *Pulstar*. A pickup F F F G into the tonic, then four
+  whole notes C Bb F G, said again an octave up. Homage: a repeated pickup note becomes a
+  neighbour. In a key with no room for both octaves the repeat comes down to a fifth, then to the
+  same octave. It uses MIDI 52 to 84 and states 4 to 6 times, drawn 35, 40 and 25%, every 12 to 16
+  bars, with the shorter octave-up half at 35% of the varied statements. Source variants: no
+  pickup, and the last note held across two bars.
+- **KOS-LD1-005 Beach Scene sigh**, Tangerine Dream, *Beach Scene*. A three-bar call, the sigh
+  with its long held sixth, and a two-bar answer of rising arpeggios on IV and V landing on the
+  root. One source variant falls to the fifth before rising. It states 3 to 5 times.
+
+How they differ from the Motorik hooks:
+
+- **Entry and sections.** The hook enters four bars into the first A section and owns the A and B
+  sections. The bridges and X-Files whistles stay with the existing Kosmic code.
+- **Forms.** No head or loop forms, since those cut a one-note bar. Answer only 25%, sequence 30 to
+  35% and varied 40 to 45%. Blade Runner's sequence always steps down.
+- **Homage.** One change per cell. Blade Runner and Pulstar restrict the operations, because a
+  dropped note empties a bar of the staircase and a swap trades Pulstar's tonic with its pickup.
+- **Filters.** `SongGenerator` passes `phraseTracks: [Lead 1]` to `ArrangementFilter`, and
+  `skipLead1ClashFilter` and `uniformLead1Lift` to `HarmonicFilter`, when Lead 1 is a Kosmic hook.
+  A regenerated hook Lead 1 does the same.
+- **Rhythm.** The base Kosmic density guard thins the arpeggio under Lead 1 whenever the arpeggio
+  is more than twice as dense, so a sparse hook thins it the way the other sparse rules do.
+- **Scope.** Kosmic Space, Drift and Drift Dreamscape never draw the hooks.
+- **Log and testing star.** Names are in `kosmicLeadRuleDescription`; the IDs are in
+  `GenerationLogEntry.testingMarkedRules`.
+
+**Lead 2.** Base Kosmic Lead 2 is the gap-answer design, running on `GapAnswerEngine` with Kosmic
+data. It answers Lead 1 in its gaps instead of playing over it. `pickLeadRule2` is one draw.
+
+- **KOS-LD2-002 Slow echo answer**, 35%: Lead 1's last 2 to 4 notes a third, sixth or octave lower,
+  but a figure that fits in a bar plays at half speed, so the echo moves in long notes. It takes
+  fewer notes when the gap is short, and may run to four bars.
+- **KOS-LD2-003 Slow answer cell**, 35%, paired with Lead 1's rule:
+  - KOS-LD1-007 Blade Runner theme: Lead 1's held last note a diatonic third lower, on the bar
+    line a bar after it starts and never before the phrase ends, held up to two bars.
+  - KOS-LD1-001 Pulstar theme: the rising riff 1 2 flat 3 into 4 on the bar, 5, then 1 held, in
+    native 16ths. Its homage only drops a middle note, so it stays a rising run.
+  - KOS-LD1-005 Beach Scene sigh: the IV and V arpeggios in 8ths landing on the root. Its homage
+    adds a passing note or drops one.
+  - Every other Lead 1 rule: KOS-LD1-004's two-on, two-off cell, the fifth held into the sixth,
+    every other answer a third lower.
+  - The cells keep their place in the bar, moving by whole bars, and take the same forms as
+    MOT-LD2-004 Answer cell, without the octave drop.
+- **KOS-LD2-004 Gap reply melody**, 30%: KOS-LD1-004's two held notes a step apart, started from
+  the note Lead 1 ended on, on a bar line in Lead 1's gap; every other reply a third lower.
+- **Harmony windows**, every Kosmic rule: Lead 2 joins Lead 1 for four bars, a diatonic third
+  under it 65% of the time and in unison 35%, drawn per window, in MIDI 52 to 79. Two windows a
+  song, one more when Lead 1 left room for under four answers, one more when Lead 1 plays through
+  more than 60% of the body, and more, up to six, while Lead 2 would have under 24 notes. Windows
+  sit on a four-bar grid from the body's start where Lead 1 has two or more 8th-grid onsets and
+  Lead 2 is silent, spread evenly. They are drawn after everything else.
+- **Behaviour** otherwise as Motorik Lead 2: silent through Lead 1's phrases outside the harmony
+  windows, 4 to 6 answers in the body, one outro echo, a tail of 4 or 8 steps after a phrase.
+  Register 52 to 69.
+- **Wiring.** `generateLead2` records the rule and writes only the bridge A-2 figure.
+  `SongGenerator.generateKosmic` writes the answers after `ArrangementFilter` and `HarmonicFilter`,
+  from the Lead 1 the listener hears. Regen does the same, reading the hook rule from the log, and
+  adds the answers after its own Lead 2 filter pass.
+- **Kosmic Space Lead 2** draws KOS-LD2-005 Space echo reply, KOS-LD2-001 Magnetic Twin or
+  KOS-LD2-000 No lead 2, a third each. KOS-LD2-005 is Echo Melody's cycle started two bars later,
+  so its phrases fall where Echo Melody rests, with the echo always a diatonic third below. It
+  plays in MIDI 55 to 80, 55 to 67 in low-intensity sections.
+- **Kosmic Drift** has no Lead 2 and logs KOS-LD2-000.
+- Measured over Kosmic seeds 1 to 300, on the 114 base songs: no Lead 2 onset inside a Lead 1
+  phrase apart from the harmony notes, no off-grid notes outside the Pulstar riff, range 52 to 69,
+  4 to 6 answers in nearly every song, and 20 to 53 Lead 2 notes a song.
+
+**Mix.** Kosmic Mono Synth on the bass has volume 0.14 and Kosmic Harpsi Pad on Rhythm 0.55, with
+Space keeping 0.50, so the hooks sit forward.
 
 **Lead thickening ✓ DONE:** Lead 1 is silently doubled by a GM Polysynth layer (GM 90) at 60% velocity. Invisible to the user — mirrors Lead 1's mute/solo state automatically. Classic JMJ layering technique. Lead Synth copy now happens after ArrangementFilter and HarmonicFilter so it matches exactly what Lead 1 plays.
 
@@ -1116,7 +1214,6 @@ In melody bridges (Archetype B): bridge lead picks rule not used in A or B; play
 - Kosmic density pass: if Rhythm note count > 2× Lead 1, Rhythm gives way to the lead (borrowed from Kosmic Space, 2026-11-07). Body bars where Lead 1 sounds keep 45% of their Rhythm notes, intro bars 65%, and the gaps between lead phrases and the outro play the full figure, so the sequencer steps back under the lead and swells when it rests. Notes go by whole onsets in metric order (off-beat 16ths, then 8ths, quarter notes last; the downbeat never), so the figure stays the same from bar to bar. No draws. Drift keeps the older random 65% thinning across the song (`KosmicArpeggioGenerator.baseKosmicGiveWayToLead`).
 - Static drone + songs > 80 bars: B sections forced to sus2 or power chord type for at least one textural shift.
 - A-B-B-A second B: Rhythm at 60% retention, Texture silent for first 8 bars, Pads at 85% velocity for first half — stripped-back feel before the A return.
-- KOS-LEAD-004 weight reduced 0.16→0.10 (was appearing in 4/5 songs); redistributed to KOS-LEAD-002 and KOS-LEAD-007.
 
 ---
 
@@ -1142,7 +1239,7 @@ All note-pool derivations use `keySemitone(frame.key)` as root. When `modal_drif
 `buildChordWindows` computes `effectiveMode` at the loop top: A sections and non-body sections use `frame.mode`; B sections use `section.mode`. Both `pickKosmicChordType` and `NotePoolBuilder.build` receive `effectiveMode`. The A-section `section.mode` is hardcoded Dorian and must not be used as the scale reference.
 
 **KOS-SYNC-004: Lead 1 is melodic primary — Lead 2 is sparse response**
-Lead 1 targets 2–5 notes/bar in body sections. Lead 2 excludes KOS-LEAD-006 (JMJ Phrase Loop) entirely — it cannot compete for the primary melodic role. When Lead 1 picks a sparse ambient rule (KOS-LEAD-001/002/003) for the A section, the B section always escalates to KOS-LEAD-004 or KOS-LEAD-006. Lead 2 sits in a lower register (MIDI 55–80) and stays below 30% simultaneous overlap with Lead 1.
+Lead 1 targets 2–5 notes/bar in body sections. Base Kosmic Lead 2 answers Lead 1 in its gaps and is silent through Lead 1's phrases, apart from the four-bar harmony windows where it joins a third below or in unison. It sits in MIDI 52–69, 52–79 in a harmony window. When Lead 1 picks a sparse ambient rule (KOS-LD1-002 or KOS-LD1-003) for the A section, the B section always escalates to KOS-LD1-004 or KOS-LD1-006.
 
 **KOS-SYNC-005: Key and override state cleared after generation**
 `keyOverride`, `moodOverride`, and `tempoOverride` are set to nil after song generation completes. Persisting these values locks all subsequent songs to the first-generated key — the root cause of the 5/11 E Dorian clustering in Study 02.

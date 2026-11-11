@@ -363,11 +363,13 @@ A sections draw one of five rules, 20% each. B sections draw one of three, a thi
 - **KOS-LD1-019 Equinoxe Thirds Riff** (B) — the See-Saw with the pivot a scale third away and
   rhythm 3+3+2 on steps 0, 2, 5, 8, 10, 13, legato. In Phrygian songs the pivot is bII over the
   tonic in the last bar of every 4.
-- **KOS-LEAD-006 JMJ Phrase Loop** (B) — base Kosmic's rule, in B sections.
+- **KOS-LD1-006 JMJ Phrase Loop** (B) — base Kosmic's rule, in B sections.
 
 ### Lead 2
 
-KOS-LEAD-004 Echo melody, KOS-LD2-001 Magnetic Twin and KOS-LD2-000 No lead 2, a third each.
+KOS-LD2-005 Space echo reply, KOS-LD2-001 Magnetic Twin and KOS-LD2-000 No lead 2, a third each.
+
+**KOS-LD2-005 Space echo reply** — Echo melody's cycle started two bars later, so its phrases fall where Echo melody rests: a held note in bars 3 and 4 of each 8-bar cycle, then the same two notes a diatonic third lower in bars 7 and 8. The echo is always below, never above.
 
 **KOS-LD2-001 Magnetic Twin** — two variants, 50/50. **Stereo twin:** Rhythm's notes replayed on
 Lead 2 outside B sections (it rests whenever B plays), 6 velocity lower; static pans Rhythm +0.45, Lead 2 −0.45; Rhythm's auto-pan holds still.
@@ -403,15 +405,15 @@ only. The automatic Kosmic filter sweep is off in Space.
 
 ## Reused and excluded rules
 
-**Reused unchanged:** KOS-PADS-001, KOS-BASS-001, KOS-LEAD-004, KOS-LD2-000, KOS-DRUM-000. Base
-Kosmic's JMJ rules KOS-DRUM-001, KOS-RTHM-002, KOS-RTHM-005 and KOS-LEAD-006 are in the pool
+**Reused unchanged:** KOS-PADS-001, KOS-BASS-001, KOS-LD2-000, KOS-DRUM-000. Base
+Kosmic's JMJ rules KOS-DRUM-001, KOS-RTHM-002, KOS-RTHM-005 and KOS-LD1-006 are in the pool
 because Zack wanted the variety, though they match no transcription. KOS-DRUM-005 Electric Buddha
 Pulse, an Electric Buddha Band rule, is in the drum pool as a plain beat, with Space's own fills
 and thinning.
 
 **Excluded from Space** (base Kosmic keeps all of them; nothing is removed from base Kosmic or
 Drift): drums KOS-DRUM-002 to 004 and 006 to 008; every bass rule except 001; Rhythm KOS-RTHM-001 to 015 except
-002 and 005; Lead 1 every KOS-LEAD rule except 004 and 006, and KOS-LD1-010 to 012; every base Pads
+002 and 005; Lead 1 every base KOS-LD1 rule except KOS-LD1-006, and KOS-LD1-010 to 012; every base Pads
 rule except 001; Texture KOS-TEXT-001 to 004.
 
 **Switched off in Space:** base Kosmic's own bridge sections (Space's separate bridge stays) and the X-Files whistle; bass sub-layers (KOS-RULE-17 and

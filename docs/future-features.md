@@ -169,9 +169,9 @@ A texture that evolves its tonal character over a long arc — beginning dark an
 **KOS-TEXT-006 — Rhythmic Pulse Texture**  
 Short repeated stabs of texture (eighth or quarter note) at very low velocity, creating a subliminal rhythmic grid underneath the main instruments. Different from the Rhythm track — quieter, more abstract, more pad-like. Think of the background synthesiser pulses in Klaus Schulze's "Mirage". Implementation: a simple repeated-note pattern at a fixed subdivision with random velocity variation, using one of the shorter-decay texture instruments (FX Echoes, Rain).
 
-### Kosmic — Lead 2 (5 rules — counter-melody subset of Lead 1 rules)
+### Kosmic — Lead 2 (gap answers in base, three rules in Space)
 
-Lead 2 is intentionally constrained to KOS-LEAD-001 through 005 (the sparser rules) and has special counter-melody logic — including a diatonic third offset from Lead 1 when rule 005 fires. It works well but its identity is a quieter version of Lead 1. A rule designed exclusively for Lead 2's supporting role would give it a distinctly different character rather than just being a reduced Lead 1.
+Base Kosmic Lead 2 answers Lead 1 in its gaps with its own rules KOS-LD2-002 Slow echo answer, KOS-LD2-003 Slow answer cell and KOS-LD2-004 Gap reply melody, and joins Lead 1 in four-bar harmony windows. Space Lead 2 draws KOS-LD2-005 Space echo reply, KOS-LD2-001 Magnetic Twin or KOS-LD2-000 No lead 2. Further rules designed exclusively for Lead 2's supporting role would widen the choice, for example a Kosmic version of MOT-LD2-002 Low bed.
 
 **KOS-LD2-001 — Sustained Anchor Tone**  
 Lead 2 holds a single long tone — the root, fifth, or major third of the current chord — for 4–8 bars without melodic movement. No phrase contour, no rhythm. Pure harmonic reinforcement. This is not a melody at all, making it entirely distinct from the existing shared rules. Inspired by the sustained wind/string layers in Harold Budd's collaborations with Brian Eno. Implementation: single note selected from chord tones, long duration (16–32 steps), very low velocity (30–50). Available to Lead 2 only.

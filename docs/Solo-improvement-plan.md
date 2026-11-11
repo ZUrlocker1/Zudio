@@ -1,9 +1,12 @@
 # Solo improvement plan: Motorik and Kosmic leads
 
-Status (2026-11-10): phases 1 to 3 are built and committed. They are the four Motorik Lead 1 hook
-rules MOT-LD1-023 to 026 and the five Motorik Lead 2 gap-answer rules MOT-LD2-013 to 017. Phase 4,
-the three Kosmic Lead 1 hook rules KOS-LEAD-010 to 012, is committed. Phase 5, the Kosmic Lead 2
-gap answers KOS-LD2-002 to 004, is built and waiting for Zack's ear. Phase 6, docs, follows.
+Status (2026-11-10): done. All six phases are built. The retired lead rules are deleted and each
+new rule holds the number of the rule it replaced, so the rule IDs below are the final ones. The
+Motorik Lead 1 hooks are MOT-LD1-001, 002, 003 and 006 and the Motorik Lead 2 gap answers are
+MOT-LD2-001, 002, 003, 004 and 006. The Kosmic Lead 1 hooks are KOS-LD1-001, 005 and 007 and the
+Kosmic Lead 2 gap answers are KOS-LD2-002 to 004, with KOS-LD2-005 Space echo reply for Space.
+Kosmic Lead 1 rules are KOS-LD1, so no ID serves both leads. The testing star stays on every new
+rule until Zack says testing is done.
 
 ## What this is
 
@@ -20,8 +23,8 @@ Lead 1 in its gaps instead of playing over it.
 ## Rules that hold for every new rule
 
 - **Replace everywhere.** A retired rule is replaced in every pool that used it. The replacement
-  takes the retired rule's slot and the retired rule moves to the end of the list at 0%, so
-  restoring it is a one-line change. Each substyle's own rules stay as they are.
+  takes the retired rule's slot and its number, and the retired rule is deleted. Each substyle's
+  own rules stay as they are.
 - **Never replace MOT-LD1-005 Call and answer.** It is liked and stays in every pool.
 - **Homage, not copy.** Each song transforms every cell, so no song plays the source as written.
 - **Fit the beat.** Motorik drums put the kick on steps 0 and 8 and the snare on 4 and 12, with
@@ -42,21 +45,20 @@ Lead 1 in its gaps instead of playing over it.
 
 ### The four rules
 
-- **MOT-LD1-023 Hallogallo hook**, Neu!, *Hallogallo*: a call 5, 7, 14, 14 semitones from the
+- **MOT-LD1-001 Hallogallo hook**, Neu!, *Hallogallo*: a call 5, 7, 14, 14 semitones from the
   tonic at steps 0, 2, 4 and 8, answered by 5, 7, 12, 12, with a source variant that ends on the
-  fifth and a soft pulse tail in 8ths. Takes MOT-LD1-001's slot: 15% in base, 4% in Noir, 3% in
+  fifth and a soft pulse tail in 8ths. Replaces Neu! motif first: 15% in base, 4% in Noir, 3% in
   Arcade.
-- **MOT-LD1-024 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff, 16th
+- **MOT-LD1-002 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff, 16th
   based with a pickup. The plain answer is the same riff two scale steps lower, and the vocal line
-  1 1 1 1 3 2 1 is the source variant. Takes MOT-LD1-002's slot: 14% in base, 2% in Arcade.
-- **MOT-LD1-025 Model riff**, Kraftwerk, *The Model*: a two-bar riff with a long held root. The
+  1 1 1 1 3 2 1 is the source variant. Replaces Pentatonic cell: 14% in base, 2% in Arcade.
+- **MOT-LD1-006 Model riff**, Kraftwerk, *The Model*: a two-bar riff with a long held root. The
   vocal line alternates with it as a restatement, and a source variant ends the riff on the root.
-  Takes MOT-LD1-006's slot: 12% in base, 4% in Noir.
-- **MOT-LD1-026 Tour de France riff**, Kraftwerk, *Tour de France*: a rising one-bar call and a
-  two-bar answer, with a variant cadence 4 3 1. The longest phrase. Takes MOT-LD1-003's slot: 11%
+  Replaces Long arc solo: 12% in base, 4% in Noir.
+- **MOT-LD1-003 Tour de France riff**, Kraftwerk, *Tour de France*: a rising one-bar call and a
+  two-bar answer, with a variant cadence 4 3 1. The longest phrase. Replaces Punch solo: 15%
   in base.
-- Europe's sequence-lock songs draw the base pool and get all four. MOT-LD1-001, 002, 003 and 006
-  sit at the end of each list at 0%. MOT-LD1-003's B-section forcing never fires now; leave it.
+- Europe's sequence-lock songs draw the base pool and get all four. The retired rules are deleted.
 - The cell data is in `HookLeadEngine.swift`. A hook drawn only for the B section keeps the A rule.
 
 ### The engine
@@ -114,17 +116,17 @@ out the whole song in one call and returns early, owning both A and B sections.
 - Motorik Lead 1 Synth Lead, Saw Stack and Polysynth: boost-node multiplier 1.3, about +2.3 dB
   (`PlaybackEngine`). Saw Stack was already at the CC7 ceiling.
 
-### Where retired rules were used outside the base pool
+### Where the retired rules were replaced outside the base pool
 
-- Motorik Noir Lead 1: MOT-LD1-001 and MOT-LD1-006, 4% each. Done.
-- Motorik Arcade Lead 1: MOT-LD1-001 at 3% and MOT-LD1-002 at 2%. Done.
-- Motorik Arcade Lead 2 regular pool: MOT-LD2-001, 003 and 005. Done in phase 3.
-- Motorik Europe base Lead 2, when Lead 2 is not in the sync. Done in phase 3.
+- Motorik Noir Lead 1: MOT-LD1-001 Hallogallo hook and MOT-LD1-006 Model riff, 4% each.
+- Motorik Arcade Lead 1: MOT-LD1-001 at 3% and MOT-LD1-002 at 2%.
+- Motorik Arcade Lead 2 regular pool: MOT-LD2-001, 003 and 004.
+- Motorik Europe base Lead 2, when Lead 2 is not in the sync.
 - Kosmic B sections and bridge melodies, base and Drift: `pickBSectionRule` and
-  `pickLeadRuleDifferentFrom` could draw KOS-LEAD-001, 005 and 007. Done in phase 4. Those are
-  per-bar contexts and hook rules are whole-song, so the retired rules came out of the candidate
-  lists rather than being replaced.
-- Kosmic Space does not use them. Its Lead 2 plays KOS-LEAD-004, which is kept.
+  `pickLeadRuleDifferentFrom` no longer draw the three retired Kosmic rules. Those are per-bar
+  contexts and hook rules are whole-song, so the retired rules came out of the candidate lists
+  rather than being replaced.
+- Kosmic Space Lead 2 plays KOS-LD2-005 Space echo reply, not a Lead 1 rule.
 
 ## Built: Motorik Lead 2 (phase 3)
 
@@ -140,13 +142,13 @@ existed.
 One is drawn per song. The cell data and the engine are in
 `Sources/Zudio/Generation/GapAnswerEngine.swift`.
 
-- **MOT-LD2-013 Echo answer**, 30% in base: Lead 1's last 2 to 4 notes in the same rhythm, a
+- **MOT-LD2-001 Echo answer**, 22.5% in base: Lead 1's last 2 to 4 notes in the same rhythm, a
   diatonic third, sixth or octave lower. The interval is drawn once per song, 45, 25 and 30%.
-- **MOT-LD2-014 Hook fragment**, 20%: the first 2 to 5 notes of Lead 1's last phrase, inverted or
+- **MOT-LD2-003 Hook fragment**, 22.5%: the first 2 to 5 notes of Lead 1's last phrase, inverted or
   moved one scale step down, drawn per answer: 2 notes 25%, 3 30%, 4 25%, 5 20%. Lead 1's 16ths
   fold into the 8th grid, so more of its notes are taken until the placed figure has the drawn
   count.
-- **MOT-LD2-015 Answer cell**, 25%: a cell paired with Lead 1's rule, reworked once per song as
+- **MOT-LD2-004 Answer cell**, 25%: a cell paired with Lead 1's rule, reworked once per song as
   homage. The first and last answers play the full cell; the others take a form drawn per answer:
   the full cell 35%, the head alone with its last note held 30%, the cell inverted around the note
   it resolves to 20%, or the cell followed by its head a scale step lower, up to three bars, 15%.
@@ -155,17 +157,17 @@ One is drawn per song. The cell data and the engine are in
   40% of the time, at most twice and never twice running; those songs sit the cell as high as
   MIDI 69 allows, and a drop plays only where it fits above 47. About one Answer cell song in
   seven drops, usually once. The cells:
-  - MOT-LD1-023 Hallogallo hook: the pulse tail, flat seventh into the root in 8ths.
-  - MOT-LD1-024 Radioactive riff: the vocal line 1 1 1 1 3 2 1, on 8ths.
-  - MOT-LD1-025 Model riff: the tail, 2 flat 7 5.
-  - MOT-LD1-026 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
+  - MOT-LD1-001 Hallogallo hook: the pulse tail, flat seventh into the root in 8ths.
+  - MOT-LD1-002 Radioactive riff: the vocal line 1 1 1 1 3 2 1, on 8ths.
+  - MOT-LD1-006 Model riff: the tail, 2 flat 7 5.
+  - MOT-LD1-003 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
   - Every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
-- **MOT-LD2-016 Statement harmony**, 15%: one Lead 1 statement in three, a diatonic third below
+- **MOT-LD2-006 Statement harmony**, 15%: one Lead 1 statement in three, a diatonic third below
   in Lead 1's rhythm, from an offset drawn per song. A statement is a body phrase of three notes
   or more. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
   between. The harmony sits a third under Lead 1 wherever Lead 1 is, so it may run above 67. In
   the other gaps it plays echo answers.
-- **MOT-LD2-017 Low bed**, 10%: the chord's root or fifth held under each Lead 1 note of a beat or
+- **MOT-LD2-002 Low bed**, 15%: the chord's root or fifth held under each Lead 1 note of a beat or
   more, and in any bar of the phrase without one from its first beat for half a bar, MIDI 50 to
   60, starting on a beat. The song's target of 4 to 6 phrases get a bed, spread evenly over the
   body. Consecutive beds on one pitch join into one note up to a bar. Once or twice a song, 50% each,
@@ -176,13 +178,13 @@ One is drawn per song. The cell data and the engine are in
 
 ### Pools
 
-- Base: 013 takes MOT-LD2-001's slot, 017 takes 002's, 014 takes 003's, 015 takes 004's and 016
-  takes 006's. 005's slot is gone. MOT-LD2-001 to 006 sit at the end at 0%.
+- Base: MOT-LD2-001 Echo answer 22.5%, MOT-LD2-002 Low bed 15%, MOT-LD2-003 Hook fragment 22.5%,
+  MOT-LD2-004 Answer cell 25% and MOT-LD2-006 Statement harmony 15%. Each took the number of the
+  Lead 2 rule it replaced, and MOT-LD2-005 is unused. The old Lead 2 rules are deleted.
 - Motorik Europe draws the base pool when Lead 2 is not in the sync, which is the Rhythm Section
   group. Sequence Lock and Machine Voice keep MOT-LD2-011 and 012.
-- Motorik Arcade's regular pool: 013, 014 and 015 take 001, 003 and 005 at 45, 35 and 20%. The arp
-  rules MOT-LD2-007 to 010 and the dense-melody "No lead 2" are drawn as before, from the same
-  stream, so those songs are unchanged.
+- Motorik Arcade's regular pool: MOT-LD2-001, 003 and 004 at 45, 35 and 20%. The arp rules
+  MOT-LD2-007 to 010 and the dense-melody "No lead 2" are drawn from the same stream as before.
 - Noir has no Lead 2.
 
 ### How they behave
@@ -212,7 +214,7 @@ One is drawn per song. The cell data and the engine are in
 ### Wiring
 
 - `LeadGenerator.generateLead2` draws the rule. For a gap rule it records the ID and returns
-  nothing. The 50% bar coin, the forced root fallback and the MOT-LD2-004 swap under Hallogallo
+  nothing. The 50% bar coin, the forced root fallback and the Hallogallo counter swap
   are gone with the old base path.
 - `SongGenerator.generateMotorik`, step 12.6, writes the part with `GapAnswerEngine.generate`,
   continuing the Lead 2 stream, from the Lead 1 the listener hears: after `ArrangementFilter` and
@@ -231,53 +233,53 @@ One is drawn per song. The cell data and the engine are in
 
 ### Measured over Motorik seeds 1 to 600
 
-- Wins in base: 013 30%, 014 18%, 015 22%, 016 21%, 017 9%.
-- Lead 2 onsets inside a Lead 1 phrase: none for 013, 014 and 015; 54% of the harmony rule's
+- Wins in base, at the earlier weights: MOT-LD2-001 30%, 003 18%, 004 22%, 006 21%, 002 9%.
+- Lead 2 onsets inside a Lead 1 phrase: none for MOT-LD2-001, 003 and 004; 54% of the harmony rule's
   notes and all of the bed's, by design.
 - Odd-step Lead 2 notes: none. Held notes off the beat: none, apart from harmony notes that
   mirror a Lead 1 note held off the beat.
 - Appearances per song: 4 to 6 in the body for nearly every song, plus the outro echo; fewer
   only where Lead 1 leaves no room, about 3% of songs.
-- Notes per song: 013 about 15, 014 about 13, 015 about 25, 016 about 31, 017 about 10. The old
-  base Lead 2 averaged 84.
+- Notes per song: MOT-LD2-001 about 15, 003 about 13, 004 about 25, 006 about 31, 002 about 10.
+  The old base Lead 2 averaged 84.
 - Fingerprints against HEAD: Noir, Arcade's arp rules and the Sequence Lock and Machine Voice
   songs are identical on every track.
 
-## Next: phases 4 and 5, Kosmic
+## Built: Kosmic (phases 4 and 5)
 
 ### Built: Kosmic Lead 1 (phase 4)
 
 Three hook rules replace the three weakest base rules and share `HookLeadEngine` with the Motorik
 hooks. The cells are in `HookLeadEngine.swift` (`kosmicRules`); the source cells are listed below.
 
-- **KOS-LEAD-010 Blade Runner theme**, 14%, takes KOS-LEAD-007 TD Skip Sequence's slot. The 12-bar
+- **KOS-LD1-007 Blade Runner theme**, 14%, replaces TD Skip Sequence. The 12-bar
   line is stored as scale steps (the `scaleSteps` flag), so it keeps its shape in any mode. The
   call is the first four bars and ends on the held fourth below; the answer is phrases 2 and 3,
   the second a step lower and the third the cadence to the long low tonic. Its homage is one
   added upper-neighbour note per cell. It states 3 or 4 times.
-- **KOS-LEAD-011 Pulstar theme**, 12%, takes KOS-LEAD-001 Slow Arc's slot. A pickup F F F G into
+- **KOS-LD1-001 Pulstar theme**, 15%, replaces Slow Arc. A pickup F F F G into
   the tonic, then four whole notes C Bb F G, said again an octave up (`answerShift` 7). Its
   homage turns a repeated pickup note into a neighbour. In a key with no room for both octaves
   the repeat comes down to a fifth, then to the same octave. It uses MIDI 52 to 84. It states 4
   to 6 times, drawn 35, 40 and 25%, every 12 to 16 bars, with the shorter answer-only form, the
   octave-up half, at 35% of the varied statements. Source variants: no pickup, and the last note
   held across two bars.
-- **KOS-LEAD-012 Beach Scene sigh**, 7%, takes KOS-LEAD-005 Arpeggio Highlight's slot. A
+- **KOS-LD1-005 Beach Scene sigh**, 14%, replaces Arpeggio Highlight. A
   three-bar call, the sigh with its long held sixth, and a two-bar answer of rising arpeggios on
   IV and V landing on the root. One source variant falls to the fifth before rising. It states 3
   to 5 times.
-- KOS-LEAD-001, 005 and 007 sit at the end of `pickLeadRule` at 0%, and 001, 005 and 007 are out of
-  `pickBSectionRule` (now 002, 003 and 004) and `pickLeadRuleDifferentFrom`. `sparseLeadRules`
-  and Lead 2's pool still hold 001 and 005; phase 5 replaces Lead 2.
-- Kept: KOS-LEAD-002 Floating tones, 003 Pentatonic drift, 006 JMJ Phrase Loop, 008 Caligari Solo
+- The three retired rules are deleted. KOS-LD1-002, 003, 004, 006, 008 and 009 hold the rest of
+  `pickLeadRule`: 9, 9, 7, 15, 9 and 8%. `pickBSectionRule` draws 002, 003 and 004, and
+  `pickLeadRuleDifferentFrom` draws 002, 003, 004, 006, 008 and 009.
+- Kept: KOS-LD1-002 Floating tones, 003 Pentatonic drift, 006 JMJ Phrase Loop, 008 Caligari Solo
   and 009 Dark Sun Solo.
 - Fixes to the kept window solos, found by ear:
-  - KOS-LEAD-008 and 009 are passed as `phraseTracks` to `ArrangementFilter`, so a block is
+  - KOS-LD1-008 and 009 are passed as `phraseTracks` to `ArrangementFilter`, so a block is
     softened but never rested; a rested block had taken whole windows.
-  - KOS-LEAD-008 Caligari Solo widens its pool to the whole scale, chord tones weighted double,
+  - KOS-LD1-008 Caligari Solo widens its pool to the whole scale, chord tones weighted double,
     when fewer than four chord tones fit the register, as with a minor chord on flat 7 whose third
     lies outside the mode. It never repeats the previous note and prefers steps to leaps.
-  - KOS-LEAD-009 Dark Sun Solo plays at least twice: when only one ten-bar window fits, a
+  - KOS-LD1-009 Dark Sun Solo plays at least twice: when only one ten-bar window fits, a
     five-bar return is added four bars clear of it.
 
 How they differ from the Motorik hooks, all as data on `HookRule`:
@@ -302,30 +304,33 @@ How they differ from the Motorik hooks, all as data on `HookRule`:
 Measured over Kosmic seeds 1 to 120 with each rule forced, on the 45 songs per rule that are not
 Space or Drift: every hook song starts with the star, Blade Runner states 3 or 4 times, Pulstar 3
 to 5 and Beach Scene 3 to 6, and Lead 1 averages about 64 notes a song. Moves of more than an
-octave between notes less than a bar apart occur in 5 of 135 songs. Not yet heard.
+octave between notes less than a bar apart occur in 5 of 135 songs.
 
 ### Built: Kosmic Lead 2 (phase 5)
 
 Base Kosmic Lead 2 is the gap-answer design. It runs on `GapAnswerEngine` with Kosmic data: the
 same draws in the same order, so Motorik is unchanged. Kosmic Space and Drift are untouched.
 
-- **The pool.** `pickLeadRule2` is still one draw. KOS-LD2-002, 003 and 004 take 35, 40 and 25%,
-  and KOS-LEAD-001 to 005 sit at the end at 0%. Space calls it, ignores the result and draws again.
-- **KOS-LD2-002 Slow echo answer**: as MOT-LD2-013, Lead 1's last 2 to 4 notes a third, sixth or
+- **The pool.** `pickLeadRule2` is one draw. KOS-LD2-002, 003 and 004 take 35, 35 and 30%. Space
+  calls it, ignores the result and draws again. Space Lead 2 plays KOS-LD2-005 Space echo reply,
+  KOS-LD2-001 Magnetic Twin or KOS-LD2-000 No lead 2, a third each. KOS-LD2-005 is the Echo Melody
+  cycle started two bars later, so its phrases fall where Echo Melody rests, with the echo always a
+  diatonic third below.
+- **KOS-LD2-002 Slow echo answer**: as MOT-LD2-001, Lead 1's last 2 to 4 notes a third, sixth or
   octave lower, but a figure that fits in a bar plays at half speed, so the echo moves in long
   notes. It takes fewer notes when the gap is short, and may run to four bars.
 - **KOS-LD2-003 Slow answer cell**, paired with Lead 1's rule:
-  - KOS-LEAD-010 Blade Runner theme: Lead 1's held last note a diatonic third lower, on the bar
+  - KOS-LD1-007 Blade Runner theme: Lead 1's held last note a diatonic third lower, on the bar
     line a bar after it starts and never before the phrase ends, held up to two bars.
-  - KOS-LEAD-011 Pulstar theme: the rising riff 1 2 flat 3 into 4 on the bar, 5, then 1 held, in
+  - KOS-LD1-001 Pulstar theme: the rising riff 1 2 flat 3 into 4 on the bar, 5, then 1 held, in
     native 16ths. Its homage only drops a middle note, so it stays a rising run.
-  - KOS-LEAD-012 Beach Scene sigh: the IV and V arpeggios in 8ths landing on the root. Its homage
+  - KOS-LD1-005 Beach Scene sigh: the IV and V arpeggios in 8ths landing on the root. Its homage
     adds a passing note or drops one.
-  - Every other Lead 1 rule: KOS-LEAD-004's two-on, two-off cell, the fifth held into the sixth,
+  - Every other Lead 1 rule: KOS-LD1-004's two-on, two-off cell, the fifth held into the sixth,
     every other answer a third lower.
   - The cells keep their place in the bar, moving by whole bars, and take the same forms as
-    MOT-LD2-015, without the octave drop.
-- **KOS-LD2-004 Gap reply melody**: KOS-LEAD-004's two held notes a step apart, started from the
+    MOT-LD2-004, without the octave drop.
+- **KOS-LD2-004 Gap reply melody**: KOS-LD1-004's two held notes a step apart, started from the
   note Lead 1 ended on, on a bar line in Lead 1's gap; every other reply a third lower.
 - **Harmony windows**, every Kosmic rule: Lead 2 joins Lead 1 for four bars, a diatonic third
   under it 65% of the time and in unison 35%, drawn per window, in MIDI 52 to 79. Two windows a
@@ -388,21 +393,20 @@ length. Negative steps are pickups. Everything is scale-mapped to the song's mod
 
 ## Phase 6: docs
 
-State only what is in place in `docs/motorik-plan.md`, `docs/kosmic-plan.md` and
-`docs/change-log.md`, with no history of what was tried. Then mark this plan done. The README and
-the change log already describe phases 1 and 2.
+Done. `docs/motorik-plan.md`, `docs/kosmic-plan.md`, `docs/change-log.md` and the README state what
+is in place, and the lead-rule IDs in the other plans use the final numbers.
 
 ## Build order and checks
 
 Each phase ends with a macOS and an iOS build and Zack listening before the next phase, and
 Zack's approval before the commit.
 
-1. Hook engine and MOT-LD1-023. Done.
-2. MOT-LD1-024 to 026 and the base weights. Done.
-3. Motorik Lead 2, MOT-LD2-013 to 017. Done.
-4. Kosmic Lead 1, KOS-LEAD-010 to 012. Done.
-5. Kosmic Lead 2, KOS-LD2-002 to 004, and the Space gate. Built, waiting for Zack's ear.
-6. Docs.
+1. Hook engine and MOT-LD1-001. Done.
+2. MOT-LD1-002, 003 and 006 and the base weights. Done.
+3. Motorik Lead 2, MOT-LD2-001, 002, 003, 004 and 006. Done.
+4. Kosmic Lead 1, KOS-LD1-001, 005 and 007. Done.
+5. Kosmic Lead 2, KOS-LD2-002 to 004, and the Space gate. Done.
+6. Docs. Done.
 
 Checks stay light:
 
@@ -438,18 +442,73 @@ Checks stay light:
 - Motorik takes Hallogallo, Radioactivity, The Model and Tour de France. Kosmic takes Blade
   Runner, Pulstar and Beach Scene, with the slots chosen as above.
 - Base Lead 2 in both styles is replaced by the gap-answer design, and the Motorik drone and the
-  other old Lead 2 rules are retired completely.
+  other old Lead 2 rules are deleted.
 - MOT-LD1-005 Call and answer is kept in every pool.
-- A retired rule is replaced in every substyle that used it.
+- A retired rule is replaced in every substyle that used it, and deleted. The new rule takes its number.
+- Kosmic Lead 1 rules are KOS-LD1 and Lead 2 rules are KOS-LD2, so no ID serves both leads, as in
+  the other styles.
 - Build number 136 in `Version.xcconfig`, since build 135 went to the App Store. Version 2.9 is
   unchanged.
 
 ## Open questions
 
-- Should MOT-LD1-024 Radioactive riff keep its off-beat 16ths, or snap its held notes onto beats?
+- Should MOT-LD1-002 Radioactive riff keep its off-beat 16ths, or snap its held notes onto beats?
 - How many statements should a Kosmic hook song have? Motorik is 3 to 6.
 - `DensitySimplifier.thin` is still buggy for Arcade's arp rules and the synced Europe Lead 2.
   The gap-answer Lead 2 is written after it runs, so it never reaches the new rules. Fix the rest
   only if Zack asks.
 - Is Zack willing to play or tap a short hook for a La Dusseldorf or Harmonia piece if no file
   exists?
+
+## Measured effect on musicality
+
+Base Motorik (262 songs) and base Kosmic (166 songs), seeds 1 to 400, with the new rules and
+weights against the code from before the Solo work. Structure only: these numbers show craft, not
+whether a melody is good. Zack's ear is the test of that. Noir, Arcade, Space and Drift are not
+included.
+
+What is better:
+
+- **More coordination between the leads.** Lead 2 plays far less over Lead 1, and where it does
+  the clash is much rarer. Notes where Lead 2 sounds over Lead 1 that form a minor second,
+  tritone or major seventh: Motorik 3.9% before, 1.4% now; Kosmic 9.8% before, 0.9% now. Motorik
+  Lead 2 notes on off-beat 16th steps: 22% before, 6% now, so Lead 2 sits on the grid with the
+  drums. Kosmic Lead 2 still sounds over Lead 1 in 59% of its notes, by design in the harmony
+  windows, and those are now clean.
+- **Recognisable tunes.** This matters most. Bars that recur exactly elsewhere in the song:
+  Motorik 38% before, 62% now; Kosmic 72% before, 82% now. The most repeated two-bar figure:
+  Motorik 3.6 times before, 3.8 now; Kosmic 2.6 before, 3.3 now.
+- **Less clutter.** Lead 2 notes a song: Motorik 104 before, 58 now; Kosmic 56 before, 28 now.
+  Lead 1 notes a song: Motorik 95 before, 72 now; Kosmic 115 before, 68 now.
+- **Steadier melodic lines.** Leaps of more than an octave between neighbouring notes: Motorik
+  0.9% before, 0.3% now; Kosmic 5.6% before, 3.3% now. Out-of-scale notes were already rare and
+  are near zero.
+
+How many songs hear the new work, a crude gauge from seeds 1 to 300 with Europe-style songs
+excluded:
+
+- **Base Motorik** (148 songs): about 76% use a new or lightly changed Lead 1 rule. That counts
+  the hooks MOT-LD1-001, 002, 003 and 006 and the lightly changed solos MOT-LD1-007 Vanishing solo
+  and MOT-LD1-008 Visiting solo.
+- **Base Kosmic** (124 songs): about 56% use a new or lightly changed Lead 1 rule. About 41% got
+  one of the new hooks KOS-LD1-001, 005 or 007; another 15% got a lightly changed solo, KOS-LD1-008
+  Caligari Solo or KOS-LD1-009 Dark Sun Solo.
+- **Lead 2** is left out of these shares. Every base Kosmic song draws one of the three new
+  gap-answer rules, and base Motorik Lead 2 is almost all new, so counting it would only inflate
+  the figures.
+
+What may be too much, to investigate:
+
+- **Bars with no lead sounding.** Counting a bar as sounding when a note rings in it, the share of
+  bars with neither Lead 1 nor Lead 2 is Motorik 43% before, 71% now, and Kosmic 35% before, 54%
+  now. Bars sounding Lead 1: Motorik 33% before, 22% now; Kosmic 45% before, 38% now. Some of this
+  is intended, since Lead 2 waits for gaps and a hook leaves room between statements, but 71% empty
+  in Motorik may be too sparse. Check by ear on full songs. If it is, the levers are the hook
+  statement counts (how many statements a Kosmic hook song should have is still open), the rest
+  windows and breakdown windows that hooks share, and the number of Lead 2 answers a song.
+- **More exact repetition** comes with the stronger hooks. If songs feel looped, look at the
+  statement forms and the full-cell returns before the counts.
+
+Rerun the same measurement after any change to these weights or counts, and keep the three
+properties above: less overlap and clash between the leads, tunes you can recognise, and less
+clutter.

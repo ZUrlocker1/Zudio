@@ -1,21 +1,38 @@
 # Zudio Change Log
 
-## V 2.9 (Build 136) — Motorik hook leads (work in progress)
+## V 2.9 (Build 136) — Hook leads and gap-answer leads
 
-In the source on `main`, not yet released. Build 135 went to the App Store before these changes.
+Build 136 is the finished 2.9 release, with minor tuning expected over a few days of listening and the App Store post likely by mid November. The plan is `docs/Solo-improvement-plan.md`.
 
-- **Four new Motorik Lead 1 rules** — (2026-11-10) Each plays a short phrase taken from a real record, mapped to the song's mode and reworked per song, so no song plays the source as written. They replace the weakest base rules in every pool that used them, including Noir, Arcade and the Europe songs whose Lead 1 is not in the sync:
-  - MOT-LD1-023 Hallogallo hook (Neu!) replaces MOT-LD1-001 Neu! motif first.
-  - MOT-LD1-024 Radioactive riff (Kraftwerk) replaces MOT-LD1-002 Pentatonic cell.
-  - MOT-LD1-025 Model riff (Kraftwerk) replaces MOT-LD1-006 Long arc solo.
-  - MOT-LD1-026 Tour de France riff (Kraftwerk) replaces MOT-LD1-003 Punch solo.
-  - The retired rules stay in the code at 0%. MOT-LD1-005 Call and answer is kept.
-- **How a hook plays** — The song states its hook 3, 4 or 5 times in the body, plus a soft outro statement about 3 songs in 10. The first statement is the full hook and the last, near the end, is the full hook with its last note ringing. Between them a statement is the full hook again or a real variation: the head alone, the head said twice, the answer alone, the call as a sequence a scale step up or down, or the hook with a dropped note, an alternate ending, a held-over last note or the answer withheld. After a variation the full hook returns often. At least one statement always falls in the last third.
-- **On the beat** — Every hook note sits on the 8th-note grid with the held notes on beats, so the line locks to the kick and snare. Variations keep to the grid. The Radioactive riff is a 16th-note riff and keeps its off-beat 16ths.
-- **Placed around the arrangement** — Statements avoid Lead 1's rest windows and the base Motorik breakdowns. The arrangement filter only softens a hook lead and never silences a block of it.
-- **Steadier register** — A hook stays in one octave for the whole song.
-- **Testing marker** — While the rules are being tuned, the generation log prints a star before each new rule's name.
-- **Motorik mix** — Moog and Synth Bass 3 on the bass are about 1.8 dB quieter. Synth Lead and Saw Stack on Lead 1 are about 2.3 dB louder.
+- **New rules replace the old lead rules** — (2026-11-10) The weakest early Lead 1 and Lead 2 rules in base Motorik and base Kosmic are gone. Each new rule plays material taken from a real record, mapped to the song's mode and reworked per song as homage, and each took the number of the rule it replaced. The old rules are deleted from the code. Songs saved earlier reload with the new rules, and a saved song that forced an old lead ID loads the rule that replaced it.
+- **How much of Zudio changed** — (2026-11-10) A rough count over a few hundred songs: about 76% of base Motorik songs and 56% of base Kosmic songs now use a new or lightly changed Lead 1 rule, and about 41% of base Kosmic songs use one of the three new hooks.
+- **Four new Motorik Lead 1 rules** — Hooks from the records, each replacing a base rule:
+  - MOT-LD1-001 Hallogallo hook replaces Neu! motif first.
+  - MOT-LD1-002 Radioactive riff replaces Pentatonic cell.
+  - MOT-LD1-003 Tour de France riff replaces Punch solo.
+  - MOT-LD1-006 Model riff replaces Long arc solo.
+  - MOT-LD1-005 Call and answer is kept in every pool.
+- **Five new Motorik Lead 2 rules** — Base Lead 2 now answers Lead 1 in its gaps instead of playing over it. It is silent while Lead 1 plays a phrase and states an answer 4 to 6 times a song. They replace Counter-response, Sustained Drone, Rhythmic Counter, Neu! counter melody, Descending line and Neu! harmony:
+  - MOT-LD2-001 Echo answer, Lead 1's last notes a third, sixth or octave lower.
+  - MOT-LD2-002 Low bed, the chord's root or fifth held under Lead 1's long notes.
+  - MOT-LD2-003 Hook fragment, the opening of Lead 1's last phrase, inverted or a step down.
+  - MOT-LD2-004 Answer cell, a short cell paired with Lead 1's rule.
+  - MOT-LD2-006 Statement harmony, one Lead 1 statement in three a third below.
+  - Arcade's arp rules and the Europe sync rules are unchanged; Arcade's regular pool uses MOT-LD2-001, 003 and 004.
+- **Three new Kosmic Lead 1 rules** — Hooks from Vangelis and Tangerine Dream, each replacing a base rule:
+  - KOS-LD1-001 Pulstar theme replaces Slow arc.
+  - KOS-LD1-005 Beach Scene sigh replaces Arpeggio highlight.
+  - KOS-LD1-007 Blade Runner theme replaces TD skip sequence.
+- **Three new Kosmic Lead 2 rules** — Base Kosmic Lead 2 is the same gap-answer design, slower: KOS-LD2-002 Slow echo answer, KOS-LD2-003 Slow answer cell and KOS-LD2-004 Gap reply melody. They replace the shared KOS-LEAD pool that either lead could draw. In every Kosmic song Lead 2 also joins Lead 1 for two to six four-bar windows, a third below it 65% of the time and in unison 35%, so it is more than a handful of notes in 100 bars without getting busy.
+- **Kosmic leads renamed** — Kosmic Lead 1 rules are now KOS-LD1, so Lead 1 and Lead 2 never share an ID, as in the other styles. The old KOS-LEAD-002, 003, 004, 006, 008 and 009 are KOS-LD1-002, 003, 004, 006, 008 and 009, with the same names.
+- **Kosmic Space Lead 2** — (2026-11-10) The Echo melody it borrowed from Lead 1 is now KOS-LD2-005 Space echo reply. It starts its cycle two bars later, so it falls where Echo melody rests, and the echo is always a third below.
+- **Lead rule weights** — Base Kosmic Lead 1: Pulstar theme 15%, JMJ evolving phrase 15%, Beach Scene sigh 14%, Blade Runner theme 14%, Eno floating tones, Pentatonic drift and Caligari solo 9% each, Dark Sun solo 8%, Echo melody 7%. Base Kosmic Lead 2: Slow echo answer 35%, Slow answer cell 35%, Gap reply melody 30%. Base Motorik Lead 1: Hallogallo hook 15%, Tour de France riff 15%, Radioactive riff 14%, Model riff 12%, Vanishing solo 12%, Stepwise sequence 11%, Call and answer 11%, Visiting solo 10%. Base Motorik Lead 2: Answer cell 25%, Echo answer 22.5%, Hook fragment 22.5%, Low bed 15%, Statement harmony 15%.
+- **How a hook plays** — The song states its hook 3 to 6 times in the body (Kosmic 3 to 6, Pulstar 4 to 6). The first statement is the full hook and the last, near the end, is the full hook with its last note ringing. Between them a statement is the full hook again or a real variation: the head alone, the head said twice, the answer alone, the call as a sequence a scale step up or down, or the hook with a dropped note, an alternate ending, a held-over last note or the answer withheld. After a variation the full hook returns often. At least one statement always falls in the last third.
+- **On the beat** — Every Motorik hook note sits on the 8th-note grid with the held notes on beats, so the line locks to the kick and snare. Variations keep to the grid. The Radioactive riff is a 16th-note riff and keeps its off-beat 16ths.
+- **Placed around the arrangement** — Statements avoid Lead 1's rest windows and the base Motorik breakdowns. The arrangement filter only softens a hook lead and never silences a block of it. A hook stays in one octave for the whole song.
+- **Kosmic solos kept whole** — KOS-LD1-008 Caligari solo and KOS-LD1-009 Dark Sun solo are no longer rested by the arrangement filter, which had taken whole windows. Caligari widens its note pool when a chord leaves it fewer than four chord tones, and Dark Sun always plays at least twice.
+- **Testing marker** — While the rules are being tuned, the generation log prints a star before each new rule's name, under its new number.
+- **Motorik mix** — Moog, Synth Bass 3 and Rock Bass on the bass are about 1.8 dB quieter, and Lead Bass about 2.7 dB. Synth Lead, Saw Stack and Polysynth on Lead 1 are about 2.3 dB louder. **Kosmic mix** — Mono Synth on the bass and Harpsi Pad on Rhythm are quieter so the hooks sit forward.
 
 ## V 2.9 (Build 135) — Kosmic Space
 

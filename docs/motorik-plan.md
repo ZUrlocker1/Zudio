@@ -511,29 +511,98 @@ final sound. Cold Stop — pads cut on final outro bar.
 #
 ### Lead 1 rule weights
 
-Per draw, from `pickLd1Rule`. The picker runs twice per song — once for the A section, once
-for B — and `bRule` reuses `aRule` 70% of the time, so a rule's chance of appearing *somewhere*
+Per draw, from `pickLd1Rule`. The picker runs twice per song, once for the A section and once
+for B, and `bRule` reuses `aRule` 70% of the time, so a rule's chance of appearing *somewhere*
 in a song is higher than its weight, and a rule that wins usually carries the whole track.
+A hook rule owns the whole song, so one drawn for B alone gives way to the A rule.
 
-Base Motorik:
+Base Motorik, also drawn by the Motorik Europe songs whose Lead 1 is in the Sequence Lock group:
 
-- 15% `MOT-LD1-001` Neu! motif first
-- 15% `MOT-LD1-004` Stepwise sequence
-- 14% `MOT-LD1-002` Pentatonic cell
-- 12% `MOT-LD1-006` Long arc solo
-- 12% `MOT-LD1-007` Vanishing solo
-- 11% `MOT-LD1-003` Punch solo
-- 11% `MOT-LD1-005` Call and answer
-- 10% `MOT-LD1-008` Visiting solo
+- 15% MOT-LD1-001 Hallogallo hook
+- 15% MOT-LD1-003 Tour de France riff
+- 14% MOT-LD1-002 Radioactive riff
+- 12% MOT-LD1-006 Model riff
+- 12% MOT-LD1-007 Vanishing solo
+- 11% MOT-LD1-004 Stepwise sequence
+- 11% MOT-LD1-005 Call and answer
+- 10% MOT-LD1-008 Visiting solo
 
-`MOT-LD1-005` was 14% and is the most recognisable shape in the pool, so with the 70% A/B reuse
-it read as more frequent than its share; its 3% went to 003, 006 and 007. `MOT-LD1-003` never
-runs in a B section — if it wins the A draw, B is forced to 001 (60%) or 004 (40%), which gives
-those two a small boost beyond the weights above.
+The four hooks hold 56%. MOT-LD1-005 Call and answer is the most recognisable shape in the
+pool and is held at 11%: with the 70% A/B reuse it reads as more frequent than its share.
+It is kept in every pool and is never replaced.
 
-Noir: 010 and 011 at 17%, 014 15%, 013 14%, 009 11%, 012 10%, with 001/005/006/008 at 4% each.
-Arcade: 019 18%, 018 and 015 17%, 017 14%, 016 and 020 13%, with 005/001 at 3% and 002 at 2%.
-Motorik Europe, when Lead 1 is in the sync group: 021 Short Statement 60%, 022 Long Run 40%.
+Noir:
+
+- 17% MOT-LD1-010 Pendulum arc and 17% MOT-LD1-011 Melodic Spiral
+- 15% MOT-LD1-014 Rising phrase and 14% MOT-LD1-013 Slow arc
+- 11% MOT-LD1-009 Cold descent and 10% MOT-LD1-012 Chromatic Descent
+- 4% each for MOT-LD1-001 Hallogallo hook, MOT-LD1-005 Call and answer, MOT-LD1-006 Model riff
+  and MOT-LD1-008 Visiting solo
+
+Arcade:
+
+- 18% MOT-LD1-019 Triad Climb, 17% MOT-LD1-018 Octave Bounce and 17% MOT-LD1-015 Arcade Riff
+- 14% MOT-LD1-017 Pentatonic Blitz, 13% MOT-LD1-016 Machine Answer and 13% MOT-LD1-020 Synth Hook
+- 3% each for MOT-LD1-005 Call and answer and MOT-LD1-001 Hallogallo hook, 2% MOT-LD1-002
+  Radioactive riff
+
+Motorik Europe, when Lead 1 is in the sync group: MOT-LD1-021 Short Statement 60%, MOT-LD1-022
+Long Run 40%.
+
+### Transcription hook leads
+
+MOT-LD1-001, MOT-LD1-002, MOT-LD1-003 and MOT-LD1-006 play a short phrase taken from one real
+record, mapped to the song's mode and reworked per song as homage, so no song plays the source as
+written. They replaced the weakest early Lead 1 rules, which are deleted; each took the number of
+the rule it replaced. The bar for each is a hook you could hum. The cell data and the engine are
+in `Sources/Zudio/Generation/HookLeadEngine.swift`.
+
+- **MOT-LD1-001 Hallogallo hook**, Neu!, *Hallogallo*: a call 5, 7, 14, 14 semitones from the
+  tonic at steps 0, 2, 4 and 8, answered by 5, 7, 12, 12, with a source variant that ends on the
+  fifth and a soft pulse tail in 8ths.
+- **MOT-LD1-002 Radioactive riff**, Kraftwerk, *Radioactivity*: the one-bar key-synth riff, 16th
+  based with a pickup. The plain answer is the same riff two scale steps lower, and the vocal line
+  1 1 1 1 3 2 1 is the source variant. It is a native 16th riff and keeps its off-beat 16ths.
+- **MOT-LD1-006 Model riff**, Kraftwerk, *The Model*: a two-bar riff with a long held root. The
+  vocal line alternates with it as a restatement, and a source variant ends the riff on the root.
+- **MOT-LD1-003 Tour de France riff**, Kraftwerk, *Tour de France*: a rising one-bar call and a
+  two-bar answer, with a variant cadence 4 3 1. The longest phrase.
+
+How a hook plays:
+
+- **Homage per song.** Every cell gets one to three changes: add a passing or neighbour note on
+  the 8th grid, drop an interior note, move an off-beat 8th onto the beat before or after it, swap
+  two adjacent notes, or turn a repeated note into a neighbour. The first and last notes never
+  change.
+- **Fit the beat.** Motorik drums put the kick on steps 0 and 8 and the snare on 4 and 12. Every
+  hook note sits on the 8th-note grid, held notes on beats, and no variation shifts a figure a
+  16th late. Only the Radioactive riff is a native 16th figure.
+- **Count.** The body states the hook 3, 4 or 5 times, the cap drawn 20, 40 and 40%, plus a soft
+  outro statement 30% of the time, so 3 to 6. Spacings run 8 to 20 bars.
+- **Forms.** The first statement is the full hook. Each later one is the full cell or one of: the
+  head alone, the head said twice in one bar, the answer alone, the call as a sequence a scale
+  step up or down, or the full cell with a small variation such as a source variant, a dropped
+  note, the last note held over the next bar or the answer withheld. After a varied statement the
+  full cell returns about 45% of the time. The last statement is always the full cell with its
+  last note ringing.
+- **Placement.** Statements avoid rest windows, the base Motorik breakdown windows and the intro.
+  At least one falls in the last third, and the last fifth plays the full hook. B sections
+  restate the hook a scale step or a third up, or lean on the variants.
+- **Fitting.** The tonic octave is chosen once per song, with the hook's centre just below the
+  middle of MIDI 52 to 79. A hook stays in one octave for the whole song. Seven-note modes map
+  source semitones by scale degree, so a major or minor third becomes the song's third;
+  pentatonic modes snap to the nearest note. A held note that is an avoid tone moves to the
+  nearest chord tone. Notes hold to the next onset, since short transcribed notes sound clunky on
+  synth leads.
+- **Filters.** `ArrangementFilter.apply(phraseTracks:)` softens a hook lead and never thins or
+  silences it, because resting whole blocks removed most statements. `HarmonicFilter.apply` gives
+  it one octave decision per song and skips the clash pass. `LeadGenerator.generateLead1` takes
+  the breakdown windows so statements are placed around them.
+- **Regen.** Motorik Lead 1 regen does not run `HarmonicFilter` and does not pass the breakdown
+  windows, so regen and first generation differ.
+- **Log and testing star.** Log names are in `lead1RuleDescription`. While the rules are tuned,
+  the generation log prints a star before each new rule, set in
+  `GenerationLogEntry.testingMarkedRules`.
 
 ### Lead 1 — where a long unbroken run is and is not a fault
 
@@ -558,27 +627,13 @@ to three-bar rests into an over-long stretch rather than rewriting either rule, 
 their density — verified by `MotorikLeadDensityTests`, which also pins that Chromatic Descent
 still runs past 20 bars so the cap is not widened to the sparse rules by mistake.
 
-### Lead 1 breathing and phrase variation
+### Lead 1 breathing
 
-Two limits found by ear in a 112-bar song whose lead ran 19 bars without a rest and repeated
-one four-bar figure verbatim fourteen times.
-
-**Rest windows scale with song length.** `buildRestBars` drew one or two windows of 4–8 bars
-for a whole song, so a long song breathed no more often than a short one. It now places one
-window per ~22 bars of body, laid out one per slot so they spread rather than cluster.
-Measured across 400 Motorik songs: mean 8.7 gaps of two or more bars per song, against 3 in
-the song that prompted this.
-
-**The replayed phrase varies on every return.** `MOT-LD1-001` replays a stored phrase on a
-4-bar cycle and mutated it every 16 bars — four identical passes before anything moved. The
-mutation interval is now 8 or 12 bars, and on top of that each bar from the second pass onward
-has a 45% chance of one note either being dropped or displaced by an octave. Dropping is
-preferred at 60%, because it varies the line and opens space at the same time; octave
-displacement keeps the pitch class, so the harmony is untouched. Bars identical to the bar four
-earlier fell from 54% to 25%.
-
-This applies to all Motorik songs, not only Motorik Europe — `buildRestBars` serves every
-non-solo Lead 1 rule.
+**Rest windows scale with song length.** `buildRestBars` places one window per ~22 bars of body,
+laid out one per slot so they spread rather than cluster. Measured across 400 Motorik songs: mean
+8.7 gaps of two or more bars per song. It serves every non-solo Lead 1 rule and every Motorik
+style, not only Motorik Europe. The hook leads take it together with the base Motorik breakdown
+windows.
 
 ## Lead 1
 
@@ -609,62 +664,103 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 
 **Lead 1 rules:**
 
-- LD1-001 — Neu! motif first: 4-bar phrase seeds cycling with slow mutation; chord tones 80%,
-  tensions 20%.
-- LD1-002 — Pentatonic Cell: short driving cell from pentatonic scale. Pitch mutates every 4 bars
-  (occasionally two intervals shift at once); rhythm grid (step positions and durations) refreshes
-  independently every 8 bars; 15% rest-bar chance for breathing room. Previously the cell was locked
-  for 16 bars with only one-interval mutation — causing monotonous repetition across whole songs.
-- LD1-003 — Long Breath: sparse, long sustained notes with generous rests.
-- LD1-004 — Stepwise Sequence: descending sequence development (5→4→2→1 bar A, b7→5→4→2 bar B).
-- LD1-005 — Statement-Answer: bar A ascends 1→2→b3→5; bar B silent then answers 4→b3. From
-  Hallogallo analysis.
-- LD1-006 — Long Arc Solo: one held note per bar, stepping through the mode scale ascending then
-  reversing direction at register boundaries. Variable duration (short/normal/held) and 15% rest-bar
-  chance add rhythmic variety. Suppressed in intro/outro.
-- LD1-007 — Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
+- MOT-LD1-001 Hallogallo hook, MOT-LD1-002 Radioactive riff, MOT-LD1-003 Tour de France riff and
+  MOT-LD1-006 Model riff: transcription hooks, described under Transcription hook leads above.
+- MOT-LD1-004 Stepwise Sequence: descending sequence development (5→4→2→1 bar A, b7→5→4→2 bar B).
+- MOT-LD1-005 Call and answer: bar A ascends 1→2→b3→5; bar B silent then answers 4→b3. From
+  Hallogallo analysis. Kept in every pool.
+- MOT-LD1-007 Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
   Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 silenced during solo
   window. Status log fires "Extended solo — Vanishing solo" at solo start bar.
   One or two shorter versions of 4 to 6 bars come back later in the body (40% two), at least 12
   bars from the full solo and from each other where the song has room, otherwise 8. Each is the
   full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 stays out of
   them, and the log fires "Short solo Vanishing solo" at each start bar.
-- LD1-008 — Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
+- MOT-LD1-008 Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
   octave arpeggio motif. Inspired by the synth solo in *Visitor from the Past* (bars 21–30). Lead 2
   silenced during solo window. Status log fires "Extended solo — Visiting solo" at solo start bar.
   Shorter versions come back in the same way, logged as "Short solo Visiting solo".
+- Intro and outro of MOT-LD1-007 and MOT-LD1-008 songs: a motif-first line, so the track is not
+  silent before the body.
 
 ### Lead 2
 
-- Entry: bar 8 (60%) or bar 16 (40%)
-- Density: 30–55% of Lead 1 event density
-- Response mode: off-beat echo (50%), interval complement 3rd/6th/octave (35%), sparse unison
-  punctuation (15%)
-- Counter-hook policy: builds from Lead 1 anchors (rhythmic echo, interval complement, delayed
-  answer); does not introduce independent long-form hook when Lead 1 is active; ≥60% of phrases
-  begin after Lead 1 phrase onset (call/response feel)
-- Role-handoff: if Lead 1 absent for a section, Lead 2 may assume Lead 1 foreground role; returns
-  to response within 1–2 bars when Lead 1 returns; the 55% density cap is suspended during handoff
-- Doubling windows: Lead 2 and Rhythm (or Lead 1) may play same motif in unison/octave; typical
-  1–4 bars (extended jam up to 8); require ≥2 bars of divergence after
-- Never active during intro; drops before Lead 1 in outro
-- Register: MIDI 55–81; max 1 simultaneous note
+In base Motorik Lead 2 answers Lead 1 in its gaps instead of playing over it. The cell data and
+the engine are in `Sources/Zudio/Generation/GapAnswerEngine.swift`. One rule is drawn per song.
 
-**Lead 2 rules:**
+**The five rules:**
 
-- LD2-001 — Counter-response: density ≤55% of Lead 1, avoids Lead 1 steps.
-- LD2-002 — Sustained Drone: very sparse, long holds on root or 5th.
-- LD2-003 — Rhythmic Counter: short off-beat bursts avoiding Lead 1 step positions. Density
-  corrected to scale properly with section intensity (previously a double * 0.5 penalty kept it at
-  ~1 note/bar regardless of intensity); slight velocity variation added.
-- LD2-004 — Neu! counter melody: 16th-note pairs at steps 0, 2, 4, 6, 10, 12, 14, 15. From
-  guitar 2 analysis.
-- LD2-005 — Descending Line: off-beat 2-bar arc 6→5→b3→2 with velocity diminuendo. Now cycles
-  through 4 distinct descent positions every 8 bars (5th/4th, 4th/♭3, ♭3/2, and back) so the line
-  travels across the register rather than repeating the same two pitches for the whole song; 20%
-  rest-bar chance. Previously a bug caused only the same 2 pitches to alternate endlessly.
-- LD2-006 — Neu! harmony: interval-shadow counterline following Lead 1 contour at consonant
-  interval.
+- **MOT-LD2-001 Echo answer**, 22.5% in base: Lead 1's last 2 to 4 notes in the same rhythm, a
+  diatonic third, sixth or octave lower. The interval is drawn once per song, 45, 25 and 30%.
+- **MOT-LD2-002 Low bed**, 15%: the chord's root or fifth held under each Lead 1 note of a beat or
+  more, and in any bar of the phrase without one from its first beat for half a bar, MIDI 50 to
+  60, starting on a beat. The song's target of 4 to 6 phrases get a bed, spread evenly over the
+  body. Consecutive beds on one pitch join into one note up to a bar. Once or twice a song, 50%
+  each, the bed also plays alone in one of the longest Lead 1 silences, four bars or more, held
+  for one or two bars from a bar line and ending half a bar before Lead 1 returns. These solo beds
+  are outside the 4 to 6 count. It plays nothing else in the gaps.
+- **MOT-LD2-003 Hook fragment**, 22.5%: the first 2 to 5 notes of Lead 1's last phrase, inverted or
+  moved one scale step down, drawn per answer: 2 notes 25%, 3 30%, 4 25%, 5 20%. Lead 1's 16ths
+  fold into the 8th grid, so more of its notes are taken until the placed figure has the drawn
+  count.
+- **MOT-LD2-004 Answer cell**, 25%: a cell paired with Lead 1's rule, reworked once per song as
+  homage. The first and last answers play the full cell; the others take a form drawn per answer:
+  the full cell 35%, the head alone with its last note held 30%, the cell inverted around the note
+  it resolves to 20%, or the cell followed by its head a scale step lower, up to three bars, 15%.
+  Every form plays in the full cell's octave, chosen once per song. Half the songs may drop a
+  middle answer an octave, at most twice and never twice running, and a drop plays only where it
+  fits above 47. The cells:
+  - MOT-LD1-001 Hallogallo hook: the pulse tail, flat seventh into the root in 8ths.
+  - MOT-LD1-002 Radioactive riff: the vocal line 1 1 1 1 3 2 1, on 8ths.
+  - MOT-LD1-006 Model riff: the tail, 2 flat 7 5.
+  - MOT-LD1-003 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
+  - Every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
+- **MOT-LD2-006 Statement harmony**, 15%: one Lead 1 statement in three, a diatonic third below
+  in Lead 1's rhythm, from an offset drawn per song. A statement is a body phrase of three notes
+  or more. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
+  between. In the other gaps it plays echo answers.
+
+**Pools:**
+
+- Base Motorik and the Motorik Europe songs whose Lead 2 is not in the sync: MOT-LD2-001, 002,
+  003, 004 and 006 at the weights above. MOT-LD2-005 is unused.
+- Motorik Arcade: 75% of normal songs draw an arp rule, MOT-LD2-007 Arcade Arp, MOT-LD2-008 Gate
+  Arp or MOT-LD2-009 Bounce Arp, a third each. The other 25% draw MOT-LD2-001 at 45%, MOT-LD2-003
+  at 35% and MOT-LD2-004 at 20%. Songs whose Lead 1 is a dense arp draw no Lead 2 20%, MOT-LD2-010
+  Blip 16%, MOT-LD2-009 16%, MOT-LD2-008 12% and that pool 36%.
+- Motorik Europe Sequence Lock and Machine Voice: MOT-LD2-011 Counter Sequencer and MOT-LD2-012
+  Octave Unison, as before.
+- Noir has no Lead 2.
+
+**How the gap answers behave:**
+
+- **Phrase map.** Lead 1's onsets group into phrases wherever the gap from one note's end to the
+  next onset is under 8 steps. A gap runs from one phrase's end to the next phrase's start.
+- **Silence.** Lead 2 is silent while Lead 1 plays a phrase and for a tail of 2 or 4 steps after
+  it, drawn per song. Only the harmony and the bed sound with Lead 1.
+- **Answers.** Only in gaps of a bar or more, ending at least two steps before Lead 1 returns, at
+  most two bars long, three for the Answer cell's long form.
+- **Count.** Each song states Lead 2 4, 5 or 6 times in the body, drawn 30, 40 and 30%. Over the
+  target, the answer whose neighbours are closest goes, never the first or last. Under it, a Lead 1
+  silence of four bars or more is a handoff: Lead 2 restates its answer there, every four bars,
+  filling the longest silences first. The outro echo is outside the count.
+- **Breakdowns.** Lead 2 stays out of the base Motorik breakdown windows and a Lead 1 solo.
+- **Intro and outro.** Silent in the intro. In the outro, at most one softer echo of the final
+  statement.
+- **Grid.** Every onset is on the 8th grid and held notes start on beats. Notes hold to the next
+  onset within 8 steps.
+- **Register.** Answers fit MIDI 50 to 67 as a block, so a figure stays in one octave. The Answer
+  cell uses 50 to 69, and 47 for a drop. The harmony sits a third under Lead 1 wherever Lead 1 is.
+- **Wiring.** `LeadGenerator.generateLead2` draws the rule and, for a gap rule, records the ID and
+  returns nothing. `SongGenerator.generateMotorik`, step 12.6, writes the part with
+  `GapAnswerEngine.generate` from the Lead 1 the listener hears, after `ArrangementFilter` and
+  `HarmonicFilter`. Lead 2 gets its own `HarmonicFilter.filterLead` pass with one octave decision
+  per song. Regen calls the same function with the Lead 1 now playing, so regen and first
+  generation agree. Names are in `lead2RuleDescription`; all five IDs are in the testing star set.
+- **Measured** over Motorik seeds 1 to 600, with the weights then in force: no Lead 2 onset inside
+  a Lead 1 phrase for MOT-LD2-001, 003 and 004; no off-grid notes; 4 to 6 appearances a song in the
+  body for nearly every song; about 15, 13, 25, 31 and 10 notes a song for Echo answer, Hook
+  fragment, Answer cell, Statement harmony and Low bed.
 
 ### Scale and hook rules (Lead 1/2)
 
@@ -844,7 +940,7 @@ Short (1–3 words), pulse-oriented, slightly cryptic. Mixes English with German
 These are structural invariants, not probabilistic firing rules. They hold for every song and every note. For the study findings and bug history that produced them, see `musical-coherence-plan.md` (Motorik Studies 01–02).
 
 **MOT-SYNC-001: Scale pools anchor to song tonic**
-All note-pool derivations use `keySemitone(frame.key)` as root. When chord roots are non-tonic (e.g. bVII in a Dorian song), generators stay in the global key. The flat7 in bass patterns is snapped to the nearest in-scale pitch class. LD2-004 Hallogallo Counter and LD2-005 Descending Line use the song tonic as their reference pitch — they are fixed tonic-anchored motifs and must not shift when chord roots change.
+All note-pool derivations use `keySemitone(frame.key)` as root. When chord roots are non-tonic (e.g. bVII in a Dorian song), generators stay in the global key. The flat7 in bass patterns is snapped to the nearest in-scale pitch class. The hook leads take their tonic from the same root.
 
 **MOT-SYNC-002: Chord root selection is mode-aware**
 `pickChordRoot` uses a mode-specific degree list. Aeolian: `[1,2,b3,4,5,b6,b7]`. Dorian: `[1,2,b3,4,5,6,b7]` (raised 6th, no b6). Ionian: `[1,2,3,4,5,6,7]`. Mixolydian: `[1,2,3,4,5,6,b7]`. Using a hardcoded Aeolian list for all modes introduces non-diatonic chord roots that cause system-wide consonance failures.
@@ -856,7 +952,7 @@ All note-pool derivations use `keySemitone(frame.key)` as root. When chord roots
 After applying chord-type interval offsets, each voiced note's pitch class is snapped to the nearest diatonic PC. Chord type offsets (e.g. dom7, min7) can land on chromatic pitches that are not in the key; the snap corrects this without removing the note from the voicing.
 
 **MOT-SYNC-005: Lead role separation**
-Lead 2 receives the Lead 1 event array before generating. When Lead 1 picks a sparse rule (LD1-003 Long Breath) for the A section, the B section escalates to an active melodic rule (LD1-001 or LD1-004). Lead 2 note share should stay below 60% of total lead notes.
+Lead 2 answers the Lead 1 the listener hears. The gap-answer rules are written after `ArrangementFilter` and `HarmonicFilter`, from Lead 1's events, and stay silent while Lead 1 plays a phrase, apart from MOT-LD2-006 Statement harmony and MOT-LD2-002 Low bed.
 
 **Consonance targets** (verified via MIDI batch analysis — see musical-coherence-plan.md):
 - Bass: > 92%
@@ -893,5 +989,5 @@ Track assignments per kTrack index:
 - **kTrackPads (Pads):** Halo Pad (94), Sweep Pad (95), Bowed Glass (92), Synth Strings (50)
 - **kTrackRhythm (Rhythm):** Guitar Pulse (28), Moog Lead (39), Fuzz Guitar (29)
 - **kTrackTexture (Texture):** Fifths Lead (86), Halo Pad (94), Warm Pad (89), FX Atmosphere (99), FX Echoes (102)
-- **kTrackBass (Bass):** Moog Bass (39), Lead Bass (87), Rock Bass (34), Elec Bass (33) — Lead Bass and Rock Bass volume reduced (0.30×) as they run hot
+- **kTrackBass (Bass):** Moog Bass (39), Lead Bass (87), Rock Bass (34), Elec Bass (33) — Lead Bass runs hot, with sampler volume 0.22 on Motorik bass; Moog, Synth Bass 3 and Rock Bass take a CC7 trim of 90, about 1.8 dB down (`AppState.instrumentPoolVolumeCC7`)
 - **kTrackDrums (Drums):** Rock Kit (8), 808 Kit (25), Brush Kit (40)

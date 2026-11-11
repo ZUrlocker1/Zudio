@@ -335,7 +335,7 @@ This is the reference list of rule IDs. Full behavioral specifications are in th
 - L2-002: Lead 2 may temporarily assume Lead 1 role when Lead 1 is absent
 - L2-003: When Lead 1 returns, Lead 2 transitions back within 1–2 bars
 - LD2-001 through LD2-006: `motorik-plan.md` § Lead 2
-- KOS-LEAD-006, KOS-LEAD-TECH-D, KOS-LEAD-BRIDGE: `kosmic-plan.md` § Lead Behavior
+- KOS-LD1-006, KOS-LD1-TECH-D, KOS-LD1-BRIDGE: `kosmic-plan.md` § Lead Behavior
 
 ### Rhythm rules
 - R-001: Rhythm must stay sparser than drums in most sections

@@ -72,7 +72,7 @@ Given a set of log + MIDI files:
 - Parse all log files and produce rule frequency table, mode distribution, section length stats
 - Write a Swift or Python script to parse MIDI and compute note density curves, consonance rates, lead overlap
 - Produce a findings report with specific rule IDs or generation parameters to investigate
-- Suggest targeted tweaks (e.g. "KOS-LEAD-002 produces 4.8 notes/bar in body — consider thinning")
+- Suggest targeted tweaks (e.g. "KOS-LD1-002 produces 4.8 notes/bar in body — consider thinning")
 
 ## What Requires Human Ears
 
@@ -103,7 +103,7 @@ Analysis of 11 generated Kosmic songs identified several structural and rule iss
 
 Full machine analysis in `docs/midi-analysis/study02_findings.txt`. Script: `docs/midi-analysis/analyze_study02.py`.
 
-**Lead 1 is far too sparse — the most urgent issue** — 8 of 11 songs produced under 0.8 notes/bar in body sections. Only Auxese (2.1), Fluxion (1.6), and Vortexe-VI (1.7) approached the 2–5 target. Songs like Deep-Solstice, Flexure, and Solaxe averaged 0.3 notes/bar — the lead is essentially inaudible. The Berlin School slow arc (KOS-LEAD-001) and Eno floating tones (KOS-LEAD-002) rules are the primary contributors and appear in 7 and 8 of 11 songs respectively. These rules are naturally sparse by design but may need a minimum density floor or be paired with denser rules more often.
+**Lead 1 is far too sparse — the most urgent issue** — 8 of 11 songs produced under 0.8 notes/bar in body sections. Only Auxese (2.1), Fluxion (1.6), and Vortexe-VI (1.7) approached the 2–5 target. Songs like Deep-Solstice, Flexure, and Solaxe averaged 0.3 notes/bar — the lead is essentially inaudible. The Berlin School slow arc (since retired) and Eno floating tones (KOS-LD1-002) rules are the primary contributors and appear in 7 and 8 of 11 songs respectively. These rules are naturally sparse by design but may need a minimum density floor or be paired with denser rules more often.
 
 **Lead overlap elevated in 5 of 11 songs** — Galaxie-VIII 50%, Flexure 39%, Deep-Solstice 39%, Polar-Horizon 37%, Void-Ether 30%. Average was 25.8% across all songs, just under the 30% target. When Lead1 is sparse, Lead2 tends to fill the same time-space, inflating overlap. Reducing overlap requires either register separation between leads or time-interleaving logic.
 
@@ -123,7 +123,7 @@ Full machine analysis in `docs/midi-analysis/study02_findings.txt`. Script: `doc
 
 All five phases from the roadmap below were implemented in the same session as the Study 02 analysis.
 
-**Lead 1 / Lead 2 role differentiation (Phase 1)** — Lead 1 weights shifted strongly toward KOS-LEAD-006 JMJ Phrase Loop (25% → 40%) and KOS-LEAD-004 Echo Melody (12% → 20%), making Lead 1 the primary melodic voice with identifiable phrases rather than ambient texture. Lead 2 now excludes KOS-LEAD-006 entirely, preventing it from ever competing for the main melodic role. Lead 2 weights redistributed to favour sparse ambient rules: Eno Floating Tones 30%, Echo Melody 25%, Pentatonic Drift 20%. Lead 2 register shifted down from 60–88 to 55–80 so it sits in a darker register below Lead 1.
+**Lead 1 / Lead 2 role differentiation (Phase 1)** — Lead 1 weights shifted strongly toward KOS-LD1-006 JMJ Phrase Loop (25% → 40%) and KOS-LD1-004 Echo Melody (12% → 20%), making Lead 1 the primary melodic voice with identifiable phrases rather than ambient texture. Lead 2 now excludes KOS-LD1-006 entirely, preventing it from ever competing for the main melodic role. Lead 2 weights redistributed to favour sparse ambient rules: Eno Floating Tones 30%, Echo Melody 25%, Pentatonic Drift 20%. Lead 2 register shifted down from 60–88 to 55–80 so it sits in a darker register below Lead 1.
 
 **Simultaneous silence fix (Phase 2)** — After Lead 2 generation, a post-processing pass scans body sections in 4-bar windows. Any window where both Lead 1 and Lead 2 are completely silent gets a single held note injected into Lead 2. This uses the `lead1Events` parameter that was passed into `generateLead2` but never previously used.
 
@@ -141,7 +141,7 @@ All five phases from the roadmap below were implemented in the same session as t
 
 8 songs generated in project root + 3 from Downloads root. One song (Auxese-test-bridge) generated in test mode with a forced melodic bridge for targeted analysis.
 
-**Study 02 lead changes confirmed effective for 006-primary songs** — Songs where Lead 1 picked KOS-LEAD-006 (Auxese-test-bridge 112 notes, Sanft-Nebel 237 notes) showed clearly improved melody density. The JMJ phrase loop is now doing its job as the primary melodic voice.
+**Study 02 lead changes confirmed effective for 006-primary songs** — Songs where Lead 1 picked KOS-LD1-006 (Auxese-test-bridge 112 notes, Sanft-Nebel 237 notes) showed clearly improved melody density. The JMJ phrase loop is now doing its job as the primary melodic voice.
 
 **Songs with sparse Lead 1 rules remain nearly inaudible** — Songs where Lead 1 picked 001/002/003 still produced only 33–58 notes across 108–128 bars (0.3–0.5/bar). The weight shift to 006 helped the songs that pick it, but the ambient rules are structurally sparse by design and the problem persists in ~60% of generations. Technique D (B-section rule swap) was firing at only 60% probability and when it did fire could still pick another sparse rule.
 
@@ -151,7 +151,7 @@ All five phases from the roadmap below were implemented in the same session as t
 
 ## Fixes Applied: Kosmic Study 03 (March 2026)
 
-**B-section escalation for sparse Lead 1 rules** — When Lead 1 picks an ambient sparse rule (KOS-LEAD-001, 002, or 003), Technique D now always fires and is constrained to pick either KOS-LEAD-004 Echo Melody or KOS-LEAD-006 JMJ Phrase Loop (60/40 split). Songs with drone or slow-arc A sections now always open into an actively melodic B section, creating a genuine ambient → melodic arc rather than 100+ bars of the same sparse texture throughout.
+**B-section escalation for sparse Lead 1 rules** — When Lead 1 picks an ambient sparse rule (the retired slow arc, KOS-LD1-002 or KOS-LD1-003), Technique D now always fires and is constrained to pick either KOS-LD1-004 Echo Melody or KOS-LD1-006 JMJ Phrase Loop (60/40 split). Songs with drone or slow-arc A sections now always open into an actively melodic B section, creating a genuine ambient → melodic arc rather than 100+ bars of the same sparse texture throughout.
 
 **Bridge rhythm variant wired to Lead 1 rule** — The bridge melody generator previously picked its rhythm skeleton at random from four options. Now the skeleton is biased (60%) toward the character of the song's Lead 1 rule: JMJ songs get the syncopated off-beat skeleton; echo melody songs get the driving 8th-note sequencer; sparse ambient songs (001/003/005) get the restrained 3-note motif with breath; floating tones songs get the steady quarter-note pulse. The bridge now feels like it belongs to the song's character rather than being a random texture shift.
 
