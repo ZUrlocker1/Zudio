@@ -931,8 +931,6 @@ struct KosmicBassGenerator {
         drift015VarType: Int = 0
     ) -> [MIDIEvent] {
         switch ruleID {
-        case "KOS-BASS-001": return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
-                                                  rng: &rng, totalBars: totalBars, isBody: isBody)
         case "KOS-BASS-002": return rootFifthWalkBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
                                                       useB7: bass002UseB7, durChoice: bass002DurChoice,
                                                       attackStep: bass002AttackStep, velocity: bass002Velocity,
@@ -967,8 +965,12 @@ struct KosmicBassGenerator {
                                                frame: frame, cell: boc016Cell, shiftIdx: boc016ShiftIdx)
         case "KOS-BASS-017": return fourBarHoldBar(barStart: barStart, bar: bar, entry: entry,
                                                     frame: frame, velBase: driftVelocityBase)
-        default:             return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
-                                                  rng: &rng, totalBars: totalBars, isBody: isBody)
+        default:
+            // Only KOS-BASS-001 Drone Root lands here; any other ID is a rule this switch forgot,
+            // so debug builds and tests stop rather than quietly playing it as a drone.
+            assert(ruleID == "KOS-BASS-001", "Kosmic Bass rule \(ruleID) has no case")
+            return droneRootBar(barStart: barStart, bar: bar, entry: entry, frame: frame,
+                                rng: &rng, totalBars: totalBars, isBody: isBody)
         }
     }
 

@@ -24,6 +24,15 @@
 # Blues harmony gate (CHL-LD1-004/003 leads, no vibraphone Lead 2). Motorik, Kosmic and Ambient identical.
 # NOTE: the Chill mix is now 30/20/50 Soho/Blues/base (2026-10-18). Any later change to the
 # mix reclassifies seeds and shows a large Chill diff — expected; re-pin after checking it.
+#
+# Re-pinned 2026-11-11, three weeks of deliberate work since 10-19, checked per track against
+# 57bae36 and 88310d1. Ambient identical. Chill: 165 base and Blues songs moved in Lead 1 and Lead 2
+# only, all from the jazz Lead 1 rules and weights (56bc459, 88310d1); 145 drew a different Lead 1
+# rule, 20 kept it but the longer rule-pick chain shifted later draws; Soho and every other track
+# identical; nothing after 88310d1 moved Chill. Motorik and Kosmic (277 of 300 each) moved with
+# Kosmic Space, the solo improvement phases, the hook layout and the 2026-11-11 bug fixes.
+# The dump now deletes all_now.txt first: a failed test run used to diff a stale file and report
+# no problems. In a Claude session macOS strips DYLD_* from bash, so run the steps by hand there.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SP="${ROOT}/tools/fingerprints"
 cd "$ROOT" || exit 1
@@ -52,8 +61,10 @@ import Foundation
     }
 }
 SW
+rm -f "$SP/all_now.txt"
 ZUDIO_FP_OUT=$SP/all_now.txt swift test --filter AllStylesFingerprintDump 2>&1 | grep -E "error:" | head -3
 rm -f Tests/ZudioTests/AllStylesFingerprintDump.swift
+[ -s "$SP/all_now.txt" ] || { echo "  FAILED: no fingerprints written (test did not run); nothing compared"; exit 1; }
 python3 - "$SP" <<'PY'
 import sys
 SP=sys.argv[1]

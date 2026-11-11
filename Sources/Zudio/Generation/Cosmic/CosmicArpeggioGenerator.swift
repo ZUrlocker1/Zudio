@@ -138,7 +138,11 @@ struct KosmicArpeggioGenerator {
         case "KOS-RTHM-013": events = generateFourBarChordHold(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         case "KOS-RTHM-014": events = generateChromaticTremolo(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         case "KOS-RTHM-015": events = generateDownbeatChord(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
-        default:             events = generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
+        default:
+            // Only KOS-RTHM-001 Tangerine Dream lands here; any other ID is a rule this switch
+            // forgot, so debug builds and tests stop rather than quietly playing it as 001.
+            assert(chosenRule == "KOS-RTHM-001", "Kosmic Rhythm rule \(chosenRule) has no case")
+            events = generateTD(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng)
         }
 
         // Rest windows: every 16 body bars, bars 12–15 are silent (4-bar rest per cycle).

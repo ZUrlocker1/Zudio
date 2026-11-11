@@ -184,13 +184,6 @@ struct KosmicTextureGenerator {
                 }
 
                 switch primaryRule {
-                case "KOS-TEXT-001":
-                    // 8-bar window rest: every 3rd window silent (prevents NO-GAPS)
-                    guard !inWindowGap else { break }
-                    guard rng.nextDouble() < textureFireProb else { break }
-                    events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,
-                                               firstBodyBar: firstBodyBar,
-                                               entry: entry, frame: frame, structure: structure, rng: &rng)
                 case "KOS-TEXT-002":
                     guard rng.nextDouble() < textureFireProb else { break }
                     events += distantPulseBar(barStart: barStart, bar: bar, firstBodyBar: firstBodyBar,
@@ -205,6 +198,10 @@ struct KosmicTextureGenerator {
                     events += loscilShimmerBar(barStart: barStart, bar: bar, firstBodyBar: firstBodyBar,
                                                entry: entry, frame: frame, rng: &rng)
                 default:
+                    // Only KOS-TEXT-001 Orbital Motive lands here; any other ID is a rule this switch
+                    // forgot, so debug builds and tests stop rather than quietly playing it as 001.
+                    assert(primaryRule == "KOS-TEXT-001", "Kosmic Texture rule \(primaryRule) has no case")
+                    // 8-bar window rest: every 3rd window silent (prevents NO-GAPS)
                     guard !inWindowGap else { break }
                     guard rng.nextDouble() < textureFireProb else { break }
                     events += orbitalMotiveBar(barStart: barStart, bar: bar, loopLen: texLoopLen,

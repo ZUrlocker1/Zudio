@@ -1324,10 +1324,14 @@ struct KosmicLeadGenerator {
         guard !scaleNotes.isEmpty else { return [] }
 
         switch rule {
-        case "KOS-LD1-002": return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         case "KOS-LD1-003": return pentatonicDriftBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, entry: entry, rng: &rng)
         case "KOS-LD1-004": return echoMelodyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
-        default:           return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
+        default:
+            // Only KOS-LD1-002 Floating Tones lands here. Any other ID is a section-level rule
+            // routed to the per-bar player by mistake (how the B-section bug fixed in 3b8f778 hid),
+            // so debug builds and tests stop rather than quietly playing it as Floating Tones.
+            assert(rule == "KOS-LD1-002", "Kosmic Lead 1 rule \(rule) has no per-bar case")
+            return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         }
     }
 

@@ -67,4 +67,53 @@ struct WeightedPickTests {
         }
         #expect(checked > 50, "expected to find the call sites; found \(checked)")
     }
+
+    /// The rule pools are named arrays (`let ruleWeights: [Double] = [...]`, often over several
+    /// lines, or one array per substyle behind `? :`), which the test above cannot see. The Noir
+    /// Rhythm pool summed to 1.02 for weeks that way (found 2026-11-11). This reads every
+    /// assignment to a name ending in "weights" and checks each all-number array after it, through
+    /// every branch of a `? :`. Arrays with arithmetic (`1.0 / 6.0`) or built at runtime are skipped.
+    @Test func namedWeightPoolsSumToOne() throws {
+        let fm = FileManager.default
+        guard let walker = fm.enumerator(at: Self.sourceRoot, includingPropertiesForKeys: nil) else {
+            Issue.record("could not read Sources"); return
+        }
+        let assign = try NSRegularExpression(pattern: #"[wW]eights\s*(?::\s*\[Double\])?\s*=(?!=)"#)
+        var checked = 0
+
+        for case let url as URL in walker where url.pathExtension == "swift" {
+            // Comments stripped, so a note inside a multi-line array does not hide it.
+            let text = try String(contentsOf: url, encoding: .utf8)
+                .replacingOccurrences(of: #"//[^\n]*"#, with: "", options: .regularExpression)
+            let ns = text as NSString
+            for m in assign.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+                var pos = m.range.location + m.range.length
+                var first = true
+                while true {
+                    let open = ns.range(of: "[", range: NSRange(location: pos, length: ns.length - pos))
+                    guard open.location != NSNotFound else { break }
+                    // Between arrays only a condition and `?` or `:` may appear.
+                    let between = ns.substring(with: NSRange(location: pos, length: open.location - pos))
+                    if between.contains(where: { "=;{},".contains($0) }) { break }
+                    if !first && !between.contains(where: { $0 == "?" || $0 == ":" }) { break }
+                    let close = ns.range(of: "]", range: NSRange(location: open.location, length: ns.length - open.location))
+                    guard close.location != NSNotFound else { break }
+                    let body = ns.substring(with: NSRange(location: open.location + 1,
+                                                          length: close.location - open.location - 1))
+                    let items = body.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    let values = items.compactMap(Double.init)
+                    guard values.count == items.count, values.count > 1 else { break }
+                    checked += 1
+                    let total = values.reduce(0, +)
+                    let line = ns.substring(to: open.location).filter { $0 == "\n" }.count + 1
+                    #expect(abs(total - 1.0) < 0.001,
+                            Comment(rawValue: "\(url.lastPathComponent):\(line) weights sum to "
+                                  + String(format: "%g", total) + ", not 1"))
+                    pos = close.location + 1
+                    first = false
+                }
+            }
+        }
+        #expect(checked > 60, "expected to find the rule pools; found \(checked)")
+    }
 }

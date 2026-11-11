@@ -277,9 +277,6 @@ struct KosmicPadsGenerator {
             let primaryCountBefore = events.count
 
             switch primaryRule {
-            case "KOS-PADS-001", "KOS-PADS-009":
-                // 009 is 001 with every attack moved early after the bar loop, below.
-                events += longDroneBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
             case "KOS-PADS-002":
                 events += swellChordBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame, rng: &rng)
             case "KOS-PADS-003":
@@ -293,6 +290,11 @@ struct KosmicPadsGenerator {
             case "KOS-PADS-007":
                 events += gatedChordPulseBar(barStart: barStart, entry: entry, frame: frame, intensity: sectionIntensity, rng: &rng)
             default:
+                // KOS-PADS-001 Long Drone and KOS-PADS-009 (001 with every attack moved early after
+                // the bar loop, below). Any other ID is a rule this switch forgot, so debug builds
+                // and tests stop rather than quietly playing it as a drone.
+                assert(primaryRule == "KOS-PADS-001" || primaryRule == "KOS-PADS-009",
+                       "Kosmic Pads rule \(primaryRule) has no case")
                 events += longDroneBar(barStart: barStart, bar: bar, sectionStartBar: section.startBar, entry: entry, frame: frame)
             }
 
