@@ -452,6 +452,10 @@ Checks stay light:
   a softer repeat. Statement harmony is a horn-section part, chord-tone thirds, fifths and
   unisons, 60% of statements simplified. Low bed carries on through every Lead 1 silence of four
   bars or more. The rules are in `docs/motorik-plan.md`.
+- 2026-11-10, after Ost Hannover: the full MOT-LD1-007 and 008 solo started in the middle third of
+  the A section, bar 78 of 144 in that song, and was heard once. It now starts between bars 24 and
+  48, clamped for short A sections, and a second shorter return is drawn 60% of the time, up from
+  40%. The long-silence fill is unchanged.
 - A retired rule is replaced in every substyle that used it, and deleted. The new rule takes its number.
 - Kosmic Lead 1 rules are KOS-LD1 and Lead 2 rules are KOS-LD2, so no ID serves both leads, as in
   the other styles.

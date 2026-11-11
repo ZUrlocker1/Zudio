@@ -672,7 +672,9 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 - MOT-LD1-007 Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
   Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 plays under and between the solo
   (see Lead 2 below). Status log fires "Extended solo — Vanishing solo" at solo start bar.
-  One or two shorter versions of 4 to 6 bars come back later in the body (40% two), at least 12
+  The full solo starts between bars 24 and 48 (it was the middle third of the A section, bar 50 to 94 in a
+  136-bar song; short A sections are clamped so it still fits), leaving room for its returns.
+  One or two shorter versions of 4 to 6 bars come back later in the body (60% two), at least 12
   bars from the full solo and from each other where the song has room, otherwise 8. Each is the
   full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 plays in
   them as in the full solo, and the log fires "Short solo Vanishing solo" at each start bar.

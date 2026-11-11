@@ -2304,12 +2304,12 @@ struct LeadGenerator {
                 earliest = a.startBar
                 latest   = a.startBar + maxBars - soloLength
             } else {
-                // Normal mode: place in the first two-thirds of the A section so the solo
-                // isn't too late. Using 1/3 as earliest and 2/3 as latest cap keeps it
-                // roughly centred in the song.
-                earliest = a.startBar + a.lengthBars / 3
-                latest   = min(a.startBar + (a.lengthBars * 2) / 3,
-                               a.startBar + a.lengthBars - soloLength - 4)
+                // Normal mode: the full solo starts between bars 24 and 48 (1-based), so the
+                // shorter returns have room to follow it and the song is not half over before
+                // the solo is heard. Short A sections are clamped so the solo still fits.
+                let hardLatest = a.startBar + a.lengthBars - soloLength - 4
+                latest   = min(47, hardLatest)
+                earliest = min(max(a.startBar + 8, 23), latest)
             }
             let clampedLatest = max(latest, earliest)
             let start = clampedLatest > earliest
@@ -2358,7 +2358,7 @@ struct LeadGenerator {
         guard let table = shortSoloBars[rule] else { return ([], []) }
         let bodyBars = Set(structure.bodySections.flatMap { Array($0.startBar..<$0.endBar) })
         guard let bodyStart = bodyBars.min(), let bodyEnd = bodyBars.max().map({ $0 + 1 }) else { return ([], []) }
-        let wanted = rng.nextDouble() < 0.40 ? 2 : 1
+        let wanted = rng.nextDouble() < 0.60 ? 2 : 1
         var ranges: [Range<Int>] = []
         var events: [MIDIEvent] = []
         var lastChoice = -1
