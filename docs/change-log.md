@@ -6,6 +6,7 @@ Build 136 is the finished 2.9 release, with minor tuning expected over a few day
 
 - **New rules replace the old lead rules** — (2026-11-10) The weakest early Lead 1 and Lead 2 rules in base Motorik and base Kosmic are gone. Each new rule plays material taken from a real record, mapped to the song's mode and reworked per song as homage, and each took the number of the rule it replaced. The old rules are deleted from the code. Songs saved earlier reload with the new rules, and a saved song that forced an old lead ID loads the rule that replaced it.
 - **How much of Zudio changed** — (2026-11-10) A rough count over a few hundred songs: about 76% of base Motorik songs and 56% of base Kosmic songs now use a new or lightly changed Lead 1 rule, and about 41% of base Kosmic songs use one of the three new hooks.
+- **Solo songs stay filled** — (2026-11-10) In a base Motorik song with Vanishing solo or Visiting solo, any stretch of more than 24 bars with no solo gets a further shorter version near its middle, a different cut from the others, so Lead 1 does not vanish for fifty bars.
 - **Four new Motorik Lead 1 rules** — Hooks from the records, each replacing a base rule:
   - MOT-LD1-001 Hallogallo hook replaces Neu! motif first.
   - MOT-LD1-002 Radioactive riff replaces Pentatonic cell.
@@ -17,7 +18,7 @@ Build 136 is the finished 2.9 release, with minor tuning expected over a few day
   - MOT-LD2-002 Low bed, the chord's root or fifth held under Lead 1's long notes.
   - MOT-LD2-003 Hook fragment, the opening of Lead 1's last phrase, inverted or a step down.
   - MOT-LD2-004 Answer cell, a short cell paired with Lead 1's rule.
-  - MOT-LD2-006 Statement harmony, one Lead 1 statement in three a third below.
+  - MOT-LD2-006 Statement harmony, every second Lead 1 statement a third below. It is not drawn when Lead 1 is a solo, since a solo blocks Lead 2.
   - Arcade's arp rules and the Europe sync rules are unchanged; Arcade's regular pool uses MOT-LD2-001, 003 and 004.
 - **Three new Kosmic Lead 1 rules** — Hooks from Vangelis and Tangerine Dream, each replacing a base rule:
   - KOS-LD1-001 Pulstar theme replaces Slow arc.

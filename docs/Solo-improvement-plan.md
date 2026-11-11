@@ -162,9 +162,9 @@ One is drawn per song. The cell data and the engine are in
   - MOT-LD1-006 Model riff: the tail, 2 flat 7 5.
   - MOT-LD1-003 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
   - Every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
-- **MOT-LD2-006 Statement harmony**, 15%: one Lead 1 statement in three, a diatonic third below
+- **MOT-LD2-006 Statement harmony**, 15%: every second Lead 1 statement, a diatonic third below
   in Lead 1's rhythm, from an offset drawn per song. A statement is a body phrase of three notes
-  or more. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
+  or more. It is not drawn in a song with a Lead 1 solo, which blocks Lead 2, and is redrawn from the other four rules in their proportions, so its share is about 12% of base songs. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
   between. The harmony sits a third under Lead 1 wherever Lead 1 is, so it may run above 67. In
   the other gaps it plays echo answers.
 - **MOT-LD2-002 Low bed**, 15%: the chord's root or fifth held under each Lead 1 note of a beat or

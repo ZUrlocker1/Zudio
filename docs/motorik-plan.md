@@ -676,6 +676,9 @@ Register: MIDI 60–88; max 2 simultaneous notes.
   bars from the full solo and from each other where the song has room, otherwise 8. Each is the
   full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 stays out of
   them, and the log fires "Short solo Vanishing solo" at each start bar.
+  Any stretch of the body longer than 24 bars with no window, between two windows or after the last, gets a further short
+  version near its middle, up to three more. Each is a different cut or ordering from the one before it and, where the
+  table allows, a different length from its neighbour, so the solo comes back changed and the song is never left empty for long.
 - MOT-LD1-008 Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
   octave arpeggio motif. Inspired by the synth solo in *Visitor from the Past* (bars 21–30). Lead 2
   silenced during solo window. Status log fires "Extended solo — Visiting solo" at solo start bar.
@@ -715,9 +718,9 @@ the engine are in `Sources/Zudio/Generation/GapAnswerEngine.swift`. One rule is 
   - MOT-LD1-006 Model riff: the tail, 2 flat 7 5.
   - MOT-LD1-003 Tour de France riff: the cadence flat 7 flat 3 1, its last note on the beat.
   - Every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
-- **MOT-LD2-006 Statement harmony**, 15%: one Lead 1 statement in three, a diatonic third below
+- **MOT-LD2-006 Statement harmony**, 15%: every second Lead 1 statement, a diatonic third below
   in Lead 1's rhythm, from an offset drawn per song. A statement is a body phrase of three notes
-  or more. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
+  or more. It is not drawn in a song with a Lead 1 solo, which blocks Lead 2, and is redrawn from the other four rules in their proportions, so its share is about 12% of base songs. Only Lead 1's 8th-grid onsets are harmonised; a harmony note holds through any 16th in
   between. In the other gaps it plays echo answers.
 
 **Pools:**
