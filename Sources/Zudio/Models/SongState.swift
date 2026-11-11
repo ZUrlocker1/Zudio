@@ -28,6 +28,29 @@ struct GenerationLogEntry: Sendable {
     }
 }
 
+// MARK: - Solo windows
+
+/// The bars where Motorik Lead 1 plays its MOT-LD1-007 or 008 solo: the full window and the
+/// shorter returns. Kept on the song because the ranges are drawn once, with Lead 1, and a later
+/// Lead 2 regen needs the same bars to answer or stay silent as generation did.
+struct SoloWindows: Equatable, Sendable {
+    var main: Range<Int>? = nil
+    var short: [Range<Int>] = []
+
+    static let none = SoloWindows()
+
+    var isEmpty: Bool { main == nil }
+
+    /// The full solo first, then its shorter returns.
+    var ranges: [Range<Int>] { (main.map { [$0] } ?? []) + short }
+
+    var allBars: Set<Int> { Set(ranges.flatMap { Array($0) }) }
+
+    func contains(bar: Int) -> Bool { ranges.contains { $0.contains(bar) } }
+
+    func overlaps(_ bars: Range<Int>) -> Bool { ranges.contains { $0.overlaps(bars) } }
+}
+
 // MARK: - Song state
 
 struct SongState: Sendable {
@@ -117,6 +140,9 @@ struct SongState: Sendable {
     let keyOverride:   String?
     let tempoOverride: Int?
     let moodOverride:  Mood?
+    /// Motorik only: where Lead 1's solo plays (`.none` for every other song). Set by generation
+    /// and by a Lead 1 regen; a Lead 2 regen reads it.
+    var soloWindows: SoloWindows
     /// Ordered log entries built by SongGenerator; rendered by StatusBoxView.
     var generationLog: [GenerationLogEntry]
     /// Live playback annotations keyed by absolute step index. Each entry fires when playback
@@ -199,7 +225,8 @@ struct SongState: Sendable {
         forcedRules: [String: String] = [:],
         keyOverride:   String? = nil,
         tempoOverride: Int?    = nil,
-        moodOverride:  Mood?   = nil
+        moodOverride:  Mood?   = nil,
+        soloWindows: SoloWindows = .none
     ) {
         self.frame              = frame
         self.structure          = structure
@@ -243,6 +270,7 @@ struct SongState: Sendable {
         self.keyOverride             = keyOverride
         self.tempoOverride           = tempoOverride
         self.moodOverride            = moodOverride
+        self.soloWindows             = soloWindows
         self.generationLog           = generationLog
         self.stepAnnotations    = stepAnnotations
     }
@@ -279,7 +307,8 @@ struct SongState: Sendable {
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
-                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride,
+                  soloWindows: soloWindows)
     }
 
     /// Returns a copy of this state with the frame replaced (used for real-time tempo changes).
@@ -307,7 +336,8 @@ struct SongState: Sendable {
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
-                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride,
+                  soloWindows: soloWindows)
     }
 
     /// Returns a copy of this state with the ambient audio texture updated (regen / generation).
@@ -335,7 +365,8 @@ struct SongState: Sendable {
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: texture, ambientAudioTextureOffset: offset,
                   forcedRules: forcedRules,
-                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride,
+                  soloWindows: soloWindows)
     }
 
     /// Returns a copy of this state with the audio texture filename updated (user selection).
@@ -363,7 +394,8 @@ struct SongState: Sendable {
                   chillAudioTexture: texture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
-                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride,
+                  soloWindows: soloWindows)
     }
 
     /// Convenience initializer for synthetic pass/extended states: carries all style-specific
@@ -439,7 +471,8 @@ struct SongState: Sendable {
                   chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
                   ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
                   forcedRules: forcedRules,
-                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride)
+                  keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride,
+                  soloWindows: soloWindows)
     }
 
     /// Returns a copy of this state with one track's events replaced.
@@ -480,7 +513,8 @@ struct SongState: Sendable {
             chillAudioTexture: chillAudioTexture, chillAudioTextureOffset: chillAudioTextureOffset,
             ambientAudioTexture: ambientAudioTexture, ambientAudioTextureOffset: ambientAudioTextureOffset,
             forcedRules: forcedRules,
-            keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride
+            keyOverride: keyOverride, tempoOverride: tempoOverride, moodOverride: moodOverride,
+            soloWindows: soloWindows
         )
     }
 }

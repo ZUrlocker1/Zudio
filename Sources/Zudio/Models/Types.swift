@@ -237,6 +237,11 @@ enum SectionIntensity: String, Codable, Sendable, Comparable {
         switch self { case .low: return 0; case .medium: return 1; case .high: return 2 }
     }
 
+    /// The velocity offset the hook and gap-answer engines give a bar of this intensity.
+    var velocityLift: Int {
+        switch self { case .low: return -6; case .medium: return 0; case .high: return 5 }
+    }
+
     static func < (lhs: SectionIntensity, rhs: SectionIntensity) -> Bool {
         lhs.order < rhs.order
     }

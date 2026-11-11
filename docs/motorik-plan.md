@@ -581,17 +581,24 @@ How a hook plays:
 - **Fit the beat.** Motorik drums put the kick on steps 0 and 8 and the snare on 4 and 12. Every
   hook note sits on the 8th-note grid, held notes on beats, and no variation shifts a figure a
   16th late. The Radioactive riff, once a native 16th figure, is on 8ths too.
-- **Count.** The body states the hook 3, 4 or 5 times, the cap drawn 20, 40 and 40%, plus a soft
-  outro statement 30% of the time, so 3 to 6. Spacings run 8 to 20 bars.
+- **Count.** The body states the full hook 3, 4 or 5 times, drawn 20, 40 and 40%, plus a soft
+  outro statement 30% of the time, so 3 to 6. Statements sit at least the hook's length plus four
+  bars apart, never under eight, so a short body takes fewer.
 - **Forms.** The first statement is the full hook. Each later one is the full cell or one of: the
   head alone, the head said twice in one bar, the answer alone, the call as a sequence a scale
   step up or down, or the full cell with a small variation such as a source variant, a dropped
   note, the last note held over the next bar or the answer withheld. After a varied statement the
   full cell returns about 45% of the time. The last statement is always the full cell with its
   last note ringing.
-- **Placement.** Statements avoid rest windows, the base Motorik breakdown windows and the intro.
-  At least one falls in the last third, and the last fifth plays the full hook. B sections
-  restate the hook a scale step or a third up, or lean on the variants.
+- **Placement, one pass.** The count is drawn first; the first statement goes at the entry, the
+  last, the full hook, in the last fifth, and the others at evenly spaced marks between. Each
+  moves to the nearest free start on the two-bar grid, so rest windows, the base Motorik
+  breakdown windows and the intro push it aside rather than swallow it. Nothing placed is
+  removed again. B sections restate the hook a scale step or a third up, or lean on the variants.
+- **Fragments.** Outside Noir, a silence of more than 24 bars between statements, or after the
+  last, takes as many short fragments as split it inside 24: the head, the head said twice, the
+  answer or a varied statement, 8 softer than the statements, with a clear bar either side and
+  no tail after them.
 - **Fitting.** The tonic octave is chosen once per song, with the hook's centre just below the
   middle of MIDI 52 to 79. A hook stays in one octave for the whole song. Seven-note modes map
   source semitones by scale degree, so a major or minor third becomes the song's third;
@@ -601,7 +608,9 @@ How a hook plays:
 - **Filters.** `ArrangementFilter.apply(phraseTracks:)` softens a hook lead and never thins or
   silences it, because resting whole blocks removed most statements. `HarmonicFilter.apply` gives
   it one octave decision per song and skips the clash pass. `LeadGenerator.generateLead1` takes
-  the breakdown windows so statements are placed around them.
+  the breakdown windows so statements are placed around them. For every Motorik Lead 1 but Noir,
+  `ArrangementFilter.apply(maxSilentBars:)` turns a rest or thinning that would leave more than
+  24 bars of Lead 1 silence into a back-off, every note kept and softened 18.
 - **Regen.** Motorik Lead 1 regen does not run `HarmonicFilter` and does not pass the breakdown
   windows, so regen and first generation differ.
 - **Log and testing star.** Log names are in `lead1RuleDescription`. While the rules are tuned,
@@ -673,6 +682,10 @@ Register: MIDI 60–88; max 2 simultaneous notes.
 - MOT-LD1-004 Stepwise Sequence: descending sequence development (5→4→2→1 bar A, b7→5→4→2 bar B).
 - MOT-LD1-005 Call and answer: bar A ascends 1→2→b3→5; bar B silent then answers 4→b3. From
   Hallogallo analysis. Kept in every pool.
+- MOT-LD1-004 and 005 gates: a quarter of 4-bar cycles and 15% of single bars are silent, drawn
+  independently. After 10 bars with neither rule sounding the gate gives way and the next bar
+  plays (2026-11-11), so the coin flips can no longer add up to 30 or 40 bars of silence. Rest
+  windows and the forced rests after a long run are not gates and keep their place.
 - MOT-LD1-007 Vanishing Solo: 10-bar pentatonic guitar solo (A minor pentatonic phrase arch).
   Inspired by the metal guitar solo in *Vanishing Point* (bars 34–43). Lead 2 plays under and between the solo
   (see Lead 2 below). Status log fires "Extended solo — Vanishing solo" at solo start bar.
@@ -682,8 +695,10 @@ Register: MIDI 60–88; max 2 simultaneous notes.
   bars from the full solo and from each other where the song has room, otherwise 8. Each is the
   full solo's own bars cut down, softer by 6 velocity, in one of two orderings; Lead 2 plays in
   them as in the full solo, and the log fires "Short solo Vanishing solo" at each start bar.
-  Any stretch of the body longer than 24 bars with no window, between two windows or after the last, gets a further short
-  version near its middle, up to three more. Each is a different cut or ordering from the one before it and, where the
+  Any stretch of the body longer than 24 bars with no window, before the full solo, between two windows or after the
+  last, gets a further short version near its middle, up to six more, 8 bars clear of its neighbours (4 where the
+  breakdowns leave no room). A solo rule is never drawn for the B section alone: it is silent outside its windows, so B
+  keeps the A rule. Each is a different cut or ordering from the one before it and, where the
   table allows, a different length from its neighbour, so the solo comes back changed and the song is never left empty for long.
 - MOT-LD1-008 Visiting Solo: 9-bar multi-voice Moog solo with staggered 3-voice entries and
   octave arpeggio motif. Inspired by the synth solo in *Visitor from the Past* (bars 21–30). Lead 2

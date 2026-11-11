@@ -37,6 +37,12 @@ struct SeededRNG: Sendable {
         }
         return weights.count - 1
     }
+
+    /// The value at a weighted index: one draw, as `weightedPick`. The index is held inside
+    /// `values`, so a weight list longer than its values picks the last one and never traps.
+    mutating func pick<T>(_ values: [T], weights: [Double]) -> T {
+        values[Swift.min(weightedPick(weights), values.count - 1)]
+    }
 }
 
 // MARK: - Track sub-seed derivation (spec §Randomization guardrails)

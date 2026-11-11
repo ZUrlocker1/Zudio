@@ -13,7 +13,10 @@
 //      - Rest (45%): all notes in the block removed.
 //      - Reduced (35%): ~35% of notes kept, velocity softened –18.
 //      - Light (20%): velocity softened –20 only (notes kept).
-//   4. Spotlight rotates: tracks featured in the previous block are deprioritised.
+//   4. A track given a `maxSilentBars` limit may not be left silent for longer than that. A
+//      rest or reduction that would break it becomes a firm back-off instead (every note kept,
+//      softened –18), so the block steps back without the track going missing.
+//   5. Spotlight rotates: tracks featured in the previous block are deprioritised.
 //
 // Block size is 8 or 16 bars, chosen once per song (seeded).
 
@@ -27,11 +30,11 @@ struct ArrangementFilter {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         seed: UInt64,
-        lead1SoloRange: Range<Int>? = nil,   // bars containing LD1-007/008 solo — never rested
-        shortSoloRanges: [Range<Int>] = [],   // the shorter returns of that solo, protected the same way
+        solo: SoloWindows = .none,            // LD1-007/008 solo and its shorter returns — never rested
         arcadeVariation: Bool = false,        // Arcade: Lead 1 is always protected from block silencing
         exemptTracks: [Int] = [],             // Kraftwerk sync members — see below
-        phraseTracks: [Int] = []              // whole-phrase hook leads: never thinned, see below
+        phraseTracks: [Int] = [],             // whole-phrase hook leads: never thinned, see below
+        maxSilentBars: [Int: Int] = [:]       // track → longest silence a rest or reduction may leave
     ) -> [[MIDIEvent]] {
         var events = trackEvents
 
@@ -98,42 +101,92 @@ struct ArrangementFilter {
 
             // Apply rest / reduce to non-spotlight active tracks
             // Lead 1 solo window is protected: never rest or thin a block containing solo bars.
-            let soloOverlaps: Bool = {
-                guard let sr = lead1SoloRange else { return false }
-                return sr.overlaps(startBar..<endBar) || shortSoloRanges.contains { $0.overlaps(startBar..<endBar) }
-            }()
+            let soloOverlaps = solo.overlaps(startBar..<endBar)
 
             for track in activeTracks where !spotlight.contains(track) {
                 if track == kTrackLead1 && (soloOverlaps || arcadeVariation) { continue }
-                let roll = rng.nextDouble()
-                if roll < 0.45 && !phraseTracks.contains(track) {
-                    // Complete rest — remove all notes in this block. A hook lead is exempt: the
-                    // engine already places its statements around rest windows and breakdowns, and
-                    // a silenced block took most of them (one song kept 2 of 8).
-                    events[track] = silence(events[track], startStep: startStep, endStep: endStep)
-                } else if roll < 0.80 && phraseTracks.contains(track) {
-                    // A hook rule (MOT-LD1-001 onward) states whole phrases; thinning or resting
-                    // picks notes out of the hook and leaves fragments. Soften it instead.
-                    events[track] = soften(events[track], startStep: startStep, endStep: endStep,
-                                          reduction: 18)
-                } else if roll < 0.80 {
-                    // Reduced — thin to ~35% and soften
-                    events[track] = thin(events[track], startStep: startStep, endStep: endStep,
-                                        keepRate: 0.35, rng: &rng)
-                    events[track] = soften(events[track], startStep: startStep, endStep: endStep,
-                                          reduction: 18)
-                } else {
-                    // Light back-off — soften velocity only
-                    events[track] = soften(events[track], startStep: startStep, endStep: endStep,
-                                          reduction: 20)
+                // A hook lead states whole phrases, so it is only ever softened: resting or
+                // thinning it picks notes out of the hook (one song kept 2 of 8 statements).
+                let treatment = Treatment(roll: rng.nextDouble(), isPhraseTrack: phraseTracks.contains(track))
+                let steps = startStep..<endStep
+                // The treatment runs in full whatever the limit says, so the random stream is the
+                // same with or without one.
+                var result = treatment.applied(to: events[track], steps: steps, rng: &rng)
+                if let limit = maxSilentBars[track], treatment.removesNotes,
+                   opensLongSilence(result, was: events[track], in: startBar..<endBar,
+                                    totalBars: frame.totalBars, limit: limit) {
+                    result = Treatment.backOff.applied(to: events[track], steps: steps, rng: &rng)
                 }
+                events[track] = result
             }
         }
 
         return events
     }
 
+    // MARK: - Treatments
+
+    /// What a block does to a track that is not in the spotlight.
+    private enum Treatment {
+        case rest           // every note in the block removed
+        case reduce         // about 35% of the notes kept, softened
+        case backOff        // every note kept, softened
+        case lightBackOff   // every note kept, softened a little more
+
+        init(roll: Double, isPhraseTrack: Bool) {
+            if roll < 0.45 && !isPhraseTrack { self = .rest }
+            else if roll < 0.80 { self = isPhraseTrack ? .backOff : .reduce }
+            else { self = .lightBackOff }
+        }
+
+        var removesNotes: Bool { self == .rest || self == .reduce }
+
+        func applied(to events: [MIDIEvent], steps: Range<Int>, rng: inout SeededRNG) -> [MIDIEvent] {
+            switch self {
+            case .rest:
+                return ArrangementFilter.silence(events, startStep: steps.lowerBound, endStep: steps.upperBound)
+            case .reduce:
+                let thinned = ArrangementFilter.thin(events, startStep: steps.lowerBound, endStep: steps.upperBound,
+                                                     keepRate: 0.35, rng: &rng)
+                return ArrangementFilter.soften(thinned, startStep: steps.lowerBound, endStep: steps.upperBound,
+                                                reduction: 18)
+            case .backOff:
+                return ArrangementFilter.soften(events, startStep: steps.lowerBound, endStep: steps.upperBound,
+                                                reduction: 18)
+            case .lightBackOff:
+                return ArrangementFilter.soften(events, startStep: steps.lowerBound, endStep: steps.upperBound,
+                                                reduction: 20)
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    /// True when `result` leaves a silence over `limit` bars around `block` that `original` did
+    /// not already have to that length.
+    private static func opensLongSilence(_ result: [MIDIEvent], was original: [MIDIEvent],
+                                         in block: Range<Int>, totalBars: Int, limit: Int) -> Bool {
+        let after = longestSilence(result, overlapping: block, totalBars: totalBars)
+        return after > limit && after > longestSilence(original, overlapping: block, totalBars: totalBars)
+    }
+
+    /// The longest run of bars with no note onset that overlaps `block`; the song start and end
+    /// count as edges, so a lead that never starts has one long run.
+    private static func longestSilence(_ events: [MIDIEvent], overlapping block: Range<Int>,
+                                       totalBars: Int) -> Int {
+        let sounding = Set(events.map { $0.stepIndex / 16 })
+        var longest = 0
+        var runStart = 0
+        for bar in 0...totalBars {
+            if bar == totalBars || sounding.contains(bar) {
+                if bar > runStart, runStart < block.upperBound, bar > block.lowerBound {
+                    longest = Swift.max(longest, bar - runStart)
+                }
+                runStart = bar + 1
+            }
+        }
+        return longest
+    }
 
     /// Fraction of steps in the range that contain at least one note.
     /// Using unique steps normalises chords (4 notes/step for pads) against single-note lines.

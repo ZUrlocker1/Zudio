@@ -5,8 +5,9 @@
 //   transcription hooks written by HookLeadEngine
 // MOT-LD1-004 Stepwise Sequence — descending 5→4→2→1 (bar A), shifted b7→5→4→2 (bar B)
 // MOT-LD1-005 Call and answer — bar A ascends 1→2→b3→5, bar B silent then answers 4→b3
-// MOT-LD1-007 Vanishing Solo — 10-bar pentatonic guitar-style solo; Lead 2 silenced during solo
-// MOT-LD1-008 Visiting Solo — 9-bar Dorian moog-style solo with octave arpeggios; Lead 2 silenced
+// MOT-LD1-007 Vanishing Solo — 10-bar pentatonic guitar-style solo, with shorter returns
+// MOT-LD1-008 Visiting Solo — 9-bar Dorian moog-style solo with octave arpeggios, with shorter returns
+//   (Lead 2 plays with both: only the gap-answer rule MOT-LD2-002 Low bed keeps the solo bars to itself)
 // Lead 1, Noir: MOT-LD1-009 Cold descent, 010 Pendulum arc, 011 Melodic Spiral,
 //   012 Chromatic Descent, 013 Slow arc, 014 Rising phrase
 // Lead 1, Arcade: MOT-LD1-015 Arcade Riff, 016 Machine Answer, 017 Pentatonic Blitz,
@@ -31,6 +32,12 @@ struct LeadGenerator {
 
     // MARK: - Lead 1
 
+    /// The longest stretch of bars Motorik Lead 1 may leave silent in the body, other than Noir,
+    /// which is sparse by design. The hook engine fills longer gaps with fragments, the solo
+    /// rules with short returns, and the arrangement filter won't rest a block that would open
+    /// one (Zack, 2026-11-11).
+    static let maxLead1SilentBars = 24
+
     static func generateLead1(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
@@ -43,14 +50,14 @@ struct LeadGenerator {
         arcadeVariation: Bool = false,
         sync: MotorikSync = .none,
         breakdownBars: Set<Int> = []
-    ) -> (events: [MIDIEvent], soloRange: Range<Int>?, shortSoloRanges: [Range<Int>]) {
+    ) -> (events: [MIDIEvent], solo: SoloWindows) {
 
         // Kraftwerk sync (Machine Voice only). No solo range: these rules are announcements
         // separated by silence, not a solo, and the Lead 1 solo machinery would fight them.
         if forceLeadRuleID == nil, sync.includes(kTrackLead1) {
             let ruleID = rng.weightedPick([0.60, 0.40]) == 1 ? "MOT-LD1-022" : "MOT-LD1-021"
             usedRuleIDs.insert(ruleID)
-            return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), nil, [])
+            return (kraftwerkLead1(ruleID: ruleID, frame: frame, tonalMap: tonalMap, rng: &rng), .none)
         }
 
         // A: Per-section rule — always consume two draws for RNG determinism across songs.
@@ -63,6 +70,12 @@ struct LeadGenerator {
         // Hook rules own the whole song, so one can only arrive as the A rule. A hook drawn
         // for B alone keeps the A rule instead; no extra draw.
         if HookLeadEngine.isMotorikHookRule(bRule) && !HookLeadEngine.isMotorikHookRule(aRule) {
+            bRule = aRule
+        }
+        // A solo rule plays only in the A section's solo window and its returns, and is silent in
+        // the rest of the body. Drawn for B alone it left the whole B section empty, 60 bars of
+        // it in a long song, so B keeps the A rule.
+        if isSoloRule(bRule) && !isSoloRule(aRule) {
             bRule = aRule
         }
         usedRuleIDs.insert(aRule)
@@ -89,6 +102,9 @@ struct LeadGenerator {
 
         // G: Phrase gate for LD1-004 and LD1-005 — set at the start of each 4-bar cycle
         var phraseSparseCycle = false
+        // The last bar either gated rule sounded in: past `maxGatedSilence` bars without one the
+        // gate gives way, see `gateOpens`.
+        var lastGatedBar = entryBar - 1
 
         // J: LD1-009 Cold Chord — two melodic variants, Noir-only
         //   Variant 0 (A): slow descent — one scale note per bar descending (20% ascending),
@@ -151,7 +167,7 @@ struct LeadGenerator {
         var baConsecutiveActive: Int = 0
 
         // H: Solo placement for LD1-007 / LD1-008 — single well-placed window in the A section.
-        let isSoloRule = aRule == "MOT-LD1-007" || aRule == "MOT-LD1-008"
+        let isSoloRule = Self.isSoloRule(aRule)
         let soloLen    = aRule == "MOT-LD1-007" ? 10 : 9
         let soloWindow: Range<Int>? = isSoloRule
             ? pickSoloStartBar(structure: structure, soloLength: soloLen, rng: &rng, passBodyBars: passBodyBars)
@@ -170,8 +186,9 @@ struct LeadGenerator {
             let events = HookLeadEngine.generate(
                 rule: hook, frame: frame, structure: structure, tonalMap: tonalMap,
                 entryBar: entryBar, restBars: ld1RestBars.union(breakdownBars),
-                register: kRegisterBounds[kTrackLead1]!, rng: &rng)
-            return (events, nil, [])
+                register: kRegisterBounds[kTrackLead1]!,
+                maxGapBars: noirVariation ? nil : Self.maxLead1SilentBars, rng: &rng)
+            return (events, .none)
         }
 
         var events: [MIDIEvent] = []
@@ -203,9 +220,7 @@ struct LeadGenerator {
             // H: Solo window — checked before the switch so bRule never interferes.
             if !isIntroOutro, let window = soloWindow, window.contains(bar) {
                 let soloBar = bar - window.lowerBound
-                barEvents = aRule == "MOT-LD1-007"
-                    ? generateGuitarSolo007(soloBar: soloBar, barStart: barStart, frame: frame)
-                    : generateMoogSolo008(soloBar: soloBar, barStart: barStart, frame: frame)
+                barEvents = soloBarEvents(rule: aRule, soloBar: soloBar, barStart: barStart, frame: frame)
                 events.append(contentsOf: barEvents)
                 prevNote = barEvents.last?.note
                 continue
@@ -260,8 +275,9 @@ struct LeadGenerator {
                     // Bar gate: 15% of individual bars in active phrases are also silent.
                     let cycleBar = (bar - entryBar) % 4
                     if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.25 }
-                    let willPlay = !inForcedRest && bar >= ld4RestUntil
+                    let gatePasses = !inForcedRest && bar >= ld4RestUntil
                                   && !phraseSparseCycle && rng.nextDouble() >= 0.15
+                    let willPlay = gatePasses || (!inForcedRest && Self.gateOpens(bar: bar, lastSounded: lastGatedBar))
                     if willPlay {
                         barEvents = lead1StepwiseSequence(barStart: barStart, bar: bar, entry: entry, frame: frame,
                             intensity: intensity, isIntroOutro: false, prevNote: prevNote, rng: &rng)
@@ -280,7 +296,8 @@ struct LeadGenerator {
                 if !isIntroOutro {
                     let cycleBar = (bar - entryBar) % 4
                     if cycleBar == 0 { phraseSparseCycle = rng.nextDouble() < 0.25 }
-                    if !phraseSparseCycle && rng.nextDouble() >= 0.15 {
+                    let gatePasses = !phraseSparseCycle && rng.nextDouble() >= 0.15
+                    if gatePasses || Self.gateOpens(bar: bar, lastSounded: lastGatedBar) {
                         barEvents = lead1StatementAnswer(barStart: barStart, bar: bar, entry: entry, frame: frame,
                             intensity: intensity, isIntroOutro: false, prevNote: prevNote, rng: &rng)
                     }
@@ -412,6 +429,7 @@ struct LeadGenerator {
             }
 
             events += barEvents
+            if !barEvents.isEmpty, ruleID == "MOT-LD1-004" || ruleID == "MOT-LD1-005" { lastGatedBar = bar }
 
             // D: Update prevNote from the last event in this bar
             if let last = barEvents.max(by: { $0.stepIndex < $1.stepIndex }) {
@@ -438,14 +456,24 @@ struct LeadGenerator {
         // MOT-LD1-007 and 008 play the full solo once. Shorter versions of it come back later in
         // the song, spread out from the full one. A pass regen only covers the start of the body,
         // so it keeps the full solo alone.
-        var shortRanges: [Range<Int>] = []
+        var solo = SoloWindows(main: soloRange)
         if let main = soloRange, passBodyBars == nil {
             let reprise = shortSoloReprises(rule: aRule, main: main, structure: structure, frame: frame,
                                             avoidBars: breakdownBars, rng: &rng)
             events = (events + reprise.events).sorted { $0.stepIndex < $1.stepIndex }
-            shortRanges = reprise.ranges
+            solo.short = reprise.ranges
         }
-        return (events, soloRange, shortRanges)
+        return (events, solo)
+    }
+
+    /// The most bars LD1-004 or LD1-005 stay silent from their phrase and bar gates. Those gates are
+    /// independent coin flips, and a few songs drew thirty or forty bars of silence from them
+    /// (Zack, 2026-11-11). Rest windows and forced rests are not gates; they keep their place.
+    private static let maxGatedSilence = 10
+
+    /// True when the gate has held for long enough that the next bar plays regardless.
+    private static func gateOpens(bar: Int, lastSounded: Int) -> Bool {
+        bar - lastSounded > maxGatedSilence
     }
 
     /// Silences a two-to-three bar window inside any stretch of sounding bars longer than
@@ -487,8 +515,7 @@ struct LeadGenerator {
         lead1Events: [MIDIEvent],
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
-        soloRange: Range<Int>? = nil,
-        shortSoloRanges: [Range<Int>] = [],
+        solo: SoloWindows = .none,
         arcadeVariation: Bool = false,
         arcadeDenseMelody: Bool = false
     ) -> [MIDIEvent] {
@@ -543,8 +570,7 @@ struct LeadGenerator {
         var bothSilentRun = 0  // consecutive body bars both leads silent
 
         for bar in 0..<frame.totalBars {
-            if let sr = soloRange, sr.contains(bar) { continue }
-            if shortSoloRanges.contains(where: { $0.contains(bar) }) { continue }
+            if solo.contains(bar: bar) { continue }
 
             guard let section = structure.section(atBar: bar),
                   let entry   = tonalMap.entry(atBar: bar) else { continue }
@@ -2284,9 +2310,19 @@ struct LeadGenerator {
 
     // MARK: - LD1-007 / LD1-008: Solo placement
 
+    /// MOT-LD1-007 Vanishing Solo and MOT-LD1-008 Visiting Solo: the rules that play a solo window.
+    static func isSoloRule(_ id: String) -> Bool { id == "MOT-LD1-007" || id == "MOT-LD1-008" }
+
+    /// One bar of the full solo, by solo bar number; the shorter returns use the same bars.
+    private static func soloBarEvents(rule: String, soloBar: Int, barStart: Int,
+                                      frame: GlobalMusicalFrame) -> [MIDIEvent] {
+        rule == "MOT-LD1-007"
+            ? generateGuitarSolo007(soloBar: soloBar, barStart: barStart, frame: frame)
+            : generateMoogSolo008(soloBar: soloBar, barStart: barStart, frame: frame)
+    }
+
     /// Returns the bar range for the solo window, always within the A section.
     /// Never uses the B section — the bar loop applies bRule there, which would silence the solo.
-    /// In test mode, places the solo near the start of the body so it is heard quickly.
     /// passBodyBars: when set (pass-regen context), constrains the solo to land within the
     /// first passBodyBars of the body so it is always audible in the evolved bars, regardless
     /// of how long the A section is.
@@ -2344,12 +2380,11 @@ struct LeadGenerator {
     /// solo. Draws for those come after everything else in Lead 1, so the rest of the song is
     /// unchanged.
     ///
-    /// Then any stretch of the body longer than `maxSilentBars` between one window and the next,
-    /// or after the last one, gets a further short version near its middle, up to three more, so
-    /// Lead 1 never leaves the song empty for long. Each is a different cut or ordering from the
-    /// one before it and, where the table allows, a different length from its neighbour, so it
-    /// reads as the solo coming back changed and not as a copy.
-    private static let maxSilentBars = 24
+    /// Then any stretch of the body longer than `maxLead1SilentBars` with no solo in it, before,
+    /// between or after the windows, gets a further short version near its middle, up to six
+    /// more, so Lead 1 never leaves the song empty for long. Each is a different cut or ordering
+    /// from the one before it and, where the table allows, a different length from its neighbour,
+    /// so it reads as the solo coming back changed and not as a copy.
 
     private static func shortSoloReprises(
         rule: String, main: Range<Int>, structure: SongStructure, frame: GlobalMusicalFrame,
@@ -2370,9 +2405,7 @@ struct LeadGenerator {
             lastChoice = choice
             for (i, soloBar) in options[choice].enumerated() {
                 let barStart = (start + i) * 16
-                let bar = rule == "MOT-LD1-007"
-                    ? generateGuitarSolo007(soloBar: soloBar, barStart: barStart, frame: frame)
-                    : generateMoogSolo008(soloBar: soloBar, barStart: barStart, frame: frame)
+                let bar = soloBarEvents(rule: rule, soloBar: soloBar, barStart: barStart, frame: frame)
                 events += bar.map {
                     MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
                               velocity: UInt8(max(40, Int($0.velocity) - 6)), durationSteps: $0.durationSteps)
@@ -2400,31 +2433,38 @@ struct LeadGenerator {
             place(start: start, length: length)
         }
 
-        // Fill the long silences: the widest stretch after the full solo, between two windows or
-        // after the last, that is longer than the cap gets a window near its middle.
-        for _ in 0..<3 {
+        // Fill the long silences. The widest stretch of the body with no solo in it, before the
+        // full solo, between two windows or after the last, that is longer than the cap gets a
+        // window near its middle. The first stretch runs from the body's first bar, so a full solo
+        // that arrives late is not preceded by a long silence.
+        for _ in 0..<6 {
             let windows = ([main] + ranges).sorted { $0.lowerBound < $1.lowerBound }
-            var widest: (from: Int, to: Int)? = nil
-            for (i, w) in windows.enumerated() where w.upperBound >= main.upperBound {
-                let to = i + 1 < windows.count ? windows[i + 1].lowerBound : bodyEnd
-                if to - w.upperBound > maxSilentBars,
-                   to - w.upperBound > (widest.map { $0.to - $0.from } ?? 0) {
-                    widest = (w.upperBound, to)
+            let edges = [(from: bodyStart, to: windows[0].lowerBound)]
+                + windows.enumerated().map { i, w in
+                    (from: w.upperBound, to: i + 1 < windows.count ? windows[i + 1].lowerBound : bodyEnd)
                 }
-            }
-            guard let span = widest else { break }
+            guard let span = edges.filter({ $0.to - $0.from > maxLead1SilentBars })
+                .max(by: { $0.to - $0.from < $1.to - $1.from }) else { break }
             let neighbour = windows.first { $0.upperBound == span.from }.map { $0.count }
+                ?? windows.first { $0.lowerBound == span.to }.map { $0.count }
             var lengths = [4, 5, 6]
             if let n = neighbour, lengths.count > 1 { lengths.removeAll { $0 == n } }
             let length = lengths[rng.nextInt(upperBound: lengths.count)]
             let mid = Double(span.from + span.to) / 2
-            let starts = stride(from: bodyStart, through: bodyEnd - 4 - length, by: 2).filter { s in
-                s >= span.from + 8 && s + length <= span.to - (span.to == bodyEnd ? 4 : 8)
-                    && (s..<(s + length)).allSatisfy { bodyBars.contains($0) && !avoidBars.contains($0) }
+            // A window sits 8 bars clear of its neighbours, 4 where the breakdowns leave no room.
+            var start: Int? = nil
+            for margin in [8, 4] {
+                let starts = stride(from: bodyStart, through: bodyEnd - 4 - length, by: 2).filter { s in
+                    s >= span.from + margin
+                        && s + length <= span.to - (span.to == bodyEnd ? 4 : margin)
+                        && (s..<(s + length)).allSatisfy { bodyBars.contains($0) && !avoidBars.contains($0) }
+                }
+                start = starts.min(by: {
+                    abs(Double($0) + Double(length) / 2 - mid) < abs(Double($1) + Double(length) / 2 - mid)
+                })
+                if start != nil { break }
             }
-            guard let start = starts.min(by: {
-                abs(Double($0) + Double(length) / 2 - mid) < abs(Double($1) + Double(length) / 2 - mid)
-            }) else { break }
+            guard let start else { break }
             place(start: start, length: length)
         }
         return (events, ranges.sorted { $0.lowerBound < $1.lowerBound })

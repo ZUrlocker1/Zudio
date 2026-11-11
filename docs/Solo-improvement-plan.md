@@ -64,17 +64,17 @@ Lead 1 in its gaps instead of playing over it.
 ### The engine
 
 `Sources/Zudio/Generation/HookLeadEngine.swift`. A rule is data: call bars, answer bars, an
-optional restatement, an answer shift, source variants, an optional tail, and statement spacings
-with weights. After `generateLead1` has drawn the entry bar and `buildRestBars`, the engine lays
+optional restatement, an answer shift, source variants, an optional tail, and the statement
+counts with weights. After `generateLead1` has drawn the entry bar and `buildRestBars`, the engine lays
 out the whole song in one call and returns early, owning both A and B sections.
 
 - **Homage per song.** Every cell gets one to three changes: add a passing or neighbour note on
   the 8th grid, drop an interior note, move an off-beat 8th onto the beat before or after it, swap
   two adjacent notes, or turn a repeated note into a neighbour. The first and last notes never
   change. Every note stays on the 8th grid except a native 16th riff.
-- **Count.** The body states the hook 3, 4 or 5 times, with the cap drawn 20, 40 and 40%, plus a
-  soft outro statement 30% of the time, so 3 to 6. Spacings run 8 to 20 bars. Over the cap, the
-  statement whose neighbours are closest goes. Under 3, the biggest gap gets one.
+- **Count.** The body states the full hook 3, 4 or 5 times, drawn 20, 40 and 40%, plus a soft
+  outro statement 30% of the time, so 3 to 6. Statements sit at least a statement and four bars
+  apart, never under eight, so a short body takes fewer.
 - **Forms.** The first statement is the full hook. Each later one is the full cell again or one of:
   - the head alone, the first half of the call with its last note held;
   - the head said twice in one bar;
@@ -84,9 +84,17 @@ out the whole song in one call and returns early, owning both A and B sections.
     over the next bar, or the answer withheld.
   - After a varied statement the full cell returns about 45% of the time. The last statement is
     always the full cell with its last note ringing.
-- **Placement.** Statements avoid rest windows, the base Motorik breakdown windows and the intro.
-  At least one statement falls in the last third of the song, and the last fifth plays the full
-  hook. B sections restate the hook a scale step or a third up, or lean on the variants.
+- **Placement, one pass (rebuilt 2026-11-11).** The count is drawn first, then each statement is
+  aimed at an evenly spaced mark: the first at the entry, the last in the last fifth, the others
+  between. Each goes to the free start nearest its mark, so rest windows, the base Motorik
+  breakdown windows and the intro move it rather than swallow it. Nothing placed is taken out
+  again: the old layout placed statements by spacing, trimmed to the cap, topped up to a minimum
+  and then patched long gaps, and those passes fought each other.
+- **Fragments (Motorik, not Noir).** A silence over `LeadGenerator.maxLead1SilentBars` (24) between
+  two statements, or after the last, takes as many short fragments as split it inside the limit,
+  evenly spread, 8 softer, with a clear bar either side: the head 35, the head said twice 20, the
+  answer 25 or a varied statement 20. They are laid out in the same pass, and take no tail.
+  Kosmic passes no limit and gets none. B sections restate the hook a scale step or a third up, or lean on the variants.
   Statements sit on a two-bar grid from the entry. The tail cell fills the bar after a statement
   about three times in ten.
 - **Fitting.** The tonic octave is chosen once per song, with the hook's centre just below the
@@ -108,6 +116,22 @@ out the whole song in one call and returns early, owning both A and B sections.
 - Motorik Lead 1 regen does not run HarmonicFilter and does not pass `breakdownBars`, so regen
   and first generation differ.
 - `lead1RuleDescription` in `SongGenerator.swift` holds the log names.
+- **The 24-bar limit** (`LeadGenerator.maxLead1SilentBars`, 2026-11-11). Base, Arcade and Europe
+  Motorik Lead 1 may not leave more than 24 body bars silent; Noir is exempt. Each mechanism owns
+  the case it creates, against the one constant:
+  - hook rules: fragments, laid out with the statements (see "The engine");
+  - MOT-LD1-007 and 008: further short returns, measured from the body's first bar as well as
+    between and after the windows, 8 bars clear of their neighbours, 4 where breakdowns leave no
+    room;
+  - MOT-LD1-004 and 005: the phrase and bar gates give way after 10 silent bars
+    (`maxGatedSilence`); rest windows and forced rests keep their place;
+  - a solo rule drawn for the B section alone keeps the A rule, since it is silent outside its
+    windows and left B empty;
+  - `ArrangementFilter.apply(maxSilentBars:)`: a rest or thinning that would open a longer
+    silence in Lead 1 becomes a back-off (every note kept, softened 18).
+- **Solo windows on the song.** `SoloWindows` (the full solo and its returns) is stored on
+  `SongState`, so a Lead 2 regen blocks and fills the same bars generation did.
+  `GapAnswerEngine.motorikBlocking` builds the blocked and solo bars for both paths.
 
 ### Mix changes made alongside
 
@@ -456,6 +480,12 @@ Checks stay light:
   the A section, bar 78 of 144 in that song, and was heard once. It now starts between bars 24 and
   48, clamped for short A sections, and a second shorter return is drawn 60% of the time, up from
   40%. The long-silence fill is unchanged.
+- 2026-11-11, after songs with over 24 bars of no lead: the limit above. The hook layout was then
+  rebuilt as one pass, because the first fix added fragments after a cap that had removed
+  statements, so one pass undid another. The count is drawn first, statements are aimed at evenly
+  spaced marks, and fragments fill long silences as the layout goes. `spacings` and
+  `minStatements` are gone from `HookRule`; `statementCounts` replaces `maxStatements`. Kosmic
+  hooks share the new layout but take no limit and no fragments.
 - A retired rule is replaced in every substyle that used it, and deleted. The new rule takes its number.
 - Kosmic Lead 1 rules are KOS-LD1 and Lead 2 rules are KOS-LD2, so no ID serves both leads, as in
   the other styles.

@@ -138,6 +138,17 @@ enum GapAnswerEngine {
 
     // MARK: - Generation
 
+    /// The bars the Motorik gap rules stay out of, and the solo bars among them. A breakdown
+    /// blocks every rule; a Lead 1 solo blocks only Low bed (see `generate`), so the solo bars
+    /// that are also breakdown bars count as breakdown, not solo. Generation and a Lead 2 regen
+    /// both call this, so they cannot drift apart.
+    static func motorikBlocking(breakdowns: [Range<Int>], solo: SoloWindows)
+        -> (blocked: Set<Int>, soloBars: Set<Int>) {
+        let breakdownBars = Set(breakdowns.flatMap { Array($0) })
+        let soloBars = solo.allBars.subtracting(breakdownBars)
+        return (breakdownBars.union(solo.allBars), soloBars)
+    }
+
     /// `steps` moves a cell note by scale steps after its pitch is worked out.
     private struct ANote { var at: Int; var src: Int; var len: Int; var vel: Int; var steps = 0 }
 
@@ -148,8 +159,44 @@ enum GapAnswerEngine {
     /// The forms an MOT-LD2-004 answer takes. The first and last answers of a song are the full
     /// cell; the others are drawn: full 35, the head alone 30, inverted around its last note 20,
     /// and the full cell with its head sequenced a step lower, up to three bars, 15.
-    private enum CellForm: CaseIterable { case full, short, inverted, long }
-    private static let cellFormWeights: [Double] = [0.35, 0.30, 0.20, 0.15]
+    private enum CellForm: CaseIterable {
+        case full, short, inverted, long
+        var weight: Double {
+            switch self {
+            case .full:     return 0.35
+            case .short:    return 0.30
+            case .inverted: return 0.20
+            case .long:     return 0.15
+            }
+        }
+        static let weights = allCases.map(\.weight)
+    }
+
+    /// How far under Lead 1 an echo answer sits: a third, a sixth or an octave lower.
+    private enum EchoInterval: CaseIterable {
+        case third, sixth, octave
+        var weight: Double {
+            switch self {
+            case .third:  return 0.45
+            case .sixth:  return 0.25
+            case .octave: return 0.30
+            }
+        }
+        static let weights = allCases.map(\.weight)
+    }
+
+    /// The note a horn-section harmony takes under a Lead 1 note: a diatonic third below, a fifth
+    /// below, or the same note an octave down.
+    private enum HornInterval {
+        case third, fifth, octave
+        func pitch(under base: Int, in scale: Set<Int>) -> Int {
+            switch self {
+            case .third:  return GapAnswerEngine.shift(base, by: -2, in: scale)
+            case .fifth:  return GapAnswerEngine.shift(base, by: -4, in: scale)
+            case .octave: return base - 12
+            }
+        }
+    }
 
     /// The whole Lead 2 part for a gap-answer rule, through HarmonicFilter. `lead1` is the Lead 1
     /// the listener hears: after ArrangementFilter, HarmonicFilter, the breakdown cut and, in a
@@ -164,7 +211,7 @@ enum GapAnswerEngine {
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         tonalMap: TonalGovernanceMap,
-        blockedBars: Set<Int>,
+        blockedBars requestedBars: Set<Int>,
         soloBars: Set<Int> = [],
         pads: [MIDIEvent],
         rng: inout SeededRNG
@@ -189,7 +236,7 @@ enum GapAnswerEngine {
         // solo bars blocked, as it places its own beds there. In a solo song the answers also
         // get one more appearance per solo window, up to four, so Lead 2 is heard with the solos.
         let soloRuns = soloBars.filter { !soloBars.contains($0 - 1) }.count
-        let blockedBars = ruleID == lowBed ? blockedBars : blockedBars.subtracting(soloBars)
+        let blockedBars = ruleID == lowBed ? requestedBars : requestedBars.subtracting(soloBars)
         // Echo answer and Hook fragment state themselves 6, 8 or 10 times in the body, Low bed
         // bars 8 to 10 phrases; the other rules 4 to 6 (Kosmic keeps its own 4 to 6).
         let targetIdx = r.weightedPick([0.30, 0.40, 0.30])
@@ -210,7 +257,7 @@ enum GapAnswerEngine {
         let target    = targetBase + (ruleID == lowBed || kosmic ? 0 : Swift.min(soloRuns, 4))   // appearances in the body
         let tailDraw  = r.nextDouble() < 0.5                    // silence after a phrase ends
         let tailSteps = kosmic ? (tailDraw ? 4 : 8) : (tailDraw ? 2 : 4)
-        let echoKind  = r.weightedPick([0.45, 0.25, 0.30])      // a third, sixth or octave lower
+        let echoKind  = r.pick(EchoInterval.allCases, weights: EchoInterval.weights)
         let harmonyOffset = r.nextInt(upperBound: 3)
         let kosmicPaired = lead1RuleIDs.sorted().compactMap { kosmicPairedCells[$0] }.first
         let cellSource = kosmic ? (kosmicPaired?.cell ?? kosmicPairCell)
@@ -231,10 +278,7 @@ enum GapAnswerEngine {
         func chordTones(atBar bar: Int) -> Set<Int> {
             tonalMap.entry(atBar: bar)?.chordWindow.chordTones ?? []
         }
-        func isBody(_ bar: Int) -> Bool {
-            guard let label = structure.section(atBar: bar)?.label else { return false }
-            return label == .A || label == .B
-        }
+        func isBody(_ bar: Int) -> Bool { structure.isBody(atBar: bar) }
         func isOutro(_ bar: Int) -> Bool {
             bar >= bodyEnd || structure.section(atBar: bar)?.label == .outro
         }
@@ -250,8 +294,7 @@ enum GapAnswerEngine {
             return true
         }
         func lift(atBar bar: Int) -> Int {
-            let intensity = structure.section(atBar: bar)?.subPhaseIntensity(atBar: bar) ?? .medium
-            return intensity == .low ? -6 : intensity == .high ? 5 : 0
+            (structure.section(atBar: bar)?.subPhaseIntensity(atBar: bar) ?? .medium).velocityLift
         }
 
         // Shapes, in Lead 1's own steps or the cell's steps, with their source pitches.
@@ -338,8 +381,11 @@ enum GapAnswerEngine {
                 switch transform {
                 case .echo:
                     let p = snap(nt.src, to: sc)
-                    return echoKind == 0 ? shift(p, by: -2, in: sc)
-                         : echoKind == 1 ? shift(p, by: -5, in: sc) : p - 12
+                    switch echoKind {
+                    case .third:  return shift(p, by: -2, in: sc)
+                    case .sixth:  return shift(p, by: -5, in: sc)
+                    case .octave: return p - 12
+                    }
                 case .stepDown:
                     return shift(snap(nt.src, to: sc), by: -1, in: sc)
                 case .invert:
@@ -530,7 +576,7 @@ enum GapAnswerEngine {
             }
             // Under a Lead 1 solo (MOT-LD1-007 or 008) Lead 2 has nothing else to play, so the bed
             // sounds in the solo windows too: see soloBeds.
-            if !kosmic && (lead1RuleIDs.contains("MOT-LD1-007") || lead1RuleIDs.contains("MOT-LD1-008")) {
+            if !kosmic && lead1RuleIDs.contains(where: LeadGenerator.isSoloRule) {
                 events += runBeds(bars: soloBars.filter { isBody($0) }.sorted(), tonicPC: tonicPC,
                                   tonalMap: tonalMap, rng: &r)
             }
@@ -643,7 +689,7 @@ enum GapAnswerEngine {
             var form = CellForm.full
             var down = false
             if cellRole && k > 0 && k < chosen.count - 1 {
-                form = CellForm.allCases[r.weightedPick(cellFormWeights)]
+                form = r.pick(CellForm.allCases, weights: CellForm.weights)
                 if octaveDropSong && drops < 2 && !droppedLast && r.nextDouble() < 0.40 { down = true }
             }
             let ph = phrases[s.phrase]
@@ -733,21 +779,21 @@ enum GapAnswerEngine {
             if kept.count >= 2 { src = kept }
         }
         let mean = src.map { Int($0.velocity) }.reduce(0, +) / src.count
-        var previous = -2
+        var previous = HornInterval.third
         var pitches: [Int] = []
         for e in src {
             let bar = e.stepIndex / 16
             let sc = scale(bar)
             let tones = chordTones(bar)
             let base = snap(Int(e.note), to: sc)
-            func candidate(_ c: Int) -> Int { c == 0 ? base - 12 : shift(base, by: c, in: sc) }
-            var choice = -2
-            for c in [previous, -2, -4, 0] where tones.contains(((candidate(c) % 12) + 12) % 12) {
+            var choice = HornInterval.third
+            for c in [previous, .third, .fifth, .octave]
+            where tones.contains(((c.pitch(under: base, in: sc) % 12) + 12) % 12) {
                 choice = c
                 break
             }
             previous = choice
-            pitches.append(candidate(choice))
+            pitches.append(choice.pitch(under: base, in: sc))
         }
         let blockShift = fitShift(pitches, in: register, keepIfFits: true)
         return src.indices.map { i in

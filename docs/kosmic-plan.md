@@ -1136,8 +1136,7 @@ rules, which are deleted; each took the number of the rule it replaced. They sha
 - **KOS-LD1-001 Pulstar theme**, Vangelis, *Pulstar*. A pickup F F F G into the tonic, then four
   whole notes C Bb F G, said again an octave up. Homage: a repeated pickup note becomes a
   neighbour. In a key with no room for both octaves the repeat comes down to a fifth, then to the
-  same octave. It uses MIDI 52 to 84 and states 4 to 6 times, drawn 35, 40 and 25%, every 12 to 16
-  bars, with the shorter octave-up half at 35% of the varied statements. Source variants: no
+  same octave. It uses MIDI 52 to 84 and states 4 to 6 times, drawn 35, 40 and 25%, with the shorter octave-up half at 35% of the varied statements. Source variants: no
   pickup, and the last note held across two bars.
 - **KOS-LD1-005 Beach Scene sigh**, Tangerine Dream, *Beach Scene*. A three-bar call, the sigh
   with its long held sixth, and a two-bar answer of rising arpeggios on IV and V landing on the
@@ -1147,6 +1146,9 @@ How they differ from the Motorik hooks:
 
 - **Entry and sections.** The hook enters four bars into the first A section and owns the A and B
   sections. The bridges and X-Files whistles stay with the existing Kosmic code.
+- **Placement.** The same one-pass layout as Motorik (2026-11-11): the count is drawn first, the
+  first statement at the entry, the last in the last fifth, the others evenly spread, each
+  nudged to the nearest free start. Kosmic passes no silence limit, so it takes no fragments.
 - **Forms.** No head or loop forms, since those cut a one-note bar. Answer only 25%, sequence 30 to
   35% and varied 40 to 45%. Blade Runner's sequence always steps down.
 - **Homage.** One change per cell. Blade Runner and Pulstar restrict the operations, because a

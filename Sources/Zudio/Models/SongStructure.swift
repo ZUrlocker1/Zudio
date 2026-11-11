@@ -60,6 +60,12 @@ struct SongStructure: Equatable, Sendable {
         sections.first { $0.contains(bar: bar) }
     }
 
+    /// True if the bar falls in an A or B section.
+    func isBody(atBar bar: Int) -> Bool {
+        guard let label = section(atBar: bar)?.label else { return false }
+        return label == .A || label == .B
+    }
+
     var introSection: SongSection? { sections.first { $0.label == .intro } }
     var outroSection: SongSection? { sections.first { $0.label == .outro } }
     var bodySections: [SongSection] { SongStructure.bodySections(sections) }

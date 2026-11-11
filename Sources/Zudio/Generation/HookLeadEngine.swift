@@ -46,10 +46,6 @@ struct HookRule: Sendable {
     var sourceVariants: [HookSourceVariant] = []
     /// Filler for the bar after a statement, so the reply isn't always another hook.
     var tail: HookBar? = nil
-    /// Statement starts, in bars from the previous start, and their weights (sum to 1). A song
-    /// states its hook 3 to 5 times in the body, so these run 8 to 20 bars.
-    var spacings: [Int]
-    var spacingWeights: [Double]
     /// `deg` is a scale step from the tonic, not a semitone: Blade Runner's line steps down the
     /// scale, so it keeps its shape in any mode.
     var scaleSteps = false
@@ -59,11 +55,10 @@ struct HookRule: Sendable {
     /// break the cell: a drop leaves a bar of Blade Runner's staircase empty, and a swap trades
     /// Pulstar's tonic with the pickup before it.
     var homageWeights: [Double]? = nil
-    /// Body statements a song may have: the cap is drawn from `maxStatements`, and a song with
-    /// fewer than `minStatements` gets one more placed.
-    var minStatements = 3
-    var maxStatements = [3, 4, 5]
-    var maxStatementWeights = [0.20, 0.40, 0.40]
+    /// How many times a song states the full hook in the body, drawn per song. A body too short
+    /// for the count takes fewer, and long silences take fragments on top (see `generate`).
+    var statementCounts = [3, 4, 5]
+    var statementCountWeights = [0.20, 0.40, 0.40]
     /// Weights for head, loop, answer only, sequence and varied, when the defaults don't suit.
     var formWeights: [Double]? = nil
     /// A call sequenced as a statement of its own, or as a variation, goes up a scale step this
@@ -71,6 +66,14 @@ struct HookRule: Sendable {
     var sequenceUpChance = 0.70
     /// The song register the hook sits in, where it differs from Lead 1's.
     var register: RegisterBounds? = nil
+
+    /// True when each weight list is as long as the list it weights. A mismatch would pick the
+    /// wrong entry, or none, without any error, so the rule tables are checked as they are built.
+    var isConsistent: Bool {
+        statementCounts.count == statementCountWeights.count
+            && (formWeights.map { $0.count == HookLeadEngine.Form.allCases.count } ?? true)
+            && (homageWeights.map { $0.count == HookLeadEngine.homageOpCount } ?? true)
+    }
 }
 
 enum HookLeadEngine {
@@ -94,9 +97,7 @@ enum HookLeadEngine {
         ],
         // From the tab's riff 1 variation: the flat seventh as a grace into the root, in soft 8ths.
         tail: [n(0, 10, 2, 60), n(2, 12, 2, 66), n(4, 12, 2, 58),
-               n(8, 10, 2, 58), n(10, 12, 2, 64), n(12, 12, 2, 56)],
-        spacings: [12, 16, 8],
-        spacingWeights: [0.40, 0.35, 0.25]
+               n(8, 10, 2, 58), n(10, 12, 2, 64), n(12, 12, 2, 56)]
     )
 
     /// Radioactivity's key-synth riff (track "Key Synthesizer", 15 statements in the file): a
@@ -119,8 +120,6 @@ enum HookLeadEngine {
             HookSourceVariant(answer: [[n(0, 0, 2, 84), n(2, 0, 2, 76), n(4, 0, 2, 82), n(6, 0, 2, 76),
                                         n(8, 4, 2, 86), n(10, 2, 2, 80), n(12, 0, 4, 84)]]),
         ],
-        spacings: [12, 16, 8],
-        spacingWeights: [0.40, 0.35, 0.25],
         gentle: true,
         homageWeights: [0, 0.5, 0, 0.5, 0]
     )
@@ -141,9 +140,7 @@ enum HookLeadEngine {
             // A homage ending: the riff's second bar comes home to the root instead of the fifth.
             HookSourceVariant(call: [[n(0, 0, 10, 86), n(10, 3, 2, 80), n(12, 2, 2, 78), n(14, 0, 2, 80)],
                                      [n(0, 2, 6, 84), n(6, -2, 2, 78), n(8, 0, 8, 82)]]),
-        ],
-        spacings: [12, 16, 20],
-        spacingWeights: [0.40, 0.40, 0.20]
+        ]
     )
 
     /// Tour de France's guitar theme (track "guitar"): a rising call 5 1 2 5, then a two-bar
@@ -159,13 +156,16 @@ enum HookLeadEngine {
             HookSourceVariant(answer: [[n(-2, 4, 2, 78), n(0, 7, 2, 84), n(2, 9, 2, 86), n(4, 2, 2, 78),
                                         n(6, 4, 2, 80), n(8, 7, 4, 86), n(12, 0, 4, 82)],
                                        [n(0, 5, 4, 84), n(4, 4, 2, 80), n(6, 0, 8, 86)]]),
-        ],
-        spacings: [16, 12, 20],
-        spacingWeights: [0.45, 0.35, 0.20]
+        ]
     )
 
-    static let motorikRules: [String: HookRule] = Dictionary(
-        uniqueKeysWithValues: [hallogallo, radioactive, model, tourDeFrance].map { ($0.id, $0) })
+    static let motorikRules = rulesByID([hallogallo, radioactive, model, tourDeFrance])
+
+    /// The rules keyed by ID, each checked for weight lists that don't match their values.
+    private static func rulesByID(_ rules: [HookRule]) -> [String: HookRule] {
+        for rule in rules { assert(rule.isConsistent, "\(rule.id): a weight list does not match its values") }
+        return Dictionary(uniqueKeysWithValues: rules.map { ($0.id, $0) })
+    }
 
     static func isMotorikHookRule(_ id: String) -> Bool { motorikRules[id] != nil }
 
@@ -207,10 +207,8 @@ enum HookLeadEngine {
                                        [n(0, -7, 24, 70)],
                                        [n(8, -5, 4, 62), n(12, -4, 12, 70)]]),
         ],
-        spacings: [16, 20, 24],
-        spacingWeights: [0.40, 0.35, 0.25],
         scaleSteps: true, gentle: true, homageWeights: [1, 0, 0, 0, 0],
-        minStatements: 3, maxStatements: [3, 4], maxStatementWeights: [0.50, 0.50],
+        statementCounts: [3, 4], statementCountWeights: [0.50, 0.50],
         formWeights: [0, 0, 0.25, 0.35, 0.40],
         sequenceUpChance: 0.0,
         register: kosmicRegister
@@ -244,10 +242,8 @@ enum HookLeadEngine {
         ],
         // 4 to 6 statements (Zack, 2026-11-10): three left long silences in a 118-bar body.
         // The shorter answer-only form, the octave-up half, is drawn more often than the others.
-        spacings: [12, 14, 16],
-        spacingWeights: [0.35, 0.40, 0.25],
         scaleSteps: false, gentle: true, homageWeights: [0, 0, 0, 0, 1],
-        minStatements: 4, maxStatements: [4, 5, 6], maxStatementWeights: [0.35, 0.40, 0.25],
+        statementCounts: [4, 5, 6], statementCountWeights: [0.35, 0.40, 0.25],
         formWeights: [0, 0, 0.35, 0.20, 0.45],
         register: pulstarRegister
     )
@@ -268,16 +264,13 @@ enum HookLeadEngine {
                                      [n(0, -5, 4, 72), n(4, -3, 28, 76)],
                                      []]),
         ],
-        spacings: [8, 12, 16],
-        spacingWeights: [0.35, 0.40, 0.25],
         gentle: true, homageWeights: [0.25, 0.20, 0.10, 0.20, 0.25],
-        minStatements: 3, maxStatements: [3, 4, 5], maxStatementWeights: [0.25, 0.40, 0.35],
+        statementCounts: [3, 4, 5], statementCountWeights: [0.25, 0.40, 0.35],
         formWeights: [0, 0, 0.25, 0.30, 0.45],
         register: kosmicRegister
     )
 
-    static let kosmicRules: [String: HookRule] = Dictionary(
-        uniqueKeysWithValues: [bladeRunner, pulstar, beachScene].map { ($0.id, $0) })
+    static let kosmicRules = rulesByID([bladeRunner, pulstar, beachScene])
 
     static func isKosmicHookRule(_ id: String) -> Bool { kosmicRules[id] != nil }
 
@@ -302,6 +295,8 @@ enum HookLeadEngine {
 
     private enum HomageOp: CaseIterable { case addPassing, dropNote, moveOnset, swapPair, neighbour }
     private static let homageWeights: [Double] = [0.25, 0.20, 0.25, 0.15, 0.15]
+    /// How many weights a rule's `homageWeights` needs, one per `HomageOp`.
+    fileprivate static var homageOpCount: Int { HomageOp.allCases.count }
 
     /// Reworks a cell with `count` distinct changes. The first note and the last note never
     /// change, so the shape that makes the hook recognisable survives every version.
@@ -314,7 +309,7 @@ enum HookLeadEngine {
         var attempts = 0
         while used.count < count && attempts < 12 {
             attempts += 1
-            let opIndex = rng.weightedPick(weights ?? homageWeights)
+            let opIndex = Swift.min(rng.weightedPick(weights ?? homageWeights), HomageOp.allCases.count - 1)
             guard !used.contains(opIndex) else { continue }
             let last = notes.count - 1
             var applied = false
@@ -409,11 +404,26 @@ enum HookLeadEngine {
 
     // MARK: - Statement
 
-    private enum Variation: CaseIterable { case dropNote, stepUp, holdOver, withhold }
+    /// Forms a statement can take. The full cell is the original form; the others are real
+    /// variations of it, not tweaks: the head alone, the head said twice, the answer alone, or
+    /// the call as a sequence a step away.
+    enum Form: CaseIterable { case head, loop, answerOnly, sequence, varied }
+
     // Drop a note 35, call a step up as a sequence 30, hold the last note over the next bar 20,
     // withhold the answer 15. There is no push: a statement shifted a 16th late drifts off the
     // drums, which sit on the 8th-note grid with the kick and snare on the beats.
-    private static let variationWeights: [Double] = [0.35, 0.30, 0.20, 0.15]
+    private enum Variation: CaseIterable {
+        case dropNote, stepUp, holdOver, withhold
+        var weight: Double {
+            switch self {
+            case .dropNote: return 0.35
+            case .stepUp:   return 0.30
+            case .holdOver: return 0.20
+            case .withhold: return 0.15
+            }
+        }
+        static let weights = allCases.map(\.weight)
+    }
 
     private struct Statement {
         var startBar: Int
@@ -425,6 +435,8 @@ enum HookLeadEngine {
         var shift = 0
         var velOffset = 0
         var ringSteps = 0
+        /// A short piece of the hook filling a long silence: it takes no tail after it.
+        var isFragment = false
         /// Bars the statement occupies, counting a held last note that rings into the next bar.
         var spanBars: Int { bars.count + (ringSteps > 0 ? 1 : 0) }
         var endBar: Int { startBar + spanBars }
@@ -443,6 +455,7 @@ enum HookLeadEngine {
         entryBar: Int,
         restBars: Set<Int>,
         register: RegisterBounds,
+        maxGapBars: Int? = nil,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
         var r = SeededRNG(seed: rng.next() ^ 0x484F_4F4B_4C45_4144)   // "HOOKLEAD"
@@ -468,12 +481,8 @@ enum HookLeadEngine {
         }
         let plainLen = plain(0).bars.count
 
-        func isBody(_ bar: Int) -> Bool {
-            guard let label = structure.section(atBar: bar)?.label else { return false }
-            return label == .A || label == .B
-        }
         func isFree(_ bar: Int) -> Bool {
-            bar >= entryBar && bar < bodyEnd && isBody(bar) && !restBars.contains(bar)
+            bar >= entryBar && bar < bodyEnd && structure.isBody(atBar: bar) && !restBars.contains(bar)
         }
 
         // B sections restate the hook a scale step or a third up, or lean on the variants.
@@ -502,7 +511,7 @@ enum HookLeadEngine {
                     }
                     continue
                 }
-                let k = Variation.allCases[r.weightedPick(variationWeights)]
+                let k = r.pick(Variation.allCases, weights: Variation.weights)
                 if !kinds.contains(k) { kinds.append(k) }
             }
             if kinds.contains(.stepUp) {
@@ -528,11 +537,10 @@ enum HookLeadEngine {
             if kinds.contains(.holdOver) { st.ringSteps = 16 }
         }
 
-        // Forms a statement can take. The full cell is the original form; the others are real
-        // variations of it, not tweaks: the head alone, the head said twice, the answer alone, or
-        // the call as a sequence a step away.
-        enum Form: CaseIterable { case head, loop, answerOnly, sequence, varied }
         let formWeights: [Double] = rule.formWeights ?? [0.28, 0.17, 0.15, 0.15, 0.25]
+        // A fragment is the head 35, the head said twice 20, the answer 25 or a varied
+        // statement 20; never a sequence, which is longer than the hook itself.
+        let fragmentFormWeights: [Double] = [0.35, 0.20, 0.25, 0, 0.20]
 
         /// The first half of a bar, ending on an even step, with the last note held. If cutting
         /// would leave fewer than two notes the whole bar is the head.
@@ -580,103 +588,90 @@ enum HookLeadEngine {
             }
         }
 
-        // Lay out the body statements. The first is the full hook, so it is learned before it
-        // moves; after a varied statement the original form returns about 45% of the time.
-        var statements: [Statement] = []
-        var bar = entryBar
-        var previousVaried = false
-        while bar < bodyEnd {
-            let index = statements.count
-            var st = plain(index)
-            var varied = false
-            if index >= 1, !(index == 1 && r.nextDouble() < 0.50), !(previousVaried && r.nextDouble() < 0.45) {
-                st = build(Form.allCases[r.weightedPick(formWeights)], index: index)
-                varied = true
-            }
-            st.startBar = bar
-            if structure.section(atBar: bar)?.label == .B { st.shift = bShift }
-            guard (st.startBar..<st.endBar).allSatisfy(isFree) else {
-                bar += 2      // stay on the two-bar grid from the entry
-                continue
-            }
-            statements.append(st)
-            previousVaried = varied
-            let spacing = rule.spacings[r.weightedPick(rule.spacingWeights)]
-            bar = Swift.max(bar + spacing, st.endBar + 1)
+        /// The start nearest `target`, on the two-bar grid from the entry, between `lo` and `hi`,
+        /// where every bar of a `span`-bar statement is free. Nil when none is.
+        func fit(span: Int, near target: Int, from lo: Int, to hi: Int) -> Int? {
+            var first = Swift.max(lo, entryBar)
+            if (first - entryBar) % 2 != 0 { first += 1 }
+            guard first <= hi else { return nil }
+            return stride(from: first, through: hi, by: 2)
+                .filter { at in (at..<(at + span)).allSatisfy(isFree) }
+                .min { abs($0 - target) < abs($1 - target) }
         }
 
-        // The hook is never missing from the last third of the song, and the last fifth plays it
-        // plain once more. Both go on the two-bar grid from the entry, in the first free slot, so
-        // a rest window or a breakdown can't swallow them.
-        func placePlain(from start: Int) -> Statement? {
-            var at = Swift.max(start, entryBar)
-            if (at - entryBar) % 2 != 0 { at += 1 }
-            while at + plainLen <= bodyEnd {
-                var st = plain(0)
-                st.startBar = at
-                if (st.startBar..<st.endBar).allSatisfy(isFree) { return st }
-                at += 2
+        /// Places `st` at `at`: in a B section it moves by the song's B shift.
+        func placed(_ st: Statement, at: Int) -> Statement {
+            var st = st
+            st.startBar = at
+            if structure.section(atBar: at)?.label == .B { st.shift = bShift }
+            return st
+        }
+
+        /// Short fragments of the hook for a silence from bar `left` up to bar `right`, when it is
+        /// longer than `maxGapBars`: as many as split it into stretches inside the limit, evenly
+        /// spread, softer than the statements, with a clear bar either side.
+        func fragments(from left: Int, to right: Int, index: Int) -> [Statement] {
+            guard let maxGap = maxGapBars, maxGap > 2, right - left > maxGap else { return [] }
+            // Two bars short of the limit, for the grid and for a fragment nudged off a rest window.
+            let pieces = (right - left + maxGap - 3) / (maxGap - 2)
+            var out: [Statement] = []
+            var from = left + 1
+            for j in 1..<pieces {
+                var st = build(r.pick(Form.allCases, weights: fragmentFormWeights), index: index)
+                st.velOffset = -8
+                st.isFragment = true
+                let target = left + (right - left) * j / pieces - st.spanBars / 2
+                guard let at = fit(span: st.spanBars, near: target, from: from,
+                                   to: right - 1 - st.spanBars) else { continue }
+                out.append(placed(st, at: at))
+                from = at + st.spanBars + 1
             }
-            return nil
+            return out
         }
-        let thirdStart = frame.totalBars * 2 / 3
-        if !statements.contains(where: { $0.startBar >= thirdStart }),
-           let st = placePlain(from: Swift.max(thirdStart, (statements.last?.endBar ?? entryBar) + 1)) {
-            statements.append(st)
-        }
+
+        // Lay out the body in one pass; nothing placed is taken out again. The song states the
+        // full hook `count` times, drawn per song: the first at the entry, so it is learned before
+        // it moves, the last plain in the last fifth, and the others spread evenly between. Each
+        // goes to the free start on the two-bar grid nearest its mark, so a rest window or a
+        // breakdown moves it rather than swallowing it. Statements sit at least a statement and
+        // four bars apart, never under eight, so a short body takes fewer. With `maxGapBars`
+        // (Motorik, Zack 2026-11-11) a silence over the limit takes fragments on the way.
+        let finalPlain = plain(0)
         let lateStart = Swift.max(entryBar, frame.totalBars * 4 / 5)
-        if statements.last.map({ $0.startBar < lateStart }) ?? true,
-           let st = placePlain(from: Swift.max(lateStart, statements.last?.endBar ?? entryBar)) {
-            statements.append(st)
-        }
-        // A song states its hook 3 to 5 times in the body. Over the cap, the statement whose
-        // neighbours are closest goes, never the first, the last or the only one in the last
-        // third. Under three, the biggest gap takes a statement near its middle.
-        // The cap is drawn per song so the count spreads across 3, 4 and 5 (20, 40 and 40%).
-        let maxBody = rule.maxStatements[r.weightedPick(rule.maxStatementWeights)]
-        while statements.count > maxBody {
-            let onlyLate = statements.filter { $0.startBar >= thirdStart }.count == 1
-            var best: Int? = nil
-            var bestGap = Int.max
-            for i in 1..<(statements.count - 1) {
-                if onlyLate && statements[i].startBar >= thirdStart { continue }
-                let gap = statements[i + 1].startBar - statements[i - 1].startBar
-                if gap < bestGap { bestGap = gap; best = i }
+        var lastMark = lateStart
+        if let maxGap = maxGapBars { lastMark = Swift.max(lastMark, bodyEnd - finalPlain.bars.count - maxGap) }
+        lastMark = Swift.min(lastMark, bodyEnd - finalPlain.bars.count)
+        let room = Swift.max(0, lastMark - entryBar)
+        let drawn = r.pick(rule.statementCounts, weights: rule.statementCountWeights)
+        let count = Swift.max(1, Swift.min(drawn, 1 + room / Swift.max(8, plainLen + 4)))
+
+        var statements: [Statement] = []
+        var previousVaried = false
+        for k in 0..<count {
+            let isLast = k == count - 1
+            // After a varied statement the original form returns about 45% of the time; the
+            // second statement is plain half the time; the last is always the plain hook.
+            var st = isLast ? finalPlain : plain(k)
+            var varied = false
+            if k >= 1, !isLast, !(k == 1 && r.nextDouble() < 0.50), !(previousVaried && r.nextDouble() < 0.45) {
+                st = build(r.pick(Form.allCases, weights: formWeights), index: k)
+                varied = true
             }
-            guard let b = best else { break }
-            statements.remove(at: b)
+            let mark = count == 1 ? entryBar : entryBar + room * k / (count - 1)
+            let hi = isLast ? bodyEnd - st.spanBars : lastMark - 1 - st.spanBars
+            let silentFrom = statements.last?.endBar ?? entryBar
+            guard let at = fit(span: st.spanBars, near: mark, from: statements.isEmpty ? entryBar : silentFrom + 1,
+                               to: hi) else { continue }
+            statements += fragments(from: silentFrom, to: at, index: k)
+            statements.append(placed(st, at: at))
+            previousVaried = varied
         }
-        while statements.count < rule.minStatements && statements.count >= 1 {
-            var gapAt = 0
-            var gapSize = 0
-            for i in 0..<(statements.count - 1) {
-                let g = statements[i + 1].startBar - statements[i].endBar
-                if g > gapSize { gapSize = g; gapAt = i }
-            }
-            var placed: Statement? = nil
-            if statements.count >= 2 {
-                let lo = statements[gapAt].endBar + 1
-                let hi = statements[gapAt + 1].startBar - plainLen - 1
-                let mid = (lo + hi) / 2
-                let candidates = (lo...Swift.max(lo, hi)).filter { ($0 - entryBar) % 2 == 0 && $0 <= hi }
-                    .sorted { abs($0 - mid) < abs($1 - mid) }
-                for at in candidates {
-                    var st = build(Form.allCases[r.weightedPick(formWeights)], index: gapAt + 1)
-                    st.startBar = at
-                    if (st.startBar..<st.endBar).allSatisfy(isFree) { placed = st; break }
-                }
-            }
-            guard let st = placed else { break }
-            statements.insert(st, at: gapAt + 1)
-        }
+        // The final statement rings through the following bar when nothing else wants it.
         if let i = statements.indices.last {
-            var final = plain(0)
-            final.startBar = statements[i].startBar
-            let next = final.startBar + final.bars.count
-            // Ring through the following bar when nothing else wants it.
-            if next < frame.totalBars && (next >= bodyEnd || isFree(next)) { final.ringSteps = 16 }
-            statements[i] = final
+            let next = statements[i].endBar
+            if next < frame.totalBars && (next >= bodyEnd || isFree(next)) { statements[i].ringSteps = 16 }
         }
+        statements += fragments(from: statements.last?.endBar ?? entryBar, to: bodyEnd, index: count)
 
         // Outro: at most one soft plain statement, so a song never states the hook more than 6 times.
         var outroStatement: Statement? = nil
@@ -693,7 +688,7 @@ enum HookLeadEngine {
             events += realise(st, base: base, tonicPC: tonicPC, structure: structure,
                               tonalMap: tonalMap, register: register, scaleSteps: rule.scaleSteps, rng: &r)
             // The bar after a statement: silence, or about three times in ten the tail.
-            guard let tail = rule.tail else { continue }
+            guard let tail = rule.tail, !st.isFragment else { continue }
             let tailBar = st.endBar
             let nextStart = i + 1 < statements.count ? statements[i + 1].startBar : bodyEnd
             if i + 1 < statements.count, tailBar < nextStart, isFree(tailBar), r.nextDouble() < 0.30 {
@@ -854,8 +849,7 @@ enum HookLeadEngine {
         return notes.map { n in
             let pitch = register.fold(n.pitch + blockShift)
             let intensity = structure.section(atBar: n.bar)?.subPhaseIntensity(atBar: n.bar) ?? .medium
-            let lift = intensity == .low ? -6 : intensity == .high ? 5 : 0
-            let vel = n.vel + st.velOffset + lift + rng.nextInt(upperBound: 7) - 3
+            let vel = n.vel + st.velOffset + intensity.velocityLift + rng.nextInt(upperBound: 7) - 3
             return MIDIEvent(stepIndex: n.step, note: UInt8(pitch),
                              velocity: UInt8(Swift.max(30, Swift.min(120, vel))),
                              durationSteps: Swift.max(1, n.len))

@@ -53,7 +53,8 @@ import Testing
             let synthetic = SongState(frame: s.frame, structure: s.structure, trackEvents: s.trackEvents,
                                       generationLog: s.generationLog, stepAnnotations: s.stepAnnotations,
                                       copyingStyleFieldsFrom: s)
-            #expect(Self.changed(s, synthetic, allowed: ["trackOverrides", "ambientXFilesBlockRange"]) == [],
+            // The pass and extended states renumber bars, so the full song's solo windows don't carry.
+            #expect(Self.changed(s, synthetic, allowed: ["trackOverrides", "ambientXFilesBlockRange", "soloWindows"]) == [],
                     "copyingStyleFieldsFrom, \(s.style)")
         }
     }
