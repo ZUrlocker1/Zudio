@@ -9,7 +9,7 @@
 // Lead 2".
 //
 // MOT-LD2-001 Echo answer       — Lead 1's last 2 to 4 notes, same rhythm, a third, sixth or octave lower
-// MOT-LD2-003 Hook fragment     — the first 2 to 5 notes of Lead 1's last phrase, inverted or a step down
+// MOT-LD2-003 Hook fragment     — the first 3 to 6 notes of Lead 1's last phrase, inverted or a step down
 // MOT-LD2-004 Answer cell       — a cell paired with Lead 1's rule, restated in every answer
 // MOT-LD2-006 Statement harmony — every second Lead 1 statement a third below, echo answers elsewhere
 // MOT-LD2-002 Low bed           — root or fifth held under Lead 1's long notes, and alone in a long gap
@@ -504,7 +504,7 @@ enum GapAnswerEngine {
             }
             if ruleID == hookFragment {
                 guard ph.notes.count >= 2 else { return nil }
-                // 2 to 5 notes. The grid fit folds a 16th into its neighbour, so more of Lead 1's
+                // 3 to 6 notes (2 from a two-note phrase). The grid fit folds a 16th into its neighbour, so more of Lead 1's
                 // notes are taken until the placed figure reaches the drawn count.
                 let want = 3 + rng.weightedPick([0.25, 0.30, 0.25, 0.20])
                 let transform: Transform = rng.nextDouble() < 0.5 ? .invert : .stepDown
@@ -640,7 +640,10 @@ enum GapAnswerEngine {
             }
         }
 
-        // The song's target of 4 to 6 appearances. The answers after phrases come first; over the
+        // The song's target appearances (4 to 6, more for long silences, Low bed and solo runs).
+        // Echo answer and Hook fragment then drop restatements under their rest rule below, so they
+        // can end under the target; left so (2026-11-11), as their density was set by ear on it.
+        // The answers after phrases come first; over the
         // target, the one whose neighbours are closest goes, never the first or the last. Under
         // it, restatements fill the longest silences, two bars or more from any other answer.
         var chosen = slots.indices.filter { slots[$0].natural }

@@ -85,6 +85,11 @@ struct ArrangementFilter {
             // Sort candidates: prefer tracks NOT spotlighted last block, then by density (higher = more prominent).
             // Tiebreaker: Lead 1 always beats Lead 2 when freshness is equal — prevents Lead 2
             // accumulating more notes than Lead 1 via the density sort.
+            // Not a strict ordering: with Lead 2 denser than a third track that is denser than
+            // Lead 1, the three compare in a circle and the order is whatever the sort makes of
+            // it. It is still the same every run (the input order is fixed). Left as it is
+            // (2026-11-11): rare, since Lead 2 is mostly empty here, and changing it moves the
+            // draws of every later block.
             let sorted = activeTracks.sorted { a, b in
                 let aFresh = !lastSpotlight.contains(a)
                 let bFresh = !lastSpotlight.contains(b)

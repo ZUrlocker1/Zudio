@@ -24,6 +24,9 @@ struct AudioWaveformView: View {
     // Tracks the most-recently-requested filename so stale background tasks
     // cannot repopulate samples after a newer filename (including nil) has been set.
     @State private var expectedFilename: String? = nil
+    // The file `samples` were read from, so the layer redraws when the texture changes even if
+    // the new one has the same sample count and length.
+    @State private var loadedFilename: String? = nil
 
     var body: some View {
         // displayStep is intentionally NOT read here — playhead uses wallClockStep
@@ -34,6 +37,7 @@ struct AudioWaveformView: View {
         ZStack {
             WaveformLayerView(
                 samples: samples,
+                sourceFilename: loadedFilename,
                 audioDurationBars: audioDurationBars,
                 visibleBars: visibleBars,
                 barOffset: barOffset,
@@ -85,6 +89,7 @@ struct AudioWaveformView: View {
                 Task { await loadWaveform(filename: f) }
             } else {
                 samples = []
+                loadedFilename = nil
                 audioDurationBars = 0
             }
         }
@@ -111,6 +116,7 @@ struct AudioWaveformView: View {
         // Discard if a newer filename (or nil) has been requested since this task started
         guard expectedFilename == filename else { return }
         samples             = result.peaks
+        loadedFilename      = filename
         audioDurationSeconds = result.durationSec
         audioDurationBars   = result.durationBars
     }
@@ -181,13 +187,17 @@ struct AudioWaveformView: View {
 
 private struct WaveformLayerView: View, Equatable {
     let samples: [Float]
+    let sourceFilename: String?
     let audioDurationBars: Double
     let visibleBars: Int
     let barOffset: Int
     let totalBars: Int
     var offsetBars: Double = 0
 
+    // Compares the file, not the samples: counting them is cheap, comparing them is not, and two
+    // textures with the same count and length otherwise kept the old waveform on screen.
     static func == (lhs: WaveformLayerView, rhs: WaveformLayerView) -> Bool {
+        lhs.sourceFilename    == rhs.sourceFilename    &&
         lhs.samples.count     == rhs.samples.count     &&
         lhs.audioDurationBars == rhs.audioDurationBars &&
         lhs.visibleBars       == rhs.visibleBars       &&

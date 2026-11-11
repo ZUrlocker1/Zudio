@@ -202,14 +202,16 @@ struct SongGenerator {
         var lead2Rules: Set<String> = []
         // The base Motorik breakdown windows are known before Lead 1 is written, so a hook rule can
         // lay its statements around them instead of losing them to the breakdown cut at step 12.5.
-        // A hook rule has no solo range, so these are the same windows that step computes.
+        // A hook rule has no solo range, so these are the same windows that step computes. For a
+        // solo rule the cut drops a window the solo overlaps, so its short returns may keep clear
+        // of a breakdown that never happens; never the reverse, as songs are long enough (96 bars
+        // or more) that dropping the first window can't let a second one in.
         let earlyBreakdownBars = (!isNoir && !isArcade && !motorikSync.isActive)
             ? Set(breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: nil).flatMap { Array($0) }) : []
         let (lead1Events, ld1Solo) = LeadGenerator.generateLead1(frame: frame, structure: structure, tonalMap: tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceLeadRuleID: forceLeadRuleID, noirVariation: isNoir, arcadeVariation: isArcade, sync: motorikSync, breakdownBars: earlyBreakdownBars)
         trackEvents[kTrackLead1] = lead1Events
 
         // When Lead 1 picks a dense arp rule, bias Bass and Lead 2 toward sparse/pulse roles.
-        let arcadeDenseArpRules: Set<String> = ["MOT-LD1-015","MOT-LD1-017","MOT-LD1-018","MOT-LD1-019"]
         let arcadeDenseMelody = isArcade && !lead1Rules.isDisjoint(with: arcadeDenseArpRules)
 
         // Step 6 — Bass
@@ -252,61 +254,12 @@ struct SongGenerator {
         if motorikSync.includes(kTrackRhythm) {
             var lead2SyncRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 67))
             lead2Rules.removeAll()
-            if lead2SyncRNG.nextDouble() < 0.65 {
-                syncLead2Partners = true
-                let rhythmEvents = trackEvents[kTrackRhythm]
-
-                // Doubling is SECTIONAL, not all-or-nothing. Applied to the whole song it was
-                // either wholly absent or a rigid copy of Rhythm from end to end, and across
-                // songs that one gesture was all you heard. Alternating 8-16 bar stretches turns
-                // it from "a doubled line" into "a line that gets doubled at certain moments",
-                // which is what the records actually do.
-                var doublingBars = Set<Int>()
-                var bar = 4 + lead2SyncRNG.nextInt(upperBound: 9)      // enter after the opening
-                var on = true
-                while bar < frame.totalBars {
-                    let run = 8 + lead2SyncRNG.nextInt(upperBound: 9)  // 8...16 bars
-                    if on { for b in bar..<min(bar + run, frame.totalBars) { doublingBars.insert(b) } }
-                    bar += run
-                    on.toggle()
-                }
-
-                // Well under Rhythm's 80. The double is a shadow of the sequencer, not a second
-                // voice competing with it — at 72 it blurred the line it doubles, and 54 was
-                // still too present once the two parts were heard together.
-                let doubleVelocity: UInt8 = 44
-
-                if rhythmRules.contains("MOT-RTHM-014") {
-                    // MOT-LD2-012 Octave Unison — generates no rhythm of its own. Strict unison,
-                    // no thirds and no offset: the machine quality comes from the exact lock.
-                    let shift = lead2SyncRNG.nextDouble() < 0.70 ? 12 : 24
-                    trackEvents[kTrackLead2] = rhythmEvents
-                        .filter { doublingBars.contains($0.stepIndex / 16) }
-                        .map {
-                            MIDIEvent(stepIndex: $0.stepIndex,
-                                      note: UInt8(min(127, Int($0.note) + shift)),
-                                      velocity: doubleVelocity, durationSteps: $0.durationSteps)
-                        }
-                    lead2Rules.insert("MOT-LD2-012")
-                } else {
-                    // MOT-LD2-011 Counter Sequencer — the same cell displaced. The offset is
-                    // drawn per song rather than fixed at 2: a half-beat, a beat and a beat and
-                    // a half are three distinctly different feels from the one rule.
-                    let offset = [2, 4, 6][lead2SyncRNG.nextInt(upperBound: 3)]
-                    let lastStep = frame.totalBars * 16
-                    trackEvents[kTrackLead2] = rhythmEvents.compactMap {
-                        guard doublingBars.contains($0.stepIndex / 16) else { return nil }
-                        let shifted = $0.stepIndex + offset
-                        guard shifted < lastStep else { return nil }
-                        return MIDIEvent(stepIndex: shifted, note: $0.note,
-                                         velocity: doubleVelocity, durationSteps: $0.durationSteps)
-                    }
-                    lead2Rules.insert("MOT-LD2-011")
-                }
-            } else {
-                trackEvents[kTrackLead2] = []
-                lead2Rules.insert("MOT-LD2-000")
-            }
+            let partner = kraftwerkLead2(rhythm: trackEvents[kTrackRhythm],
+                                         rhythmIsOctaveUnison: rhythmRules.contains("MOT-RTHM-014"),
+                                         totalBars: frame.totalBars, rng: &lead2SyncRNG)
+            trackEvents[kTrackLead2] = partner.events
+            lead2Rules.insert(partner.ruleID)
+            syncLead2Partners = partner.isPartner
         }
 
         // Step 9 — Texture
@@ -355,7 +308,7 @@ struct SongGenerator {
         }
 
         // Step 12 — Pattern evolver: gradual bass mutation across evolution windows
-        trackEvents = PatternEvolver.apply(trackEvents: trackEvents, frame: frame, structure: structure, tonalMap: tonalMap, seed: seed, skipForKraftwerkBass: bassRules.contains("MOT-BASS-026"))
+        trackEvents = PatternEvolver.apply(trackEvents: trackEvents, frame: frame, structure: structure, tonalMap: tonalMap, seed: seed, skipForKraftwerkBass: !bassRules.isDisjoint(with: PatternEvolver.kraftwerkBassRules))
 
         // Step 12.5 — Base Motorik breakdown: Lead 1, Lead 2 and Rhythm drop out together while
         // drums, bass, pads and texture carry the groove. Applied before the drum pass so the
@@ -832,10 +785,12 @@ struct SongGenerator {
             for ev in trackEvents[kTrackPads] {
                 padByStep[ev.stepIndex, default: []].append(ev)
             }
+            // Sorted on pitch too: the Dictionary hands steps back in a different order each run,
+            // and same-step notes kept that order (the notes were stable, their order was not).
             trackEvents[kTrackPads] = padByStep.flatMap { _, evs -> [MIDIEvent] in
                 guard evs.count > 2 else { return evs }
                 return Array(evs.sorted { $0.note < $1.note }.prefix(2))
-            }.sorted { $0.stepIndex < $1.stepIndex }
+            }.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
 
             // 4. Drift drum dropout windows — each KOS-DRUM rule gets dropout windows
             // sized to its character. KOS-DRUM-001 (Minimal) and 003 (Absent) are skipped
@@ -1623,6 +1578,28 @@ struct SongGenerator {
         let isChill    = songState.style == .chill
         let isAmbPiano = isAmbient && songState.isAmbientPiano
         let ambLoopLengths = songState.ambientLoopLengths
+        // Motorik: the substyle and sync a generated song's passes take, so a regenerated track is
+        // made and post-processed as generation makes it (found 2026-11-11: regen took no sync, so a
+        // Kraftwerk song's regenerated Rhythm, Bass, Drums or Lead 1 drew ordinary rules, and no
+        // regenerated track got the breakdown cut, the harmonic filter or the velocity arc).
+        let isMotorik  = songState.style == .motorik
+        let motNoir    = songState.motorikNoirVariation
+        let motArcade  = songState.motorikArcadeVariation
+        let motSync    = isMotorik ? songState.motorikSync : .none
+        let motBase    = isMotorik && !motNoir && !motArcade && !motSync.isActive
+        let motSyncWindows = motSync.isActive
+            ? syncDropoutWindows(sync: motSync, totalBars: songState.frame.totalBars, seed: songState.globalSeed) : []
+        func motBreakdowns(_ solo: SoloWindows) -> [Range<Int>] {
+            motBase ? breakdownWindows(totalBars: songState.frame.totalBars, seed: songState.globalSeed,
+                                       avoiding: solo.main) : []
+        }
+        // The fill seams generation passes the drum pass: either side of the sync and the breakdowns.
+        let motSeams = (motSyncWindows + motBreakdowns(songState.soloWindows))
+            .flatMap { [$0.lowerBound - 1, $0.upperBound - 1] }
+        let motArcadeDense = motArcade
+            && !currentMotorikLead1Rules(songState.generationLog).isDisjoint(with: arcadeDenseArpRules)
+        var motLead2IsGap = false                // Motorik Lead 2 regenerated as gap answers
+        var motLead2Partner: Bool? = nil         // Kraftwerk Lead 2 regenerated: whether it doubles
         // For Ambient texture regen: may switch between audio and MIDI texture.
         var regenAmbientAudioTexture: String? = songState.ambientAudioTexture
         var regenAmbientAudioOffset:  Int     = songState.ambientAudioTextureOffset
@@ -1676,10 +1653,11 @@ struct SongGenerator {
                     sohoPlan: regenSohoPlan,
                     rng: &rng, usedRuleIDs: &usedRules, fillBars: &ignoredFills)
             } else {
-                let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                let rawDrum = DrumGenerator.generate(frame: songState.frame, structure: songState.structure, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync)
                 var scratch = songState.trackEvents
                 scratch[kTrackDrums] = rawDrum
-                events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)[kTrackDrums]
+                // The same arguments as generation's, which a later bass regen repeats to find these fills.
+                events = DrumVariationEngine.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: newTrackSeed, noirVariation: motNoir, arcadeVariation: motArcade, kraftwerkSync: motSync.isActive, syncBoundaryBars: motSeams, syncBassIsLocked: motSync.includes(kTrackBass))[kTrackDrums]
             }
         case kTrackBass:
             if isAmbPiano {
@@ -1714,11 +1692,18 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules,
                     variationAnnotations: &chillBassVariationRegen)
             } else {
-                let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                let rawBass = BassGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, arcadeDenseMelody: motArcadeDense, sync: motSync)
                 var scratch = songState.trackEvents
                 scratch[kTrackBass] = rawBass
-                scratch = PatternEvolver.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, seed: newTrackSeed)
-                scratch = DrumVariationEngine.lockBassToExistingFills(trackEvents: scratch, frame: songState.frame, structure: songState.structure, seed: songState.globalSeed, noirVariation: songState.motorikNoirVariation)
+                scratch = PatternEvolver.apply(trackEvents: scratch, frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, seed: newTrackSeed,
+                                               skipForKraftwerkBass: !usedRules.isDisjoint(with: PatternEvolver.kraftwerkBassRules))
+                // Locked to the fills the drums play: made from the drum track's own seed, its regen
+                // override if it has one (until 2026-11-11 the song's seed even after a drum regen).
+                scratch = DrumVariationEngine.lockBassToExistingFills(
+                    trackEvents: scratch, frame: songState.frame, structure: songState.structure,
+                    seed: songState.trackOverrides[kTrackDrums] ?? songState.globalSeed,
+                    noirVariation: motNoir, arcadeVariation: motArcade, kraftwerkSync: motSync.isActive,
+                    syncBoundaryBars: motSeams, syncBassIsLocked: motSync.includes(kTrackBass))
                 events = scratch[kTrackBass]
             }
         case kTrackPads:
@@ -1748,7 +1733,7 @@ struct SongGenerator {
                     sohoVariation: songState.chillSohoVariation,
                     rng: &rng, usedRuleIDs: &usedRules)
             } else {
-                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                events = PadsGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade)
             }
         case kTrackLead1:
             if isAmbPiano {
@@ -1769,8 +1754,8 @@ struct SongGenerator {
                 events = isSectionSolo ? loop
                     : AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
             } else if isKosmic {
-                // lead1BaseRule and xFilesBars are needed during initial song generation
-                // (Lead 2 and Arpeggio reference them) but are unused in single-track regen.
+                // lead1BaseRule is read by nothing that plays. The X-Files bars matter to Lead 2,
+                // which keeps out of them: a Lead 2 regen finds them by replaying Lead 1 on its seed.
                 var unusedBaseRule = ""
                 var unusedXFilesBars: [Int] = []
                 events = KosmicLeadGenerator.generateLead1(
@@ -1790,7 +1775,10 @@ struct SongGenerator {
                     sohoVariation: songState.chillSohoVariation,
                     rng: &rng, usedRuleIDs: &usedRules, returns: { chillLead1Returns = $0 })
             } else {
-                let lead1 = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                // The breakdown windows as generation hands them to Lead 1, so hooks and solo
+                // returns lay out around them.
+                let earlyBreakdownBars = Set(motBreakdowns(.none).flatMap { Array($0) })
+                let lead1 = LeadGenerator.generateLead1(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, passBodyBars: passBodyBars, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync, breakdownBars: earlyBreakdownBars)
                 events = lead1.events
                 regenSolo = lead1.solo
             }
@@ -1806,10 +1794,28 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules)
                 events = AmbientLoopTiler.tile(events: loop, loopBars: loopBars, totalBars: songState.frame.totalBars)
             } else if isKosmic {
+                // Drift has no Lead 2, as Noir has none (regen and Evolve's first pass gave it one
+                // until 2026-11-11).
+                if songState.isKosmicDrift { return songState }
+                // The X-Files whistle bars of the Lead 1 playing, which Lead 2 stays silent over and
+                // after. Lead 1 doesn't keep them, so they are found by replaying it on its own seed:
+                // its regen override if it has one, else the song's Lead 1 stream (unchanged since
+                // the regen draws nothing before it).
+                var xFilesBars: [Int] = []
+                if !isSpace {
+                    var lead1RNG = SeededRNG(seed: songState.trackOverrides[kTrackLead1]
+                        ?? SeededRNG.trackSeed(globalSeed: songState.globalSeed, trackIndex: kTrackLead1))
+                    var lead1Rules: Set<String> = []
+                    var lead1Base = ""
+                    _ = KosmicLeadGenerator.generateLead1(
+                        frame: songState.frame, structure: songState.structure,
+                        tonalMap: songState.tonalMap, rng: &lead1RNG, usedRuleIDs: &lead1Rules,
+                        lead1BaseRule: &lead1Base, xFilesBars: &xFilesBars)
+                }
                 events = KosmicLeadGenerator.generateLead2(
                     frame: songState.frame, structure: songState.structure,
                     tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1],
-                    rng: &rng, usedRuleIDs: &usedRules, isKosmicSpace: isSpace,
+                    rng: &rng, usedRuleIDs: &usedRules, xFilesBars: xFilesBars, isKosmicSpace: isSpace,
                     spaceArrangement: regenArrangement,
                     rhythmEvents: songState.trackEvents[kTrackRhythm])
                 // A gap-answer rule is written as generation writes it, from the Lead 1 now
@@ -1845,22 +1851,31 @@ struct SongGenerator {
                     sohoVariation: songState.chillSohoVariation,
                     keepInstrument: songState.chillLead2Instrument,
                     rng: &rng, usedRuleIDs: &usedRules).events
+            } else if motNoir {
+                // Noir has no Lead 2 (regen and Evolve's first pass gave it one until 2026-11-11).
+                return songState
+            } else if motSync.includes(kTrackRhythm) {
+                // A Kraftwerk sync's Lead 2 is Rhythm's partner or silent, never a melodic rule.
+                let partner = kraftwerkLead2(
+                    rhythm: songState.trackEvents[kTrackRhythm],
+                    rhythmIsOctaveUnison: !currentRules(songState.generationLog, track: kTrackRhythm) { $0 == "MOT-RTHM-014" }
+                        .isEmpty,
+                    totalBars: songState.frame.totalBars, rng: &rng)
+                events = partner.events
+                usedRules.insert(partner.ruleID)
+                motLead2Partner = partner.isPartner
             } else {
-                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, arcadeVariation: songState.motorikArcadeVariation)
+                // With the song's solo windows, as generation's Lead 2 has them.
+                events = LeadGenerator.generateLead2(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, lead1Events: songState.trackEvents[kTrackLead1], rng: &rng, usedRuleIDs: &usedRules, solo: songState.soloWindows, arcadeVariation: motArcade, arcadeDenseMelody: motArcadeDense)
                 // A gap-answer rule is written as generation writes it, from the Lead 1 now
                 // playing, which already has its breakdowns and dropouts cut, and kept out of the
                 // breakdown windows. The current Lead 1 rule comes from the log.
                 if let gapRule = usedRules.first(where: GapAnswerEngine.isGapRule) {
-                    let isBase = !songState.motorikNoirVariation && !songState.motorikArcadeVariation
-                        && !songState.motorikSync.isActive
+                    motLead2IsGap = true
                     // The solo windows are the song's own, so Low bed and the breakdown windows
                     // see the same bars they did at generation.
                     let solo = songState.soloWindows
-                    let breakdowns = isBase
-                        ? breakdownWindows(totalBars: songState.frame.totalBars, seed: songState.globalSeed,
-                                           avoiding: solo.main)
-                        : []
-                    let (blocked, soloBars) = GapAnswerEngine.motorikBlocking(breakdowns: breakdowns, solo: solo)
+                    let (blocked, soloBars) = GapAnswerEngine.motorikBlocking(breakdowns: motBreakdowns(solo), solo: solo)
                     events = GapAnswerEngine.generate(
                         ruleID: gapRule, lead1: songState.trackEvents[kTrackLead1],
                         lead1RuleIDs: currentMotorikLead1Rules(songState.generationLog),
@@ -1897,7 +1912,12 @@ struct SongGenerator {
                     rng: &rng, usedRuleIDs: &usedRules,
                     switchAnnotation: &chillRhythmSwitchRegen)
             } else {
-                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                events = RhythmGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync)
+                if motSync.includes(kTrackRhythm) {
+                    // As generation does, before anything doubles it.
+                    events = limitIdenticalBars(events, trackIndex: kTrackRhythm,
+                                                totalBars: songState.frame.totalBars, seed: newTrackSeed)
+                }
             }
         case kTrackTexture:
             if isAmbPiano {
@@ -1943,10 +1963,90 @@ struct SongGenerator {
                 // Base Chill and Blues texture is audio-only; regen is a no-op for the MIDI track.
                 events = []
             } else {
-                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: songState.motorikNoirVariation, arcadeVariation: songState.motorikArcadeVariation)
+                events = TextureGenerator.generate(frame: songState.frame, structure: songState.structure, tonalMap: songState.tonalMap, rng: &rng, usedRuleIDs: &usedRules, noirVariation: motNoir, arcadeVariation: motArcade, sync: motSync, syncWindows: motSyncWindows)
             }
         default:
             return songState
+        }
+
+        // Motorik: the passes generation runs on this track, in generation's order (steps 10 to 13.6),
+        // against the song as it now plays. Not repeated: ArrangementFilter's spotlight, which draws
+        // across all the tracks at once and would need the others as they were before it.
+        var motPartnerLead2: (events: [MIDIEvent], ruleID: String)? = nil
+        if isMotorik {
+            let total = songState.frame.totalBars
+            func cut(_ evs: [MIDIEvent], _ windows: [Range<Int>]) -> [MIDIEvent] {
+                let steps = windows.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
+                return steps.isEmpty ? evs : evs.filter { ev in !steps.contains { $0.contains(ev.stepIndex) } }
+            }
+            func simplified(_ evs: [MIDIEvent]) -> [MIDIEvent] {                       // step 10
+                var scratch = songState.trackEvents
+                scratch[trackIndex] = evs
+                return DensitySimplifier.simplify(trackEvents: scratch, frame: songState.frame,
+                                                  structure: songState.structure,
+                                                  exemptTracks: motSync.isActive ? [kTrackLead2] : [])[trackIndex]
+            }
+            func filteredLead(_ evs: [MIDIEvent], track: Int, hook: Bool = false, skipClash: Bool = false) -> [MIDIEvent] {
+                HarmonicFilter.filterLead(evs, track: track, pads: songState.trackEvents[kTrackPads],  // step 11
+                                          frame: songState.frame, structure: songState.structure,
+                                          skipClashFilter: skipClash || hook,
+                                          bounds: kRegisterBounds[track] ?? RegisterBounds(low: 55, high: 88),
+                                          uniformLift: hook)
+            }
+            switch trackIndex {
+            case kTrackLead1:
+                let isLD1012 = usedRules.contains("MOT-LD1-012")
+                events = filteredLead(simplified(events), track: kTrackLead1,
+                                      hook: usedRules.contains(where: HookLeadEngine.isMotorikHookRule),
+                                      skipClash: isLD1012)
+                if isLD1012 { events = removeIsolatedPhrases(events, minNotes: 2, maxGapSteps: 16) }  // step 11.5
+            case kTrackLead2 where !motLead2IsGap:   // gap answers had their own filter pass
+                events = filteredLead(simplified(events), track: kTrackLead2)
+            case kTrackPads:
+                // Step 10.7: a sparse solo Lead 1 has the pads thinned outside its windows.
+                let solo = songState.soloWindows
+                if !solo.isEmpty, songState.trackEvents[kTrackLead1]
+                    .filter({ ev in !solo.short.contains { $0.contains(ev.stepIndex / 16) } }).count < 30 {
+                    let soloBars = solo.allBars
+                    var padGateRNG = SeededRNG(seed: newTrackSeed &+ 0xE1)
+                    events = events.filter { ev in
+                        soloBars.contains(ev.stepIndex / 16) || padGateRNG.nextDouble() < 0.70
+                    }
+                }
+                events = HarmonicFilter.velocityArc(events, frame: songState.frame, structure: songState.structure)
+            case kTrackRhythm, kTrackTexture:
+                events = HarmonicFilter.velocityArc(events, frame: songState.frame, structure: songState.structure)
+            default:
+                break
+            }
+            // Step 12.5: the base Motorik breakdowns, around the solo now playing.
+            if [kTrackLead1, kTrackLead2, kTrackRhythm].contains(trackIndex) {
+                events = cut(events, motBreakdowns(regenSolo ?? songState.soloWindows))
+            }
+            // Step 13.5: the sync drops out together; Texture plays through, a partner Lead 2 goes too.
+            if (motSync.includes(trackIndex) && trackIndex != kTrackTexture)
+                || (trackIndex == kTrackLead2 && motLead2Partner == true) {
+                events = cut(events, motSyncWindows)
+            }
+            // Step 13.6: the repeat guard on every track of a sync song (Rhythm had it above).
+            if motSync.isActive && trackIndex != kTrackRhythm {
+                events = limitIdenticalBars(events, trackIndex: trackIndex, totalBars: total, seed: newTrackSeed)
+            }
+            // A synced Rhythm's partner Lead 2 follows the new Rhythm, re-derived on Lead 2's own seed
+            // so it keeps its doubling stretches and offset. Reload replays Lead 2's override before
+            // Rhythm's, so this also keeps a reloaded partner in step.
+            if trackIndex == kTrackRhythm && motSync.includes(kTrackRhythm) {
+                let lead2Seed = songState.trackOverrides[kTrackLead2]
+                var lead2RNG = SeededRNG(seed: lead2Seed
+                    ?? SeededRNG.trackSeed(globalSeed: songState.globalSeed, trackIndex: 67))
+                let partner = kraftwerkLead2(rhythm: events, rhythmIsOctaveUnison: usedRules.contains("MOT-RTHM-014"),
+                                             totalBars: total, rng: &lead2RNG)
+                var lead2 = filteredLead(partner.events, track: kTrackLead2)
+                if partner.isPartner { lead2 = cut(lead2, motSyncWindows) }
+                lead2 = limitIdenticalBars(lead2, trackIndex: kTrackLead2, totalBars: total,
+                                           seed: lead2Seed ?? songState.globalSeed)
+                motPartnerLead2 = (lead2, partner.ruleID)
+            }
         }
 
         // A regenerated Chill lead gets the same groove passes the full generator applies.
@@ -2009,6 +2109,11 @@ struct SongGenerator {
             if trackIndex == kTrackLead2 && !kosmicGapAnswers.isEmpty {
                 events = (events + kosmicGapAnswers).sorted { $0.stepIndex < $1.stepIndex }
             }
+        }
+        // Kosmic Pads, Rhythm and Texture get the song's velocity arc, as HarmonicFilter gives them
+        // in a generated song (regen had skipped it, so a regenerated intro played at full strength).
+        if isKosmic, [kTrackPads, kTrackRhythm, kTrackTexture].contains(trackIndex) {
+            events = HarmonicFilter.velocityArc(events, frame: songState.frame, structure: songState.structure)
         }
 
         // A regenerated Drift track gets its bridge treatment, as generation gives it, replayed on a
@@ -2104,6 +2209,9 @@ struct SongGenerator {
         }
         updated.trackOverrides[trackIndex] = newTrackSeed
         if let solo = regenSolo { updated.soloWindows = solo }
+        if let partner = motPartnerLead2 {
+            updated = updated.replacingEvents(partner.events, forTrack: kTrackLead2)
+        }
         // Kosmic Space: a KOS-LD2-001 stereo twin follows a regenerated Rhythm, so it stays a twin.
         // Reload replays Lead 2's override before Rhythm's, so this also keeps a reloaded twin in step.
         if isSpace, trackIndex == kTrackRhythm, songState.isSpaceStereoTwin {
@@ -2488,19 +2596,84 @@ struct SongGenerator {
         currentLead1Rules(log) { $0.hasPrefix("MOT-LD1-") }
     }
 
-    /// The Lead 1 rule IDs in the log that `isWanted` accepts, as of now: a Lead 1 regen entry
-    /// clears those logged before it.
+    /// The Lead 1 rule IDs in the log that `isWanted` accepts, as of now.
     private static func currentLead1Rules(_ log: [GenerationLogEntry],
                                           where isWanted: (String) -> Bool) -> Set<String> {
+        currentRules(log, track: kTrackLead1, where: isWanted)
+    }
+
+    /// The rule IDs in the log that `isWanted` accepts for `track`, as of now: a regen entry for that
+    /// track clears those logged before it. `isWanted` must accept only that track's IDs.
+    private static func currentRules(_ log: [GenerationLogEntry], track: Int,
+                                     where isWanted: (String) -> Bool) -> Set<String> {
         var rules: Set<String> = []
         for entry in log {
             if entry.tag == "⚡ REGEN" {
-                if entry.description == kTrackNames[kTrackLead1] { rules = [] }
+                if entry.description == kTrackNames[track] { rules = [] }
             } else if isWanted(entry.tag) {
                 rules.insert(entry.tag)
             }
         }
         return rules
+    }
+
+    /// Arcade Lead 1 dense arp rules: with one of them, Bass and Lead 2 lean to sparse, pulse roles.
+    static let arcadeDenseArpRules: Set<String> = ["MOT-LD1-015", "MOT-LD1-017", "MOT-LD1-018", "MOT-LD1-019"]
+
+    /// Kraftwerk sync Lead 2 (step 8b): the partner of a synced Rhythm, derived from Rhythm's
+    /// actual events. Generation draws on stream 67; a Lead 2 regen on its own seed, and a Rhythm
+    /// regen re-derives it on Lead 2's seed so the double follows the new sequencer.
+    static func kraftwerkLead2(rhythm rhythmEvents: [MIDIEvent], rhythmIsOctaveUnison: Bool,
+                               totalBars: Int, rng: inout SeededRNG)
+        -> (events: [MIDIEvent], ruleID: String, isPartner: Bool) {
+        guard rng.nextDouble() < 0.65 else { return ([], "MOT-LD2-000", false) }
+
+        // Doubling is SECTIONAL, not all-or-nothing. Applied to the whole song it was
+        // either wholly absent or a rigid copy of Rhythm from end to end, and across
+        // songs that one gesture was all you heard. Alternating 8-16 bar stretches turns
+        // it from "a doubled line" into "a line that gets doubled at certain moments",
+        // which is what the records actually do.
+        var doublingBars = Set<Int>()
+        var bar = 4 + rng.nextInt(upperBound: 9)      // enter after the opening
+        var on = true
+        while bar < totalBars {
+            let run = 8 + rng.nextInt(upperBound: 9)  // 8...16 bars
+            if on { for b in bar..<min(bar + run, totalBars) { doublingBars.insert(b) } }
+            bar += run
+            on.toggle()
+        }
+
+        // Well under Rhythm's 80. The double is a shadow of the sequencer, not a second
+        // voice competing with it — at 72 it blurred the line it doubles, and 54 was
+        // still too present once the two parts were heard together.
+        let doubleVelocity: UInt8 = 44
+
+        if rhythmIsOctaveUnison {
+            // MOT-LD2-012 Octave Unison — generates no rhythm of its own. Strict unison,
+            // no thirds and no offset: the machine quality comes from the exact lock.
+            let shift = rng.nextDouble() < 0.70 ? 12 : 24
+            let events = rhythmEvents
+                .filter { doublingBars.contains($0.stepIndex / 16) }
+                .map {
+                    MIDIEvent(stepIndex: $0.stepIndex,
+                              note: UInt8(min(127, Int($0.note) + shift)),
+                              velocity: doubleVelocity, durationSteps: $0.durationSteps)
+                }
+            return (events, "MOT-LD2-012", true)
+        }
+        // MOT-LD2-011 Counter Sequencer — the same cell displaced. The offset is
+        // drawn per song rather than fixed at 2: a half-beat, a beat and a beat and
+        // a half are three distinctly different feels from the one rule.
+        let offset = [2, 4, 6][rng.nextInt(upperBound: 3)]
+        let lastStep = totalBars * 16
+        let events: [MIDIEvent] = rhythmEvents.compactMap {
+            guard doublingBars.contains($0.stepIndex / 16) else { return nil }
+            let shifted = $0.stepIndex + offset
+            guard shifted < lastStep else { return nil }
+            return MIDIEvent(stepIndex: shifted, note: $0.note,
+                             velocity: doubleVelocity, durationSteps: $0.durationSteps)
+        }
+        return (events, "MOT-LD2-011", true)
     }
 
     /// Base Motorik breakdown windows, borrowed from the Europe dropout. Half of base songs take

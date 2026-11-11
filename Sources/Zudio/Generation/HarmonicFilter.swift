@@ -97,7 +97,9 @@ struct HarmonicFilter {
     }
 
     /// Pass C — the velocity arc for one melodic track (Bass and Drums are exempt).
-    private static func velocityArc(_ track: [MIDIEvent], frame: GlobalMusicalFrame,
+    /// Also run by a Motorik or Kosmic regen of Pads, Rhythm or Texture, which `apply` covers in a
+    /// generated song.
+    static func velocityArc(_ track: [MIDIEvent], frame: GlobalMusicalFrame,
                                     structure: SongStructure) -> [MIDIEvent] {
         let bodyStart = structure.bodySections.map { $0.startBar }.min() ?? 0
         let bodyEnd   = structure.bodySections.map { $0.endBar   }.max() ?? frame.totalBars

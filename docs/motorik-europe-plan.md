@@ -782,9 +782,16 @@ This is a deliberate departure from the measured behaviour, chosen for listenabi
   long identical runs. Bass locking is skipped when Bass is a sync member, because
   `MOT-BASS-027` already takes every kick and `MOT-BASS-026` is a cell that must not be
   perturbed.
-- **`PatternEvolver`** — skipped for `MOT-BASS-026` only. That rule alone is "drawn once and
-  repeated with no variation"; the other three options in the sync bass pool are pre-existing
-  rules that have always evolved, and they still do.
+- **`PatternEvolver`** — skipped for `MOT-BASS-026` and `MOT-BASS-027`. 026 is "drawn once and
+  repeated with no variation". 027 was skipped only from 2026-11-11: until then the evolver's
+  Fill put passing notes in its rests and Rotate moved it off the kicks it exists to take, which
+  the code comment had always said must not happen. The other options in the sync bass pools
+  are pre-existing rules that have always evolved, and they still do.
+- **Regen** (2026-11-11) — a regenerated track takes the song's sync, so it draws the sync's
+  rules, and runs the sync passes: the drum pass with seam fills, the bass lock skipped for a
+  locked bass, the section dropout and the 12-bar repeat guard. A regenerated Lead 2 is Rhythm's
+  partner or silent (`SongGenerator.kraftwerkLead2`, step 8b), and a regenerated Rhythm
+  re-derives Lead 2's double on Lead 2's own seed so it follows the new sequencer.
 
 ### Rule ID conventions
 

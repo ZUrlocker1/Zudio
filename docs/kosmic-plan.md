@@ -1212,7 +1212,9 @@ data. It answers Lead 1 in its gaps instead of playing over it. `pickLeadRule2` 
 **Mix.** Kosmic Mono Synth on the bass has volume 0.14 and Kosmic Harpsi Pad on Rhythm 0.55, with
 Space keeping 0.50, so the hooks sit forward.
 
-**Lead thickening ✓ DONE:** Lead 1 is silently doubled by a GM Polysynth layer (GM 90) at 60% velocity. Invisible to the user — mirrors Lead 1's mute/solo state automatically. Classic JMJ layering technique. Lead Synth copy now happens after ArrangementFilter and HarmonicFilter so it matches exactly what Lead 1 plays.
+**Lead thickening ✓ DONE:** Lead 1 is silently doubled by a GM Polysynth layer (GM 90) at 60% velocity. Invisible to the user — mirrors Lead 1's mute/solo state automatically. Classic JMJ layering technique. Lead Synth copy now happens after ArrangementFilter and HarmonicFilter so it matches exactly what Lead 1 plays. A Lead 1 regen rebuilds it, and from 2026-11-11 the live REGEN path and Evolve passes take the rebuilt layer too (before that, both kept doubling the old melody).
+
+**Regen (2026-11-11):** Drift Lead 2 regen leaves Lead 2 empty, as Drift has none. A regenerated Lead 2 keeps clear of the X-Files whistle bars, found by replaying Lead 1 on its own seed. Regenerated Pads, Rhythm and Texture take the velocity arc. Still not re-run on regen: the density guard, the second-B variation, the Drift filters and the arrangement filter.
 
 **Quality improvements ✓ DONE (v0.95 analysis):**
 - Chord/mode clash fix: major chord type now blocked in Aeolian/Dorian modes; minor chord type blocked in Ionian mode. Prevents G♮ vs G# clashes between scale-based generators (Lead, Pads) and chord-based generators (Arpeggio, Bass).

@@ -23,11 +23,11 @@
 //                Restricted to off-beat 8th positions (steps 2, 6, 10, 14).
 //
 //   Substitute — replaces one non-anchor note's pitch with the adjacent scale degree.
-//                Available at all busyness levels (60% probability per window).
+//                Available at all busyness levels (45% probability per window).
 //                Direction (+1 / -1 scale degree) is fixed for the whole window.
 //
 //   Rotate     — shifts all non-beat1 notes by ±1–2 steps, accumulating across the window.
-//                Available with 35% probability; only on windows ≥ 8 bars.
+//                Available with 15% probability; only on windows ≥ 8 bars.
 //                The evolve-reset arc reverses the rotation on the descent.
 //
 // Performance: events are pre-indexed into a [bar → [MIDIEvent]] dictionary once at the
@@ -35,6 +35,9 @@
 // filter scans. The tonal map is also pre-indexed per bar. Total work drops from O(n² ) to O(n).
 
 struct PatternEvolver {
+
+    /// The Kraftwerk sync bass rules, which this pass leaves as written.
+    static let kraftwerkBassRules: Set<String> = ["MOT-BASS-026", "MOT-BASS-027"]
 
     static func apply(
         trackEvents: [[MIDIEvent]],
@@ -46,7 +49,9 @@ struct PatternEvolver {
     ) -> [[MIDIEvent]] {
         // This pass exists to mutate the bass gradually across the song. MOT-BASS-026 is a cell
         // drawn once and repeated with no variation, and MOT-BASS-027's statement/rest shape is
-        // deliberate too — evolving either one would remove the measured feature.
+        // deliberate too — evolving either one would remove the measured feature (Fill put
+        // passing notes in 027's rests and Rotate moved it off the kicks it takes, until
+        // 2026-11-11, when only 026 was skipped).
         guard !skipForKraftwerkBass else { return trackEvents }
 
         var rng = SeededRNG(seed: seed &+ 0xCAFE_BABE_7654_3210)

@@ -172,44 +172,28 @@ struct DrumVariationEngine {
 
     // MARK: - Public: bass-only locking for use during bass track regeneration
     //
-    // Replays the same fill detection + rng sequence as the original apply() call
-    // (using the original globalSeed), then applies only the bass locking step.
-    // The drum track in trackEvents must already contain the fills from the
-    // original generation; only trackEvents[kTrackBass] is modified.
+    // Runs `apply` itself with the arguments and seed the drum track's fills were made with, and
+    // keeps only its bass: the fills are drawn exactly as they were, so the bass locks to the
+    // fills that are playing. `seed` is the drum track's (its regen override, else the song's).
+    // It used to replay the draws by hand, and the copy had drifted: Arcade took 2- and 3-beat
+    // fills its drums never play, and a sync's seam fills and locked bass were ignored.
 
     static func lockBassToExistingFills(
         trackEvents: [[MIDIEvent]],
         frame: GlobalMusicalFrame,
         structure: SongStructure,
         seed: UInt64,
-        noirVariation: Bool = false
+        noirVariation: Bool = false,
+        arcadeVariation: Bool = false,
+        kraftwerkSync: Bool = false,
+        syncBoundaryBars: [Int] = [],
+        syncBassIsLocked: Bool = false
     ) -> [[MIDIEvent]] {
-        var rng = SeededRNG(seed: seed &+ 0xDEAD_BABE_F11E_D20B)
-
-        let fillBars = computeFillBars(trackEvents: trackEvents, frame: frame, structure: structure,
-                                       chillMode: false, noirVariation: noirVariation)
-
-        var fillInfos: [FillBarInfo] = []
-        for fillBar in fillBars.sorted() {
-            guard let sec = structure.section(atBar: fillBar),
-                  sec.label != .intro && sec.label != .outro else { continue }
-            let fillLength = noirVariation
-                ? rng.weightedPick([0.95, 0.05, 0.00])
-                : rng.weightedPick([0.70, 0.25, 0.05])
-            // Consume the variant rng draw to stay in sync with the original apply() sequence
-            switch fillLength {
-            case 0:  _ = rng.nextInt(upperBound: noirVariation ? 7 : 6)
-            case 2:  _ = rng.nextInt(upperBound: 3)
-            default: _ = rng.nextInt(upperBound: noirVariation ? 3 : 4)
-            }
-            fillInfos.append(FillBarInfo(bar: fillBar, fillLength: fillLength))
-        }
-
-        var bassLockRNG = SeededRNG(seed: seed &+ 0xB455_F177_D20B_1337)
         var result = trackEvents
-        result[kTrackBass] = applyBassLocking(bassEvents: trackEvents[kTrackBass],
-                                              fillInfos: fillInfos,
-                                              rng: &bassLockRNG)
+        result[kTrackBass] = apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed,
+                                   noirVariation: noirVariation, arcadeVariation: arcadeVariation,
+                                   kraftwerkSync: kraftwerkSync, syncBoundaryBars: syncBoundaryBars,
+                                   syncBassIsLocked: syncBassIsLocked)[kTrackBass]
         return result
     }
 

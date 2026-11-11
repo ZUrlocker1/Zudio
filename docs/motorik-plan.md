@@ -381,7 +381,8 @@ the groove, so the drop reads as a section change and Lead 1's return is the str
 - The Form log line reads, for example, `Subtle A/B + breakdown`; the playback log shows
   `Breakdown  Leads, Rhythm drop - 6 bars` and `Breakdown  Leads, Rhythm return`
 - Measured: 58% of base songs take one, 1.9 windows on average, 5.7 bars mean length
-- Not re-applied when a single track is regenerated, like the spotlight filter
+- Re-applied when Lead 1, Lead 2 or Rhythm is regenerated (from 2026-11-11), around the solo
+  now playing; the spotlight filter is still not re-applied on regen
 
 By ear, the fill reduction and the breakdown are a minor improvement. Use the batch audio export
 in `implementation.md` (Test Mode) for any further A/B listening.
@@ -611,8 +612,13 @@ How a hook plays:
   the breakdown windows so statements are placed around them. For every Motorik Lead 1 but Noir,
   `ArrangementFilter.apply(maxSilentBars:)` turns a rest or thinning that would leave more than
   24 bars of Lead 1 silence into a back-off, every note kept and softened 18.
-- **Regen.** Motorik Lead 1 regen does not run `HarmonicFilter` and does not pass the breakdown
-  windows, so regen and first generation differ.
+- **Regen.** (2026-11-11) A regenerated Motorik track gets generation's passes for that track,
+  run against the song as it now plays: the substyle and sync flags, the density pass, the
+  harmonic filter (hook and MOT-LD1-012 flags as generation sets them), the MOT-LD1-012 phrase
+  cleanup, the pads gate, the velocity arc on Pads, Rhythm and Texture, the breakdown cut, the
+  sync dropout and repeat guard. Lead 1 is written around the breakdown windows; Lead 2 takes the
+  song's solo windows. Only the arrangement filter's spotlight is not re-run. Noir Lead 2 regen
+  leaves Lead 2 empty. See `SongGenerator.regenerateTrack`.
 - **Log and testing star.** Log names are in `lead1RuleDescription`. While the rules are tuned,
   the generation log prints a star before each new rule, set in
   `GenerationLogEntry.testingMarkedRules`.

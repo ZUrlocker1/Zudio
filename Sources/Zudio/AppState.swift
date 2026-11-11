@@ -389,6 +389,10 @@ final class AppState: ObservableObject {
             forbidSohoVariation:  forbidSoho,
             forceAmbientPianoRule: forced["Piano"]
         )
+        // Every saved seed is known before the replay, so a track that reads another's seed sees the
+        // final one whatever the order: Bass (replayed before Drums) locks to the regenerated drums'
+        // fills, not the original drums'.
+        state.trackOverrides = trackOverrides
         for idx in trackOverrides.keys.sorted() {
             state = SongGenerator.regenerateTrack(idx, songState: state, overrideSeed: trackOverrides[idx])
         }
@@ -1905,9 +1909,26 @@ final class AppState: ObservableObject {
             }
             var updated = current.replacingEvents(newEvents, forTrack: trackIndex, appendingLog: regenEntries,
                                                   replacingStepAnnotations: newAnnotations)
-            // Kosmic Space: a regenerated Rhythm takes its KOS-LD2-001 stereo twin with it
-            if trackIndex == kTrackRhythm, current.isSpaceStereoTwin, evolveBodyEndStep == nil {
-                updated = updated.replacingEvents(regen.trackEvents[kTrackLead2], forTrack: kTrackLead2)
+            // A companion track the regen rebuilt goes with it: Kosmic's Lead Synth doubling Lead 1,
+            // a Kraftwerk Lead 2 doubling Rhythm, Space's KOS-LD2-001 stereo twin. Until 2026-11-11
+            // only the twin was carried, so after a Kosmic Lead 1 regen the Lead Synth went on
+            // playing the old melody under the new one until the song was reloaded.
+            for t in 0..<min(regen.trackEvents.count, current.trackEvents.count)
+            where t != trackIndex && regen.trackEvents[t] != sourceState.trackEvents[t] {
+                let rebuilt: [MIDIEvent]
+                if let bodyEnd = evolveBodyEndStep {
+                    rebuilt = (regen.trackEvents[t].filter { $0.stepIndex < bodyEnd }
+                               + current.trackEvents[t].filter { $0.stepIndex >= bodyEnd })
+                        .sorted { $0.stepIndex < $1.stepIndex }
+                } else {
+                    rebuilt = regen.trackEvents[t]
+                }
+                updated = updated.replacingEvents(rebuilt, forTrack: t)
+            }
+            // The solo windows go with a regenerated Lead 1, so a later Lead 2 regen keeps out of
+            // the new solo. An Evolve state's bars are renumbered, so it keeps none.
+            if trackIndex == kTrackLead1, evolveBodyEndStep == nil {
+                updated.soloWindows = regen.soloWindows
             }
             // Keep the regen's track seed. Without it a saved file or history entry replays the
             // old seed and rebuilds the track as it was before ⚡REGEN, and bass slides (seeded
@@ -3039,12 +3060,24 @@ final class AppState: ObservableObject {
         // once Lead 1 is done its new events go into the source for the tracks after it.
         // Built against the anchor's Lead 1, Lead 2 played over the new one in 41-42% of its
         // notes in Chill and Motorik, against 20-24% in a generated song (measured 2026-10-18).
+        //
+        // The whole regenerated state becomes the source, not just its events: the next track then
+        // reads the current Lead 1's rules, seed and solo windows, and a companion track the regen
+        // rebuilt (Kosmic's Lead Synth doubling Lead 1, a Kraftwerk Lead 2 doubling Rhythm, Space's
+        // stereo twin) goes into the pass too. Until 2026-11-11 a Kosmic pass played the anchor's
+        // Lead Synth, the old melody, under the new Lead 1.
         var source = leadInstruments.map { anchor.withChillLeadInstruments($0.0, $0.1) } ?? anchor
         var fullTracks = anchor.trackEvents   // whole-song events per track, regenerated ones swapped in
+        func passWindow(_ track: [MIDIEvent]) -> [MIDIEvent] {
+            track.filter { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
+                 .map { MIDIEvent(stepIndex: $0.stepIndex - bodyStartStep, note: $0.note,
+                                  velocity: $0.velocity, durationSteps: $0.durationSteps) }
+        }
         for idx in freshTracks {
             let anchorHadContent = !anchor.trackEvents[idx].isEmpty
+            let sourceLogCount = source.generationLog.count
             var regen      = SongGenerator.regenerateTrack(idx, songState: source, passBodyBars: passBars)
-            var newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
+            var newEntries = Array(regen.generationLog.dropFirst(sourceLogCount))
             // Retry until: (a) the regen brings at least one rule the anchor did not use AND
             //              (b) there are body events (not just intro motif) within the pass window.
             //              Solo rules (MOT-LD1-007/008) are completely silent in body bars outside
@@ -3065,17 +3098,15 @@ final class AppState: ObservableObject {
                 let bringsNewRule = ruleIsFixed || newRuleIDs.isEmpty || !newRuleIDs.isSubset(of: anchorRuleIDs)
                 if bringsNewRule && !eventsEmpty { break }
                 regen      = SongGenerator.regenerateTrack(idx, songState: source, passBodyBars: passBars)
-                newEntries = Array(regen.generationLog.dropFirst(baseLogCount))
+                newEntries = Array(regen.generationLog.dropFirst(sourceLogCount))
                 attempts  += 1
             }
-            if idx == kTrackLead1 {
-                source = source.replacingEvents(regen.trackEvents[kTrackLead1], forTrack: kTrackLead1)
+            for t in 0..<min(regen.trackEvents.count, fullTracks.count)
+            where t == idx || regen.trackEvents[t] != source.trackEvents[t] {
+                fullTracks[t] = regen.trackEvents[t]
+                events[t] = passWindow(regen.trackEvents[t])
             }
-            fullTracks[idx] = regen.trackEvents[idx]
-            events[idx] = regen.trackEvents[idx]
-                .filter { $0.stepIndex >= bodyStartStep && $0.stepIndex < bodyStartStep + cutoff }
-                .map { MIDIEvent(stepIndex: $0.stepIndex - bodyStartStep, note: $0.note,
-                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
+            source = regen
             regenLog.append(contentsOf: newEntries)
         }
         // A song with no intro opens on a cold-start pickup: its first bar is drums alone (Blues:
