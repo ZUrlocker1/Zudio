@@ -8,22 +8,22 @@
 // so it answers only the calls that survived. See docs/Solo-improvement-plan.md, "Built: Motorik
 // Lead 2".
 //
-// MOT-LD2-013 Echo answer       — Lead 1's last 2 to 4 notes, same rhythm, a third, sixth or octave lower
-// MOT-LD2-014 Hook fragment     — the first 2 to 5 notes of Lead 1's last phrase, inverted or a step down
-// MOT-LD2-015 Answer cell       — a cell paired with Lead 1's rule, restated in every answer
-// MOT-LD2-016 Statement harmony — one Lead 1 statement in three a third below, echo answers elsewhere
-// MOT-LD2-017 Low bed           — root or fifth held under Lead 1's long notes, and alone in a long gap
+// MOT-LD2-001 Echo answer       — Lead 1's last 2 to 4 notes, same rhythm, a third, sixth or octave lower
+// MOT-LD2-003 Hook fragment     — the first 2 to 5 notes of Lead 1's last phrase, inverted or a step down
+// MOT-LD2-004 Answer cell       — a cell paired with Lead 1's rule, restated in every answer
+// MOT-LD2-006 Statement harmony — one Lead 1 statement in three a third below, echo answers elsewhere
+// MOT-LD2-002 Low bed           — root or fifth held under Lead 1's long notes, and alone in a long gap
 //
 // Every note sits on the 8th-note grid and held notes start on beats, so Lead 2 locks to the same
 // kick and snare as the Lead 1 hooks.
 
 enum GapAnswerEngine {
 
-    static let echoAnswer       = "MOT-LD2-013"
-    static let hookFragment     = "MOT-LD2-014"
-    static let answerCell       = "MOT-LD2-015"
-    static let statementHarmony = "MOT-LD2-016"
-    static let lowBed           = "MOT-LD2-017"
+    static let echoAnswer       = "MOT-LD2-001"
+    static let hookFragment     = "MOT-LD2-003"
+    static let answerCell       = "MOT-LD2-004"
+    static let statementHarmony = "MOT-LD2-006"
+    static let lowBed           = "MOT-LD2-002"
     static let ruleIDs: Set<String> = [echoAnswer, hookFragment, answerCell, statementHarmony, lowBed]
 
     static func isGapRule(_ id: String) -> Bool { ruleIDs.contains(id) }
@@ -64,44 +64,44 @@ enum GapAnswerEngine {
         HookNote(step: step, deg: deg, len: len, vel: vel)
     }
 
-    /// MOT-LD2-015's cell for each Lead 1 hook, in semitones from the song tonic, all on the 8th
+    /// MOT-LD2-004's cell for each Lead 1 hook, in semitones from the song tonic, all on the 8th
     /// grid with held notes on beats.
     private static let pairedCells: [String: [HookBar]] = [
         // Hallogallo hook: the pulse tail, the flat seventh into the root in soft 8ths.
-        "MOT-LD1-023": [[n(0, -2, 2, 66), n(2, 0, 2, 72), n(4, 0, 2, 64),
+        "MOT-LD1-001": [[n(0, -2, 2, 66), n(2, 0, 2, 72), n(4, 0, 2, 64),
                          n(8, -2, 2, 64), n(10, 0, 2, 70), n(12, 0, 4, 68)]],
         // Radioactive riff: the vocal line 1 1 1 1 3 2 1, re-gridded onto 8ths.
-        "MOT-LD1-024": [[n(0, 0, 2, 72), n(2, 0, 2, 66), n(4, 0, 2, 70), n(6, 0, 2, 64),
+        "MOT-LD1-002": [[n(0, 0, 2, 72), n(2, 0, 2, 66), n(4, 0, 2, 70), n(6, 0, 2, 64),
                          n(8, 4, 2, 74), n(10, 2, 2, 68), n(12, 0, 4, 72)]],
         // Model riff: the riff's tail, 2 flat 7 5.
-        "MOT-LD1-025": [[n(0, 2, 6, 72), n(6, -2, 2, 66), n(8, -5, 8, 70)]],
+        "MOT-LD1-006": [[n(0, 2, 6, 72), n(6, -2, 2, 66), n(8, -5, 8, 70)]],
         // Tour de France riff: the cadence flat 7 flat 3 1, its last note moved onto the beat.
-        "MOT-LD1-026": [[n(0, -2, 4, 72), n(4, 3, 4, 68), n(8, 0, 8, 72)]],
+        "MOT-LD1-003": [[n(0, -2, 4, 72), n(4, 3, 4, 68), n(8, 0, 8, 72)]],
     ]
 
-    /// MOT-LD2-015's cell under every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
+    /// MOT-LD2-004's cell under every other Lead 1 rule: a two-bar descent 5 4 3 2 to the root.
     private static let descentCell: [HookBar] = [
         [n(0, 7, 4, 70), n(4, 5, 4, 66), n(8, 4, 4, 68), n(12, 2, 4, 64)],
         [n(0, 0, 8, 70)],
     ]
 
     /// KOS-LD2-003's cells for the Kosmic hooks, in semitones from the song tonic, with the
-    /// homage operations that keep each one recognisable. KOS-LEAD-010 Blade Runner theme has no
+    /// homage operations that keep each one recognisable. KOS-LD1-007 Blade Runner theme has no
     /// stored cell: its answer is Lead 1's own held last note, a third lower (see `generate`).
     private static let kosmicPairedCells: [String: (cell: [HookBar], homage: [Double])] = [
         // Pulstar's rising riff, a native 16th figure: 1 2 flat 3 into 4 on the bar, 5, then
         // back to 1, held. Only a dropped middle note keeps it a rising run.
-        "KOS-LEAD-011": ([[n(13, 0, 1, 58), n(14, 2, 1, 60), n(15, 3, 1, 62)],
+        "KOS-LD1-001": ([[n(13, 0, 1, 58), n(14, 2, 1, 60), n(15, 3, 1, 62)],
                           [n(0, 5, 2, 66), n(2, 7, 1, 62), n(3, 0, 9, 64)]],
                          [0, 1, 0, 0, 0]),
         // Beach Scene's answer: rising arpeggios on IV and V in 8ths, landing on the root.
-        "KOS-LEAD-012": ([[n(0, -12, 2, 60), n(2, -7, 2, 62), n(4, -3, 4, 64),
+        "KOS-LD1-005": ([[n(0, -12, 2, 60), n(2, -7, 2, 62), n(4, -3, 4, 64),
                            n(8, -10, 2, 60), n(10, -5, 2, 62), n(12, -1, 4, 64)],
                           [n(0, 0, 12, 66)]],
                          [0.5, 0.5, 0, 0, 0]),
     ]
 
-    /// KOS-LD2-003 under every other Kosmic Lead 1 rule: KOS-LEAD-004's two-on, two-off echo cell,
+    /// KOS-LD2-003 under every other Kosmic Lead 1 rule: KOS-LD1-004's two-on, two-off echo cell,
     /// two held notes a step apart, the fifth rising to the sixth. Every other answer plays it a
     /// third lower, as the old rule's echo did.
     private static let kosmicPairCell: [HookBar] = [[n(0, 7, 14, 62)], [n(0, 9, 14, 58)]]
@@ -145,7 +145,7 @@ enum GapAnswerEngine {
     /// Blade Runner answer).
     private enum Transform { case echo, stepDown, invert, cell, cellInverted, steps }
 
-    /// The forms an MOT-LD2-015 answer takes. The first and last answers of a song are the full
+    /// The forms an MOT-LD2-004 answer takes. The first and last answers of a song are the full
     /// cell; the others are drawn: full 35, the head alone 30, inverted around its last note 20,
     /// and the full cell with its head sequenced a step lower, up to three bars, 15.
     private enum CellForm: CaseIterable { case full, short, inverted, long }
@@ -194,9 +194,9 @@ enum GapAnswerEngine {
                                          weights: kosmic ? kosmicPaired?.homage : nil, rng: &r)
         // Half the songs let a middle Answer cell drop an octave now and then. Never in Kosmic.
         let octaveDropSong = r.nextDouble() < 0.50 && !kosmic
-        // KOS-LD2-003 under KOS-LEAD-010 Blade Runner theme answers with Lead 1's held last note.
-        let bladeRunner = ruleID == kosmicCell && lead1RuleIDs.contains("KOS-LEAD-010")
-        // KOS-LEAD-004's two-on, two-off cell: every other answer a third lower.
+        // KOS-LD2-003 under KOS-LD1-007 Blade Runner theme answers with Lead 1's held last note.
+        let bladeRunner = ruleID == kosmicCell && lead1RuleIDs.contains("KOS-LD1-007")
+        // KOS-LD1-004's two-on, two-off cell: every other answer a third lower.
         let pairCell = kosmic && kosmicPaired == nil
 
         func scale(atBar bar: Int) -> Set<Int> {
@@ -391,7 +391,7 @@ enum GapAnswerEngine {
                 return realise(shape, .steps, rng: &rng)
             }
             if ruleID == kosmicReply {
-                // KOS-LD2-004 Gap reply melody: KOS-LEAD-004's two held notes a step apart, from
+                // KOS-LD2-004 Gap reply melody: KOS-LD1-004's two held notes a step apart, from
                 // the note Lead 1 ended on; every other reply a third lower, as its echo was.
                 guard let last = ph.notes.last else { return nil }
                 let base = turn % 2 == 1 ? -2 : 0
@@ -431,7 +431,7 @@ enum GapAnswerEngine {
             return nil
         }
 
-        // MOT-LD2-016: which statements are harmonised. A statement is a body phrase of three
+        // MOT-LD2-006: which statements are harmonised. A statement is a body phrase of three
         // notes or more; one in three, from an offset drawn per song.
         var harmonised: Set<Int> = []
         if ruleID == statementHarmony {
@@ -442,7 +442,7 @@ enum GapAnswerEngine {
                 k += 1
             }
         }
-        // MOT-LD2-017: the song's target count of phrases get a bed, spread evenly over the body
+        // MOT-LD2-002: the song's target count of phrases get a bed, spread evenly over the body
         // phrases, or every one of them if there are fewer.
         var bedded: Set<Int> = []
         var events: [MIDIEvent] = []
@@ -571,7 +571,7 @@ enum GapAnswerEngine {
         // Kosmic: now and then Lead 2 joins Lead 1 for four bars, a third under it (65%) or in
         // unison (35%), drawn per window (Zack, 2026-11-10). Two windows a song, one more when
         // Lead 1 left room for under four answers, and one more when Lead 1 plays through more
-        // than 60% of the body, as KOS-LEAD-006 does. A song whose Lead 2 would still have under
+        // than 60% of the body, as KOS-LD1-006 does. A song whose Lead 2 would still have under
         // 24 notes, under a Lead 1 of long notes, takes more, up to six. Windows sit on a four-bar
         // grid from the body's start, where Lead 1 has two or more 8th-grid onsets and Lead 2 is
         // silent, and are spread evenly over the candidates. Drawn last, so no earlier draw moves.
@@ -627,7 +627,7 @@ enum GapAnswerEngine {
 
     // MARK: - Harmony and bed
 
-    /// MOT-LD2-016: a whole Lead 1 statement a diatonic third below, in Lead 1's rhythm. Only Lead
+    /// MOT-LD2-006: a whole Lead 1 statement a diatonic third below, in Lead 1's rhythm. Only Lead
     /// 1's 8th-grid onsets are harmonised; each harmony note holds through any 16th in between.
     private static func harmony(_ ph: Phrase, scale: (Int) -> Set<Int>, register: RegisterBounds,
                                 steps: Int = -2, rng: inout SeededRNG) -> [MIDIEvent] {
@@ -652,7 +652,7 @@ enum GapAnswerEngine {
     /// A Lead 1 note this long or longer gets a bed under it.
     private static let bedMinLength = 4
 
-    /// MOT-LD2-017: the chord's root or fifth held under each of Lead 1's long notes in a phrase,
+    /// MOT-LD2-002: the chord's root or fifth held under each of Lead 1's long notes in a phrase,
     /// and in each bar without one, MIDI 50 to 60, starting on a beat. A bed on the same pitch as
     /// the one before it carries on as one held note, up to a bar.
     private static func bed(_ ph: Phrase, tonicPC: Int, tonalMap: TonalGovernanceMap,
@@ -707,7 +707,7 @@ enum GapAnswerEngine {
         return choice
     }
 
-    /// MOT-LD2-017 on its own: the chord's root or fifth held for one or two bars in a long Lead 1
+    /// MOT-LD2-002 on its own: the chord's root or fifth held for one or two bars in a long Lead 1
     /// silence, with no Lead 1 above it. It starts on a bar line at least a bar after the phrase
     /// before it ends and finishes half a bar before Lead 1 returns. Two bars only if the chord
     /// stays the same; nil if the gap can't hold it or isn't all body.

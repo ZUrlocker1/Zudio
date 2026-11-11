@@ -33,7 +33,7 @@ struct HarmonicFilter {
         // tenor's notes ended up above its own ceiling, which is where the screech came from
         // (Zack, 2026-10-14).
         registerOverrides: [Int: RegisterBounds] = [:],
-        // Hook rules (MOT-LD1-023 onward) restate one phrase all song. Lifting it window by window
+        // Hook rules (MOT-LD1-001 onward) restate one phrase all song. Lifting it window by window
         // put one statement an octave above the next, so for them Pass B decides once per song.
         uniformLead1Lift: Bool = false
     ) -> [[MIDIEvent]] {

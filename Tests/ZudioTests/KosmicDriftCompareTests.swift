@@ -124,8 +124,8 @@ struct KosmicDriftCompareTests {
         // ── LEAD 1 RULES ───────────────────────────────────────────────────
         print(sep)
         print("  LEAD 1 RULES")
-        printRuleDistribution("Regular", songs: regular, prefix: "KOS-LEAD")
-        printRuleDistribution("Drift  ", songs: drift,   prefix: "KOS-LEAD")
+        printRuleDistribution("Regular", songs: regular, prefix: "KOS-LD1")
+        printRuleDistribution("Drift  ", songs: drift,   prefix: "KOS-LD1")
 
         // ── BRIDGE PRESENCE ────────────────────────────────────────────────
         print(sep)
@@ -190,7 +190,7 @@ struct KosmicDriftCompareTests {
         print("  REGULAR KOSMIC songs:")
         for (i, s) in regular.enumerated() {
             let drum = ruleTag(s, prefix: "KOS-DRUM")
-            let lead = ruleTag(s, prefix: "KOS-LEAD")
+            let lead = ruleTag(s, prefix: "KOS-LD1")
             let bass = ruleTag(s, prefix: "KOS-BASS")
             print("  \(i+1). \(s.frame.key) \(s.frame.mode.rawValue.padding(toLength:10,withPad:" ",startingAt:0))  \(s.frame.tempo) BPM  \(s.frame.totalBars)b  D:\(drum) B:\(bass) L:\(lead)  \(s.title)")
         }
@@ -198,7 +198,7 @@ struct KosmicDriftCompareTests {
         print("  KOSMIC DRIFT songs:")
         for (i, s) in drift.enumerated() {
             let drum = ruleTag(s, prefix: "KOS-DRUM")
-            let lead = ruleTag(s, prefix: "KOS-LEAD")
+            let lead = ruleTag(s, prefix: "KOS-LD1")
             let bridge = driftBridgeType(s).map { " [\($0)]" } ?? ""
             print("  \(i+1). \(s.frame.key) \(s.frame.mode.rawValue.padding(toLength:10,withPad:" ",startingAt:0))  \(s.frame.tempo) BPM  \(s.frame.totalBars)b  D:\(drum) L:\(lead)\(bridge)  \(s.title)")
         }

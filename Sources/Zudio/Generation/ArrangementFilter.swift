@@ -112,7 +112,7 @@ struct ArrangementFilter {
                     // a silenced block took most of them (one song kept 2 of 8).
                     events[track] = silence(events[track], startStep: startStep, endStep: endStep)
                 } else if roll < 0.80 && phraseTracks.contains(track) {
-                    // A hook rule (MOT-LD1-023 onward) states whole phrases; thinning or resting
+                    // A hook rule (MOT-LD1-001 onward) states whole phrases; thinning or resting
                     // picks notes out of the hook and leaves fragments. Soften it instead.
                     events[track] = soften(events[track], startStep: startStep, endStep: endStep,
                                           reduction: 18)

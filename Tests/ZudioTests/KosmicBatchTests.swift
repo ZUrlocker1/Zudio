@@ -43,7 +43,7 @@ struct KosmicBatchTests {
             try SongLogExporter.export(song, midiURL: midiURL)
 
             let keyMode   = (song.frame.key + " " + song.frame.mode.rawValue).padding(toLength: 20, withPad: " ", startingAt: 0)
-            let leadRule  = song.generationLog.first { $0.tag.hasPrefix("KOS-LEAD") }?.tag ?? "?"
+            let leadRule  = song.generationLog.first { $0.tag.hasPrefix("KOS-LD1") }?.tag ?? "?"
             let drumRule  = song.generationLog.first { $0.tag.hasPrefix("KOS-DRUM") }?.tag ?? "?"
             let rhytmRule = song.generationLog.first { $0.tag.hasPrefix("KOS-RTHM") }?.tag ?? "?"
             print("  \(i). \(keyMode)  \(song.frame.tempo) BPM  \(song.frame.totalBars) bars  [\(leadRule)] [\(drumRule)] [\(rhytmRule)]  \(song.title)")

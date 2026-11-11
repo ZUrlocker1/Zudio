@@ -9,15 +9,15 @@ struct GenerationLogEntry: Sendable {
     var isTitle: Bool = false
 
     /// TESTING ONLY. Rules that are new or changed in the current round, marked with "* " in the
-    /// generation log so Zack can spot them while listening ("MOT-LD1-023 * Hallogallo hook").
+    /// generation log so Zack can spot them while listening ("MOT-LD1-001 * Hallogallo hook").
     /// Add each new or changed rule ID as it lands. Empty this set when Zack says testing is
     /// done, the rules are final, or the build is going to the App Store.
     static let testingMarkedRules: Set<String> = [
-        "MOT-LD1-023", "MOT-LD1-024", "MOT-LD1-025", "MOT-LD1-026",
+        "MOT-LD1-001", "MOT-LD1-002", "MOT-LD1-003", "MOT-LD1-006",
         "MOT-LD1-007", "MOT-LD1-008",
-        "MOT-LD2-013", "MOT-LD2-014", "MOT-LD2-015", "MOT-LD2-016", "MOT-LD2-017",
-        "KOS-LEAD-010", "KOS-LEAD-011", "KOS-LEAD-012",
-        "KOS-LD2-002", "KOS-LD2-003", "KOS-LD2-004",
+        "MOT-LD2-001", "MOT-LD2-002", "MOT-LD2-003", "MOT-LD2-004", "MOT-LD2-006",
+        "KOS-LD1-001", "KOS-LD1-005", "KOS-LD1-007",
+        "KOS-LD2-002", "KOS-LD2-003", "KOS-LD2-004", "KOS-LD2-005",
     ]
 
     init(tag: String, description: String, isTitle: Bool = false) {

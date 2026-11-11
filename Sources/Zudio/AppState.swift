@@ -894,6 +894,9 @@ final class AppState: ObservableObject {
             // about 1.8 dB down from the untouched 100. Kosmic keeps its own, lower trims below.
             case (kTrackBass,    .motorik, "Moog"):          return 90
             case (kTrackBass,    .motorik, "Synth Bass 3"):  return 90
+            // Rock Bass sat a little forward of the rest of the Motorik bass pool (Zack, 2026-11-10),
+            // trimmed the same 1.8 dB as Moog.
+            case (kTrackBass,    .motorik, "Rock Bass"):     return 90
             case (kTrackRhythm,  .motorik, "Charang"):       return 70
             case (kTrackTexture, .motorik, "Interference"):  return 127
             case (kTrackBass,    .kosmic,  "Pulse Bass"):    return 115
@@ -3737,6 +3740,20 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Lead rule IDs that were renumbered, so a saved song that forced one still gets the same rule.
+    /// Kosmic Lead 1 moved from KOS-LEAD to KOS-LD1, and the transcription rules took the numbers of
+    /// the rules they replaced.
+    static let renumberedLeadRuleIDs: [String: String] = [
+        "KOS-LEAD-001": "KOS-LD1-001", "KOS-LEAD-002": "KOS-LD1-002", "KOS-LEAD-003": "KOS-LD1-003",
+        "KOS-LEAD-004": "KOS-LD1-004", "KOS-LEAD-005": "KOS-LD1-005", "KOS-LEAD-006": "KOS-LD1-006",
+        "KOS-LEAD-007": "KOS-LD1-007", "KOS-LEAD-008": "KOS-LD1-008", "KOS-LEAD-009": "KOS-LD1-009",
+        "KOS-LEAD-010": "KOS-LD1-007", "KOS-LEAD-011": "KOS-LD1-001", "KOS-LEAD-012": "KOS-LD1-005",
+        "MOT-LD1-023": "MOT-LD1-001", "MOT-LD1-024": "MOT-LD1-002",
+        "MOT-LD1-025": "MOT-LD1-006", "MOT-LD1-026": "MOT-LD1-003",
+        "MOT-LD2-013": "MOT-LD2-001", "MOT-LD2-014": "MOT-LD2-003", "MOT-LD2-015": "MOT-LD2-004",
+        "MOT-LD2-016": "MOT-LD2-006", "MOT-LD2-017": "MOT-LD2-002",
+    ]
+
     func loadFromLogURL(_ url: URL) {
         // If a generation is in progress, queue the URL and load it when generation finishes.
         if isGenerating {
@@ -3806,7 +3823,7 @@ final class AppState: ObservableObject {
                 for pair in val.components(separatedBy: "  ") {
                     let parts = pair.trimmingCharacters(in: .whitespaces).components(separatedBy: "=")
                     if parts.count == 2 {
-                        forcedRules[parts[0]] = parts[1]
+                        forcedRules[parts[0]] = Self.renumberedLeadRuleIDs[parts[1]] ?? parts[1]
                     }
                 }
             } else if trimmed.hasPrefix("Instruments") {

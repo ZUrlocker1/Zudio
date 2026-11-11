@@ -11,10 +11,10 @@
 // note turned into a neighbour. The first note and the held last note stay, so the shape is still
 // recognisable, but no song plays the source as transcribed and no two songs play the same version.
 //
-// MOT-LD1-023 Hallogallo hook     — Neu!, Hallogallo (1972), Michael Rother's Guitar 2 riff
-// MOT-LD1-024 Radioactive riff    — Kraftwerk, Radioactivity (1975), the key-synth riff
-// MOT-LD1-025 Model riff          — Kraftwerk, The Model (1978), synth riff and vocal line
-// MOT-LD1-026 Tour de France riff — Kraftwerk, Tour de France (1983), the guitar theme
+// MOT-LD1-001 Hallogallo hook     — Neu!, Hallogallo (1972), Michael Rother's Guitar 2 riff
+// MOT-LD1-002 Radioactive riff    — Kraftwerk, Radioactivity (1975), the key-synth riff
+// MOT-LD1-006 Model riff          — Kraftwerk, The Model (1978), synth riff and vocal line
+// MOT-LD1-003 Tour de France riff — Kraftwerk, Tour de France (1983), the guitar theme
 
 /// One note of a hook cell. `step` is the onset within its bar (negative for a pickup into the
 /// bar), `deg` is semitones from the song tonic in the source's terms (14 is the ninth an octave
@@ -85,7 +85,7 @@ enum HookLeadEngine {
     /// the literal tab. The tab's Guitar 2 riff is A3 B3 F#4 F#4, then A3 B3 E4 E4: degrees 4 5 9 9
     /// answered by 4 5 1 1, the call ending open on the ninth and the answer ending home.
     static let hallogallo = HookRule(
-        id: "MOT-LD1-023",
+        id: "MOT-LD1-001",
         call:   [[n(0, 5, 2, 84), n(2, 7, 2, 80), n(4, 14, 4, 88), n(8, 14, 8, 82)]],
         answer: [[n(0, 5, 2, 84), n(2, 7, 2, 80), n(4, 12, 4, 88), n(8, 12, 8, 82)]],
         sourceVariants: [
@@ -104,7 +104,7 @@ enum HookLeadEngine {
     /// record alternates it with the same shape a third lower, so the plain answer is the riff
     /// moved down two scale steps. The vocal line (1 1 1 1 3 2 1) is the source variant answer.
     static let radioactive = HookRule(
-        id: "MOT-LD1-024",
+        id: "MOT-LD1-002",
         call:   [[n(-1, -5, 1, 74), n(0, 0, 2, 88), n(2, 0, 1, 76), n(3, -5, 1, 72), n(4, 0, 1, 82),
                   n(5, -5, 2, 74), n(7, 0, 1, 78), n(8, 4, 2, 86), n(10, 2, 1, 80), n(11, 0, 4, 84)]],
         answer: [[n(-1, -5, 1, 74), n(0, 0, 2, 88), n(2, 0, 1, 76), n(3, -5, 1, 72), n(4, 0, 1, 82),
@@ -123,7 +123,7 @@ enum HookLeadEngine {
     /// on plain statements as the record does. The riff is complete on its own, so there is no
     /// separate answer.
     static let model = HookRule(
-        id: "MOT-LD1-025",
+        id: "MOT-LD1-006",
         call: [[n(0, 0, 10, 86), n(10, 3, 2, 80), n(12, 2, 2, 78), n(14, 0, 2, 80)],
                [n(0, 2, 6, 84), n(6, -2, 2, 78), n(8, -5, 6, 82), n(14, -5, 2, 70)]],
         answer: [],
@@ -142,7 +142,7 @@ enum HookLeadEngine {
     /// Tour de France's guitar theme (track "guitar"): a rising call 5 1 2 5, then a two-bar
     /// answer 3 5 6 2 3 5 1 | b7 b3 1. The longest phrase of the four, so it states least often.
     static let tourDeFrance = HookRule(
-        id: "MOT-LD1-026",
+        id: "MOT-LD1-003",
         call:   [[n(0, -5, 4, 84), n(4, 0, 2, 80), n(6, 2, 2, 82), n(8, 7, 6, 90)]],
         answer: [[n(-2, 4, 2, 78), n(0, 7, 2, 84), n(2, 9, 2, 86), n(4, 2, 2, 78), n(6, 4, 2, 80),
                   n(8, 7, 4, 86), n(12, 0, 4, 82)],
@@ -176,7 +176,7 @@ enum HookLeadEngine {
     /// falls to the long low tonic. Phrases 2 and 3 are the answer, so the full statement is 12
     /// bars; the call alone is an open question that ends on the held fourth below.
     static let bladeRunner = HookRule(
-        id: "KOS-LEAD-010",
+        id: "KOS-LD1-007",
         call: [[n(0, 0, 16, 72)],
                [n(0, -1, 8, 70), n(8, -2, 8, 68)],
                [n(0, -3, 32, 74)],
@@ -213,7 +213,7 @@ enum HookLeadEngine {
     /// then four whole notes, one a bar, C Bb F G, said again an octave up. The pickup sits in the
     /// bar before the line. The variants hold the last note across two bars, or drop the pickup.
     static let pulstar = HookRule(
-        id: "KOS-LEAD-011",
+        id: "KOS-LD1-001",
         call: [[n(-8, -7, 2, 70), n(-6, -7, 2, 72), n(-4, -7, 2, 74), n(-2, -5, 2, 78), n(0, 0, 16, 84)],
                [n(0, -2, 16, 78)],
                [n(0, -7, 16, 76)],
@@ -249,7 +249,7 @@ enum HookLeadEngine {
     /// seventh, repeats and sinks to the sixth, then rising arpeggios on IV and V land on the
     /// root. The variant call falls to the fifth before rising to the sixth.
     static let beachScene = HookRule(
-        id: "KOS-LEAD-012",
+        id: "KOS-LD1-005",
         call: [[n(0, 0, 2, 70), n(2, -1, 4, 72), n(6, -1, 6, 70), n(12, -1, 4, 72)],
                [n(0, -1, 4, 72), n(4, -3, 28, 76)],
                []],

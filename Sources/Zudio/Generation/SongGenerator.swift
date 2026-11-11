@@ -363,7 +363,7 @@ struct SongGenerator {
             ? breakdownWindows(totalBars: frame.totalBars, seed: seed, avoiding: ld1SoloRange) : []
         let breakdownSteps = breakdowns.map { ($0.lowerBound * 16)..<($0.upperBound * 16) }
 
-        // Step 12.6 — Lead 2 gap answers (MOT-LD2-013 to 017). Written now, from the Lead 1 the
+        // Step 12.6 — Lead 2 gap answers (MOT-LD2-001 to 004 and 006). Written now, from the Lead 1 the
         // listener hears: after ArrangementFilter and HarmonicFilter, without the breakdown
         // windows and, in a sync that includes Lead 1, without the sync dropout windows that
         // step 13.5 cuts. Lead 2 is not in that sync, so it can answer in them. It stays out of
@@ -715,12 +715,12 @@ struct SongGenerator {
         // and Pads are exempt too (Zack, 2026-11-03): their rests come from `KosmicSpaceArrangement`,
         // and the filter's random blocks would cut leads across section edges. It never fired on them
         // when measured, so no song changed; it guards against Phase 2's denser Lead 2.
-        // A transcription hook (KOS-LEAD-010 to 012) is softened, never thinned or rested, and gets
+        // A transcription hook (KOS-LD1-001, 005 or 007) is softened, never thinned or rested, and gets
         // one octave decision for the song, as the Motorik hooks do.
         let isKosmicHook = lead1Rules.contains(where: HookLeadEngine.isKosmicHookRule)
-        // KOS-LEAD-008 and 009 play in two or three short windows; a rested block took whole
+        // KOS-LD1-008 and 009 play in two or three short windows; a rested block took whole
         // windows (Polar Perihelion kept 5 Lead 1 notes), so they are never rested, only softened.
-        let isKosmicWindowSolo = lead1Rules.contains("KOS-LEAD-008") || lead1Rules.contains("KOS-LEAD-009")
+        let isKosmicWindowSolo = lead1Rules.contains("KOS-LD1-008") || lead1Rules.contains("KOS-LD1-009")
         trackEvents = ArrangementFilter.apply(trackEvents: trackEvents, frame: frame, structure: structure, seed: seed,
                                               exemptTracks: isKosmicSpace ? [kTrackRhythm, kTrackLead1, kTrackLead2, kTrackPads] : [],
                                               phraseTracks: (isKosmicHook || isKosmicWindowSolo) ? [kTrackLead1] : [])
@@ -2417,7 +2417,7 @@ struct SongGenerator {
     private static func ruleDescription(_ ruleID: String, trackIndex: Int) -> String {
         if ruleID.hasPrefix("AMB-") { return ambientRuleDescription(ruleID) }
         if ruleID.hasPrefix("KOS-RTHM-") { return kosmicRthmRuleDescription(ruleID) }
-        if ruleID.hasPrefix("KOS-LEAD-") || ruleID.hasPrefix("KOS-LD1-") || ruleID.hasPrefix("KOS-LD2-") {
+        if ruleID.hasPrefix("KOS-LD1-") || ruleID.hasPrefix("KOS-LD2-") {
             return kosmicLeadRuleDescription(ruleID)
         }
         if ruleID.hasPrefix("KOS-DRUM-") { return kosmicDrumRuleDescription(ruleID) }
@@ -2473,7 +2473,7 @@ struct SongGenerator {
     /// Drawn on its own stream so no other decision in the song shifts.
     /// The Motorik Lead 1 rules now playing: the song's own, or those of the latest Lead 1 regen.
     /// The Kosmic hook rule Lead 1 plays now, from the log: KOS-LD2-003 pairs its cell with it.
-    /// Only the hook IDs are read, because Lead 2's old rules share the KOS-LEAD- prefix.
+    /// Only the hook IDs are read.
     private static func currentKosmicHookRules(_ log: [GenerationLogEntry]) -> Set<String> {
         var rules: Set<String> = []
         for entry in log {
@@ -2705,7 +2705,7 @@ struct SongGenerator {
             log.append(GenerationLogEntry(tag: tag, description: lead1RuleDescription(ruleID)))
         }
         if lead1Rules.isEmpty {
-            log.append(GenerationLogEntry(tag: "MOT-LD1-001", description: lead1RuleDescription("MOT-LD1-001")))
+            log.append(GenerationLogEntry(tag: "MOT-LD1-000", description: "No lead 1"))
         }
 
         // Lead 2 — MOT-LD2-000 means track was suppressed for Noir
@@ -2721,7 +2721,7 @@ struct SongGenerator {
                 }
             }
             if lead2Rules.isEmpty {
-                log.append(GenerationLogEntry(tag: "MOT-LD2-001", description: lead2RuleDescription("MOT-LD2-001")))
+                log.append(GenerationLogEntry(tag: "MOT-LD2-000", description: "No lead 2"))
             }
         }
 
@@ -2932,12 +2932,8 @@ struct SongGenerator {
 
     private static func lead1RuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "MOT-LD1-001": return "Neu! motif first"
-        case "MOT-LD1-002": return "Pentatonic cell"
-        case "MOT-LD1-003": return "Punch solo"
         case "MOT-LD1-004": return "Stepwise sequence"
         case "MOT-LD1-005": return "Call and answer"
-        case "MOT-LD1-006": return "Long arc solo"
         case "MOT-LD1-007": return "Vanishing solo"
         case "MOT-LD1-008": return "Visiting solo"
         case "MOT-LD1-009": return "Cold descent"
@@ -2954,10 +2950,10 @@ struct SongGenerator {
         case "MOT-LD1-020": return "Synth Hook"
         case "MOT-LD1-021": return "Short Statement"
         case "MOT-LD1-022": return "Long Run"
-        case "MOT-LD1-023": return "Hallogallo hook"
-        case "MOT-LD1-024": return "Radioactive riff"
-        case "MOT-LD1-025": return "Model riff"
-        case "MOT-LD1-026": return "Tour de France riff"
+        case "MOT-LD1-001": return "Hallogallo hook"
+        case "MOT-LD1-002": return "Radioactive riff"
+        case "MOT-LD1-006": return "Model riff"
+        case "MOT-LD1-003": return "Tour de France riff"
         default:            return ruleID
         }
     }
@@ -2967,23 +2963,17 @@ struct SongGenerator {
         if ruleID.hasPrefix("CHL-LD2-UNIS-") { return "Lead 2 unison" }
         switch ruleID {
         case "MOT-LD2-000": return "No lead 2"
-        case "MOT-LD2-001": return "Counter-response"
-        case "MOT-LD2-002": return "Sustained Drone"
-        case "MOT-LD2-003": return "Rhythmic Counter"
-        case "MOT-LD2-004": return "Neu! counter melody"
-        case "MOT-LD2-005": return "Descending line"
-        case "MOT-LD2-006": return "Neu! harmony"
         case "MOT-LD2-007": return "Arcade Arp"
         case "MOT-LD2-008": return "Gate Arp"
         case "MOT-LD2-009": return "Bounce Arp"
         case "MOT-LD2-010": return "Blip"
         case "MOT-LD2-011": return "Counter Sequencer"
         case "MOT-LD2-012": return "Octave Unison"
-        case "MOT-LD2-013": return "Echo answer"
-        case "MOT-LD2-014": return "Hook fragment"
-        case "MOT-LD2-015": return "Answer cell"
-        case "MOT-LD2-016": return "Statement harmony"
-        case "MOT-LD2-017": return "Low bed"
+        case "MOT-LD2-001": return "Echo answer"
+        case "MOT-LD2-003": return "Hook fragment"
+        case "MOT-LD2-004": return "Answer cell"
+        case "MOT-LD2-006": return "Statement harmony"
+        case "MOT-LD2-002": return "Low bed"
         // Ambient Lead 2 rules
         case "AMB-LEAD-005": return "Tonal cell"
         case "AMB-LEAD-006": return "Descending phrase"
@@ -3115,18 +3105,15 @@ struct SongGenerator {
 
     private static func kosmicLeadRuleDescription(_ ruleID: String) -> String {
         switch ruleID {
-        case "KOS-LEAD-001": return "Berlin school slow arc"
-        case "KOS-LEAD-002": return "Eno floating tones"
-        case "KOS-LEAD-003": return "Pentatonic drift"
-        case "KOS-LEAD-004": return "Echo melody"
-        case "KOS-LEAD-005": return "TD arp highlight"
-        case "KOS-LEAD-006": return "JMJ evolving phrase"
-        case "KOS-LEAD-007": return "TD skip sequence"
-        case "KOS-LEAD-008": return "Caligari solo"
-        case "KOS-LEAD-009": return "Dark Sun solo"
-        case "KOS-LEAD-010": return "Blade Runner theme"
-        case "KOS-LEAD-011": return "Pulstar theme"
-        case "KOS-LEAD-012": return "Beach Scene sigh"
+        case "KOS-LD1-002": return "Eno floating tones"
+        case "KOS-LD1-003": return "Pentatonic drift"
+        case "KOS-LD1-004": return "Echo melody"
+        case "KOS-LD1-006": return "JMJ evolving phrase"
+        case "KOS-LD1-008": return "Caligari solo"
+        case "KOS-LD1-009": return "Dark Sun solo"
+        case "KOS-LD1-007": return "Blade Runner theme"
+        case "KOS-LD1-001": return "Pulstar theme"
+        case "KOS-LD1-005": return "Beach Scene sigh"
         case "KOS-LD1-010": return "Tycho rise and fall"
         case "KOS-LD1-011": return "Drift memory"
         case "KOS-LD1-012": return "Sigur Ros late entry float"
@@ -3142,6 +3129,7 @@ struct SongGenerator {
         case "KOS-LD2-002":  return "Slow echo answer"
         case "KOS-LD2-003":  return "Slow answer cell"
         case "KOS-LD2-004":  return "Gap reply melody"
+        case "KOS-LD2-005":  return "Space echo reply"
         default:             return ruleID
         }
     }

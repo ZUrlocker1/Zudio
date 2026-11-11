@@ -1,21 +1,20 @@
 // KosmicLeadGenerator.swift — Kosmic lead melody generation
 // Copyright (c) 2026 Zack Urlocker
-// Implements KOS-LEAD-001 through KOS-LEAD-009
-// KOS-LEAD-006  JMJ Phrase Loop: 4–6 note melodic phrase built with arch contour (peaks at ~65%),
+// Implements the Kosmic Lead 1 rules KOS-LD1-002 to 004, 006, 008 and 009, the Drift and Space
+// Lead 1 rules, and the bar-by-bar Lead 2 rules. The hooks KOS-LD1-001, 005 and 007 are in
+// HookLeadEngine and the base Lead 2 gap answers KOS-LD2-002 to 004 in GapAnswerEngine.
+// KOS-LD1-006  JMJ Phrase Loop: 4–6 note melodic phrase built with arch contour (peaks at ~65%),
 //              repeated identically for 4 bars, then one note shifts a scale step on bar 5,
 //              another shifts on bar 7. Final phrase note lands on a chord tone. JMJ feel.
-// KOS-LEAD-007  TD Skip Sequence: Tangerine Dream ascending 6–8 note scale run per bar,
-//              1–2 ghost notes (very soft) give the characteristic skip-drop texture.
-// KOS-LEAD-008  Caligari Solo: slow lyrical chord-tone lead (from Caligari Drop bars 10–18).
+// KOS-LD1-008  Caligari Solo: slow lyrical chord-tone lead (from Caligari Drop bars 10–18).
 //              1–2 chord-tone notes per bar, held 2–3 beats, slight rhythmic offset.
 //              Plays in 2–3 windows of 8 bars with ≥6-bar gaps between repeats.
-// KOS-LEAD-009  Dark Sun Solo: spacious 70s analog synth lead (from Dark Sun bars 21–46).
+// KOS-LD1-009  Dark Sun Solo: spacious 70s analog synth lead (from Dark Sun bars 21–46).
 //              One sustained note per bar, stepwise ascent then descent through scale.
 //              Occasional chromatic trill ornament. Lower register (MIDI 60–76).
 //              Plays in 2–3 windows of 10 bars with ≥8-bar gaps between repeats.
 // Lead 1 register: MIDI 60–84 (C4–C6, one octave lower ceiling than original 96)
-// Lead 2 register: MIDI 55–80 (lower/darker than Lead 1; counter-melody role)
-// Lead 2 rule pool: KOS-LEAD-001 through 005 only — KOS-LEAD-006/007/008/009 are Lead 1 exclusive
+// Lead 2 register: MIDI 55–80 for KOS-LD2-005; the gap answers use 52–69
 // Velocity: 45–72 (softer than Motorik — kosmic is never aggressive)
 
 import Foundation
@@ -42,7 +41,7 @@ struct KosmicLeadGenerator {
 
         // Kosmic Space: KOS-LD1-013 Falling Theme, KOS-LD1-016 Rising Strings or KOS-LD1-017 Offbeat
         // Climb in A sections, a third each, the
-        // KOS-LD1-014 riff or KOS-LEAD-006 Phrase Loop in B sections. Space sets its own A and B rules,
+        // KOS-LD1-014 riff or KOS-LD1-006 Phrase Loop in B sections. Space sets its own A and B rules,
         // so Technique D escalation never runs.
         if isKosmicSpace {
             let _ = pickLeadRule(rng: &rng)   // consume base slot
@@ -53,7 +52,7 @@ struct KosmicLeadGenerator {
                                                     rng: &rng)
             var riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
                                                  rng: &rng)
-            // In 50% of songs KOS-LEAD-006 JMJ Phrase Loop plays the B sections in place of the riff,
+            // In 50% of songs KOS-LD1-006 JMJ Phrase Loop plays the B sections in place of the riff,
             // for variety. Drawn after the theme and riff, so they are unchanged for a given seed.
             var phrase: [MIDIEvent] = []
             if rng.nextDouble() < 0.50, structure.sections.contains(where: { $0.label == .B }) {
@@ -66,7 +65,7 @@ struct KosmicLeadGenerator {
                                                rng: &rng, xFilesBars: &discard).filter(inB)
                 riff = riff.filter { !inB($0) }
                 usedRuleIDs.remove("KOS-LD1-014")
-                usedRuleIDs.insert("KOS-LEAD-006")
+                usedRuleIDs.insert("KOS-LD1-006")
             }
             // In 50% of songs KOS-LD1-016 Rising Strings plays the A sections in place of the theme.
             // Drawn last, so the other Lead 1 draws are unchanged for a given seed.
@@ -111,7 +110,7 @@ struct KosmicLeadGenerator {
                 riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
                                                  rng: &rng, equinoxeThirds: true)
                 phrase = []
-                usedRuleIDs.subtract(["KOS-LD1-014", "KOS-LEAD-006"])
+                usedRuleIDs.subtract(["KOS-LD1-014", "KOS-LD1-006"])
                 usedRuleIDs.insert("KOS-LD1-019")
             }
             var lead = theme + riff + phrase
@@ -142,10 +141,10 @@ struct KosmicLeadGenerator {
                 aRule = forceRuleID ?? "KOS-LD1-012"
             } else {
                 // Drift-exclusive (010/011/012) = 78%; shared = 22%
-                // KOS-LEAD-004 (Echo Melody) excluded — question-answer structure is too composed for Drift
+                // KOS-LD1-004 (Echo Melody) excluded — question-answer structure is too composed for Drift
                 let driftRules:   [String] = ["KOS-LD1-010", "KOS-LD1-011", "KOS-LD1-012",
-                                              "KOS-LEAD-002", "KOS-LEAD-008", "KOS-LEAD-009",
-                                              "KOS-LEAD-003"]
+                                              "KOS-LD1-002", "KOS-LD1-008", "KOS-LD1-009",
+                                              "KOS-LD1-003"]
                 let driftWeights: [Double] = [0.28,           0.27,           0.23,
                                               0.09,           0.05,           0.05,
                                               0.03]
@@ -181,9 +180,9 @@ struct KosmicLeadGenerator {
         // Other Lead 1 rules keep the original 60% Technique D probability.
         // bRule must be a per-bar-compatible rule (001–007 only); section-level solo rules
         // (008, 009) must never serve as bRule since emitLeadBar doesn't dispatch them.
-        let sparseLeadRules: Set<String> = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003"]
+        let sparseLeadRules: Set<String> = ["KOS-LD1-002", "KOS-LD1-003"]
         let hasBSection = structure.sections.contains { $0.label == .B }
-        // A transcription hook (KOS-LEAD-010 to 012) owns both the A and the B sections, so it
+        // A transcription hook (KOS-LD1-001, 005 or 007) owns both the A and the B sections, so it
         // makes no Technique D draw.
         let hook = HookLeadEngine.kosmicRules[aRule]
         let bRule: String
@@ -191,8 +190,8 @@ struct KosmicLeadGenerator {
             bRule = aRule
         } else if sparseLeadRules.contains(aRule) {
             // Escalate to a denser rule for B sections.
-            // Drift: KOS-LEAD-006 and 007 excluded — escalate to 004 (Echo Melody) only.
-            bRule = isKosmicDrift ? "KOS-LEAD-004" : pickDenseLeadRule(rng: &rng)
+            // Drift: KOS-LD1-006 excluded — escalate to 004 (Echo Melody) only.
+            bRule = isKosmicDrift ? "KOS-LD1-004" : pickDenseLeadRule(rng: &rng)
             if hasBSection { usedRuleIDs.insert(bRule) }
         } else if rng.nextDouble() < 0.60 {
             bRule = pickBSectionRule(excluding: aRule, isKosmicDrift: isKosmicDrift, rng: &rng)
@@ -202,22 +201,22 @@ struct KosmicLeadGenerator {
         }
 
         // Bridge melody sections always use a distinct rule (independent of Technique D)
-        // Drift: exclude KOS-LEAD-006 and KOS-LEAD-007 from bridge melody selection.
+        // Drift: exclude KOS-LD1-006 from bridge melody selection.
         let bridgeMelodyRule = isKosmicDrift
-            ? pickLeadRuleDifferentFrom(aRule, excluding: ["KOS-LEAD-006","KOS-LEAD-007"], rng: &rng)
+            ? pickLeadRuleDifferentFrom(aRule, excluding: ["KOS-LD1-006"], rng: &rng)
             : pickLeadRuleDifferentFrom(aRule, rng: &rng)
 
-        // KOS-LEAD-006/008/009 use section-level phrase generation — bypass per-bar dispatch
-        if aRule == "KOS-LEAD-006" {
+        // KOS-LD1-006/008/009 use section-level phrase generation — bypass per-bar dispatch
+        if aRule == "KOS-LD1-006" {
             return generateJMJPhraseLoop(frame: frame, structure: structure,
                                          tonalMap: tonalMap, bRule: bRule, rng: &rng,
                                          xFilesBars: &xFilesBars)
         }
-        if aRule == "KOS-LEAD-008" {
+        if aRule == "KOS-LD1-008" {
             return generateCaligariSolo(frame: frame, structure: structure,
                                         tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
         }
-        if aRule == "KOS-LEAD-009" {
+        if aRule == "KOS-LD1-009" {
             return generateDarkSunSolo(frame: frame, structure: structure,
                                        tonalMap: tonalMap, rng: &rng, xFilesBars: &xFilesBars)
         }
@@ -292,9 +291,8 @@ struct KosmicLeadGenerator {
     ) -> [MIDIEvent] {
 
         let baseRule = pickLeadRule2(rng: &rng)
-        // Kosmic Space: KOS-LEAD-004 Echo melody, KOS-LD2-001 Magnetic Twin and KOS-LD2-000 No lead 2,
-        // a third each. Lead 1 never plays 004 in Space, so the same-rule lag never applies, and 004 is
-        // not sparse, so it is never escalated either.
+        // Kosmic Space: KOS-LD2-005 Space echo reply, KOS-LD2-001 Magnetic Twin and KOS-LD2-000 No
+        // lead 2, a third each.
         let rule: String
         if isKosmicSpace {
             let r = rng.nextDouble()
@@ -308,7 +306,7 @@ struct KosmicLeadGenerator {
                     ? spaceStereoTwin(rhythm: rhythmEvents, structure: structure)
                     : magneticLateOctave(lead1: lead1Events, totalBars: frame.totalBars)
             }
-            rule = "KOS-LEAD-004"
+            rule = "KOS-LD2-005"
         } else {
             rule = baseRule
         }
@@ -321,33 +319,7 @@ struct KosmicLeadGenerator {
                                           xFilesBars: xFilesBars)
         }
 
-        // Technique D equivalent for Lead 2: if the rule is sparse and we're in a B section,
-        // escalate to KOS-LEAD-004 (Echo Melody) which has more phrase activity.
-        let lead2SparseRules: Set<String> = ["KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003"]
-        let lead2BRule: String = lead2SparseRules.contains(rule) ? "KOS-LEAD-004" : rule
-
-        // If both leads share the same JMJ rule, generate sparse version for Lead 2.
-        // suppressXFiles=true so Lead 2 never independently plays the X-Files whistle.
-        // bridgeAlt is handled separately below via generateBridgeAltLead2.
-        if rule == "KOS-LEAD-006" {
-            let sparseMode = (lead1BaseRuleID == "KOS-LEAD-006")
-            var discard: [Int] = []
-            var events = generateJMJPhraseLoop(frame: frame, structure: structure,
-                                               tonalMap: tonalMap, sparseMode: sparseMode, rng: &rng,
-                                               xFilesBars: &discard,
-                                               suppressXFiles: true, readonlyXFilesBars: xFilesBars)
-            events += generateBridgeAltLead2(frame: frame, structure: structure, tonalMap: tonalMap, rng: &rng,
-                                             xFilesBars: xFilesBars)
-            return events
-        }
-
-        // When Lead 2 draws the same rule as Lead 1, shift bar index by 1 so Lead 2
-        // always fires at least one bar after Lead 1, and skip the first bar of each section.
-        // KOS-LEAD-005 special case: 2-bar lag + diatonic 3rd offset (scaleNotes rotated by +2).
-        let sameRule    = (lead1BaseRuleID != nil && rule == lead1BaseRuleID)
-        let sameRule005 = sameRule && rule == "KOS-LEAD-005"
-        let sameRuleLag = sameRule005 ? 2 : (sameRule ? 1 : 0)
-
+        // KOS-LD2-005 Space echo reply, the only Lead 2 rule written bar by bar.
         var events: [MIDIEvent] = []
 
         // Bridge A-2: Lead 2 plays a complementary ascending figure on response bars (silent on X-Files bars)
@@ -359,32 +331,21 @@ struct KosmicLeadGenerator {
             // Lead 2 silent in A-1 and melody bridges; bridgeAlt handled above
             guard section.label != .bridge && section.label != .bridgeMelody else { continue }
             guard section.label != .bridgeAlt else { continue }
-            // Technique D: use escalated rule in B sections; narrower register in .low A sections
-            let activeRule = (section.label == .B) ? lead2BRule : rule
             for bar in section.startBar..<section.endBar {
-                // Same-rule fixup: skip leading bars per lag, then offset virtualBar
-                if sameRule && bar < section.startBar + sameRuleLag { continue }
-                let virtualBar = sameRule ? bar - sameRuleLag : bar
                 guard let entry = tonalMap.entry(atBar: bar) else { continue }
                 let barStart = bar * 16
                 // In .low sections constrain Lead 2 to lower half (55–67) leaving 67–80 for Lead 1
                 let lead2High = section.intensity == .low ? 67 : 80
-                var scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
+                let scaleNotes = scaleNotesInRegister(entry: entry, frame: frame,
                                                       low: 55, high: lead2High)
-                // KOS-LEAD-005 dual-same-rule: offset pitch by +2 scale positions (diatonic 3rd)
-                if sameRule005 && scaleNotes.count > 2 {
-                    scaleNotes = Array(scaleNotes.dropFirst(2)) + Array(scaleNotes.prefix(2))
-                }
-                events += emitLeadBar(rule: activeRule, barStart: barStart, bar: virtualBar,
-                                      scaleNotes: scaleNotes, entry: entry, frame: frame,
-                                      useWideInterval: false, rng: &rng)
+                events += spaceEchoReplyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
             }
         }
 
         // Phase 2 — Step-level avoidance: if a Lead 2 note attacks on the exact same step
         // as a Lead 1 note, shift it forward by 2 steps (the "and" of the beat) rather than
         // removing it. This keeps Lead 2 audible as a staggered response voice even when
-        // Lead 1 is dense (e.g. KOS-LEAD-006 which fires at step 0 of every bar).
+        // Lead 1 is dense (e.g. KOS-LD1-006 which fires at step 0 of every bar).
         let lead1StepSet = Set(lead1Events.map(\.stepIndex))
         events = events.map { ev -> MIDIEvent in
             guard lead1StepSet.contains(ev.stepIndex) else { return ev }
@@ -1083,22 +1044,18 @@ struct KosmicLeadGenerator {
     // MARK: - Rule selection
 
     private static func pickLeadRule(rng: inout SeededRNG) -> String {
-        // Lead 1 rule pool — 006 reduced to 15% so other rules get more airtime.
-        // KOS-LEAD-004 reduced 0.16→0.10 (was appearing in 4/5 songs); redistributed to 002 and 007.
-        // KOS-LEAD-011, 012 and 010 take the slots of 001, 005 and 007, which sit at the end at 0%.
-        let rules:   [String] = ["KOS-LEAD-011", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-012", "KOS-LEAD-006", "KOS-LEAD-010", "KOS-LEAD-008", "KOS-LEAD-009", "KOS-LEAD-001", "KOS-LEAD-005", "KOS-LEAD-007"]
-        let weights: [Double] = [0.12,           0.12,           0.13,           0.10,           0.07,           0.15,           0.14,           0.09,           0.08,           0.0,            0.0,            0.0]
+        // Lead 1 rule pool. The transcription hooks Pulstar theme, Beach Scene sigh and Blade Runner
+        // theme hold 001, 005 and 007 and take 43% between them.
+        let rules:   [String] = ["KOS-LD1-001", "KOS-LD1-002", "KOS-LD1-003", "KOS-LD1-004", "KOS-LD1-005", "KOS-LD1-006", "KOS-LD1-007", "KOS-LD1-008", "KOS-LD1-009"]
+        let weights: [Double] = [0.15,           0.09,           0.09,           0.07,           0.14,           0.15,           0.14,           0.09,           0.08]
         return rules[rng.weightedPick(weights)]
     }
 
     private static func pickLeadRule2(rng: inout SeededRNG) -> String {
-        // Base Kosmic Lead 2 answers Lead 1 in its gaps (GapAnswerEngine, phase 5). The old
-        // counter-melody rules sit at the end at 0%, so restoring one is a weight change.
+        // Base Kosmic Lead 2 answers Lead 1 in its gaps (GapAnswerEngine).
         // Kosmic Space calls this, ignores the result and draws again: it must stay one draw.
-        let rules:   [String] = ["KOS-LD2-002", "KOS-LD2-003", "KOS-LD2-004",
-                                 "KOS-LEAD-001", "KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-005"]
-        let weights: [Double] = [0.35,          0.40,          0.25,
-                                 0,              0,              0,              0,              0]
+        let rules:   [String] = ["KOS-LD2-002", "KOS-LD2-003", "KOS-LD2-004"]
+        let weights: [Double] = [0.35,          0.35,          0.30]
         return rules[rng.weightedPick(weights)]
     }
 
@@ -1106,16 +1063,15 @@ struct KosmicLeadGenerator {
     /// Only 004 (Echo Melody) and 006 (JMJ Phrase Loop) qualify — both produce clearly
     /// audible melodic content that contrasts with a sparse A section.
     private static func pickDenseLeadRule(rng: inout SeededRNG) -> String {
-        return rng.nextDouble() < 0.60 ? "KOS-LEAD-006" : "KOS-LEAD-004"
+        return rng.nextDouble() < 0.60 ? "KOS-LD1-006" : "KOS-LD1-004"
     }
 
     /// Pick a lead rule that is different from `current`. Used by bridge melody selection.
     private static func pickLeadRuleDifferentFrom(_ current: String,
                                                    excluding: [String] = [],
                                                    rng: inout SeededRNG) -> String {
-        // The retired 001, 005 and 007 are out: a bridge melody is a per-bar context, which the
-        // hook rules that replaced them are not.
-        let allRules = ["KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004", "KOS-LEAD-006", "KOS-LEAD-008", "KOS-LEAD-009"]
+        // The hook rules 001, 005 and 007 are whole-song rules, so a bridge melody never uses them.
+        let allRules = ["KOS-LD1-002", "KOS-LD1-003", "KOS-LD1-004", "KOS-LD1-006", "KOS-LD1-008", "KOS-LD1-009"]
         let excluded = Set(excluding + [current])
         let candidates = allRules.filter { !excluded.contains($0) }
         guard !candidates.isEmpty else { return current }
@@ -1123,12 +1079,11 @@ struct KosmicLeadGenerator {
     }
 
     /// Pick a B-section rule for Technique D. Restricted to per-bar-compatible rules only.
-    /// Only 002, 003 and 004 qualify: 001, 005 and 007 are retired, and 006 bypasses emitLeadBar.
+    /// Only 002, 003 and 004 qualify: 001, 005 and 007 are hooks, and 006 bypasses emitLeadBar.
     private static func pickBSectionRule(excluding current: String,
                                           isKosmicDrift: Bool = false,
                                           rng: inout SeededRNG) -> String {
-        // 001, 005 and 007 are retired; the hook rules that replaced them are whole-song rules.
-        let perBarRules: [String] = ["KOS-LEAD-002", "KOS-LEAD-003", "KOS-LEAD-004"]
+        let perBarRules: [String] = ["KOS-LD1-002", "KOS-LD1-003", "KOS-LD1-004"]
         let candidates = perBarRules.filter { $0 != current }
         guard !candidates.isEmpty else { return current }
         return candidates[rng.nextInt(upperBound: candidates.count)]
@@ -1204,15 +1159,14 @@ struct KosmicLeadGenerator {
         // belongs to the song (60% rule-matched, 40% any variant for variety).
         //   bridgeRule 006 (JMJ)            → variant 1 syncopated JMJ
         //   bridgeRule 004 (Echo Melody)    → variant 3 driving 8th sequencer
-        //   bridgeRule 001 (Slow Arc)       → variant 2 3-note motif with breath
         //   bridgeRule 002 (Floating Tones) → variant 0 quarter-note pulse
-        //   bridgeRule 003/005              → variant 2 3-note motif with breath
+        //   any other rule                  → variant 2 3-note motif with breath
         let preferredVariant: Int
         switch bridgeRule {
-        case "KOS-LEAD-006": preferredVariant = 1
-        case "KOS-LEAD-004": preferredVariant = 3
-        case "KOS-LEAD-002": preferredVariant = 0
-        default:             preferredVariant = 2   // 001, 003, 005 — restrained
+        case "KOS-LD1-006": preferredVariant = 1
+        case "KOS-LD1-004": preferredVariant = 3
+        case "KOS-LD1-002": preferredVariant = 0
+        default:             preferredVariant = 2   // restrained
         }
         let rhythmVariant = rng.nextDouble() < 0.60
             ? preferredVariant
@@ -1358,52 +1312,14 @@ struct KosmicLeadGenerator {
         guard !scaleNotes.isEmpty else { return [] }
 
         switch rule {
-        case "KOS-LEAD-001": return slowArcBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
-        case "KOS-LEAD-002": return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
-        case "KOS-LEAD-003": return pentatonicDriftBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, entry: entry, rng: &rng)
-        case "KOS-LEAD-004": return echoMelodyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
-        case "KOS-LEAD-005": return arpeggioHighlightBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, entry: entry, frame: frame, rng: &rng)
-        case "KOS-LEAD-007": return tdSkipSequenceBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, rng: &rng)
+        case "KOS-LD1-002": return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
+        case "KOS-LD1-003": return pentatonicDriftBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, frame: frame, entry: entry, rng: &rng)
+        case "KOS-LD1-004": return echoMelodyBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         default:           return floatingTonesBar(barStart: barStart, bar: bar, scaleNotes: scaleNotes, rng: &rng)
         }
     }
 
-    // MARK: - KOS-LD-001: Slow Arc
-    // 2–4 note phrase, each note 4–8 beats, rising or falling; one phrase per 4–8 bars
-
-    private static func slowArcBar(
-        barStart: Int, bar: Int, scaleNotes: [Int], rng: inout SeededRNG
-    ) -> [MIDIEvent] {
-        // Only start a new phrase every 4 bars
-        guard bar % 4 == 0 else { return [] }
-
-        let noteCount = 2 + rng.nextInt(upperBound: 3)  // 2–4 notes
-        let ascending = rng.nextDouble() < 0.55
-
-        var evs: [MIDIEvent] = []
-        var stepPos = 0
-        var lastIdx = ascending ? 0 : (scaleNotes.count - 1)
-
-        for _ in 0..<noteCount {
-            guard stepPos < 16 else { break }
-            let note = scaleNotes[Swift.max(0, Swift.min(scaleNotes.count - 1, lastIdx))]
-            let dur = 4 + rng.nextInt(upperBound: 5)  // 4–8 steps (1–2 beats)
-            let vel = UInt8(45 + rng.nextInt(upperBound: 28))  // 45–72
-
-            evs.append(MIDIEvent(stepIndex: barStart + stepPos, note: UInt8(note),
-                                 velocity: vel, durationSteps: Swift.min(dur, 16 - stepPos)))
-            stepPos += dur
-
-            if ascending {
-                lastIdx = Swift.min(lastIdx + 1 + rng.nextInt(upperBound: 2), scaleNotes.count - 1)
-            } else {
-                lastIdx = Swift.max(lastIdx - 1 - rng.nextInt(upperBound: 2), 0)
-            }
-        }
-        return evs
-    }
-
-    // MARK: - KOS-LD-002: Floating Tones
+    // MARK: - KOS-LD1-002: Floating Tones
     // Single notes every 2–4 bars, held until next attack
 
     private static func floatingTonesBar(
@@ -1421,7 +1337,7 @@ struct KosmicLeadGenerator {
         return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 30)]
     }
 
-    // MARK: - KOS-LD-003: Pentatonic Drift
+    // MARK: - KOS-LD1-003: Pentatonic Drift
     // Slow 2-note pentatonic figure every 4 bars, following a ping-pong arc through the pentatonic
     // scale: ascends from lowest to highest position over several phrases, then descends back down.
     // Key-derived offset staggers the starting point across songs.
@@ -1473,7 +1389,7 @@ struct KosmicLeadGenerator {
         return evs
     }
 
-    // MARK: - KOS-LD-004: Echo Melody
+    // MARK: - KOS-LD1-004: Echo Melody
     // 4-note phrase (2 bars) → 2-bar silence → phrase transposed ±3rd; repeats
 
     private static func echoMelodyBar(
@@ -1504,133 +1420,37 @@ struct KosmicLeadGenerator {
         return []
     }
 
-    // MARK: - KOS-LD-005: Arpeggio Highlight
-    // Held single-note lead that follows a contour shape across 20-bar phrases.
-    // Contour (ascending/descending/arch/valley) and start position are stable within a phrase,
-    // derived from a sub-RNG seeded by song seed + phrase number.
-    // 35% rest bars give breathing space. Chord-tone bias (70%) anchors held notes harmonically.
+    // MARK: - KOS-LD2-005: Space Echo Reply
+    // Kosmic Space Lead 2. The Echo melody cycle two bars later, so its phrase falls where Echo
+    // melody rests: a held note in bars 3 and 4 of each 8-bar cycle, started a diatonic third above
+    // the register's lowest scale note, then the same two notes a third lower in bars 7 and 8.
 
-    private static func arpeggioHighlightBar(
-        barStart: Int, bar: Int, scaleNotes: [Int],
-        entry: TonalGovernanceEntry, frame: GlobalMusicalFrame,
-        rng: inout SeededRNG
+    private static func spaceEchoReplyBar(
+        barStart: Int, bar: Int, scaleNotes: [Int], rng: inout SeededRNG
     ) -> [MIDIEvent] {
         guard !scaleNotes.isEmpty else { return [] }
-
-        // Improvement 2: 35% rest gate — adds breathing space
-        guard rng.nextDouble() > 0.35 else { return [] }
-
-        // Improvement 1: Contour shapes in 20-bar phrases.
-        // Derive stable per-phrase parameters deterministically from musical frame properties
-        // so contour is consistent across all bars in the phrase, and varies between songs.
-        let phraseLen = 20
-        let phraseNum = bar / phraseLen
-        let keyVal    = frame.keySemitoneValue  // 0–11, stable per song
-
-        // Pick contour: 0=ascending, 1=descending, 2=arch, 3=valley
-        let contour = (phraseNum * 3 + keyVal) % 4
-
-        // Starting index in the middle 60% of the scale range
-        let scLo  = max(0, scaleNotes.count / 5)
-        let scHi  = min(scaleNotes.count - 1, scaleNotes.count * 4 / 5)
-        let span  = max(1, scHi - scLo)
-        let startIdx = scLo + (phraseNum * 7 + keyVal * 3) % span
-        let halfSpan = max(2, span / 2)
-
-        // Map bar position within phrase to a 0.0–1.0 contour fraction
-        let posInPhrase = bar % phraseLen
-        let progress    = Double(posInPhrase) / Double(max(1, phraseLen - 1))
-        let contourFrac: Double
-        switch contour {
-        case 0:  contourFrac = progress                                        // ascending
-        case 1:  contourFrac = 1.0 - progress                                 // descending
-        case 2:  contourFrac = progress < 0.5 ? progress * 2.0 : (1.0 - progress) * 2.0  // arch
-        default: contourFrac = progress < 0.5 ? 1.0 - progress * 2.0 : (progress - 0.5) * 2.0  // valley
+        let cycle = (bar + 6) % 8
+        // Phrase: bars 0–1 of the shifted cycle
+        if cycle < 2 {
+            let phraseNote = scaleNotes[Swift.min(cycle + 2, scaleNotes.count - 1)]
+            let vel = UInt8(55 + rng.nextInt(upperBound: 18))
+            return [MIDIEvent(stepIndex: barStart, note: UInt8(phraseNote), velocity: vel, durationSteps: 14)]
         }
-
-        let rawIdx  = (startIdx + Int(contourFrac * Double(halfSpan))) % scaleNotes.count
-        let rawNote = scaleNotes[rawIdx]
-
-        // Improvement 4: Chord-tone bias — 70% chance to snap to nearest chord tone
-        let chordTonePCs = Set(entry.chordWindow.chordTones.map { $0 % 12 })
-        let chordNotes   = scaleNotes.filter { chordTonePCs.contains($0 % 12) }
-        let note: Int
-        if !chordNotes.isEmpty && rng.nextDouble() < 0.70 {
-            note = chordNotes.min(by: { abs($0 - rawNote) < abs($1 - rawNote) }) ?? rawNote
-        } else {
-            note = rawNote
+        if cycle < 4 { return [] }
+        // Echo: always a diatonic third below the phrase
+        if cycle < 6 {
+            let echoNote = scaleNotes[Swift.min(cycle - 4, scaleNotes.count - 1)]
+            let vel = UInt8(45 + rng.nextInt(upperBound: 18))
+            return [MIDIEvent(stepIndex: barStart, note: UInt8(echoNote), velocity: vel, durationSteps: 14)]
         }
-
-        let vel = UInt8(52 + rng.nextInt(upperBound: 20))
-        return [MIDIEvent(stepIndex: barStart, note: UInt8(note), velocity: vel, durationSteps: 14)]
+        return []
     }
 
-    // MARK: - KOS-LEAD-007: TD Skip Sequence
-    // Tangerine Dream ascending/descending scale run: 6–8 evenly spaced notes per bar.
-    // Start position is fixed for 4-bar phrase groups, then advances one step — so
-    // each phrase feels like a coherent unit before the sequence shifts.
-    // A ping-pong arc drives the start position up across phrases then back down, giving
-    // the sequence a long-range shape rather than a circular drift.
-    // In ascending phrases the run climbs the scale; in descending phrases it falls.
-    // 1–2 ghost notes (very soft, 1 step) preserve the characteristic TD "skip" texture.
-    // Rest probability rises at arc turnarounds to add breathing space at the phrase peak/valley.
-
-    private static func tdSkipSequenceBar(
-        barStart: Int, bar: Int, scaleNotes: [Int],
-        frame: GlobalMusicalFrame, rng: inout SeededRNG
-    ) -> [MIDIEvent] {
-        guard scaleNotes.count >= 4 else { return [] }
-
-        // Ping-pong start position: fixed per 4-bar phrase, arcs up then down across all phrases.
-        let phraseNum = bar / 4
-        let maxStart  = max(1, scaleNotes.count - 1)
-        let period    = maxStart * 2
-        let keyOff    = frame.keySemitoneValue % max(1, period)
-        let pos       = (phraseNum + keyOff) % period
-        let startIdx  = pos <= maxStart ? pos : period - pos  // bounces in [0, maxStart]
-        let ascending = pos < maxStart
-
-        // Higher rest probability at arc turnarounds so the peak/valley has breathing space
-        let atTurn  = (pos == 0 || pos == maxStart)
-        let restGate = atTurn ? 0.45 : 0.25
-        guard rng.nextDouble() > restGate else { return [] }
-
-        let seqLen      = 6 + rng.nextInt(upperBound: 3)   // 6–8 notes
-        let stepSpacing = max(1, 16 / seqLen)
-
-        // Ghost positions: 1–2 very soft notes creating the characteristic skip texture
-        let ghost1    = rng.nextInt(upperBound: seqLen)
-        let ghost2    = (ghost1 + 2 + rng.nextInt(upperBound: max(1, seqLen - 3))) % seqLen
-        let twoGhosts = rng.nextDouble() < 0.40
-
-        var events: [MIDIEvent] = []
-        for i in 0..<seqLen {
-            let step = i * stepSpacing
-            guard step < 16 else { break }
-            // Direction-aware note index: ascending runs climb, descending runs fall.
-            // Swift's % preserves sign for negatives, so add scaleNotes.count before taking modulo.
-            let noteIdx: Int
-            if ascending {
-                noteIdx = (startIdx + i) % scaleNotes.count
-            } else {
-                noteIdx = ((startIdx - i) % scaleNotes.count + scaleNotes.count) % scaleNotes.count
-            }
-            let isGhost = i == ghost1 || (twoGhosts && i == ghost2)
-            let vel = UInt8(isGhost ? 20 + rng.nextInt(upperBound: 14)
-                                    : 50 + rng.nextInt(upperBound: 18))
-            let dur = isGhost ? 1 : 3
-            events.append(MIDIEvent(stepIndex: barStart + step,
-                                    note: UInt8(scaleNotes[noteIdx]),
-                                    velocity: vel, durationSteps: dur))
-        }
-        return events
-    }
-
-    // MARK: - KOS-LEAD-006: JMJ Phrase Loop
+    // MARK: - KOS-LD1-006: JMJ Phrase Loop
 
     private static func generateJMJPhraseLoop(
         frame: GlobalMusicalFrame, structure: SongStructure,
-        tonalMap: TonalGovernanceMap, bRule: String = "KOS-LEAD-006",
+        tonalMap: TonalGovernanceMap, bRule: String = "KOS-LD1-006",
         sparseMode: Bool = false, rng: inout SeededRNG,
         xFilesBars: inout [Int],
         suppressXFiles: Bool = false,
@@ -1646,7 +1466,7 @@ struct KosmicLeadGenerator {
         }
 
         // Bridge melody rule: pick once, different from JMJ
-        let jmjBridgeMelodyRule = pickLeadRuleDifferentFrom("KOS-LEAD-006", rng: &rng)
+        let jmjBridgeMelodyRule = pickLeadRuleDifferentFrom("KOS-LD1-006", rng: &rng)
 
         for section in structure.sections {
             guard section.label != .intro && section.label != .outro else { continue }
@@ -1773,7 +1593,7 @@ struct KosmicLeadGenerator {
         return events
     }
 
-    // MARK: - KOS-LEAD-008: Caligari Solo
+    // MARK: - KOS-LD1-008: Caligari Solo
     // Slow, lyrical chord-tracking lead inspired by Caligari Drop bars 10–18.
     // "Freely soft" character: 1–2 chord-tone notes per bar, held 2–3 beats, slight rhythmic offset.
     // Plays in 2–3 windows of 8 bars with ≥6-bar gaps between repeats.
@@ -1852,7 +1672,7 @@ struct KosmicLeadGenerator {
         return events
     }
 
-    // MARK: - KOS-LEAD-009: Dark Sun Solo
+    // MARK: - KOS-LD1-009: Dark Sun Solo
     // Spacious 70s analog synth lead inspired by Dark Sun bars 21–46.
     // One sustained note per bar, stepwise ascent then descent through scale (MIDI 60–76).
     // Occasional chromatic trill ornament (4 alternating semitone steps at very low velocity).
@@ -1971,7 +1791,7 @@ struct KosmicLeadGenerator {
         (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
     }
 
-    /// Scale notes for KOS-LEAD-006 phrase loop: MIDI 65–84 (upper-mid solo register)
+    /// Scale notes for KOS-LD1-006 phrase loop: MIDI 65–84 (upper-mid solo register)
     private static func jmjPhraseScaleNotes(entry: TonalGovernanceEntry,
                                              frame: GlobalMusicalFrame) -> [Int] {
         return scaleNotesInRegister(entry: entry, frame: frame, low: 65, high: 84)
