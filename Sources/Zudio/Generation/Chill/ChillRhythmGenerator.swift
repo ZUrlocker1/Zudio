@@ -91,40 +91,24 @@ struct ChillRhythmGenerator {
                                          rng: &rng)].compactMap { $0 }
         // CHL-RHY-009 rotates its variants on its own 8–12 bar period; drawn for Soho only.
         let eighthsPeriod = beatStyle.isSoho ? 8 + rng.nextInt(upperBound: 5) : 8
-        let events = generateComping(frame: frame, structure: structure,
+        return generateComping(frame: frame, structure: structure,
                                 modeA: modeA, modeB: modeB, breakdownStyle: breakdownStyle,
                                 bluesVariation: bluesVariation, bluesKeyboardBar: bluesKeyboardBar,
                                 forcedSwitchBar: forcedSwitchBar, sparseFragments: sparseFragments,
                                 dropoutFragments: dropoutFragments, clave: beatStyle == .sohoLatin,
                                 soho: beatStyle.isSoho, eighthsPeriod: eighthsPeriod, rng: &rng)
-        // Chill Soho unchanged.
-        return beatStyle.isSoho ? events : softenedFullVoicings(events)
     }
 
-    /// A pianist's touch on full chords (Zack, 2026-11-12): an attack of four or more notes keeps
-    /// its top note at full velocity and plays the notes under it 15% softer, so the voicing
-    /// carries a faint top line without sounding heavy-handed. A fourth note at the same velocity
-    /// adds about 1 dB; this takes the inner notes down about 2 to 3 dB, so the chord sits about
-    /// where the old triads did. In practice this is Chill Blues, whose Rhythm comps four-note
-    /// voicings (`bluesVoicing`); base Chill voices three notes and draws nothing new.
-    /// Measured over 300 Chill seeds: about 40% of Blues Rhythm attacks, in every Blues song;
-    /// no base Chill attack has four distinct pitches.
-    static func softenedFullVoicings(_ events: [MIDIEvent]) -> [MIDIEvent] {
-        var byStep: [Int: [Int]] = [:]
-        for (i, e) in events.enumerated() { byStep[e.stepIndex, default: []].append(i) }
-        var out = events
-        // Distinct pitches: base Chill sometimes lays a second figure on a triad's attack,
-        // doubling one of its notes, which is still a three-note chord.
-        for indices in byStep.values where Set(indices.map { events[$0].note }).count >= 4 {
-            let top = indices.map { events[$0].note }.max()!
-            for i in indices where events[i].note != top {
-                let e = events[i]
-                let v = Swift.max(1, Int((Double(e.velocity) * 0.85).rounded()))
-                out[i] = MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: UInt8(v),
-                                   durationSteps: e.durationSteps)
-            }
-        }
-        return out
+    /// A pianist's touch on full chords (Zack, 2026-11-12), applied where each chord is written:
+    /// in a voicing of four or more notes the top note plays at full velocity and the notes under
+    /// it 15% softer, so the chord carries a faint top line without sounding heavy-handed. A
+    /// fourth note at the same velocity adds about 1 dB; this takes the inner notes down about 2
+    /// to 3 dB, so the chord sits about where the old triads did. In practice this is Chill Blues,
+    /// whose Rhythm comps four-note voicings (`bluesVoicing`), about 40% of its attacks; base Chill
+    /// and Chill Soho voice three notes, so it never fires there.
+    private static func touch(_ vel: UInt8, _ note: Int, in voicing: [Int]) -> UInt8 {
+        guard Set(voicing).count >= 4, note != voicing.max() else { return vel }
+        return UInt8(Swift.max(1, Int((Double(vel) * 0.85).rounded())))
     }
 
     /// Picks a single fragment (12 or 16 bars, chord-plan-boundary aligned) where the whole
@@ -370,6 +354,9 @@ struct ChillRhythmGenerator {
         let remixEntry = ChillStructureGenerator.remixEntryBars(structure: structure,
                                                                 breakdownStyle: breakdownStyle)
 
+        // Pitch classes a groove-pocket tension stab plays, by step: the comping that runs under
+        // it leaves those notes to the stab rather than striking the same keys again.
+        var pocketStabs: [Int: Set<Int>] = [:]
         for bar in 0..<frame.totalBars {
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
@@ -385,7 +372,7 @@ struct ChillRhythmGenerator {
                     let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                     let base    = bar * 16
                     for note in voicing {
-                        events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: 92, durationSteps: 3))
+                        events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: touch(92, note, in: voicing), durationSteps: 3))
                     }
                     continue
                 }
@@ -456,7 +443,7 @@ struct ChillRhythmGenerator {
                         let vel = UInt8((isLast ? 70 : 48) + rng.nextInt(upperBound: 12))
                         for note in voicing {
                             events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
-                                                    velocity: vel, durationSteps: isLast ? 2 : 1))
+                                                    velocity: touch(vel, note, in: voicing), durationSteps: isLast ? 2 : 1))
                         }
                     }
                     continue
@@ -476,7 +463,8 @@ struct ChillRhythmGenerator {
                             let vel = UInt8(Swift.min(95, 68 + tensionBar * 8 + rng.nextInt(upperBound: 10)))
                             for note in voicing {
                                 events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
-                                                        velocity: vel, durationSteps: 3))
+                                                        velocity: touch(vel, note, in: voicing), durationSteps: 3))
+                                if !soho { pocketStabs[base + step, default: []].insert(note % 12) }   // Soho unchanged
                             }
                         }
                     }
@@ -507,7 +495,7 @@ struct ChillRhythmGenerator {
                     let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                     let vel     = UInt8(42 + rng.nextInt(upperBound: 12))
                     for note in voicing {
-                        events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: vel, durationSteps: 4))
+                        events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: touch(vel, note, in: voicing), durationSteps: 4))
                     }
                     continue
                 } else {
@@ -526,7 +514,7 @@ struct ChillRhythmGenerator {
                     let vel = UInt8(76 + rng.nextInt(upperBound: 12))
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note),
-                                                velocity: vel, durationSteps: 2))
+                                                velocity: touch(vel, note, in: voicing), durationSteps: 2))
                     }
                 }
                 continue
@@ -571,6 +559,7 @@ struct ChillRhythmGenerator {
             // thinning it there changed songs that are already released.
             let forceSparse = sparseFragments.contains { $0.contains(bar) } || (soho && label == .intro)
 
+            let compStart = events.count
             switch compingMode {
             case .stGermainSyncopated:
                 events += stGermainSyncopated(base: base, voicing: voicing, bar: bar,
@@ -604,6 +593,12 @@ struct ChillRhythmGenerator {
                 events += rootAndChordEighths(base: base, frame: frame, chord: chord, voicing: voicing,
                                               bar: bar, variant: (bar / eighthsPeriod) % 3,
                                               forceSparse: forceSparse, rng: &rng)
+            }
+            if !pocketStabs.isEmpty {
+                let comp = events[compStart...].filter {
+                    !(pocketStabs[$0.stepIndex]?.contains(Int($0.note) % 12) ?? false)
+                }
+                events.replaceSubrange(compStart..., with: comp)
             }
         }
         return events
@@ -789,7 +784,7 @@ struct ChillRhythmGenerator {
         // Beat 1 downbeat: always present
         let vel1 = UInt8(75 + rng.nextInt(upperBound: 11))
         for note in activeVoicing {
-            events.append(MIDIEvent(stepIndex: base + 0, note: UInt8(note), velocity: vel1, durationSteps: 5))
+            events.append(MIDIEvent(stepIndex: base + 0, note: UInt8(note), velocity: touch(vel1, note, in: activeVoicing), durationSteps: 5))
         }
 
         if !isSparseBar {
@@ -797,7 +792,7 @@ struct ChillRhythmGenerator {
             let vel2 = UInt8(70 + rng.nextInt(upperBound: 11))
             for note in voicing {
                 events.append(MIDIEvent(stepIndex: base + secondHitStep, note: UInt8(note),
-                                        velocity: vel2, durationSteps: 5))
+                                        velocity: touch(vel2, note, in: voicing), durationSteps: 5))
             }
             // Occasional fill at AND of beat 3 or beat 4 (skip if second hit is already at step 10)
             if rng.nextDouble() < 0.30 {
@@ -807,7 +802,7 @@ struct ChillRhythmGenerator {
                 let vel3 = UInt8(55 + rng.nextInt(upperBound: 11))
                 for note in voicing {
                     events.append(MIDIEvent(stepIndex: base + fillStep, note: UInt8(note),
-                                            velocity: vel3, durationSteps: 3))
+                                            velocity: touch(vel3, note, in: voicing), durationSteps: 3))
                 }
             }
         }
@@ -891,14 +886,14 @@ struct ChillRhythmGenerator {
             let vel = UInt8(65 + rng.nextInt(upperBound: 11))
             for note in beat2Voicing {
                 events.append(MIDIEvent(stepIndex: base + beat2Step, note: UInt8(note),
-                                        velocity: vel, durationSteps: 5))
+                                        velocity: touch(vel, note, in: beat2Voicing), durationSteps: 5))
             }
         }
         if !onlyBeat2 {
             let vel = UInt8(60 + rng.nextInt(upperBound: 11))
             for note in beat4Voicing {
                 events.append(MIDIEvent(stepIndex: base + beat4Step, note: UInt8(note),
-                                        velocity: vel, durationSteps: 4))
+                                        velocity: touch(vel, note, in: beat4Voicing), durationSteps: 4))
             }
         }
 
@@ -988,13 +983,16 @@ struct ChillRhythmGenerator {
             events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: 3))
         }
 
-        // Block chord accent on step 0 or step 8 (30–40% chance)
+        // Block chord accent on step 0 or step 8 (30–40% chance). It replaces the arpeggio note
+        // on that step, which is always one of the chord's notes: striking both played the same
+        // key twice at once (Zack, 2026-11-12).
         if rng.nextDouble() < 0.35 {
             let accentStep = rng.nextDouble() < 0.50 ? 0 : 8
             let accentVel = UInt8(80 + rng.nextInt(upperBound: 16))
+            events.removeAll { $0.stepIndex == base + accentStep }
             for note in voicing {
                 events.append(MIDIEvent(stepIndex: base + accentStep, note: UInt8(note),
-                                        velocity: accentVel, durationSteps: 4))
+                                        velocity: touch(accentVel, note, in: voicing), durationSteps: 4))
             }
         }
         return events
@@ -1065,7 +1063,7 @@ struct ChillRhythmGenerator {
             let dur = 12 + rng.nextInt(upperBound: 3)
             let vel = UInt8(50 + rng.nextInt(upperBound: 12))
             for note in voicing {
-                events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: vel, durationSteps: dur))
+                events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: touch(vel, note, in: voicing), durationSteps: dur))
             }
             return events
         }
@@ -1079,7 +1077,7 @@ struct ChillRhythmGenerator {
         let dur: Int = staccato ? (3 + rng.nextInt(upperBound: 2)) : (12 + rng.nextInt(upperBound: 3))
         let vel = UInt8((staccato ? 58 : 50) + rng.nextInt(upperBound: 12))
         for note in voicing {
-            events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: vel, durationSteps: dur))
+            events.append(MIDIEvent(stepIndex: base + step, note: UInt8(note), velocity: touch(vel, note, in: voicing), durationSteps: dur))
         }
         if !staccato && rng.nextDouble() < 0.20 {
             let touchVel = UInt8(38 + rng.nextInt(upperBound: 10))

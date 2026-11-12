@@ -263,10 +263,31 @@ than the triads they replaced. Instead, a pianist's touch.
   in every Blues song. No base Chill attack has four distinct pitches: its four-event attacks are
   triads with one note doubled by a second figure on the same step, which is why the rule counts
   pitches, not events. Chill Soho is excluded explicitly and unchanged.
-- **Code:** `softenedFullVoicings` in `ChillRhythmGenerator.swift`, applied to the result of
-  `generateComping` in `generate`, so regenerated Rhythm gets it too. No random draws.
+- **Code:** `touch` in `ChillRhythmGenerator.swift`, applied where each chord is written (13
+  sites), not in a later pass (Zack: fix it where the chords are generated). It fires only for a
+  voicing of four or more distinct pitches. The first version (9d5fd40) was a pass over the
+  finished track; the write-time version produces identical Blues and Soho Rhythm over 300 seeds
+  (sorted-event fingerprint, deterministic hashing). No random draws.
 - **Verified:** build clean; ChillSohoTests, ChillLeadRegisterTests and ChordPlanShapeTests pass.
   **Not verified:** by ear.
+
+## As built (2026-11-12, round 3b: no doubled notes in Rhythm)
+
+Zack: two notes of a chord on the same note name (G2 and G3, or the same key twice) sound
+ham-fisted; don't generate them. Measured over 300 Chill seeds: Chill Blues Rhythm had none, and
+base Chill had no octave doublings, only the same key struck twice at once in about 2% of its
+chords (313 attacks, half its songs). Two sources, both fixed where the notes are written:
+
+- **CHL-RHY-003 Bosa Moon arpeggiated:** the block-chord accent on step 0 or 8 struck the whole
+  chord on top of the arpeggio note on that step, always one of the chord's notes. The accent now
+  replaces that arpeggio note. Draw order unchanged.
+- **Groove pocket breakdown (base Chill):** the tension stabs in bars 6 to 8 of an 8-bar pocket
+  play the chord on beats 2, 3 and 4 while normal comping runs underneath; comping now leaves the
+  stab's notes to the stab on those steps. Chill Soho also has groove pockets and keeps the old
+  behaviour (Soho unchanged).
+- **Result:** no unison or octave doublings in base Chill or Chill Blues Rhythm over 300 seeds.
+  Changed songs: 67 of 73 Bosa Moon songs and 4 of 70 others (groove pockets). Chill Blues and
+  Soho identical. Soho still has a few doublings of its own (15 attacks in 107 songs), left as is.
 
 ## Item 2: tune-named progressions (later)
 
