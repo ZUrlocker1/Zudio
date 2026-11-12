@@ -248,6 +248,7 @@ struct StatusBoxView: View {
         let descColor      = NSColor(Color.white.opacity(0.85))
         let descTitleColor = NSColor(Color.yellow.opacity(0.95))
         let errorColor     = NSColor(Color.red.opacity(0.95))
+        let starColor      = NSColor(Color.green)
         #else
         let uiFont     = UIFont.monospacedSystemFont(ofSize: fontBody, weight: .regular)
         let uiFontBold = UIFont.monospacedSystemFont(ofSize: fontBody, weight: .bold)
@@ -256,17 +257,24 @@ struct StatusBoxView: View {
         let descColor      = UIColor(Color.white.opacity(0.85))
         let descTitleColor = UIColor(Color.yellow.opacity(0.95))
         let errorColor     = UIColor(Color.red.opacity(0.95))
+        let starColor      = UIColor(Color.green)
         #endif
 
         for (i, entry) in entries.enumerated() {
-            let tag = entry.tag.padding(toLength: tagWidth, withPad: " ", startingAt: 0)
+            // A testing star ("* " from testingMarkedRules) moves up beside the rule ID, in bright
+            // green, so it stands out: "CHL-LD2-004 *   Rhythm trade". The saved file keeps it
+            // in the description.
+            let starred = !entry.isTitle && entry.description.hasPrefix("* ")
+            let description = starred ? String(entry.description.dropFirst(2)) : entry.description
+            let tag = (starred ? entry.tag + " " : entry.tag)
+                .padding(toLength: tagWidth - (starred ? 1 : 0), withPad: " ", startingAt: 0)
             let font = entry.isTitle ? uiFontBold : uiFont
 
             var tagAttr = AttributedString(tag)
             tagAttr.font = font
             tagAttr.foregroundColor = entry.isTitle ? tagTitleColor : (entry.tag == "ERROR" ? errorColor : tagColor)
 
-            var descAttr = AttributedString(entry.description)
+            var descAttr = AttributedString(description)
             descAttr.font = font
             descAttr.foregroundColor = entry.isTitle ? descTitleColor : descColor
 
@@ -276,6 +284,12 @@ struct StatusBoxView: View {
                 attrStr += nl
             }
             attrStr += tagAttr
+            if starred {
+                var star = AttributedString("*")
+                star.font = uiFontBold
+                star.foregroundColor = starColor
+                attrStr += star
+            }
             attrStr += descAttr
         }
 
