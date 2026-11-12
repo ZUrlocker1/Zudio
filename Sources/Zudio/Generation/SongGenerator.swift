@@ -882,7 +882,7 @@ struct SongGenerator {
             spaceArrangement: spaceArrangement
         )
         // Kosmic Space Lead 1 names its per-song version beside the rule, as the Chill jazz leads
-        // do: "Oxygene Falling Theme sixth top, 5-4-5".
+        // do: "Oxygene Falling lower top, squeezed".
         for (i, entry) in log.enumerated() {
             guard let note = kosmicLeadNotes.byRule[entry.tag], !note.isEmpty else { continue }
             log[i] = GenerationLogEntry(tag: entry.tag, description: entry.description + " " + note,

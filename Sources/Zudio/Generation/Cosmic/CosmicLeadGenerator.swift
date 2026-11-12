@@ -826,7 +826,7 @@ struct KosmicLeadGenerator {
         let shapeNames = ["arching", "dipping", "climbing", "leaping", "dropping"]
         note = KosmicLeadNotes.words([shapeNames[shapes.firstIndex(of: shape)!],
                                       runs == 3 ? "few runs" : runs == 5 ? "many runs" : nil,
-                                      [nil, "from the 3rd", "from the 5th"][startDegree / 2],
+                                      [nil, "mid start", "high start"][startDegree / 2],
                                       runLength == 5 ? "short runs" : nil])
         let scalePCs = frame.scalePCs
         let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,

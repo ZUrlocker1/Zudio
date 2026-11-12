@@ -476,7 +476,7 @@ all its draws. `KosmicLeadNotes` carries them from `KosmicLeadGenerator.generate
 Examples:
 - KOS-LD1-013 "Oxygene Falling lower top, squeezed" (low top; steady fall or closer middle; fewer or more notes; new rhythm)
 - KOS-LD1-014 "Oxygene See-Saw Riff wide leap, even groups" (narrow or widest leap; uneven groups; starts late; rocks down)
-- KOS-LD1-015 "Magnetic Turn Melody climbing, few runs" (arching, dipping, leaping, dropping; many runs; from the 3rd or 5th; short runs)
+- KOS-LD1-015 "Magnetic Turn Melody climbing, few runs" (arching, dipping, leaping, dropping; many runs; mid or high start; short runs)
 - KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third" (short cycle)
 - KOS-LD1-017 "Oxygene 8 Offbeat Climb low start, early finish" (high start; ends higher or lower)
 - KOS-LD1-018 "Magnetic Call high call, tight" (middle call, on the beat, turning or leaping tail, rising answer, octave bounce)
