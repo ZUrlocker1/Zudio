@@ -204,6 +204,7 @@ extension ChillLeadGenerator {
             frame: frame, structure: structure, leadInstrument: leadInstrument,
             beatStyle: .electronic,   // only consulted by the St Germain staccato roll, which forcing skips
             breakdownStyle: breakdownStyle, forceRuleID: ruleID,
+            lickVariants: false,   // Chill Soho unchanged: Chet sigh plays as written
             rng: &rng, usedRuleIDs: &usedRuleIDs, replayBars: { replays = $0 },
             returns: { returns = $0 })
 

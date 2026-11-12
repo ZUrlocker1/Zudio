@@ -22,6 +22,7 @@ struct ChillLeadGenerator {
         bluesVariation: Bool = false,
         sohoVariation: Bool = false,
         forceRuleID: String? = nil,
+        lickVariants: Bool = true,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         replayBars reportReplayBars: ((Set<Int>) -> Void)? = nil,
@@ -114,7 +115,7 @@ struct ChillLeadGenerator {
         var jazzState: JazzCellState? = lickRules.contains(ruleID)
             ? JazzCellState(ruleID: ruleID, regLow: register(for: leadInstrument).low,
                             regHigh: register(for: leadInstrument).high,
-                            keyPC: frame.keySemitoneValue, rng: &rng)
+                            keyPC: frame.keySemitoneValue, allowVariants: lickVariants, rng: &rng)
             : nil
         usedRuleIDs.insert(ruleID)
 
@@ -491,7 +492,8 @@ struct ChillLeadGenerator {
         }
         reportReplayBars?(replayBars)
         reportReturns?(formReturns)
-        return (events, phraseOnsets, handoffBarSet, nil)   // Avalon Hook is Soho-only
+        // The jazz lick rules' per-song version, named in the log beside the rule.
+        return (events, phraseOnsets, handoffBarSet, jazzState?.variantNote)
     }
 
     // MARK: - Lead 2
@@ -2165,8 +2167,25 @@ struct JazzCellState {
     /// Which of the two B and the two C licks plays next; they alternate from a seed-picked start.
     var bPick = 0
     var cPick = 0
+    /// This song's version of the licks (2026-11-12): up to one transformation from each family,
+    /// applied to every lick the rule plays, so the hook is the same all through a song and
+    /// different from the next song's. Empty in a fifth of songs, which play the licks as written.
+    let variants: [JazzVariant]
     var isThemed: Bool { Self.themedRules.contains(ruleID) }
     static let themedRules: Set<String> = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-015"]
+    /// The rules that draw a per-song version.
+    static let variantRules: Set<String> = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008",
+                                            "CHL-LD1-013", "CHL-LD1-014", "CHL-LD1-015"]
+
+    /// The transformations for the log, beside the rule's name; nil when the licks play as written.
+    var variantNote: String? {
+        let names = variants.map(\.rawValue)
+        switch names.count {
+        case 0:  return nil
+        case 1:  return names[0]
+        default: return names.dropLast().joined(separator: ", ") + " and " + names.last!
+        }
+    }
 
     var phraseBars: Int {
         switch ruleID {
@@ -2176,8 +2195,18 @@ struct JazzCellState {
         }
     }
 
-    init(ruleID: String, regLow: Int, regHigh: Int, keyPC: Int, rng: inout SeededRNG) {
+    init(ruleID: String, regLow: Int, regHigh: Int, keyPC: Int, allowVariants: Bool = true,
+         rng: inout SeededRNG) {
         self.ruleID = ruleID
+        // The song's version, drawn on a stream derived from a copy of `rng`, so the main stream
+        // does not move and every other draw in the song stays as it was.
+        if allowVariants && Self.variantRules.contains(ruleID) {
+            var copy = rng
+            var vr = SeededRNG(seed: copy.next() ^ 0x4A41_5A5A_5641_5249)   // "JAZZVARI"
+            variants = JazzVariant.draw(rng: &vr)
+        } else {
+            variants = []
+        }
         let ladders = [[0, 1, 2, 0], [0, 2, 1, 0], [1, 0, 2, 0]]
         ladder = ladders[rng.nextInt(upperBound: ladders.count)]
         switch ruleID {
@@ -2209,7 +2238,183 @@ struct JazzCellState {
     }
 }
 
+/// A per-song transformation of the jazz licks. Three families, at most one from each, so they
+/// never pile up on the same feature: the contour (inverted, reversed, leap flipped), the notes
+/// (filled in, pared down) and the rhythm (pushed, laid back). Every one keeps the 8th grid,
+/// the phrase's landing note and its octave span.
+enum JazzVariant: String {
+    case inverted       = "inverted"
+    case reversed       = "reversed"
+    case leapFlipped    = "leap flipped"
+    case filledIn       = "filled in"
+    case paredDown      = "pared down"
+    case pushed         = "pushed"
+    case laidBack       = "laid back"
+
+    /// None in 20% of songs, one in 20%, two in 30%, three in 30% (Zack, 2026-11-12).
+    static func draw(rng: inout SeededRNG) -> [JazzVariant] {
+        let r = rng.nextDouble()
+        let families: [Int]
+        if r < 0.20 {
+            families = []
+        } else if r < 0.40 {
+            // One alone: the contour half the time, since it changes the hook most.
+            let f = rng.nextDouble()
+            families = [f < 0.50 ? 0 : f < 0.75 ? 1 : 2]
+        } else if r < 0.70 {
+            families = [[0, 1], [0, 2], [1, 2]][rng.nextInt(upperBound: 3)]
+        } else {
+            families = [0, 1, 2]
+        }
+        return families.map { family -> JazzVariant in
+            let c = rng.nextDouble()
+            switch family {
+            case 0:  return c < 0.40 ? .inverted : c < 0.75 ? .reversed : .leapFlipped
+            case 1:  return c < 0.50 ? .filledIn : .paredDown
+            default: return c < 0.50 ? .pushed : .laidBack
+            }
+        }
+    }
+}
+
 extension ChillLeadGenerator {
+
+    // MARK: Per-song versions of the licks
+
+    /// A lick in this song's version. Deterministic: the same lick always comes out the same in
+    /// one song, so its hook is recognisable each time it returns.
+    static func applyJazzVariants(_ input: [JazzNote], _ variants: [JazzVariant]) -> [JazzNote] {
+        var cell = input.sorted { $0.step < $1.step }
+        guard cell.count >= 3 else { return cell }
+        for v in variants {
+            switch v {
+            case .inverted:    cell = invertedLick(cell)
+            case .reversed:    cell = reversedFigure(cell)
+            case .leapFlipped: cell = leapFlippedLick(cell) ?? reversedFigure(cell)
+            case .filledIn:    cell = filledInLick(cell)
+            case .paredDown:   cell = paredDownLick(cell)
+            case .pushed:      cell = shiftedHeldNotes(cell, by: -2)
+            case .laidBack:    cell = shiftedHeldNotes(cell, by: 2)
+            }
+        }
+        return cell
+    }
+
+    /// Mirrored around the chord root, so a minor-pentatonic climb becomes a major-pentatonic
+    /// fall (b3 to the 6 below, 4 to the 5 below). The landing note keeps its pitch, in the octave
+    /// nearest the note before it, so the phrase still comes home.
+    private static func invertedLick(_ cell: [JazzNote]) -> [JazzNote] {
+        var out = cell.map { (step: $0.step, iv: -$0.iv, dur: $0.dur) }
+        let landing = cell[cell.count - 1].iv
+        let before  = out[out.count - 2].iv
+        let octaves = Int((Double(before - landing) / 12).rounded())
+        out[out.count - 1].iv = landing + 12 * octaves
+        return out
+    }
+
+    /// The pitches of the opening figure (the first run of three or more short notes, up to five)
+    /// played backwards in the same rhythm. The held notes and the landing stay.
+    private static func reversedFigure(_ cell: [JazzNote]) -> [JazzNote] {
+        var start = 0
+        while start < cell.count - 1 {
+            var end = start
+            while end < cell.count - 1 && cell[end].dur < 6 { end += 1 }
+            if end - start >= 3 {
+                let stop = Swift.min(end, start + 5)
+                var out = cell
+                let ivs = cell[start..<stop].map(\.iv).reversed()
+                for (j, iv) in zip(start..<stop, ivs) { out[j].iv = iv }
+                return out
+            }
+            start = end + 1
+        }
+        return cell
+    }
+
+    /// The widest leap out to a peak or a trough goes the other way: a dip to the b7 below
+    /// becomes a lift to the b7 above, and the line comes back as before. Only where the leap
+    /// back is a minor 7th or less and the lick stays within an octave (or its own span). Nil if
+    /// the lick has no such leap.
+    private static func leapFlippedLick(_ cell: [JazzNote]) -> [JazzNote]? {
+        let ivs = cell.map(\.iv)
+        let maxSpan = Swift.max(12, ivs.max()! - ivs.min()!)
+        var best: (i: Int, size: Int)? = nil
+        for i in 1..<(cell.count - 1) {
+            let d = ivs[i] - ivs[i - 1]
+            guard Swift.abs(d) >= 5 && Swift.abs(d) < 12 else { continue }
+            guard Swift.abs(ivs[i + 1] - ivs[i - 1]) < Swift.abs(d) else { continue }
+            let moved = ivs[i] - (d > 0 ? 12 : -12)
+            guard Swift.abs(ivs[i + 1] - moved) <= 10 else { continue }
+            var trial = ivs
+            trial[i] = moved
+            guard trial.max()! - trial.min()! <= maxSpan else { continue }
+            if best == nil || Swift.abs(d) > best!.size { best = (i, Swift.abs(d)) }
+        }
+        guard let b = best else { return nil }
+        var out = cell
+        out[b.i].iv -= (ivs[b.i] - ivs[b.i - 1] > 0 ? 12 : -12)
+        return out
+    }
+
+    /// Up to two notes added an 8th before a note that has room before it: an upper neighbour
+    /// between repeated notes, a step through a third, or a step into the end of a fourth or
+    /// fifth. The fitting pass moves them into the scale.
+    private static func filledInLick(_ cell: [JazzNote]) -> [JazzNote] {
+        var out: [JazzNote] = []
+        var added = 0
+        for i in cell.indices {
+            out.append(cell[i])
+            guard added < 2, i + 1 < cell.count else { continue }
+            let a = cell[i], b = cell[i + 1]
+            guard b.step - a.step >= 4 else { continue }
+            let gap = b.iv - a.iv, dir = gap >= 0 ? 1 : -1
+            let passing: Int
+            switch Swift.abs(gap) {
+            case 0:      passing = a.iv + 2
+            case 3, 4:   passing = a.iv + 2 * dir
+            case 5, 7:   passing = b.iv - 2 * dir
+            default:     continue
+            }
+            out[out.count - 1].dur = Swift.min(a.dur, b.step - 2 - a.step)
+            out.append((step: b.step - 2, iv: passing, dur: 2))
+            added += 1
+        }
+        return out
+    }
+
+    /// One short inner note left out, its time given to the note before: a repeated note if
+    /// there is one, otherwise the first short note after another short note.
+    private static func paredDownLick(_ cell: [JazzNote]) -> [JazzNote] {
+        guard cell.count >= 4 else { return cell }
+        let inner = Array(1..<(cell.count - 1)).filter { cell[$0].dur <= 2 }
+        guard let i = inner.first(where: { cell[$0].iv == cell[$0 - 1].iv })
+                ?? inner.first(where: { cell[$0 - 1].dur <= 3 }) else { return cell }
+        var out = cell
+        out[i - 1].dur = cell[i].step + cell[i].dur - cell[i - 1].step
+        out.remove(at: i)
+        return out
+    }
+
+    /// Held notes on a beat moved an 8th: early (pushed, anticipating the beat) or late (laid
+    /// back, the note before held into the beat).
+    private static func shiftedHeldNotes(_ cell: [JazzNote], by delta: Int) -> [JazzNote] {
+        var out = cell
+        for i in 1..<out.count where out[i].step % 4 == 0 && out[i].dur >= 4 {
+            if delta < 0 {
+                guard out[i - 1].step <= out[i].step - 3 else { continue }
+                out[i].step -= 2
+                out[i].dur  += 2
+            } else {
+                guard out[i].dur >= 5 else { continue }
+                if i + 1 < out.count && out[i].step + 2 >= out[i + 1].step { continue }
+                let joined = out[i - 1].step + out[i - 1].dur >= out[i].step
+                out[i].step += 2
+                out[i].dur  -= 2
+                if joined { out[i - 1].dur = out[i].step - out[i - 1].step }
+            }
+        }
+        return out
+    }
 
     // Moanin' (Bobby Timmons, from Art Blakey's Moanin', 1958): a two-bar call and response.
     private static let moaninCalls: [[JazzNote]] = [
@@ -2592,6 +2797,9 @@ extension ChillLeadGenerator {
                 if late { state.finalHookDone = true }
             }
         }
+
+        // This song's version of the lick, the same every time the lick comes round.
+        if !state.variants.isEmpty { cell = applyJazzVariants(cell, state.variants) }
 
         // Horace hook and Blues bossa vary each statement after the first two (the last fifth
         // plays plain), so the tune is recognisable but never copied. Chet sigh varies every

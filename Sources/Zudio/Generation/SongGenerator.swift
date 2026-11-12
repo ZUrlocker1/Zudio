@@ -4979,9 +4979,13 @@ struct SongGenerator {
         )
         // Avalon Hook draws one or two per-song treatments; naming them beside the rule is the
         // only way to tell from a log why one song's hook sounds unlike another's.
-        if let t = hookTreatments, let i = log.firstIndex(where: { $0.tag == "CHL-LD1-012" }) {
+        // The jazz lick rules name their per-song version the same way ("Cantaloupe Island
+        // hook, inverted and pushed").
+        if let t = hookTreatments, let i = log.firstIndex(where: {
+            $0.tag == "CHL-LD1-012" || JazzCellState.variantRules.contains($0.tag) }) {
+            let sep = log[i].tag == "CHL-LD1-012" ? " " : ", "
             log[i] = GenerationLogEntry(tag: log[i].tag,
-                                        description: log[i].description + " " + t,
+                                        description: log[i].description + sep + t,
                                         isTitle: log[i].isTitle)
         }
         if let summary = grooveFixupSummary {

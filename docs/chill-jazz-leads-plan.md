@@ -3,6 +3,7 @@
 Status (2026-11-11): work in progress. Six lick-bank rules are built: 013 to 015 (2026-11-07)
 and the homage rules 001, 007 and 008 that replaced the random walks (below). 001, 007, 008 and
 015 now play three themes each (below). Weights and licks are still being fine-tuned by ear. Next: Lead 2 call and response (see the end of this file).
+2026-11-12: every song now plays its own version of these licks ("Per-song versions" below), not yet heard.
 
 ## What this is
 
@@ -96,6 +97,68 @@ are left alone because they already work as call and response with solo licks.
 - **Weimar solos** in `tools/batch-output/jazz-midi/weimar/` are melody only. Fast ones
   (Sidewinder 156, Let's Get Lost 159, So What 139, Tenor Madness 176) were read at half speed so
   their 8ths become Chill 16ths; the 65 bpm ballad at double speed.
+
+## Per-song versions of the licks (2026-11-12)
+
+Zack: CHL-LD1-014 Cantaloupe, and likely the other jazz rules, sounded the same in every song.
+The hook's pitches and rhythm were identical everywhere, only transposed; the seed varied the
+order, pickups and answers, not the lick. He knew it by ear, so no similarity measurement was
+taken. He proposed 20% of songs as written and 20%, 30%, 30% with one, two or three
+transformations, then left the musical design to Claude on one condition: "never random".
+
+- **As built:** each song draws a version for CHL-LD1-001, 007, 008, 013, 014 and 015 and applies
+  it to every lick the rule plays (A, B and C themes, answers, stabs, fragments, the final
+  hook). The same lick always comes out the same in one song, so the hook stays recognisable
+  inside a song and differs between songs. The per-statement homage touches (`varyHomageCell`)
+  run after it, as before.
+- **Count** (`JazzVariant.draw`): none 20%, one 20%, two 30%, three 30%. One alone is the contour half the time, the notes or the rhythm a quarter each. Two is any
+  pair of families, equally.
+- **Three families, at most one from each,** so transformations never pile up on one feature
+  (three contour changes together would leave nothing of the hook):
+  - **Contour:** inverted 40%, reversed 35%, leap flipped 25%.
+    - *Inverted:* mirrored around the chord root. Minor-blues intervals become major-pentatonic
+      ones (b3 to the 6 below, 4 to the 5 below), which the fitter then maps to the mode.
+      Cantaloupe becomes 1 1 1 6 5 5~ 6 5 4 2 1.
+    - *Reversed:* the pitches of the opening figure (the first run of three or more short notes,
+      at most five) backwards in the same rhythm. Cantaloupe opens 4 b3 1 1 1 into the held 4.
+    - *Leap flipped:* the widest leap out to a peak or trough (a 4th up to a major 7th, where
+      the next note comes back) goes an octave the other way, if the leap back is a minor 7th
+      or less and the lick stays within an octave or its own span. Cantaloupe's dip to the b7
+      below becomes a lift to the b7 above. A lick with no such leap is reversed instead.
+  - **Notes:** filled in 50%, pared down 50%.
+    - *Filled in:* up to two notes added an 8th before a note with room before it: an upper
+      neighbour between repeated notes (1 1 2 1 b3 4), a step through a third, or a step into
+      the end of a 4th or 5th.
+    - *Pared down:* one short inner note left out, a repeated note first, its time given to the
+      note before (Cantaloupe's 1 1 becomes one longer 1).
+  - **Rhythm:** pushed 50%, laid back 50%. Held notes (4 steps or more) on a beat move an 8th
+    early, or an 8th late with the note before held into the beat.
+- **Kept in every version:** the 8th grid (every move is 2 steps), the landing note (inversion
+  keeps the last note's pitch, in the octave nearest the note before), the octave span, and the
+  existing fitting to scale, chord and register.
+- **Draw:** on a stream derived from a copy of the Lead 1 stream ("JAZZVARI"), so nothing else in
+  the song moves; songs that draw the plain version are identical to before. Chill Soho's reused
+  CHL-LD1-001 passes `lickVariants: false` and is unchanged.
+- **Log:** the version follows the rule's name, as in "Cantaloupe Island hook, inverted, filled
+  in and pushed"; nothing is added for the plain version.
+- **Measured over 900 Chill seeds:** the shares come out 20/20/30/30 within sampling noise per
+  rule, and every transformation changes the first 16 notes of the song's lead in all but a
+  handful of songs (Horace hook's filled in and pushed sometimes act only later in the phrase).
+- **Code:** `JazzVariant` and `applyJazzVariants` (with `invertedLick`, `reversedFigure`,
+  `leapFlippedLick`, `filledInLick`, `paredDownLick`, `shiftedHeldNotes`) in
+  `ChillLeadGenerator.swift`; `JazzCellState.variants` and `variantNote`; the log line in
+  `SongGenerator.swift` beside Avalon Hook's treatments.
+- **Demos** in /Users/urlocker/Downloads/Zudio 3.0 lead demos/ (Lead 1 starts at the bar given):
+  - Cantaloupe: After Midnight (seed 49, plain, bar 5), Funeral in DTW (264, inverted, bar 5),
+    Cool Velours (50, reversed and pared down, bar 5), Before Dawn Forest (215, inverted,
+    filled in and pushed, bar 5), Slow Burn Gaspesie Blues (38, inverted, filled in and laid
+    back, bar 2).
+  - Moanin': Upper Longueuil Blues (262, plain, bar 5), Pale Sun Petoskey Blues (111, inverted,
+    filled in and pushed, bar 7).
+  - Blue Monk: Mexico Sanction (98, plain, bar 5), Maple City Case (74, inverted, filled in and
+    pushed, bar 5).
+  - Horace hook: Old Pamplemousse (8, inverted, bar 5).
+- **Not yet heard by Zack.** Dials: the count shares and family weights in `JazzVariant.draw`.
 
 ## Lead 2 answers (2026-11-11)
 
