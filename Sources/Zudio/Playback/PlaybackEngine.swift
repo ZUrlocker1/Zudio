@@ -5,6 +5,7 @@
 import AVFoundation
 import AudioToolbox
 import Combine
+import QuartzCore
 
 /// Visualizer orb notes, published separately from PlaybackEngine (see activeVisualizerNotes).
 @MainActor
@@ -33,7 +34,7 @@ final class PlaybackEngine: ObservableObject {
     // stepPublisher replaces the @Published $currentStep Combine publisher.
     // PassthroughSubject: no initial value emitted on subscribe (unlike @Published).
     let stepPublisher = PassthroughSubject<Int, Never>()
-    // Plain var (not @Published): wallClockStep reads it as a fallback when stopped.
+    // Plain var (not @Published): the playhead reads it as a fallback when stopped.
     // While stopped, a change moves the lane playheads through playheadSync.
     var displayStep: Int = 0 {
         didSet { if !isPlaying && displayStep != oldValue { playheadSync.send() } }
@@ -55,36 +56,27 @@ final class PlaybackEngine: ObservableObject {
     private var pendingVisualizerNotes: [VisualizerNote] = []
     private var lastVisualizerFlush: Date = .distantPast
 
-    // MARK: - Wall-clock playhead (Option A: smooth animation without dispatch lag)
+    // MARK: - Playhead clock
 
     // Set by recordPlaybackStart() at the moment the scheduler fires its first step.
-    // Cleared (sps → 0) by stopSchedulerOnly() so wallClockStep falls back to displayStep.
-    var playbackStartWallTime: Date = .distantPast
+    // Cleared (sps → 0) by stopSchedulerOnly() so the playhead falls back to displayStep.
+    // CACurrentMediaTime is monotonic and is the clock Core Animation runs on, so the track
+    // playhead's glide (PlayheadHostView) and this position share one timeline.
+    var playbackStartTime: CFTimeInterval = 0
     var playbackSecondsPerStep: Double = 0.0
     var playbackStartStep: Int = 0
     var playbackTotalSteps: Int = 1
 
-    /// Smooth wall-clock playhead: computed from elapsed time so MIDILaneView's
-    /// TimelineView always reads the true position rather than a dispatch-queued value.
-    /// Falls back to displayStep when stopped or before the scheduler has started.
-    var wallClockStep: Int {
-        guard isPlaying && playbackSecondsPerStep > 0 else { return displayStep }
-        let elapsed = Date().timeIntervalSince(playbackStartWallTime)
-        let step = playbackStartStep + Int(elapsed / playbackSecondsPerStep)
-        return max(0, min(step, playbackTotalSteps - 1))
-    }
-
-    /// Fractional version of wallClockStep for the playhead drawing: glides between steps
-    /// instead of jumping a whole 16th at a time.
-    var wallClockPosition: Double {
+    /// The playhead's fractional step at `time` (a CACurrentMediaTime value): it glides between
+    /// steps instead of jumping a whole 16th at a time. displayStep when stopped.
+    func playheadPosition(at time: CFTimeInterval) -> Double {
         guard isPlaying && playbackSecondsPerStep > 0 else { return Double(displayStep) }
-        let elapsed = Date().timeIntervalSince(playbackStartWallTime)
-        let pos = Double(playbackStartStep) + elapsed / playbackSecondsPerStep
+        let pos = Double(playbackStartStep) + (time - playbackStartTime) / playbackSecondsPerStep
         return max(0, min(pos, Double(playbackTotalSteps) - 0.001))
     }
 
     private func recordPlaybackStart(step: Int, state: SongState) {
-        playbackStartWallTime   = Date()
+        playbackStartTime       = CACurrentMediaTime()
         playbackStartStep       = step
         playbackSecondsPerStep  = state.frame.secondsPerStep
         playbackTotalSteps      = state.frame.totalBars * 16
@@ -710,7 +702,7 @@ final class PlaybackEngine: ObservableObject {
         scheduler?.stop()
         scheduler = nil
         isPlaying = false
-        playbackSecondsPerStep = 0   // disables wallClockStep; falls back to displayStep
+        playbackSecondsPerStep = 0   // the playhead falls back to displayStep
         // Leave playhead in place — user can resume from here with Play
         allNotesOff()
         stopKosmicDroneFades()
@@ -941,7 +933,7 @@ final class PlaybackEngine: ObservableObject {
             self.currentStep = step
             if bar != self.currentBar { self.currentBar = bar }
             // displayStep is a plain var (not @Published) — update every step so
-            // wallClockStep has an accurate fallback when stopped.
+            // the playhead has an accurate fallback when stopped.
             self.displayStep = step
             // Notify DAW-scroll and annotation subscriber (AppState) without firing
             // objectWillChange — currentStep is now a plain var, not @Published.

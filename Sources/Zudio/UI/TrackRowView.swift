@@ -16,7 +16,6 @@ struct TrackRowView: View {
     let isEffectivelyMuted: Bool
     let visibleBars: Int
     let barOffset: Int
-    var showPlayheadHandle: Bool = false
     var onSeek: ((Int) -> Void)? = nil
     var contentWidth: CGFloat = 900
     /// Row height in points. 63 everywhere except the short unfolded-Duo landscape window.
@@ -192,48 +191,52 @@ struct TrackRowView: View {
 
                 // MIDI lane (or audio waveform for Chill/Ambient Texture track when audio texture active)
                 let ambientTextureFile = appState.songState?.ambientAudioTexture
+                // The lane reports its frame so the track rows can draw one playhead over all lanes
+                // (TrackPlayheadOverlay in MIDILaneView.swift).
                 // Chill Soho's texture is MIDI, so it gets the MIDI lane below rather than a waveform.
                 // Drawing a waveform here for every Chill song is what showed one under a Soho song
                 // whose picker read "None".
-                if trackIndex == kTrackTexture && activeStyle == .chill
-                    && appState.songState?.chillSohoVariation != true {
-                    AudioWaveformView(
-                        filename: appState.songState?.chillAudioTexture,
-                        totalBars: max(totalBars, 1),
-                        tempo: Double(appState.songState?.frame.tempo ?? 92),
-                        visibleBars: visibleBars,
-                        barOffset: barOffset,
-                        offsetSeconds: appState.songState?.chillAudioTextureOffset ?? 0,
-                        onSeek: onSeek
-                    )
-                    .frame(height: rowHeight)
-                    .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
-                } else if trackIndex == kTrackTexture && activeStyle == .ambient && ambientTextureFile != nil {
-                    AudioWaveformView(
-                        filename: ambientTextureFile,
-                        totalBars: max(totalBars, 1),
-                        tempo: Double(appState.songState?.frame.tempo ?? 92),
-                        visibleBars: visibleBars,
-                        barOffset: barOffset,
-                        offsetSeconds: appState.songState?.ambientAudioTextureOffset ?? 0,
-                        onSeek: onSeek
-                    )
-                    .frame(height: rowHeight)
-                    .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
-                } else {
-                    MIDILaneView(
-                        events: events,
-                        totalBars: max(totalBars, 1),
-                        isDrumTrack: trackIndex == kTrackDrums,
-                        trackColor: trackColor,
-                        visibleBars: visibleBars,
-                        barOffset: barOffset,
-                        onSeek: onSeek,
-                        showPlayheadHandle: showPlayheadHandle
-                    )
-                    .frame(height: rowHeight)
-                    .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
+                Group {
+                    if trackIndex == kTrackTexture && activeStyle == .chill
+                        && appState.songState?.chillSohoVariation != true {
+                        AudioWaveformView(
+                            filename: appState.songState?.chillAudioTexture,
+                            totalBars: max(totalBars, 1),
+                            tempo: Double(appState.songState?.frame.tempo ?? 92),
+                            visibleBars: visibleBars,
+                            barOffset: barOffset,
+                            offsetSeconds: appState.songState?.chillAudioTextureOffset ?? 0,
+                            onSeek: onSeek
+                        )
+                        .frame(height: rowHeight)
+                        .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
+                    } else if trackIndex == kTrackTexture && activeStyle == .ambient && ambientTextureFile != nil {
+                        AudioWaveformView(
+                            filename: ambientTextureFile,
+                            totalBars: max(totalBars, 1),
+                            tempo: Double(appState.songState?.frame.tempo ?? 92),
+                            visibleBars: visibleBars,
+                            barOffset: barOffset,
+                            offsetSeconds: appState.songState?.ambientAudioTextureOffset ?? 0,
+                            onSeek: onSeek
+                        )
+                        .frame(height: rowHeight)
+                        .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
+                    } else {
+                        MIDILaneView(
+                            events: events,
+                            totalBars: max(totalBars, 1),
+                            isDrumTrack: trackIndex == kTrackDrums,
+                            trackColor: trackColor,
+                            visibleBars: visibleBars,
+                            barOffset: barOffset,
+                            onSeek: onSeek
+                        )
+                        .frame(height: rowHeight)
+                        .opacity(isEffectivelyMuted ? 0.22 : (isMuted ? 0.35 : 1.0))
+                    }
                 }
+                .anchorPreference(key: LaneBoundsKey.self, value: .bounds) { [$0] }
             }
             // Right effects column — layout varies by platform and size class
             effectsColumn

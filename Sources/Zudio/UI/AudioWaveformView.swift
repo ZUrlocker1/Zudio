@@ -1,15 +1,13 @@
 // AudioWaveformView.swift — Looping audio waveform display for the Chill Texture track.
 // Copyright (c) 2026 Zack Urlocker
 // Replaces MIDILaneView on kTrackTexture when an audio texture is selected.
-// Same 3-layer ZStack pattern as MIDILaneView: static waveform layer (Equatable,
-// skipped on playhead ticks) + Core Animation playhead (PlayheadLayerView) + drag-to-seek.
+// Same pattern as MIDILaneView: static waveform layer (Equatable, skipped on playhead ticks) +
+// drag-to-seek; the playhead is drawn over all the lanes (TrackPlayheadOverlay).
 
 import SwiftUI
 import AVFoundation
 
 struct AudioWaveformView: View {
-    @EnvironmentObject var playback: PlaybackEngine
-
     let filename: String?
     let totalBars: Int
     let tempo: Double
@@ -40,10 +38,6 @@ struct AudioWaveformView: View {
                 offsetBars: tempo > 0 ? Double(offsetSeconds) / (240.0 / max(tempo, 1)) : 0
             )
             .equatable()
-
-            // Playhead — the same Core Animation layer as MIDILaneView (PlayheadLayerView).
-            PlayheadLayerView(playback: playback, visibleBars: visibleBars, barOffset: barOffset,
-                              totalBars: totalBars, showHandle: false)
 
             // Drag-to-seek
             GeometryReader { geo in

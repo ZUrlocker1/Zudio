@@ -235,7 +235,6 @@ struct ContentView: View {
                     .environmentObject(appState.playback)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Lead 1 (index 0) gets the single playhead handle triangle
                 VStack(spacing: 0) {
                     ForEach(0..<7, id: \.self) { trackIndex in
                         TrackRowView(
@@ -248,12 +247,12 @@ struct ContentView: View {
                             isEffectivelyMuted: appState.isEffectivelyMuted(trackIndex),
                             visibleBars: appState.visibleBars,
                             barOffset: appState.visibleBarOffset,
-                            showPlayheadHandle: trackIndex == 0,
                             onSeek: { step in appState.seekTo(step: step) },
                             contentWidth: contentWidth
                         )
                     }
                 }
+                .overlayPreferenceValue(LaneBoundsKey.self) { lanes in trackPlayhead(lanes) }
                 // frame(minHeight:0) + clipped() lets the VStack compress when the window is
                 // made short: its row children have fixed .frame(height:63) so SwiftUI would
                 // otherwise treat it as incompressible.
@@ -509,6 +508,13 @@ struct ContentView: View {
         }
     }
 
+    /// One playhead over all the track lanes (the ▼ handle on the top lane).
+    private func trackPlayhead(_ lanes: [Anchor<CGRect>]) -> some View {
+        TrackPlayheadOverlay(lanes: lanes, playback: appState.playback,
+                             visibleBars: appState.visibleBars, barOffset: appState.visibleBarOffset,
+                             totalBars: appState.songState?.frame.totalBars ?? 32)
+    }
+
     // MARK: - iPad Tab Layout (iOS only)
 
     #if os(iOS)
@@ -632,13 +638,13 @@ struct ContentView: View {
                         isEffectivelyMuted: appState.isEffectivelyMuted(trackIndex),
                         visibleBars: appState.visibleBars,
                         barOffset: appState.visibleBarOffset,
-                        showPlayheadHandle: trackIndex == 0,
                         onSeek: { step in appState.seekTo(step: step) },
                         contentWidth: contentWidth,
                         rowHeight: isShortWindow ? 57 : 63
                     )
                 }
             }
+            .overlayPreferenceValue(LaneBoundsKey.self) { lanes in trackPlayhead(lanes) }
             .frame(minHeight: 0)
             .clipped()
             .contentShape(Rectangle())

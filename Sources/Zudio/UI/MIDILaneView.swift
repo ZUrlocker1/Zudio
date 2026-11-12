@@ -2,16 +2,15 @@
 // Copyright (c) 2026 Zack Urlocker
 // Drag anywhere in the lane to reposition the playhead.
 //
-// Performance split: note drawing is isolated in NoteLayerView (Equatable), and the playhead is a
-// Core Animation layer (PlayheadLayerView), so playback costs the lane no per-frame drawing.
+// Performance split: note drawing is isolated in NoteLayerView (Equatable). The playhead is one
+// Core Animation layer over all the lanes (TrackPlayheadOverlay), so playback costs the lane no
+// per-frame drawing.
 
 import SwiftUI
 import Combine
 import QuartzCore
 
 struct MIDILaneView: View {
-    @EnvironmentObject var playback: PlaybackEngine
-
     let events: [MIDIEvent]
     let totalBars: Int
     let isDrumTrack: Bool
@@ -19,7 +18,6 @@ struct MIDILaneView: View {
     var visibleBars: Int = 16
     var barOffset: Int = 0
     var onSeek: ((Int) -> Void)? = nil   // called with absolute step index
-    var showPlayheadHandle: Bool = false // only top lane draws the ▼ drag handle
 
     private let noteH: CGFloat = 7
 
@@ -32,10 +30,9 @@ struct MIDILaneView: View {
     @State private var cacheVersion: Int = 0
 
     var body: some View {
-        // Capture stable locals so closures hold their current values.
-        // displayStep is intentionally NOT read here — the playhead uses
-        // wallClockStep inside a TimelineView so this body only re-runs on
-        // note-data changes (song load / regen / DAW scroll), not on step ticks.
+        // Capture stable locals so closures hold their current values. The lane does not observe
+        // the playback engine (the playhead is drawn over the lanes), so this body only re-runs
+        // on note-data changes (song load / regen / DAW scroll), not on bar or step ticks.
         let onsets    = onsetsByNote
         let pitchRng  = cachedPitchRange
         let version   = cacheVersion
@@ -56,11 +53,6 @@ struct MIDILaneView: View {
                 cacheVersion: version
             )
             .equatable()
-
-            // Playhead — a Core Animation layer that glides at display rate with no per-frame
-            // work in the app (PlayheadLayerView, below).
-            PlayheadLayerView(playback: playback, visibleBars: visibleBars, barOffset: barOffset,
-                              totalBars: totalBars, showHandle: showPlayheadHandle)
 
             // Drag-to-seek overlay — invisible, covers full lane
             GeometryReader { geo in
@@ -107,20 +99,62 @@ struct MIDILaneView: View {
 
 }
 
+// MARK: - Track playhead
+
+// One playhead for all the track lanes (2026-11-12). Each lane used to carry its own layer and
+// re-anchor it separately; when a window-wide re-render (a log line, say) fell between two lanes'
+// re-anchors, the lanes came out a few points apart for a bar. Now each lane reports its frame
+// (LaneBoundsKey) and the track rows draw a single line over all of them (TrackPlayheadOverlay).
+
+/// The track lanes' frames, so the rows can draw one playhead across them.
+struct LaneBoundsKey: PreferenceKey {
+    static let defaultValue: [Anchor<CGRect>] = []
+    static func reduce(value: inout [Anchor<CGRect>], nextValue: () -> [Anchor<CGRect>]) {
+        value += nextValue()
+    }
+}
+
+/// The playhead over the lanes reported through LaneBoundsKey: top of the first lane to the
+/// bottom of the last, the lanes' width. Touches pass through to the lanes' drag-to-seek.
+struct TrackPlayheadOverlay: View {
+    let lanes: [Anchor<CGRect>]
+    let playback: PlaybackEngine
+    let visibleBars: Int
+    let barOffset: Int
+    let totalBars: Int
+
+    var body: some View {
+        GeometryReader { geo in
+            if let first = lanes.first {
+                let r = lanes.dropFirst().reduce(geo[first]) { $0.union(geo[$1]) }
+                PlayheadLayerView(playback: playback, visibleBars: visibleBars, barOffset: barOffset,
+                                  totalBars: max(totalBars, 1), showHandle: true)
+                    .frame(width: r.width, height: r.height)
+                    .offset(x: r.minX, y: r.minY)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 // MARK: - PlayheadLayerView
 
-// The lane playhead (2 pt line, plus the ▼ handle on the top lane) as a Core Animation layer.
-// While playing it carries one linear animation to the end of the visible window, which the
-// window server runs at display rate with no per-frame work in the app. It replaced a
-// TimelineView per lane that redrew a lane-sized Canvas 4-20 times a second (2026-11-11).
-// Re-anchored from the wall clock on play/stop, every bar (corrects any drift), seek, tempo
-// change and Evolve pass (PlaybackEngine.playheadSync), and on zoom, scroll and resize.
-struct PlayheadLayerView {
+// The playhead (2 pt line, plus the ▼ handle) as a Core Animation layer. While playing it carries
+// one linear animation to the end of the visible window, which the window server runs at display
+// rate with no per-frame work in the app. It replaced a TimelineView per lane that redrew a
+// lane-sized Canvas 4-20 times a second (2026-11-11). Re-anchored on play/stop, every bar, seek,
+// tempo change and Evolve pass (PlaybackEngine.playheadSync), and on zoom, scroll and resize.
+struct PlayheadLayerView: Equatable {
     let playback: PlaybackEngine
     let visibleBars: Int
     let barOffset: Int
     let totalBars: Int
     let showHandle: Bool
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.playback === b.playback && a.visibleBars == b.visibleBars && a.barOffset == b.barOffset
+            && a.totalBars == b.totalBars && a.showHandle == b.showHandle
+    }
 }
 
 #if os(macOS)
@@ -154,6 +188,7 @@ final class PlayheadHostView: PlayheadBaseView {
         backgroundColor = .clear
         let root = layer
         #endif
+        root.masksToBounds = true                      // the handle stays inside the lanes
         line.anchorPoint = .zero
         line.backgroundColor = CGColor(gray: 1, alpha: 0.9)
         line.isHidden = true
@@ -186,7 +221,10 @@ final class PlayheadHostView: PlayheadBaseView {
     }
     #endif
 
+    /// SwiftUI calls this on every re-render of the track rows (a log line re-renders the window);
+    /// the glide is only rebuilt when something it depends on changed.
     func configure(_ spec: PlayheadLayerView) {
+        guard spec != self.spec else { return }
         self.spec = spec
         if subscribed !== spec.playback {
             subscribed = spec.playback
@@ -203,10 +241,13 @@ final class PlayheadHostView: PlayheadBaseView {
     }
 
     /// Places the line at the engine's current position and, while playing, sets it gliding
-    /// to the window's right edge at the song's step rate.
+    /// to the window's right edge at the song's step rate. The glide starts at the instant the
+    /// position was read (`beginTime`), not when Core Animation commits it, so a busy main thread
+    /// between the two cannot leave the line behind the music.
     private func sync() {
         guard let spec else { return }
-        let pb = spec.playback
+        let pb  = spec.playback
+        let now = CACurrentMediaTime()
         let w = bounds.width, h = bounds.height
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -218,7 +259,7 @@ final class PlayheadHostView: PlayheadBaseView {
         let offset    = max(0, min(spec.barOffset, spec.totalBars - visible))
         let startStep = Double(offset * 16)
         let steps     = Double(visible * 16)
-        let pos       = pb.wallClockPosition
+        let pos       = pb.playheadPosition(at: now)
         guard pos >= startStep && pos < startStep + steps else { line.isHidden = true; return }
 
         line.isHidden = false
@@ -237,6 +278,7 @@ final class PlayheadHostView: PlayheadBaseView {
         glide.fromValue = x
         glide.toValue   = endX
         glide.duration  = duration
+        glide.beginTime = line.convertTime(now, from: nil)
         glide.timingFunction = CAMediaTimingFunction(name: .linear)
         line.position = CGPoint(x: endX, y: 0)   // model value: where the glide ends
         line.add(glide, forKey: "glide")
