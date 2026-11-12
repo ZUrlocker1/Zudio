@@ -884,11 +884,7 @@ struct SongGenerator {
         // Kosmic Space Lead 1 names its per-song version beside the rule, as the Chill jazz leads
         // do: "Oxygene Falling Theme sixth top, 5-4-5".
         for (i, entry) in log.enumerated() {
-            guard let full = kosmicLeadNotes.byRule[entry.tag], !full.isEmpty else { continue }
-            // Short log (Zack, 2026-11-12): the first draw only, and none on Offbeat Climb and
-            // Call and Hold, whose names are already long.
-            if entry.tag == "KOS-LD1-017" || entry.tag == "KOS-LD1-018" { continue }
-            let note = full.components(separatedBy: ", ")[0]
+            guard let note = kosmicLeadNotes.byRule[entry.tag], !note.isEmpty else { continue }
             log[i] = GenerationLogEntry(tag: entry.tag, description: entry.description + " " + note,
                                         isTitle: entry.isTitle)
         }
