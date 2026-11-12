@@ -25,8 +25,8 @@ import Foundation
 /// lead versions: name the transformations.
 final class KosmicLeadNotes {
     var byRule: [String: String] = [:]
-    /// The log words for a song's draws: plain words, at most three (the rule's name comes first).
-    static func words(_ list: [String?], limit: Int = 3) -> String {
+    /// The log words for a song's draws: plain words, at most two (the rule's name comes first).
+    static func words(_ list: [String?], limit: Int = 2) -> String {
         list.compactMap { $0 }.prefix(limit).joined(separator: ", ")
     }
 }
@@ -145,11 +145,12 @@ struct KosmicLeadGenerator {
                     MIDIEvent(stepIndex: $0.stepIndex + shift, note: $0.note, velocity: $0.velocity,
                               durationSteps: Swift.min($0.durationSteps, source.upperBound - $0.stepIndex))
                 }
-                // The log says the theme comes back (two draw words at most, then "returns").
+                // The log says the theme comes back when the line has room (two words at most).
                 if let notes {
                     let draws = (notes.byRule[lead1BaseRule] ?? "").components(separatedBy: ", ")
                         .filter { !$0.isEmpty }
-                    notes.byRule[lead1BaseRule] = (Array(draws.prefix(2)) + ["returns"]).joined(separator: ", ")
+                    notes.byRule[lead1BaseRule] = (draws.count < 2 ? draws + ["returns"] : draws)
+                        .joined(separator: ", ")
                 }
             }
             // The lead's rests are the arrangement's main relief, as in Oxygene 4, 6 and 8. It sits out
@@ -454,7 +455,7 @@ struct KosmicLeadGenerator {
         let tops: [(steps: Int, name: String)] = [(7, "octave top"), (5, "lower top"), (3, "low top")]
         let top = tops[rng.weightedPick([0.30, 0.35, 0.35])]
         let inners: [(steps: [Int], name: String)] = [([4, 2, 4], "5-3-5"), ([4, 3, 4], "closer middle"),
-                                                      ([5, 4, 2], "falling middle")]
+                                                      ([5, 4, 2], "steady fall")]
         let inner = inners[rng.weightedPick([0.35, 0.35, 0.30])]
         let compressed = rng.nextDouble() < 0.40
 
@@ -483,7 +484,7 @@ struct KosmicLeadGenerator {
         if compressed { words = ["squeezed"] } else {
             if top.steps != 7 { words.append(top.name) }
             if inner.steps != [4, 2, 4] { words.append(inner.name) }
-            if noteCount != 5 { words.append(noteCount == 4 ? "short" : "busier") }
+            if noteCount != 5 { words.append(noteCount == 4 ? "fewer notes" : "more notes") }
             else if onsets != [0, 6, 8, 10, 14] { words.append("new rhythm") }
         }
         note = KosmicLeadNotes.words(words)
@@ -732,7 +733,7 @@ struct KosmicLeadGenerator {
         let sixOnsets  = altRhythm ? [2, 4, 6, 8, 10, 13] : [2, 4, 6, 8, 11, 14]
         let fiveOnsets = altRhythm ? [2, 6, 8, 10, 13] : [2, 6, 8, 11, 14]
         note = KosmicLeadNotes.words([leap == -2 ? "high start" : leap == -4 ? "low start" : nil,
-                                      top == [3, 4] ? "climbs on" : top == [3, 2] ? "turns back" : nil,
+                                      top == [3, 4] ? "ends higher" : top == [3, 2] ? "ends lower" : nil,
                                       altRhythm ? "early finish" : nil])
         let scalePCs = frame.scalePCs
         let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
@@ -921,10 +922,10 @@ struct KosmicLeadGenerator {
         let octavePhase = rng.nextDouble() < 0.60
         let tailNames: [[Int]: String] = [[-1, -1, -1]: "falling tail", [1, -1, -2]: "turning tail",
                                           [-2, 1, -1]: "leaping tail"]
-        note = KosmicLeadNotes.words([[nil, "mid call", "high call"][callDegree / 2],
+        note = KosmicLeadNotes.words([[nil, "middle call", "high call"][callDegree / 2],
                                       callRhythm == [0, 2, 3, 6] ? "on the beat" : callRhythm == [2, 3, 5, 7] ? "tight" : nil,
                                       tailNames[tail], answerDown ? nil : "rising answer",
-                                      octavePhase ? "bounces" : nil])
+                                      octavePhase ? "octave bounce" : nil])
         let scalePCs = frame.scalePCs
         let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
                                     low: 62, high: 73)
@@ -1065,11 +1066,11 @@ struct KosmicLeadGenerator {
             offset = 0
         }
         // The source is a fifth, 3+3, first half, anchor below; KOS-LD1-019 keeps only the anchor draw.
-        let intervalWords = ["fourth": "narrow", "sixth": "wide", "octave": "widest"]
-        let groupWords = ["2+2+2": "even", "3+2": "lopsided"]
+        let intervalWords = ["fourth": "narrow leap", "sixth": "wide leap", "octave": "widest leap"]
+        let groupWords = ["2+2+2": "even groups", "3+2": "uneven groups"]
         note = KosmicLeadNotes.words((equinoxeThirds ? [] : [intervalWords[interval.name],
                                                              groupWords[grouping.name],
-                                                             offset == 8 ? "late" : nil])
+                                                             offset == 8 ? "starts late" : nil])
                                      + [anchorAbove ? "rocks down" : nil])
 
         let scalePCs = frame.scalePCs

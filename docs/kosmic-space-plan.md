@@ -474,14 +474,14 @@ jazz leads do. Only draws that differ from the source are named, so a line with 
 name played the source form; KOS-LD1-015 Magnetic Turn Melody has no single source form and names
 all its draws. `KosmicLeadNotes` carries them from `KosmicLeadGenerator.generateLead1` to the log.
 Examples:
-- KOS-LD1-013 "Oxygene Falling Theme lower top, falling middle" or "squeezed"
-- KOS-LD1-014 "Oxygene See-Saw Riff wide, even, late" (narrow, widest; lopsided; rocks down)
-- KOS-LD1-015 "Magnetic Turn Melody climbing, few runs, from the 5th" (arching, dipping, leaping, dropping)
-- KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third, short cycle"
-- KOS-LD1-017 "Oxygene 8 Offbeat Climb low start, climbs on, early finish" (high start, turns back)
-- KOS-LD1-018 "Magnetic Call high call, tight, falling tail" (mid call, on the beat, turning or leaping tail, rising answer, bounces)
+- KOS-LD1-013 "Oxygene Falling lower top, squeezed" (low top; steady fall or closer middle; fewer or more notes; new rhythm)
+- KOS-LD1-014 "Oxygene See-Saw Riff wide leap, even groups" (narrow or widest leap; uneven groups; starts late; rocks down)
+- KOS-LD1-015 "Magnetic Turn Melody climbing, few runs" (arching, dipping, leaping, dropping; many runs; from the 3rd or 5th; short runs)
+- KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third" (short cycle)
+- KOS-LD1-017 "Oxygene 8 Offbeat Climb low start, early finish" (high start; ends higher or lower)
+- KOS-LD1-018 "Magnetic Call high call, tight" (middle call, on the beat, turning or leaping tail, rising answer, octave bounce)
 - KOS-LD1-019 "Equinoxe Thirds Riff rocks down" (its interval and rhythm are fixed)
-Plain words, three at most (Zack, 2026-11-12); a song whose A theme returns after B ends its line with "returns".
+Plain words, two at most (Zack, 2026-11-12); the rule's name is capitalised, the changes are lower case. A song whose A theme returns after B ends its line with "returns" when there is room.
 The line a Lead 1 regen appends names the rule only, without its version, as Chill's jazz leads
 do. Log text only: no draw moved, so every song plays as before.
 
