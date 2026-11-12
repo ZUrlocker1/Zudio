@@ -262,8 +262,10 @@ patterns room to breathe without the progression feeling rushed.
 **Voicings (3.0).** Rhythm comps four-note rootless voicings with a tension (m9, 13, 7sus4 with
 9, maj9), guide tones first so its two-note shells are the 3rd and 7th. Pads (B section only,
 CHL-PAD-004) hold root, 7th and 3rd shells instead of root and fifth. Rhythm never rests in
-form position 15 and never extends a rest into position 8. Details in
-`docs/chill-chords-plan.md`, "As built (2026-11-12, round 2)".
+form position 15 and never extends a rest into position 8. On four-note attacks the top note
+plays at full velocity and the notes under it 15% softer, a pianist's touch that keeps the
+voicings from sounding heavy. Details in `docs/chill-chords-plan.md`, "As built (2026-11-12,
+round 2)" and "round 3".
 
 **Chorus variation (3.0).** 30% of songs play the quick change (IV in bar 2) in every chorus,
 the first included. Otherwise the first chorus is plain. Each song takes two of three devices

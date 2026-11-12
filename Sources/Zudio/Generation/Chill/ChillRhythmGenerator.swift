@@ -91,12 +91,40 @@ struct ChillRhythmGenerator {
                                          rng: &rng)].compactMap { $0 }
         // CHL-RHY-009 rotates its variants on its own 8–12 bar period; drawn for Soho only.
         let eighthsPeriod = beatStyle.isSoho ? 8 + rng.nextInt(upperBound: 5) : 8
-        return generateComping(frame: frame, structure: structure,
+        let events = generateComping(frame: frame, structure: structure,
                                 modeA: modeA, modeB: modeB, breakdownStyle: breakdownStyle,
                                 bluesVariation: bluesVariation, bluesKeyboardBar: bluesKeyboardBar,
                                 forcedSwitchBar: forcedSwitchBar, sparseFragments: sparseFragments,
                                 dropoutFragments: dropoutFragments, clave: beatStyle == .sohoLatin,
                                 soho: beatStyle.isSoho, eighthsPeriod: eighthsPeriod, rng: &rng)
+        // Chill Soho unchanged.
+        return beatStyle.isSoho ? events : softenedFullVoicings(events)
+    }
+
+    /// A pianist's touch on full chords (Zack, 2026-11-12): an attack of four or more notes keeps
+    /// its top note at full velocity and plays the notes under it 15% softer, so the voicing
+    /// carries a faint top line without sounding heavy-handed. A fourth note at the same velocity
+    /// adds about 1 dB; this takes the inner notes down about 2 to 3 dB, so the chord sits about
+    /// where the old triads did. In practice this is Chill Blues, whose Rhythm comps four-note
+    /// voicings (`bluesVoicing`); base Chill voices three notes and draws nothing new.
+    /// Measured over 300 Chill seeds: about 40% of Blues Rhythm attacks, in every Blues song;
+    /// no base Chill attack has four distinct pitches.
+    static func softenedFullVoicings(_ events: [MIDIEvent]) -> [MIDIEvent] {
+        var byStep: [Int: [Int]] = [:]
+        for (i, e) in events.enumerated() { byStep[e.stepIndex, default: []].append(i) }
+        var out = events
+        // Distinct pitches: base Chill sometimes lays a second figure on a triad's attack,
+        // doubling one of its notes, which is still a three-note chord.
+        for indices in byStep.values where Set(indices.map { events[$0].note }).count >= 4 {
+            let top = indices.map { events[$0].note }.max()!
+            for i in indices where events[i].note != top {
+                let e = events[i]
+                let v = Swift.max(1, Int((Double(e.velocity) * 0.85).rounded()))
+                out[i] = MIDIEvent(stepIndex: e.stepIndex, note: e.note, velocity: UInt8(v),
+                                   durationSteps: e.durationSteps)
+            }
+        }
+        return out
     }
 
     /// Picks a single fragment (12 or 16 bars, chord-plan-boundary aligned) where the whole

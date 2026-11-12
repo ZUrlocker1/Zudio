@@ -249,6 +249,25 @@ change songs 26 of 105 Blues songs in seeds 1 to 600, none broken mid-song.
 **Verified:** build clean; ChillSohoTests, ChillLeadRegisterTests, ChordPlanShapeTests and
 ChillBluesBatchTests pass. **Not verified:** by ear.
 
+## As built (2026-11-12, round 3: lighter four-note comping)
+
+Zack asked for Rhythm chords of four or more notes to play 20% softer so they are not
+heavy-handed. Claude's counter, approved: a fourth note at equal velocity adds only about 1 dB,
+and a flat 20% cut takes each note down 3 to 4 dB, which would leave the new voicings quieter
+than the triads they replaced. Instead, a pianist's touch.
+
+- **Rule:** a Rhythm attack with four or more distinct pitches keeps its top note at full
+  velocity and plays the notes under it 15% softer. The voicing keeps a faint top line, and the
+  chord sits about where the old three-note attacks did.
+- **Where it applies:** measured over 300 Chill seeds, about 40% of Chill Blues Rhythm attacks,
+  in every Blues song. No base Chill attack has four distinct pitches: its four-event attacks are
+  triads with one note doubled by a second figure on the same step, which is why the rule counts
+  pitches, not events. Chill Soho is excluded explicitly and unchanged.
+- **Code:** `softenedFullVoicings` in `ChillRhythmGenerator.swift`, applied to the result of
+  `generateComping` in `generate`, so regenerated Rhythm gets it too. No random draws.
+- **Verified:** build clean; ChillSohoTests, ChillLeadRegisterTests and ChordPlanShapeTests pass.
+  **Not verified:** by ear.
+
 ## Item 2: tune-named progressions (later)
 
 Candidates, each from 1959 or later, each paired with a lead rule where one exists:
