@@ -252,16 +252,25 @@ This is a 16-bar slow blues form — less common than 12-bar but well-suited to 
 tempo range (75–92 BPM) because the long 8-bar I section gives the sparse drum and bass
 patterns room to breathe without the progression feeling rushed.
 
-**Chord quality (all from Dorian, no scale changes needed):**
-- I chord: Im7 (root, minor 3rd, 5th, b7) — natural in Dorian
-- IV chord: IVm7 (same shape transposed) — natural in Dorian
-- V chord: V7 (dominant 7th) — the key blues signal; major 3rd on V is diatonic to Dorian
+**Chord quality (3.0, all diatonic to Dorian):**
+- I chord: Im7, comped as Im9
+- IV chord: IV7sus4 (root, 4, 5, b7, 9). It was IVm7, but the minor third of IV is the key's
+  b6, outside Dorian; snapped to the scale it sounded as a different chord in different keys.
+- V chord: Vm7, comped as Vm9. It was V7, whose major third (the key's 7) is outside Dorian
+  and snapped to Vm7 in most keys and V7sus4 in C and C#. Corrected 2026-11-12.
 
-**Chorus variation (3.0).** The first chorus of a song is plain. Each song then takes two of
-four devices and plays each at 60% in every later chorus, inside the form, so the seams at
-positions 8, 12 and 15 stay put: a quick change (IV in bar 2), Dorian IV7 in the IV bars, a
-modal turn (bVIImaj7 – IV7 in bars 13 and 14) and a suspended turnaround (IIm7 – V7sus4 in
-bars 15 and 16). See `docs/chill-chords-plan.md`, item 4.
+**Voicings (3.0).** Rhythm comps four-note rootless voicings with a tension (m9, 13, 7sus4 with
+9, maj9), guide tones first so its two-note shells are the 3rd and 7th. Pads (B section only,
+CHL-PAD-004) hold root, 7th and 3rd shells instead of root and fifth. Rhythm never rests in
+form position 15 and never extends a rest into position 8. Details in
+`docs/chill-chords-plan.md`, "As built (2026-11-12, round 2)".
+
+**Chorus variation (3.0).** 30% of songs play the quick change (IV in bar 2) in every chorus,
+the first included. Otherwise the first chorus is plain. Each song takes two of three devices
+and plays each at 60% in every later chorus, inside the form, so the seams at positions 8, 12
+and 15 stay put: Dorian IV7 in the IV bars (the sus resolves to IV13), a modal turn
+(bVIImaj7 – IV7 in bars 13 and 14) and a suspended turnaround (IIm7 – V7sus4 in bars 15 and
+16). See `docs/chill-chords-plan.md`, item 4.
 
 **Pads and rhythm:** play from the chord tones of the active chord at each bar position.
 No structural generator changes needed — just supply the chord sequence to the existing

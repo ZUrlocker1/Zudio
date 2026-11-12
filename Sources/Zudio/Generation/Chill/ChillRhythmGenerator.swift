@@ -354,7 +354,7 @@ struct ChillRhythmGenerator {
                 if bar >= outroEnd - 1 { continue }
                 if bar == outroEnd - 2 {
                     let chord   = structure.chordWindow(atBar: bar)
-                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                     let base    = bar * 16
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base, note: UInt8(note), velocity: 92, durationSteps: 3))
@@ -408,7 +408,7 @@ struct ChillRhythmGenerator {
                         duo = singleNoteLine(base: base, chord: chord, bar: bar,
                                              forceSparse: false, rng: &rng)
                     } else {
-                        let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                        let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                         duo = chordalComp(base: base, voicing: voicing, bar: bar, clave: clave,
                                           forceSparse: false, rng: &rng)
                     }
@@ -422,7 +422,7 @@ struct ChillRhythmGenerator {
                     // Remix Break (Chill Soho): Rhythm reduced to short offbeat stabs — the house
                     // offbeat chord on 2, 6, 10 and 14 — and on the last bar it joins the band's
                     // unison hits on 0 and 8.
-                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                     let isLast  = breakdownBar == sectionLen - 1
                     for step in (isLast ? ChillStructureGenerator.remixExitHitSteps : [2, 6, 10, 14]) {
                         let vel = UInt8((isLast ? 70 : 48) + rng.nextInt(upperBound: 12))
@@ -436,7 +436,7 @@ struct ChillRhythmGenerator {
                     // Rhythm plays straight through — fall through to normal comping below.
                     // For 8-bar pockets, overlay escalating tension stabs in bars 6–8.
                     if sectionLen >= 8 && breakdownBar >= 5 {
-                        let voicing    = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                        let voicing    = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                         let tensionBar = breakdownBar - 5   // 0 = bar 6, 1 = bar 7, 2 = bar 8
                         let stabSteps: [Int]
                         switch tensionBar {
@@ -476,7 +476,7 @@ struct ChillRhythmGenerator {
                     continue
                 } else if breakdownStyle == .bassOstinato {
                     // Bass ostinato: one beat-2 chord stab keeps harmonic context
-                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                    let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                     let vel     = UInt8(42 + rng.nextInt(upperBound: 12))
                     for note in voicing {
                         events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(note), velocity: vel, durationSteps: 4))
@@ -492,7 +492,7 @@ struct ChillRhythmGenerator {
             // bar is the way in, and the band does not sit it out.
             if remixEntry.contains(bar) {
                 let chord   = structure.chordWindow(atBar: bar)
-                let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+                let voicing = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
                 let base    = bar * 16
                 for step in ChillStructureGenerator.remixEntryHitSteps {
                     let vel = UInt8(76 + rng.nextInt(upperBound: 12))
@@ -518,16 +518,20 @@ struct ChillRhythmGenerator {
             // relentless. Roughly one rest every ~23 bars on average, never on back-to-back bars.
             // ~20% of triggered rests extend to a second bar (only if that next bar is still the
             // same section, so the extension never bleeds into a breakdown/outro boundary).
+            // Chill Blues rests only in form position 7, inside the tonic stretch, and never
+            // extends: position 15 is the turnaround's last chord and position 8 the IV arrival,
+            // and with no pads in A a rest there left the change to the bass alone (2026-11-12).
             let barInSection = bar - (section?.startBar ?? bar)
-            if barInSection > 0 && barInSection % 8 == 7 && rng.nextDouble() < 0.35 {
-                if rng.nextDouble() < 0.20, structure.section(atBar: bar + 1)?.label == label {
+            let bluesChangeBar = bluesVariation && barInSection % 16 == 15
+            if barInSection > 0 && barInSection % 8 == 7 && !bluesChangeBar && rng.nextDouble() < 0.35 {
+                if !bluesVariation, rng.nextDouble() < 0.20, structure.section(atBar: bar + 1)?.label == label {
                     extendedRestBar = bar + 1
                 }
                 continue
             }
 
             let chord     = structure.chordWindow(atBar: bar)
-            let voicing   = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable)
+            let voicing   = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable, blues: bluesVariation)
             let base      = bar * 16
 
             // B section always plays a different comping mode than A (and everything else);
@@ -1107,10 +1111,15 @@ struct ChillRhythmGenerator {
     }
 
     private static func buildVoicing(frame: GlobalMusicalFrame, chord: ChordWindow?,
-                                      baseRegister: Int, snapTable: [Int]) -> [Int] {
+                                      baseRegister: Int, snapTable: [Int],
+                                      blues: Bool = false) -> [Int] {
         let chordRoot  = chord?.chordRoot ?? "1"
         let chordType  = chord?.chordType ?? .min7
         let chordRootPC = (frame.keySemitoneValue + degreeSemitone(chordRoot)) % 12
+        if blues {
+            return bluesVoicing(frame: frame, rootPC: chordRootPC, type: chordType,
+                                baseRegister: baseRegister, snapTable: snapTable)
+        }
 
         let intervals: [Int]
         switch chordType {
@@ -1147,5 +1156,39 @@ struct ChillRhythmGenerator {
             notes.append(note)
         }
         return notes
+    }
+
+    /// Chill Blues comping voicing: four notes, rootless (the bass has the root), stacked up from
+    /// the third (the fourth for a sus) near `baseRegister`, every note in the mode.
+    /// - m7: b3 5 b7 9 (Im9, Vm9); on IIm7, whose 9 leaves Dorian, the 11 replaces it
+    /// - 7: 3 b7 9 13, the soul-jazz organ voicing of the Dorian IV7
+    /// - 7sus4: 4 5 b7 9 (the plain IV and the suspended turnaround's V)
+    /// - maj7: 3 5 7 9 (the modal turn's bVIImaj9)
+    /// Triads made the Blues chord changes hard to hear, with Pads on root and fifth only (Zack,
+    /// 2026-11-12). Returned guide tones first, then the tension and the fifth, because the
+    /// comping modes take `prefix(2)` as their two-note shell: that shell is the 3rd (or 4th)
+    /// and 7th, which name the chord.
+    private static func bluesVoicing(frame: GlobalMusicalFrame, rootPC: Int, type: ChordType,
+                                     baseRegister: Int, snapTable: [Int]) -> [Int] {
+        let scale = frame.scalePCs
+        func inMode(_ interval: Int) -> Bool { scale.contains((rootPC + interval) % 12) }
+        let ninth = inMode(14) ? 14 : 17
+        let stack: [Int]       // intervals above the root, low to high
+        let roles: [Int]       // indices into `stack`, guide tones first
+        switch type {
+        case .sus4:         stack = [5, 7, 10, ninth];                 roles = [0, 2, 3, 1]
+        case .dom7:         stack = [4, 10, ninth, inMode(21) ? 21 : 19]; roles = [0, 1, 2, 3]
+        case .maj7, .major: stack = [4, 7, 11, ninth];                 roles = [0, 2, 3, 1]
+        default:            stack = [3, 7, 10, ninth];                 roles = [0, 2, 3, 1]
+        }
+        // Lowest note in [baseRegister - 2, baseRegister + 10); the rest keep the stack's spacing.
+        let lowPC = snapTable[(rootPC + stack[0]) % 12]
+        let low = baseRegister - 2 + (lowPC - (baseRegister - 2) % 12 + 12) % 12
+        var notes = stack.map { iv -> Int in
+            let raw = low + iv - stack[0]
+            return raw - raw % 12 + snapTable[raw % 12]   // a no-op unless the chord leaves the mode
+        }
+        if let top = notes.last, top > 76 { notes[notes.count - 1] = top - 12 }
+        return roles.map { notes[$0] }
     }
 }

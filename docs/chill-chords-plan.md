@@ -200,9 +200,54 @@ change). That is why the Dorian IV7 and the modal turn are subtle by ear. Every 
 re-roots on the new chords; CHL-BASS-010 and CHL-BASS-011 start their figures off the root by
 design, CHL-BASS-010 walking down b7, 5, b3, root on alternate choruses.
 
-**Demo files** in `~/Downloads/Zudio 3.0 chord demos/` (seeds 25, 99, 134, 237), listed with
-bars in the session notes; they regenerate from the seed, so they need a 3.0 build with this
-round in it.
+**Demo files** in `~/Downloads/Zudio 3.0 chord demos/`; they regenerate from the seed, so they
+need a 3.0 build with this round in it.
+
+## As built (2026-11-12, round 2: Chill Blues voicings)
+
+Zack heard Still Water Scotts Valley (seed 25) and Summer Dorval (seed 99) and liked the
+"subtle jazzy chords". In Chill Blues he could not hear the changes beyond the quick change, and
+asked for jazzier chords in Rhythm or Pads, built when the voicing is generated, not in a later
+pass. Both cannot be two- or three-note chords.
+
+**Diatonic plan.** The plain form is now Im7 ×8, IV7sus4 ×2, Im7 ×2, Vm7, IV7sus4, Im7 ×2
+(`bluesChorus`). This settles the open question from round 1 (the plain IV and V sounded
+different by key). Option A as offered would have kept the IV as root, 9, 5, b7; the sus4 is
+used instead because its 4th resolving to the major third makes the Dorian IV7 device audible.
+Bass `isIV` keys on root 4, `isV` on root 5 when not a sus; the "Blues" bar row says "V chord".
+
+**Rhythm** (`bluesVoicing` in `ChillRhythmGenerator.swift`, reached through `buildVoicing(blues:)`
+in every `generateComping` call). Four notes, rootless, stacked up from the third (fourth for a
+sus) in MIDI 50 to 61, every note in the mode:
+- m7: b3 5 b7 9 (IIm7 takes the 11, its 9 leaving Dorian)
+- 7: 3 b7 9 13 (IV13, the soul-jazz organ sound)
+- 7sus4: 4 5 b7 9
+- maj7: 3 5 7 9
+Returned guide tones first (3rd or 4th, 7th, tension, 5th), since the comping modes use
+`prefix(2)` as a two-note shell and `[0]` with `[last]` in sparse bars. Base Chill and Soho keep
+the old three-note voicing.
+
+**Pads** (`openFifthHold(bluesShell:)`, Blues only): root, 7th above, 3rd (4th for a sus) an
+octave above that, three notes in place of root and fifth. Same draws.
+
+**Rest bars.** Rhythm rested in section positions 7 and 15 at 35%, extending into the next bar
+at 20%. Position 15 is the suspended turnaround's V7sus4 and position 8 the IV arrival, and the
+A section has no Blues pads, so a rest there left the change to the bass. Blues now rests only
+in position 7 and never extends. Base Chill and Soho unchanged.
+
+**Quick change per song.** 30% of Blues songs play it in every chorus, the first too; the rest
+never do (Zack: all or none, 20 to 40% of songs). The others draw two of the remaining three
+devices at 60% per later chorus. Chords line: "sus turnaround" for "suspended turnaround".
+
+**MIDI check** (ChillBluesBatchTests, 30 songs; seeds 1 to 600 for shares). Every chord type
+sounds as named in Rhythm and Pads with no snapped notes. Rhythm attacks: 4 notes about 36%, 2
+(the guide-tone shell) about 51%. Pads: 3 notes. Device bars closer to the device chord than
+to the plain one: Dorian IV7 111 of 113, quick change 31 of 31, suspended turnaround 107 of 114,
+modal turn 59 of 78 (bVIImaj9 and Vm9 share three notes; the measure undercounts it). Quick
+change songs 26 of 105 Blues songs in seeds 1 to 600, none broken mid-song.
+
+**Verified:** build clean; ChillSohoTests, ChillLeadRegisterTests, ChordPlanShapeTests and
+ChillBluesBatchTests pass. **Not verified:** by ear.
 
 ## Item 2: tune-named progressions (later)
 
@@ -225,8 +270,7 @@ plus the four devices, which combine into many chorus variants.
 
 - Items 1, 3 and 4 committed (be74994) plus round 1 (2026-11-12); Zack to listen.
 - Simple-form pendulum and modal drift dominant sus confirmed (2026-11-12).
-- Open: make the Chill Blues plan diatonic so the plain IV and V sound alike in every key
-  (today the key decides, see "As built (2026-11-12)").
+- Chill Blues plan made diatonic with jazz voicings (round 2); Zack to listen.
 - ChillBluesBatchTests run 2026-11-12 (MIDI check above); ChillBatchTests not run.
 - Item 2 later, after chord-aware snapping.
 - Mark nothing with "* " here (chord plans are not rules), but log the new motion.

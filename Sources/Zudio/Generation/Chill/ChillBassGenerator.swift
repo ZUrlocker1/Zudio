@@ -1611,8 +1611,9 @@ struct ChillBassGenerator {
                 let usesOwnChordHandling = usePickup || useRumba || useOstinato
                 // Keyed on the root: the 3.0 chorus devices put IV7 (a dom7) and a quick-change IV
                 // in the form, and V7sus4 in a suspended turnaround (position 15, handled above).
-                let isIV = chord?.chordRoot == "4" && (chord?.chordType == .min7 || chord?.chordType == .dom7)
-                let isV  = chord?.chordRoot == "5" && chord?.chordType == .dom7
+                // The plain form's IV is IV7sus4 and its V is Vm7 since 3.0 (all diatonic).
+                let isIV = chord?.chordRoot == "4"
+                let isV  = chord?.chordRoot == "5" && chord?.chordType != .sus4
 
                 // True for the first full 16-bar blues form in B section — enables B-form variants.
                 let isFirstBForm = label == .B && posInForm < 32

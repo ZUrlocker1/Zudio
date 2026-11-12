@@ -51,12 +51,12 @@ struct ChillPadsGenerator {
             guard let build = pick.build else { return [] }
             events = build(frame, structure, &rng)
         } else if bluesVariation {
-            // Blues: CHL-PAD-004 (open fifth hold) — full B section.
+            // Blues: CHL-PAD-004 (open fifth hold, voiced as root–7th–3rd shells) — full B section.
             // First 16-bar cycle: pads throughout. Subsequent cycles: Im7 section (first 8 bars
-            // of each cycle) is silent — pads re-enter at the chord changes (IVm7 onwards).
+            // of each cycle) is silent — pads re-enter at the chord changes (IV onwards).
             // Warm Pad or String Pad chosen in AppState (50/50).
             usedRuleIDs.insert("CHL-PAD-004")
-            var bPads = openFifthHold(frame: frame, structure: structure, rng: &rng)
+            var bPads = openFifthHold(frame: frame, structure: structure, bluesShell: true, rng: &rng)
 
             let firstBSection = structure.sections.first { $0.label == .B }
             if let bSec = firstBSection {
@@ -463,7 +463,16 @@ struct ChillPadsGenerator {
     // The missing third lets it sit under any chord quality without clashing.
     // Two voices spread an octave apart for width: lower root and upper fifth.
 
+    /// `bluesShell`: Chill Blues voices each chord as a jazz shell instead, root with the 7th
+    /// above it and the 3rd (the 4th for a sus) an octave above that, so the pads name the chord
+    /// (Zack, 2026-11-12: root and fifth alone hid the Blues chord changes).
     private static func openFifthHold(frame: GlobalMusicalFrame, structure: SongStructure,
+                                       rng: inout SeededRNG) -> [MIDIEvent] {
+        openFifthHold(frame: frame, structure: structure, bluesShell: false, rng: &rng)
+    }
+
+    private static func openFifthHold(frame: GlobalMusicalFrame, structure: SongStructure,
+                                       bluesShell: Bool,
                                        rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let scalePCs  = frame.scalePCs
@@ -511,6 +520,21 @@ struct ChillPadsGenerator {
 
             events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(noteLow),
                                     velocity: velLow,  durationSteps: holdSteps))
+            if bluesShell {
+                let (seventh, third): (Int, Int)
+                switch chord?.chordType ?? .min7 {
+                case .sus4:         (seventh, third) = (10, 17)
+                case .dom7:         (seventh, third) = (10, 16)
+                case .maj7, .major: (seventh, third) = (11, 16)
+                default:            (seventh, third) = (10, 15)
+                }
+                for interval in [seventh, third] {
+                    let raw = noteLow + interval
+                    events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(raw - raw % 12 + snapTable[raw % 12]),
+                                            velocity: velHigh, durationSteps: holdSteps))
+                }
+                continue
+            }
             events.append(MIDIEvent(stepIndex: bar * 16, note: UInt8(noteHigh),
                                     velocity: velHigh, durationSteps: holdSteps))
         }

@@ -4123,8 +4123,8 @@ struct SongGenerator {
                 // Keyed on the root: the Dorian IV7 chorus device makes IV a dominant seventh too.
                 if window.chordRoot == "4" {
                     fireBar(window.startBar, tag: "Blues", desc: "IV chord — \(bluesIVVDesc)")
-                } else if window.chordRoot == "5" && window.chordType == .dom7 {
-                    fireBar(window.startBar, tag: "Blues", desc: "V7 — \(bluesIVVDesc)")
+                } else if window.chordRoot == "5" && window.chordType != .sus4 {
+                    fireBar(window.startBar, tag: "Blues", desc: "V chord — \(bluesIVVDesc)")
                 }
             }
         }
@@ -5639,24 +5639,26 @@ struct SongGenerator {
             case .quickChange:         return "quick change"
             case .dorianIV7:           return "Dorian IV7"
             case .modalTurn:           return "modal turn"
-            case .suspendedTurnaround: return "suspended turnaround"
+            case .suspendedTurnaround: return "sus turnaround"
             }
         }
     }
 
-    /// One chorus of the Chill Blues form, one chord per form position (0–15). All diatonic to
-    /// Dorian. The plain form: Im7 ×8, IVm7 ×2, Im7 ×2, V7, IVm7, Im7 ×2 (the V7's major third
-    /// snaps to the b7 in Pads and Rhythm, so it sounds as Vm7).
+    /// One chorus of the Chill Blues form, one chord per form position (0–15). Every chord is
+    /// diatonic to Dorian, so Pads and Rhythm voice it as named and nothing is snapped. The plain
+    /// form: Im7 ×8, IV7sus4 ×2, Im7 ×2, Vm7, IV7sus4, Im7 ×2. The minor blues's IVm7 and V7
+    /// each have a note outside Dorian; snapped to the scale they sounded as a different chord
+    /// in each key (Zack, 2026-11-12), so the IV is a suspended IV and the V a minor v.
     /// - Quick change: position 1 goes to the IV chord and back in position 2.
     /// - Dorian IV7: the IV bars (8, 9, 13, and 1 with a quick change) play IV7, the brighter
-    ///   Dorian subdominant of soul-jazz organ blues.
-    /// - Modal turn: positions 12 and 13 play bVIImaj7 – IV7 in place of V7 – IVm7.
+    ///   Dorian subdominant of soul-jazz organ blues; the sus resolves to the major third.
+    /// - Modal turn: positions 12 and 13 play bVIImaj7 – IV7 in place of Vm7 – IV7sus4.
     /// - Suspended turnaround: positions 14 and 15 play IIm7 – V7sus4 back to Im7.
     static func bluesChorus(_ devices: Set<BluesChorusDevice>) -> [(String, ChordType)] {
-        let iv: (String, ChordType) = devices.contains(.dorianIV7) ? ("4", .dom7) : ("4", .min7)
+        let iv: (String, ChordType) = devices.contains(.dorianIV7) ? ("4", .dom7) : ("4", .sus4)
         var form: [(String, ChordType)] = Array(repeating: ("1", .min7), count: 16)
         form[8] = iv; form[9] = iv
-        form[12] = ("5", .dom7)
+        form[12] = ("5", .min7)
         form[13] = iv
         if devices.contains(.quickChange) { form[1] = iv }
         if devices.contains(.modalTurn) {
@@ -5675,8 +5677,10 @@ struct SongGenerator {
     /// Intro and outro use Im7 throughout. Breakdown uses sus4 (single window); the Blues form
     /// has no breakdown section, so that case is defensive only.
     ///
-    /// Chorus to chorus: the song's first chorus is plain. Each song takes two of the four
-    /// `BluesChorusDevice`s as its vocabulary, and every later chorus plays each of them at 60%.
+    /// Chorus to chorus: a quick-change song (30%) plays the quick change in every chorus, the
+    /// first included, as a band does once it has chosen the form (Zack, 2026-11-12). Otherwise
+    /// the first chorus is plain; each song takes two of the other three devices as its
+    /// vocabulary, and every later chorus plays each of them at 60%.
     /// Returns the windows and, for the Chords line, the devices the song actually played.
     private static func buildBluesChordPlan(frame: GlobalMusicalFrame,
                                              structure: SongStructure,
@@ -5685,10 +5689,12 @@ struct SongGenerator {
         let mode = frame.mode   // always Dorian for blues
         var windows: [ChordWindow] = []
 
-        var pool = BluesChorusDevice.allCases
+        let quickChange = rng.nextDouble() < 0.30
+        var pool: [BluesChorusDevice] = [.dorianIV7, .modalTurn, .suspendedTurnaround]
         let first = pool.remove(at: rng.nextInt(upperBound: pool.count))
         let second = pool.remove(at: rng.nextInt(upperBound: pool.count))
-        let vocabulary = [first, second].sorted { $0.rawValue < $1.rawValue }
+        let vocabulary = ((quickChange ? [.quickChange] : []) + [first, second])
+            .sorted { $0.rawValue < $1.rawValue }
         var played = Set<BluesChorusDevice>()
         var firstChorus = true
 
@@ -5716,9 +5722,11 @@ struct SongGenerator {
                 // section keeps its own form clock from its first bar, as the bass and leads do.
                 var chorusStart = s
                 while chorusStart < e {
-                    var devices = Set<BluesChorusDevice>()
+                    var devices = Set<BluesChorusDevice>(quickChange ? [.quickChange] : [])
                     if !firstChorus {
-                        for d in vocabulary where rng.nextDouble() < 0.60 { devices.insert(d) }
+                        for d in vocabulary where d != .quickChange && rng.nextDouble() < 0.60 {
+                            devices.insert(d)
+                        }
                     }
                     firstChorus = false
                     let form = bluesChorus(devices)
