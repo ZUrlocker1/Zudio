@@ -160,7 +160,43 @@ transformations, then left the musical design to Claude on one condition: "never
   - Blue Monk: Mexico Sanction (98, plain, bar 5), Maple City Case (74, inverted, filled in and
     pushed, bar 5).
   - Horace hook: Old Pamplemousse (8, inverted, bar 5).
-- **Not yet heard by Zack.** Dials: the count shares and family weights in `JazzVariant.draw`.
+- **Heard by Zack:** Murder in Abitibi (Blues bossa filled, pushed): "sounds great with the
+  transformations" (before fragments, below, which now change it). Others not yet heard. Dials:
+  the count shares and family weights in `JazzVariant.draw`.
+
+## Fragments: lighter long solos (2026-11-12)
+
+Zack: songs with many long solos tire the listener; some long licks should play a short figure,
+a pause and the figure again. Measured on his files: Blue Hour (Horace hook) had 13 of 15 Lead 1
+phrases over 12 notes, typically 21; Cold Signal 9 of 15 and Midnight Nocturne 9 of 12 (Chet
+sigh). Murder in Abitibi, which he liked, had shorter phrases (typically 9 notes).
+
+- **As built:** CHL-LD1-001, 007, 008 and 014 only (Blue Monk and Moanin' phrases are two bars).
+  A song fragments if it drew a version (never the 20% plain songs) and then a 60% draw, both on
+  the "JAZZVARI" stream after the version draws, so versions are unchanged. 40% of those songs
+  take the closing figure, the rest the opening one.
+- **Which licks:** from the third statement on, every other lick of more than 12 notes (after the
+  version and the homage touches). The opening statements, seed returns of them and the full
+  return in the last fifth stay whole.
+- **The shape** (`fragmentedLick`): the opening figure (up to and including the first held note)
+  or the closing figure (after the last held note before the end), at most six notes and one
+  bar, played where the lick started; then the same figure half a phrase later, landing on a
+  chord tone (root, b3, 5 or b7 in the lick's terms) and held a little longer. At least half a
+  bar of rest between. Same phrase bars, so the song's form and Lead 2's answers do not move.
+- **Draws:** each note of a lick draws its velocity, so a fragmented lick burns the draws the
+  whole lick would have made (`drawCount`); otherwise every later Lead 1 phrase changed and some
+  songs came out denser (Deep Berlin 258 to 320 notes in a first try).
+- **Log:** "fragments" after the version, as in "Chet sigh reversed, pushed, fragments".
+- **Measured** (Lead 1 notes, phrases over 12 notes, same bars sounding): Midnight Nocturne 173
+  to 154, 9 to 6; Murder in Abitibi 206 to 153, 7 to 3; Deep Berlin (seed 80) 333 to 286, 16 to
+  10; After Hours (51) 61 to 59; Blue Hour seed 124 110 to 100, 6 to 5. Zack's Blue Hour (seed
+  12002987865361117877) and Cold Signal drew no fragments and are unchanged.
+- **Demos:** /Users/urlocker/Downloads/Zudio 3.0 fragment demos/: West Side LHR (3) and Low Light
+  London (59) Blues bossa; Before Blue (34), After Hours (51) and Midnight Nocturne Chet sigh;
+  Deep Berlin (80) and Blue Hour seed 124 Horace hook; Slow Burn Gaspesie Blues (38) and Cool
+  Velours (50) Cantaloupe; Murder in Abitibi.
+- **Not yet heard.** Dials: the 60% song share, back 40%, "every other", the six-note and one-bar
+  cap in `fragmentedLick`.
 
 ## Lead 2 answers (2026-11-11)
 

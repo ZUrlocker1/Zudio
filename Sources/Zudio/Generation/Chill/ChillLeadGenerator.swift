@@ -2171,6 +2171,16 @@ struct JazzCellState {
     /// applied to every lick the rule plays, so the hook is the same all through a song and
     /// different from the next song's. Empty in a fifth of songs, which play the licks as written.
     let variants: [JazzVariant]
+    /// Long licks played as fragments (2026-11-12): in about 60% of songs with a version, on the
+    /// four-bar rules and Cantaloupe, every other long lick (over 12 notes) from the third
+    /// statement on plays a figure, a rest, and the figure again. `fragmentBack` takes the closing
+    /// figure rather than the opening one. Long solos tired the ear (Blue Hour: 13 of 15 phrases
+    /// over 12 notes, typically 21); a few short statements lighten a song.
+    let fragments: Bool
+    let fragmentBack: Bool
+    /// Long licks seen since the third statement, so fragments alternate with whole licks.
+    var longLicks = 0
+    static let fragmentRules: Set<String> = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-014"]
     var isThemed: Bool { Self.themedRules.contains(ruleID) }
     static let themedRules: Set<String> = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-015"]
     /// The rules that draw a per-song version.
@@ -2180,7 +2190,8 @@ struct JazzCellState {
     /// The transformations for the log, beside the rule's name; nil when the licks play as written.
     /// Short, after the rule's name: "Blues bossa filled, pushed" (Zack, 2026-11-12).
     var variantNote: String? {
-        variants.isEmpty ? nil : variants.map(\.rawValue).joined(separator: ", ")
+        let words = variants.map(\.rawValue) + (fragments ? ["fragments"] : [])
+        return words.isEmpty ? nil : words.joined(separator: ", ")
     }
 
     var phraseBars: Int {
@@ -2200,8 +2211,15 @@ struct JazzCellState {
             var copy = rng
             var vr = SeededRNG(seed: copy.next() ^ 0x4A41_5A5A_5641_5249)   // "JAZZVARI"
             variants = JazzVariant.draw(rng: &vr)
+            // Drawn after the version, so the version draws are unchanged. Songs that play the
+            // licks as written never fragment.
+            let f = !variants.isEmpty && Self.fragmentRules.contains(ruleID) && vr.nextDouble() < 0.60
+            fragments = f
+            fragmentBack = f && vr.nextDouble() < 0.40
         } else {
             variants = []
+            fragments = false
+            fragmentBack = false
         }
         let ladders = [[0, 1, 2, 0], [0, 2, 1, 0], [1, 0, 2, 0]]
         ladder = ladders[rng.nextInt(upperBound: ladders.count)]
@@ -2294,6 +2312,52 @@ extension ChillLeadGenerator {
             }
         }
         return cell
+    }
+
+    /// A long lick as a figure, a rest and the figure again, the way a player restates an idea
+    /// and leaves air. The figure is the opening one (up to and including the first held note)
+    /// or the closing one (after the last held note before the end), at most six notes and one
+    /// bar. The first statement starts where the lick did; the second starts half a phrase later,
+    /// on the same grid, lands on a chord tone and holds a little longer. At least half a bar of
+    /// rest follows the first. Returns the lick unchanged if the figure would not fit.
+    static func fragmentedLick(_ input: [JazzNote], span: Int, back: Bool) -> [JazzNote] {
+        let cell = input.sorted { $0.step < $1.step }
+        guard cell.count > 12 else { return cell }
+        let start = Swift.max(0, cell[0].step)
+        let half  = span / 2
+        let p2    = start + half
+        let room  = Swift.min(16, half - 8, span - p2 - 2)
+        guard room >= 8 else { return cell }
+        var fig: [JazzNote]
+        if back {
+            let lastHeld = cell.indices.dropLast().last { cell[$0].dur >= 4 && $0 <= cell.count - 4 }
+            let from = Swift.max(lastHeld.map { $0 + 1 } ?? cell.count - 5, cell.count - 6)
+            fig = Array(cell[from...])
+        } else {
+            let firstHeld = cell.indices.first { $0 >= 2 && cell[$0].dur >= 4 } ?? 5
+            fig = Array(cell.prefix(Swift.min(firstHeld + 1, 6)))
+        }
+        // Re-based to the lick's start, keeping its 8th or 16th placement.
+        let offset = ((fig[0].step - start) % 2 + 2) % 2
+        let f0 = fig[0].step
+        fig = fig.map { (step: $0.step - f0 + offset, iv: $0.iv, dur: $0.dur) }
+            .filter { $0.step < room - 2 }
+        guard fig.count >= 3 else { return cell }
+        for i in fig.indices {
+            let end = i + 1 < fig.count ? fig[i + 1].step : room
+            fig[i].dur = Swift.max(1, Swift.min(fig[i].dur, end - fig[i].step))
+        }
+        var out = fig.map { (step: start + $0.step, iv: $0.iv, dur: $0.dur) }
+        var again = fig.map { (step: p2 + $0.step, iv: $0.iv, dur: $0.dur) }
+        // The restatement lands on a chord tone (root, b3, 5 or b7 in the lick's minor-blues
+        // terms; the fitting pass maps them to the mode) and holds a little longer.
+        let last = again.count - 1
+        let landing = again[last].iv
+        again[last].iv = (-12...24).filter { [0, 3, 7, 10].contains(($0 % 12 + 12) % 12) }
+            .min { Swift.abs($0 - landing) < Swift.abs($1 - landing) }!
+        again[last].dur = Swift.max(4, Swift.min(again[last].dur + 4, span - again[last].step))
+        out += again
+        return out
     }
 
     /// Mirrored around the chord root, so a minor-pentatonic climb becomes a major-pentatonic
@@ -2672,6 +2736,8 @@ extension ChillLeadGenerator {
         let degree  = structure.chordWindow(atBar: bar)?.chordRoot ?? "1"
         let onTonic = degree == "1"
         let late    = bar >= frame.totalBars * 4 / 5   // the last fifth plays the licks plain
+        // The full statement that comes back once in the last fifth is never fragmented.
+        let finalReturn = late && !state.finalHookDone
         let shift   = state.shift
 
         // Themed rules (001, 007, 008, 015): A A B to open, then the song's seed-picked form. The
@@ -2806,21 +2872,36 @@ extension ChillLeadGenerator {
         }
 
         // Fit to the phrase: drop what runs past its end, and keep the line to one note at a time.
-        let span = bars * 16
-        cell = cell.filter { $0.step >= 0 && $0.step < span }.sorted { $0.step < $1.step }
-        guard !cell.isEmpty else { return [] }
-        for i in cell.indices {
-            let end = i + 1 < cell.count ? cell[i + 1].step : span
-            cell[i].dur = Swift.max(1, Swift.min(cell[i].dur, end - cell[i].step))
-        }
         // A phrase cut short by a section end or the intro's two-bar cap can stop on a pickup
         // whose landing was cut. End on the last note that is held instead (every bank lick ends
         // on a held note, so only a cut one ends short).
-        if homage {
-            while cell.count > 1, let last = cell.last, last.dur < 3 {
-                cell.removeLast()
+        let span = bars * 16
+        func fitted(_ input: [JazzNote]) -> [JazzNote] {
+            var c = input.filter { $0.step >= 0 && $0.step < span }.sorted { $0.step < $1.step }
+            for i in c.indices {
+                let end = i + 1 < c.count ? c[i + 1].step : span
+                c[i].dur = Swift.max(1, Swift.min(c[i].dur, end - c[i].step))
+            }
+            if homage {
+                while c.count > 1, let last = c.last, last.dur < 3 { c.removeLast() }
+            }
+            return c
+        }
+
+        // Every other long lick from the third statement on, in a song that fragments. After
+        // the homage touches, whose draws depend on the lick's notes. Each note draws its
+        // velocity below, so a fragmented lick still makes the draws the whole lick would have
+        // (`drawCount`): otherwise the rest of the song's Lead 1 would change.
+        var drawCount: Int? = nil
+        if state.fragments && k >= 2 && !finalReturn && cell.count > 12 {
+            state.longLicks += 1
+            if state.longLicks % 2 == 1 {
+                drawCount = fitted(cell).count
+                cell = fragmentedLick(cell, span: span, back: state.fragmentBack)
             }
         }
+        cell = fitted(cell)
+        guard !cell.isEmpty else { return [] }
 
         // Move to the chord root, in the octave nearest the song's anchor where the whole lick fits.
         let rootPC = (frame.keySemitoneValue + degreeSemitone(degree)) % 12
@@ -2873,6 +2954,9 @@ extension ChillLeadGenerator {
             let vel = Swift.max(30, Swift.min(120, velBase + accent + rng.nextInt(upperBound: 9) - 4))
             events.append(MIDIEvent(stepIndex: at, note: UInt8(pitch), velocity: UInt8(vel),
                                     durationSteps: n.dur))
+        }
+        if let whole = drawCount, whole > cell.count {
+            for _ in cell.count..<whole { _ = rng.nextInt(upperBound: 9) }
         }
         return events
     }
