@@ -474,14 +474,14 @@ jazz leads do. Only draws that differ from the source are named, so a line with 
 name played the source form; KOS-LD1-015 Magnetic Turn Melody has no single source form and names
 all its draws. `KosmicLeadNotes` carries them from `KosmicLeadGenerator.generateLead1` to the log.
 Examples:
-- KOS-LD1-013 "Oxygene Falling Theme sixth top, 6-5-3, new rhythm" or "compressed run"
-- KOS-LD1-014 "Oxygene See-Saw Riff sixth, 2+2+2, second half, rocks down"
-- KOS-LD1-015 "Magnetic Turn Melody climb turn, 4 runs, from the 5th, 5-note runs"
-- KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third note, 8-bar cycle"
-- KOS-LD1-017 "Oxygene 8 Offbeat Climb" (no version words; too long, Zack 2026-11-12)
-- KOS-LD1-018 "Magnetic Call" (renamed from Magnetic Call and Hold in the log; no version words)
+- KOS-LD1-013 "Oxygene Falling Theme lower top, falling middle" or "squeezed"
+- KOS-LD1-014 "Oxygene See-Saw Riff wide, even, late" (narrow, widest; lopsided; rocks down)
+- KOS-LD1-015 "Magnetic Turn Melody climbing, few runs, from the 5th" (arching, dipping, leaping, dropping)
+- KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third, short cycle"
+- KOS-LD1-017 "Oxygene 8 Offbeat Climb low start, climbs on, early finish" (high start, turns back)
+- KOS-LD1-018 "Magnetic Call high call, tight, falling tail" (mid call, on the beat, turning or leaping tail, rising answer, bounces)
 - KOS-LD1-019 "Equinoxe Thirds Riff rocks down" (its interval and rhythm are fixed)
-Version words show only the first draw (2026-11-12: "Oxygene 6 Rising Strings no lead-in").
+Plain words, three at most (Zack, 2026-11-12); a song whose A theme returns after B ends its line with "returns".
 The line a Lead 1 regen appends names the rule only, without its version, as Chill's jazz leads
 do. Log text only: no draw moved, so every song plays as before.
 
