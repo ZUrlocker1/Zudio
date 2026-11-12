@@ -106,17 +106,25 @@ struct ChillBassGenerator {
                     let isLastBDBar  = (breakdownBar == sectionLen - 1)
 
                     if isLastBDBar {
-                        // Last bar: chromatic quarter-note walk toward groove chord root
+                        // Last bar: quarter-note walk toward the groove chord root. On the same
+                        // root it is four repeated roots. From the closing V7sus4 it walks the
+                        // scale toward the tonic and arrives by half step (G, F, Eb, D into C;
+                        // G, A, Bb, B into C): a semitone walk from the fifth would pass through
+                        // notes outside the mode and land a third away.
                         let walkTarget = grooveRoot
                         let walkStart  = root
                         let diff = walkTarget - walkStart
-                        let step = diff == 0 ? 0 : (diff > 0 ? 1 : -1)
+                        let up = diff > 0
                         var walkNote = walkStart
                         for (i, s) in [0, 4, 8, 12].enumerated() {
                             let vel = UInt8(72 + i * 6)  // rising: 72, 78, 84, 90
                             events.append(MIDIEvent(stepIndex: base + s, note: UInt8(clampBass(walkNote)),
                                                     velocity: vel, durationSteps: 3))
-                            walkNote = clampBass(walkNote + step)
+                            guard diff != 0 else { continue }
+                            let next = scaleStep(from: walkNote, up: up, scale: scale)
+                            let neighbour = walkTarget + (up ? -1 : 1)
+                            let reaches = up ? next >= walkTarget : next <= walkTarget
+                            walkNote = reaches ? neighbour : next
                         }
                     } else {
                         // Base riff: root (3 steps) → 5th (2 steps) → root (2 steps) → approach (2 steps)
@@ -148,8 +156,10 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base,     note: UInt8(root),  velocity: 80, durationSteps: 4))
                         events.append(MIDIEvent(stepIndex: base + 4, note: UInt8(fifth), velocity: 85, durationSteps: 2))
                         events.append(MIDIEvent(stepIndex: base + 8, note: UInt8(root),  velocity: 88, durationSteps: 2))
-                        // Chromatic approach into groove on beat 4
-                        let approach = clampBass(snapToScale(chordRoot - 1, scale: scale))
+                        // Approach into groove on beat 4, aimed at the next bar's root: the same
+                        // note unless the breakdown closes on a V7sus4.
+                        let target = nextChordRootNote(bar: bar, frame: frame, structure: structure)
+                        let approach = clampBass(snapToScale(target - 1, scale: scale))
                         events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach), velocity: 92, durationSteps: 3))
                     } else if breakdownBar == sectionLen - 2 {
                         // Bar 3: whisper root reentry — barely there, tension peaking
@@ -161,7 +171,8 @@ struct ChillBassGenerator {
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
                     let root  = clampBass(chordRoot)
-                    let third = clampBass(snapToScale(chordRoot + 3, scale: scale))
+                    // Over the closing V7sus4 the climb takes the 4th, not a third.
+                    let third = clampBass(snapToScale(chordRoot + (chord?.chordType == .sus4 ? 5 : 3), scale: scale))
                     let fifth = clampBass(snapToScale(chordRoot + 7, scale: scale))
                     let oct   = clampBass(chordRoot + 12)
                     for (i, note) in [root, third, fifth, oct].enumerated() {
@@ -436,7 +447,7 @@ struct ChillBassGenerator {
                     // Beat 4: approach tone on final bar, root otherwise
                     if isFinalBreakdownBar {
                         // Chromatic approach: semitone below the root that will return on Groove B beat 1
-                        let approach = clampBass(chordRoot - 1)
+                        let approach = clampBass(nextChordRootNote(bar: bar, frame: frame, structure: structure) - 1)
                         events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(approach), velocity: vel4, durationSteps: 3))
                     } else {
                         events.append(MIDIEvent(stepIndex: base + 12, note: UInt8(root), velocity: vel4, durationSteps: 3))
@@ -448,9 +459,10 @@ struct ChillBassGenerator {
                                                 velocity: 88, durationSteps: 4))
                     }
                 case .bassOstinato:
-                    // Syncopated riff: root + 5th with funk articulation
+                    // Syncopated riff: root + 5th with funk articulation. The approach aims at the
+                    // next bar's root, which differs only where a V7sus4 hands back to the tonic.
                     let fifth    = clampBass(snapToScale(chordRoot + 7, scale: scale))
-                    let approach = clampBass(chordRoot - 1)
+                    let approach = clampBass(nextChordRootNote(bar: bar, frame: frame, structure: structure) - 1)
                     events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),     velocity: 90, durationSteps: 3))
                     events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(fifth),    velocity: 78, durationSteps: 2))
                     events.append(MIDIEvent(stepIndex: base + 9,  note: UInt8(root),     velocity: 84, durationSteps: 2))
@@ -460,7 +472,8 @@ struct ChillBassGenerator {
                 case .groovePocket, .sohoRemix, .sohoDuo:   // remix, duo: Soho-only, unreachable here
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
-                    let third  = clampBass(snapToScale(chordRoot + 3, scale: scale))
+                    // Over the closing V7sus4 the climb takes the 4th, not a third.
+                    let third  = clampBass(snapToScale(chordRoot + (chord?.chordType == .sus4 ? 5 : 3), scale: scale))
                     let fifth2 = clampBass(snapToScale(chordRoot + 7, scale: scale))
                     let oct    = clampBass(chordRoot + 12)
                     for (i, note) in [root, third, fifth2, oct].enumerated() {
@@ -1254,6 +1267,17 @@ struct ChillBassGenerator {
         return frame.mode.intervals.map { (root + $0) % 12 }
     }
 
+    /// The nearest scale note strictly above (or below) `note`.
+    private static func scaleStep(from note: Int, up: Bool, scale: [Int]) -> Int {
+        let pcs = Set(scale.map { (($0 % 12) + 12) % 12 })
+        var n = note
+        for _ in 0..<12 {
+            n += up ? 1 : -1
+            if pcs.contains(((n % 12) + 12) % 12) { return n }
+        }
+        return note + (up ? 2 : -2)
+    }
+
     private static func snapToScale(_ note: Int, scale: [Int]) -> Int {
         let pc = note % 12
         let octave = note / 12
@@ -1313,11 +1337,13 @@ struct ChillBassGenerator {
                         events.append(MIDIEvent(stepIndex: base, note: UInt8(root), velocity: 85, durationSteps: 4))
                     }
                 case .bassOstinato:
-                    // Syncopated 2-bar arpeggio riff
+                    // Syncopated 2-bar arpeggio riff. The approach aims at the next bar's root,
+                    // which differs only where a V7sus4 hands back to the tonic.
+                    let target = nextChordRootNote(bar: bar, frame: frame, structure: structure)
                     events.append(MIDIEvent(stepIndex: base,     note: UInt8(root),  velocity: 88, durationSteps: 3))
                     events.append(MIDIEvent(stepIndex: base + 6, note: UInt8(fifth), velocity: 76, durationSteps: 2))
                     events.append(MIDIEvent(stepIndex: base + 9, note: UInt8(root),  velocity: 82, durationSteps: 2))
-                    events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(snapToScale(chordRoot - 1, scale: scale) == root ? b7 : clampBass(snapToScale(chordRoot - 1, scale: scale))), velocity: 70, durationSteps: 2))
+                    events.append(MIDIEvent(stepIndex: base + 13, note: UInt8(snapToScale(target - 1, scale: scale) == clampBass(target) ? b7 : clampBass(snapToScale(target - 1, scale: scale))), velocity: 70, durationSteps: 2))
                 case .harmonicDrone:
                     // Alternating pulse / motion arc. This used to be a root quarter-note on
                     // every beat of every breakdown bar — four identical bars, 16 identical
@@ -1349,7 +1375,8 @@ struct ChillBassGenerator {
                         // chordRoot-1 sits one semitone from both the root and the b7, so
                         // snapToScale's tie-break could collapse it onto the root and leave
                         // beat 4, beat 1 and the B-section downbeat all on the same note.
-                        let approach = clampBass(chordRoot - 1)
+                        // Aimed at the next bar's root: the same note unless a V7sus4 hands back.
+                        let approach = clampBass(nextChordRootNote(bar: bar, frame: frame, structure: structure) - 1)
                         events.append(MIDIEvent(stepIndex: base,      note: UInt8(root),     velocity: 84,    durationSteps: 3))
                         events.append(MIDIEvent(stepIndex: base + 3,  note: UInt8(root),     velocity: ghost, durationSteps: 1))
                         events.append(MIDIEvent(stepIndex: base + 6,  note: UInt8(b7),       velocity: 84,    durationSteps: 2))
@@ -1382,7 +1409,9 @@ struct ChillBassGenerator {
                     let sectionLen = section?.lengthBars ?? 4
                     guard breakdownBar == sectionLen - 1 else { break }
                     let oct = clampBass(chordRoot + 12)
-                    for (i, note) in [root, third, fifth, oct].enumerated() {
+                    // Over the closing V7sus4 the climb takes the 4th, not a third.
+                    let climb = chord?.chordType == .sus4 ? clampBass(snapToScale(chordRoot + 5, scale: scale)) : third
+                    for (i, note) in [root, climb, fifth, oct].enumerated() {
                         events.append(MIDIEvent(stepIndex: base + 8 + i * 2, note: UInt8(note),
                                                 velocity: UInt8(50 + i * 12), durationSteps: 2))
                     }
@@ -1580,8 +1609,10 @@ struct ChillBassGenerator {
                 // Pickup, rumba, and ostinato bypass this — all three handle every chord context
                 // in their own riff, so add any future rule with the same trait to this list.
                 let usesOwnChordHandling = usePickup || useRumba || useOstinato
-                let isIV = chord?.chordRoot == "4" && chord?.chordType == .min7
-                let isV  = chord?.chordType == .dom7  // dom7 only appears on V in the blues cycle
+                // Keyed on the root: the 3.0 chorus devices put IV7 (a dom7) and a quick-change IV
+                // in the form, and V7sus4 in a suspended turnaround (position 15, handled above).
+                let isIV = chord?.chordRoot == "4" && (chord?.chordType == .min7 || chord?.chordType == .dom7)
+                let isV  = chord?.chordRoot == "5" && chord?.chordType == .dom7
 
                 // True for the first full 16-bar blues form in B section — enables B-form variants.
                 let isFirstBForm = label == .B && posInForm < 32

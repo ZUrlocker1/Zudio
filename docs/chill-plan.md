@@ -838,6 +838,18 @@ No chord selection needed; the tile is fixed by mode. Breakdown = tonic-root sus
 
 **modal_drift** — 2 or 3 chords total, placed at section boundaries.
 
+**Chord motion (3.0).** Since version 3.0 the family plans above are reshaped before use, on
+a derived random stream so nothing else in the song moves (`applyChordMotion` in
+`ChillStructureGenerator.swift`; details in `docs/chill-chords-plan.md`):
+- Static groove B sections are a pendulum of the tonic and a `pickChordPair` partner, four bars
+  each. A simple-form static groove does the same over the second half of its body.
+- Two-chord pendulum B sections take a different partner from A. Both restart on the tonic at
+  every 16-bar phrase; intro and outro hold the tonic.
+- The last two bars of each 16-bar phrase (60% of songs) or of each groove section (40%) play
+  a two-chord diatonic turnaround where the next bar is on the tonic. Not in minor blues.
+- The breakdown is no longer all tonic sus4: its last bar (last two when longer than 4) is a
+  sus4 on the fifth above the chord the groove returns to, V7sus4 for the tonic.
+
 Number of chords: 2 (60%) or 3 (40%).
 
 Two-chord drift: tonic chord for Intro + first half of Groove A → second chord for second

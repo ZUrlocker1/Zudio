@@ -3706,6 +3706,7 @@ struct SongGenerator {
         bluesVariation: Bool = false,
         sohoVariation: Bool = false,
         bluesIVVDesc: String = "",
+        chillTurnaroundBars: [Int] = [],
         driftBridgeLabels: [Int: String] = [:],
         chillRhythmSwitch: (bar: Int, ruleID: String)? = nil,
         kraftwerkSync: Bool = false,
@@ -3774,7 +3775,21 @@ struct SongGenerator {
             let keyST = keySemitone(frame.key)
             let rootST = (keyST + degreeSemitone(rootDegree) + 12) % 12
             let flatKeys: Set<String> = ["F", "Bb", "Eb", "Ab", "Db", "Gb"]
-            let names = flatKeys.contains(frame.key)
+            // Flats when the mode's key signature is flat, not only the key name: G Aeolian
+            // (two flats) spells its bVI Ebmaj7, not D#maj7.
+            let parentOffset: Int
+            switch frame.mode {
+            case .Dorian:                                       parentOffset = 2
+            case .Phrygian:                                     parentOffset = 4
+            case .Lydian:                                       parentOffset = 5
+            case .Mixolydian:                                   parentOffset = 7
+            case .Aeolian, .HarmonicMinor, .MinorPentatonic:    parentOffset = 9
+            case .Ionian, .MajorPentatonic:                     parentOffset = 0
+            }
+            let flatParents: Set<Int> = [5, 10, 3, 8, 1, 6]   // F, Bb, Eb, Ab, Db, Gb major
+            let useFlats = flatKeys.contains(frame.key)
+                || flatParents.contains((keyST - parentOffset + 12) % 12)
+            let names = useFlats
                 ? ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"]
                 : ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
             let root = names[rootST]
@@ -3796,6 +3811,17 @@ struct SongGenerator {
             case .dom9:    return root + "9"
             case .min7b5:  return root + "m7b5"
             }
+        }
+        // The chords played over bars from..<to, a repeated chord named once: "Abmaj7 – Bb7".
+        func turnaroundChords(_ from: Int, _ to: Int) -> String {
+            var names: [String] = []
+            for bar in from..<min(to, totalBars) {
+                guard let w = structure.chordPlan.first(where: { $0.startBar <= bar && bar < $0.endBar })
+                else { continue }
+                let name = chordName(w.chordRoot, w.chordType)
+                if names.last != name { names.append(name) }
+            }
+            return names.joined(separator: " – ")
         }
 
         // Helper: describe which instruments are active in a section (for intro/outro labels)
@@ -3981,13 +4007,21 @@ struct SongGenerator {
                 fireBar(bar, tag: "Turnaround", desc: treatment.name)
             }
         } else if bluesVariation {
-            // The 16-bar blues cycle turns around on its V7, at cycle bar 12.
+            // The 16-bar blues cycle turns around on its V7, at cycle bar 12. The row lists the
+            // chords of cycle bars 12 to 15, so the modal turn and suspended turnaround devices
+            // show where they play.
             for section in structure.sections where section.label == .A || section.label == .B {
                 var cycleStart = section.startBar
                 while cycleStart + 12 < section.endBar {
-                    fireBar(cycleStart + 12, tag: "Turnaround", desc: "")
+                    let end = min(cycleStart + 16, section.endBar)
+                    fireBar(cycleStart + 12, tag: "Turnaround", desc: turnaroundChords(cycleStart + 12, end))
                     cycleStart += 16
                 }
+            }
+        } else {
+            // Base Chill 3.0 phrase-end turnarounds: two one-bar chords back to the tonic.
+            for bar in chillTurnaroundBars {
+                fireBar(bar, tag: "Turnaround", desc: turnaroundChords(bar, bar + 2))
             }
         }
 
@@ -4067,9 +4101,10 @@ struct SongGenerator {
             for window in structure.chordPlan {
                 guard let sec = structure.section(atBar: window.startBar),
                       sec.label == .A || sec.label == .B else { continue }
-                if window.chordRoot == "4" && window.chordType == .min7 {
+                // Keyed on the root: the Dorian IV7 chorus device makes IV a dominant seventh too.
+                if window.chordRoot == "4" {
                     fireBar(window.startBar, tag: "Blues", desc: "IV chord — \(bluesIVVDesc)")
-                } else if window.chordType == .dom7 {
+                } else if window.chordRoot == "5" && window.chordType == .dom7 {
                     fireBar(window.startBar, tag: "Blues", desc: "V7 — \(bluesIVVDesc)")
                 }
             }
@@ -4480,19 +4515,27 @@ struct SongGenerator {
 
         // Step 2 — Structure (INTRO / GROOVE-A / BREAKDOWN / GROOVE-B / OUTRO)
         // Blues skips the breakdown entirely — the 16-bar cycle is self-contained form.
-        let baseStructure = ChillStructureGenerator.generate(
+        // The 3.0 chord motion (base Chill B sections, turnarounds, breakdown V7sus4) draws on its
+        // own derived stream (99), so the main stream is unchanged for every Chill substyle.
+        let (baseStructure, baseChordMotion, baseTurnaroundBars) = ChillStructureGenerator.generateWithChordMotion(
             frame: frame, chillProgFamily: chillProgFamily,
             mood: frame.mood, breakdownStyle: chillBreakdownStyle,
-            noBreakdown: bluesVariation, sohoVariation: sohoVariation, rng: &rng
+            noBreakdown: bluesVariation, sohoVariation: sohoVariation,
+            motionSeed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 99), rng: &rng
         )
 
         // Step 2.5 — Blues chord plan: replace the structure's default chord plan with the
-        // 16-bar blues cycle (Im7×8, IVm7×2, Im7×2, V7×1, IVm7×1, Im7×2) when blues is active.
+        // 16-bar blues cycle (Im7×8, IVm7×2, Im7×2, V7×1, IVm7×1, Im7×2) when blues is active,
+        // varied chorus to chorus from the second chorus on (own derived stream, 96).
         let structure: SongStructure
         var sohoCycleLabel: String? = nil
         var sohoHasTurnaround = false
+        var chordMotionLabel: String? = (bluesVariation || sohoVariation) ? nil : baseChordMotion
         if bluesVariation {
-            let bluesChordPlan = buildBluesChordPlan(frame: frame, structure: baseStructure)
+            var bluesRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 96))
+            let (bluesChordPlan, bluesDevices) = buildBluesChordPlan(frame: frame, structure: baseStructure,
+                                                                     rng: &bluesRNG)
+            chordMotionLabel = bluesDevices
             structure = SongStructure(sections: baseStructure.sections,
                                        chordPlan: bluesChordPlan,
                                        introStyle: baseStructure.introStyle,
@@ -4908,6 +4951,7 @@ struct SongGenerator {
             }() : nil,
             sohoVariation: sohoVariation, sohoCycleLabel: sohoCycleLabel,
             sohoHasTurnaround: sohoHasTurnaround,
+            chordMotionLabel: chordMotionLabel,
             sohoTexRules: sohoTexRules,
             chillAudioTexture: chillAudioTexture,
             drumRules: drumRules, bassRules: bassRules, padRules: padRules,
@@ -4944,6 +4988,7 @@ struct SongGenerator {
             bluesVariation: bluesVariation,
             sohoVariation: sohoVariation,
             bluesIVVDesc: bluesIVVDesc,
+            chillTurnaroundBars: (bluesVariation || sohoVariation) ? [] : baseTurnaroundBars,
             chillRhythmSwitch: chillRhythmSwitchAnnotation
         )
         // Rhythm comping-mode switch (both the natural B-section boundary and the Simple-form
@@ -5565,24 +5610,68 @@ struct SongGenerator {
         }
     }
 
+    /// The four Chill Blues chorus devices (docs/chill-chords-plan.md, item 4). Each changes
+    /// chords inside the 16-bar form only; the seams at positions 8, 12 and 15 stay put.
+    enum BluesChorusDevice: Int, CaseIterable {
+        case quickChange, dorianIV7, modalTurn, suspendedTurnaround
+
+        var name: String {
+            switch self {
+            case .quickChange:         return "quick change"
+            case .dorianIV7:           return "Dorian IV7"
+            case .modalTurn:           return "modal turn"
+            case .suspendedTurnaround: return "suspended turnaround"
+            }
+        }
+    }
+
+    /// One chorus of the Chill Blues form, one chord per form position (0–15). All diatonic to
+    /// Dorian. The plain form: Im7 ×8, IVm7 ×2, Im7 ×2, V7, IVm7, Im7 ×2 (the V7's major third
+    /// snaps to the b7 in Pads and Rhythm, so it sounds as Vm7).
+    /// - Quick change: position 1 goes to the IV chord and back in position 2.
+    /// - Dorian IV7: the IV bars (8, 9, 13, and 1 with a quick change) play IV7, the brighter
+    ///   Dorian subdominant of soul-jazz organ blues.
+    /// - Modal turn: positions 12 and 13 play bVIImaj7 – IV7 in place of V7 – IVm7.
+    /// - Suspended turnaround: positions 14 and 15 play IIm7 – V7sus4 back to Im7.
+    static func bluesChorus(_ devices: Set<BluesChorusDevice>) -> [(String, ChordType)] {
+        let iv: (String, ChordType) = devices.contains(.dorianIV7) ? ("4", .dom7) : ("4", .min7)
+        var form: [(String, ChordType)] = Array(repeating: ("1", .min7), count: 16)
+        form[8] = iv; form[9] = iv
+        form[12] = ("5", .dom7)
+        form[13] = iv
+        if devices.contains(.quickChange) { form[1] = iv }
+        if devices.contains(.modalTurn) {
+            form[12] = ("b7", .maj7)
+            form[13] = ("4", .dom7)
+        }
+        if devices.contains(.suspendedTurnaround) {
+            form[14] = ("2", .min7)
+            form[15] = ("5", .sus4)
+        }
+        return form
+    }
+
     /// Tiles the 16-bar blues cycle across all song sections.
     /// Groove sections get the full cycle (Im7×8, IVm7×2, Im7×2, V7×1, IVm7×1, Im7×2).
-    /// Intro and outro use Im7 throughout. Breakdown uses sus4 (single window).
+    /// Intro and outro use Im7 throughout. Breakdown uses sus4 (single window); the Blues form
+    /// has no breakdown section, so that case is defensive only.
+    ///
+    /// Chorus to chorus: the song's first chorus is plain. Each song takes two of the four
+    /// `BluesChorusDevice`s as its vocabulary, and every later chorus plays each of them at 60%.
+    /// Returns the windows and, for the Chords line, the devices the song actually played.
     private static func buildBluesChordPlan(frame: GlobalMusicalFrame,
-                                             structure: SongStructure) -> [ChordWindow] {
+                                             structure: SongStructure,
+                                             rng: inout SeededRNG) -> ([ChordWindow], String?) {
         let key  = frame.key
         let mode = frame.mode   // always Dorian for blues
         var windows: [ChordWindow] = []
 
-        // 16-bar blues cycle: Im7(8) | IVm7(2) | Im7(2) | V7(1) | IVm7(1) | Im7(2)
-        let bluesCycle: [(String, ChordType, Int)] = [
-            ("1", .min7, 8),
-            ("4", .min7, 2),
-            ("1", .min7, 2),
-            ("5", .dom7, 1),
-            ("4", .min7, 1),
-            ("1", .min7, 2),
-        ]
+        var pool = BluesChorusDevice.allCases
+        let first = pool.remove(at: rng.nextInt(upperBound: pool.count))
+        let second = pool.remove(at: rng.nextInt(upperBound: pool.count))
+        let vocabulary = [first, second].sorted { $0.rawValue < $1.rawValue }
+        var played = Set<BluesChorusDevice>()
+        var firstChorus = true
 
         for section in structure.sections {
             let s = section.startBar
@@ -5604,26 +5693,42 @@ struct SongGenerator {
                                            chordRoot: "1", chordType: .min7,
                                            chordTones: ct, scaleTensions: st, avoidTones: at))
             default:
-                // Groove sections: tile the 16-bar blues cycle, partial cycles allowed
-                var bar = s
-                var patIdx = 0
-                var patBar = 0
-                while bar < e {
-                    let (root, type_, len) = bluesCycle[patIdx % bluesCycle.count]
-                    let remaining = len - patBar
-                    let chunkLen  = Swift.min(remaining, e - bar)
-                    let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: root, chordType: type_,
-                                                              key: key, mode: mode)
-                    windows.append(ChordWindow(startBar: bar, lengthBars: chunkLen,
-                                               chordRoot: root, chordType: type_,
-                                               chordTones: ct, scaleTensions: st, avoidTones: at))
-                    bar    += chunkLen
-                    patBar += chunkLen
-                    if patBar >= len { patIdx += 1; patBar = 0 }
+                // Groove sections: tile the 16-bar blues cycle, partial cycles allowed. Each
+                // section keeps its own form clock from its first bar, as the bass and leads do.
+                var chorusStart = s
+                while chorusStart < e {
+                    var devices = Set<BluesChorusDevice>()
+                    if !firstChorus {
+                        for d in vocabulary where rng.nextDouble() < 0.60 { devices.insert(d) }
+                    }
+                    firstChorus = false
+                    let form = bluesChorus(devices)
+                    let chorusEnd = Swift.min(e, chorusStart + 16)
+                    // Count a device as played only if a bar it changes falls inside the song.
+                    let plain = bluesChorus([])
+                    for d in devices where (0..<(chorusEnd - chorusStart)).contains(where: { p in
+                        let solo = bluesChorus([d])
+                        return solo[p].0 != plain[p].0 || solo[p].1 != plain[p].1
+                    }) { played.insert(d) }
+                    // Consecutive equal positions merge into one window.
+                    var bar = chorusStart
+                    while bar < chorusEnd {
+                        let (root, type_) = form[bar - chorusStart]
+                        var end = bar + 1
+                        while end < chorusEnd && form[end - chorusStart] == form[bar - chorusStart] { end += 1 }
+                        let (ct, st, at) = NotePoolBuilder.build(chordRootDegree: root, chordType: type_,
+                                                                  key: key, mode: mode)
+                        windows.append(ChordWindow(startBar: bar, lengthBars: end - bar,
+                                                   chordRoot: root, chordType: type_,
+                                                   chordTones: ct, scaleTensions: st, avoidTones: at))
+                        bar = end
+                    }
+                    chorusStart = chorusEnd
                 }
             }
         }
-        return windows
+        let names = vocabulary.filter { played.contains($0) }.map(\.name)
+        return (windows, names.isEmpty ? nil : names.joined(separator: ", "))
     }
 
     // MARK: - Chill log builder
@@ -5642,6 +5747,7 @@ struct SongGenerator {
         sohoVariation: Bool = false,
         sohoCycleLabel: String? = nil,
         sohoHasTurnaround: Bool = false,
+        chordMotionLabel: String? = nil,
         sohoTexRules: Set<String> = [],
         chillAudioTexture: String?,
         drumRules: Set<String>,
@@ -5705,7 +5811,12 @@ struct SongGenerator {
                 .trimmingCharacters(in: .whitespaces)
             chordsLine = "\(keyMode) \(soho)"
         } else {
-            chordsLine = chordsDescription(key: frame.key, mode: frame.mode, familyLabel: familyLabel)
+            // Chill Blues has its own form, not a base family (the line used to print whichever
+            // base family the frame drew). The 3.0 motion follows: base Chill's B section and
+            // turnaround, or the Blues chorus devices the song played.
+            chordsLine = chordsDescription(key: frame.key, mode: frame.mode,
+                                           familyLabel: bluesVariation ? "blues" : familyLabel)
+                + (chordMotionLabel.map { " - \($0)" } ?? "")
                 + (blueNoteName.map { _ in " - blues scale" } ?? "")
         }
         log.append(GenerationLogEntry(tag: "Chords", description: chordsLine))

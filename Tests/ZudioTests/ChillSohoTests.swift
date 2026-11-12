@@ -1670,7 +1670,8 @@ import Foundation
         for seed in Self.seeds {
             let s = SongGenerator.generate(seed: seed, style: .chill)
             let marked = s.stepAnnotations.values.contains { $0.contains { $0.tag == "Turnaround" } }
-            // Soho names which treatment the bass is using; Blues has none, so no description.
+            // Soho names which treatment the bass is using; Blues lists the chords of cycle bars
+            // 12 to 15.
             if s.chillSohoVariation {
                 let names = ChillStructureGenerator.sohoTurnaroundStyleNames + ["original form"]
                 let desc = s.stepAnnotations.values.flatMap { $0 }.first { $0.tag == "Turnaround" }?.description

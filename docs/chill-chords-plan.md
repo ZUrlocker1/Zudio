@@ -86,6 +86,81 @@ devices as its vocabulary, and each later chorus plays each of them at 60%:
   (acceptable; players do the same).
 - Log the devices on the Chords line.
 
+## As built (2026-11-11, items 1, 3 and 4)
+
+Built, compiled and traced over 60 seeds; not yet judged by ear.
+
+**Random streams.** Every new draw is on a derived stream: 99 for base Chill motion (passed
+into `ChillStructureGenerator.generateWithChordMotion` as `motionSeed`), 96 for the Blues
+chorus devices. The main stream consumes exactly what it did before, so Chill Soho is
+unchanged and base Chill and Blues songs change only in their chords (and the bass, pads,
+rhythm and leads that follow them).
+
+**Item 1, base Chill** (`applyChordMotion` in `ChillStructureGenerator.swift`). The family
+plan is built as before, flattened to one chord per bar, reshaped, then rebuilt into windows
+that never cross a section boundary and chunked at 8 bars.
+- Static groove: A is the tonic vamp; B is tonic and a partner from `pickChordPair`, four bars
+  each, restarting on the tonic at every 16-bar phrase.
+- Simple form (no B section, 30% of Deep and Dream songs) was the worst case, up to 104 bars
+  of one chord. A static groove there now runs the same pendulum over the body's second half,
+  from the phrase nearest its middle. This goes beyond the plan as written; Zack to confirm.
+- Two-chord pendulum: A keeps its partner and window length; B takes a different partner
+  (the mode's other two options, renormalised). Both restart on the tonic every phrase, and
+  intro and outro now hold the tonic (they used to carry the alternation on).
+- Turnarounds as planned, one bar each, 60% every phrase and 40% section ends only, placed
+  only where the bar after is on the tonic root (modal drift often is not). Not in minor blues.
+- Phrases are 16 bars, and a remainder under 8 joins the phrase before, as in Soho.
+
+**Item 3, breakdowns.** The last bar of a 4-bar breakdown, or the last two of a 6- or 8-bar
+one, become a sus4 on the fifth above the chord the groove returns to. Pads (4, 5, b7, 9)
+and Rhythm (4, 5, b7) already voice `.sus4` as a 7sus4, so no new chord type was needed.
+Returning to the tonic, the chord is V7sus4. Modal drift often returns to another chord (the
+chord after the breakdown is its second or third chord). There it takes that chord's own
+dominant sus when all of root, 4, 5 and b7 are in the mode (II7sus4 into Vm7 in Dorian, for
+example), and otherwise keeps the tonic sus4.
+- Chill Blues has **no breakdown**: `buildNoBreakdownSections` never makes one, and the
+  `.bridge` case in `buildBluesChordPlan` is dead code. Item 3 is base Chill only; in Blues the
+  suspended turnaround device supplies the V7sus4.
+
+**Breakdown bass, checked and adjusted** (`ChillBassGenerator.swift`; base rules, St Germain
+CHL-BASS-007 and hip-hop CHL-BASS-008). The bass follows the chord root, so it plays the
+fifth under V7sus4; no tonic pedal.
+- Stop time: root hits on even bars, unchanged. In a 6-bar break the hit in bar 5 is the fifth.
+- Bass ostinato: the last-bar quarter-note walk was chromatic toward the next root, which
+  from the fifth passed notes outside the mode and landed a third away. It now walks the scale
+  and arrives by half step (G, F, Eb, D into C; G, A, Bb, B into C). Same-root walks unchanged.
+- Approach notes in the drone and ostinato rules now aim at the next bar's root (the tonic's
+  leading tone) rather than the current root. Identical wherever the two roots match.
+- Groove pocket: the closing climb takes the 4th over a sus4 (root, 4, 5, octave), not a third.
+
+**Item 4, Chill Blues** (`bluesChorus` and `buildBluesChordPlan` in `SongGenerator.swift`). As
+planned: the song's first chorus plain, two of the four devices per song, each at 60% per later
+chorus. Each section keeps its own form clock from its first bar. With quick change and Dorian
+IV7 together, the quick-change bar plays IV7 too. The Blues bass (`isIV`, `isV`) and the
+"Blues" bar annotations now key on the chord root, so IV7 counts as a IV chord and not a V7.
+
+**Log.** The Chords line appends the motion: base Chill gets "B Im7 – bVII" (or "second half
+..." in simple form) and "turn: IV7 – Vm7" when one was placed (shortened from "- turnaround"
+because the line ran long; Zack, 2026-11-11); Chill Blues gets the
+devices it actually played. The Blues Chords line used to print whichever base family the
+frame happened to draw; it now says "blues". Examples:
+- "Eb Aeolian groove - B Im7 – bVII turn: IVm7 – Vm7" (Deep Long Lake)
+- "F Dorian blues - modal turn, suspended turnaround"
+
+**Turnaround rows** (Zack, 2026-11-11). The performance log fires "Turnaround" on the first bar
+of each base Chill turnaround with its chords in the key, for example "Abm7 – Bbm7" at bars 19,
+27, 47 and 67 of Deep Long Lake. `generateWithChordMotion` returns the turnaround bars, and
+`buildStepAnnotations` takes them as `chillTurnaroundBars`. The Chill Blues Turnaround row (cycle
+bar 12) had no description; it now lists the chords of cycle bars 12 to 15, a repeat named once,
+so the modal turn ("Ebmaj7 – Bb7 – Fm7") and suspended turnaround ("C7 – Bbm7 – Gm7 – Csus4")
+show in the log. Soho's row (the bass treatment name) is unchanged. The log's chord namer now
+spells with flats when the mode's parent key is flat (G Aeolian gives Ebmaj7, not D#maj7); this
+also touches Ambient's chord-shift rows. Ab keys still print B and E for Cb and Fb.
+
+**Verified:** `swift build` clean; ChillSohoTests, ChillLeadRegisterTests and
+ChordPlanShapeTests pass (100 tests). **Not verified:** anything by ear; ChillBatchTests and
+ChillBluesBatchTests not run.
+
 ## Item 2: tune-named progressions (later)
 
 Candidates, each from 1959 or later, each paired with a lead rule where one exists:
@@ -105,6 +180,8 @@ plus the four devices, which combine into many chorus variants.
 
 ## Open items
 
-- Items 1, 3 and 4 not started. Testing light: build, then ChillBatchTests/ChillBluesBatchTests
-  as affected (ask before long batches), plus ChillLeadRegisterTests.
+- Items 1, 3 and 4 built (see "As built"); Zack to listen, then commit code and docs together.
+- Zack to confirm the simple-form second-half pendulum and the modal drift dominant sus.
+- ChillBatchTests and ChillBluesBatchTests not run; ask before running them.
+- Item 2 later, after chord-aware snapping.
 - Mark nothing with "* " here (chord plans are not rules), but log the new motion.

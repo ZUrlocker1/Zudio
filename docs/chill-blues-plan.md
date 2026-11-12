@@ -257,6 +257,12 @@ patterns room to breathe without the progression feeling rushed.
 - IV chord: IVm7 (same shape transposed) — natural in Dorian
 - V chord: V7 (dominant 7th) — the key blues signal; major 3rd on V is diatonic to Dorian
 
+**Chorus variation (3.0).** The first chorus of a song is plain. Each song then takes two of
+four devices and plays each at 60% in every later chorus, inside the form, so the seams at
+positions 8, 12 and 15 stay put: a quick change (IV in bar 2), Dorian IV7 in the IV bars, a
+modal turn (bVIImaj7 – IV7 in bars 13 and 14) and a suspended turnaround (IIm7 – V7sus4 in
+bars 15 and 16). See `docs/chill-chords-plan.md`, item 4.
+
 **Pads and rhythm:** play from the chord tones of the active chord at each bar position.
 No structural generator changes needed — just supply the chord sequence to the existing
 chord-per-bar machinery.
