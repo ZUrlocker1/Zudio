@@ -2105,7 +2105,9 @@ struct SongGenerator {
             events = HarmonicFilter.filterLead(events, track: trackIndex,
                                                pads: songState.trackEvents[kTrackPads],
                                                frame: songState.frame, structure: songState.structure,
-                                               bounds: bounds)
+                                               bounds: bounds,
+                                               lift: !(trackIndex == kTrackLead2
+                                                       && usedRules.contains("CHL-LD2-002")))
             events = foldedIntoRegister(events, bounds)
         }
 
@@ -4648,59 +4650,12 @@ struct SongGenerator {
         var harmonyStepAnnotation:  (bar: Int, isUnison: Bool, intervalSteps: Int)? = nil
         var finaleStepAnnotation:   (bar: Int, isUnison: Bool, intervalSteps: Int)? = nil
 
-        // Regular Chill harmony — 20% of non-blues songs get a second horn joining Lead 1
-        // briefly in section A and (if present) section B. Same applyBluesHarmony function,
-        // different window selection: ~40% into section A, ~30% into section B, 4-bar spans.
-        if !bluesVariation && lead2RNG.nextDouble() < 0.20 {
-            let useUnison     = lead2RNG.nextDouble() < 0.25
-            let intervalSteps = lead2RNG.nextDouble() < 0.70 ? 2 : 5
-
-            func applyRegularHarmonyWindow(_ sec: SongSection, annotSlot: inout (bar: Int, isUnison: Bool, intervalSteps: Int)?,
-                                           minOffsetFraction: Double) {
-                let winSize = 6   // wider window catches more Lead 1 phrases
-                guard sec.lengthBars >= winSize + 4 else { return }
-
-                // Find the 6-bar window with the most Lead 1 events — avoids landing in sparse stretches
-                let scanFrom = sec.startBar + max(4, Int(Double(sec.lengthBars) * minOffsetFraction))
-                let scanTo   = sec.endBar - winSize - 2
-                guard scanTo > scanFrom else { return }
-                var bestStart = scanFrom
-                var bestCount = 0
-                for start in scanFrom...scanTo {
-                    let n = lead1Events.filter {
-                        let b = $0.stepIndex / 16; return b >= start && b < start + winSize
-                    }.count
-                    if n > bestCount { bestCount = n; bestStart = start }
-                }
-                guard bestCount > 0 else { return }   // no Lead 1 activity in any window
-
-                let harmSet = Set(bestStart..<bestStart + winSize)
-                let beforeCount = lead2EventsFinal.filter({ harmSet.contains($0.stepIndex / 16) }).count
-                ChillLeadGenerator.applyBluesHarmony(
-                    lead1Events: lead1Events, lead2Events: &lead2EventsFinal,
-                    harmonyBars: harmSet, useUnison: useUnison,
-                    intervalSteps: intervalSteps, maxPhrases: 4,   // allow up to 4 phrases
-                    frame: frame, rng: &lead2RNG
-                )
-                // Only log and annotate if harmony notes were actually added
-                let harmonyNotes = lead2EventsFinal.filter({ harmSet.contains($0.stepIndex / 16) })
-                guard harmonyNotes.count > beforeCount else { return }
-
-                let tag = useUnison ? "CHL-LD2-UNIS-\(bestStart + 1)" : "CHL-LD2-HARM-\(bestStart + 1)"
-                lead2Rules.insert(tag)
-                if annotSlot == nil,
-                   let first = harmonyNotes.min(by: { $0.stepIndex < $1.stepIndex }) {
-                    annotSlot = (first.stepIndex / 16, useUnison, intervalSteps)
-                }
-            }
-
-            if let secA = structure.sections.first(where: { $0.label == .A }) {
-                applyRegularHarmonyWindow(secA, annotSlot: &harmonyStepAnnotation, minOffsetFraction: 0.30)
-            }
-            if let secB = structure.sections.first(where: { $0.label == .B }) {
-                applyRegularHarmonyWindow(secB, annotSlot: &finaleStepAnnotation, minOffsetFraction: 0.20)
-            }
-        }
+        // Base Chill and Soho had a harmony pass here until 2026-11-12: in 20% of songs it
+        // replaced Lead 2 in a six-bar window of A and of B with a note-for-note copy of Lead 1,
+        // whatever Lead 2's rule was, and the log named only that rule. Zack did not want a pass
+        // that silently replaces a track; CHL-LD2-002 Shadow hold now plays a slow line under
+        // Lead 1 instead. Removing it moves no other draw: lead2RNG was not read after it outside
+        // Blues, which never reached it.
 
         // Blues harmony/unison sections — about 15% of blues songs.
         // Only for the longer, unhurried leads (CHL-LD1-004 Blues Lead, CHL-LD1-003 Chet Sparse Melody) and never
@@ -4912,7 +4867,8 @@ struct SongGenerator {
         ]
         trackEvents = HarmonicFilter.apply(trackEvents: trackEvents, frame: frame,
                                            structure: structure,
-                                           registerOverrides: leadRegisters)
+                                           registerOverrides: leadRegisters,
+                                           liftLead2: !lead2Rules.contains("CHL-LD2-002"))
         // Belt and braces: fold anything still outside its instrument's register back in by
         // octaves. Nothing should reach here out of range, but a future pass that moves a lead
         // note would otherwise break the register silently, and the symptom — a sax playing above

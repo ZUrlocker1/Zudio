@@ -224,6 +224,11 @@ song still varies. Marked "* " in the log while being tuned by ear.
   2 keeps riffing on its own answer, up to three in a row, each a sequence of the last; now and
   then a long Groove B gap does the same. Never in breakdowns, and in Blues never in the
   turnaround (form positions 13 to 15).
+- **Floor:** at least two answers in each groove section. A section that falls short takes its
+  widest unanswered gaps, eight bars apart where it can, and a gap of 40 steps or more riffs on
+  into a second answer. Own random stream, so songs already at the floor are unchanged.
+- **Short phrases:** a Lead 1 phrase of one or two notes (a fragment's last note) borrows the
+  phrase before it, when that ended within a bar, as the material to answer.
 - **Pitch:** each answer is fitted to the register as one block (moved by scale steps if no
   octave fits), held notes on chord tones of their bar, passing notes in the scale. A held note
   never restates the note before it. An enclosure's chromatic note is kept off the beat, where
@@ -232,7 +237,7 @@ song still varies. Marked "* " in the log while being tuned by ear.
   otherwise the instrument's own bottom octave and a half. The old rule could ask a flute under a
   muted trumpet for 55 to 67, under the flute's floor, and the final register fold then split its
   figures across octaves. The fix applies to the answer rules; Shadow hold and Soho are unchanged.
-- **Shares:** base Chill Shadow hold 35% (was 50%), answer rules 65%. Blues: answer rules only.
+- **Shares:** base Chill Shadow hold 35%, answer rules 65%. Blues: answer rules only.
 - **Bug fixes with it:** Lead 2 no longer starts over Lead 1's still-sounding last note, and a
   Lead 2 regen now gets Lead 1's notes and handoff windows (it replays Lead 1 on its own seed for
   the windows, as Kosmic does for its X-Files bars). A Shadow hold lead-in no longer lands in a

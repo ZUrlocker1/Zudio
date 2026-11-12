@@ -35,7 +35,10 @@ struct HarmonicFilter {
         registerOverrides: [Int: RegisterBounds] = [:],
         // Hook rules (MOT-LD1-001 onward) restate one phrase all song. Lifting it window by window
         // put one statement an octave above the next, so for them Pass B decides once per song.
-        uniformLead1Lift: Bool = false
+        uniformLead1Lift: Bool = false,
+        // Chill's CHL-LD2-002 Shadow hold is an inner voice written below Lead 1 note by note;
+        // Pass B lifting it above the pads put it above Lead 1 instead.
+        liftLead2: Bool = true
     ) -> [[MIDIEvent]] {
         var events = trackEvents
         // Each lead is filtered on its own (Passes A, B and C below, in `filterLead`), reading the
@@ -47,7 +50,8 @@ struct HarmonicFilter {
                                        skipClashFilter: track == kTrackLead1 && skipLead1ClashFilter,
                                        bounds: registerOverrides[track] ?? kRegisterBounds[track]
                                              ?? RegisterBounds(low: 55, high: 88),
-                                       uniformLift: track == kTrackLead1 && uniformLead1Lift)
+                                       uniformLift: track == kTrackLead1 && uniformLead1Lift,
+                                       lift: track == kTrackLead1 || liftLead2)
         }
         for track in [kTrackPads, kTrackRhythm, kTrackTexture] {
             events[track] = velocityArc(events[track], frame: frame, structure: structure)
@@ -60,11 +64,13 @@ struct HarmonicFilter {
     /// Chromatic Descent uses chromatic passing tones on purpose);
     /// Pass B — push the lead above the pads' median in each 8-bar window;
     /// Pass C — the song's velocity arc.
+    /// `lift: false` skips Pass B, for a part written as an inner voice under Lead 1.
     static func filterLead(_ lead: [MIDIEvent], track: Int, pads: [MIDIEvent],
                            frame: GlobalMusicalFrame, structure: SongStructure,
                            skipClashFilter: Bool = false, bounds: RegisterBounds,
-                           uniformLift: Bool = false) -> [MIDIEvent] {
+                           uniformLift: Bool = false, lift: Bool = true) -> [MIDIEvent] {
         var events = skipClashFilter ? lead : removeStrongBeatClashes(lead, structure: structure)
+        guard lift else { return velocityArc(events, frame: frame, structure: structure) }
 
         // One decision for the whole part: up an octave everywhere, or nowhere.
         if uniformLift {

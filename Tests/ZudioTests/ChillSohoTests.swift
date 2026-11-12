@@ -903,8 +903,8 @@ import Foundation
             #expect(pool.contains(s.chillLead2Instrument))
             #expect(s.chillLead2Instrument != s.chillLeadInstrument)
             if Self.uses(s, "CHL-LD2-002") { shadow += 1 }
-            // The Chill harmony windows double Lead 1 note for note; that is not Lead 2's own line.
-            // (Their tags are shown as step annotations, not in the generation log.)
+            // Notes on Lead 1's onsets are left out of the count. Until 2026-11-12 a Chill harmony
+            // pass doubled Lead 1 note for note in Soho too; that pass is gone.
             let lead1Steps = Set(s.trackEvents[kTrackLead1].map(\.stepIndex))
             let own = s.trackEvents[kTrackLead2].filter { !lead1Steps.contains($0.stepIndex) }
             let perBar = Dictionary(grouping: own, by: { $0.stepIndex / 16 })

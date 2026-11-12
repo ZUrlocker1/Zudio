@@ -1934,6 +1934,30 @@ and Shadow hold. The answer rules are described under "Lead 2 answers" in
 `docs/chill-jazz-leads-plan.md`. The CHL-LD2-003 to 006 entries below are the original design,
 never built; their numbers now belong to the answer rules.
 
+**Answer floor (2026-11-12):** each gap between Lead 1 phrases is answered 50% of the time in A
+and 80% in B, and each groove section gets at least two answers. Without the floor a song could
+go 50 bars with no Lead 2 (Three AM Nuage). A section that falls short takes its widest
+unanswered gaps, eight bars apart where it can, and a gap of two and a half bars or more riffs on
+into a second answer, as in a handoff window. The floor draws from its own random stream, so a
+song that already has two answers per section does not change. A Lead 1 phrase of one or two
+notes (a fragment's last note under CHL-LD1-014) borrows the phrase before it when that ended
+within a bar, so Rhythm trade always has notes to answer.
+
+**Shadow hold as built (2026-11-12):** CHL-LD2-002 plays a slow chord-tone line under about 55%
+of Lead 1's phrases in A and B (`shadowHold` in `ChillLeadGenerator.swift`). Each half bar takes
+one Lead 1 note as its anchor (the longest sounding, a note on the beat preferred, or the
+phrase's peak). The line takes a chord tone a third to a sixth below the anchor (fourth and fifth
+allowed, weighed down), in the instrument's own register, below every Lead 1 note of three steps
+or more sounding with it and never a second, seventh or tritone from one. It holds while that
+note still fits and Lead 1 moves less than a fourth, and otherwise moves by the smallest step,
+in Lead 1's direction when Lead 1 leaps. The last note rings a little past the phrase. Velocity
+40 to 54. Lead 1 is read as the register fold will play it. The harmonic filter's Pass B does not
+lift a Shadow hold Lead 2 above the pads. A Shadow hold song draws Lead 2 only from instruments
+whose floor is at most three semitones above Lead 1's, which drops the flute under a sax or
+trumpet. It replaced single held notes with a companion note, and the 20% harmony pass that
+overwrote Lead 2 in base Chill and Soho with a note-for-note copy of Lead 1 (Zack: no pass that
+silently replaces a track). Chill Blues keeps its own harmony windows.
+
 Lead 2 is always the call-and-response counter-voice to Lead 1. Instrument assigned at frame
 level (opposite family from Lead 1). One behavior rule is selected per song.
 

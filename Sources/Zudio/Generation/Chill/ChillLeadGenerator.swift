@@ -532,10 +532,15 @@ struct ChillLeadGenerator {
         // not, so 299 Blues songs in 8,000 were written for flute register and then had the patch
         // overridden to something else — a flute part nobody ever heard on a flute (Zack,
         // 2026-10-13). Mirrored by the `isChillBlues` branch of `instrumentPoolNames`.
-        let l2Pool: [ChillLeadInstrument] = sohoVariation
+        let basePool: [ChillLeadInstrument] = sohoVariation
             ? [.saxophone, .tenorSax, .synthBrass, .trombone, .vibraphone].filter { $0 != lead1Instrument }
             : bluesVariation ? [.vibraphone, .sopranoSax, .trombone]
                              : [.vibraphone, .flute, .sopranoSax, .trombone]
+        // Shadow hold plays under Lead 1, so it takes an instrument that can get there: one whose
+        // floor is no more than three semitones above Lead 1's. A flute under a sax or trumpet
+        // found room for three to eight notes a song (2026-11-12).
+        let reachesUnder = basePool.filter { register(for: $0).low <= register(for: lead1Instrument).low + 3 }
+        let l2Pool = useShadowHold && !reachesUnder.isEmpty ? reachesUnder : basePool
         let picked = l2Pool[rng.nextInt(upperBound: l2Pool.count)]
         // Regeneration keeps the song's instrument: playback still has that patch loaded, so a
         // line written for a freshly drawn instrument's register would play on the wrong one.
@@ -549,17 +554,18 @@ struct ChillLeadGenerator {
         let regHigh2 = min(rawHigh2, regMid1 - 2)
         let regLow2  = max(36, min(rawLow2, regHigh2 - 12))
 
-        // CHL-LD2-002: Shadow hold — long-held chord tones sounding under Lead 1 simultaneously
-        // Base Chill and Blues: Lead 2 never sounds in a breakdown. A shadow hold's lead-in two
-        // steps before Groove B could land in a stop-time breakdown's last bar, on top of Lead 1
-        // joining the band's climb there.
+        // CHL-LD2-002: Shadow hold — a slow chord-tone line under some of Lead 1's phrases.
+        // Base Chill and Blues: Lead 2 never sounds in a breakdown.
         func outsideBreakdowns(_ evs: [MIDIEvent]) -> [MIDIEvent] {
             evs.filter { structure.section(atBar: $0.stepIndex / 16)?.label != .bridge }
         }
         if useShadowHold {
+            // The instrument's own register: the line is kept below Lead 1 note by note, so it
+            // does not need the midpoint cap the gap phrases use, which can fall under the
+            // instrument's floor and get folded back up an octave.
             let events = shadowHold(frame: frame, structure: structure,
-                                    lead1Onsets: lead1Onsets, scale: scale,
-                                    regLow: regLow2, regHigh: regHigh2, rng: &rng)
+                                    lead1Events: lead1Events, lead1Register: (regLow1, regHigh1),
+                                    regLow: rawLow2, regHigh: rawHigh2, rng: &rng)
             return (sohoVariation ? capNotesPerBar(events, 2) : outsideBreakdowns(events), inst2)
         }
 
@@ -691,80 +697,177 @@ struct ChillLeadGenerator {
 
     // MARK: - CHL-LD2-002: Shadow Hold
 
-    /// CHL-LD2-002: Long-held chord tones sounding underneath Lead 1 simultaneously.
-    /// Iterates all Lead 1 active bars across groove sections; places a hold whenever
-    /// ≥2 bars have elapsed since the last hold and a 50% roll clears. Each hold lasts
-    /// 16–28 steps. Notes are chord tones in the lower octave of Lead 2's register.
-    /// Velocity is soft (38–55) so the shadow sits under Lead 1 without competing.
+    /// CHL-LD2-002: a slow line of chord tones under some of Lead 1's phrases, following part of
+    /// their shape (Zack, 2026-11-12). It replaced single held notes placed every two bars or more,
+    /// and the 20% harmony pass that overwrote Lead 2 with a note-for-note copy of Lead 1 two scale
+    /// steps down, which the register lift then put a sixth above Lead 1.
+    ///
+    /// - About 55% of Lead 1's phrases in the groove sections get a shadow; the rest have none.
+    /// - Each half bar of a shadowed phrase takes one Lead 1 note as its anchor: the one sounding
+    ///   longest in that half bar, with a note on the beat preferred, or the phrase's peak.
+    /// - Under each anchor goes a chord tone a third to a sixth below it, inside the instrument's
+    ///   register and below every Lead 1 note sounding with it, never a second, seventh or tritone
+    ///   against one. The fourth and fifth are allowed but weighed down.
+    /// - The line holds its note while that note still fits and Lead 1 has moved by less than a
+    ///   fourth. It moves by the smallest step otherwise, in Lead 1's direction where Lead 1 leaps.
+    ///   A half bar with no fitting note ends the line there and the next one starts it afresh.
+    /// - The last note rings a little past the phrase, never into the next phrase, past the
+    ///   section, or over a chord it does not belong to.
+    /// - Soft, at 40 to 54, so it sits under Lead 1 as an inner voice. The harmonic filter does
+    ///   not lift it above the pads (`HarmonicFilter.apply(liftLead2:)`), which would put it on top.
     private static func shadowHold(
         frame: GlobalMusicalFrame,
         structure: SongStructure,
-        lead1Onsets: [(startBar: Int, endBar: Int)],
-        scale: [Int],
+        lead1Events: [MIDIEvent],
+        lead1Register: (low: Int, high: Int),
         regLow: Int,
         regHigh: Int,
         rng: inout SeededRNG
     ) -> [MIDIEvent] {
+        // Lead 1 as it will sound: the register fold at the end of generation moves notes outside
+        // its instrument's range by octaves (a jazz lick reaching 73 on an alto sax plays at 61),
+        // which put a shadow written under the unfolded line above it.
+        let lead1 = lead1Events.map { e -> MIDIEvent in
+            var n = Int(e.note)
+            while n > lead1Register.high { n -= 12 }
+            while n < lead1Register.low  { n += 12 }
+            return MIDIEvent(stepIndex: e.stepIndex, note: UInt8(n), velocity: e.velocity,
+                             durationSteps: e.durationSteps)
+        }.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }
+        guard !lead1.isEmpty, regHigh >= regLow else { return [] }
+        let songEnd = frame.totalBars * 16
+        let scalePCs = Set(scaleNotes(frame: frame).map { $0 % 12 })
+        func sectionStart(_ step: Int) -> Int? { structure.section(atBar: step / 16)?.startBar }
+        func chordTones(atStep step: Int) -> Set<Int> {
+            let tones = structure.chordWindow(atBar: step / 16)?.chordTones ?? []
+            return tones.isEmpty ? scalePCs : tones
+        }
+
+        // Lead 1's phrases: a rest of three beats or more, or a new section, starts one.
+        var phrases: [[MIDIEvent]] = []
+        var lastEnd = 0
+        for ev in lead1 {
+            if let first = phrases.last?.first,
+               ev.stepIndex - lastEnd < 12, sectionStart(first.stepIndex) == sectionStart(ev.stepIndex) {
+                phrases[phrases.count - 1].append(ev)
+            } else {
+                phrases.append([ev])
+            }
+            lastEnd = Swift.max(lastEnd, ev.stepIndex + ev.durationSteps)
+        }
+
         var events: [MIDIEvent] = []
+        for (pi, phrase) in phrases.enumerated() {
+            guard let first = phrase.first,
+                  let section = structure.section(atBar: first.stepIndex / 16),
+                  section.label == .A || section.label == .B else { continue }
+            guard rng.nextDouble() < 0.55 else { continue }
 
-        // Sorted Lead 1 active bars restricted to groove sections
-        let grooveBarSet = Set(structure.sections
-            .filter { $0.label == .A || $0.label == .B }
-            .flatMap { s in s.startBar..<(s.startBar + s.lengthBars) })
-        var lead1BarSet = Set<Int>()
-        for onset in lead1Onsets { for b in onset.startBar..<onset.endBar { lead1BarSet.insert(b) } }
-        let activeBars = lead1BarSet.intersection(grooveBarSet).sorted()
-        guard !activeBars.isEmpty else { return [] }
+            let phraseEnd  = phrase.map { $0.stepIndex + $0.durationSteps }.max() ?? first.stepIndex
+            let nextPhrase = pi + 1 < phrases.count ? phrases[pi + 1][0].stepIndex : songEnd
+            let limit      = Swift.min(nextPhrase, section.endBar * 16, songEnd)
+            let peak       = phrase.max { $0.note < $1.note }
+            // The first note opens a sixth below Lead 1 or a third below it, picked per phrase.
+            let openingGap = rng.nextDouble() < 0.5 ? 9 : 4
+            let phraseVel  = 42 + rng.nextInt(upperBound: 9)
 
-        // Shadow notes sit in the lower octave of Lead 2's register
-        let shadowHigh = Swift.min(regLow + 13, regHigh)
-        var lastPlaced = -4
-
-        for bar in activeBars {
-            guard bar >= lastPlaced + 2 else { continue }   // minimum 2-bar spacing
-            guard rng.nextDouble() < 0.50 else { continue } // 50% chance when gap is met
-
-            let chord        = structure.chordWindow(atBar: bar)
-            let chordTonePCs = chord?.chordTones ?? Set<Int>()
-            var pool = scale.filter { $0 >= regLow && $0 <= shadowHigh }
-            if !chordTonePCs.isEmpty {
-                let chordPool = pool.filter { chordTonePCs.contains($0 % 12) }
-                if !chordPool.isEmpty { pool = chordPool }
-            }
-            guard !pool.isEmpty else { continue }
-
-            let note   = UInt8(pool[rng.nextInt(upperBound: pool.count)])
-            let maxDur = frame.totalBars * 16 - bar * 16
-            let dur    = Swift.min(16 + rng.nextInt(upperBound: 13), maxDur)  // 16–28 steps
-            let vel    = UInt8(38 + rng.nextInt(upperBound: 18))              // 38–55
-
-            // Every Chill form, Soho and base alike (Zack, 2026-10-13). A lone held note sounded
-            // wrong on Lead 1's Sustained Tone and sounds wrong here for the same reason, so most
-            // holds get a companion. Shape and intervals are the ones tools/soho_sustained.py
-            // measured off the corpus: short notes of one to two steps, sitting on the unison or
-            // within a tone or two of the held pitch, leading in about twice as often as answering.
-            //
-            // Soho caps Lead 2 at two notes a bar, so a lead-in shares the hold's bar and an
-            // answer falls in the bar after the hold ends — never three in one bar.
-            let holdStart = bar * 16
-            if rng.nextDouble() < 0.70 {
-                let step = [0, 2, -2, 3][rng.weightedPick([0.34, 0.32, 0.21, 0.13])]
-                let near = pool.min { abs($0 - (Int(note) + step)) < abs($1 - (Int(note) + step)) }
-                let companion = UInt8(near ?? Int(note))
-                let softer = UInt8(Swift.min(70, Int(vel) + 6))
-                if rng.nextDouble() < 0.65 {
-                    // The companion leads in, two steps ahead of the hold.
-                    events.append(MIDIEvent(stepIndex: Swift.max(0, holdStart - 2), note: companion,
-                                            velocity: softer, durationSteps: 2))
-                } else if holdStart + dur + 2 < frame.totalBars * 16 {
-                    // Or answers once the hold has let go.
-                    events.append(MIDIEvent(stepIndex: holdStart + dur + 2, note: companion,
-                                            velocity: softer, durationSteps: 2))
+            // Each note, and where it stops when the line breaks off before the next one.
+            var line: [(start: Int, pitch: Int, cut: Int?)] = []
+            var current: Int? = nil   // the pitch sounding now; nil once the line has broken off
+            var prevAnchor: Int? = nil
+            var slot = (first.stepIndex / 8) * 8
+            while slot < Swift.min(phraseEnd, limit) {
+                let slotEnd = slot + 8
+                let start   = Swift.max(slot, (first.stepIndex / 4) * 4)
+                defer { slot = slotEnd }
+                // Lead 1's notes sounding in this half bar, and how much of it each fills.
+                let sounding = phrase.filter { $0.stepIndex < slotEnd && $0.stepIndex + $0.durationSteps > slot }
+                func overlap(_ e: MIDIEvent) -> Int {
+                    Swift.min(slotEnd, e.stepIndex + e.durationSteps) - Swift.max(slot, e.stepIndex)
                 }
+                // Lead 1 rests: the line holds on, unless the chord has moved from under it.
+                guard !sounding.isEmpty else {
+                    if let p = current, !chordTones(atStep: slot).contains(p % 12) {
+                        line[line.count - 1].cut = slot
+                        current = nil
+                    }
+                    continue
+                }
+                let anchorEv: MIDIEvent
+                if let p = peak, p.stepIndex >= slot, p.stepIndex < slotEnd, p.durationSteps >= 3 {
+                    anchorEv = p
+                } else {
+                    anchorEv = sounding.max { a, b in
+                        (overlap(a) + (a.stepIndex % 4 == 0 ? 3 : 0), Int(b.note))
+                            < (overlap(b) + (b.stepIndex % 4 == 0 ? 3 : 0), Int(a.note))
+                    }!
+                }
+                let anchor = Int(anchorEv.note)
+                // Below every Lead 1 note that rings against it, and never a second or seventh
+                // from one. Short passing notes may rub: under three steps, measured to the next
+                // onset, because the groove fixup later joins a clipped note up to it.
+                let heard = sounding.filter { e in
+                    let next = phrase.first { $0.stepIndex > e.stepIndex }?.stepIndex ?? Int.max
+                    return Swift.max(e.durationSteps, next - e.stepIndex) >= 3
+                }.map { Int($0.note) }
+                let tones = chordTones(atStep: start)
+                func fits(_ p: Int) -> Bool {
+                    guard p >= regLow, p <= regHigh, tones.contains(p % 12) else { return false }
+                    let gap = anchor - p
+                    guard gap >= 3, gap <= 16, [3, 4, 5, 7, 8, 9].contains(gap % 12) else { return false }
+                    return heard.allSatisfy { h in h - p >= 3 && ![1, 2, 6, 10, 11].contains((h - p) % 12) }
+                }
+                let prev = current
+                let move = prevAnchor.map { anchor - $0 } ?? 0
+                prevAnchor = anchor
+                if let p = prev, fits(p), abs(move) < 5 { continue }   // hold through small moves
+
+                let candidates = (regLow...regHigh).filter(fits)
+                guard !candidates.isEmpty else {
+                    if prev != nil {   // nothing fits: the line stops here
+                        line[line.count - 1].cut = start
+                        current = nil
+                    }
+                    continue
+                }
+                func cost(_ p: Int) -> Double {
+                    var c = Double(prev.map { abs(p - $0) } ?? abs((anchor - p) - openingGap))
+                    if [5, 7].contains((anchor - p) % 12) { c += 1.5 }
+                    if let q = prev, abs(move) >= 5 {
+                        // Lead 1 leaps: the line goes the same way if it can.
+                        c += (p - q).signum() == move.signum() ? -3 : (p == q ? 0 : 3)
+                    }
+                    return c + rng.nextDouble() * 0.5
+                }
+                let pick = candidates.map { ($0, cost($0)) }.min { $0.1 < $1.1 }!.0
+                if pick != prev { line.append((start, pick, nil)) }
+                current = pick
             }
-            events.append(MIDIEvent(stepIndex: holdStart, note: note,
-                                    velocity: vel, durationSteps: Swift.max(1, dur)))
-            lastPlaced = bar
+            guard !line.isEmpty else { continue }
+
+            for (i, n) in line.enumerated() {
+                let nextStart = i + 1 < line.count ? line[i + 1].start : nil
+                var end: Int
+                if let c = n.cut {
+                    end = c
+                } else if let s = nextStart {
+                    end = s
+                } else {
+                    // The last note rings past the phrase, but not over a chord it is not part of.
+                    end = Swift.min(phraseEnd + 4 + rng.nextInt(upperBound: 9), limit)
+                    var bar = n.start / 16 + 1
+                    while bar * 16 < end {
+                        if !chordTones(atStep: bar * 16).contains(n.pitch % 12) { end = bar * 16; break }
+                        bar += 1
+                    }
+                }
+                // A breath before the next note when the line moves straight on.
+                if let s = nextStart, end == s, end - n.start > 4 { end -= 1 }
+                guard end - n.start >= 2 else { continue }
+                let vel = phraseVel + rng.nextInt(upperBound: 5) - 2
+                events.append(MIDIEvent(stepIndex: n.start, note: UInt8(n.pitch),
+                                        velocity: UInt8(vel), durationSteps: end - n.start))
+            }
         }
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
@@ -1134,8 +1237,60 @@ struct ChillLeadGenerator {
 
         var events: [MIDIEvent] = []
         var chaining = false
-        for (pi, ph) in phrases.enumerated() {
+
+        /// Answers phrase `pi` in the gap start..<limit, then riffs on that answer when `chain`
+        /// decides to, up to `maxAnswers` in all. Returns whether the first answer sounded.
+        func answerPhrase(_ pi: Int, start: Int, limit: Int, maxAnswers: Int,
+                          chain: (Int) -> Bool) -> Bool {
+            let ph = phrases[pi]
             chaining = false
+            let tones = structure.chordWindow(atBar: start / 16)?.chordTones ?? []
+            let device = rng.nextDouble() < 0.70 ? ruleID
+                : devices.filter { $0 != ruleID }[rng.nextInt(upperBound: devices.count - 1)]
+            let velocity = Swift.max(55, Swift.min(90, Int(ph.last!.velocity))) - 6 + velocityOffset
+            // A fragmented hook (CHL-LD1-014) can leave a single note as its own phrase, a short
+            // cell and then one note ten steps later. Tail riff and Rhythm trade build on Lead 1's
+            // last notes, and one note gave Rhythm trade nothing to answer with: the answer in bar
+            // 27 of Three AM Nuage came out empty. Under three notes, a phrase that ended within
+            // a bar lends its notes.
+            var source = ph
+            if ph.count < 3, pi > 0,
+               let prevEnd = phrases[pi - 1].map({ $0.stepIndex + $0.durationSteps }).max(),
+               ph[0].stepIndex - prevEnd <= 16 {
+                source = phrases[pi - 1] + ph
+            }
+            var placed = place(answer(device, phrase: source, tones: tones), start: start, limit: limit,
+                               velocity: velocity)
+            events += placed
+            let sounded = placed.count >= 2
+
+            // Riffing on: Lead 2 takes its own answer as the next call.
+            let chained = chain(limit - start)
+            var answers = 1
+            while chained, answers < maxAnswers, placed.count >= 2 {
+                let lastEnd = placed.map { $0.stepIndex + $0.durationSteps }.max()!
+                var s = lastEnd + 4 + 2 * rng.nextInt(upperBound: 3)
+                s += s % 2
+                guard limit - s >= 8 else { break }
+                let chordAt = structure.chordWindow(atBar: s / 16)?.chordTones ?? []
+                let own = placed.map { MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
+                                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
+                let d = rng.nextDouble() < 0.60 ? "CHL-LD2-003" : devices[rng.nextInt(upperBound: devices.count)]
+                chaining = true
+                placed = place(answer(d, phrase: own, tones: chordAt), start: s, limit: limit,
+                               velocity: velocity - 3 * answers)
+                events += placed
+                answers += 1
+            }
+            return sounded
+        }
+
+        // Every gap Lead 2 could answer, and the gaps it did answer, by section start bar.
+        struct Gap { let pi: Int; let start: Int; let limit: Int; let secStart: Int }
+        var openGaps: [Gap] = []
+        var answeredStarts: [Int: [Int]] = [:]
+
+        for (pi, ph) in phrases.enumerated() {
             let end = ph.map { $0.stepIndex + $0.durationSteps }.max()!
             let next = pi + 1 < phrases.count ? phrases[pi + 1][0].stepIndex : totalSteps
             var start = end + 2
@@ -1152,36 +1307,48 @@ struct ChillLeadGenerator {
             guard limit - start >= 8 else { continue }
             let handoff = (start / 16...(limit - 1) / 16).contains { handoffBars.contains($0) }
             let prob = handoff ? 1.0 : (sec.label == .A ? 0.50 : 0.80)
-            guard rng.nextDouble() < prob else { continue }
+            guard rng.nextDouble() < prob else {
+                openGaps.append(Gap(pi: pi, start: start, limit: limit, secStart: sec.startBar))
+                continue
+            }
+            // In a handoff window, or now and then over a long gap in Groove B, the answer riffs
+            // on, up to three answers in all.
+            let sounded = answerPhrase(pi, start: start, limit: limit, maxAnswers: 3) { room in
+                handoff || (sec.label == .B && room >= 40 && rng.nextDouble() < 0.30)
+            }
+            if sounded { answeredStarts[sec.startBar, default: []].append(start) }
+            else { openGaps.append(Gap(pi: pi, start: start, limit: limit, secStart: sec.startBar)) }
+        }
 
-            let tones = structure.chordWindow(atBar: start / 16)?.chordTones ?? []
-            let device = rng.nextDouble() < 0.70 ? ruleID
-                : devices.filter { $0 != ruleID }[rng.nextInt(upperBound: devices.count - 1)]
-            let velocity = Swift.max(55, Swift.min(90, Int(ph.last!.velocity))) - 6 + velocityOffset
-            var placed = place(answer(device, phrase: ph, tones: tones), start: start, limit: limit,
-                               velocity: velocity)
-            events += placed
-
-            // Riffing on: in a handoff window, or now and then over a long gap in Groove B, Lead 2
-            // takes its own answer as the next call, up to three answers in all.
-            let chain = handoff || (sec.label == .B && limit - start >= 40 && rng.nextDouble() < 0.30)
-            var answers = 1
-            while chain, answers < 3, placed.count >= 2 {
-                let lastEnd = placed.map { $0.stepIndex + $0.durationSteps }.max()!
-                var s = lastEnd + 4 + 2 * rng.nextInt(upperBound: 3)
-                s += s % 2
-                guard limit - s >= 8 else { break }
-                let chordAt = structure.chordWindow(atBar: s / 16)?.chordTones ?? []
-                let own = placed.map { MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
-                                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
-                let d = rng.nextDouble() < 0.60 ? "CHL-LD2-003" : devices[rng.nextInt(upperBound: devices.count)]
-                chaining = true
-                placed = place(answer(d, phrase: own, tones: chordAt), start: s, limit: limit,
-                               velocity: velocity - 3 * answers)
-                events += placed
-                answers += 1
+        // Floor: at least two answers in each groove section (Zack, 2026-11-12). With a coin per
+        // gap and nothing else, Three AM Nuage went from bar 1 to bar 55 with no Lead 2 at all.
+        // A short section takes the widest gaps it has, each at least eight bars from another
+        // answer where it can be, and an answer with two and a half bars of room riffs on into a
+        // second one, the way Lead 2 trades in a handoff window. Its own random stream: a song
+        // that already has two answers a section draws nothing here and does not change, and
+        // Lead 2's stream reads on afterwards (Blues harmony) as if the floor had not run.
+        let mainStream = rng
+        var probe = rng
+        rng = SeededRNG(seed: probe.next() ^ 0x9E37_79B9_7F4A_7C15)
+        for secStart in Set(openGaps.map { $0.secStart }).sorted() {
+            var answered = answeredStarts[secStart] ?? []
+            guard answered.count < 2 else { continue }
+            var candidates = openGaps.filter { $0.secStart == secStart }
+                .sorted { ($0.limit - $0.start, -$0.start) > ($1.limit - $1.start, -$1.start) }
+            for spaced in [true, false] {
+                var i = 0
+                while answered.count < 2, i < candidates.count {
+                    let g = candidates[i]
+                    if spaced && answered.contains(where: { abs($0 - g.start) < 8 * 16 }) { i += 1; continue }
+                    candidates.remove(at: i)
+                    if answerPhrase(g.pi, start: g.start, limit: g.limit, maxAnswers: 2,
+                                    chain: { $0 >= 40 }) {
+                        answered.append(g.start)
+                    }
+                }
             }
         }
+        rng = mainStream
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
 
@@ -1693,10 +1860,10 @@ struct ChillLeadGenerator {
     /// by interval and then by octave, so consecutive indices are an octave apart rather than a
     /// scale step apart. Two call sites depend on that in opposite ways:
     ///
-    /// - Lead 2 Shadow Hold draws a note with `pool[rng.nextInt(upperBound: pool.count)]` from
-    ///   an unsorted filter of this array. Sorting here changes which note that draw lands on,
-    ///   in every Chill form, for every Shadow Hold song.
-    /// - The harmony pass at `scaleNotes(frame:).sorted()` does `scale[idx - intervalSteps]`,
+    /// - Callers that draw a note with `pool[rng.nextInt(upperBound: pool.count)]` from an
+    ///   unsorted filter of this array (Lead 2 Shadow hold did until 2026-11-12). Sorting here
+    ///   changes which note those draws land on.
+    /// - The Blues harmony pass at `scaleNotes(frame:).sorted()` does `scale[idx - intervalSteps]`,
     ///   stepping down the scale by index. That is only correct because it sorts first.
     ///
     /// A caller that needs scale-step arithmetic must sort; a caller that is only picking from
