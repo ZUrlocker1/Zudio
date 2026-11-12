@@ -465,9 +465,24 @@ numeral, prefix and adjective patterns 26%.
 
 **Log.** The Chords line shows key, mode, family name and Roman numerals on every family, for
 example `E Ionian Magnetic Descent I vi V IV` and `A Phrygian Equinoxe i iv bII` (other styles
-still trim the numerals; `chordsDescription` takes `keepNumerals`). Rule lines carry the rule's
-name only, no per-song draws and no parentheses. Space fill, thin-stretch and bridge lines are
-rebuilt after a drum or Lead 2 regen.
+still trim the numerals; `chordsDescription` takes `keepNumerals`). Rule lines have no
+parentheses. Space fill, thin-stretch and bridge lines are rebuilt after a drum or Lead 2 regen.
+
+**Lead 1 versions in the log** (Zack, 2026-11-12, reversing "rule name only"): the Lead 1 rules
+KOS-LD1-013 to KOS-LD1-019 name their per-song draws after the rule, comma-joined, as the Chill
+jazz leads do. Only draws that differ from the source are named, so a line with nothing after the
+name played the source form; KOS-LD1-015 Magnetic Turn Melody has no single source form and names
+all its draws. `KosmicLeadNotes` carries them from `KosmicLeadGenerator.generateLead1` to the log.
+Examples:
+- KOS-LD1-013 "Oxygene Falling Theme sixth top, 6-5-3, new rhythm" or "compressed run"
+- KOS-LD1-014 "Oxygene See-Saw Riff sixth, 2+2+2, second half, rocks down"
+- KOS-LD1-015 "Magnetic Turn Melody climb turn, 4 runs, from the 5th, 5-note runs"
+- KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third note, 8-bar cycle"
+- KOS-LD1-017 "Oxygene 8 Offbeat Climb from the 6th below, on to the 5th, early last notes"
+- KOS-LD1-018 "Magnetic Call and Hold calls on the 3rd, tight call, turning tail, rising answer, octave phase"
+- KOS-LD1-019 "Equinoxe Thirds Riff rocks down" (its interval and rhythm are fixed)
+The line a Lead 1 regen appends names the rule only, without its version, as Chill's jazz leads
+do. Log text only: no draw moved, so every song plays as before.
 
 ---
 

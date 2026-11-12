@@ -19,6 +19,14 @@
 
 import Foundation
 
+/// Kosmic Space Lead 1: each homage rule's per-song draws in a few plain words, for the log beside
+/// the rule's name ("Oxygene See-Saw Riff sixth, 2+2+2"). Only draws that differ from the source
+/// are named; empty when a rule played its source form. Zack, 2026-11-12, after the Chill jazz
+/// lead versions: name the transformations.
+final class KosmicLeadNotes {
+    var byRule: [String: String] = [:]
+}
+
 struct KosmicLeadGenerator {
 
     // MARK: - Lead 1
@@ -36,7 +44,8 @@ struct KosmicLeadGenerator {
         isDriftDreamscape: Bool = false,
         driftVelocityBase: Int = 89,
         isKosmicSpace: Bool = false,
-        spaceArrangement: KosmicSpaceArrangement? = nil
+        spaceArrangement: KosmicSpaceArrangement? = nil,
+        notes: KosmicLeadNotes? = nil
     ) -> [MIDIEvent] {
 
         // Kosmic Space: KOS-LD1-013 Falling Theme, KOS-LD1-016 Rising Strings or KOS-LD1-017 Offbeat
@@ -48,10 +57,11 @@ struct KosmicLeadGenerator {
             lead1BaseRule = "KOS-LD1-013"
             usedRuleIDs.insert("KOS-LD1-013")
             if structure.sections.contains(where: { $0.label == .B }) { usedRuleIDs.insert("KOS-LD1-014") }
+            var themeNote = "", riffNote = ""
             var theme = generateOxygeneFallingTheme(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng)
+                                                    rng: &rng, note: &themeNote)
             var riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                 rng: &rng)
+                                                 rng: &rng, note: &riffNote)
             // In 50% of songs KOS-LD1-006 JMJ Phrase Loop plays the B sections in place of the riff,
             // for variety. Drawn after the theme and riff, so they are unchanged for a given seed.
             var phrase: [MIDIEvent] = []
@@ -71,7 +81,7 @@ struct KosmicLeadGenerator {
             // Drawn last, so the other Lead 1 draws are unchanged for a given seed.
             if rng.nextDouble() < 0.50 {
                 theme = generateOxygeneRisingStrings(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                     rng: &rng)
+                                                     rng: &rng, note: &themeNote)
                 lead1BaseRule = "KOS-LD1-016"
                 usedRuleIDs.remove("KOS-LD1-013")
                 usedRuleIDs.insert("KOS-LD1-016")
@@ -80,7 +90,7 @@ struct KosmicLeadGenerator {
             // A-section rules share them evenly. Drawn last, so the earlier draws are unchanged.
             if rng.nextDouble() < 1.0 / 3.0 {
                 theme = generateOxygeneOffbeatClimb(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng)
+                                                    rng: &rng, note: &themeNote)
                 lead1BaseRule = "KOS-LD1-017"
                 usedRuleIDs.remove("KOS-LD1-013")
                 usedRuleIDs.remove("KOS-LD1-016")
@@ -90,7 +100,7 @@ struct KosmicLeadGenerator {
             // instead, so the four A-section rules share them evenly. Drawn last, as above.
             if rng.nextDouble() < 0.25 {
                 theme = generateMagneticTurnMelody(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                   rng: &rng)
+                                                   rng: &rng, note: &themeNote)
                 lead1BaseRule = "KOS-LD1-015"
                 usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-016", "KOS-LD1-017"])
                 usedRuleIDs.insert("KOS-LD1-015")
@@ -99,7 +109,7 @@ struct KosmicLeadGenerator {
             // the five A-section rules share them evenly. Drawn last, as above.
             if rng.nextDouble() < 0.20 {
                 theme = generateMagneticCallAndHold(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                    rng: &rng)
+                                                    rng: &rng, note: &themeNote)
                 lead1BaseRule = "KOS-LD1-018"
                 usedRuleIDs.subtract(["KOS-LD1-013", "KOS-LD1-015", "KOS-LD1-016", "KOS-LD1-017"])
                 usedRuleIDs.insert("KOS-LD1-018")
@@ -108,12 +118,16 @@ struct KosmicLeadGenerator {
             // in place of the riff or the Phrase Loop, so the three B-section rules share them evenly.
             if structure.sections.contains(where: { $0.label == .B }), rng.nextDouble() < 1.0 / 3.0 {
                 riff = generateOxygeneSeeSawRiff(frame: frame, structure: structure, tonalMap: tonalMap,
-                                                 rng: &rng, equinoxeThirds: true)
+                                                 rng: &rng, equinoxeThirds: true, note: &riffNote)
                 phrase = []
                 usedRuleIDs.subtract(["KOS-LD1-014", "KOS-LD1-006"])
                 usedRuleIDs.insert("KOS-LD1-019")
             }
             var lead = theme + riff + phrase
+            if let notes {
+                notes.byRule[lead1BaseRule] = themeNote
+                for id in ["KOS-LD1-014", "KOS-LD1-019"] where usedRuleIDs.contains(id) { notes.byRule[id] = riffNote }
+            }
             // Theme return (Zack, 2026-11-03): a song that ends on B (ab, abab) never hears its A theme
             // again, so 8 bars two thirds into the last B replay the first A section's opening 8 bars
             // in place of the B rule. The chord plan gives those 8 bars the first A section's opening
@@ -425,7 +439,7 @@ struct KosmicLeadGenerator {
 
     private static func generateOxygeneFallingTheme(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG, note: inout String
     ) -> [MIDIEvent] {
         let tops: [(steps: Int, name: String)] = [(7, "octave top"), (5, "sixth top"), (3, "fourth top")]
         let top = tops[rng.weightedPick([0.30, 0.35, 0.35])]
@@ -454,6 +468,16 @@ struct KosmicLeadGenerator {
                 onsets = rng.nextDouble() < 0.5 ? [0, 4, 8, 10, 14] : [0, 6, 10, 12, 14]
             }
         }
+        // The log names what differs from the source; the compressed run replaces the whole figure.
+        var words: [String] = []
+        if compressed { words = ["compressed run"] } else {
+            if top.steps != 7 { words.append(top.name) }
+            if inner.steps != [4, 2, 4] { words.append(inner.name) }
+            if noteCount != 5 { words.append(noteCount == 4 ? "four notes" : "six notes") }
+            else if onsets != [0, 6, 8, 10, 14] { words.append("new rhythm") }
+        }
+        note = words.joined(separator: ", ")
+
         // Scale steps above the root for each note, falling to the root
         var pitchSteps: [Int]
         switch noteCount {
@@ -538,12 +562,14 @@ struct KosmicLeadGenerator {
 
     private static func generateOxygeneRisingStrings(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG, note: inout String
     ) -> [MIDIEvent] {
         let approach = rng.nextDouble() < 0.60
         let onsets: [(step: Int, dur: Int)] = rng.nextDouble() < 0.40
             ? [(0, 6), (6, 4), (10, 6)] : [(0, 6), (6, 6), (12, 4)]
         let longCycle = rng.nextDouble() >= 0.40
+        note = [approach ? nil : "no lead-in", onsets[2].step == 10 ? "early third note" : nil,
+                longCycle ? nil : "8-bar cycle"].compactMap { $0 }.joined(separator: ", ")
         var peek = rng
         var passRNG = SeededRNG(seed: peek.next() ^ 0x0E06_A5C3_1976_0016)
         func cycle(_ v: RisingVariant) -> [RisingCell] {
@@ -686,7 +712,7 @@ struct KosmicLeadGenerator {
 
     private static func generateOxygeneOffbeatClimb(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG, note: inout String
     ) -> [MIDIEvent] {
         let leap = [-3, -2, -4][rng.weightedPick([0.40, 0.30, 0.30])]
         let top = [[3, 3], [3, 4], [3, 2]][rng.weightedPick([0.40, 0.30, 0.30])]
@@ -695,6 +721,9 @@ struct KosmicLeadGenerator {
         let altRhythm = rhythmRoll < 0.40 || (leap == -3 && top == [3, 3])
         let sixOnsets  = altRhythm ? [2, 4, 6, 8, 10, 13] : [2, 4, 6, 8, 11, 14]
         let fiveOnsets = altRhythm ? [2, 6, 8, 10, 13] : [2, 6, 8, 11, 14]
+        note = [leap == -2 ? "from the 6th below" : leap == -4 ? "from the 4th below" : nil,
+                top == [3, 4] ? "on to the 5th" : top == [3, 2] ? "back to the 3rd" : nil,
+                altRhythm ? "early last notes" : nil].compactMap { $0 }.joined(separator: ", ")
         let scalePCs = frame.scalePCs
         let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
                                     low: 62, high: 73)
@@ -775,13 +804,18 @@ struct KosmicLeadGenerator {
 
     private static func generateMagneticTurnMelody(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG, note: inout String
     ) -> [MIDIEvent] {
         let shapes: [[Int]] = [[2, 1, -1, -2], [-1, -2, 3], [1, 1, -2], [2, -1, -1], [-2, 1, 1]]
         let shape = shapes[rng.weightedPick([0.15, 0.15, 0.24, 0.23, 0.23])]
         let runs = 3 + rng.nextInt(upperBound: 3)
         let startDegree = [0, 2, 4][rng.weightedPick([0.30, 0.35, 0.35])]
         let runLength = rng.nextDouble() < 0.60 ? 6 : 5
+        // Every song draws its own melody here, so the log names all four draws.
+        let shapeNames = ["arch turn", "dip turn", "climb turn", "leap turn", "drop turn"]
+        note = [shapeNames[shapes.firstIndex(of: shape)!], "\(runs) runs",
+                ["from the root", "from the 3rd", "from the 5th"][startDegree / 2],
+                runLength == 5 ? "5-note runs" : nil].compactMap { $0 }.joined(separator: ", ")
         let scalePCs = frame.scalePCs
         let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
                                     low: 62, high: 73)
@@ -867,13 +901,19 @@ struct KosmicLeadGenerator {
 
     private static func generateMagneticCallAndHold(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG
+        rng: inout SeededRNG, note: inout String
     ) -> [MIDIEvent] {
         let callDegree = [0, 2, 4][rng.weightedPick([0.30, 0.35, 0.35])]
         let callRhythm = [[2, 4, 5, 7], [0, 2, 3, 6], [2, 3, 5, 7]][rng.weightedPick([0.50, 0.25, 0.25])]
         let tail = [[-1, -2, 1], [-1, -1, -1], [1, -1, -2], [-2, 1, -1]][rng.weightedPick([0.40, 0.20, 0.20, 0.20])]
         let answerDown = rng.nextDouble() < 0.60
         let octavePhase = rng.nextDouble() < 0.60
+        let tailNames: [[Int]: String] = [[-1, -1, -1]: "falling tail", [1, -1, -2]: "turning tail",
+                                          [-2, 1, -1]: "leaping tail"]
+        note = [["calls on the root", "calls on the 3rd", "calls on the 5th"][callDegree / 2],
+                callRhythm == [0, 2, 3, 6] ? "call on the beat" : callRhythm == [2, 3, 5, 7] ? "tight call" : nil,
+                tailNames[tail], answerDown ? nil : "rising answer",
+                octavePhase ? "octave phase" : nil].compactMap { $0 }.joined(separator: ", ")
         let scalePCs = frame.scalePCs
         let tonic = clampToRegister(snapToScale(keySemitone(frame.key), scalePCs: scalePCs) + 60,
                                     low: 62, high: 73)
@@ -998,7 +1038,7 @@ struct KosmicLeadGenerator {
 
     private static func generateOxygeneSeeSawRiff(
         frame: GlobalMusicalFrame, structure: SongStructure, tonalMap: TonalGovernanceMap,
-        rng: inout SeededRNG, equinoxeThirds: Bool = false
+        rng: inout SeededRNG, equinoxeThirds: Bool = false, note: inout String
     ) -> [MIDIEvent] {
         let intervals: [(steps: Int, name: String)] = [(3, "fourth"), (5, "sixth"), (7, "octave"), (4, "fifth")]
         var interval = intervals[rng.weightedPick([0.30, 0.30, 0.20, 0.20])]
@@ -1013,6 +1053,12 @@ struct KosmicLeadGenerator {
             grouping = ([0, 2, 5, 8, 10, 13], "3+3+2")
             offset = 0
         }
+        // The source is a fifth, 3+3, first half, anchor below; KOS-LD1-019 keeps only the anchor draw.
+        note = (equinoxeThirds ? [] : [interval.steps == 4 ? nil : interval.name,
+                                       grouping.name == "3+3" ? nil : grouping.name,
+                                       offset == 8 ? "second half" : nil])
+            .compactMap { $0 }.joined(separator: ", ")
+        if anchorAbove { note += (note.isEmpty ? "" : ", ") + "rocks down" }
 
         let scalePCs = frame.scalePCs
         let lastB = structure.sections.last(where: { $0.label == .B })

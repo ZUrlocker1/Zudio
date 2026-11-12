@@ -570,13 +570,15 @@ struct SongGenerator {
         var lead1Rules: Set<String> = []
         var lead1BaseRule = ""
         var xFilesBars: [Int] = []
+        let kosmicLeadNotes = KosmicLeadNotes()
         trackEvents[kTrackLead1] = KosmicLeadGenerator.generateLead1(
             frame: frame, structure: structure, tonalMap: tonalMap,
             rng: &lead1RNG, usedRuleIDs: &lead1Rules, forceRuleID: forceLeadRuleID,
             lead1BaseRule: &lead1BaseRule, xFilesBars: &xFilesBars,
             isKosmicDrift: isKosmicDrift, isDriftDreamscape: isDriftDreamscape,
             driftVelocityBase: driftVelBase,
-            isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement
+            isKosmicSpace: isKosmicSpace, spaceArrangement: spaceArrangement,
+            notes: kosmicLeadNotes
         )
 
         // Arpeggio (rhythm slot) — the heartbeat of Kosmic
@@ -868,7 +870,7 @@ struct SongGenerator {
         }()
 
         // Build Kosmic generation log
-        let log = buildKosmicLog(
+        var log = buildKosmicLog(
             title: title, frame: frame, structure: structure, form: form,
             percussionStyle: percussionStyle, kosmicForm: kosmicForm,
             kosmicProgFamily: kosmicProgFamily,
@@ -879,6 +881,13 @@ struct SongGenerator {
             isKosmicSpace: isKosmicSpace,
             spaceArrangement: spaceArrangement
         )
+        // Kosmic Space Lead 1 names its per-song version beside the rule, as the Chill jazz leads
+        // do: "Oxygene Falling Theme sixth top, 5-4-5".
+        for (i, entry) in log.enumerated() {
+            guard let note = kosmicLeadNotes.byRule[entry.tag], !note.isEmpty else { continue }
+            log[i] = GenerationLogEntry(tag: entry.tag, description: entry.description + " " + note,
+                                        isTitle: entry.isTitle)
+        }
 
         // Space only: the drum rules name its fills and skip bars where a Space box has dropped out.
         // Base Kosmic and Drift never passed them, and their annotations stay as they were.
@@ -4647,8 +4656,8 @@ struct SongGenerator {
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
         var lead2EventsFinal = lead2Events
-        var harmonyStepAnnotation:  (bar: Int, isUnison: Bool, intervalSteps: Int)? = nil
-        var finaleStepAnnotation:   (bar: Int, isUnison: Bool, intervalSteps: Int)? = nil
+        var harmonyStepAnnotation:  (bar: Int, isUnison: Bool, intervalSteps: Int, longNotes: Bool)? = nil
+        var finaleStepAnnotation:   (bar: Int, isUnison: Bool, intervalSteps: Int, longNotes: Bool)? = nil
 
         // Base Chill and Soho had a harmony pass here until 2026-11-12: in 20% of songs it
         // replaced Lead 2 in a six-bar window of A and of B with a note-for-note copy of Lead 1,
@@ -4658,23 +4667,37 @@ struct SongGenerator {
         // Blues, which never reached it.
 
         // Blues harmony/unison sections — about 15% of blues songs.
-        // Only for the longer, unhurried leads (CHL-LD1-004 Blues Lead, CHL-LD1-003 Chet Sparse Melody) and never
-        // when Lead 2 is a vibraphone: parallel 3rds on a busy jazz-idiom line sound cluttered, and
-        // a vibraphone doubling reads as an echo, not a second horn. A vibraphone Lead 2 plays its
+        // For the longer, unhurried leads (CHL-LD1-004 Blues Lead, CHL-LD1-003 Chet Sparse Melody),
+        // and the Moanin' and Cantaloupe hooks below, never when Lead 2 is a vibraphone: a
+        // vibraphone doubling reads as an echo, not a second horn. A vibraphone Lead 2 plays its
         // normal part. About 27% of blues songs are eligible (measured over 791), so a 0.55 roll lands near 15%.
         // One roll decides if an eligible song gets harmony. If yes, both windows always fire:
         //   (1) second time through the 16-bar form, (2) finale = last pass (3+ passes only).
         // Each window: at most 2 phrases harmonized.
+        //
+        // CHL-LD1-013 Moanin' and CHL-LD1-014 Cantaloupe hook joined 2026-11-12 (Zack: in some
+        // songs, only a couple of times, not the whole song): half of eligible songs, one phrase
+        // of at most 4 bars per window, so twice at most. Their lines are busy, so 60% of them
+        // harmonize only the notes on a beat or a quarter or longer (`longNotesOnly`); 30% of
+        // CHL-LD1-003/004 songs do the same. That draw is on a stream derived from a copy of
+        // lead2RNG, so the main stream moves exactly as before.
         if bluesVariation {
             let formStart  = structure.sections.first { $0.label != .intro && $0.label != .outro }?.startBar ?? 0
             let outroStart = structure.sections.first { $0.label == .outro }?.startBar ?? frame.totalBars
             let numPasses  = (outroStart - formStart) / 16
 
-            let harmonyProb: Double = 0.55
-            let harmonyEligible = (lead1Rules.contains("CHL-LD1-004") || lead1Rules.contains("CHL-LD1-003"))
+            let jazzHarmony = lead1Rules.contains("CHL-LD1-013") || lead1Rules.contains("CHL-LD1-014")
+            let harmonyProb: Double = jazzHarmony ? 0.50 : 0.55
+            let harmonyEligible = (lead1Rules.contains("CHL-LD1-004") || lead1Rules.contains("CHL-LD1-003")
+                                   || jazzHarmony)
                 && chillLead2Instrument != .vibraphone
             let harmonyStart = formStart + 16
             let harmonyEnd   = harmonyStart + 16
+            var hornCopy = lead2RNG
+            var hornRNG  = SeededRNG(seed: hornCopy.next() ^ 0x484F_524E_5345_4354)   // "HORNSECT"
+            let longNotes = hornRNG.nextDouble() < (jazzHarmony ? 0.60 : 0.30)
+            let maxPhrases = jazzHarmony ? 1 : 2
+            let maxBars: Int? = jazzHarmony ? 4 : nil
 
             if harmonyEnd <= outroStart && lead2RNG.nextDouble() < harmonyProb && harmonyEligible {
                 let useUnison     = lead2RNG.nextDouble() < 0.30
@@ -4685,14 +4708,15 @@ struct SongGenerator {
                 ChillLeadGenerator.applyBluesHarmony(
                     lead1Events: lead1Events, lead2Events: &lead2EventsFinal,
                     harmonyBars: harmonySet, useUnison: useUnison,
-                    intervalSteps: intervalSteps, maxPhrases: 2,
+                    intervalSteps: intervalSteps, maxPhrases: maxPhrases,
+                    maxBars: maxBars, longNotesOnly: longNotes,
                     frame: frame, rng: &lead2RNG
                 )
                 // Anchor annotation to the first actual harmony note so the log fires when
                 // Zack hears it, not at the (potentially silent) window start bar.
                 if let firstNote = lead2EventsFinal.filter({ harmonySet.contains($0.stepIndex / 16) })
                                                     .min(by: { $0.stepIndex < $1.stepIndex }) {
-                    harmonyStepAnnotation = (firstNote.stepIndex / 16, useUnison, intervalSteps)
+                    harmonyStepAnnotation = (firstNote.stepIndex / 16, useUnison, intervalSteps, longNotes)
                     // Tag for Form "- harmony" display — only when notes actually fired
                     lead2Rules.insert(useUnison ? "CHL-LD2-UNIS-\(harmonyStart + 1)" : "CHL-LD2-HARM-\(harmonyStart + 1)")
                 }
@@ -4704,12 +4728,13 @@ struct SongGenerator {
                     ChillLeadGenerator.applyBluesHarmony(
                         lead1Events: lead1Events, lead2Events: &lead2EventsFinal,
                         harmonyBars: finaleSet, useUnison: useUnison,
-                        intervalSteps: intervalSteps, maxPhrases: 2,
+                        intervalSteps: intervalSteps, maxPhrases: maxPhrases,
+                        maxBars: maxBars, longNotesOnly: longNotes,
                         frame: frame, rng: &lead2RNG
                     )
                     if let firstNote = lead2EventsFinal.filter({ finaleSet.contains($0.stepIndex / 16) })
                                                         .min(by: { $0.stepIndex < $1.stepIndex }) {
-                        finaleStepAnnotation = (firstNote.stepIndex / 16, useUnison, intervalSteps)
+                        finaleStepAnnotation = (firstNote.stepIndex / 16, useUnison, intervalSteps, longNotes)
                     }
                 }
             }
@@ -4992,10 +5017,9 @@ struct SongGenerator {
             stepAnnotations[bar * 16, default: []].append(
                 GenerationLogEntry(tag: "Bass", description: "variation \(kind)"))
         }
-        func harmonyDesc(_ h: (bar: Int, isUnison: Bool, intervalSteps: Int)) -> String {
-            if h.isUnison      { return "Lead 2 harmony - unison" }
-            if h.intervalSteps == 2 { return "Lead 2 harmony - third" }
-            return "Lead 2 harmony - sixth"
+        func harmonyDesc(_ h: (bar: Int, isUnison: Bool, intervalSteps: Int, longNotes: Bool)) -> String {
+            let kind = h.isUnison ? "unison" : h.intervalSteps == 2 ? "third" : "sixth"
+            return "Lead 2 harmony - " + kind + (h.longNotes ? ", long notes" : "")
         }
         if let ha = harmonyStepAnnotation {
             stepAnnotations[ha.bar * 16, default: []].append(GenerationLogEntry(tag: "", description: harmonyDesc(ha)))

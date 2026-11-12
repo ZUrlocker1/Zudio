@@ -893,25 +893,29 @@ import Foundation
         #expect(total > 0 && Double(withPickup) / Double(total) > 0.8, "pickups \(withPickup)/\(total)")
     }
 
-    /// Lead 2: sax, brass, trombone or vibes, never Lead 1's instrument, at most 2 notes a bar,
-    /// and call-and-response about three songs in four.
+    /// Lead 2: sax, brass, trombone or vibes, never Lead 1's instrument, sparse, and answers
+    /// (CHL-LD2-003 to 006) about three songs in four.
+    /// Until 2026-11-12 Soho's Lead 2 was CHL-LD2-001's random walk capped at 2 notes a bar. The
+    /// answer rules riff on Lead 1 in short bursts of 3 to 5 notes, so the cap no longer applies;
+    /// overall the answers play fewer notes (100 seeds: 37 a song before, 32 after). The check is
+    /// now notes per groove bar, under 1 a song and about half that on average.
     @Test func sohoLead2IsSparseAndAnswers() {
         let pool: Set<ChillLeadInstrument> = [.saxophone, .tenorSax, .synthBrass, .trombone, .vibraphone]
-        var shadow = 0
+        var shadow = 0, notes = 0, grooveBars = 0
         let songs = Self.sohoSongs()
         for s in songs {
             #expect(pool.contains(s.chillLead2Instrument))
             #expect(s.chillLead2Instrument != s.chillLeadInstrument)
             if Self.uses(s, "CHL-LD2-002") { shadow += 1 }
-            // Notes on Lead 1's onsets are left out of the count. Until 2026-11-12 a Chill harmony
-            // pass doubled Lead 1 note for note in Soho too; that pass is gone.
-            let lead1Steps = Set(s.trackEvents[kTrackLead1].map(\.stepIndex))
-            let own = s.trackEvents[kTrackLead2].filter { !lead1Steps.contains($0.stepIndex) }
-            let perBar = Dictionary(grouping: own, by: { $0.stepIndex / 16 })
-            #expect(perBar.values.allSatisfy { $0.count <= 2 }, "Lead 2 over 2 notes a bar")
+            let bars = s.structure.sections.filter { $0.label == .A || $0.label == .B }
+                .reduce(0) { $0 + $1.lengthBars }
+            let n = s.trackEvents[kTrackLead2].count
+            #expect(Double(n) < Double(bars), "Lead 2 \(n) notes in \(bars) groove bars")
+            notes += n; grooveBars += bars
         }
         let share = Double(shadow) / Double(songs.count)
         #expect(share > 0.14 && share < 0.36, "shadow hold share \(share)")
+        #expect(Double(notes) / Double(grooveBars) < 0.7, "Lead 2 \(notes) notes in \(grooveBars) groove bars")
     }
 
     /// The Lead 2 picker pool for Soho plays the instrument the song generated.

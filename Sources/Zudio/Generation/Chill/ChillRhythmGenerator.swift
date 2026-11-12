@@ -1194,7 +1194,9 @@ struct ChillRhythmGenerator {
     /// 2026-11-12). Returned guide tones first, then the tension and the fifth, because the
     /// comping modes take `prefix(2)` as their two-note shell: that shell is the 3rd (or 4th)
     /// and 7th, which name the chord.
-    private static func bluesVoicing(frame: GlobalMusicalFrame, rootPC: Int, type: ChordType,
+    /// Chill Blues Pads read it too (`ChillPadsGenerator.openFifthHold`), to keep their shell a
+    /// semitone clear of these notes.
+    static func bluesVoicing(frame: GlobalMusicalFrame, rootPC: Int, type: ChordType,
                                      baseRegister: Int, snapTable: [Int]) -> [Int] {
         let scale = frame.scalePCs
         func inMode(_ interval: Int) -> Bool { scale.contains((rootPC + interval) % 12) }

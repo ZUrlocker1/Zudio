@@ -326,10 +326,24 @@ Shared between substyles: CHL-LD1-009 and CHL-LD1-014.
 
 - Fine-tune the weights and the licks by ear. A Chill Blues-only fourth lick rule from the Weimar
   solos (Vierd Blues, K.C. Blues, So What) is the next option if Blues needs more distinction.
-- The Blues second-horn harmony pass is limited to CHL-LD1-004 and CHL-LD1-003. The jazz rules
-  never get it. Decide by ear whether Moanin' or Cantaloupe should.
+- **Blues second-horn harmony on Moanin' and Cantaloupe, built 2026-11-12, not heard.** Zack: in
+  some songs, not all; only a couple of times a song; it need not be note for note and can hit the
+  strong beats or longer notes. CHL-LD1-013 and CHL-LD1-014 Blues songs (never with a vibraphone
+  Lead 2) take it in 50%. Each takes one phrase of at most 4 bars in each window (the second
+  chorus, and the last when the song has three or more), so twice a song at most. `longNotesOnly`
+  in `applyBluesHarmony`: the second horn plays only Lead 1's notes on a beat or a quarter or
+  longer, each held to the next (8 steps at most), 6 velocity softer. It applies to 60% of
+  the Moanin' and Cantaloupe harmony songs and 30% of the CHL-LD1-003/004 ones, drawn on a stream
+  derived from a copy of Lead 2's ("HORNSECT"), so other songs' Lead 2 is unchanged. The playback
+  row reads "Lead 2 harmony - third, long notes". Over 200 Blues seeds: 48 songs with harmony
+  (23 before), 21 of them long notes.
 - Lead 2 answers (CHL-LD2-003 to 006) and the stop-time solo are built (2026-11-11) and not yet
   heard. Tune by ear: rule shares and the 70% habit in `generateLead2` and `jazzAnswers`, the
-  answer rates (A 50%, B 80%), the chain length, and the join styles in `stopTimeSolo`.
-- Chill Soho's Lead 2 still plays CHL-LD2-001's random-walk replies, capped at two notes a bar.
-  The answer rules could serve Soho too if Zack wants it.
+  answer rates (A 50%, B 80%; Soho 35%, 55%), the chain length, and the join styles in
+  `stopTimeSolo`.
+- **Chill Soho Lead 2 plays the answer rules, built 2026-11-12, not heard** (Zack: "for sure").
+  CHL-LD2-001's random walk is retired and its code deleted. Soho keeps its 25% Shadow hold and
+  its instrument pool, and answers at the rates its replies had, A 35% and B 55%. The old two-notes-
+  a-bar cap and the section sit-outs are gone: answers come in short bursts of 3 to 5 notes, and
+  overall Soho's Lead 2 plays fewer notes (100 seeds: 37 a song before, 32 after).
+  ChillSohoTests `sohoLead2IsSparseAndAnswers` now checks notes per groove bar.

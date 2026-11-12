@@ -233,9 +233,14 @@ octave above that, three notes in place of root and fifth. Same draws. A long Im
 (an 8-bar Im7 keeps its 56). The quick change's 6-bar Im7 had held two bars into the IV7
 (Long Lake Exchange Blues, bars 41–42), fixed 2026-11-12.
 
-**Open (2026-11-12):** in the B section's Im7 bars the pad shell's 3rd (F4 in D) sits a semitone
-above Rhythm's accented 9th (E4), and Lead 1 plays in the same octave. Proposed: drop the pad's
-3rd an octave (D3 F3 C4). Awaiting Zack.
+**Pad clash, fixed 2026-11-12** (Zack: prevent it). In the B section's Im7 bars the pad shell's
+3rd (F4 in D) sat a semitone above Rhythm's accented 9th (E4), in Lead 1's octave. The shell is
+now close, root, 3rd (4th for a sus) and 7th (D3 F3 C4), and each pad note is checked against
+Rhythm's Blues voicing for the same chord (`ChillRhythmGenerator.bluesVoicing`, always built from
+MIDI 52): a pad note a semitone or a minor 9th from a Rhythm note moves an octave, or drops out if
+no octave is clear. A root a semitone above Rhythm's major 7th (bVIImaj7 rooted high) drops an
+octave. No random draws. Over 200 Blues songs, pad notes sounding a semitone or minor 9th from a
+Rhythm note: 2,334 before, 0 after.
 
 **Rest bars.** Rhythm rested in section positions 7 and 15 at 35%, extending into the next bar
 at 20%. Position 15 is the suspended turnaround's V7sus4 and position 8 the IV arrival, and the
@@ -319,6 +324,21 @@ Candidates, each from 1959 or later, each paired with a lead rule where one exis
 
 Dropped: the Autumn Leaves circle of fifths (a 1945 tune; it reads as standards-era).
 
+**Recommended first two (2026-11-12, awaiting Zack's go-ahead).** Both stay in the mode, so
+neither needs chord-aware snapping; both are 8- or 16-bar forms with a destination, unlike the
+pendulum and the static groove.
+- **Walk-down** (after Song for My Father): the bass steps down 1, b7, 6, 5 and the form resolves
+  home, 8 bars, harmonic rhythm 2, 2, 1, 1, 2 as in the tune. Aeolian Im7 – bVII7 – bVImaj7 – Vm7
+  (the tune's Db7 and C7 lose their major thirds to the mode); Dorian Im7 – bVIImaj7 – VIm7b5 –
+  Vm7; Mixolydian I7 – bVIImaj7 – VIm7 – Vm7; Ionian Imaj7 – VIIm7b5 – VIm7 – V7. Pairs with
+  CHL-LD1-007 Horace hook.
+- **Relative lift** (after Blue Bossa): 16 bars, the first 8 at home (Im7, IVm7, a minor ii–v, Im7),
+  the second 8 lifting to the relative major (bIIImaj7, then bVImaj7 in Aeolian or IV7 in Dorian)
+  before the ii–v home; major modes mirror it, dropping to VIm7. Blue Bossa's lift is to bII major,
+  a key change; the relative major keeps the shape in the mode. Pairs with CHL-LD1-008 Blues bossa.
+- Neither takes the turnaround (each form already cadences, like minor blues). Proposed shares:
+  static groove 20, pendulum 20, minor blues 15, modal drift 10, walk-down 20, relative lift 15.
+
 **How many:** about 10 base Chill progressions in all (the four fixed families plus about six
 named ones), so one recurs in about one song in ten; Soho has seven. Chill Blues: the plain form
 plus the four devices, which combine into many chorus variants.
@@ -328,6 +348,11 @@ plus the four devices, which combine into many chorus variants.
 - Items 1, 3 and 4 committed (be74994) plus round 1 (2026-11-12); Zack to listen.
 - Simple-form pendulum and modal drift dominant sus confirmed (2026-11-12).
 - Chill Blues plan made diatonic with jazz voicings (round 2); Zack to listen.
+- Blues pad clash with Rhythm's 9th fixed (2026-11-12); not heard.
+- Two new base Chill progressions that go somewhere (Zack, 2026-11-12: one or two, beyond the
+  pendulum and the static groove): Claude recommended a walk-down after Song for My Father and a
+  relative-key lift after Blue Bossa, both in the mode, so no chord-aware snapping. Awaiting his
+  go-ahead; see Item 2.
 - ChillBluesBatchTests run 2026-11-12 (MIDI check above); ChillBatchTests not run.
 - Item 2 later, after chord-aware snapping.
 - Mark nothing with "* " here (chord plans are not rules), but log the new motion.

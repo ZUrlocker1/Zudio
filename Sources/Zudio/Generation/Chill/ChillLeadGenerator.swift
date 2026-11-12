@@ -1,8 +1,8 @@
 // ChillLeadGenerator.swift — Chill generation step 6
 // Copyright (c) 2026 Zack Urlocker
 // Lead 1: primary solo voice (flute, muted trumpet, vibraphone, saxophone).
-// Lead 2: answers that riff on Lead 1 (CHL-LD2-003 to 006), shadow hold (CHL-LD2-002); Soho's
-// call-and-response (CHL-LD2-001).
+// Lead 2: answers that riff on Lead 1 (CHL-LD2-003 to 006), shadow hold (CHL-LD2-002), in all
+// three Chill styles.
 // Phrases: 2–4 bars with deliberate rests (CHL-RULE-06).
 // Pitch pool: mode pentatonic + occasional blue note (CHL-RULE-07).
 // All notes snapped to scale (CHL-SYNC-001).
@@ -516,13 +516,7 @@ struct ChillLeadGenerator {
         // corpus; a pad-like voice under the melody is the exception. Base Chill: shadow hold 35%
         // (50% until the answer rules arrived on 2026-11-11).
         let useShadowHold = bluesVariation ? false : rng.nextDouble() < (sohoVariation ? 0.25 : 0.35)
-        if useShadowHold || sohoVariation {
-            usedRuleIDs.insert(useShadowHold ? "CHL-LD2-002" : "CHL-LD2-001")
-        }
-
-        var events: [MIDIEvent] = []
-        let scale      = scaleNotes(frame: frame)
-        let pentatonic = pentatonicNotes(frame: frame)
+        if useShadowHold { usedRuleIDs.insert("CHL-LD2-002") }
 
         // Lead 2 instrument: uniform random from the four L2-appropriate instruments.
         // Register separation (below) ensures L2 stays out of L1's range regardless of choice.
@@ -551,8 +545,6 @@ struct ChillLeadGenerator {
         // Using the midpoint (not regLow1) prevents degenerate one-note pools when Lead 1
         // has a low bottom register (e.g. regLow near 52 → midpoint cap → only a few scale notes).
         let regMid1  = (regLow1 + regHigh1) / 2
-        let regHigh2 = min(rawHigh2, regMid1 - 2)
-        let regLow2  = max(36, min(rawLow2, regHigh2 - 12))
 
         // CHL-LD2-002: Shadow hold — a slow chord-tone line under some of Lead 1's phrases.
         // Base Chill and Blues: Lead 2 never sounds in a breakdown.
@@ -561,7 +553,7 @@ struct ChillLeadGenerator {
         }
         if useShadowHold {
             // The instrument's own register: the line is kept below Lead 1 note by note, so it
-            // does not need the midpoint cap the gap phrases use, which can fall under the
+            // does not need the midpoint cap the answers use, which can fall under the
             // instrument's floor and get folded back up an octave.
             let events = shadowHold(frame: frame, structure: structure,
                                     lead1Events: lead1Events, lead1Register: (regLow1, regHigh1),
@@ -569,15 +561,17 @@ struct ChillLeadGenerator {
             return (sohoVariation ? capNotesPerBar(events, 2) : outsideBreakdowns(events), inst2)
         }
 
-        // CHL-LD2-003 to 006 (base Chill and Blues): answers that riff on Lead 1's phrases. Shares
-        // of the answer songs: Tail riff 30, Rhythm trade 25, Bebop enclosure 20, Question and
-        // answer 25. See jazzAnswers.
-        if !sohoVariation {
+        // CHL-LD2-003 to 006: answers that riff on Lead 1's phrases. Shares of the answer songs:
+        // Tail riff 30, Rhythm trade 25, Bebop enclosure 20, Question and answer 25. See
+        // jazzAnswers. Chill Soho too since 2026-11-12 (Zack: not the old random walk,
+        // CHL-LD2-001, now retired), at the lower answer rates its replies had, A 35% and B 55%,
+        // so a sax that answers the singer does not answer everything.
+        do {
             let ruleID = ["CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006"][
                 rng.weightedPick([0.30, 0.25, 0.20, 0.25])]
             usedRuleIDs.insert(ruleID)
-            // The answers' register stays inside the instrument's own. regLow2 and regHigh2 above
-            // can fall below it (a flute under a muted trumpet got 55 to 67, under the flute's 65
+            // The answers' register stays inside the instrument's own. A cap at the midpoint
+            // alone can fall below it (a flute under a muted trumpet got 55 to 67, under the flute's 65
             // floor), and the final register fold then split figures across octaves. An answer
             // plays in Lead 1's gaps, so where the instrument cannot sit below the middle of Lead
             // 1's register it takes its own bottom octave and a half instead.
@@ -586,95 +580,10 @@ struct ChillLeadGenerator {
             let answers = jazzAnswers(ruleID: ruleID, frame: frame, structure: structure,
                                       lead1Events: lead1Events, handoffBars: handoffBars,
                                       bluesVariation: bluesVariation, regLow: ansLow, regHigh: ansHigh,
+                                      answerRates: sohoVariation ? (0.35, 0.55) : (0.50, 0.80),
                                       velocityOffset: inst2 == .vibraphone ? 0 : -15, rng: &rng)
             return (outsideBreakdowns(answers), inst2)
         }
-
-        // Soho: Lead 2 sits out the opening of a groove section about a third of the time — a sax
-        // that replies to everything stops sounding like a reply.
-        //
-        // It used to sit out the *whole* section, which in a two-section song meant vanishing for
-        // more than half of it: a 56-bar B section sat out entirely left Lead 2 silent from bar 45
-        // to the end while the log still listed a rule and a note count for it, and 29% of Soho
-        // songs were silent for over 40% of their length (Zack, 2026-10-12). Sitting out the
-        // first 8–16 bars gives the same effect — the section opens without the reply and the sax
-        // arrives later — without the track disappearing.
-        var sittingOut = Set<Int>()
-        if sohoVariation {
-            for sec in structure.sections where sec.label == .A || sec.label == .B {
-                guard rng.nextDouble() < 0.35 else { continue }
-                let len = Swift.min(sec.lengthBars, 8 + rng.nextInt(upperBound: 9))   // 8–16 bars
-                sittingOut.formUnion(sec.startBar..<(sec.startBar + len))
-            }
-        }
-
-        // CHL-LD2-001: Call-and-response, Chill Soho only since 2026-11-11 — a fresh phrase in the
-        // gaps between Lead 1 phrases
-        var lead1BarSet = Set<Int>()
-        for onset in lead1Onsets {
-            for b in onset.startBar..<onset.endBar { lead1BarSet.insert(b) }
-        }
-
-        // Blues form: section anchors for turnaround zone silence (pos 13–15 are Lead-2-free)
-        let (ld2_bSectionStart, ld2_aSectionStart) = bluesVariation ? bluesSectionAnchors(structure: structure) : (-1, -1)
-
-        var bar = 0
-        while bar < frame.totalBars {
-            let section = structure.section(atBar: bar)
-            let label   = section?.label ?? .A
-
-            // Lead 2 only in groove sections (A and B)
-            guard label == .A || label == .B else { bar += 1; continue }
-
-            // Blues: turnaround zone (pos 13–15) — Lead 2 silent; Lead 1 lick + drums own this
-            if bluesVariation
-                && bluesFormPosition(bar: bar, label: label, bStart: ld2_bSectionStart, aStart: ld2_aSectionStart) >= 13 {
-                bar += 1; continue
-            }
-
-            // Skip bars where Lead 1 is playing
-            guard !lead1BarSet.contains(bar), !sittingOut.contains(bar) else { bar += 1; continue }
-            // Handoff window: LD2 strongly encouraged to fill bars LD1 was forced to skip.
-            // Normal: 40% in A (sparse), 80% in B (dense). Soho: 35% / 55%.
-            let responseProb: Double = handoffBars.contains(bar) ? 0.90
-                : sohoVariation ? (label == .A ? 0.35 : 0.55)
-                : (label == .A ? 0.40 : 0.80)
-            guard rng.nextDouble() < responseProb else { bar += 1; continue }
-
-            let sectionEnd = section.map { $0.startBar + $0.lengthBars } ?? frame.totalBars
-            // 2-bar phrases for Lead 2; blues: clamp to chord seam so phrases don't span chord changes
-            var phraseLen = Swift.min(2, sectionEnd - bar)
-            // Soho: Lead 1 rests about a bar and a half between phrases, so a one-bar answer is
-            // what fits the gap.
-            if sohoVariation && phraseLen == 2 && lead1BarSet.contains(bar + 1) { phraseLen = 1 }
-            if bluesVariation {
-                let ld2FormPos = bluesFormPosition(bar: bar, label: label, bStart: ld2_bSectionStart, aStart: ld2_aSectionStart)
-                if ld2FormPos >= 0 {
-                    phraseLen = Swift.min(phraseLen, bluesNextSeam(after: ld2FormPos) - ld2FormPos)
-                }
-            }
-            guard phraseLen > 0 else { bar += 1; continue }
-
-            // Check gap is free of Lead 1
-            let gapFree = (bar..<bar + phraseLen).allSatisfy { !lead1BarSet.contains($0) }
-            guard gapFree else { bar += 1; continue }
-
-            let ld2PhraseStartChord = bluesVariation ? structure.chordWindow(atBar: bar) : nil
-            let phraseNotes = buildPhrase(
-                frame: frame, bar: bar, bars: phraseLen,
-                leadInstrument: inst2,
-                pentatonic: pentatonic, scale: scale,
-                blueNotePC: nil,
-                regLow: regLow2, regHigh: regHigh2,
-                section: label,
-                phraseStartChord: ld2PhraseStartChord,
-                rng: &rng,
-                velocityOffset: inst2 == .vibraphone ? 0 : -15  // vibraphone reads quietly; match Lead 1 level
-            )
-            events += phraseNotes
-            bar += phraseLen + 1  // mandatory 1-bar rest after each phrase (CHL-RULE-06 breathing room)
-        }
-        return (sohoVariation ? capNotesPerBar(events, 2) : events, inst2)
     }
 
     /// The next chord-change seam of the 16-bar Blues form after `pos`: IVm7 at 8, V7 at 12, the
@@ -1043,7 +952,7 @@ struct ChillLeadGenerator {
 
     // MARK: - CHL-LD2-003 to 006: answers that riff on Lead 1
 
-    /// Base Chill and Chill Blues Lead 2 since 2026-11-11 (Chill Soho keeps CHL-LD2-001). Until then
+    /// Base Chill and Chill Blues Lead 2 since 2026-11-11, Chill Soho since 2026-11-12. Until then
     /// every reply was a fresh scale random walk that took nothing from the phrase it answered.
     /// Now Lead 2 answers each Lead 1 phrase it replies to like a second soloist trading with the
     /// first, shorter than Lead 1: one answer, about a bar, starting an 8th or so after Lead 1's
@@ -1069,6 +978,7 @@ struct ChillLeadGenerator {
     private static func jazzAnswers(ruleID: String, frame: GlobalMusicalFrame, structure: SongStructure,
                                     lead1Events: [MIDIEvent], handoffBars: Set<Int>,
                                     bluesVariation: Bool, regLow: Int, regHigh: Int,
+                                    answerRates: (a: Double, b: Double) = (0.50, 0.80),
                                     velocityOffset: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         struct ANote { var rel: Int; var note: Int; var dur: Int; var chromatic = false }
         let scale = sortedScale(frame: frame)
@@ -1306,7 +1216,7 @@ struct ChillLeadGenerator {
             }
             guard limit - start >= 8 else { continue }
             let handoff = (start / 16...(limit - 1) / 16).contains { handoffBars.contains($0) }
-            let prob = handoff ? 1.0 : (sec.label == .A ? 0.50 : 0.80)
+            let prob = handoff ? 1.0 : (sec.label == .A ? answerRates.a : answerRates.b)
             guard rng.nextDouble() < prob else {
                 openGaps.append(Gap(pi: pi, start: start, limit: limit, secStart: sec.startBar))
                 continue
@@ -2206,10 +2116,14 @@ struct ChillLeadGenerator {
 
     // MARK: - Blues harmony / unison section
 
-    /// Post-processing pass: replaces Lead 2 events in `harmonyBars` with notes derived
+    /// Replaces Lead 2 events in `harmonyBars` with notes derived
     /// from Lead 1 — either diatonic parallel harmony (intervalSteps scale positions below)
     /// or unison (same pitch). Called from SongGenerator after both leads are generated.
     /// ~15% of Lead 1's shortest notes are dropped for natural player looseness.
+    /// `maxBars`: harmonize at most this many bars of the kept phrases (a lick or two, not a solo).
+    /// `longNotesOnly`: the second horn plays only Lead 1's notes on a beat or a quarter or
+    /// longer, each held to the next and a little softer, a backing line rather than a note-for-
+    /// note copy (Zack, 2026-11-12: harmonies can hit the strong beats or longer notes).
     static func applyBluesHarmony(
         lead1Events: [MIDIEvent],
         lead2Events: inout [MIDIEvent],
@@ -2217,6 +2131,8 @@ struct ChillLeadGenerator {
         useUnison: Bool,
         intervalSteps: Int,
         maxPhrases: Int = 2,
+        maxBars: Int? = nil,
+        longNotesOnly: Bool = false,
         frame: GlobalMusicalFrame,
         rng: inout SeededRNG
     ) {
@@ -2247,12 +2163,28 @@ struct ChillLeadGenerator {
         }
         if !currentGroup.isEmpty { phraseBarGroups.append(currentGroup) }
 
-        let keptBars = Set(phraseBarGroups.prefix(maxPhrases).flatMap { $0 })
-        let keptEvents = windowEvents.filter { keptBars.contains($0.stepIndex / 16) }
+        var keptBarList = phraseBarGroups.prefix(maxPhrases).flatMap { $0 }
+        if let cap = maxBars { keptBarList = Array(keptBarList.prefix(cap)) }
+        let keptBars = Set(keptBarList)
+        var keptEvents = windowEvents.filter { keptBars.contains($0.stepIndex / 16) }
+
+        if longNotesOnly {
+            // Lead 1 can stack notes on one step; the horn takes the top one.
+            let strong = keptEvents.filter { $0.stepIndex % 4 == 0 || Int($0.durationSteps) >= 4 }
+            let byStep = Dictionary(grouping: strong, by: \.stepIndex).compactMapValues { $0.max { $0.note < $1.note } }
+            let steps = byStep.keys.sorted()
+            keptEvents = steps.enumerated().map { i, step in
+                let e = byStep[step]!
+                let next = i + 1 < steps.count ? steps[i + 1] : step + 8
+                let held = Swift.min(8, Swift.max(Int(e.durationSteps), next - step - 1))
+                return MIDIEvent(stepIndex: step, note: e.note,
+                                 velocity: UInt8(Swift.max(1, Int(e.velocity) - 6)), durationSteps: held)
+            }
+        }
 
         for event in keptEvents {
             // Drop ~15% of very short notes — looseness like real horn players
-            if Int(event.durationSteps) < 3 && rng.nextDouble() < 0.15 { continue }
+            if !longNotesOnly && Int(event.durationSteps) < 3 && rng.nextDouble() < 0.15 { continue }
 
             let pitch: Int
             if useUnison {
