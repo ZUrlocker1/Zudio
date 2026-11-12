@@ -338,7 +338,7 @@ struct ChillStructureGenerator {
             let partner: BarChord = (r2, t2)
             for section in sections where section.label == .B {
                 pendulum(section, partner: partner, every: 4)
-                bLabel = "B \(chordName(tonic)) – \(chordName(partner))"
+                bLabel = "B \(chordName(tonic))–\(chordName(partner))"
             }
             // Simple form has no B section: the body's second half moves instead, from the
             // phrase nearest its middle, so no song is one chord from start to finish.
@@ -347,7 +347,7 @@ struct ChillStructureGenerator {
                 let list = phrases(body)
                 if list.count >= 2 {
                     pendulum(Array(list[(list.count / 2)...]), partner: partner, every: 4)
-                    bLabel = "second half \(chordName(tonic)) – \(chordName(partner))"
+                    bLabel = "second half \(chordName(tonic))–\(chordName(partner))"
                 }
             }
         case .two_chord_pendulum:
@@ -361,7 +361,7 @@ struct ChillStructureGenerator {
                     pendulum(section, partner: fp.partner, every: every)
                 case .B:
                     pendulum(section, partner: bPartner, every: every)
-                    bLabel = "B \(chordName(tonic)) – \(chordName(bPartner))"
+                    bLabel = "B \(chordName(tonic))–\(chordName(bPartner))"
                 case .intro, .outro:
                     for b in section.startBar..<Swift.min(total, section.endBar) { bars[b] = tonic }
                 default:
@@ -388,7 +388,7 @@ struct ChillStructureGenerator {
             for section in sections where section.label == .outro {
                 for b in section.startBar..<Swift.min(total, section.endBar) { bars[b] = tonic }
             }
-            if let held = swung { bLabel = "then \(chordName(tonic)) – \(chordName(held))" }
+            if let held = swung { bLabel = "then \(chordName(tonic))–\(chordName(held))" }
         case .minor_blues:
             break
         }
@@ -439,8 +439,9 @@ struct ChillStructureGenerator {
         }
         // Chunk any window > 8 bars into same-chord sub-windows so analyzer sees correct windows.
         // Breakdown sus4 windows are exempt — they're intentionally static.
-        // "turn:" rather than " - turnaround": the Chords line runs long (Zack, 2026-11-11).
-        let turnLabel = turnBars.isEmpty ? nil : "turn: \(turn.map(chordName).joined(separator: " – "))"
+        // "turn:" rather than " - turnaround", and chords joined with an unspaced dash: the Chords
+        // line runs long (Zack, 2026-11-11 and 2026-11-12).
+        let turnLabel = turnBars.isEmpty ? nil : "turn: \(turn.map(chordName).joined(separator: "–"))"
         let label = [bLabel, turnLabel].compactMap { $0 }.joined(separator: " ")
         return (chunkWindows(out, maxBarLen: 8, key: key, mode: mode), label.isEmpty ? nil : label, turnBars)
     }

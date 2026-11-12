@@ -139,8 +139,10 @@ transformations, then left the musical design to Claude on one condition: "never
 - **Draw:** on a stream derived from a copy of the Lead 1 stream ("JAZZVARI"), so nothing else in
   the song moves; songs that draw the plain version are identical to before. Chill Soho's reused
   CHL-LD1-001 passes `lickVariants: false` and is unchanged.
-- **Log:** the version follows the rule's name, as in "Cantaloupe Island hook, inverted, filled
-  in and pushed"; nothing is added for the plain version.
+- **Log:** the version follows the rule's name, short and comma-separated (Zack, 2026-11-12):
+  "Blues bossa filled, pushed", "Cantaloupe hook inverted, filled, laid back". The log words are
+  inverted, reversed, flipped, filled, pared, pushed and laid back. Nothing is added for the
+  plain version.
 - **Measured over 900 Chill seeds:** the shares come out 20/20/30/30 within sampling noise per
   rule, and every transformation changes the first 16 notes of the song's lead in all but a
   handful of songs (Horace hook's filled in and pushed sometimes act only later in the phrase).
@@ -259,7 +261,8 @@ Shared between substyles: CHL-LD1-009 and CHL-LD1-014.
   (a chord tone first, then the lower); short semitone passing tones keep the blue note. This is
   how one bank serves Dorian Blues and the major modes of regular Chill.
 - **Phrase lengths:** Cantaloupe 3 bars, the others 2, clamped by section ends and Blues seams.
-- **Log names:** "Moanin' call and response", "Cantaloupe Island hook", "Blue Monk riff".
+- **Log names:** "Moanin' call and response", "Cantaloupe hook" (shortened from "Cantaloupe
+  Island hook", Zack, 2026-11-12), "Blue Monk riff".
 - **No swing:** the engine plays straight 16ths. Moanin's swung 8ths land on step 3 of the beat
   when quantized, which reads as a dotted, shuffle-like lilt.
 

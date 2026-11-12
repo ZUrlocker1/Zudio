@@ -3840,7 +3840,7 @@ struct SongGenerator {
                 }
                 if names.last != name { names.append(name) }
             }
-            return names.joined(separator: " – ")
+            return names.joined(separator: "–")   // "Gmaj7–A7" (Zack, 2026-11-12)
         }
 
         // Helper: describe which instruments are active in a section (for intro/outro labels)
@@ -4026,14 +4026,22 @@ struct SongGenerator {
                 fireBar(bar, tag: "Turnaround", desc: treatment.name)
             }
         } else if bluesVariation {
-            // The 16-bar blues cycle turns around on its V7, at cycle bar 12. The row lists the
-            // chords of cycle bars 12 to 15, so the modal turn and suspended turnaround devices
-            // show where they play.
+            // The 16-bar blues cycle turns around at cycle bars 12 and 13 (Vm7–IV7sus4, or the
+            // modal turn's bVIImaj7–IV7). A suspended turnaround in bars 14 and 15 gets a row of
+            // its own. Each row names only its own two chords, not the tonic it resolves to
+            // (Zack, 2026-11-12).
             for section in structure.sections where section.label == .A || section.label == .B {
                 var cycleStart = section.startBar
                 while cycleStart + 12 < section.endBar {
-                    let end = min(cycleStart + 16, section.endBar)
-                    fireBar(cycleStart + 12, tag: "Turnaround", desc: turnaroundChords(cycleStart + 12, end))
+                    fireBar(cycleStart + 12, tag: "Turnaround",
+                            desc: turnaroundChords(cycleStart + 12, min(cycleStart + 14, section.endBar)))
+                    let susBars = (cycleStart + 14)..<min(cycleStart + 16, section.endBar)
+                    if susBars.contains(where: { bar in
+                        structure.chordPlan.first { $0.startBar <= bar && bar < $0.endBar }?.chordRoot != "1"
+                    }) {
+                        fireBar(cycleStart + 14, tag: "Turnaround",
+                                desc: turnaroundChords(susBars.lowerBound, susBars.upperBound))
+                    }
                     cycleStart += 16
                 }
             }
@@ -4979,11 +4987,11 @@ struct SongGenerator {
         )
         // Avalon Hook draws one or two per-song treatments; naming them beside the rule is the
         // only way to tell from a log why one song's hook sounds unlike another's.
-        // The jazz lick rules name their per-song version the same way ("Cantaloupe Island
-        // hook, inverted and pushed").
+        // The jazz lick rules name their per-song version the same way ("Blues bossa filled,
+        // pushed").
         if let t = hookTreatments, let i = log.firstIndex(where: {
             $0.tag == "CHL-LD1-012" || JazzCellState.variantRules.contains($0.tag) }) {
-            let sep = log[i].tag == "CHL-LD1-012" ? " " : ", "
+            let sep = " "
             log[i] = GenerationLogEntry(tag: log[i].tag,
                                         description: log[i].description + sep + t,
                                         isTitle: log[i].isTitle)
@@ -5847,7 +5855,7 @@ struct SongGenerator {
             // turnaround, or the Blues chorus devices the song played.
             chordsLine = chordsDescription(key: frame.key, mode: frame.mode,
                                            familyLabel: bluesVariation ? "blues" : familyLabel)
-                + (chordMotionLabel.map { " - \($0)" } ?? "")
+                + (chordMotionLabel.map { " \($0)" } ?? "")   // no " - " (Zack, 2026-11-12)
                 + (blueNoteName.map { _ in " - blues scale" } ?? "")
         }
         log.append(GenerationLogEntry(tag: "Chords", description: chordsLine))
@@ -5963,7 +5971,7 @@ struct SongGenerator {
         case "CHL-LD1-008":  return "Blues bossa"
         case "CHL-LD1-009":  return "Jazzy blues lead"
         case "CHL-LD1-013":  return "Moanin' call and response"
-        case "CHL-LD1-014":  return "Cantaloupe Island hook"
+        case "CHL-LD1-014":  return "Cantaloupe hook"
         case "CHL-LD1-015":  return "Blue Monk riff"
         case "CHL-LD2-001":  return "Counter-melody"
         case "CHL-LD2-002":  return "Shadow hold"

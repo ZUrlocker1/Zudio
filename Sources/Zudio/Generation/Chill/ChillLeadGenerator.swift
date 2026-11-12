@@ -2178,13 +2178,9 @@ struct JazzCellState {
                                             "CHL-LD1-013", "CHL-LD1-014", "CHL-LD1-015"]
 
     /// The transformations for the log, beside the rule's name; nil when the licks play as written.
+    /// Short, after the rule's name: "Blues bossa filled, pushed" (Zack, 2026-11-12).
     var variantNote: String? {
-        let names = variants.map(\.rawValue)
-        switch names.count {
-        case 0:  return nil
-        case 1:  return names[0]
-        default: return names.dropLast().joined(separator: ", ") + " and " + names.last!
-        }
+        variants.isEmpty ? nil : variants.map(\.rawValue).joined(separator: ", ")
     }
 
     var phraseBars: Int {
@@ -2245,9 +2241,9 @@ struct JazzCellState {
 enum JazzVariant: String {
     case inverted       = "inverted"
     case reversed       = "reversed"
-    case leapFlipped    = "leap flipped"
-    case filledIn       = "filled in"
-    case paredDown      = "pared down"
+    case leapFlipped    = "flipped"
+    case filledIn       = "filled"
+    case paredDown      = "pared"
     case pushed         = "pushed"
     case laidBack       = "laid back"
 

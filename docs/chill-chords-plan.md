@@ -289,6 +289,16 @@ chords (313 attacks, half its songs). Two sources, both fixed where the notes ar
   Changed songs: 67 of 73 Bosa Moon songs and 4 of 70 others (groove pockets). Chill Blues and
   Soho identical. Soho still has a few doublings of its own (15 attacks in 107 songs), left as is.
 
+## Log text (2026-11-12)
+
+Zack asked for shorter lines. The Chords line drops " - " between its parts and joins chords
+with an unspaced en dash: "E Dorian groove B Im7–Vm7 turn: bIIImaj7–IV7", "D Dorian blues quick
+change, modal turn". Turnaround rows read "Gmaj7–A7". The examples quoted in the sections above
+show the older spaced form. A Chill Blues Turnaround row now names only its own two chords: at
+form position 12 the Vm7–IV7sus4 (or the modal turn's bVIImaj7–IV7), and when the suspended
+turnaround plays, a second row at position 14 with its IIm7–V7sus4. It used to list positions 12
+to 15, the tonic included. Soho's Chords line is unchanged.
+
 ## Item 2: tune-named progressions (later)
 
 Candidates, each from 1959 or later, each paired with a lead rule where one exists:
