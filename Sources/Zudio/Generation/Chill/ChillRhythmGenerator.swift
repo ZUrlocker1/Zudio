@@ -17,6 +17,7 @@ struct ChillRhythmGenerator {
         beatStyle: ChillBeatStyle = .electronic,
         breakdownStyle: ChillBreakdownStyle = .bassOstinato,
         bluesVariation: Bool = false,
+        melody: ChillClearance? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         switchAnnotation: inout (bar: Int, ruleID: String)?
@@ -96,7 +97,8 @@ struct ChillRhythmGenerator {
                                 bluesVariation: bluesVariation, bluesKeyboardBar: bluesKeyboardBar,
                                 forcedSwitchBar: forcedSwitchBar, sparseFragments: sparseFragments,
                                 dropoutFragments: dropoutFragments, clave: beatStyle == .sohoLatin,
-                                soho: beatStyle.isSoho, eighthsPeriod: eighthsPeriod, rng: &rng)
+                                soho: beatStyle.isSoho, eighthsPeriod: eighthsPeriod,
+                                melody: melody, rng: &rng)
     }
 
     /// A pianist's touch on full chords (Zack, 2026-11-12), applied where each chord is written:
@@ -344,6 +346,7 @@ struct ChillRhythmGenerator {
                                          clave: Bool = false,
                                          soho: Bool = false,
                                          eighthsPeriod: Int = 8,
+                                         melody: ChillClearance? = nil,
                                          rng: inout SeededRNG) -> [MIDIEvent] {
         var events: [MIDIEvent] = []
         let scalePCs  = frame.scalePCs
@@ -358,6 +361,17 @@ struct ChillRhythmGenerator {
         // it leaves those notes to the stab rather than striking the same keys again.
         var pocketStabs: [Int: Set<Int>] = [:]
         for bar in 0..<frame.totalBars {
+            // Each bar, as it is written, is voiced around the melody (ChillClearance): a note
+            // that would rub a held lead note drops an octave or is left out, as a pianist leaves
+            // the melody's neighbour out of the chord under it. Base Chill and Blues; Soho passes
+            // no melody. No draws, so the comping's random stream is unchanged.
+            let barStart = events.count
+            defer {
+                if let melody, events.count > barStart {
+                    let written = Array(events[barStart...])
+                    events.replaceSubrange(barStart..., with: melody.voiceComping(written, floor: 45))
+                }
+            }
             let section = structure.section(atBar: bar)
             let label   = section?.label ?? .A
 

@@ -311,6 +311,87 @@ form position 12 the Vm7–IV7sus4 (or the modal turn's bVIImaj7–IV7), and whe
 turnaround plays, a second row at position 14 with its IIm7–V7sus4. It used to list positions 12
 to 15, the tonic included. Soho's Chords line is unchanged.
 
+## As built (2026-11-12, round 5: chords in the mode, two named forms, brighter moods, no rubs)
+
+Zack heard After Hours (seed 12039892168198894544, Ab Ionian, minor blues): too depressing, and
+the solo's last note in bar 50 sounded wrong. The MIDI showed Lead 1 holding Cb for 8 steps over
+Rhythm's C4 and the Pads' C6. He asked for no clashes, and no rubs "unless it's a short passing
+note before landing on something that resolves properly with the chord", plus items 1 and 2
+below and the two new progressions.
+
+**Minor blues in the mode** (`bluesTile` in `ChillStructureGenerator.swift`). The tile was i (4),
+ivm7 (2), i (2), bVII (1), IV (1), i (2) in every mode; ivm7 is outside Dorian, Mixolydian and
+Ionian, IV major outside Aeolian, bVII outside Ionian. Pads and Rhythm snapped those notes, the
+leads and bass did not. Same bar layout and no draws, per mode:
+- Dorian: Im7, IV7, Im7, bVIImaj7, IV7, Im7
+- Aeolian: Im7, IVm7, Im7, bVImaj7, bVII7, Im7
+- Mixolydian: I, IV, I, bVII, IV, I ("Major blues" on the Chords line)
+- Ionian: I, IVmaj7, I, IIm7, V7sus4, I ("Major blues")
+
+The Ionian pendulum's bVII partner (the Moby open, CHL-SYNC-012) was also outside the mode; it
+and the drift's Ionian third chord are now IIm7. After this, no base Chill chord window over 400
+seeds has a chord tone outside the mode. **Chill Soho still has some** (Mixolydian V major and
+IIIm7, Ionian bVII, in 29 of 135 Soho songs); Soho is unchanged, so they are left for Zack.
+
+**Two named forms** (`namedForm`, `namedFormCycle`; new `ChillProgressionFamily` cases
+`.walk_down` and `.relative_lift`). The family-draw gotcha is respected: the frame still draws the
+four families on the main stream, and the drawn family's plan is still built so its draws are
+made. A new derived stream (113) then turns 35/65 of static-groove and pendulum songs into a named
+form, 20/35 of those the walk-down. Over 193 base seeds: walk-down 34, relative lift 31, static
+groove 31, pendulum 22, minor blues 43, modal drift 32. Each form is a 16-bar cycle tiled over the
+groove sections, then the 8-bar home half where 8 or more bars remain, then the tonic; intro and
+outro hold the tonic; no turnarounds (each form cadences); the breakdown keeps its V7sus4.
+- Walk-down: tonic (2), the b7 chord (2), 6 (1), 5 (1), tonic (2), then b7 (2), tonic (2), 6, 5,
+  tonic (2). Aeolian Im7 bVII7 bVImaj7 Vm7; Dorian Im7 bVIImaj7 VIm7b5 Vm7; Mixolydian I bVIImaj7
+  VIm7 Vm7; Ionian I VIIm7b5 VIm7 V7.
+- Relative lift: home I (2), IV chord (2), ii (1), v (1), I (2); then the lift and the ii–v home.
+  Aeolian: IVm7 bVII7 bIIImaj7 (2), Blue Bossa's own ii–V–I into the relative major. Dorian:
+  bIIImaj7 (2), IV7 (2), IIm7, Vm7. Ionian turns to the relative minor (VIIm7b5, IIIm7, VIm7 (2));
+  Mixolydian VIm7 (2), IIm7 (2), home by bVIImaj7 and IVmaj7. Logged "Relative turn" in a major mode.
+- The bass gets the song's form, not the drawn family, so a converted static groove never takes
+  the static-only ostinato (CHL-BASS-004); `SongState.chillProgFamily` stores the form, so a bass
+  regen agrees.
+
+**Mood brightens the mode** (`generateChill`, derived stream 112, base Chill only). Bright songs
+are always major, Free songs half the time: Dorian becomes Mixolydian, Aeolian Ionian. Base Chill
+major share 35% to 52% (100 of 193 seeds). Blues (Dorian) and Soho unchanged.
+
+**No rubs** (new `ChillClearance.swift`). Definitions: a rub is 1, 13, 25 or 37 semitones for two
+steps or more (a major 7th is not a rub); a short passing note is two steps or less with the
+line's next onset within two steps of its end, a semitone or tone away; an avoid note is a
+semitone above a tone of a chord it sounds over. Who yields:
+- Lead 1 (`generateLead1(band:)`, base and Blues): each phrase, as it is appended (fresh, seed
+  replay, stop-time solo, Blues turnaround lick, St Germain staccato), keeps clear of the Pads and
+  Bass already written and holds no avoid note. A failing note moves up to four semitones, in the
+  scale and register, chord tone first, then toward the next note; otherwise it stays.
+- The check covers the note as it will sound: a step either side and through a legato join (the
+  groove fixup runs after the leads), and the octave above (the harmonic filter's Pass B can lift
+  a window, turning a major 7th into a minor 9th).
+- Lead 2 (`generateLead2(band:)`): each answer as it is placed, and the Shadow hold line, clear of
+  Pads, Bass and Lead 1, and in Soho of Soho's Rhythm too. The Blues second horn leaves out a
+  harmony note that rubs Pads or Bass.
+- Rhythm (`generate(melody:)`), written after the leads in base Chill and Blues: each bar, as it
+  is written, drops a note that rubs a held melody note an octave, or leaves it out (a `defer` in
+  the comping loop, as the groove-pocket stab filter already did). It hears the leads through the
+  harmonic filter and register fold that run after it, so it sees them as they sound. Soho's
+  Rhythm is now written before the leads (identical notes; each track has its own stream).
+- No random draws anywhere, so every draw stays aligned.
+
+**Measured** (400 Chill seeds, throwaway dump, before = dba69e2; 265 of them base Chill or Blues).
+Rubs where neither the lead note nor the Pads, Rhythm, Bass or other-lead note is passing (here
+counting a passing note of up to three steps, as the legato join leaves it): 2,840 in 260 songs
+before; 42 in 31 songs after, nearly all eighths that
+the groove fixup lengthened or moved after they were written (C–B–A with the A pushed two steps
+later, the B now a quarter). Rhythm rubs went to zero. Bass passing notes under a held lead note
+are allowed by the rule. About 9% of base and Blues Lead 1 notes changed pitch; Rhythm plays 1.0%
+(base) and 1.5% (Blues) fewer notes. Soho Lead 2 rubs 328 to 93; Soho Lead 1, Pads, Bass and
+Rhythm identical in all 135 Soho songs.
+
+**Not done, for Zack:** Soho's Lead 1 still rubs (1,771 notes in 135 songs, against Pads 1,063,
+Rhythm 463, Bass 245) and Soho has out-of-mode chords; both need his go-ahead because Soho is
+otherwise frozen. Stopping the groove fixup from lengthening a passing note into a rub would
+close most of the remaining 42. A Lead 1 or Lead 2 regen does not pass a band yet.
+
 ## Item 2: tune-named progressions (later)
 
 Candidates, each from 1959 or later, each paired with a lead rule where one exists:
@@ -324,7 +405,7 @@ Candidates, each from 1959 or later, each paired with a lead rule where one exis
 
 Dropped: the Autumn Leaves circle of fifths (a 1945 tune; it reads as standards-era).
 
-**Recommended first two (2026-11-12, awaiting Zack's go-ahead).** Both stay in the mode, so
+**Recommended first two (2026-11-12; built in round 5, see above).** Both stay in the mode, so
 neither needs chord-aware snapping; both are 8- or 16-bar forms with a destination, unlike the
 pendulum and the static groove.
 - **Walk-down** (after Song for My Father): the bass steps down 1, b7, 6, 5 and the form resolves
@@ -349,10 +430,9 @@ plus the four devices, which combine into many chorus variants.
 - Simple-form pendulum and modal drift dominant sus confirmed (2026-11-12).
 - Chill Blues plan made diatonic with jazz voicings (round 2); Zack to listen.
 - Blues pad clash with Rhythm's 9th fixed (2026-11-12); not heard.
-- Two new base Chill progressions that go somewhere (Zack, 2026-11-12: one or two, beyond the
-  pendulum and the static groove): Claude recommended a walk-down after Song for My Father and a
-  relative-key lift after Blue Bossa, both in the mode, so no chord-aware snapping. Awaiting his
-  go-ahead; see Item 2.
+- Walk-down and relative lift built (round 5, 2026-11-12), with minor blues in the mode, the
+  mood brightening the mode and the no-rubs rule; not heard. Open for Zack: Soho Lead 1 rubs and
+  Soho's out-of-mode chords; the groove fixup lengthening passing notes; regens without a band.
 - ChillBluesBatchTests run 2026-11-12 (MIDI check above); ChillBatchTests not run.
 - Item 2 later, after chord-aware snapping.
 - Mark nothing with "* " here (chord plans are not rules), but log the new motion.

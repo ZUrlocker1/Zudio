@@ -4523,7 +4523,7 @@ struct SongGenerator {
         // CHL-BASS-007 (stGermainOstinato) automatically.
         let forceBeatStyle: ChillBeatStyle? = forceDrumRuleID == "CHL-DRUM-004" ? .stGermain : nil
         // Step 1 — Chill musical frame
-        let (frame, chillProgFamily, pickedLeadInstrument, chillBeatStyle, chillSwingFeel, bluesVariation,
+        let (drawnFrame, drawnProgFamily, pickedLeadInstrument, chillBeatStyle, chillSwingFeel, bluesVariation,
              sohoVariation) =
             ChillMusicalFrameGenerator.generate(
                 rng: &rng, keyOverride: keyOverride, tempoOverride: tempoOverride,
@@ -4532,6 +4532,31 @@ struct SongGenerator {
                 sohoRoll: sohoRoll, forceSohoVariation: forceSohoVariation
             )
         let chillLeadInstrument = pickedLeadInstrument
+
+        // Base Chill only, each on its own derived stream so no main-stream draw moves; Blues and
+        // Soho are unchanged (2026-11-12).
+        // - The mood brightens the mode. A Bright song is always major, a Free one half the time:
+        //   Dorian becomes Mixolydian, Aeolian becomes Ionian (Zack: too many songs sounded
+        //   depressing; the mood never touched the mode before). Base Chill major: 35% to about 51%.
+        // - A share of static-groove and pendulum songs play a named form, the walk-down or the
+        //   relative lift (ChillStructureGenerator.namedForm).
+        let baseChill = !bluesVariation && !sohoVariation
+        var frame = drawnFrame
+        do {
+            var moodRNG = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 112))
+            let half = moodRNG.nextDouble() < 0.50
+            let brighten = drawnFrame.mood == .Bright || (drawnFrame.mood == .Free && half)
+            let major: Mode? = drawnFrame.mode == .Dorian ? .Mixolydian
+                             : drawnFrame.mode == .Aeolian ? .Ionian : nil
+            if baseChill, brighten, let major {
+                frame = GlobalMusicalFrame(key: drawnFrame.key, mode: major, tempo: drawnFrame.tempo,
+                                           mood: drawnFrame.mood,
+                                           progressionFamily: drawnFrame.progressionFamily,
+                                           totalBars: drawnFrame.totalBars)
+            }
+        }
+        let chillProgFamily = baseChill
+            ? ChillStructureGenerator.namedForm(drawn: drawnProgFamily, seed: seed) : drawnProgFamily
 
         // Chill Soho drum plan — rule and percussion overlay — from its own derived stream (94),
         // decided here because the breakdown style picked just below depends on it.
@@ -4556,10 +4581,11 @@ struct SongGenerator {
         // The 3.0 chord motion (base Chill B sections, turnarounds, breakdown V7sus4) draws on its
         // own derived stream (99), so the main stream is unchanged for every Chill substyle.
         let (baseStructure, baseChordMotion, baseTurnaroundBars) = ChillStructureGenerator.generateWithChordMotion(
-            frame: frame, chillProgFamily: chillProgFamily,
+            frame: frame, chillProgFamily: drawnProgFamily,
             mood: frame.mood, breakdownStyle: chillBreakdownStyle,
             noBreakdown: bluesVariation, sohoVariation: sohoVariation,
-            motionSeed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 99), rng: &rng
+            motionSeed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 99),
+            formFamily: chillProgFamily, rng: &rng
         )
 
         // Step 2.5 — Blues chord plan: replace the structure's default chord plan with the
@@ -4637,13 +4663,35 @@ struct SongGenerator {
             rng: &padsRNG, usedRuleIDs: &padRules
         )
 
+        // Rhythm reads nothing the leads write, and each track draws on its own stream, so where
+        // it is generated changes none of its notes. Chill Soho writes it here, before the leads,
+        // so Soho's Lead 2 can hear it; base Chill and Blues write it after the leads (Step 7)
+        // and voice it around them. See ChillClearance (2026-11-12).
+        var rhythmRules: Set<String> = []
+        var chillRhythmSwitchAnnotation: (bar: Int, ruleID: String)? = nil
+        func writeRhythm(melody: ChillClearance?) {
+            trackEvents[kTrackRhythm] = ChillRhythmGenerator.generate(
+                frame: frame, structure: structure,
+                beatStyle: chillBeatStyle,
+                breakdownStyle: chillBreakdownStyle, bluesVariation: bluesVariation,
+                melody: melody,
+                rng: &rhythmRNG, usedRuleIDs: &rhythmRules,
+                switchAnnotation: &chillRhythmSwitchAnnotation
+            )
+        }
+        if sohoVariation { writeRhythm(melody: nil) }
+
         // Step 6 — Lead 1 (primary solo) and Lead 2 (call-and-response)
+        // The soloists listen to the band as they write (ChillClearance): Lead 1 to the Pads and
+        // Bass, Lead 2 to those and Lead 1 (and in Soho to Rhythm). Soho's Lead 1 is unchanged.
+        let padsAndBass = ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass]])
         var lead1Rules: Set<String> = []
         var lead1Returns = Set<Int>()
         let (lead1Events, lead1Onsets, lead1HandoffBars, hookTreatments) = ChillLeadGenerator.generateLead1(
             frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation, forceRuleID: forceLeadRuleID,
+            band: sohoVariation ? nil : padsAndBass,
             rng: &lead1RNG, usedRuleIDs: &lead1Rules, returns: { lead1Returns = $0 }
         )
         trackEvents[kTrackLead1] = lead1Events
@@ -4653,6 +4701,8 @@ struct SongGenerator {
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
             lead1Onsets: lead1Onsets, lead1Events: lead1Events, handoffBars: lead1HandoffBars,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation,
+            band: ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass], lead1Events]
+                                 + (sohoVariation ? [trackEvents[kTrackRhythm]] : [])),
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
         var lead2EventsFinal = lead2Events
@@ -4710,7 +4760,7 @@ struct SongGenerator {
                     harmonyBars: harmonySet, useUnison: useUnison,
                     intervalSteps: intervalSteps, maxPhrases: maxPhrases,
                     maxBars: maxBars, longNotesOnly: longNotes,
-                    frame: frame, rng: &lead2RNG
+                    frame: frame, band: padsAndBass, rng: &lead2RNG
                 )
                 // Anchor annotation to the first actual harmony note so the log fires when
                 // Zack hears it, not at the (potentially silent) window start bar.
@@ -4730,7 +4780,7 @@ struct SongGenerator {
                         harmonyBars: finaleSet, useUnison: useUnison,
                         intervalSteps: intervalSteps, maxPhrases: maxPhrases,
                         maxBars: maxBars, longNotesOnly: longNotes,
-                        frame: frame, rng: &lead2RNG
+                        frame: frame, band: padsAndBass, rng: &lead2RNG
                     )
                     if let firstNote = lead2EventsFinal.filter({ finaleSet.contains($0.stepIndex / 16) })
                                                         .min(by: { $0.stepIndex < $1.stepIndex }) {
@@ -4787,16 +4837,21 @@ struct SongGenerator {
                 + fixupShare("L2", kTrackLead2) + " fixes" 
         }
 
-        // Step 7 — Rhythm (Rhodes active comping)
-        var rhythmRules: Set<String> = []
-        var chillRhythmSwitchAnnotation: (bar: Int, ruleID: String)? = nil
-        trackEvents[kTrackRhythm] = ChillRhythmGenerator.generate(
-            frame: frame, structure: structure,
-            beatStyle: chillBeatStyle,
-            breakdownStyle: chillBreakdownStyle, bluesVariation: bluesVariation,
-            rng: &rhythmRNG, usedRuleIDs: &rhythmRules,
-            switchAnnotation: &chillRhythmSwitchAnnotation
-        )
+        // Step 7 — Rhythm (Rhodes active comping), voiced around the leads as they will sound:
+        // the harmonic filter and register fold below can still drop a lead note or move it an
+        // octave, so Rhythm hears the leads through the same two steps (deterministic; nothing
+        // is stored).
+        if !sohoVariation {
+            let heardLeads = [(kTrackLead1, chillLeadInstrument), (kTrackLead2, chillLead2Instrument)].map { track, inst in
+                foldedIntoRegister(
+                    HarmonicFilter.filterLead(trackEvents[track], track: track, pads: trackEvents[kTrackPads],
+                                              frame: frame, structure: structure,
+                                              bounds: chillLeadRegister(inst),
+                                              lift: track == kTrackLead1 || !lead2Rules.contains("CHL-LD2-002")),
+                    chillLeadRegister(inst))
+            }
+            writeRhythm(melody: ChillClearance(heardLeads))
+        }
 
         // Texture track: audio-only for base Chill and Blues — no MIDI events generated here.
         // Chill Soho is the exception: its texture is always MIDI and never absent. It runs on its
@@ -5819,8 +5874,12 @@ struct SongGenerator {
         switch chillProgFamily {
         case .static_groove:      familyLabel = "Static groove"
         case .two_chord_pendulum: familyLabel = "2 chord pendulum"
-        case .minor_blues:        familyLabel = "Minor blues"
+        case .minor_blues:        familyLabel = frame.mode == .Ionian || frame.mode == .Mixolydian
+                                                ? "Major blues" : "Minor blues"
         case .modal_drift:        familyLabel = "Modal drift"
+        case .walk_down:          familyLabel = "Walk-down"
+        case .relative_lift:      familyLabel = frame.mode == .Ionian || frame.mode == .Mixolydian
+                                                ? "Relative turn" : "Relative lift"
         }
         // Soho bypasses chordsDescription's truncation: that shortens base-Chill family names by
         // cutting at tokens like " bVII", which cut "Im9 – bVII9 (Smooth Operator)" to "Im9 –".

@@ -350,6 +350,10 @@ enum ChillProgressionFamily: String, Codable, Sendable {
     case two_chord_pendulum  // Two chords alternating every 4–8 bars (30%)
     case minor_blues         // 12-bar blues tile in groove sections (20%)
     case modal_drift         // 2–3 slow chord changes over the full song (15%)
+    // 3.0: never drawn by the frame. A share of static-groove and pendulum songs become one of
+    // these on a derived stream (ChillStructureGenerator.namedForm), so no main-stream draw moves.
+    case walk_down           // after Song for My Father: 1, b7, 6, 5 in the bass, 8-bar halves
+    case relative_lift       // after Blue Bossa: 8 bars home, 8 lifting to the relative key
 }
 
 // MARK: - Chill lead instrument

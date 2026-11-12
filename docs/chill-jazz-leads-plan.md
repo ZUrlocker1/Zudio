@@ -324,6 +324,12 @@ Shared between substyles: CHL-LD1-009 and CHL-LD1-014.
 
 ## Open items
 
+- **No rubs (2026-11-12, round 5 of the chords plan).** Lead 1 and Lead 2 now keep clear of the
+  band as each phrase is written (`ChillClearance`): a note that is not a short passing note moves
+  up to four semitones to avoid a semitone or minor 9th against held Pads, Bass (and for Lead 2,
+  Lead 1) notes, or an avoid note over the chord. About 9% of base and Blues Lead 1 notes moved;
+  lick shapes and octaves are otherwise kept. Soho Lead 1 untouched. Details in
+  docs/chill-chords-plan.md, "As built (2026-11-12, round 5 ...)". Not heard.
 - Fine-tune the weights and the licks by ear. A Chill Blues-only fourth lick rule from the Weimar
   solos (Vierd Blues, K.C. Blues, So What) is the next option if Blues needs more distinction.
 - **Blues second-horn harmony on Moanin' and Cantaloupe, built 2026-11-12, not heard.** Zack: in

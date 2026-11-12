@@ -23,6 +23,7 @@ struct ChillLeadGenerator {
         sohoVariation: Bool = false,
         forceRuleID: String? = nil,
         lickVariants: Bool = true,
+        band: ChillClearance? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         replayBars reportReplayBars: ((Set<Int>) -> Void)? = nil,
@@ -43,8 +44,11 @@ struct ChillLeadGenerator {
         let staccatoProb: Double = forceNonStaccato ? 0.0 : (beatStyle == .stGermain ? 0.70 : 0.05)
         if rng.nextDouble() < staccatoProb {
             usedRuleIDs.insert("CHL-LD1-005")
-            let events = stGermainStaccato(frame: frame, structure: structure,
-                                           breakdownStyle: breakdownStyle, rng: &rng)
+            let written = stGermainStaccato(frame: frame, structure: structure,
+                                            breakdownStyle: breakdownStyle, rng: &rng)
+            let (low, high) = register(for: leadInstrument)
+            let events = band?.voiceLine(written, structure: structure, scale: frame.scalePCs,
+                                         low: low, high: high) ?? written
             // Build phraseOnsets from the events for Lead 2 call-and-response awareness
             let onsets = eventsToOnsets(events: events, totalBars: frame.totalBars)
             return (events, onsets, [], nil)   // staccato already has long silences; no extra handoff
@@ -126,6 +130,12 @@ struct ChillLeadGenerator {
         let pentatonic  = pentatonicNotes(frame: frame)
         let blueNote    = blueNotePC(frame: frame)
         let (regLow, regHigh) = register(for: leadInstrument)
+        // Each phrase listens to the band as it is written (ChillClearance): no rub with the Pads
+        // and Bass notes already written, no avoid note held over the chord. Soho passes no band.
+        func heard(_ line: [MIDIEvent]) -> [MIDIEvent] {
+            band?.voiceLine(line, structure: structure, scale: frame.scalePCs,
+                            low: regLow, high: regHigh) ?? line
+        }
 
         // Blues: 60% of songs have a soloist who uses the blue note (the b5 of the key), the rest
         // play plain Dorian. In those songs about a third of phrases try for it until the first lands, and only as a
@@ -264,8 +274,8 @@ struct ChillLeadGenerator {
                     if let sec = section, stopTimeSections.insert(sec.startBar).inserted {
                         var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
                         let motif = melodyPitches(seedPhrases.first ?? Array(events.suffix(6)))
-                        events += stopTimeSolo(section: sec, frame: frame, structure: structure,
-                                               motif: motif, regLow: regLow, regHigh: regHigh, rng: &st)
+                        events += heard(stopTimeSolo(section: sec, frame: frame, structure: structure,
+                                                     motif: motif, regLow: regLow, regHigh: regHigh, rng: &st))
                     }
                     bar += 1
                     continue
@@ -305,9 +315,9 @@ struct ChillLeadGenerator {
                 : -1
             if bluesFormPos >= 14 {
                 if bluesFormPos == 14 && rng.nextDouble() < 0.50 {
-                    events += bluesTurnaroundLick(base: bar * 16, frame: frame,
-                                                  regLow: regLow, regHigh: regHigh,
-                                                  useChromatic: useJazzIdioms, rng: &rng)
+                    events += heard(bluesTurnaroundLick(base: bar * 16, frame: frame,
+                                                        regLow: regLow, regHigh: regHigh,
+                                                        useChromatic: useJazzIdioms, rng: &rng))
                 }
                 bar += 1; continue
             }
@@ -382,7 +392,7 @@ struct ChillLeadGenerator {
 
                 if seedPhrases.count < 2 {
                     // Seed zone: generate normally and store as relative-indexed motif.
-                    let phraseNotes = freshPhrase(bar: bar, bars: actualPhraseLen, label: label)
+                    let phraseNotes = heard(freshPhrase(bar: bar, bars: actualPhraseLen, label: label))
                     events += phraseNotes
                     phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
                     let offset = bar * 16
@@ -451,7 +461,7 @@ struct ChillLeadGenerator {
                             replayedNotes = applyLastNoteDuration(replayedNotes, rng: &rng)
                         }
                         if !canReplayOpening { formReturns.insert(bar) }
-                        events += replayedNotes
+                        events += heard(replayedNotes)
                         phraseOnsets.append((startBar: bar, endBar: bar + seedLen))
                         if canReplayOpening { openingReplaysDone += 1 }
                         if canRecap || duePending { pendingRecall = false }
@@ -468,7 +478,7 @@ struct ChillLeadGenerator {
             }
 
             // Normal phrase generation (free development zone, or replay fallback).
-            let phraseNotes = freshPhrase(bar: bar, bars: actualPhraseLen, label: label)
+            let phraseNotes = heard(freshPhrase(bar: bar, bars: actualPhraseLen, label: label))
             events += phraseNotes
             phraseOnsets.append((startBar: bar, endBar: bar + actualPhraseLen))
             bluesLeadHasPlayed = true
@@ -486,8 +496,8 @@ struct ChillLeadGenerator {
                 var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
                 let before = events.filter { $0.stepIndex < sec.startBar * 16 }
                 let motif = melodyPitches(seedPhrases.first ?? Array(before.suffix(6)))
-                events += stopTimeSolo(section: sec, frame: frame, structure: structure,
-                                       motif: motif, regLow: regLow, regHigh: regHigh, rng: &st)
+                events += heard(stopTimeSolo(section: sec, frame: frame, structure: structure,
+                                             motif: motif, regLow: regLow, regHigh: regHigh, rng: &st))
             }
         }
         reportReplayBars?(replayBars)
@@ -508,6 +518,7 @@ struct ChillLeadGenerator {
         bluesVariation: Bool = false,
         sohoVariation: Bool = false,
         keepInstrument: ChillLeadInstrument? = nil,
+        band: ChillClearance? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
@@ -555,9 +566,12 @@ struct ChillLeadGenerator {
             // The instrument's own register: the line is kept below Lead 1 note by note, so it
             // does not need the midpoint cap the answers use, which can fall under the
             // instrument's floor and get folded back up an octave.
-            let events = shadowHold(frame: frame, structure: structure,
-                                    lead1Events: lead1Events, lead1Register: (regLow1, regHigh1),
-                                    regLow: rawLow2, regHigh: rawHigh2, rng: &rng)
+            let line = shadowHold(frame: frame, structure: structure,
+                                  lead1Events: lead1Events, lead1Register: (regLow1, regHigh1),
+                                  regLow: rawLow2, regHigh: rawHigh2, rng: &rng)
+            // Written as one line; it listens to the band and Lead 1 (ChillClearance).
+            let events = band?.voiceLine(line, structure: structure, scale: frame.scalePCs,
+                                         low: rawLow2, high: rawHigh2) ?? line
             return (sohoVariation ? capNotesPerBar(events, 2) : outsideBreakdowns(events), inst2)
         }
 
@@ -581,7 +595,7 @@ struct ChillLeadGenerator {
                                       lead1Events: lead1Events, handoffBars: handoffBars,
                                       bluesVariation: bluesVariation, regLow: ansLow, regHigh: ansHigh,
                                       answerRates: sohoVariation ? (0.35, 0.55) : (0.50, 0.80),
-                                      velocityOffset: inst2 == .vibraphone ? 0 : -15, rng: &rng)
+                                      band: band, velocityOffset: inst2 == .vibraphone ? 0 : -15, rng: &rng)
             return (outsideBreakdowns(answers), inst2)
         }
     }
@@ -979,6 +993,7 @@ struct ChillLeadGenerator {
                                     lead1Events: [MIDIEvent], handoffBars: Set<Int>,
                                     bluesVariation: Bool, regLow: Int, regHigh: Int,
                                     answerRates: (a: Double, b: Double) = (0.50, 0.80),
+                                    band: ChillClearance? = nil,
                                     velocityOffset: Int, rng: inout SeededRNG) -> [MIDIEvent] {
         struct ANote { var rel: Int; var note: Int; var dur: Int; var chromatic = false }
         let scale = sortedScale(frame: frame)
@@ -1142,7 +1157,9 @@ struct ChillLeadGenerator {
                 out.append(MIDIEvent(stepIndex: step, note: UInt8(pitch),
                                      velocity: UInt8(Swift.max(30, Swift.min(110, v))), durationSteps: n.dur))
             }
-            return out
+            // The answer listens to the band and to Lead 1 as it is placed (ChillClearance).
+            return band?.voiceLine(out, structure: structure, scale: frame.scalePCs,
+                                   low: regLow, high: regHigh) ?? out
         }
 
         var events: [MIDIEvent] = []
@@ -2134,6 +2151,7 @@ struct ChillLeadGenerator {
         maxBars: Int? = nil,
         longNotesOnly: Bool = false,
         frame: GlobalMusicalFrame,
+        band: ChillClearance? = nil,
         rng: inout SeededRNG
     ) {
         // Strip any existing Lead 2 events from the harmony window
@@ -2195,6 +2213,10 @@ struct ChillLeadGenerator {
                 let idx = scale.indices.min(by: { abs(scale[$0] - noteInt) < abs(scale[$1] - noteInt) }) ?? 0
                 pitch = scale[Swift.max(0, idx - intervalSteps)]
             }
+            // The second horn leaves out a note that would rub the Pads or Bass (ChillClearance);
+            // it harmonizes the line, not every note of it. After the draw, so draws are unchanged.
+            if let band, band.clashes(pitch, start: event.stepIndex,
+                                      end: event.stepIndex + Int(event.durationSteps)) { continue }
 
             lead2Events.append(MIDIEvent(
                 stepIndex:     event.stepIndex,

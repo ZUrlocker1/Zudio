@@ -23,11 +23,13 @@ struct ChillStructureGenerator {
         noBreakdown: Bool = false,
         sohoVariation: Bool = false,
         motionSeed: UInt64,
+        formFamily: ChillProgressionFamily? = nil,
         rng: inout SeededRNG
     ) -> SongStructure {
         generateWithChordMotion(frame: frame, chillProgFamily: chillProgFamily, mood: mood,
                                 breakdownStyle: breakdownStyle, noBreakdown: noBreakdown,
-                                sohoVariation: sohoVariation, motionSeed: motionSeed, rng: &rng).structure
+                                sohoVariation: sohoVariation, motionSeed: motionSeed,
+                                formFamily: formFamily, rng: &rng).structure
     }
 
     /// As `generate`, plus a short description of the base Chill chord motion (the B section's
@@ -45,6 +47,7 @@ struct ChillStructureGenerator {
         noBreakdown: Bool = false,
         sohoVariation: Bool = false,
         motionSeed: UInt64,
+        formFamily: ChillProgressionFamily? = nil,
         rng: inout SeededRNG
     ) -> (structure: SongStructure, chordMotion: String?, turnaroundBars: [Int]) {
         let (sections, introStyle, outroStyle): ([SongSection], IntroStyle, OutroStyle)
@@ -59,8 +62,9 @@ struct ChillStructureGenerator {
         }
         var motionRNG = SeededRNG(seed: motionSeed)
         let (chordPlan, motion, turnBars) = buildChordPlan(frame: frame, sections: sections,
-                                                           family: chillProgFamily, rng: &rng,
-                                                           motionRNG: &motionRNG)
+                                                           family: chillProgFamily,
+                                                           form: formFamily ?? chillProgFamily,
+                                                           rng: &rng, motionRNG: &motionRNG)
         return (SongStructure(sections: sections, chordPlan: chordPlan,
                               introStyle: introStyle, outroStyle: outroStyle), motion, turnBars)
     }
@@ -220,12 +224,15 @@ struct ChillStructureGenerator {
     private static func buildChordPlan(frame: GlobalMusicalFrame,
                                         sections: [SongSection],
                                         family: ChillProgressionFamily,
+                                        form: ChillProgressionFamily,
                                         rng: inout SeededRNG,
                                         motionRNG: inout SeededRNG) -> ([ChordWindow], String?, [Int]) {
         var pendulum: (partner: BarChord, windowLen: Int)? = nil
+        // The drawn family's plan is always built, so its main-stream draws are made even when
+        // the song plays a named form instead; the form then rewrites the groove sections.
         let familyWindows = buildFamilyChordPlan(frame: frame, sections: sections, family: family,
                                                  rng: &rng, pendulum: &pendulum)
-        return applyChordMotion(frame: frame, sections: sections, family: family,
+        return applyChordMotion(frame: frame, sections: sections, family: form,
                                 windows: familyWindows, pendulum: pendulum, rng: &motionRNG)
     }
 
@@ -269,6 +276,11 @@ struct ChillStructureGenerator {
             windows = buildModalDrift(frame: frame, sections: sections,
                                       breakdownStart: breakdownStart, breakdownEnd: breakdownEnd,
                                       rng: &rng)
+
+        case .walk_down, .relative_lift:
+            // Never drawn by the frame (see namedForm); the static plan is the safe fallback.
+            windows = buildStaticGroove(key: key, mode: mode, total: total,
+                                        breakdownStart: breakdownStart, breakdownEnd: breakdownEnd)
         }
         return windows
     }
@@ -391,6 +403,27 @@ struct ChillStructureGenerator {
             if let held = swung { bLabel = "then \(chordName(tonic))–\(chordName(held))" }
         case .minor_blues:
             break
+        case .walk_down, .relative_lift:
+            // The named forms replace the groove sections' chords outright: whole 16-bar cycles
+            // from the top of each section, then the 8-bar home half where 8 or more bars remain,
+            // then the tonic. Intro and outro hold the tonic.
+            let cycle = namedFormCycle(family, mode: mode)
+            for section in sections {
+                switch section.label {
+                case .A, .B:
+                    let len = section.endBar - section.startBar
+                    let full = (len / 16) * 16
+                    let usable = full + (len - full >= 8 ? 8 : 0)
+                    for b in section.startBar..<Swift.min(total, section.endBar) {
+                        let i = b - section.startBar
+                        bars[b] = i < usable ? cycle[i % 16] : tonic
+                    }
+                case .intro, .outro:
+                    for b in section.startBar..<Swift.min(total, section.endBar) { bars[b] = tonic }
+                default:
+                    break
+                }
+            }
         }
 
         // Turnarounds. Both draws are made for every family so the stream's use is uniform.
@@ -399,7 +432,8 @@ struct ChillStructureGenerator {
         let everyPhrase = rng.nextDouble() < 0.60 || !sections.contains { $0.label == .B }
         let turn = turnaround(mode: mode, second: rng.nextDouble() < 0.50)
         var turnBars: [Int] = []   // first bar of each placed turnaround, for the performance log
-        if family != .minor_blues {
+        // Not in minor blues or the named forms: each already cadences home.
+        if ![.minor_blues, .walk_down, .relative_lift].contains(family) {
             for section in sections where section.label == .A || section.label == .B {
                 for phrase in phrases(section) {
                     let end = phrase.upperBound
@@ -459,6 +493,63 @@ struct ChillStructureGenerator {
         case .Mixolydian: return second ? [("2", .min7), ("5", .min7)] : [("b7", .maj7), ("4", .maj7)]
         case .Ionian:     return second ? [("4", .maj7), ("5", .sus4)] : [("2", .min7), ("5", .dom7)]
         default:          return [("4", .min7), ("5", .min7)]
+        }
+    }
+
+    /// The named form a base Chill song plays, drawn on its own derived stream (113) so the
+    /// frame's family draw and every main-stream draw stay where they were. About 35% of all base
+    /// Chill songs: 20 walk-down, 15 relative lift, taken from static groove (35 to about 16)
+    /// and the pendulum (30 to about 14). Both draws are always made.
+    static func namedForm(drawn: ChillProgressionFamily, seed: UInt64) -> ChillProgressionFamily {
+        var rng = SeededRNG(seed: SeededRNG.trackSeed(globalSeed: seed, trackIndex: 113))
+        let convert = rng.nextDouble() < 35.0 / 65.0
+        let walk = rng.nextDouble() < 20.0 / 35.0
+        guard convert, drawn == .static_groove || drawn == .two_chord_pendulum else { return drawn }
+        return walk ? .walk_down : .relative_lift
+    }
+
+    /// One 16-bar cycle of a named form, one chord a bar, every chord in the mode.
+    ///
+    /// - **Walk-down** (after Song for My Father, 1964): the bass steps 1, b7, 6, 5 and home,
+    ///   harmonic rhythm 2, 2, 1, 1, 2; the second 8 answers from the b7 (2), home (2), then the
+    ///   same 6, 5 descent. Aeolian Im7 bVII7 bVImaj7 Vm7; Dorian Im7 bVIImaj7 VIm7b5 Vm7;
+    ///   Mixolydian I bVIImaj7 VIm7 Vm7; Ionian I VIIm7b5 VIm7 V7.
+    /// - **Relative lift** (after Blue Bossa, 1963): 8 bars at home (I, the IV chord, a ii–v),
+    ///   then 8 that lift toward the relative major before the ii–v home. Aeolian lifts with
+    ///   Blue Bossa's own move, a ii–V–I into bIII (IVm7 bVII7 bIIImaj7); Dorian to bIIImaj7 and
+    ///   IV7. The major modes mirror it, turning to the relative minor: Ionian VIIm7b5 IIIm7 VIm7;
+    ///   Mixolydian VIm7 IIm7, home by bVII and IV.
+    static func namedFormCycle(_ form: ChillProgressionFamily, mode: Mode) -> [BarChord] {
+        let t: BarChord = tonicChord(mode: mode)
+        func expand(_ chords: [(BarChord, Int)]) -> [BarChord] { chords.flatMap { Array(repeating: $0.0, count: $0.1) } }
+        if form == .walk_down {
+            let (b7, six, five): (BarChord, BarChord, BarChord)
+            switch mode {
+            case .Aeolian:    (b7, six, five) = (("b7", .dom7), ("b6", .maj7), ("5", .min7))
+            case .Dorian:     (b7, six, five) = (("b7", .maj7), ("6", .min7b5), ("5", .min7))
+            case .Mixolydian: (b7, six, five) = (("b7", .maj7), ("6", .min7), ("5", .min7))
+            default:          (b7, six, five) = (("7", .min7b5), ("6", .min7), ("5", .dom7))
+            }
+            return expand([(t, 2), (b7, 2), (six, 1), (five, 1), (t, 2),
+                           (b7, 2), (t, 2), (six, 1), (five, 1), (t, 2)])
+        }
+        switch mode {
+        case .Aeolian:
+            return expand([(t, 2), (("4", .min7), 2), (("2", .min7b5), 1), (("5", .min7), 1), (t, 2),
+                           (("4", .min7), 1), (("b7", .dom7), 1), (("b3", .maj7), 2),
+                           (("2", .min7b5), 1), (("5", .min7), 1), (t, 2)])
+        case .Dorian:
+            return expand([(t, 2), (("4", .dom7), 2), (("2", .min7), 1), (("5", .min7), 1), (t, 2),
+                           (("b3", .maj7), 2), (("4", .dom7), 2),
+                           (("2", .min7), 1), (("5", .min7), 1), (t, 2)])
+        case .Mixolydian:
+            return expand([(t, 2), (("4", .maj7), 2), (("2", .min7), 1), (("5", .min7), 1), (t, 2),
+                           (("6", .min7), 2), (("2", .min7), 2),
+                           (("b7", .maj7), 1), (("4", .maj7), 1), (t, 2)])
+        default:   // Ionian
+            return expand([(t, 2), (("4", .maj7), 2), (("2", .min7), 1), (("5", .dom7), 1), (t, 2),
+                           (("7", .min7b5), 1), (("3", .min7), 1), (("6", .min7), 2),
+                           (("2", .min7), 1), (("5", .dom7), 1), (t, 2)])
         }
     }
 
@@ -562,13 +653,30 @@ struct ChillStructureGenerator {
 
     // MARK: - minor_blues: 12-bar tile in groove sections
 
+    /// The 12-bar tile, every chord in the mode (2026-11-12). It used to be i (4), ivm7 (2),
+    /// i (2), bVII (1), IV (1), i (2) in every mode, and each mode had at least one chord outside
+    /// it: Pads and Rhythm snapped those notes to the scale while the leads and bass played them
+    /// as written, so the solo rubbed the comping (After Hours, Ab Ionian: Lead 1's Cb over
+    /// Rhythm's C). Ionian and Mixolydian now play a major blues and log it as one.
+    static func bluesTile(mode: Mode) -> [(String, ChordType, Int)] {
+        let (t, tt) = tonicChord(mode: mode)
+        switch mode {
+        case .Dorian:     // the soul-jazz organ blues: Dorian's own IV7
+            return [(t, tt, 4), ("4", .dom7, 2), (t, tt, 2), ("b7", .maj7, 1), ("4", .dom7, 1), (t, tt, 2)]
+        case .Aeolian:
+            return [(t, tt, 4), ("4", .min7, 2), (t, tt, 2), ("b6", .maj7, 1), ("b7", .dom7, 1), (t, tt, 2)]
+        case .Mixolydian:
+            return [(t, tt, 4), ("4", .major, 2), (t, tt, 2), ("b7", .major, 1), ("4", .major, 1), (t, tt, 2)]
+        default:          // Ionian
+            return [(t, tt, 4), ("4", .maj7, 2), (t, tt, 2), ("2", .min7, 1), ("5", .sus4, 1), (t, tt, 2)]
+        }
+    }
+
     private static func buildMinorBlues(frame: GlobalMusicalFrame,
                                          sections: [SongSection],
                                          breakdownStart: Int?, breakdownEnd: Int?) -> [ChordWindow] {
         let key = frame.key
         let mode = frame.mode
-        let (tonicRoot, tonicType) = tonicChord(mode: mode)
-        let subdominantRoot = subdominantDegree(mode: mode)
         var windows: [ChordWindow] = []
 
         for section in sections {
@@ -581,16 +689,8 @@ struct ChillStructureGenerator {
                 windows.append(ChordWindow(startBar: s, lengthBars: section.lengthBars, chordRoot: "1",
                                            chordType: .sus4, chordTones: ct, scaleTensions: st, avoidTones: at))
             } else {
-                // Tile 12-bar blues: i (4) | iv (2) | i (2) | bVII (1) | IV (1) | i (2)
-                // Mapped to bars; any remainder uses tonic
-                let pattern: [(String, ChordType, Int)] = [
-                    (tonicRoot,      tonicType, 4),
-                    (subdominantRoot, .min7,    2),
-                    (tonicRoot,      tonicType, 2),
-                    ("b7",           .major,    1),
-                    (subdominantRoot, .major,   1),
-                    (tonicRoot,      tonicType, 2),
-                ]
+                // Tile the 12-bar blues (bluesTile); a remainder continues the tile.
+                let pattern = bluesTile(mode: mode)
                 var bar = s
                 var patIdx = 0
                 var patBar = 0
@@ -687,10 +787,6 @@ struct ChillStructureGenerator {
         }
     }
 
-    private static func subdominantDegree(mode: Mode) -> String {
-        return "4"  // scale degree 4 is the subdominant root in all supported modes
-    }
-
     /// The tonic's partners per mode with their weights (CHL-SYNC-010).
     private static func chordPairOptions(mode: Mode) -> [(root: String, type: ChordType, weight: Double)] {
         switch mode {
@@ -700,9 +796,11 @@ struct ChillStructureGenerator {
             return [("b7", .major, 0.35), ("4", .min7, 0.35), ("b6", .major, 0.30)]
         case .Mixolydian: // I|bVII 45%, I|IV 35%, I|vm7 20%
             return [("b7", .major, 0.45), ("4", .major, 0.35), ("5", .min7, 0.20)]
-        case .Ionian:     // Imaj7|IVmaj7 35%, Imaj7|vim7 35%, Imaj7|bVIImaj7 30%
-            // bVII is the Moby open — a named exception (CHL-SYNC-012)
-            return [("4", .major, 0.35), ("6", .min7, 0.35), ("b7", .major, 0.30)]
+        case .Ionian:     // Imaj7|IVmaj7 35%, Imaj7|vim7 35%, Imaj7|IIm7 30%
+            // IIm7 replaced bVII (the Moby open, CHL-SYNC-012) on 2026-11-12: bVII is outside
+            // Ionian, so Pads and Rhythm snapped it to a different chord while the bass and
+            // leads played its root and notes as written.
+            return [("4", .major, 0.35), ("6", .min7, 0.35), ("2", .min7, 0.30)]
         default:
             return [("b7", .major, 1.0)]
         }
@@ -747,7 +845,7 @@ struct ChillStructureGenerator {
         case .Dorian:     options = [("4", .major), ("b7", .major), ("5", .min7)]
         case .Aeolian:    options = [("b6", .major), ("b7", .major), ("4", .min7)]
         case .Mixolydian: options = [("4", .major), ("b7", .major), ("5", .min7)]
-        case .Ionian:     options = [("4", .major), ("6", .min7), ("b7", .major)]
+        case .Ionian:     options = [("4", .major), ("6", .min7), ("2", .min7)]   // IIm7 for bVII, as above
         default:          options = [("4", .major), ("b7", .major)]
         }
         let filtered = options.filter { $0.0 != avoiding }
