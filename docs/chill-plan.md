@@ -788,7 +788,9 @@ rather than sustaining full activity.
 - **Stop-time** (35%): Unison hit on beat 1 of every other bar — kick + snare + staccato
   bass root + pad chord stab (~4 steps each). Lead plays freely in the silent bars between
   stabs (2–4 note phrases). Classic acid jazz and nu-jazz technique (Incognito, Greyboy
-  Allstars).
+  Allstars). Since 2026-11-11 Lead 1 plays in every stop-time breakdown, in the last few
+  odd bars of a long one, and joins the Rhythm track's climb in the last solo bar (see
+  "Stop-time breakdown solo" in `docs/chill-jazz-leads-plan.md`).
 
 - **Bass ostinato** (35%): All instruments drop out except bass. Bass plays a syncopated
   riff: root (step 0, 3 steps) → 5th (step 6) → root (step 9) → approach tone (step 13).
@@ -1790,7 +1792,10 @@ replay at their own pitches; from 60% of the way through, recalls take over with
 note. A song brings its seeds back about six times, and the longest stretch without one is about
 23 bars. Chill Blues and Chill Soho's reused rules share this code.
 
-**CHL-LD1-001 — St Germain Long Phrase** (Bright/Free moods, 25%)
+**CHL-LD1-001 — St Germain Long Phrase** (Bright/Free moods, 25%) — **retired 2026-11-11.**
+In code it had become a plain scale random walk shared with Wide interval solo and Warm jazz line.
+The number now plays CHL-LD1-001 Chet sigh (see "Jazz lick rules" below); the design that follows
+is kept for history.
 4-bar phrase structure: bar 1 has 3–4 notes on strong beats, pentatonic degrees, duration
 1.5–2 beats each; bar 2 continues as a question phrase, ending on the 2nd or 6th scale
 degree (unresolved); bars 3–4 are rest. Range MIDI 65–85. Velocity 65–85 in groove.
@@ -1868,13 +1873,23 @@ enters before Lead 1 finishes, Lead 2 defers to the next rest window.
 - Register bias by instrument: flute MIDI 65–85; trumpet MIDI 55–75; vibraphone MIDI 60–80;
   saxophone MIDI 50–70
 
-**Jazz lick rules (work in progress, 2026-11-07)** — three rules play licks taken from jazz tunes,
+**Jazz lick rules (work in progress, 2026-11-07, extended 2026-11-11)** — six rules play licks taken from jazz tunes,
 reworked per song rather than copied. Design, sources and build notes are in
 `docs/chill-jazz-leads-plan.md`. They fit the song's scale and chords, so they play in the major
 modes too. Seed returns and the turnaround lick still apply; the blue-note overlay is skipped.
 - **CHL-LD1-013 Moanin' call and response** (Chill Blues only) — Bobby Timmons.
 - **CHL-LD1-014 Cantaloupe Island hook** (both) — Herbie Hancock.
 - **CHL-LD1-015 Blue Monk riff** (regular Chill only) — Thelonious Monk.
+- **CHL-LD1-001 Chet sigh** (Chill, and Chill Soho through its reused rule) — after Chet Baker's
+  My Funny Valentine, the gesture rather than the tune. Added 2026-11-11.
+- **CHL-LD1-007 Horace hook** (Chill) — after Horace Silver's Song for My Father. Added 2026-11-11.
+- **CHL-LD1-008 Blues bossa** (Chill) — after Kenny Dorham's Blue Bossa. Added 2026-11-11.
+- 001, 007 and 008 replaced the retired random-walk rules Long phrase, Wide interval solo and
+  Warm jazz line, with the same numbers and shares.
+- **Three themes (2026-11-11):** 001, 007, 008 and 015 play a head (A), a contrasting tune (B)
+  and a blowing line from a real solo (C), each from a different work. The opening reads A A B A,
+  then a seed-picked form mixes all three, with the opening phrase still coming back now and
+  then. Sources and shares are in `docs/chill-jazz-leads-plan.md`.
 
 **Lead 1 shares, as a share of all songs** (the per-rule percentages above are the original
 design and are out of date):
@@ -1894,6 +1909,14 @@ design and are out of date):
 ---
 
 ### Lead 2
+
+**As built (2026-11-11):** base Chill and Chill Blues draw CHL-LD2-002 Shadow hold (35% of base
+Chill, never Blues) or one of four answer rules that riff on Lead 1's phrases:
+CHL-LD2-003 Tail riff, CHL-LD2-004 Rhythm trade, CHL-LD2-005 Bebop enclosure and
+CHL-LD2-006 Question and answer. Chill Soho keeps CHL-LD2-001 (a fresh phrase in Lead 1's gaps)
+and Shadow hold. The answer rules are described under "Lead 2 answers" in
+`docs/chill-jazz-leads-plan.md`. The CHL-LD2-003 to 006 entries below are the original design,
+never built; their numbers now belong to the answer rules.
 
 Lead 2 is always the call-and-response counter-voice to Lead 1. Instrument assigned at frame
 level (opposite family from Lead 1). One behavior rule is selected per song.

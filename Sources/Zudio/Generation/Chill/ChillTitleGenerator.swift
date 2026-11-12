@@ -52,7 +52,7 @@ struct ChillTitleGenerator {
             // Other North America
             "Traverse City", "Detroit", "Cadillac", "Alpina", "Midland", "Flint", "Petoskey", "Interlochen", "Long Island", "Point Lookout", "Hicksville",
             "Santa Cruz", "Scotts Valley", "Felton", "Boulder Creek","San Francisco", "Ben Lomond", "Cupertino", "Santa Clara", "San Mateo",
-            "Long Lake", "Leland", "Lelenau", "Ann Arbor", "Ypsilanti", "Northport",
+            "Long Lake", "Leland", "Leelanau", "Ann Arbor", "Ypsilanti", "Northport",
             "Glen Arbor","Maple City", "Walled Lake", "Waterloo", "Plymouth",
             "Mississauga","Port Credit", "Toronto", "Etobicoke",
             "TVC", "YYZ", "SFO", "ORD", "LHR", "SJC", "DTW", "LGA","Forest",

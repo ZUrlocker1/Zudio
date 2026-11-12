@@ -1848,10 +1848,25 @@ struct SongGenerator {
                     }
                 }
                 if let s = onsetStart { lead1Onsets.append((s, onsetPrev + 1)) }
+                // Lead 1's handoff windows (where it lays out so Lead 2 can take over) are not kept
+                // on the song, so they are found by replaying Lead 1 on its own seed: its regen
+                // override if it has one, else the song's Lead 1 stream. Until 2026-11-11 a Lead 2
+                // regen passed none and stopped filling those bars.
+                var lead1RNG = SeededRNG(seed: songState.trackOverrides[kTrackLead1]
+                    ?? SeededRNG.trackSeed(globalSeed: songState.globalSeed, trackIndex: kTrackLead1))
+                var lead1Rules: Set<String> = []
+                let handoffBars = ChillLeadGenerator.generateLead1(
+                    frame: songState.frame, structure: songState.structure,
+                    leadInstrument: songState.chillLeadInstrument,
+                    beatStyle: songState.chillBeatStyle,
+                    breakdownStyle: songState.chillBreakdownStyle,
+                    bluesVariation: songState.chillBluesVariation,
+                    sohoVariation: songState.chillSohoVariation,
+                    rng: &lead1RNG, usedRuleIDs: &lead1Rules).handoffBars
                 events = ChillLeadGenerator.generateLead2(
                     frame: songState.frame, structure: songState.structure,
                     lead1Instrument: songState.chillLeadInstrument,
-                    lead1Onsets: lead1Onsets,
+                    lead1Onsets: lead1Onsets, lead1Events: lead1Evts, handoffBars: handoffBars,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
                     keepInstrument: songState.chillLead2Instrument,
@@ -4555,7 +4570,7 @@ struct SongGenerator {
         var lead2Rules: Set<String> = []
         let (lead2Events, chillLead2Instrument) = ChillLeadGenerator.generateLead2(
             frame: frame, structure: structure, lead1Instrument: chillLeadInstrument,
-            lead1Onsets: lead1Onsets, handoffBars: lead1HandoffBars,
+            lead1Onsets: lead1Onsets, lead1Events: lead1Events, handoffBars: lead1HandoffBars,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation,
             rng: &lead2RNG, usedRuleIDs: &lead2Rules
         )
@@ -5796,20 +5811,24 @@ struct SongGenerator {
         case "CHL-PAD-005":  return "Slow chord build"
         case "CHL-PAD-006":  return "String hold"
         case "CHL-PAD-000":  return "No pads"
-        case "CHL-LD1-001":  return "Long phrase"
+        case "CHL-LD1-001":  return "Chet sigh"
         case "CHL-LD1-002":  return "Miles punch"
         case "CHL-LD1-003":  return "Chet sparse melody"
         case "CHL-LD1-004":  return "Blues lead"
         case "CHL-LD1-005":  return "St Germain staccato burst"
         case "CHL-LD1-006":  return "Bright melodic solo"
-        case "CHL-LD1-007":  return "Wide interval solo"
-        case "CHL-LD1-008":  return "Warm jazz line"
+        case "CHL-LD1-007":  return "Horace hook"
+        case "CHL-LD1-008":  return "Blues bossa"
         case "CHL-LD1-009":  return "Jazzy blues lead"
         case "CHL-LD1-013":  return "Moanin' call and response"
         case "CHL-LD1-014":  return "Cantaloupe Island hook"
         case "CHL-LD1-015":  return "Blue Monk riff"
         case "CHL-LD2-001":  return "Counter-melody"
         case "CHL-LD2-002":  return "Shadow hold"
+        case "CHL-LD2-003":  return "Tail riff"
+        case "CHL-LD2-004":  return "Rhythm trade"
+        case "CHL-LD2-005":  return "Bebop enclosure"
+        case "CHL-LD2-006":  return "Question and answer"
         case "CHL-RHY-001":  return "St Germain beat"
         case "CHL-RHY-002":  return "Moby backbeat beat"
         case "CHL-RHY-003":  return "Bosa Moon broken chord"

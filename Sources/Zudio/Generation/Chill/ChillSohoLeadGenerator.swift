@@ -188,7 +188,8 @@ extension ChillLeadGenerator {
 
     // MARK: - Reused base Chill rules
 
-    /// CHL-LD1-004 Blues lead and CHL-LD1-001 Long phrase, played by base Chill's lead code
+    /// CHL-LD1-004 Blues lead and CHL-LD1-001 Chet sigh (Long phrase until
+    /// 2026-11-11), played by base Chill's lead code
     /// exactly as in a regular Chill song, then thinned to Soho's space: rest windows of 4–8
     /// bars every ~22, no unbroken stretch over 14–16 bars, and the pickup into a Remix Break
     /// return. Intro and breakdown behaviour stay base Chill's.

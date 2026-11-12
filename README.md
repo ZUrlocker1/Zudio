@@ -25,6 +25,8 @@ The download is `2.9` (build 136), a near final version with Kosmic Space and th
 
 **new lead rules for Kosmic and Motorik:** New more musical Lead 1 and Lead 2 rules replace some of the original rules in base Motorik and base Kosmic. Each plays a hook or answer taken from a real record, reworked per song rather than copied. There is also more coordination between Lead 1 and Lead 2. Roughly three in four base Motorik songs and over half of base Kosmic songs now use a new or lightly changed Lead 1 rule. Details are in the [Solo improvement plan](docs/Solo-improvement-plan.md).
 
+**Jazz solos for Chill:** Chill's Lead 1 now plays licks from jazz tunes, including Moanin', Cantaloupe Island, Blue Monk, My Funny Valentine, Song for My Father and Blue Bossa. They are reworked per song rather than copied, and three generic random-walk rules are gone. Four of the rules play three ideas in a solo: the head, a contrasting tune and a line from a real solo by Chet Baker, Kenny Dorham, Lee Morgan, Miles Davis or Sonny Rollins. Like a player, the solo keeps coming back to the head. Lead 2 now answers Lead 1 like a second soloist trading phrases, picking up its last notes, its rhythm or its last word, and in a stop-time breakdown the soloist joins the band's climb. Details are in the [Chill jazz leads plan](docs/chill-jazz-leads-plan.md).
+
 **Smoother Track View:** The playhead now glides across the lanes at the display's refresh rate instead of stepping, and the visualizer does less redundant drawing, both of which should lower CPU use. Details are in the [change log](docs/change-log.md).
 
 **What's new — v2.8 iPhone Duo:** Zudio now has a layout made for the iPhone Duo, the foldable iPhone. Tested on a real Duo. Folded, it is the iPhone player it always was. Unfolded, it is the iPad layout, opening on Visuals with the track view one tap away on the Tracks tab. Fold and unfold mid-song and playback carries on.
@@ -77,6 +79,7 @@ Earlier releases are covered in the [change log](docs/change-log.md).
 - [Solo-improvement-plan.md](docs/Solo-improvement-plan.md) — Hook-based Lead 1 and gap-answer Lead 2 rules for base Motorik and Kosmic: what is built, what is next, and the source cells.
 - [ambient-plan.md](docs/ambient-plan.md) — Ambient style: genre research, artist-by-artist analysis, universal rules, generator design, and MIDI analysis.
 - [chill-plan.md](docs/chill-plan.md) — Chill style: genre research, artist-by-artist analysis (St Germain, Moby, Air, DJ Cam Quartet, Electric Buddha Band), universal rules, generator design, and MIDI analysis.
+- [chill-jazz-leads-plan.md](docs/chill-jazz-leads-plan.md) — Chill's jazz lick Lead 1 rules: the tunes and solos they come from, the three-theme form, shares, and open items.
 
 ### Analysis and quality
 

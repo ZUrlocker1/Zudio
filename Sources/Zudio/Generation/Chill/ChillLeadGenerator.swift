@@ -1,7 +1,8 @@
 // ChillLeadGenerator.swift — Chill generation step 6
 // Copyright (c) 2026 Zack Urlocker
 // Lead 1: primary solo voice (flute, muted trumpet, vibraphone, saxophone).
-// Lead 2: counter-melody; call-and-response with Lead 1 (CHL-LD2-001, CHL-LD2-002).
+// Lead 2: answers that riff on Lead 1 (CHL-LD2-003 to 006), shadow hold (CHL-LD2-002); Soho's
+// call-and-response (CHL-LD2-001).
 // Phrases: 2–4 bars with deliberate rests (CHL-RULE-06).
 // Pitch pool: mode pentatonic + occasional blue note (CHL-RULE-07).
 // All notes snapped to scale (CHL-SYNC-001).
@@ -54,6 +55,8 @@ struct ChillLeadGenerator {
         // Shares of all songs (work in progress, fine-tuned by ear):
         //   Blues: 013 20, 004 20, 002 20, 003 15, 009 13, 014 12
         //   Chill: 005 18, 015 17, 001 17, 014 15, 007 13, 008 13, 009 7
+        // 001 Chet sigh, 007 Horace hook and 008 Blues bossa took over those numbers
+        // and shares on 2026-11-11; the random-walk rules they replaced are retired.
         // 005 St Germain staccato is a separate roll above (70% on the St Germain beat, 5% on the
         // others) and never plays in Blues. 002, 003, 004 and 013 are Blues only; 015 is Chill only;
         // 014 and 009 play in both. 001 is excluded from Blues (flowing European flute phrasing).
@@ -102,8 +105,13 @@ struct ChillLeadGenerator {
         let useBluesRuns    = (ruleID == "CHL-LD1-004")   // CHL-LD1-004: occasional fast blues runs
         let isShortPunch    = (ruleID == "CHL-LD1-002")   // CHL-LD1-002: compact staccato punches
         let isSparseMelodic = (ruleID == "CHL-LD1-003")   // CHL-LD1-003: sparse phrasing, per-bar density
-        // CHL-LD1-013/014/015: phrases come from a lick bank (jazzCellPhrase) instead of buildPhrase.
-        var jazzState: JazzCellState? = jazzRules.contains(ruleID)
+        // CHL-LD1-013/014/015 and CHL-LD1-001/007/008: phrases come from a lick bank
+        // (jazzCellPhrase) instead of buildPhrase. 001, 007 and 008 were scale random walks until
+        // 2026-11-11 (Long phrase, Wide interval solo, Warm jazz line); those are retired and the
+        // numbers now play Chet sigh, Horace hook and Blues bossa, wherever they are
+        // drawn or forced (Soho reuses 001).
+        let lickRules = jazzRules + ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008"]
+        var jazzState: JazzCellState? = lickRules.contains(ruleID)
             ? JazzCellState(ruleID: ruleID, regLow: register(for: leadInstrument).low,
                             regHigh: register(for: leadInstrument).high,
                             keyPC: frame.keySemitoneValue, rng: &rng)
@@ -117,9 +125,6 @@ struct ChillLeadGenerator {
         let pentatonic  = pentatonicNotes(frame: frame)
         let blueNote    = blueNotePC(frame: frame)
         let (regLow, regHigh) = register(for: leadInstrument)
-        // Stop-time solo bars draw from the scale in the lead's register, deduplicated.
-        let stopPool = scale.filter { $0 >= regLow && $0 <= regHigh }.sorted()
-            .reduce(into: [Int]()) { acc, n in if acc.last != n { acc.append(n) } }
 
         // Blues: 60% of songs have a soloist who uses the blue note (the b5 of the key), the rest
         // play plain Dorian. In those songs about a third of phrases try for it until the first lands, and only as a
@@ -184,9 +189,10 @@ struct ChillLeadGenerator {
             for b in winStart..<(winStart + winLen) { handoffBarSet.insert(b) }
         }
 
-        // Stop-time breakdown: cap solo bars at 4 or 6 to leave some odd bars silent
-        let stopTimeSoloMax = rng.nextDouble() < 0.50 ? 4 : 6
-        var stopTimeSoloBarsUsed = 0
+        // This draw set the old stop-time cap of 4 or 6 random solo bars. stopTimeSolo replaced
+        // it (2026-11-11); the draw stays so songs without a stop-time breakdown are unchanged.
+        _ = rng.nextDouble()
+        var stopTimeSections = Set<Int>()
 
         // Zone-based phrase repetition for all melodic Chill lead rules except CHL-LD1-005
         // (St Germain staccato burst, which has its own active-period architecture).
@@ -251,34 +257,15 @@ struct ChillLeadGenerator {
                     bar += 1
                     continue
                 case .stopTime:
-                    // Lead plays in the "odd" silence bars between stabs
-                    let breakdownBar = bar - (section?.startBar ?? bar)
-                    if breakdownBar % 2 == 0 {
-                        // Stab bar — lead silent (rhythm section plays the hit)
-                        bar += 1
-                        continue
+                    // The whole breakdown's solo is written on the first bar Lead 1 reaches in it
+                    // (a rest can step past the section's first bar). The fragment comes from the
+                    // song's opening phrase, or Lead 1's latest notes if it has none yet.
+                    if let sec = section, stopTimeSections.insert(sec.startBar).inserted {
+                        var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                        let motif = melodyPitches(seedPhrases.first ?? Array(events.suffix(6)))
+                        events += stopTimeSolo(section: sec, frame: frame, structure: structure,
+                                               motif: motif, regLow: regLow, regHigh: regHigh, rng: &st)
                     }
-                    // Cap total solo bars at 4 or 6 — leave later odd bars silent for space
-                    guard stopTimeSoloBarsUsed < stopTimeSoloMax else { bar += 1; continue }
-                    // Odd bar: lead gets 1 bar to play freely
-                    if !stopPool.isEmpty {
-                        let noteCount = 3 + rng.nextInt(upperBound: 3)
-                        let base = bar * 16
-                        var prevNote = stopPool[rng.nextInt(upperBound: stopPool.count)]
-                        var stepCursor = 0
-                        for i in 0..<noteCount {
-                            let remaining = 15 - stepCursor
-                            guard remaining > 1 else { break }
-                            let vel = UInt8(62 + rng.nextInt(upperBound: 18))
-                            let maxDur = Swift.max(1, remaining / Swift.max(1, noteCount - i))
-                            let dur = Swift.min(Swift.max(2, rng.nextInt(upperBound: 5) + 2), maxDur)
-                            events.append(MIDIEvent(stepIndex: base + stepCursor, note: UInt8(prevNote),
-                                                    velocity: vel, durationSteps: dur))
-                            stepCursor += dur + 1
-                            prevNote = stopPool[rng.nextInt(upperBound: stopPool.count)]
-                        }
-                    }
-                    stopTimeSoloBarsUsed += 1
                     bar += 1
                     continue
                 case .harmonicDrone:
@@ -386,7 +373,11 @@ struct ChillLeadGenerator {
 
             // Zone-based repetition: seed collection → opening replay → free development → recap
             if useZoneRepeat, label == .A || label == .B {
-                let canReplayOpening = openingReplaysDone < 2 && seedPhrases.count == 2
+                // Themed lick rules (001, 007, 008, 015) open A A B A: one replay of the first
+                // seed, after the B theme has played, instead of replaying both seeds back to back.
+                let themed = jazzState?.isThemed ?? false
+                let canReplayOpening = openingReplaysDone < (themed ? 1 : 2) && seedPhrases.count == 2
+                    && (!themed || (jazzState?.statements ?? 0) >= 3)
 
                 if seedPhrases.count < 2 {
                     // Seed zone: generate normally and store as relative-indexed motif.
@@ -406,11 +397,15 @@ struct ChillLeadGenerator {
                     continue
                 }
 
-                let canRecap = bar >= recapStartBar && rng.nextDouble() < 0.55
+                // Themed rules recall the seeds less (30%, not 55%) so the B and C themes get room,
+                // and never before the A A B A opening is complete.
+                let openingDone = !themed || openingReplaysDone >= 1
+                let canRecap = bar >= recapStartBar && rng.nextDouble() < (themed ? 0.30 : 0.55)
+                    && openingDone
                 // The seeds that fit this bar's chords, worked out only where a mid-song return
                 // could otherwise happen. The 0.35 draw is made only when one fits.
                 let midOpen = !canReplayOpening && seedPhrases.count == 2 && bar < recapStartBar
-                    && bar >= lastReturnBar + 8
+                    && bar >= lastReturnBar + 8 && openingDone
                 let matching = !midOpen ? [] : seedPhrases.indices.filter { i in
                     seedPhrases[i].allSatisfy { e in
                         guard e.durationSteps >= 3,
@@ -483,6 +478,17 @@ struct ChillLeadGenerator {
             let extraRest = (label == .B || (bluesVariation && isShortPunch)) ? 0 : rng.nextInt(upperBound: 2)
             bar += 1 + extraRest
         }
+        // A lay-out can step over a whole stop-time breakdown; the soloist still plays it.
+        if breakdownStyle == .stopTime {
+            for sec in structure.sections where sec.label == .bridge
+                && stopTimeSections.insert(sec.startBar).inserted {
+                var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                let before = events.filter { $0.stepIndex < sec.startBar * 16 }
+                let motif = melodyPitches(seedPhrases.first ?? Array(before.suffix(6)))
+                events += stopTimeSolo(section: sec, frame: frame, structure: structure,
+                                       motif: motif, regLow: regLow, regHigh: regHigh, rng: &st)
+            }
+        }
         reportReplayBars?(replayBars)
         reportReturns?(formReturns)
         return (events, phraseOnsets, handoffBarSet, nil)   // Avalon Hook is Soho-only
@@ -495,6 +501,7 @@ struct ChillLeadGenerator {
         structure: SongStructure,
         lead1Instrument: ChillLeadInstrument,
         lead1Onsets: [(startBar: Int, endBar: Int)],
+        lead1Events: [MIDIEvent] = [],
         handoffBars: Set<Int> = [],
         bluesVariation: Bool = false,
         sohoVariation: Bool = false,
@@ -502,11 +509,14 @@ struct ChillLeadGenerator {
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>
     ) -> (events: [MIDIEvent], instrument: ChillLeadInstrument) {
-        // Blues forces CHL-LD2-001 (call-and-response) — shadow hold is too ambient for blues energy.
-        // Soho: 75/25 call-and-response. The second voice sounds under the main line a median 17%
-        // of the time across the corpus; a pad-like voice under the melody is the exception.
-        let useShadowHold = bluesVariation ? false : rng.nextDouble() < (sohoVariation ? 0.25 : 0.50)
-        usedRuleIDs.insert(useShadowHold ? "CHL-LD2-002" : "CHL-LD2-001")
+        // Blues never takes shadow hold, too ambient for blues energy. Soho: 75/25 call-and-response.
+        // The second voice sounds under the main line a median 17% of the time across the Soho
+        // corpus; a pad-like voice under the melody is the exception. Base Chill: shadow hold 35%
+        // (50% until the answer rules arrived on 2026-11-11).
+        let useShadowHold = bluesVariation ? false : rng.nextDouble() < (sohoVariation ? 0.25 : 0.35)
+        if useShadowHold || sohoVariation {
+            usedRuleIDs.insert(useShadowHold ? "CHL-LD2-002" : "CHL-LD2-001")
+        }
 
         var events: [MIDIEvent] = []
         let scale      = scaleNotes(frame: frame)
@@ -538,11 +548,38 @@ struct ChillLeadGenerator {
         let regLow2  = max(36, min(rawLow2, regHigh2 - 12))
 
         // CHL-LD2-002: Shadow hold — long-held chord tones sounding under Lead 1 simultaneously
+        // Base Chill and Blues: Lead 2 never sounds in a breakdown. A shadow hold's lead-in two
+        // steps before Groove B could land in a stop-time breakdown's last bar, on top of Lead 1
+        // joining the band's climb there.
+        func outsideBreakdowns(_ evs: [MIDIEvent]) -> [MIDIEvent] {
+            evs.filter { structure.section(atBar: $0.stepIndex / 16)?.label != .bridge }
+        }
         if useShadowHold {
             let events = shadowHold(frame: frame, structure: structure,
                                     lead1Onsets: lead1Onsets, scale: scale,
                                     regLow: regLow2, regHigh: regHigh2, rng: &rng)
-            return (sohoVariation ? capNotesPerBar(events, 2) : events, inst2)
+            return (sohoVariation ? capNotesPerBar(events, 2) : outsideBreakdowns(events), inst2)
+        }
+
+        // CHL-LD2-003 to 006 (base Chill and Blues): answers that riff on Lead 1's phrases. Shares
+        // of the answer songs: Tail riff 30, Rhythm trade 25, Bebop enclosure 20, Question and
+        // answer 25. See jazzAnswers.
+        if !sohoVariation {
+            let ruleID = ["CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006"][
+                rng.weightedPick([0.30, 0.25, 0.20, 0.25])]
+            usedRuleIDs.insert(ruleID)
+            // The answers' register stays inside the instrument's own. regLow2 and regHigh2 above
+            // can fall below it (a flute under a muted trumpet got 55 to 67, under the flute's 65
+            // floor), and the final register fold then split figures across octaves. An answer
+            // plays in Lead 1's gaps, so where the instrument cannot sit below the middle of Lead
+            // 1's register it takes its own bottom octave and a half instead.
+            let ansHigh = Swift.min(rawHigh2, Swift.max(regMid1 - 2, rawLow2 + 12))
+            let ansLow  = Swift.max(rawLow2, ansHigh - 14)
+            let answers = jazzAnswers(ruleID: ruleID, frame: frame, structure: structure,
+                                      lead1Events: lead1Events, handoffBars: handoffBars,
+                                      bluesVariation: bluesVariation, regLow: ansLow, regHigh: ansHigh,
+                                      velocityOffset: inst2 == .vibraphone ? 0 : -15, rng: &rng)
+            return (outsideBreakdowns(answers), inst2)
         }
 
         // Soho: Lead 2 sits out the opening of a groove section about a third of the time — a sax
@@ -563,7 +600,8 @@ struct ChillLeadGenerator {
             }
         }
 
-        // CHL-LD2-001: Call-and-response — responds in gaps between Lead 1 phrases
+        // CHL-LD2-001: Call-and-response, Chill Soho only since 2026-11-11 — a fresh phrase in the
+        // gaps between Lead 1 phrases
         var lead1BarSet = Set<Int>()
         for onset in lead1Onsets {
             for b in onset.startBar..<onset.endBar { lead1BarSet.insert(b) }
@@ -725,6 +763,422 @@ struct ChillLeadGenerator {
             events.append(MIDIEvent(stepIndex: holdStart, note: note,
                                     velocity: vel, durationSteps: Swift.max(1, dur)))
             lastPlaced = bar
+        }
+        return events.sorted { $0.stepIndex < $1.stepIndex }
+    }
+
+    // MARK: - Shared pitch helpers (stop-time solo, Lead 2 answers)
+
+    /// The scale, sorted and without duplicates, for scale-step arithmetic.
+    private static func sortedScale(frame: GlobalMusicalFrame) -> [Int] {
+        scaleNotes(frame: frame).sorted().reduce(into: [Int]()) { acc, n in
+            if acc.last != n { acc.append(n) }
+        }
+    }
+
+    /// `note` moved `steps` scale steps (from the nearest scale note), held inside the scale array.
+    private static func scaleStep(_ note: Int, _ steps: Int, scale: [Int]) -> Int {
+        guard !scale.isEmpty else { return note }
+        let idx = scale.indices.min { abs(scale[$0] - note) < abs(scale[$1] - note) } ?? 0
+        return scale[Swift.max(0, Swift.min(scale.count - 1, idx + steps))]
+    }
+
+    /// The nearest note whose pitch class is in `pcs`; on a tie, the one in direction `prefer`
+    /// (-1 lower, +1 higher). `note` itself if `pcs` is empty.
+    private static func nearestPC(_ note: Int, _ pcs: Set<Int>, prefer: Int = -1) -> Int {
+        guard !pcs.isEmpty else { return note }
+        for d in 0...6 {
+            let first = note + d * prefer, second = note - d * prefer
+            if pcs.contains(((first % 12) + 12) % 12) { return first }
+            if pcs.contains(((second % 12) + 12) % 12) { return second }
+        }
+        return note
+    }
+
+    /// A figure moved by whole octaves into the register as one block: the octave that leaves the
+    /// fewest notes outside, then the one whose middle is nearest `near`. A note still outside is
+    /// folded on its own, so the register is never crossed.
+    /// With `scale`, a figure that fits the register's width but no octave of it is moved the
+    /// fewest scale steps that bring it inside instead, keeping its shape.
+    private static func fitBlock(_ notes: [Int], regLow: Int, regHigh: Int, near: Int,
+                                 scale: [Int] = []) -> [Int] {
+        guard !notes.isEmpty else { return notes }
+        let mid = (notes.min()! + notes.max()!) / 2
+        let outside = { (ns: [Int]) in ns.filter { $0 < regLow || $0 > regHigh }.count }
+        let best = (-4...4).map { $0 * 12 }.min { a, b in
+            let oa = outside(notes.map { $0 + a }), ob = outside(notes.map { $0 + b })
+            return oa != ob ? oa < ob : abs(mid + a - near) < abs(mid + b - near)
+        } ?? 0
+        if !scale.isEmpty, outside(notes.map { $0 + best }) > 0,
+           notes.max()! - notes.min()! <= regHigh - regLow - 2 {
+            for k in [-1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6] {
+                let moved = notes.map { scaleStep($0 + best, k, scale: scale) }
+                if outside(moved) == 0 { return moved }
+            }
+        }
+        return notes.map { n in
+            var m = n + best
+            while m < regLow { m += 12 }
+            while m > regHigh { m -= 12 }
+            return m
+        }
+    }
+
+    // MARK: - Stop-time breakdown solo
+
+    /// Lead 1 in a stop-time breakdown (Zack, 2026-11-11). The band hits on the even bars; on the
+    /// odd bars Rhythm climbs the chord on beats 2, 3 and 4 (`ChillRhythmGenerator.stopTimeReveal`)
+    /// and Pads climb with it. Until 2026-11-11 Lead 1 played random scale notes in up to four or
+    /// six odd bars, often falling while the band rose on the same beats.
+    ///
+    /// The soloist now plays in every stop-time breakdown: all the odd bars of a short one, the
+    /// last two of an 8-bar one and the last three of a 12-bar one. The earlier solo bars play the
+    /// first notes of the song's opening phrase in the gaps around the band, a scale step higher
+    /// each time. The last solo bar opens on the soloist's own note and then joins the band's climb
+    /// on its beats: a chord tone above each band note, in unison with it, or from beat 3 only.
+    /// Half the time an 8th-note pickup leads into the groove. Each song draws its own fragment
+    /// rhythms, join and pickup from `rng`, a stream derived for this breakdown.
+    private static func stopTimeSolo(section: SongSection, frame: GlobalMusicalFrame,
+                                     structure: SongStructure, motif: [Int],
+                                     regLow: Int, regHigh: Int,
+                                     rng: inout SeededRNG) -> [MIDIEvent] {
+        let len = section.lengthBars
+        let oddBars = stride(from: 1, to: len, by: 2).map { section.startBar + $0 }
+        guard !oddBars.isEmpty else { return [] }
+        let soloBars = Array(oddBars.suffix(len <= 5 ? oddBars.count : (len >= 12 ? 3 : 2)))
+        let scale = sortedScale(frame: frame)
+        let regMid = (regLow + regHigh) / 2
+        var events: [MIDIEvent] = []
+
+        // The opening phrase's first four notes; a song with no opening yet climbs the chord.
+        var head = Array(motif.prefix(4))
+        if head.count < 3 {
+            let tones = structure.chordWindow(atBar: section.startBar)?.chordTones ?? []
+            let c0 = nearestPC(regMid - 4, tones)
+            let c1 = nearestPC(c0 + 3, tones, prefer: 1)
+            let c2 = nearestPC(c1 + 3, tones, prefer: 1)
+            head = [c0, c1, c2, c1]
+        }
+        while head.count < 4 { head.append(head.last!) }
+        head = fitBlock(head, regLow: regLow, regHigh: regHigh, near: regMid, scale: scale)
+
+        // Fragment rhythms (step, length): in the gaps around the band's beats 2, 3 and 4; a
+        // quick call on beat 1 and a pickup at the end of the bar; or the off-beats only.
+        let fragmentRhythms: [[(Int, Int)]] = [
+            [(0, 2), (2, 2), (6, 2), (10, 3)],
+            [(0, 1), (1, 1), (2, 2), (14, 2)],
+            [(2, 2), (6, 2), (10, 2), (14, 2)],
+        ]
+        var lastNote = head[0]
+        for (i, bar) in soloBars.dropLast().enumerated() {
+            let tones = structure.chordWindow(atBar: bar)?.chordTones ?? []
+            let rhythm = fragmentRhythms[rng.nextInt(upperBound: fragmentRhythms.count)]
+            var pitches = fitBlock(head.map { scaleStep($0, i, scale: scale) },
+                                   regLow: regLow, regHigh: regHigh, near: regMid, scale: scale)
+            pitches[pitches.count - 1] = nearestPC(pitches[pitches.count - 1], tones)
+            pitches = fitBlock(pitches, regLow: regLow, regHigh: regHigh, near: regMid, scale: scale)
+            for (k, (step, dur)) in rhythm.enumerated() {
+                events.append(MIDIEvent(stepIndex: bar * 16 + step, note: UInt8(pitches[k]),
+                                        velocity: UInt8(66 + 3 * k + rng.nextInt(upperBound: 6)),
+                                        durationSteps: dur))
+            }
+            lastNote = pitches[pitches.count - 1]
+        }
+
+        // The join, in the last solo bar.
+        guard let joinBar = soloBars.last else { return events }
+        let chord = structure.chordWindow(atBar: joinBar)
+        let tones = chord?.chordTones ?? []
+        let band = ChillRhythmGenerator.stopTimeReveal(frame: frame, chord: chord)
+        guard band.count >= 3 else { return events }
+        let style = rng.weightedPick([0.45, 0.25, 0.30])   // above, unison, from beat 3
+        // The climb must fit the register whole, at some octave, or it stops sounding like the
+        // band's climb. The drawn line first, then the other; failing both, the chord climbed
+        // from the bottom of the register.
+        let above = [band[1], band[2], band[0] + 12], unison = [band[0], band[1], band[2]]
+        let fits = { (l: [Int]) in l.max()! - l.min()! <= regHigh - regLow
+            && (-4...4).contains { o in l.allSatisfy { $0 + o * 12 >= regLow && $0 + o * 12 <= regHigh } } }
+        var line: [Int]
+        if let l = (style == 1 ? [unison, above] : [above, unison]).first(where: fits) {
+            line = fitBlock(l, regLow: regLow, regHigh: regHigh, near: lastNote, scale: scale)
+        } else {
+            let c0 = nearestPC(regLow + 1, tones, prefer: 1)
+            let c1 = nearestPC(c0 + 3, tones, prefer: 1)
+            line = [c0, c1, nearestPC(c1 + 3, tones, prefer: 1)]
+        }
+        let own = soloBars.count > 1 ? nearestPC(lastNote, tones) : nearestPC(head[0], tones)
+        let pickup = rng.nextDouble() < 0.50
+        let base = joinBar * 16
+        var notes: [(step: Int, note: Int, dur: Int)]
+        if style == 2 {
+            let neighbour = scaleStep(own, line[1] > own ? 1 : -1, scale: scale)
+            notes = [(0, own, 2), (2, neighbour, 2), (8, line[1], 3), (12, line[2], pickup ? 2 : 4)]
+        } else {
+            notes = [(0, own, 3), (4, line[0], 3), (8, line[1], 3), (12, line[2], pickup ? 2 : 4)]
+        }
+        if pickup {
+            notes.append((14, scaleStep(line[2], rng.nextDouble() < 0.5 ? -1 : 1, scale: scale), 2))
+        }
+        for (k, n) in notes.enumerated() {
+            let pitch = Swift.max(regLow, Swift.min(regHigh, n.note))
+            events.append(MIDIEvent(stepIndex: base + n.step, note: UInt8(pitch),
+                                    velocity: UInt8(Swift.min(90, 68 + 4 * k + rng.nextInt(upperBound: 5))),
+                                    durationSteps: n.dur))
+        }
+        return events
+    }
+
+    /// Lead 1's pitches in time order, one per onset (the highest), for the stop-time fragment.
+    private static func melodyPitches(_ events: [MIDIEvent]) -> [Int] {
+        var seen = Set<Int>()
+        return events.sorted { ($0.stepIndex, -Int($0.note)) < ($1.stepIndex, -Int($1.note)) }
+            .filter { seen.insert($0.stepIndex).inserted }
+            .map { Int($0.note) }
+    }
+
+    // MARK: - CHL-LD2-003 to 006: answers that riff on Lead 1
+
+    /// Base Chill and Chill Blues Lead 2 since 2026-11-11 (Chill Soho keeps CHL-LD2-001). Until then
+    /// every reply was a fresh scale random walk that took nothing from the phrase it answered.
+    /// Now Lead 2 answers each Lead 1 phrase it replies to like a second soloist trading with the
+    /// first, shorter than Lead 1: one answer, about a bar, starting an 8th or so after Lead 1's
+    /// last note has ended and finishing before Lead 1's next note. In a handoff window, where
+    /// Lead 1 lays out, Lead 2 keeps riffing on its own answer, up to three in a row.
+    ///
+    /// The song's rule is Lead 2's habit, used for about 70% of its answers; the rest are drawn
+    /// from the other three so a song still varies:
+    /// - CHL-LD2-003 Tail riff: Lead 1's last two to four notes in Lead 1's rhythm, a scale step
+    ///   lower or higher, a third lower or an octave down, then a resolving chord tone. A two-note
+    ///   tail is often sequenced twice.
+    /// - CHL-LD2-004 Rhythm trade: the rhythm of Lead 1's last notes with a new line moving the
+    ///   other way, ending on a chord tone.
+    /// - CHL-LD2-005 Bebop enclosure: Lead 1's last note (or a chord tone next to it) approached
+    ///   from a scale step above and a semitone below, then held, sometimes with a falling tag.
+    /// - CHL-LD2-006 Question and answer: after a phrase that ends off the root or fifth, a falling
+    ///   line home to a chord tone; after one that ends on it, a rising arpeggio left open on a
+    ///   tension.
+    ///
+    /// Answers sit in Lead 2's register (below the middle of Lead 1's, CHL-RULE-12) as one block,
+    /// held notes on chord tones of their bar and passing notes in the scale. Only groove sections
+    /// (A and B); in Blues, never in the turnaround (form positions 13 to 15).
+    private static func jazzAnswers(ruleID: String, frame: GlobalMusicalFrame, structure: SongStructure,
+                                    lead1Events: [MIDIEvent], handoffBars: Set<Int>,
+                                    bluesVariation: Bool, regLow: Int, regHigh: Int,
+                                    velocityOffset: Int, rng: inout SeededRNG) -> [MIDIEvent] {
+        struct ANote { var rel: Int; var note: Int; var dur: Int; var chromatic = false }
+        let scale = sortedScale(frame: frame)
+        let keyPC = frame.keySemitoneValue % 12
+        let regMid = (regLow + regHigh) / 2
+        let totalSteps = frame.totalBars * 16
+        let (bStart, aStart) = bluesVariation ? bluesSectionAnchors(structure: structure) : (-1, -1)
+        let devices = ["CHL-LD2-003", "CHL-LD2-004", "CHL-LD2-005", "CHL-LD2-006"]
+
+        // Lead 1 as heard: one note per onset (the highest), grouped into phrases wherever Lead 1
+        // has been silent for 10 steps or more.
+        var seen = Set<Int>()
+        let melody = lead1Events.sorted { ($0.stepIndex, -Int($0.note)) < ($1.stepIndex, -Int($1.note)) }
+            .filter { seen.insert($0.stepIndex).inserted }
+        var phrases: [[MIDIEvent]] = []
+        var soundingEnd = -100
+        for n in melody {
+            if n.stepIndex - soundingEnd >= 10 || phrases.isEmpty { phrases.append([n]) }
+            else { phrases[phrases.count - 1].append(n) }
+            soundingEnd = Swift.max(soundingEnd, n.stepIndex + n.durationSteps)
+        }
+
+        /// Lead 1's last notes, with gaps capped at 6 steps and each note held to the next.
+        func tail(_ ph: [MIDIEvent], _ k: Int) -> [ANote] {
+            let src = Array(ph.suffix(k))
+            var out: [ANote] = []
+            var rel = 0
+            for (i, e) in src.enumerated() {
+                if i > 0 { rel += Swift.max(1, Swift.min(6, e.stepIndex - src[i - 1].stepIndex)) }
+                out.append(ANote(rel: rel, note: Int(e.note), dur: Swift.max(1, e.durationSteps)))
+            }
+            for i in out.indices.dropLast() { out[i].dur = Swift.min(out[i].dur, out[i + 1].rel - out[i].rel) }
+            out[out.count - 1].dur = Swift.max(4, Swift.min(8, out[out.count - 1].dur))
+            return out
+        }
+        let rhythmCells: [[(Int, Int)]] = [
+            [(0, 2), (2, 2), (4, 2), (6, 8)],
+            [(0, 3), (3, 1), (4, 4), (8, 8)],
+            [(2, 2), (4, 1), (5, 3), (8, 8)],
+        ]
+        /// Pitches set to one of three jazz rhythm cells (straight 8ths, dotted, or pushed with a
+        /// 16th), the held note last; a three-note line takes the cell's last three.
+        func fromCell(_ pitches: [Int]) -> [ANote] {
+            var cell = rhythmCells[rng.nextInt(upperBound: rhythmCells.count)]
+            if pitches.count < cell.count { cell = Array(cell.suffix(pitches.count)) }
+            let shift = cell.first?.0 ?? 0
+            return zip(cell, pitches).map { ANote(rel: $0.0 - shift, note: $1, dur: $0.1) }
+        }
+
+        func answer(_ device: String, phrase ph: [MIDIEvent], tones: Set<Int>) -> [ANote] {
+            let last = Int(ph.last!.note)
+            switch device {
+            case "CHL-LD2-003":   // Tail riff
+                var t = tail(ph, Swift.min(ph.count, 2 + rng.nextInt(upperBound: 3)))
+                let moved = fitBlock(t.map { $0.note }, regLow: regLow, regHigh: regHigh, near: regMid, scale: scale)
+                // A chained riff always moves (a sequence); a first answer may echo at pitch.
+                let shift = chaining ? [-1, 1, -2][rng.weightedPick([0.50, 0.30, 0.20])]
+                    : [-1, 1, -2, 0][rng.weightedPick([0.40, 0.25, 0.15, 0.20])]
+                for i in t.indices { t[i].note = scaleStep(moved[i], shift, scale: scale) }
+                if t.count == 2 && rng.nextDouble() < 0.60 {
+                    let again = shift == 0 ? -1 : shift
+                    let gap = Swift.min(t[1].dur, 3)
+                    t[1].dur = gap
+                    let start = t[1].rel + gap + 1
+                    t += t.map { ANote(rel: $0.rel + start, note: scaleStep($0.note, again, scale: scale),
+                                       dur: Swift.min($0.dur, 3)) }
+                }
+                let dir = shift > 0 ? 1 : -1
+                let lastT = t[t.count - 1]
+                t[t.count - 1].dur = Swift.min(lastT.dur, 2)   // a passing note into the resolution
+                let res = nearestPC(scaleStep(lastT.note, dir, scale: scale), tones, prefer: dir)
+                t.append(ANote(rel: lastT.rel + t[t.count - 1].dur + (rng.nextDouble() < 0.5 ? 0 : 1),
+                               note: res, dur: 6 + rng.nextInt(upperBound: 3)))
+                return t
+            case "CHL-LD2-004":   // Rhythm trade
+                var t = tail(ph, Swift.min(ph.count, 3 + rng.nextInt(upperBound: 3)))
+                let rising = Int(ph.last!.note) - Int(ph.suffix(t.count).first!.note) > 0
+                let dir = rising ? -1 : 1
+                var p = nearestPC(rising ? regHigh - 3 : regLow + 4, tones)
+                for i in t.indices {
+                    if i > 0 { p = scaleStep(p, dir * (rng.nextDouble() < 0.25 ? 2 : 1), scale: scale) }
+                    t[i].note = p
+                }
+                t[t.count - 1].note = nearestPC(t[t.count - 1].note, tones, prefer: dir)
+                return t
+            case "CHL-LD2-005":   // Bebop enclosure
+                let folded = fitBlock([last], regLow: regLow + 2, regHigh: regHigh - 2, near: regMid, scale: scale)[0]
+                var target = nearestPC(folded, tones)
+                if rng.nextDouble() < 0.30 {
+                    target = nearestPC(target + 2, tones.subtracting([((target % 12) + 12) % 12]), prefer: 1)
+                }
+                let up = scaleStep(target, 1, scale: scale), up2 = scaleStep(target, 2, scale: scale)
+                var t: [ANote]
+                switch rng.nextInt(upperBound: 4) {
+                case 0:  t = [ANote(rel: 0, note: up, dur: 2), ANote(rel: 2, note: target - 1, dur: 2, chromatic: true),
+                              ANote(rel: 4, note: target, dur: 8)]
+                case 1:  t = [ANote(rel: 0, note: target - 1, dur: 2, chromatic: true), ANote(rel: 2, note: up, dur: 2),
+                              ANote(rel: 4, note: target, dur: 8)]
+                case 2:  t = [ANote(rel: 0, note: up2, dur: 2), ANote(rel: 2, note: up, dur: 2),
+                              ANote(rel: 4, note: target - 1, dur: 2, chromatic: true), ANote(rel: 6, note: target, dur: 8)]
+                default: t = [ANote(rel: 0, note: up, dur: 1), ANote(rel: 1, note: target - 1, dur: 1, chromatic: true),
+                              ANote(rel: 2, note: target, dur: 8)]
+                }
+                if rng.nextDouble() < 0.40 {
+                    let held = t[t.count - 1]
+                    t[t.count - 1].dur = 6
+                    t.append(ANote(rel: held.rel + 8, note: nearestPC(held.note - 2, tones), dur: 4))
+                }
+                return t
+            default:              // CHL-LD2-006 Question and answer
+                let lastPC = ((last % 12) + 12) % 12
+                let settled = lastPC == keyPC || lastPC == (keyPC + 7) % 12
+                if settled {
+                    let c0 = nearestPC(regLow + 3, tones, prefer: 1)
+                    let c1 = nearestPC(c0 + 3, tones, prefer: 1)
+                    let c2 = nearestPC(c1 + 3, tones, prefer: 1)
+                    return fromCell([c0, c1, c2, scaleStep(c2, 1, scale: scale)])
+                }
+                let home = tones.contains(keyPC) ? Set([keyPC]) : tones
+                let target = nearestPC(regMid - 2, home)
+                let count = 3 + rng.nextInt(upperBound: 2)
+                return fromCell((0..<count).reversed().map { scaleStep(target, $0, scale: scale) })
+            }
+        }
+
+        /// Places an answer at `start`, cut at `limit`: held notes on chord tones of their bar,
+        /// passing notes in the scale, the whole figure in the register.
+        func place(_ shape: [ANote], start: Int, limit: Int, velocity: Int) -> [MIDIEvent] {
+            // HarmonicFilter drops an out-of-scale note on a beat, which would leave an enclosure
+            // without its chromatic note: push the answer an 8th later, or failing that play the
+            // scale step instead.
+            var shape = shape, start = start
+            if shape.contains(where: { $0.chromatic && (start + $0.rel) % 4 == 0 }) {
+                if start + 2 + (shape.last?.rel ?? 0) + 2 < limit { start += 2 }
+                else { for i in shape.indices where shape[i].chromatic { shape[i].chromatic = false } }
+            }
+            var notes = shape.filter { start + $0.rel < limit - 1 }
+            guard notes.count >= 2 else { return [] }
+            for i in notes.indices {
+                notes[i].dur = Swift.max(1, Swift.min(notes[i].dur, limit - (start + notes[i].rel)))
+            }
+            let fitted = fitBlock(notes.map { $0.note }, regLow: regLow, regHigh: regHigh, near: regMid, scale: scale)
+            var out: [MIDIEvent] = []
+            for (i, n) in notes.enumerated() {
+                let step = start + n.rel
+                let tones = structure.chordWindow(atBar: step / 16)?.chordTones ?? []
+                var pitch = fitted[i]
+                let isLast = i == notes.count - 1
+                if !n.chromatic {
+                    pitch = (n.dur >= 3 || isLast) ? nearestPC(pitch, tones) : scaleStep(pitch, 0, scale: scale)
+                }
+                // A held note never restates the note just before it: the line moves to the next
+                // chord tone down (up at the bottom of the register).
+                if (n.dur >= 3 || isLast), let prev = out.last, Int(prev.note) == pitch {
+                    let down = nearestPC(pitch - 2, tones.subtracting([pitch % 12]))
+                    pitch = down >= regLow ? down : nearestPC(pitch + 2, tones.subtracting([pitch % 12]), prefer: 1)
+                }
+                while pitch < regLow { pitch += 12 }
+                while pitch > regHigh { pitch -= 12 }
+                let v = velocity + (i == 0 ? 4 : 0) - (isLast ? 4 : 0) + rng.nextInt(upperBound: 6)
+                out.append(MIDIEvent(stepIndex: step, note: UInt8(pitch),
+                                     velocity: UInt8(Swift.max(30, Swift.min(110, v))), durationSteps: n.dur))
+            }
+            return out
+        }
+
+        var events: [MIDIEvent] = []
+        var chaining = false
+        for (pi, ph) in phrases.enumerated() {
+            chaining = false
+            let end = ph.map { $0.stepIndex + $0.durationSteps }.max()!
+            let next = pi + 1 < phrases.count ? phrases[pi + 1][0].stepIndex : totalSteps
+            var start = end + 2
+            start += start % 2                                   // onto the 8th grid
+            guard start < totalSteps, let sec = structure.section(atBar: start / 16),
+                  sec.label == .A || sec.label == .B else { continue }
+            var limit = Swift.min(next - 2, sec.endBar * 16)
+            if bluesVariation {
+                for b in (start / 16)...Swift.max(start / 16, (limit - 1) / 16)
+                where bluesFormPosition(bar: b, label: sec.label, bStart: bStart, aStart: aStart) >= 13 {
+                    limit = Swift.min(limit, b * 16); break
+                }
+            }
+            guard limit - start >= 8 else { continue }
+            let handoff = (start / 16...(limit - 1) / 16).contains { handoffBars.contains($0) }
+            let prob = handoff ? 1.0 : (sec.label == .A ? 0.50 : 0.80)
+            guard rng.nextDouble() < prob else { continue }
+
+            let tones = structure.chordWindow(atBar: start / 16)?.chordTones ?? []
+            let device = rng.nextDouble() < 0.70 ? ruleID
+                : devices.filter { $0 != ruleID }[rng.nextInt(upperBound: devices.count - 1)]
+            let velocity = Swift.max(55, Swift.min(90, Int(ph.last!.velocity))) - 6 + velocityOffset
+            var placed = place(answer(device, phrase: ph, tones: tones), start: start, limit: limit,
+                               velocity: velocity)
+            events += placed
+
+            // Riffing on: in a handoff window, or now and then over a long gap in Groove B, Lead 2
+            // takes its own answer as the next call, up to three answers in all.
+            let chain = handoff || (sec.label == .B && limit - start >= 40 && rng.nextDouble() < 0.30)
+            var answers = 1
+            while chain, answers < 3, placed.count >= 2 {
+                let lastEnd = placed.map { $0.stepIndex + $0.durationSteps }.max()!
+                var s = lastEnd + 4 + 2 * rng.nextInt(upperBound: 3)
+                s += s % 2
+                guard limit - s >= 8 else { break }
+                let chordAt = structure.chordWindow(atBar: s / 16)?.chordTones ?? []
+                let own = placed.map { MIDIEvent(stepIndex: $0.stepIndex, note: $0.note,
+                                                 velocity: $0.velocity, durationSteps: $0.durationSteps) }
+                let d = rng.nextDouble() < 0.60 ? "CHL-LD2-003" : devices[rng.nextInt(upperBound: devices.count)]
+                chaining = true
+                placed = place(answer(d, phrase: own, tones: chordAt), start: s, limit: limit,
+                               velocity: velocity - 3 * answers)
+                events += placed
+                answers += 1
+            }
         }
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
@@ -1458,6 +1912,7 @@ struct ChillLeadGenerator {
         let tonicPC  = frame.keySemitoneValue % 12
         let tonicIdx = pool.indices.min(by: { abs(pool[$0] % 12 - tonicPC) < abs(pool[$1] % 12 - tonicPC) }) ?? 0
 
+        var stopTimeSections = Set<Int>()
         var bar = 0
         while bar < frame.totalBars {
             let section = structure.section(atBar: bar)
@@ -1470,30 +1925,13 @@ struct ChillLeadGenerator {
                     // Silent — bass carries the groove alone
                     bar += 1; continue
                 case .stopTime:
-                    // Play 2–4 note burst in the "silence" bars between stabs (odd breakdown bars)
-                    let breakdownBar = bar - (section?.startBar ?? bar)
-                    if breakdownBar % 2 == 0 {
-                        bar += 1; continue  // stab bar — lead silent
-                    }
-                    if !pool.isEmpty {
-                        let burstCount = 2 + rng.nextInt(upperBound: 3)
-                        let barBase    = bar * 16
-                        var step       = barBase + rng.nextInt(upperBound: 4)
-                        var prevIdx    = tonicIdx
-                        for i in 0..<burstCount {
-                            guard step < barBase + 15 else { break }
-                            let delta = rng.nextDouble() < 0.70 ? (rng.nextDouble() < 0.5 ? 1 : -1)
-                                                                 : (rng.nextDouble() < 0.5 ? 2 : -2)
-                            prevIdx = Swift.max(0, Swift.min(pool.count - 1, prevIdx + delta))
-                            let isLast = i == burstCount - 1
-                            let remaining = barBase + 15 - step
-                            let dur = isLast ? Swift.min(4 + rng.nextInt(upperBound: 4), remaining)
-                                             : 1 + rng.nextInt(upperBound: 2)
-                            let vel = UInt8(60 + i * 3 + rng.nextInt(upperBound: 18))
-                            events.append(MIDIEvent(stepIndex: step, note: UInt8(pool[prevIdx]),
-                                                    velocity: vel, durationSteps: Swift.max(1, dur)))
-                            step += dur + (isLast ? 0 : rng.nextInt(upperBound: 2))
-                        }
+                    // The same stop-time solo as the other rules (stopTimeSolo), its fragment
+                    // taken from the latest staccato notes. Until 2026-11-11, random 2–4 note bursts.
+                    if let sec = section, stopTimeSections.insert(sec.startBar).inserted {
+                        var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                        events += stopTimeSolo(section: sec, frame: frame, structure: structure,
+                                               motif: melodyPitches(Array(events.suffix(6))),
+                                               regLow: regLow, regHigh: regHigh, rng: &st)
                     }
                     bar += 1; continue
                 case .harmonicDrone:
@@ -1582,6 +2020,17 @@ struct ChillLeadGenerator {
                 }
             }
             bar = nextBoundary
+        }
+        // A silent gap can still step over a whole stop-time breakdown; the soloist plays it.
+        if breakdownStyle == .stopTime {
+            for sec in structure.sections where sec.label == .bridge
+                && stopTimeSections.insert(sec.startBar).inserted {
+                var st = SeededRNG(seed: rng.next() ^ 0x5354_4F50_5449_4D45)   // "STOPTIME"
+                let before = events.filter { $0.stepIndex < sec.startBar * 16 }
+                events += stopTimeSolo(section: sec, frame: frame, structure: structure,
+                                       motif: melodyPitches(Array(before.suffix(6))),
+                                       regLow: regLow, regHigh: regHigh, rng: &st)
+            }
         }
         return events.sorted { $0.stepIndex < $1.stepIndex }
     }
@@ -1705,8 +2154,27 @@ struct JazzCellState {
     let altAmen: Bool
     /// The key-root MIDI note the phrases sit around.
     let anchor: Int
+    /// CHL-LD1-001/007/008: the root the last phrase was placed on, so the next stays in its octave.
+    var lastRoot: Int? = nil
+    /// CHL-LD1-001/007/008/015 play three themes like a player with a head and two more ideas:
+    /// A (the rule's own licks), B (a contrasting tune) and C (a blowing line from a solo). After
+    /// the opening A A B, the song cycles this seed-picked form; A also comes back through seed
+    /// returns, the recap and a plain final statement.
+    let form: [Character]
+    var formPos = 0
+    /// Which of the two B and the two C licks plays next; they alternate from a seed-picked start.
+    var bPick = 0
+    var cPick = 0
+    var isThemed: Bool { Self.themedRules.contains(ruleID) }
+    static let themedRules: Set<String> = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-015"]
 
-    var phraseBars: Int { ruleID == "CHL-LD1-014" ? 3 : 2 }
+    var phraseBars: Int {
+        switch ruleID {
+        case "CHL-LD1-014":                               return 3
+        case "CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008": return 4
+        default:                                          return 2
+        }
+    }
 
     init(ruleID: String, regLow: Int, regHigh: Int, keyPC: Int, rng: inout SeededRNG) {
         self.ruleID = ruleID
@@ -1715,6 +2183,10 @@ struct JazzCellState {
         switch ruleID {
         case "CHL-LD1-013": shift = rng.nextDouble() < 0.65 ? 0 : -4
         case "CHL-LD1-015": shift = rng.nextDouble() < 0.65 ? 0 : 2
+        // Chet sigh and Horace hook: pickups on time or an 8th early (held notes anticipate
+        // the bar). Blues bossa: the fall on the beat or an 8th late.
+        case "CHL-LD1-001", "CHL-LD1-007": shift = rng.nextDouble() < 0.65 ? 0 : -2
+        case "CHL-LD1-008": shift = rng.nextDouble() < 0.65 ? 0 : 2
         default:            shift = rng.nextDouble() < 0.65 ? 0 : 4
         }
         altAmen = rng.nextDouble() < 0.30
@@ -1722,6 +2194,18 @@ struct JazzCellState {
         let target = (regLow + regHigh) / 2 - 3
         let below = target - ((target - keyPC) % 12 + 12) % 12
         anchor = (target - below > 6) ? below + 12 : below
+        // Drawn only for the themed rules, so the other lick rules keep their seeds' songs.
+        if Self.themedRules.contains(ruleID) {
+            // One A in five: seed returns and the final statement bring A back on top of these.
+            let forms: [[Character]] = [["C", "B", "A", "C", "B"],
+                                        ["C", "A", "B", "C", "B"],
+                                        ["B", "C", "A", "B", "C"]]
+            form  = forms[rng.nextInt(upperBound: forms.count)]
+            bPick = rng.nextInt(upperBound: 2)
+            cPick = rng.nextInt(upperBound: 2)
+        } else {
+            form = []
+        }
     }
 }
 
@@ -1774,6 +2258,208 @@ extension ChillLeadGenerator {
     /// The short tail: b3, then 2 held.
     private static let monkTail: [JazzNote]   = [(18, 3, 4), (22, 2, 8)]
 
+    // CHL-LD1-001 Chet sigh: after My Funny Valentine (Rodgers and Hart), Chet Baker's signature
+    // tune, 1954. Deliberately not the tune: the gesture (a short pickup into a held 2 that
+    // leans on the root, a climb that falls home) with its own pitches and rhythm, and every
+    // statement varied. Four-bar phrases.
+    /// The sigh approached from the b7 below (b7-1-b3 into a held 2), then a climb to the 5
+    /// falling b3-2 to a held root.
+    private static let valentineOpening: [JazzNote] =
+        [(10, -2, 2), (12, 0, 2), (14, 3, 2), (16, 2, 10),
+         (26, 3, 2), (28, 2, 1), (29, 0, 1), (30, 2, 2), (32, 7, 8),
+         (42, 5, 2), (44, 3, 2), (46, 2, 2), (48, 0, 12)]
+    /// The sigh twice, the second climbing to the 4 and turning back onto the held 2.
+    private static let valentineSighs: [JazzNote] =
+        [(10, -2, 2), (12, 0, 2), (14, 3, 2), (16, 2, 10),
+         (26, 0, 2), (28, 3, 2), (30, 5, 1), (31, 3, 1), (32, 2, 14)]
+    /// The sigh moved up: 2-b3-5 into a held 4, then up to the b7 settling on the 5.
+    private static let valentineSequence: [JazzNote] =
+        [(10, 2, 2), (12, 3, 2), (14, 7, 2), (16, 5, 10),
+         (26, 3, 2), (28, 5, 1), (29, 7, 1), (30, 10, 2), (32, 7, 12)]
+    /// The trumpet's scale run up to the b3 an octave over, then the fall from the 9th to the 5.
+    private static let valentineRun: [JazzNote] =
+        [(0, 3, 4), (4, 5, 2), (6, 7, 1), (8, 10, 2), (11, 12, 2), (13, 14, 2), (16, 15, 14),
+         (32, 14, 9), (42, 12, 1), (45, 10, 1), (47, 8, 1), (48, 7, 14)]
+    /// Over other chords, a bridge in the tune's manner, not its melody: 5 dropping to a held root
+    /// with a leading-tone lean, then 3-4 up to the 6 and a slow fall to the 2.
+    private static let valentineBridge: [JazzNote] =
+        [(0, 7, 3), (4, 0, 8), (13, -1, 3), (16, 0, 8),
+         (28, 4, 2), (30, 5, 2), (32, 9, 4), (36, 7, 2), (38, 4, 2), (40, 2, 10)]
+
+    // CHL-LD1-007 Horace hook: after Song for My Father (Horace Silver, 1965). Four-bar phrases.
+    /// The hook: a pickup from the 5 below, the turn on the b6, the fall to the b7 below with a b2
+    /// grace, and a long b6 under the root.
+    private static let fatherHook: [JazzNote] =
+        [(10, -5, 2), (12, 0, 2), (14, 3, 2),
+         (16, 7, 2), (18, 8, 1), (19, 7, 1), (20, 5, 1), (21, 3, 2), (23, 5, 3), (26, 7, 1), (27, 5, 1),
+         (28, 0, 2), (30, 3, 4),
+         (34, 5, 1), (35, 3, 1), (36, -2, 3), (39, 0, 3), (42, 1, 1), (43, 0, 1), (44, -5, 2), (46, -4, 14)]
+    /// The B-section call: the 5 repeated, a fall to the 4 and a held b6; then the b6 repeated
+    /// and lifted to the b7.
+    private static let fatherCall: [JazzNote] =
+        [(10, 7, 1), (12, 7, 1), (14, 7, 2), (16, 7, 2), (18, 5, 2), (22, 8, 14),
+         (43, 8, 1), (44, 8, 1), (46, 8, 2), (48, 8, 2), (51, 7, 1), (54, 10, 10)]
+    /// Over other chords, the horns' sighs: 4 to 3 into a held b6, then the leading tone home.
+    private static let fatherSighs: [JazzNote] =
+        [(12, 5, 2), (14, 4, 2), (16, 3, 2), (18, 8, 14), (40, -1, 6), (46, 0, 14)]
+
+    // CHL-LD1-008 Blues bossa: after Blue Bossa (Kenny Dorham, on Joe Henderson's Page One, 1963). Four-bar phrases in the bossa's anticipations.
+    /// The fall 5-4-b3-2 on the off-beats into a held root, then a 5-4 tag held over.
+    private static let bossaHead: [JazzNote] =
+        [(0, 7, 4), (6, 5, 3), (10, 3, 3), (14, 2, 2), (16, 0, 8), (42, 7, 2), (46, 5, 14)]
+    /// The second phrase, the same fall a step lower, on through the b6 to the 5 below.
+    private static let bossaSequence: [JazzNote] =
+        [(0, 5, 4), (6, 3, 3), (10, 2, 3), (14, 0, 2), (16, -2, 8), (26, -4, 2), (30, -5, 9),
+         (42, 5, 2), (46, 3, 14)]
+    /// The fall turned upside down: root-2-b3-4 up to a held 5.
+    private static let bossaRise: [JazzNote] =
+        [(0, 0, 4), (6, 2, 3), (10, 3, 3), (14, 5, 2), (16, 7, 8), (42, 5, 2), (46, 3, 14)]
+    /// Over other chords, the modulation's long fall: down a whole octave from the root.
+    private static let bossaLongFall: [JazzNote] =
+        [(0, 0, 3), (6, -2, 2), (10, -3, 2), (14, -5, 2), (16, -7, 10), (28, -9, 2),
+         (32, -9, 4), (36, -10, 2), (40, -12, 12)]
+
+    // Second and third themes (B, C) for CHL-LD1-001, 007, 008 and 015, each from a different
+    // work, transcribed in key-root terms and fitted per song like the A licks. Four bars for
+    // 001/007/008, two for 015. Notes are held to the next onset (legato for synth leads).
+
+    /// 001 B, after Chet Baker's ballad solo on I Fall in Love Too Easily (Chet Baker Sings, 1954):
+    /// a lean around the 3 climbing to a held 5, then a rise from the 5 below to the root.
+    private static let chetBalladClimb: [JazzNote] =
+        [(14, 4, 2), (17, 5, 2), (19, 4, 3), (22, 4, 7), (29, 2, 2), (31, 4, 4), (35, 5, 3),
+         (38, 7, 4), (42, 7, 6), (48, -5, 2), (50, -3, 2), (52, -1, 3), (55, 0, 3), (58, -1, 2),
+         (60, 0, 4)]
+    /// 001 B: the same solo's repeated 3 between the blue thirds, settling on a long 5.
+    private static let chetBalladRepeat: [JazzNote] =
+        [(2, 4, 3), (5, 3, 2), (7, 6, 2), (9, 9, 4), (20, 8, 2), (22, 9, 1), (23, 11, 2),
+         (25, 4, 3), (28, 4, 3), (31, 4, 4), (35, 4, 4), (39, 5, 1), (40, 4, 1), (41, 3, 1),
+         (42, 4, 3), (45, 6, 3), (48, 7, 14)]
+    /// 001 C, after Chet Baker's solo on Let's Get Lost (1955): a leap to the b7 and 9 above,
+    /// through the #4 to the 5, then a fall to the 6 below and a lift to a held 2.
+    private static let lostLeap: [JazzNote] =
+        [(15, 12, 1), (16, 10, 4), (20, 14, 3), (23, 9, 3), (26, 6, 1), (27, 10, 1), (28, 7, 5),
+         (33, 9, 1), (34, 7, 1), (35, 5, 1), (36, 2, 1), (37, -3, 2), (39, -5, 2), (41, -3, 7),
+         (48, 0, 2), (50, 4, 1), (51, 5, 1), (52, 2, 8)]
+    /// 001 C: an arpeggio up to the octave, turning down through the 5 and 3, home to the root.
+    private static let lostTurn: [JazzNote] =
+        [(3, -2, 1), (4, 2, 1), (5, 5, 1), (6, 9, 1), (7, 12, 5), (12, 9, 1), (13, 7, 4),
+         (17, 12, 3), (20, 7, 1), (21, 4, 3), (24, 7, 1), (25, 10, 3), (28, 9, 1), (29, 7, 1),
+         (30, 4, 2), (32, 5, 2), (34, 0, 2), (36, -3, 1), (37, -5, 6), (43, 4, 1), (44, 5, 2),
+         (46, 0, 12)]
+
+    /// 007 B, after Kenny Dorham's solo on Doodlin' (Horace Silver, 1954): a riff around the
+    /// root stated three times, each reaching higher, falling to a held 5 below.
+    private static let doodlinRiff: [JazzNote] =
+        [(3, -5, 2), (5, -3, 1), (6, 0, 2), (8, 2, 1), (9, 0, 1), (10, -3, 2), (12, 0, 4),
+         (19, -7, 2), (21, -3, 1), (22, 0, 2), (24, 3, 1), (25, 0, 2), (27, -3, 1), (28, 0, 4),
+         (33, -5, 2), (35, -3, 2), (37, 0, 2), (39, 3, 1), (40, 4, 2), (42, 0, 2), (44, -3, 2),
+         (46, 0, 3), (49, -3, 3), (52, -5, 10)]
+    /// 007 B: the same solo's chromatic climb b3-3-4-#4-5 in 8ths, the fall to a held 4, home on the 5 below.
+    private static let doodlinClimb: [JazzNote] =
+        [(13, -5, 1), (14, -3, 1), (15, 0, 2), (17, 3, 2), (19, 4, 2), (21, 5, 2), (23, 6, 2),
+         (25, 7, 2), (27, 4, 6), (33, 0, 2), (35, -2, 2), (37, -5, 3), (40, -7, 6), (46, -9, 1),
+         (47, -8, 1), (48, -5, 10)]
+    /// 007 C, after Lee Morgan's solo on The Sidewinder (1963): a b7-5-4 pickup to the root, the
+    /// 4 hammered in 8ths, then b3-3 down to the root.
+    private static let sidewinderHammer: [JazzNote] =
+        [(3, 10, 2), (5, 7, 1), (6, 5, 1), (7, 7, 1), (8, 0, 1), (9, -2, 1), (10, 0, 6),
+         (24, 5, 2), (26, 5, 2), (28, 5, 2), (30, 5, 2), (32, 5, 1), (33, 4, 1), (34, 3, 2),
+         (36, 0, 1), (37, -2, 1), (38, 0, 8), (48, 3, 1), (49, 4, 2), (51, 0, 1), (52, -2, 1),
+         (53, -5, 3), (56, 0, 8)]
+    /// 007 C: the same solo's 8th-note run up to the octave and back down, then a 3-4 tag home.
+    private static let sidewinderRun: [JazzNote] =
+        [(0, 2, 2), (2, 4, 2), (4, 5, 2), (6, 7, 2), (8, 9, 2), (10, 12, 2), (12, 11, 2),
+         (14, 10, 2), (16, 9, 2), (18, 8, 2), (20, 7, 2), (22, 5, 2), (24, 4, 2), (26, 7, 2),
+         (28, 0, 6), (36, 4, 2), (38, 5, 4), (42, 3, 2), (44, 4, 2), (46, 0, 4), (50, -2, 2),
+         (52, 0, 10)]
+
+    /// 008 B, after Stolen Moments (Oliver Nelson, The Blues and the Abstract Truth, 1961): the
+    /// head's climb to the 9 and fall to the b3 below, stated twice with a new ending.
+    private static let stolenHead: [JazzNote] =
+        [(2, -5, 2), (4, -2, 2), (6, 2, 4), (10, 0, 4), (14, -2, 2), (16, 0, 2), (18, -3, 4),
+         (22, -7, 2), (24, -9, 2), (26, -5, 8), (34, -5, 2), (36, -2, 2), (38, 2, 4), (42, 0, 4),
+         (46, -2, 2), (48, 0, 2), (50, -3, 6), (56, -5, 8)]
+    /// 008 B: the head's second phrase, the same shape a step up and falling further.
+    private static let stolenSequence: [JazzNote] =
+        [(2, -4, 2), (4, 0, 2), (6, 3, 4), (10, 2, 4), (14, 0, 2), (16, 2, 2), (18, -2, 6),
+         (24, -7, 2), (26, -4, 8), (34, -9, 2), (36, -5, 2), (38, -2, 4), (42, -3, 4),
+         (46, -5, 2), (48, -3, 2), (50, -7, 6), (56, -9, 8)]
+    /// 008 C, after Miles Davis's solo on So What (Kind of Blue, 1959): the root restated with
+    /// space around it, a b3, a long 2 and a b7 that does not resolve.
+    private static let soWhatSpace: [JazzNote] =
+        [(0, 0, 2), (2, 0, 9), (11, 0, 2), (13, 3, 4), (17, 2, 1), (18, 0, 2), (20, -5, 1),
+         (21, -5, 6), (31, 5, 3), (34, 2, 11), (45, 2, 1), (46, -2, 1), (47, 2, 2), (49, 5, 2),
+         (51, 2, 3), (54, -2, 2), (56, -2, 7)]
+    /// 008 C: the same solo's 2-b3 into a held 4, the fall to the 5 below, and a slow rise home.
+    private static let soWhatFall: [JazzNote] =
+        [(0, 2, 1), (1, 3, 1), (2, 5, 5), (7, 2, 8), (15, -2, 3), (18, -5, 1), (19, -2, 1),
+         (20, 2, 1), (21, 5, 2), (23, 2, 4), (27, -2, 2), (29, 0, 1), (30, -2, 2), (32, -3, 1),
+         (33, -5, 2), (35, -5, 8), (48, -5, 1), (49, -1, 1), (50, 0, 1), (51, 2, 4), (55, -2, 3),
+         (58, 0, 6)]
+
+    /// 015 B, after Parker's Mood (Charlie Parker, 1948): the opening fanfare up to the 3, a
+    /// turn around the 2, and a long 2. Two bars.
+    private static let moodFanfare: [JazzNote] =
+        [(0, 0, 2), (2, -3, 2), (4, 4, 6), (10, 2, 1), (11, 0, 1), (12, 2, 1), (13, 4, 1),
+         (14, 0, 1), (15, -3, 1), (16, 4, 3), (19, 0, 1), (20, 2, 2), (22, 2, 10)]
+    /// 015 B: the theme's arpeggio up to the octave, dropping back to the root, then the
+    /// octave repeated into a held 4.
+    private static let moodArpeggio: [JazzNote] =
+        [(2, 0, 2), (4, 4, 1), (5, 7, 2), (7, 9, 1), (8, 12, 1), (9, 0, 2), (11, 4, 3),
+         (14, 0, 2), (16, 12, 1), (17, 12, 2), (19, 12, 1), (20, 7, 1), (21, 5, 10)]
+    /// 015 C, after Sonny Rollins's solo on Tenor Madness (1956): the 3 and root traded in a
+    /// rhythm, twice, landing on the root.
+    private static let madnessRhythm: [JazzNote] =
+        [(4, 4, 1), (5, 4, 2), (7, 0, 1), (8, 4, 2), (10, 0, 6), (16, 4, 2), (18, 0, 1),
+         (19, 0, 1), (20, 4, 2), (22, 0, 1), (23, 3, 1), (24, 0, 8)]
+    /// 015 C: the root hammered in a broken rhythm, a turn below it, and the 5 below held.
+    private static let madnessHammer: [JazzNote] =
+        [(1, 0, 2), (3, 0, 1), (4, 0, 2), (6, 0, 1), (7, 0, 2), (9, 0, 1), (10, -1, 1),
+         (11, 2, 1), (12, -1, 1), (13, -3, 3), (16, -5, 2), (18, 0, 5), (23, 0, 2), (25, -2, 2),
+         (27, -5, 5)]
+
+    /// The B or C lick for a themed rule; `pick` alternates between the two of each.
+    private static func themeLick(ruleID: String, theme: Character, pick: Int) -> [JazzNote] {
+        let banks: [String: [[JazzNote]]] = [
+            "CHL-LD1-001B": [chetBalladClimb, chetBalladRepeat], "CHL-LD1-001C": [lostLeap, lostTurn],
+            "CHL-LD1-007B": [doodlinRiff, doodlinClimb], "CHL-LD1-007C": [sidewinderHammer, sidewinderRun],
+            "CHL-LD1-008B": [stolenHead, stolenSequence], "CHL-LD1-008C": [soWhatSpace, soWhatFall],
+            "CHL-LD1-015B": [moodFanfare, moodArpeggio], "CHL-LD1-015C": [madnessRhythm, madnessHammer],
+        ]
+        guard let bank = banks[ruleID + String(theme)] else { return [] }
+        return bank[pick % bank.count]
+    }
+
+    /// The homage transformations for CHL-LD1-001, 007 and 008, each drawn on its own: drop a short
+    /// inner note, nudge one inner note a 16th, add a chromatic grace into the first note, and on
+    /// Chet sigh, Chet's turn (note, the one above, note) on the first long held note.
+    private static func varyHomageCell(_ input: [JazzNote], ruleID: String,
+                                       rng: inout SeededRNG) -> [JazzNote] {
+        var cell = input.sorted { $0.step < $1.step }
+        guard cell.count >= 4 else { return cell }
+        if rng.nextDouble() < 0.35 {
+            let inner = (1..<(cell.count - 1)).filter { cell[$0].dur <= 3 }
+            if !inner.isEmpty { cell.remove(at: inner[rng.nextInt(upperBound: inner.count)]) }
+        }
+        if rng.nextDouble() < 0.30, cell.count >= 3 {
+            let i = 1 + rng.nextInt(upperBound: cell.count - 2)
+            let moved = cell[i].step + (rng.nextDouble() < 0.5 ? -1 : 1)
+            if moved > cell[i - 1].step && moved < cell[i + 1].step { cell[i].step = moved }
+        }
+        if rng.nextDouble() < 0.20, cell[0].step >= 1 {
+            let first = cell[0]
+            cell.insert((step: first.step - 1, iv: first.iv - 1, dur: 1), at: 0)
+        }
+        if ruleID == "CHL-LD1-001", rng.nextDouble() < 0.30,
+           let i = cell.indices.first(where: { cell[$0].dur >= 8 }) {
+            let held = cell[i]
+            cell.replaceSubrange(i...i, with: [(step: held.step, iv: held.iv, dur: 1),
+                                               (step: held.step + 1, iv: held.iv + 1, dur: 1),
+                                               (step: held.step + 2, iv: held.iv, dur: held.dur - 2)])
+        }
+        return cell
+    }
+
     /// One phrase for a jazz cell rule. Picks a lick for this point in the song, moves it to the
     /// chord root under the phrase's first bar, and fits it to the scale and the register.
     static func jazzCellPhrase(state: inout JazzCellState, frame: GlobalMusicalFrame,
@@ -1787,53 +2473,132 @@ extension ChillLeadGenerator {
         let late    = bar >= frame.totalBars * 4 / 5   // the last fifth plays the licks plain
         let shift   = state.shift
 
+        // Themed rules (001, 007, 008, 015): A A B to open, then the song's seed-picked form. The
+        // last fifth opens with a plain A before the form resumes.
+        var theme: Character = "A"
+        if state.isThemed && k >= 2 && !(late && !state.finalHookDone) {
+            if k == 2 {
+                theme = "B"
+            } else {
+                theme = state.form[state.formPos % state.form.count]
+                state.formPos += 1
+            }
+        }
+
         var cell: [JazzNote]
-        switch state.ruleID {
-        case "CHL-LD1-013":   // Moanin'
-            if !onTonic && rng.nextDouble() < 0.50 {
-                cell = moaninBridge
-            } else {
-                cell = moaninCalls[state.ladder[k % state.ladder.count]].map {
-                    (step: $0.step < 16 ? $0.step + shift : $0.step, iv: $0.iv, dur: $0.dur)
-                }
-                // The first four calls are always answered; later the answer varies or drops out.
-                let answer = rng.nextDouble()
-                if late || k < 4 || answer >= 0.55 {
-                    cell += state.altAmen ? moaninAmenAlt : moaninAmen
-                } else if answer >= 0.25 {
-                    cell += moaninAmenHome
-                }
+        if theme != "A" {
+            let pick: Int
+            if theme == "B" { pick = state.bPick; state.bPick += 1 }
+            else            { pick = state.cPick; state.cPick += 1 }
+            cell = themeLick(ruleID: state.ruleID, theme: theme, pick: pick)
+            if state.ruleID != "CHL-LD1-015" {
+                cell = cell.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
             }
-        case "CHL-LD1-014":   // Cantaloupe Island
-            if k < 2 {
-                cell = k == 0 ? cantaloupeHook : cantaloupeRestate
-            } else if late && !state.finalHookDone {
-                cell = cantaloupeHook
-                state.finalHookDone = true
-            } else {
-                let r = rng.nextDouble()
-                let fragment = cantaloupeHook.filter { $0.step < 32 }
-                if !onTonic {
-                    cell = r < 0.50 ? fragment : cantaloupeStabs
-                } else if r < 0.30 {
-                    cell = fragment
-                } else if r < 0.80 {
-                    cell = cantaloupeSolos[rng.nextInt(upperBound: cantaloupeSolos.count)].map {
-                        (step: $0.step + shift, iv: $0.iv, dur: $0.dur)
-                    }
+        } else {
+            switch state.ruleID {
+            case "CHL-LD1-013":   // Moanin'
+                if !onTonic && rng.nextDouble() < 0.50 {
+                    cell = moaninBridge
                 } else {
-                    cell = cantaloupeStabs
+                    cell = moaninCalls[state.ladder[k % state.ladder.count]].map {
+                        (step: $0.step < 16 ? $0.step + shift : $0.step, iv: $0.iv, dur: $0.dur)
+                    }
+                    // The first four calls are always answered; later the answer varies or drops out.
+                    let answer = rng.nextDouble()
+                    if late || k < 4 || answer >= 0.55 {
+                        cell += state.altAmen ? moaninAmenAlt : moaninAmen
+                    } else if answer >= 0.25 {
+                        cell += moaninAmenHome
+                    }
                 }
+            case "CHL-LD1-014":   // Cantaloupe Island
+                if k < 2 {
+                    cell = k == 0 ? cantaloupeHook : cantaloupeRestate
+                } else if late && !state.finalHookDone {
+                    cell = cantaloupeHook
+                    state.finalHookDone = true
+                } else {
+                    let r = rng.nextDouble()
+                    let fragment = cantaloupeHook.filter { $0.step < 32 }
+                    if !onTonic {
+                        cell = r < 0.50 ? fragment : cantaloupeStabs
+                    } else if r < 0.30 {
+                        cell = fragment
+                    } else if r < 0.80 {
+                        cell = cantaloupeSolos[rng.nextInt(upperBound: cantaloupeSolos.count)].map {
+                            (step: $0.step + shift, iv: $0.iv, dur: $0.dur)
+                        }
+                    } else {
+                        cell = cantaloupeStabs
+                    }
+                }
+            case "CHL-LD1-001":   // Chet sigh
+                if k == 0 {
+                    cell = valentineOpening
+                } else if k == 1 {
+                    cell = valentineSequence
+                } else if late && !state.finalHookDone {
+                    cell = valentineOpening
+                    state.finalHookDone = true
+                } else if !onTonic {
+                    cell = rng.nextDouble() < 0.55 ? valentineBridge : valentineSighs
+                } else {
+                    let r = rng.nextDouble()
+                    cell = r < 0.35 ? valentineSighs
+                         : r < 0.65 ? valentineRun
+                         : r < 0.85 ? valentineOpening
+                         :            valentineSequence
+                }
+                cell = cell.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
+            case "CHL-LD1-007":   // Horace hook
+                // The tune's A A B A: the hook, the hook again, the call, the hook.
+                if k < 2 || (late && !state.finalHookDone) {
+                    cell = fatherHook
+                    if late && k >= 2 { state.finalHookDone = true }
+                } else if !onTonic {
+                    cell = rng.nextDouble() < 0.60 ? fatherSighs : fatherCall
+                } else if k % 4 == 2 {
+                    cell = fatherCall
+                } else {
+                    // Later the hook keeps its head and swaps the tail for the sighs' resolution.
+                    cell = rng.nextDouble() < 0.60 ? fatherHook
+                         : fatherHook.filter { $0.step < 32 } + [(40, -1, 6), (46, 0, 14)]
+                }
+                cell = cell.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
+            case "CHL-LD1-008":   // Blues bossa
+                if k == 0 {
+                    cell = bossaHead
+                } else if k == 1 {
+                    cell = bossaSequence
+                } else if late && !state.finalHookDone {
+                    cell = bossaHead
+                    state.finalHookDone = true
+                } else if !onTonic {
+                    cell = rng.nextDouble() < 0.50 ? bossaSequence : bossaLongFall
+                } else {
+                    let r = rng.nextDouble()
+                    cell = r < 0.40 ? bossaHead : r < 0.70 ? bossaRise : bossaSequence
+                }
+                cell = cell.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
+            default:              // CHL-LD1-015 Blue Monk
+                var riff: [JazzNote] = monkRiff.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
+                // Later on the riff sometimes cuts its held note short, leaving air.
+                if k >= 3 && !late && rng.nextDouble() < 0.30 { riff[riff.count - 1].dur = 4 }
+                let answer: [JazzNote]
+                if k == 0 || late           { answer = monkAnswer }
+                else if k == 1 || !onTonic  { answer = monkTail }
+                else                        { answer = rng.nextDouble() < 0.50 ? monkAnswer : monkTail }
+                cell = riff + answer
+                if late { state.finalHookDone = true }
             }
-        default:              // CHL-LD1-015 Blue Monk
-            var riff: [JazzNote] = monkRiff.map { (step: $0.step + shift, iv: $0.iv, dur: $0.dur) }
-            // Later on the riff sometimes cuts its held note short, leaving air.
-            if k >= 3 && !late && rng.nextDouble() < 0.30 { riff[riff.count - 1].dur = 4 }
-            let answer: [JazzNote]
-            if k == 0 || late           { answer = monkAnswer }
-            else if k == 1 || !onTonic  { answer = monkTail }
-            else                        { answer = rng.nextDouble() < 0.50 ? monkAnswer : monkTail }
-            cell = riff + answer
+        }
+
+        // Horace hook and Blues bossa vary each statement after the first two (the last fifth
+        // plays plain), so the tune is recognisable but never copied. Chet sigh varies every
+        // statement, the first and last included: its source melody is too well known to state.
+        let homage = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008"].contains(state.ruleID)
+        if homage && (state.ruleID == "CHL-LD1-001" || (k >= 2 && !late)) {
+            cell = varyHomageCell(cell, ruleID: state.ruleID, rng: &rng)
         }
 
         // Fit to the phrase: drop what runs past its end, and keep the line to one note at a time.
@@ -1844,14 +2609,33 @@ extension ChillLeadGenerator {
             let end = i + 1 < cell.count ? cell[i + 1].step : span
             cell[i].dur = Swift.max(1, Swift.min(cell[i].dur, end - cell[i].step))
         }
+        // A phrase cut short by a section end or the intro's two-bar cap can stop on a pickup
+        // whose landing was cut. End on the last note that is held instead (every bank lick ends
+        // on a held note, so only a cut one ends short).
+        if homage {
+            while cell.count > 1, let last = cell.last, last.dur < 3 {
+                cell.removeLast()
+            }
+        }
 
         // Move to the chord root, in the octave nearest the song's anchor where the whole lick fits.
         let rootPC = (frame.keySemitoneValue + degreeSemitone(degree)) % 12
         let lo = cell.map { $0.iv }.min()!, hi = cell.map { $0.iv }.max()!
         let roots = Array(stride(from: 24 + rootPC, through: 108, by: 12))
-        let fitting = roots.filter { $0 + lo >= regLow && $0 + hi <= regHigh }
-        let root = (fitting.isEmpty ? roots : fitting)
-            .min { Swift.abs($0 - state.anchor) < Swift.abs($1 - state.anchor) }!
+        let root: Int
+        if homage {
+            // The register is a hard limit (the Chill post-pass folds anything outside it), and a
+            // four-bar lick can be wider than a sax's. Take the octave that folds the fewest notes,
+            // then the one nearest the last phrase, so a figure stays in one octave.
+            let target = state.lastRoot ?? state.anchor
+            let folds = { (r: Int) in cell.filter { r + $0.iv < regLow || r + $0.iv > regHigh }.count }
+            root = roots.min { (folds($0), Swift.abs($0 - target)) < (folds($1), Swift.abs($1 - target)) }!
+            state.lastRoot = root
+        } else {
+            let fitting = roots.filter { $0 + lo >= regLow && $0 + hi <= regHigh }
+            root = (fitting.isEmpty ? roots : fitting)
+                .min { Swift.abs($0 - state.anchor) < Swift.abs($1 - state.anchor) }!
+        }
 
         let mutedTrumpetBoost = leadInstrument == .mutedTrumpet ? 22 : 0
         let velBase: Int

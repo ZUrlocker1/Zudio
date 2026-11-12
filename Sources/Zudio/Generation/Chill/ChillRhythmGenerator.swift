@@ -455,7 +455,8 @@ struct ChillRhythmGenerator {
                     // Fall through — normal comping runs below
                 } else if breakdownStyle == .stopTime && breakdownBar % 2 == 1 {
                     // Odd (silence) bars: chord reveal — play voicing bottom to top on beats 2, 3, 4.
-                    let sorted = buildVoicing(frame: frame, chord: chord, baseRegister: 52, snapTable: snapTable).sorted()
+                    // Lead 1's stop-time solo rides this rise (stopTimeReveal), so keep them in step.
+                    let sorted = stopTimeReveal(frame: frame, chord: chord)
                     let n = sorted.count
                     if n >= 1 {
                         events.append(MIDIEvent(stepIndex: base + 4,  note: UInt8(sorted[0]),
@@ -1097,6 +1098,14 @@ struct ChillRhythmGenerator {
     /// Upper-structure voicing: [3rd, 5th, 7th] in mid register MIDI 48–72.
     /// Root omitted — bass covers it (CHL-SYNC-004).
     /// All notes snapped to scale (CHL-SYNC-001).
+    /// The stop-time breakdown's chord reveal, low to high: Rhythm plays the first on beat 2, the
+    /// second on beat 3 and the rest on beat 4 of each odd breakdown bar. Lead 1's stop-time solo
+    /// joins this rise in its last solo bar, so both read it from here.
+    static func stopTimeReveal(frame: GlobalMusicalFrame, chord: ChordWindow?) -> [Int] {
+        buildVoicing(frame: frame, chord: chord, baseRegister: 52,
+                     snapTable: ChillPadsGenerator.makeSnapTable(frame.scalePCs)).sorted()
+    }
+
     private static func buildVoicing(frame: GlobalMusicalFrame, chord: ChordWindow?,
                                       baseRegister: Int, snapTable: [Int]) -> [Int] {
         let chordRoot  = chord?.chordRoot ?? "1"
