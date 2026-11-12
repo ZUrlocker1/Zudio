@@ -2299,6 +2299,8 @@ struct JazzCellState {
     /// over 12 notes, typically 21); a few short statements lighten a song.
     let fragments: Bool
     let fragmentBack: Bool
+    /// Horace hook plays short statements in every song (`fragmentedLick`), version or not.
+    var shortHooks: Bool { ruleID == "CHL-LD1-007" }
     /// Long licks seen since the third statement, so fragments alternate with whole licks.
     var longLicks = 0
     static let fragmentRules: Set<String> = ["CHL-LD1-001", "CHL-LD1-007", "CHL-LD1-008", "CHL-LD1-014"]
@@ -2441,7 +2443,7 @@ extension ChillLeadGenerator {
     /// bar. The first statement starts where the lick did; the second starts half a phrase later,
     /// on the same grid, lands on a chord tone and holds a little longer. At least half a bar of
     /// rest follows the first. Returns the lick unchanged if the figure would not fit.
-    static func fragmentedLick(_ input: [JazzNote], span: Int, back: Bool) -> [JazzNote] {
+    static func fragmentedLick(_ input: [JazzNote], span: Int, back: Bool, single: Bool = false) -> [JazzNote] {
         let cell = input.sorted { $0.step < $1.step }
         guard cell.count > 12 else { return cell }
         let start = Swift.max(0, cell[0].step)
@@ -2469,6 +2471,15 @@ extension ChillLeadGenerator {
             fig[i].dur = Swift.max(1, Swift.min(fig[i].dur, end - fig[i].step))
         }
         var out = fig.map { (step: start + $0.step, iv: $0.iv, dur: $0.dur) }
+        if single {
+            // One bar and then air: the figure once, landing on a chord tone and held.
+            let last = out.count - 1
+            let landing = out[last].iv
+            out[last].iv = (-12...24).filter { [0, 3, 7, 10].contains(($0 % 12 + 12) % 12) }
+                .min { Swift.abs($0 - landing) < Swift.abs($1 - landing) }!
+            out[last].dur = Swift.max(4, Swift.min(out[last].dur + 4, span - out[last].step))
+            return out
+        }
         var again = fig.map { (step: p2 + $0.step, iv: $0.iv, dur: $0.dur) }
         // The restatement lands on a chord tone (root, b3, 5 or b7 in the lick's minor-blues
         // terms; the fitting pass maps them to the mode) and holds a little longer.
@@ -3014,11 +3025,16 @@ extension ChillLeadGenerator {
         // velocity below, so a fragmented lick still makes the draws the whole lick would have
         // (`drawCount`): otherwise the rest of the song's Lead 1 would change.
         var drawCount: Int? = nil
-        if state.fragments && k >= 2 && !finalReturn && cell.count > 12 {
+        if (state.fragments || state.shortHooks) && k >= 2 && !finalReturn && cell.count > 12 {
             state.longLicks += 1
-            if state.longLicks % 2 == 1 {
+            // Horace hook (Zack, 2026-11-12: its 20-note four-bar hook made every solo long): every
+            // song, and two long licks in three, in turn a one-bar figure, the whole hook, a
+            // figure restated. The other rules fragment every other lick, in songs that drew it.
+            let form = state.shortHooks ? (state.longLicks - 1) % 3 : (state.longLicks % 2 == 1 ? 2 : 1)
+            if form != 1 {
                 drawCount = fitted(cell).count
-                cell = fragmentedLick(cell, span: span, back: state.fragmentBack)
+                cell = fragmentedLick(cell, span: span, back: state.shortHooks ? false : state.fragmentBack,
+                                      single: state.shortHooks && form == 0)
             }
         }
         cell = fitted(cell)

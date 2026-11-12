@@ -2,7 +2,6 @@
 
 ## What this is
 
-Zack's wife said Chill "doesn't sound like music because it's not going anywhere" (2026-11-11).
 Measured from the code: about half of base Chill songs barely change chord. Deep Long Lake is
 Ebm7 for 72 bars apart from a 4-bar sus4 breakdown. This plan adds harmonic motion to base Chill
 and Chill Blues for version 3.0. Chill Soho already has varied cycles, B-section cycles and

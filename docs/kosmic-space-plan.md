@@ -478,9 +478,10 @@ Examples:
 - KOS-LD1-014 "Oxygene See-Saw Riff sixth, 2+2+2, second half, rocks down"
 - KOS-LD1-015 "Magnetic Turn Melody climb turn, 4 runs, from the 5th, 5-note runs"
 - KOS-LD1-016 "Oxygene 6 Rising Strings no lead-in, early third note, 8-bar cycle"
-- KOS-LD1-017 "Oxygene 8 Offbeat Climb from the 6th below, on to the 5th, early last notes"
-- KOS-LD1-018 "Magnetic Call and Hold calls on the 3rd, tight call, turning tail, rising answer, octave phase"
+- KOS-LD1-017 "Oxygene 8 Offbeat Climb" (no version words; too long, Zack 2026-11-12)
+- KOS-LD1-018 "Magnetic Call" (renamed from Magnetic Call and Hold in the log; no version words)
 - KOS-LD1-019 "Equinoxe Thirds Riff rocks down" (its interval and rhythm are fixed)
+Version words show only the first draw (2026-11-12: "Oxygene 6 Rising Strings no lead-in").
 The line a Lead 1 regen appends names the rule only, without its version, as Chill's jazz leads
 do. Log text only: no draw moved, so every song plays as before.
 

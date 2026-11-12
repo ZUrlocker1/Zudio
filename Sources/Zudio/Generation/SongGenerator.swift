@@ -884,7 +884,11 @@ struct SongGenerator {
         // Kosmic Space Lead 1 names its per-song version beside the rule, as the Chill jazz leads
         // do: "Oxygene Falling Theme sixth top, 5-4-5".
         for (i, entry) in log.enumerated() {
-            guard let note = kosmicLeadNotes.byRule[entry.tag], !note.isEmpty else { continue }
+            guard let full = kosmicLeadNotes.byRule[entry.tag], !full.isEmpty else { continue }
+            // Short log (Zack, 2026-11-12): the first draw only, and none on Offbeat Climb and
+            // Call and Hold, whose names are already long.
+            if entry.tag == "KOS-LD1-017" || entry.tag == "KOS-LD1-018" { continue }
+            let note = full.components(separatedBy: ", ")[0]
             log[i] = GenerationLogEntry(tag: entry.tag, description: entry.description + " " + note,
                                         isTitle: entry.isTitle)
         }
@@ -3295,8 +3299,8 @@ struct SongGenerator {
         case "KOS-BASS-011":  return "Kraftwerk driving bass"
         case "KOS-BASS-012":  return "McCartney melodic drive"
         case "KOS-BASS-013":  return "Loscil sub-bass pulse"
-        case "KOS-BASS-014":  return "Smooth arpeggio root, third, fifth"
-        case "KOS-BASS-015":  return "Drift groove — step-6 syncopation"
+        case "KOS-BASS-014":  return "Root third fifth arpeggio"
+        case "KOS-BASS-015":  return "Drift step-6 syncopation"
         case "KOS-BASS-016":  return "BoC loop — repeating cell"
         case "KOS-BASS-017":  return "Four-bar hold root sustain"
         case "KOS-BASS-018":  return "Oxygene Falling Walk"
@@ -3319,7 +3323,7 @@ struct SongGenerator {
         case "KOS-PADS-006":  return "Electric Buddha shimmer"
         case "KOS-PADS-007":  return "Probabilistic gated chord pulse"
         case "KOS-PADS-008":  return "bIII colour chord layer"
-        case "KOS-PADS-009":  return "Oxygene 7-13 Anticipated Strings"
+        case "KOS-PADS-009":  return "Oxygene Anticipated Strings"
         case "KOS-PADS-010":  return "Oxygene 4 Staggered Bloom"
         default:              return ruleID
         }
@@ -3343,7 +3347,7 @@ struct SongGenerator {
         case "KOS-LD1-014": return "Oxygene See-Saw Riff"
         case "KOS-LD1-016": return "Oxygene 6 Rising Strings"
         case "KOS-LD1-015": return "Magnetic Turn Melody"
-        case "KOS-LD1-018": return "Magnetic Call and Hold"
+        case "KOS-LD1-018": return "Magnetic Call"
         case "KOS-LD1-019": return "Equinoxe Thirds Riff"
         case "KOS-LD1-017": return "Oxygene 8 Offbeat Climb"
         case "KOS-LD2-000":  return "No lead 2"

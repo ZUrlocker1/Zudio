@@ -330,6 +330,14 @@ Shared between substyles: CHL-LD1-009 and CHL-LD1-014.
   Lead 1) notes, or an avoid note over the chord. About 9% of base and Blues Lead 1 notes moved;
   lick shapes and octaves are otherwise kept. Soho Lead 1 untouched. Details in
   docs/chill-chords-plan.md, "As built (2026-11-12, round 5 ...)". Not heard.
+- **Horace hook short statements (2026-11-12, not heard).** Fragmenting was gated on a drawn
+  version and a 60% chance, so Quiet Pulse and North Shore Poitrine played the whole 20-note hook
+  in 12 of 13 and 15 of 18 phrases. CHL-LD1-007 now fragments in every song (`shortHooks`), from
+  the third statement on, in a cycle of three long licks: a one-bar figure played once and held
+  (`fragmentedLick(single:)`), the whole hook, the figure restated. Same draws burned
+  (`drawCount`), so the rest of Lead 1 is unchanged. Chet sigh, Blues bossa and Cantaloupe keep
+  the old rule. Measured: 248 to 215 and 348 to 288 Lead 1 notes. Dials: the cycle order, the
+  one-bar cap in `fragmentedLick`.
 - Fine-tune the weights and the licks by ear. A Chill Blues-only fourth lick rule from the Weimar
   solos (Vierd Blues, K.C. Blues, So What) is the next option if Blues needs more distinction.
 - **Blues second-horn harmony on Moanin' and Cantaloupe, built 2026-11-12, not heard.** Zack: in
