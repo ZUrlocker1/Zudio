@@ -3813,12 +3813,31 @@ struct SongGenerator {
             }
         }
         // The chords played over bars from..<to, a repeated chord named once: "Abmaj7 – Bb7".
+        // Chill only. Named as they sound: Pads and Rhythm snap chord notes to the scale, and a
+        // third outside the mode moves to the nearest scale tone, the lower pitch class on a tie.
+        // So the Blues V7 sounds as Vm7 in most keys but V7sus4 in C and C# Dorian, and the
+        // Blues IVm7 as IV7sus2 (root, 9, 5, b7) in most keys but IV7 in Eb and E Dorian.
+        // Chill voices sus4 with the seventh (4, 5, b7).
+        let keyPC = keySemitone(frame.key)
         func turnaroundChords(_ from: Int, _ to: Int) -> String {
             var names: [String] = []
             for bar in from..<min(to, totalBars) {
                 guard let w = structure.chordPlan.first(where: { $0.startBar <= bar && bar < $0.endBar })
                 else { continue }
-                let name = chordName(w.chordRoot, w.chordType)
+                let r = degreeSemitone(w.chordRoot)
+                let thirdUp = w.chordType == .dom7 ? 4 : (w.chordType == .min7 ? 3 : 0)
+                let thirdPC = (keyPC + r + thirdUp) % 12
+                let snapped = thirdUp == 0 ? thirdPC : nearestScalePitchClass(thirdPC, in: frame.scalePCs)
+                let sounding = (snapped - keyPC - r + 24) % 12
+                let name: String
+                switch (w.chordType, sounding) {
+                case (.dom7, 3): name = chordName(w.chordRoot, .min7)
+                case (.dom7, 5): name = chordName(w.chordRoot, .dom7) + "sus4"
+                case (.min7, 4): name = chordName(w.chordRoot, .dom7)
+                case (.min7, 2): name = chordName(w.chordRoot, .dom7) + "sus2"
+                case (.sus4, _): name = chordName(w.chordRoot, .dom7) + "sus4"
+                default:         name = chordName(w.chordRoot, w.chordType)
+                }
                 if names.last != name { names.append(name) }
             }
             return names.joined(separator: " – ")

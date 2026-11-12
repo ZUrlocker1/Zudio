@@ -849,6 +849,10 @@ a derived random stream so nothing else in the song moves (`applyChordMotion` in
   a two-chord diatonic turnaround where the next bar is on the tonic. Not in minor blues.
 - The breakdown is no longer all tonic sus4: its last bar (last two when longer than 4) is a
   sus4 on the fifth above the chord the groove returns to, V7sus4 for the tonic.
+- Simple form (no B section) always takes the every-phrase turnarounds.
+- Modal drift: once a chord other than the tonic has held a whole phrase, the phrases after it
+  swing between the tonic and that chord, four bars each, from the tonic; the outro is the
+  tonic. The first phrase after a breakdown still holds the chord its dominant sus leads into.
 
 Number of chords: 2 (60%) or 3 (40%).
 

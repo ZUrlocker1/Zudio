@@ -368,12 +368,35 @@ struct ChillStructureGenerator {
                     break
                 }
             }
-        case .minor_blues, .modal_drift:
+        case .modal_drift:
+            // Once a chord other than the tonic has held a whole phrase, the phrases after it
+            // swing between the tonic and that chord, four bars each, from the tonic. Before
+            // this a drift B section could sit on Vm7 or IV for 40 bars and end the song there
+            // (Zack, 2026-11-12). The first phrase after the breakdown still holds the chord the
+            // breakdown's dominant sus leads into; the outro returns to the tonic.
+            var swung: BarChord? = nil
+            func same(_ a: BarChord, _ b: BarChord) -> Bool { a.root == b.root && a.type == b.type }
+            for section in sections where section.label == .A || section.label == .B {
+                for phrase in phrases(section) where phrase.lowerBound > 0 {
+                    let held = bars[phrase.lowerBound]
+                    guard held.root != tonic.root, same(bars[phrase.lowerBound - 1], held),
+                          phrase.allSatisfy({ same(bars[$0], held) }) else { continue }
+                    pendulum([phrase], partner: held, every: 4)
+                    if swung == nil { swung = held }
+                }
+            }
+            for section in sections where section.label == .outro {
+                for b in section.startBar..<Swift.min(total, section.endBar) { bars[b] = tonic }
+            }
+            if let held = swung { bLabel = "then \(chordName(tonic)) – \(chordName(held))" }
+        case .minor_blues:
             break
         }
 
         // Turnarounds. Both draws are made for every family so the stream's use is uniform.
-        let everyPhrase = rng.nextDouble() < 0.60
+        // Simple form always takes the every-phrase share: with no B section, section ends only
+        // left the first half of the body one chord for 50 bars or more (Zack, 2026-11-12).
+        let everyPhrase = rng.nextDouble() < 0.60 || !sections.contains { $0.label == .B }
         let turn = turnaround(mode: mode, second: rng.nextDouble() < 0.50)
         var turnBars: [Int] = []   // first bar of each placed turnaround, for the performance log
         if family != .minor_blues {

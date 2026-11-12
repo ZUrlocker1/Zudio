@@ -161,6 +161,49 @@ also touches Ambient's chord-shift rows. Ab keys still print B and E for Cb and 
 ChordPlanShapeTests pass (100 tests). **Not verified:** anything by ear; ChillBatchTests and
 ChillBluesBatchTests not run.
 
+## As built (2026-11-12, rulings and round 1)
+
+**Rulings (Zack, 2026-11-12).** Keep the simple-form second-half pendulum. Keep the modal drift
+dominant sus (the breakdown ends on the 7sus4 a fifth above the chord the groove returns to,
+when it is in the mode). In practice that differs from the tonic sus4 only when the return is
+to Vm7 in Dorian: returning to IV, the fifth above is the tonic; returning to bVI in Aeolian,
+the 7sus4 leaves the mode and the tonic sus4 stays.
+
+**Simple form cadences every phrase.** The every-phrase draw is still made (stream use
+unchanged), but simple form ignores it: section ends only left seed 15 on Abm7 for bars 1 to 56.
+
+**Modal drift swings** (`applyChordMotion`, `.modal_drift`). The drift plan could hold its
+second or third chord through B and the outro, 40 bars or more, and end the song there (seed
+26: Cm7 bars 41 to 84 in F Dorian). Now any groove phrase that is entirely one non-tonic chord,
+where that chord was already sounding in the bar before, becomes a pendulum of the tonic and
+that chord, four bars each, from the tonic. The first phrase of B (after the breakdown's sus)
+and a drift chord's first appearance in A are untouched, so the drift is still heard and the
+dominant sus still resolves to the chord it names. The outro holds the tonic. Turnarounds then
+fire wherever the next phrase starts on the tonic. The Chords line adds "then Im7 – Vm7".
+
+**Turnaround rows name chords as they sound** (`turnaroundChords` in `buildStepAnnotations`,
+Chill only). `nearestScalePitchClass` breaks a tie toward the lower absolute pitch class, so a
+third outside the mode lands differently by key:
+- Blues V7 in Dorian (major third is the key's 7): Vm7 in most keys, V7sus4 in C and C#.
+- Blues IVm7 in Dorian (minor third is the key's b6): root, 9, 5, b7 (IV7sus2) in most keys,
+  IV7 in Eb and E. In those two keys the Dorian IV7 device is inaudible.
+The rows now name the snapped quality, and sus4 reads 7sus4. The plan's chord types are
+unchanged; making the Blues plan diatonic so every key sounds alike is an open question.
+
+**MIDI check (2026-11-12).** ChillBluesBatchTests (30 songs) exported and parsed: in each device
+bar, the Bass, Rhythm and Pads notes were scored against the device chord and the plain chord
+it replaced. Quick change 44 of 44 bars closer to the device, suspended turnaround 70 of 72,
+Dorian IV7 61 of 70, modal turn 51 of 64. The misses are bars whose voicing lacks the one note
+that differs: Chill Blues Pads play root and fifth only, so the chord's colour is in the Rhythm
+part, and bVIImaj7 shares three notes with the Vm7 it replaces (the bass root is the main
+change). That is why the Dorian IV7 and the modal turn are subtle by ear. Every bass rule
+re-roots on the new chords; CHL-BASS-010 and CHL-BASS-011 start their figures off the root by
+design, CHL-BASS-010 walking down b7, 5, b3, root on alternate choruses.
+
+**Demo files** in `~/Downloads/Zudio 3.0 chord demos/` (seeds 25, 99, 134, 237), listed with
+bars in the session notes; they regenerate from the seed, so they need a 3.0 build with this
+round in it.
+
 ## Item 2: tune-named progressions (later)
 
 Candidates, each from 1959 or later, each paired with a lead rule where one exists:
@@ -180,8 +223,10 @@ plus the four devices, which combine into many chorus variants.
 
 ## Open items
 
-- Items 1, 3 and 4 built (see "As built"); Zack to listen, then commit code and docs together.
-- Zack to confirm the simple-form second-half pendulum and the modal drift dominant sus.
-- ChillBatchTests and ChillBluesBatchTests not run; ask before running them.
+- Items 1, 3 and 4 committed (be74994) plus round 1 (2026-11-12); Zack to listen.
+- Simple-form pendulum and modal drift dominant sus confirmed (2026-11-12).
+- Open: make the Chill Blues plan diatonic so the plain IV and V sound alike in every key
+  (today the key decides, see "As built (2026-11-12)").
+- ChillBluesBatchTests run 2026-11-12 (MIDI check above); ChillBatchTests not run.
 - Item 2 later, after chord-aware snapping.
 - Mark nothing with "* " here (chord plans are not rules), but log the new motion.
