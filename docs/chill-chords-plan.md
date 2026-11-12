@@ -228,7 +228,14 @@ Returned guide tones first (3rd or 4th, 7th, tension, 5th), since the comping mo
 the old three-note voicing.
 
 **Pads** (`openFifthHold(bluesShell:)`, Blues only): root, 7th above, 3rd (4th for a sus) an
-octave above that, three notes in place of root and fifth. Same draws.
+octave above that, three notes in place of root and fifth. Same draws. A long Im7 hold
+(over 60 steps) splits in two at bar +4; the second hold ends 10 steps before the chord change
+(an 8-bar Im7 keeps its 56). The quick change's 6-bar Im7 had held two bars into the IV7
+(Long Lake Exchange Blues, bars 41–42), fixed 2026-11-12.
+
+**Open (2026-11-12):** in the B section's Im7 bars the pad shell's 3rd (F4 in D) sits a semitone
+above Rhythm's accented 9th (E4), and Lead 1 plays in the same octave. Proposed: drop the pad's
+3rd an octave (D3 F3 C4). Awaiting Zack.
 
 **Rest bars.** Rhythm rested in section positions 7 and 15 at 35%, extending into the next bar
 at 20%. Position 15 is the suspended turnaround's V7sus4 and position 8 the IV arrival, and the

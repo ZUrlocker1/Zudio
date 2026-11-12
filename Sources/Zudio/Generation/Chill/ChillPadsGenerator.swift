@@ -76,13 +76,19 @@ struct ChillPadsGenerator {
             // Hold 1: 0–3.5 bars (56 steps). Hold 2: starts at bar 4 (step +64), ends at 7.5
             // bars (56 steps). The 0.5-bar gap lets the Chill Pads fade-out fire before the
             // second attack, keeping volume consistent rather than one loud unbroken hold.
+            // A quick-change chorus has a 6-bar Im7 (86 steps). The second hold used to be a fixed
+            // 56 steps and ran two bars into the IV7 under it, Im7's root and 7th sounding against
+            // the IV7 pad and Rhythm (Long Lake Exchange Blues, bars 41-42, 2026-11-12). A shorter
+            // window's second hold now ends where its window's single hold would have, 10 steps
+            // before the change; an 8-bar window keeps its 56.
             var splitPads: [MIDIEvent] = []
             for ev in bPads {
                 if ev.durationSteps > 60 {
                     splitPads.append(MIDIEvent(stepIndex: ev.stepIndex,
                                                note: ev.note, velocity: ev.velocity, durationSteps: 56))
                     splitPads.append(MIDIEvent(stepIndex: ev.stepIndex + 64,
-                                               note: ev.note, velocity: ev.velocity, durationSteps: 56))
+                                               note: ev.note, velocity: ev.velocity,
+                                               durationSteps: ev.durationSteps >= 118 ? 56 : ev.durationSteps - 64))
                 } else {
                     splitPads.append(ev)
                 }

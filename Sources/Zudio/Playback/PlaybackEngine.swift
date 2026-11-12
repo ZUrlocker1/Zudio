@@ -745,6 +745,10 @@ final class PlaybackEngine: ObservableObject {
         // thread from racing with engine.stop() and loadSoundBankInstrument() below.
         // stopSchedulerOnly() calls allNotesOff() internally, so no separate call needed.
         stopSchedulerOnly()
+        // Let the All Notes Off in stopSchedulerOnly() render before the engine stops: every
+        // patch reloads below, and a load onto a sampler with live voices can leave one stuck
+        // (see loadPatch). If the route change already stopped the engine, nothing can render.
+        if engine.isRunning { Thread.sleep(forTimeInterval: Self.loadSilenceSeconds) }
         engine.stop()
         currentProgram    = Array(repeating: 255, count: kTrackCount)
         currentBankMSB    = Array(repeating: 0,   count: kTrackCount)
@@ -913,6 +917,7 @@ final class PlaybackEngine: ObservableObject {
                 fireVelocity = ev.velocity
             }
             func fire() {
+                if trackLoading[trackIndex] { return }   // patch loading on this track; see loadPatch
                 if trackIndex == kTrackBass, !bassSlidesSuppressed, let slide = bassSlideMap[step] {
                     startBassSlide(slide, channel: channel, schedulerID: schedulerID)
                 }
@@ -1211,6 +1216,9 @@ final class PlaybackEngine: ObservableObject {
     nonisolated(unsafe) private var cachedIsKosmicSpace:    Bool  = false
     // The song's current drum rule is KOS-DRUM-005 Electric Buddha Pulse (set with songState).
     nonisolated(unsafe) private var cachedIsBuddhaPulse:    Bool  = false
+    /// True while loadPatch() loads that track's sampler: its note-ons are dropped. Written only
+    /// inside stepTimerQueue.sync and read on stepTimerQueue, where every note-on fires.
+    nonisolated(unsafe) private var trackLoading = Array(repeating: false, count: kTrackCount)
 
     /// `immediate` should be true only for batch song-start loads (applyCurrentInstrumentsToPlayback).
     /// Interactive changes (< > buttons, regen) use the default false, which debounces rapid calls
@@ -1251,19 +1259,18 @@ final class PlaybackEngine: ObservableObject {
         // safe to call while the engine is running from the main thread. For interactive changes,
         // debounce 80 ms to coalesce rapid taps — the dedup check above already short-circuits
         // same-program calls. engine stop/start is NOT used here: it resets all other samplers.
+        // Batch loads (immediate) come after silenceAllForLoad(), so they skip the per-load wait.
         if immediate {
             do {
-                try samplers[trackIndex].loadSoundBankInstrument(
-                    at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
-                )
+                try loadPatch(trackIndex, url: soundBankURL, program: actualProgram,
+                              bankMSB: bankMSB, bankLSB: bankLSB, settle: false)
             } catch { onMissingPatch?(trackIndex, program) }
         } else {
             let work = DispatchWorkItem { [weak self, soundBankURL, actualProgram, bankMSB, bankLSB, trackIndex, program] in
                 guard let self else { return }
                 do {
-                    try self.samplers[trackIndex].loadSoundBankInstrument(
-                        at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
-                    )
+                    try self.loadPatch(trackIndex, url: soundBankURL, program: actualProgram,
+                                       bankMSB: bankMSB, bankLSB: bankLSB, settle: true)
                 } catch { self.onMissingPatch?(trackIndex, program) }
                 self.programLoadWork[trackIndex] = nil
             }
@@ -1272,9 +1279,8 @@ final class PlaybackEngine: ObservableObject {
         }
         #else
         do {
-            try samplers[trackIndex].loadSoundBankInstrument(
-                at: soundBankURL, program: actualProgram, bankMSB: bankMSB, bankLSB: bankLSB
-            )
+            try loadPatch(trackIndex, url: soundBankURL, program: actualProgram,
+                          bankMSB: bankMSB, bankLSB: bankLSB, settle: !immediate)
         } catch { onMissingPatch?(trackIndex, program) }
         #endif
         // Per-track default volumes; tremolo overrides live sampler volume via LFO.
@@ -1491,6 +1497,52 @@ final class PlaybackEngine: ObservableObject {
         // Re-apply mute/solo state — loadSoundBankInstrument resets the sampler node
         applyMuteState()
     }
+
+    /// Loads a patch into one sampler with that sampler silent and no note able to reach it.
+    ///
+    /// A patch loaded while the sampler still has voices sounding can leave one voice stuck:
+    /// it ignores every note-off and plays on loud enough to clip, heard as one badly distorted
+    /// instrument until a regen or instrument switch sends All Sound Off or reloads it (Zack,
+    /// 2026-11-12, Mac and iPhone, since 2.7 when Evolve began switching instruments mid-play).
+    /// A stress test reproduced it on Zudio.sf2: 4 stuck in 159 trials with live loads, none in
+    /// 134 without. Holding notes off during the load still failed (3 in 82); only silencing
+    /// first and letting the engine render that silence for about 30 ms fixed it (0 in 180).
+    /// AVAudioUnitSampler.reset() would kill voices without a render but crashes mid-render.
+    ///
+    /// `settle` waits the 30 ms; batch loads pass false because silenceAllForLoad() already did.
+    /// With the engine stopped (iOS batch loads) nothing can render, so no wait is made.
+    private func loadPatch(_ trackIndex: Int, url: URL, program: UInt8,
+                           bankMSB: UInt8, bankLSB: UInt8, settle: Bool) throws {
+        let sampler = samplers[trackIndex]
+        let ch      = gmChannel(trackIndex)
+        let live    = engine.isRunning
+        if live {
+            stepTimerQueue.sync { trackLoading[trackIndex] = true }   // no note-on reaches it now
+            sampler.sendController(120, withValue: 0, onChannel: ch)  // All Sound Off
+            sampler.sendController(123, withValue: 0, onChannel: ch)  // All Notes Off
+            if settle { Thread.sleep(forTimeInterval: Self.loadSilenceSeconds) }
+        }
+        defer {
+            if live {
+                sampler.sendController(120, withValue: 0, onChannel: ch)
+                stepTimerQueue.sync { trackLoading[trackIndex] = false }
+            }
+        }
+        try sampler.loadSoundBankInstrument(at: url, program: program, bankMSB: bankMSB, bankLSB: bankLSB)
+    }
+
+    /// Silences every sampler and lets the engine render it, once, before a batch of loads
+    /// (song start, style change, route change). See loadPatch. A no-op while the engine is
+    /// stopped. On iOS this must run before beginBatchLoad() stops the engine.
+    func silenceAllForLoad() {
+        guard engine.isRunning else { return }
+        allNotesOff()
+        Thread.sleep(forTimeInterval: Self.loadSilenceSeconds)
+    }
+
+    /// How long a silenced sampler is given to render the silence before a patch loads:
+    /// about one render cycle at the iOS 23 ms IO buffer, more than two on the Mac.
+    private static let loadSilenceSeconds: TimeInterval = 0.03
 
     /// Returns the most recently CONFIRMED loaded program for a track (255 = never successfully loaded).
     /// Used by AppState to detect whether a style-specific instrument loaded correctly.

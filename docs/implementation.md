@@ -550,6 +550,23 @@ Track `currentProgram[trackIndex]` and `currentBankMSB[trackIndex]`. In `setProg
 early if the requested program and bank already match. Seed the cache in `loadGMPrograms()` so
 the startup load is reflected and eliminates all redundant calls after the first generation.
 
+### Rule 16a: Never load a patch onto a sampler with live voices
+
+`loadSoundBankInstrument` on an `AVAudioUnitSampler` that still has a voice sounding can leave
+that voice stuck: it ignores every note-off and plays on, often loud enough to clip. It sounds
+like one badly distorted instrument, with no error, until All Sound Off or another load clears
+it. This was an intermittent bug in every release from 2.7 (when Evolve began switching
+instruments mid-play) until 3.0, also hit by route changes. A stress test reproduced it in about
+2.5% of trials; holding note-ons off during the load did not help.
+
+**Pattern**: every patch load goes through `PlaybackEngine.loadPatch()`, which drops that track's
+note-ons (`trackLoading`, checked in `onStep`'s `fire()`), sends CC120 and CC123, waits 30 ms
+for the engine to render the silence, loads, and sends CC120 again. Batch loads call
+`silenceAllForLoad()` once first (on iOS before `beginBatchLoad()` stops the engine), and
+`restartAudio()` waits 30 ms before `engine.stop()`. Do not use `AVAudioUnitSampler.reset()` to
+kill voices instead: it crashes when called mid-render. The stress harness is described in the
+3.0 change log entry.
+
 ### Rule 17: Never chain SwiftUI Text structs with `+` over large datasets
 
 `Text` `+` concatenation copies the accumulated result at each iteration — O(n²) total work. Over

@@ -1061,6 +1061,9 @@ final class AppState: ObservableObject {
         // load all tracks (including kTrackLeadSynth=7, Kosmic's hidden doubling layer),
         // then restart. The dedup cache is invalidated first so every track reloads fresh.
         // macOS: setProgram() works while the engine is running — no stop/start needed.
+        // Every sampler goes silent first, rendered, so no patch loads under a live voice
+        // (PlaybackEngine.loadPatch). On iOS this has to come before beginBatchLoad() stops the engine.
+        playback.silenceAllForLoad()
         #if os(iOS)
         playback.invalidateProgramCache()
         let batchWasRunning = playback.beginBatchLoad()
