@@ -23,10 +23,27 @@ struct GenerationLogEntry: Sendable {
         "CHL-PAD-004",
     ]
 
+    /// TESTING ONLY. Existing rules changed to stop clashing with the band (docs/clash-fix.md),
+    /// marked with "F " instead of "* " so Zack can tell a fix from a new rule. Empty this set
+    /// before the build ships; the "* " marks stay (Zack, 2026-11-13).
+    static let fixMarkedRules: Set<String> = [
+        "CHL-BASS-001", "CHL-BASS-003", "CHL-BASS-004", "CHL-BASS-009", "CHL-BASS-010", "CHL-BASS-011",
+        "CHL-BASS-012",
+    ]
+
+    /// The testing markers a description can start with.
+    static let testingMarkers = ["* ", "F "]
+
     init(tag: String, description: String, isTitle: Bool = false) {
         self.tag = tag
-        self.description = Self.testingMarkedRules.contains(tag) && !description.hasPrefix("* ")
-            ? "* " + description : description
+        let marked = Self.testingMarkers.contains { description.hasPrefix($0) }
+        if !marked, Self.fixMarkedRules.contains(tag) {
+            self.description = "F " + description
+        } else if !marked, Self.testingMarkedRules.contains(tag) {
+            self.description = "* " + description
+        } else {
+            self.description = description
+        }
         self.isTitle = isTitle
     }
 }

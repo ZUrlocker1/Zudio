@@ -541,13 +541,7 @@ struct ChillPadsGenerator {
                 // Rhythm's voicing for this chord (always built from MIDI 52) by more than a
                 // semitone and a minor 9th, moving an octave if it must, or dropping out.
                 let type = chord?.chordType ?? .min7
-                let (seventh, third): (Int, Int)
-                switch type {
-                case .sus4:         (seventh, third) = (10, 5)
-                case .dom7:         (seventh, third) = (10, 4)
-                case .maj7, .major: (seventh, third) = (11, 4)
-                default:            (seventh, third) = (10, 3)
-                }
+                let (seventh, third) = (type.chillSeventh, type.chillThird)
                 let rhythm = ChillRhythmGenerator.bluesVoicing(frame: frame, rootPC: rawRootPC, type: type,
                                                                baseRegister: 52, snapTable: snapTable)
                 var placed = [noteLow]
@@ -633,13 +627,7 @@ struct ChillPadsGenerator {
 
             if isPhase1 {
                 // Third — reveals chord quality (major/minor/sus)
-                let thirdInt: Int
-                switch ct {
-                case .major, .dom7, .add9: thirdInt = 4
-                case .maj7, .maj9, .maj6, .dom9: thirdInt = 4   // Soho extended types — major third
-                case .sus4:                thirdInt = 5
-                default:                   thirdInt = 3
-                }
+                let thirdInt = ct.chillThird
                 let thirdPC   = snapTable[(rootPC + thirdInt) % 12]
                 let noteThird = noteNear(thirdPC, ref: 53, lo: 48, hi: 65)
                 let vel = UInt8(40 + rng.nextInt(upperBound: 12))  // 40–51
@@ -711,21 +699,8 @@ struct ChillPadsGenerator {
             let rootPC     = snapTable[rawRootPC]
             let ct         = chord?.chordType ?? .min7
 
-            let thirdInt: Int
-            switch ct {
-            case .major, .dom7, .add9: thirdInt = 4
-            case .maj7, .maj9, .maj6, .dom9: thirdInt = 4   // Soho extended types — major third
-            case .sus4:                thirdInt = 5
-            default:                   thirdInt = 3
-            }
-            // Major seventh for the maj types, the sixth for sixth chords (they have no seventh),
-            // flat seventh otherwise. Existing types are unchanged: only .major took 11 before.
-            let seventhInt: Int
-            switch ct {
-            case .major, .maj7, .maj9: seventhInt = 11
-            case .maj6, .min6:         seventhInt = 9
-            default:                   seventhInt = 10
-            }
+            let thirdInt   = ct.chillThird
+            let seventhInt = ct.chillSeventh
 
             let thirdPC   = snapTable[(rootPC + thirdInt) % 12]
             let fifthPC   = snapTable[(rootPC + 7) % 12]

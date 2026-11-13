@@ -259,10 +259,12 @@ struct StatusBoxView: View {
         #endif
 
         for (i, entry) in entries.enumerated() {
-            // A testing star ("* " from testingMarkedRules) moves up beside the rule ID, one space
-            // after it and in the same green: "CHL-LD2-004 *  Rhythm trade". The saved file keeps it
-            // in the description.
-            let starred = !entry.isTitle && entry.description.hasPrefix("* ")
+            // A testing marker ("* " new, "F " fixed clash; see GenerationLogEntry) moves up beside
+            // the rule ID, one space after it and in the same green: "CHL-LD2-004 *  Rhythm trade".
+            // The saved file keeps it in the description.
+            let marker = entry.isTitle ? nil
+                : GenerationLogEntry.testingMarkers.first { entry.description.hasPrefix($0) }
+            let starred = marker != nil
             let description = starred ? String(entry.description.dropFirst(2)) : entry.description
             // Starred: rule ID, one space, "*", then padding to the description column.
             let tag = starred
@@ -286,7 +288,7 @@ struct StatusBoxView: View {
             }
             attrStr += tagAttr
             if starred {
-                var star = AttributedString("*")
+                var star = AttributedString(String(marker!.prefix(1)))
                 star.font = uiFont
                 star.foregroundColor = tagColor
                 attrStr += star

@@ -579,3 +579,26 @@ The timing system is untouched. No new GM programs (Clarinet/71 is already wired
 **Delay effect chip (TrackRowView):**
 - Delay chip on Lead 1 and Lead 2 now greys out and disables for Chill Blues songs
 
+
+### 3.0 (2026-11-13) — bass clashes with pads and Rhythm
+
+A clash scan of 151 Blues songs (bass note outside the chord, a minor 2nd or minor 9th from a note the pads or Rhythm hold, on a beat or held a beat or more) found three patterns doing it every bar or every cycle. Fixed where each pattern picks its notes:
+
+- **CHL-BASS-012 Rumba:** the 3rd is the chord's own (a fixed m3 played Eb under C7's E), and beat 4 plays the chord's 7th instead of the 6th, which sat a semitone under the b7 every bar. Soho keeps the 6th as its Latin colour but gets the chord's 3rd.
+- **CHL-BASS-011 Ascending riff:** the downward opener starts on the chord's 7th instead of the 6th (7th, 5th, root). The upward opener keeps 5th, 6th, root: there the 6th is an off-beat passing tone.
+- **CHL-BASS-004 Air ostinato (Blues only):** the 2nd, which fell on beats 2 and 3 a minor 9th under the b3, becomes the b7 below the root. Base Chill and Soho keep the 2nd; their chords usually carry a 9th.
+
+Result on the same seeds: strong bass clashes 1551 to 167, songs over 4 from 63 to 18; Rumba median 41 to 0, ostinato 18 to 0, riff 6 to 0. What remained was the beat-4 chromatic approach into the next chord, fixed next (below).
+
+Refactor alongside: `ChordType.chillThird` and `chillSeventh` replace three copies of the same switch in ChillPadsGenerator (no note changes), and one `ostinatoBar` helper replaces the three copies of the ostinato loop.
+
+**Beat-4 approach (same day).** Zack heard it and ruled that a chromatic note may pass only off the beat, short, once or twice a song. Every remaining beat-4 clash (147 on the 151 seeds) came from one place: the IV/V "approach" option in the dispatcher, which CHL-BASS-001, 003, 010 and 011 use on every IV and V bar in a third of their songs. It held the half step below the next chord's root on beat 4. Now beat 4 plays the current chord's 5th, and the half step passes on the "and" of 4 as an 8th, once per 16-bar form, the first time the chord changes (Zack allows up to 12 off-beat chromatic notes a song if musical; songs on this option get 4 to 7). The walking line's own beat 4 and the variation passing tone did not clash and are unchanged.
+
+Result: beat-4 clashes 147 to 0; strong bass clashes 167 to 20, songs over 4 from 18 to 2 (one CHL-BASS-004, one CHL-BASS-009, both untouched). Blues songs with any track over 4: 19% to 7%. Base Chill and Soho unchanged.
+
+**Pickup and riff follow-up (same day).** Zack's rule: a note that rubs against two or more other tracks for more than a few bars is a fault, not colour; a quick passing tone, occasional or in a short run, is colour. Under it:
+
+- **CHL-BASS-009 Pickup:** the "b3" pickup and the b3/b7 on beat 4 are the chord's own 3rd and 7th (a snapped +3 gave a major 3rd under a sus4's 4th, held on beat 3). The first-B-form tail played the half step under the root every bar for 32 bars against pads and Rhythm; it now plays the b7, with the chromatic note only into a chord change, sharing the approach note's allowance (one per form, 12 a song).
+- **CHL-BASS-011 Ascending riff, upward opener:** the 6th stays as a quick 16th (dotted template); as an 8th it becomes the chord's 7th (5th, 7th, root).
+
+Result: strong bass clashes 167 to 10; persistent rubs (two or more tracks, more than 4 bars) in 7 Blues songs to 0.

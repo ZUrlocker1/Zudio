@@ -289,6 +289,26 @@ enum ChordType: String, Codable, Sendable {
     // Pitch classes (mod 12)
     var pitchClasses: Set<Int> { Set(intervals.map { $0 % 12 }) }
 
+    /// The 3rd Chill voices for this chord: major for the major family, the 4th for a sus4,
+    /// minor otherwise. Pads and bass share it so the bass's 3rd is the one the pads hold.
+    var chillThird: Int {
+        switch self {
+        case .major, .dom7, .add9, .maj7, .maj9, .maj6, .dom9: return 4
+        case .sus4:                                             return 5
+        default:                                                return 3
+        }
+    }
+
+    /// The 7th Chill voices for this chord (Chill plays every chord as a 7th chord): major 7th
+    /// for the major family, the 6th for sixth chords (they have no 7th), flat 7th otherwise.
+    var chillSeventh: Int {
+        switch self {
+        case .major, .maj7, .maj9: return 11
+        case .maj6, .min6:         return 9
+        default:                   return 10
+        }
+    }
+
     /// True for chord types that imply a major harmonic context in bass patterns.
     /// Used to decide whether b7 / flatSeven slots use the mode's b7 or a neutral replacement.
     var isMajorContext: Bool {
