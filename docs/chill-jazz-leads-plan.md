@@ -292,7 +292,7 @@ Shared between substyles: CHL-LD1-009 and CHL-LD1-014.
 - **Code:** the "Jazz cell rules" section at the end of
   `Sources/Zudio/Generation/Chill/ChillLeadGenerator.swift`. `jazzCellPhrase` replaces
   `buildPhrase` for these rules. Everything else in the Lead 1 loop runs as before: intro silence,
-  lay-outs, handoffs, Blues chord seams, seed returns and the turnaround lick. The blue-note
+  the one rest drawn after each phrase, handoffs, Blues chord seams, seed returns and the turnaround lick. The blue-note
   overlay is skipped because the licks carry their own. Seed returns still apply, so a song's
   first two phrases replay and Cantaloupe's hook can state four times early on.
 - **Licks:** written in minor blues terms as semitones from the chord root, on a 16th-step grid,

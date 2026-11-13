@@ -229,9 +229,30 @@ struct ChillLeadGenerator {
         // Blues form: section anchors for posInForm tracking (same approach as drums/bass/pads)
         let (bSectionStart, aSectionStart) = bluesVariation ? bluesSectionAnchors(structure: structure) : (-1, -1)
 
-        // Blues: lead must have played at least one phrase before bar 4 of section A.
-        // Suppresses the lay-out rule and overrides silence probability until first phrase fires.
-        var bluesLeadHasPlayed = false
+        // The rest after a phrase in a groove section: ONE draw per phrase, and the only thing that
+        // keeps Lead 1 out of A and B apart from the handoff windows and the Blues turnaround bars.
+        // It replaces a per-bar silence roll plus a separate 12% "lay-out" roll plus a 1-2 bar rest
+        // that all stacked, and a song could go 20+ bars with no lead (Cold Cut Blues, 2026-11-12).
+        // Now the longest gap is one draw: A rests longer than B (A averages 2.9 bars, B 2.0); 4, 6
+        // and 8 bars are the occasional jazz lay-out; punches in Blues keep it short. Three clamps keep
+        // gaps from joining: a rest never runs past its section, so the next section's entrance is
+        // on time; a rest ahead of a handoff window is at most 2 bars, so Lead 1 has just played
+        // for Lead 2 to answer; and the phrase itself is never part of the rest.
+        func restAfterPhrase(label: SectionLabel, phraseEnd: Int, sectionEnd: Int) -> Int {
+            let u = rng.nextDouble()
+            var rest: Int
+            if bluesVariation && isShortPunch {
+                rest = u < 0.70 ? 1 : u < 0.90 ? 2 : 4
+            } else if label == .B {
+                rest = u < 0.50 ? 1 : u < 0.75 ? 2 : u < 0.88 ? 3 : u < 0.96 ? 4 : 6
+            } else {
+                rest = u < 0.25 ? 1 : u < 0.55 ? 2 : u < 0.70 ? 3 : u < 0.85 ? 4 : u < 0.95 ? 6 : 8
+            }
+            if let window = handoffBarSet.filter({ $0 >= phraseEnd }).min(), window - phraseEnd < 8 {
+                rest = Swift.min(rest, 2)
+            }
+            return Swift.min(rest, Swift.max(0, sectionEnd - phraseEnd))
+        }
 
         var bar = 0
         while bar < frame.totalBars {
@@ -285,21 +306,6 @@ struct ChillLeadGenerator {
             // Handoff window: LD1 forced silent so LD2 can take the melody
             if handoffBarSet.contains(bar) { bar += 1; continue }
 
-            // Brass and blues leads occasionally "lay out" for a full 4 or 8 bars — jazz breathing room.
-            // Suppressed in blues until the lead has played at least once (guarantees early A-section entry).
-            // Blues caps lay-out at 4 bars: an 8-bar lay-out at the start of a chorus can chain with
-            // another and silence a full 16-bar pass, which prevents harmony from firing.
-            // CHL-LD1-002 in blues: reduce lay-out probability to 5% — short punches should keep
-            // the groove alive rather than dropping out for 4 bars at a time.
-            let layOutProb: Double = (bluesVariation && isShortPunch) ? 0.05 : 0.12
-            if (leadInstrument == .trumpet || leadInstrument == .mutedTrumpet || leadInstrument == .saxophone || leadInstrument == .tenorSax || leadInstrument == .clarinet),
-               label == .A || label == .B,
-               !(bluesVariation && !bluesLeadHasPlayed),
-               rng.nextDouble() < layOutProb {
-                bar += (bluesVariation || rng.nextDouble() < 0.60) ? 4 : 8
-                continue
-            }
-
             // Blues form: handle turnaround zone (positions 14–15 of 16-bar form).
             // Position 15 always silent (drums/bass own the turnaround bar).
             // Position 14: optional descending lick (50%) or rest; beats 3–4 left clear for fill.
@@ -315,14 +321,10 @@ struct ChillLeadGenerator {
                 bar += 1; continue
             }
 
-            // Blues: force the lead to play within the first 4 bars of the groove section.
-            // Once the lead has played once, normal silence/rest rules resume.
-            let forceBluesEntry = bluesVariation && !bluesLeadHasPlayed
-                && (label == .A || label == .B)
-                && bar >= (section?.startBar ?? 0) + 4
-
-            if !forceBluesEntry {
-                // Silence probability by section
+            // Groove sections (A, B) rest only after a phrase (restAfterPhrase); the lead enters at
+            // the first bar the handoff windows and turnaround leave free. Other sections are
+            // sparse: one roll per bar.
+            if label != .A && label != .B {
                 let silenceProb: Double
                 switch label {
                 case .intro:
@@ -334,9 +336,6 @@ struct ChillLeadGenerator {
                     }
                     silenceProb = 0.90  // very sparse — at most 1 brief phrase
                 case .outro:  silenceProb = 0.85  // very sparse in outro — trailing off
-                // CHL-LD1-002 in blues: less silence in A so punches keep the energy going
-                case .A:      silenceProb = (bluesVariation && isShortPunch) ? 0.25 : 0.40
-                case .B:      silenceProb = 0.10  // most active in groove B — consistently denser than A
                 default:      silenceProb = 0.50
                 }
 
@@ -394,9 +393,8 @@ struct ChillLeadGenerator {
                     })
                     seedPhraseLengths.append(actualPhraseLen)
                     lastReturnBar = bar
-                    bluesLeadHasPlayed = true
                     bar += actualPhraseLen
-                    bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
+                    bar += restAfterPhrase(label: label, phraseEnd: bar, sectionEnd: sectionEnd)
                     continue
                 }
 
@@ -458,9 +456,8 @@ struct ChillLeadGenerator {
                         if canRecap || duePending { pendingRecall = false }
                         lastReturnBar = bar
                         replayBars.formUnion(bar..<(bar + seedLen))
-                        bluesLeadHasPlayed = true
                         bar += seedLen
-                        bar += (label == .B) ? 1 : 1 + rng.nextInt(upperBound: 2)
+                        bar += restAfterPhrase(label: label, phraseEnd: bar, sectionEnd: sectionEnd)
                         continue
                     }
                     // Seed doesn't fit remaining section — count replay as done to avoid getting stuck
@@ -471,15 +468,12 @@ struct ChillLeadGenerator {
             // Normal phrase generation (free development zone, or replay fallback).
             let phraseNotes = heard(freshPhrase(bar: bar, bars: actualPhraseLen, label: label))
             events += phraseNotes
-            bluesLeadHasPlayed = true
 
             bar += actualPhraseLen
-            // Mandatory rest after phrase (CHL-RULE-06); Groove B capped at 1 bar; CHL-LD1-002 blues
-            // also capped at 1 bar so punches keep the groove alive without long halting gaps.
-            let extraRest = (label == .B || (bluesVariation && isShortPunch)) ? 0 : rng.nextInt(upperBound: 2)
-            bar += 1 + extraRest
+            bar += restAfterPhrase(label: label, phraseEnd: bar, sectionEnd: sectionEnd)
         }
-        // A lay-out can step over a whole stop-time breakdown; the soloist still plays it.
+        // Safety net: a rest never runs past its section, so this should not fire, but if a rest
+        // ever does step over a whole stop-time breakdown the soloist still plays it.
         if breakdownStyle == .stopTime {
             for sec in structure.sections where sec.label == .bridge
                 && stopTimeSections.insert(sec.startBar).inserted {
