@@ -116,7 +116,16 @@ Done 2026-11-13, uncommitted. The walk is top, mid, low on a locked 16th grid (O
 - Hear: `~/Downloads/Zudio Falling Walk demos/` (before is MIDI only; a before .zudio would reload with the new code). Bars that change: Hypnotique Part 8 (kosmic_02ceb8ad2b3c179b) 5–6, 11–14; Vortexe Pulsotron (kosmic_bd173ff001f3165b) 5–6, 8, 11–14; Inner Luminare (kosmic_0dfebe14cb10c60b) 5–14; Quantique Minipod (kosmic_c051260e59c90139) 5–6, 11–14. Same pattern every 8 bars after.
 - Heard 2026-11-13 (Quantique Minipod): keep the fix, but it was a mild clash, not a glaring one. The walk was E, D#, B over E and A, G#, E over A, with the bass two octaves under the pad. Graded by severity, KOS-BASS-018 was glaring in 11% of its songs and mild in 66%. Quantique's Lead 1 (KOS-LD1-014) has six one-beat minor 9ths that step on (bars 5, 7, 21, 23, 105, 107). They are mild, and with the fix the song has no glaring clashes.
 
-### 4. Chill Soho Lead 1: bring it under ChillClearance
+### 4. Chill Soho Lead 1: bring it under ChillClearance (done in code 2026-11-13, uncommitted, not heard)
+
+Soho Lead 1 was left out only by scope: Soho was frozen for the 2.7 release when ChillClearance went in. Done: `sohoLead1` takes the `band` and voices its finished line through `ChillClearance.voiceLine`, for all five Soho rules (010, 011, 012 and the reused 001 and 004, which base Chill already clears). In Soho, Rhythm is written before Lead 1, so the band is Pads, Bass and Rhythm. The Lead 1 regen sites pass the same band. No new draws. Marked F: CHL-LD1-010, 011, 012.
+
+- Measured on 1,501 Chill seeds (461 Soho). Base Chill and Blues are byte-identical. In Soho, Lead 1 changed, and Lead 2 changed in 339 songs where it answers the new Lead 1. Soho glaring problem songs went from 37% to 2%, and Soho Lead 1 glaring clashes from 1,945 to 311. No Soho rule is left on the problem list (010 was at 50%, 012 at 30%, 011 at 29%). What's left is mostly short passing notes, which the clearance allows.
+- About 15% of Soho Lead 1 notes moved, mostly by a semitone or a tone, against about 9% in base Chill.
+- For Zack to judge by ear: hooks flatten where a moved note lands on its neighbour. Thunder in the Lobby's Avalon hook goes from C#–C#–D–B (the D is the 4th over A's major 3rd, against the pad's C#4) to C#–C#–C#–B. Hackney Evening's Operator hook goes from D–Eb–Eb–C (Eb is the b7 over F6, a major 7th under the pad's D5) to D–D–D–C. The hook's returns change the same way, so the repetition level is kept. The clearance also checks the octave above, because the lead filter can lift a figure, so a chord tone under a pad's 9th sometimes moves too (Hackney Evening bar 7: Bb4 to G4 under A5).
+- Hear: `~/Downloads/Zudio Soho Lead 1 clash demos/` (before is MIDI only). Thunder in the Lobby bars 2–13, Hackney Evening bars 5–11 and 21–29, Oxford Street Terrace bars 5–15, Carnaby Street Espresso (Sustained tone) bars 8, 15, 23 and 35.
+
+Original notes:
 
 - Rules: CHL-LD1-012 Avalon (76% of its songs, median 6, up to 32), CHL-LD1-010 Operator (70%), CHL-LD1-011 Sustained tone (67%). Soho Lead 1 caused 957 of Soho's clashes.
 - Cause (confirmed): Soho Lead 1 is deliberately outside ChillClearance (change log, "Chill leads no longer rub against the band": "Soho's Lead 1, Pads, Rhythm and Bass are unchanged"). It holds the 4th over a major 3rd and the 11th over maj9 (Dean Street Lights, bars 19 and 22).

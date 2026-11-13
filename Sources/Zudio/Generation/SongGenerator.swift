@@ -1795,7 +1795,8 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
-                    band: songState.chillSohoVariation ? nil : regenChillBand(songState, [kTrackPads, kTrackBass]),
+                    band: regenChillBand(songState, [kTrackPads, kTrackBass]
+                                         + (songState.chillSohoVariation ? [kTrackRhythm] : [])),
                     rng: &rng, usedRuleIDs: &usedRules, returns: { chillLead1Returns = $0 })
             } else {
                 // The breakdown windows as generation hands them to Lead 1, so hooks and solo
@@ -1866,7 +1867,8 @@ struct SongGenerator {
                     breakdownStyle: songState.chillBreakdownStyle,
                     bluesVariation: songState.chillBluesVariation,
                     sohoVariation: songState.chillSohoVariation,
-                    band: songState.chillSohoVariation ? nil : regenChillBand(songState, [kTrackPads, kTrackBass]),
+                    band: regenChillBand(songState, [kTrackPads, kTrackBass]
+                                         + (songState.chillSohoVariation ? [kTrackRhythm] : [])),
                     rng: &lead1RNG, usedRuleIDs: &lead1Rules).handoffBars
                 events = ChillLeadGenerator.generateLead2(
                     frame: songState.frame, structure: songState.structure,
@@ -4690,15 +4692,17 @@ struct SongGenerator {
 
         // Step 6 — Lead 1 (primary solo) and Lead 2 (call-and-response)
         // The soloists listen to the band as they write (ChillClearance): Lead 1 to the Pads and
-        // Bass, Lead 2 to those and Lead 1 (and in Soho to Rhythm). Soho's Lead 1 is unchanged.
-        let padsAndBass = ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass]])
+        // Bass, Lead 2 to those and Lead 1. In Soho, Rhythm is written first, so both leads also
+        // listen to it.
+        let padsAndBass = ChillClearance([trackEvents[kTrackPads], trackEvents[kTrackBass]]
+                                         + (sohoVariation ? [trackEvents[kTrackRhythm]] : []))
         var lead1Rules: Set<String> = []
         var lead1Returns = Set<Int>()
         let (lead1Events, lead1HandoffBars, hookTreatments) = ChillLeadGenerator.generateLead1(
             frame: frame, structure: structure, leadInstrument: chillLeadInstrument,
             beatStyle: chillBeatStyle, breakdownStyle: chillBreakdownStyle,
             bluesVariation: bluesVariation, sohoVariation: sohoVariation, forceRuleID: forceLeadRuleID,
-            band: sohoVariation ? nil : padsAndBass,
+            band: padsAndBass,
             rng: &lead1RNG, usedRuleIDs: &lead1Rules, returns: { lead1Returns = $0 }
         )
         trackEvents[kTrackLead1] = lead1Events

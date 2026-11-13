@@ -34,7 +34,7 @@ struct ChillLeadGenerator {
         // at probability 0.
         if sohoVariation {
             return sohoLead1(frame: frame, structure: structure, leadInstrument: leadInstrument,
-                             breakdownStyle: breakdownStyle, forceRuleID: forceRuleID,
+                             breakdownStyle: breakdownStyle, forceRuleID: forceRuleID, band: band,
                              rng: &rng, usedRuleIDs: &usedRuleIDs, reportReturns: reportReturns)
         }
         // CHL-LD1-005: St Germain staccato style — suppressed in blues (blues needs sustained phrases).

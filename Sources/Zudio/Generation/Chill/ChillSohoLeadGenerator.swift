@@ -84,11 +84,19 @@ extension ChillLeadGenerator {
         leadInstrument: ChillLeadInstrument,
         breakdownStyle: ChillBreakdownStyle,
         forceRuleID: String?,
+        band: ChillClearance? = nil,
         rng: inout SeededRNG,
         usedRuleIDs: inout Set<String>,
         reportReturns: ((Set<Int>) -> Void)? = nil
     ) -> (events: [MIDIEvent], handoffBars: Set<Int>,
           hookTreatments: String?) {
+        // The finished line keeps clear of the Pads, Bass and Rhythm, as base Chill's leads do:
+        // a held note a semitone from the band, or a semitone above a chord tone (the 4th over a
+        // major 3rd), moves to the nearest clear scale note. Short passing notes stay. No draws.
+        func voiced(_ line: [MIDIEvent]) -> [MIDIEvent] {
+            let (low, high) = register(for: leadInstrument)
+            return band?.voiceLine(line, structure: structure, scale: frame.scalePCs, low: low, high: high) ?? line
+        }
         var hookTreatments: String? = nil
         // Bars where the lead comes back to its original form, for the log. Recorded only.
         var formReturns = Set<Int>()
@@ -105,7 +113,7 @@ extension ChillLeadGenerator {
             let r = reusedLead1(ruleID, frame: frame, structure: structure, leadInstrument: leadInstrument,
                                 breakdownStyle: breakdownStyle, rng: &rng, usedRuleIDs: &usedRuleIDs,
                                 formReturns: &formReturns)
-            return (r.events, r.handoffBars, nil)   // not an Avalon Hook
+            return (voiced(r.events), r.handoffBars, nil)   // not an Avalon Hook
         }
         usedRuleIDs.insert(ruleID)
 
@@ -178,7 +186,7 @@ extension ChillLeadGenerator {
             events = LeadGenerator.capUnbrokenStretch(events, maxBars: 14 + rng.nextInt(upperBound: 3),
                                                       totalBars: frame.totalBars, rng: &rng)
         }
-        return (events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }, [], hookTreatments)
+        return (voiced(events.sorted { ($0.stepIndex, $0.note) < ($1.stepIndex, $1.note) }), [], hookTreatments)
     }
 
     // MARK: - Reused base Chill rules
