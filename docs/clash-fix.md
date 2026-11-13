@@ -142,10 +142,11 @@ MOT-LD1-012 Chromatic Descent, checked 2026-11-13 (Zack asked whether its clashe
 - E Tone (motorik_75cfef7f85616709, E harmonic minor, 24 glaring): Bb4 for 3¼ beats over the pad's A3 and the Rhythm's A4, bar 16; B4 for 3¾ beats under the pad's C5, bar 28.
 - Tone Rad (motorik_59a071a9c984e3cd, E Phrygian, 10): F#4 for 4 beats over the pad's F4, bars 17, 18, 30; Bb4 over the pad's A4, bar 14.
 - Dunkel Dusseldorf (motorik_8e469e6f14388e02, A Aeolian, 11): F#4 and Bb4 held 3 to 3½ beats a minor 9th over the Rhythm's F3 and A3, bars 16, 19, 20, 23.
-- Not fixed yet. It is chromatic by design, so the general clearance would turn the descent into repeated notes. Options for Zack, not yet chosen:
-  1. Hold only notes that are clear of the chord, with the chromatic step between them as a short off-beat passing note. This keeps the chromatic colour within the ground rules: off the beat, up to 6 a song, or 12 if musical.
-  2. Keep the held chromatic steps but shorten each to a beat, so the clash lasts a beat instead of a bar.
-  3. Descend through the scale instead of chromatically wherever a step would land a semitone from the chord, keeping chromatic steps only where they are clear.
+- It is chromatic by design, so the general clearance would turn the descent into repeated notes. Three options were put to Zack: (1) hold only clear notes, with the chromatic step as a short off-beat passing note; (2) keep the held steps but shorten each to a beat; (3) descend through the scale where a step would rub. Zack chose option 1 (2026-11-13: "I hear it on long sustain instruments"; keep the code simple).
+- Fixed 2026-11-13, uncommitted, not heard. In `lead1ChromaticDescent`, a step a semitone from a chord tone is not held: the bar holds the nearest clear scale note behind it (above on the way down, below on the arc's way up), and in the bar before the line moves on, the step itself plays as an 8th on the "and" of 4 (`hold`). Up to 12 passing notes a song (`chromaPassCount`); after that the clear note is held alone. Tone Rad bars 17–18: F#4 held over F becomes G4 with F#4 passing into F4. The 20% echo repeats the held note. The fast runs are unchanged, and 012 stays in `clearanceSkipBars` because the fix does not rely on the clearance. No new draws. Marked F.
+- Measured on the 113 Noir songs that use 012 among 5,000 Motorik seeds: Lead 1 changed in all 113, and Pads and Rhythm changed in one (Sud Middelbrau, where they react to Lead 1). Lead 1 glaring clashes went from 1,231 to 62 and Noir problem songs from 65% to 15%. MOT-LD1-012 dropped off the problem list (it was at 64% glaring). The uncapped first version gave a median of 16 passing notes a song, so the cap is 12 and most songs reach it.
+- What remains: a held step that is clear of the chord but sits a minor 9th over a Rhythm note that isn't in the chord. Example: Dunkel Dusseldorf bars 19–20, Bb4 over Fsus2 with the Rhythm's A3. Lead 1 is written before the Rhythm and can't see it. These are rare, so they are left alone.
+- Hear: `~/Downloads/Zudio Motorik clash demos/chromatic descent (fixed)/`. E Tone bars 13–16 and 28, Tone Rad bars 13–21 and 30, Dunkel Dusseldorf bars 15–16 and 22–24.
 
 Original notes: the biggest group of rules. Motorik base is 72% problem songs, mostly Lead 1 and Lead 2.
 
@@ -209,3 +210,4 @@ Rarer rules with very high counts when they fire. Probably fixed note choices in
 - 2026-11-13: Zack set the colour-or-grating rule. Persistent-rub measure added to clash_scan.py. CHL-BASS-009 and the 011 upward opener fixed under it (in item 2's notes). Not heard.
 - 2026-11-13: Zack heard items 1 and 2: "sounds better". Committed together (ec1a239).
 - 2026-11-13: item 3 coded and measured, not heard. clash_scan.py wording: a clash is counted against the rule that wrote the note, not "blamed" on a track (Zack: "we don't blame people, only rules").
+- 2026-11-13: items 5, 6 and 7 (KOS-LD2-005), the Motorik clearance and the Machine Answer fix committed together (5f13599). MOT-LD1-012 fixed with option 1, measured, not heard.

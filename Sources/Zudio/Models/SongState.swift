@@ -32,6 +32,7 @@ struct GenerationLogEntry: Sendable {
         // Motorik clearance (Lead 1 and the Lead 2 gap answers); 016 also had its call rewritten.
         "MOT-LD1-004", "MOT-LD1-009", "MOT-LD1-010", "MOT-LD1-011", "MOT-LD1-013", "MOT-LD1-014",
         "MOT-LD1-016", "MOT-LD1-017", "MOT-LD1-018", "MOT-LD1-019", "MOT-LD1-020",
+        "MOT-LD1-012",   // Chromatic Descent: clear held notes, chromatic step as an off-beat 8th
     ]
 
     /// The testing markers a description can start with.

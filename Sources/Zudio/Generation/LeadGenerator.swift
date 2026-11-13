@@ -143,6 +143,7 @@ struct LeadGenerator {
         var chromaAscending:     Bool   = false
         var chromaArcFastFired:  Bool   = false
         var chromaArcPeak:       UInt8  = 0
+        var chromaPassCount      = 0     // LD1-012 off-beat chromatic passing notes, 12 a song
 
         // M: LD1-013 Slow Arc — melodic phrase generator, Noir only
         var dronePhraseData: [MelodicNote] = []
@@ -362,7 +363,7 @@ struct LeadGenerator {
                         chromaDescNote: &chromaDescNote, chromaDescStepUntil: &chromaDescStepUntil,
                         chromaArcMode: &chromaArcMode, chromaAscending: &chromaAscending,
                         chromaArcFastFired: &chromaArcFastFired, chromaArcPeak: &chromaArcPeak,
-                        rng: &rng)
+                        chromaPassCount: &chromaPassCount, rng: &rng)
                 }
 
             case "MOT-LD1-013":
@@ -1352,7 +1353,7 @@ struct LeadGenerator {
         chromaDescNote: inout UInt8?, chromaDescStepUntil: inout Int,
         chromaArcMode: inout Bool, chromaAscending: inout Bool,
         chromaArcFastFired: inout Bool, chromaArcPeak: inout UInt8,
-        rng: inout SeededRNG
+        chromaPassCount: inout Int, rng: inout SeededRNG
     ) -> [MIDIEvent] {
         let bounds   = kRegisterBounds[kTrackLead1]!
         let rootPC   = (keySemitone(frame.key) + degreeSemitone(entry.chordWindow.chordRoot)) % 12
@@ -1360,6 +1361,27 @@ struct LeadGenerator {
 
         // Silence gate — respect gap after phrase cadence
         if bar < chromaDescStepUntil { return [] }
+
+        // A step a semitone from a chord tone is not held: the bar holds the nearest clear scale
+        // note behind it (above on the way down), and in the bar before the line moves on the step
+        // itself passes as an 8th on the "and" of 4, up to 12 a song. No random draws.
+        func hold(_ note: UInt8, _ dur: Int, _ vel: UInt8, rising: Bool = false) -> [MIDIEvent] {
+            let tones = entry.chordWindow.chordTones
+            let scale = tones.union(entry.chordWindow.scaleTensions)
+            let back  = rising ? -1 : 1
+            guard MotorikClearance.rubsChord(Int(note), tones),
+                  let clear = (1...3).map({ Int(note) + $0 * back })
+                      .first(where: { scale.contains($0 % 12) && !MotorikClearance.rubsChord($0, tones) })
+            else { return [MIDIEvent(stepIndex: barStart, note: note, velocity: vel, durationSteps: dur)] }
+            let next = bar + 1
+            guard next % (2 + (next % 3 == 0 ? 1 : 0)) == 0, chromaPassCount < 12 else {
+                return [MIDIEvent(stepIndex: barStart, note: UInt8(clear), velocity: vel, durationSteps: dur)]
+            }
+            chromaPassCount += 1
+            return [MIDIEvent(stepIndex: barStart, note: UInt8(clear), velocity: vel, durationSteps: 14),
+                    MIDIEvent(stepIndex: barStart + 14, note: note,
+                              velocity: UInt8(clamping: Int(vel) - 6), durationSteps: 2)]
+        }
 
         if chromaDescNote == nil {
             if rng.nextDouble() < 0.20 {
@@ -1396,7 +1418,7 @@ struct LeadGenerator {
             }
             let dur = 12 + rng.nextInt(upperBound: 5)
             let vel = UInt8(62 + rng.nextInt(upperBound: 12))
-            return [MIDIEvent(stepIndex: barStart, note: noteVal, velocity: vel, durationSteps: dur)]
+            return hold(noteVal, dur, vel, rising: true)
 
         } else if chromaArcMode {
             // Descending leg of arc
@@ -1436,7 +1458,7 @@ struct LeadGenerator {
             }
             let dur = 12 + rng.nextInt(upperBound: 5)
             let vel = UInt8(62 + rng.nextInt(upperBound: 12))
-            return [MIDIEvent(stepIndex: barStart, note: noteVal, velocity: vel, durationSteps: dur)]
+            return hold(noteVal, dur, vel)
 
         } else {
             // Normal descent (original behavior with arc restart chance)
@@ -1464,15 +1486,15 @@ struct LeadGenerator {
             }
             let dur = 12 + rng.nextInt(upperBound: 5)
             let vel = UInt8(62 + rng.nextInt(upperBound: 12))
-            var events: [MIDIEvent] = []
-            events.append(MIDIEvent(stepIndex: barStart, note: noteVal, velocity: vel, durationSteps: dur))
+            var events = hold(noteVal, dur, vel)
+            let heldNote = events[0].note
             // Skip echo on phrase-end cadence — clean landing before the silence gap
             if chromaDescNote != nil {
                 // Echo only when pitch class is in scale — out-of-scale main notes are removed by
                 // HarmonicFilter, which would leave the echo orphaned with nothing preceding it.
                 let echoRoll = rng.nextDouble()
-                if echoRoll < 0.20 && frame.scalePCs.contains(Int(noteVal) % 12) {
-                    events.append(MIDIEvent(stepIndex: barStart + 8, note: noteVal,
+                if echoRoll < 0.20 && frame.scalePCs.contains(Int(heldNote) % 12) {
+                    events.append(MIDIEvent(stepIndex: barStart + 8, note: heldNote,
                                             velocity: UInt8(clamping: Int(vel) - 12), durationSteps: 4))
                 }
             }
