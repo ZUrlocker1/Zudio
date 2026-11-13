@@ -156,6 +156,13 @@ tools/fingerprints/baseline.txt (pinned at 0dfb880) no longer matches Motorik, K
 - **Lane playhead is a Core Animation layer** (`PlayheadLayerView`, bottom of MIDILaneView.swift; also used by AudioWaveformView). Replaces a TimelineView per lane that redrew a lane-sized Canvas 4, 8 or 20 times a second by zoom. The layer carries one linear `position.x` animation to the window's right edge, which the window server runs at display rate. It re-anchors from `wallClockPosition` on `$isPlaying`, `$currentBar` (each bar, correcting drift), `PlaybackEngine.playheadSync` (sent by `recordPlaybackStart`, so play, seek, tempo and Evolve passes, and by a stopped `displayStep` change), SwiftUI updates (zoom, scroll, song) and layout (resize). This was the "one shared playhead overlay" candidate; per-lane layers cost the app nothing per frame, so a shared overlay is not needed. Zack: much smoother. Not measured; when it is, sample WindowServer as well as Zudio.
 - **Visualizer redraws only on its timeline.** `VisualizerFeed.notes` is a plain var; only `hasNotes` is published (the timeline's pause condition after Stop). Before, each flush re-rendered the visualizer out of phase with its 12 fps timeline, about 20 draws a second in Motorik. The Mac gesture view reads the feed at hit-test time, as iOS does. Not measured with the window visible.
 
+### Result (2026-11-12)
+
+Read from the Mac Activity Monitor, so ranges and not benchmarks:
+
+- **Track View** is now more efficient than the Visualizer view, generally always under 15% of CPU, with smoother animation.
+- **Compact mode** (no visualizer, no tracks) is under 10% for Ambient and slightly higher for the other styles.
+
 ### Considered and not done
 
 - Static background or `drawingGroup()` for the visualizer: judged under 1%.
