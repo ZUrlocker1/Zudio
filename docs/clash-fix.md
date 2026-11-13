@@ -14,6 +14,13 @@ It started with After Dark Soiree Blues, where the bass rubbed against the pads 
 - Kosmic base: 52%, Motorik Noir: 52%, Motorik Europe: 36%, Kosmic Drift: 33%.
 - Chill Blues: 22%, Motorik Arcade: 19%, Chill base: 8%.
 
+Regraded by severity on the same 1,400 songs (see Measuring), glaring problems only, then mild-only songs:
+
+- Motorik base 55% (mild-only 20%), Kosmic Space 51% (35%), Chill Soho 37% (29%), Kosmic base 34% (20%).
+- Kosmic Drift 28% (6%), Motorik Noir 27% (29%), Motorik Europe 21% (22%).
+- Motorik Arcade 10% (15%), Chill Blues 9% (21%), Chill base 2% (6%).
+- Leads and Rhythm cause most of the glaring clashes. Bass patterns are mostly mild: KOS-BASS-018 was glaring in 11% of its songs and mild in 66%. Most of the other bass rules flagged above 15% are mild-only. The glaring top of the list: KOS-LD2-005 (75% of its songs), then MOT-LD1-012, MOT-LD1-004, MOT-LD1-007, KOS-RTHM-021 and KOS-BASS-016 (50% or more), then MOT-RTHM-004 and CHL-LD1-010 (48%). CHL-LD1-012 is 34% glaring and 41% mild-only.
+
 Two kinds of cause:
 
 - **A pattern that writes the same wrong note every bar.** Bass and pad patterns built from fixed intervals that ignore the chord the pads hold (the Blues Rumba's 6th under the b7, KOS-BASS-018's 2nd under the minor 3rd). These are fixed inside the pattern, one at a time, and are the cheapest wins.
@@ -41,7 +48,15 @@ Two kinds of cause:
 
 It measures two things. **Strong clashes:** on a beat or overlapping a beat, more than 4 for one track. **Persistent rubs:** a note outside the chord that rubs against two or more other tracks at once, in a run of more than 4 bars (a one-bar gap doesn't break the run). A rub is a minor 2nd or minor 9th at any octave, or a major 7th with the note outside the chord at the bottom; an extension a major 7th above a chord tone (Blues Rhythm's 13th over the bass's b7) is a voicing and doesn't count. Calibrated on Zack's ears: West End Cornichon Blues before the 009 fix is flagged (8-bar run), Riviere-du-Loup Exchange Blues is not (16ths, longest two-track run 4 bars). Add each song Zack judges to this list and check the scanner still agrees.
 
-A song is a problem when either measure fires. `--worst N` also lists the longest persistent runs per substyle.
+**Severity, glaring or mild** (Zack, 2026-11-13, on Quantique Minipod's Falling Walk: "not that bad, not like B against Bb"). Every clash and run is graded, and every analysis must say which kind it is:
+
+- Glaring: the two notes are within an octave of each other, either a semitone (B against Bb) or a major 7th with the outside note below. A minor 9th held two beats or more with both notes at C3 or above also counts as glaring. A minor 9th held one beat that steps on is mild. Example: Quantique Minipod's lead plays E, G#, A over E major, with the A against the pad's G#3, then moves to B.
+- Mild: everything else. That covers notes two or more octaves apart (a low bass note under the pad's octave) and a minor 9th that is short or has one note in the bass register. Quantique Minipod's D# in the bass two octaves under the pad's E is mild.
+- A strong clash is graded by its own interval. A persistent run is glaring when the glaring rubs alone make a run of more than 4 bars.
+
+A song is a problem when either measure fires on glaring clashes. Songs flagged only by mild ones are reported separately as mild-only: worth fixing when a fix is cheap and keeps the flavour, but they are not urgent. `--worst N` also lists the worst songs and the longest persistent runs per substyle, each marked glaring or mild.
+
+Calibration still holds with the grading: West End Cornichon Blues (grating) is a glaring persistent run, Riviere-du-Loup Exchange Blues is not flagged, and Quantique Minipod before the item 3 fix is mild.
 
 To generate songs in-session, use a throwaway XCTest (Swift Testing `@Test` functions do not run under `xctest -XCTest`) that reads `style seedhex` lines from `seeds.txt` in a folder named by an env var, calls `SongGenerator.generate(seed:style:forceBluesVariation:)`, and writes `MIDIFileExporter.export` and `SongLogExporter.export` per song. The build and run commands are in memory (reference-claude-session-toolchain). 1,400 songs take about 10 seconds to generate and 20 to scan. Delete the test afterwards.
 
@@ -88,13 +103,17 @@ Original notes: Zack listened (2026-11-13): it sounds bad. A chromatic approach 
 - Fix: beat 4 plays a chord tone of the current chord (the root or the 5th, held), and the chromatic approach, if kept, moves to the "and of 4" (step 14) as an 8th. The walking line's beat 4 becomes a chord tone that steps toward the next root, with any chromatic note only on step 14.
 - Verify: rerun the 151 Blues seeds; strong beat-4 clashes should go to near zero. Re-listen to the five songs in `~/Downloads/Zudio beat-4 approach demos/` (YYZ Memorandum Blues bars 10, 13, 14, 26, 41; Alpina Document Blues bars 13, 26, 29, 30; L'Avenir File Blues bars 17, 33, 45, 49; Dark Detroit Blues bars 6, 14, 18, 33; Low Light Cornichon Blues bars 13, 29, 41, 45).
 
-### 3. Kosmic Space bass, KOS-BASS-018 Oxygene Falling Walk
+### 3. Kosmic Space bass, KOS-BASS-018 Oxygene Falling Walk (done in code, not heard)
 
 The worst single rule by volume: in 70% of 103 Space songs, median 12 clashes, up to 100. Space is about 40% of Kosmic songs.
 
-- Cause (confirmed): on beat 1 the bass plays the 2nd, a minor ninth under the pad's minor 3rd, held a beat (Pyreon Part IV, bars 8 and 16: Bb2 under the pad's Cb, Eb2 under E).
-- Proposed fix: same shape as the Blues ostinato: the falling walk keeps its contour but starts on a chord tone, or the 2nd moves off the beat. Read the rule's source notes first; the falling line may be the Oxygene identity.
-- Hear: Hypnotique Part 8 (kosmic_02ceb8ad2b3c179b) bars 5–6, 11–14; Vortexe Pulsotron (kosmic_bd173ff001f3165b) bars 5–6, 8, 11–14.
+Done 2026-11-13, uncommitted. The walk is top, mid, low on a locked 16th grid (Oxygene 4), so the rhythm stays put and only the clashing note changes (Zack: Space is sequencer-based; option 1).
+
+- Cause, measured on the 103 songs: mostly the mid note on beats 2 and 4, held across the beat, not the lift. The walk counts scale steps above the chord root, which ignores the chord. The 6th set's mid note is a b6 over minor chords (and over the major V with a leading tone), a semitone above the pad's 5th. The b7 set's mid note is a major 7th over the I and IV (and bIII, bVI) major chords, a semitone under the pad's root. Together about 5,500 of 9,500 raw bass clashes. The lift bar (last of each 8) plays the 9th on beat 1, a semitone under a minor 3rd, or the b2 over a Phrygian-coloured chord: about 1,400 more (Pyreon Part IV bars 8 and 16).
+- Fix (`walkDegrees` in `CosmicBassGenerator.swift`): when the mid note is a semitone from a chord tone it takes the other of 6th and 7th (b6 becomes b7, major 7th becomes 6th), so the fall stays top, mid, low. When the lift's 9th rubs, it becomes the 10th (the chord's 3rd an octave up). The octave-5th-3rd set and the short off-beat low notes are unchanged. Thin bars keep the plain figure, as before. No new draws. Marked F.
+- Measured on 500 Kosmic seeds: only the Bass track changed, in 102 of the 103 Falling Walk songs. Clashes caused by the Space bass 2,258 to 111. KOS-BASS-018 no longer appears in the problem list (was 77%, persistent rubs in 23 songs). Space problem songs 86% to 73%, songs with persistent rubs 40 to 19. What remains in these songs comes from other rules: Rhythm and leads holding a major 7th or b2 against the bass root.
+- Hear: `~/Downloads/Zudio Falling Walk demos/` (before is MIDI only; a before .zudio would reload with the new code). Bars that change: Hypnotique Part 8 (kosmic_02ceb8ad2b3c179b) 5–6, 11–14; Vortexe Pulsotron (kosmic_bd173ff001f3165b) 5–6, 8, 11–14; Inner Luminare (kosmic_0dfebe14cb10c60b) 5–14; Quantique Minipod (kosmic_c051260e59c90139) 5–6, 11–14. Same pattern every 8 bars after.
+- Heard 2026-11-13 (Quantique Minipod): keep the fix, but it was a mild clash, not a glaring one. The walk was E, D#, B over E and A, G#, E over A, with the bass two octaves under the pad. Graded by severity, KOS-BASS-018 was glaring in 11% of its songs and mild in 66%. Quantique's Lead 1 (KOS-LD1-014) has six one-beat minor 9ths that step on (bars 5, 7, 21, 23, 105, 107). They are mild, and with the fix the song has no glaring clashes.
 
 ### 4. Chill Soho Lead 1: bring it under ChillClearance
 
@@ -159,4 +178,5 @@ Rarer rules with very high counts when they fire. Probably fixed note choices in
 - 2026-11-13: item 1 coded and measured; 1,400-song scan run; this plan written. Zack heard the beat-4 approach demos and ruled it must be fixed (item 2).
 - 2026-11-13: F marker added for fixed rules (`fixMarkedRules`, cleared before shipping; * stays). Item 2 coded and measured, not heard.
 - 2026-11-13: Zack set the colour-or-grating rule. Persistent-rub measure added to clash_scan.py. CHL-BASS-009 and the 011 upward opener fixed under it (in item 2's notes). Not heard.
-- 2026-11-13: Zack heard items 1 and 2: "sounds better". Committed together.
+- 2026-11-13: Zack heard items 1 and 2: "sounds better". Committed together (ec1a239).
+- 2026-11-13: item 3 coded and measured, not heard. clash_scan.py wording: a clash is counted against the rule that wrote the note, not "blamed" on a track (Zack: "we don't blame people, only rules").

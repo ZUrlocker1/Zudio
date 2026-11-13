@@ -888,6 +888,9 @@ struct KosmicBassGenerator {
         let scalePCs = frame.scalePCs
         // Root 23–34 puts the top note at 35–46; the 3rd set's lowest note can reach 26.
         let root  = clampToRegister(spaceChordRootPC(entry, frame: frame) + 24, low: 23, high: 34)
+        // The lift (9th, octave, 6th) plays in the last bar of each 8; thin bars never lift.
+        let degrees = walkDegrees(bar % 8 == 7 && !thin ? [8, 7, 5] : walk.steps, root: root,
+                                  tones: entry.chordWindow.chordTones, scalePCs: scalePCs)
         if thin {
             // Half the walk, same pitches: the notes on steps 0, 6 and 12 (beat 1, the syncopated
             // anticipation of beat 2's off-beat, and beat 4), each held to the next. The short
@@ -895,19 +898,35 @@ struct KosmicBassGenerator {
             let lengths = [0: 6, 6: 6, 12: 4]
             return lengths.sorted { $0.key < $1.key }.compactMap { step, dur in
                 guard let hit = walk.hits.first(where: { $0.step == step }) else { return nil }
-                let note = scaleStep(root, by: walk.steps[hit.role], scalePCs: scalePCs)
+                let note = scaleStep(root, by: degrees[hit.role], scalePCs: scalePCs)
                 return MIDIEvent(stepIndex: barStart + step, note: UInt8(note),
                                  velocity: step == 0 ? 96 : 88, durationSteps: dur)
             }
         }
-        let steps = bar % 8 == 7 ? [8, 7, 5] : walk.steps
         return walk.hits.compactMap { hit in
             if hit.step == 14 && variant == .breath { return nil }
             let role = hit.step == 14 && variant == .turn ? 1 : hit.role
-            let note = scaleStep(root, by: steps[role], scalePCs: scalePCs)
+            let note = scaleStep(root, by: degrees[role], scalePCs: scalePCs)
             return MIDIEvent(stepIndex: barStart + hit.step, note: UInt8(note),
                              velocity: hit.step == 0 ? 96 : 88, durationSteps: hit.dur)
         }
+    }
+
+    /// The walk's top, mid and low degrees under this chord. The mid note (beats 2 and 4) and the
+    /// lift bar's top note (beat 1) are held across a beat, so a semitone from a chord tone grates
+    /// against the pads: the 6th set's b6 over a minor chord's 5th, the b7 set's major 7th under a
+    /// major chord's root, the lift's 9th under a minor 3rd. The mid note then takes the other of
+    /// 6th and 7th, and the lift's 9th becomes the 10th, so the fall and the rhythm stay as drawn.
+    private static func walkDegrees(_ steps: [Int], root: Int, tones: Set<Int>,
+                                    scalePCs: Set<Int>) -> [Int] {
+        func rubs(_ degree: Int) -> Bool {
+            let pc = scaleStep(root, by: degree, scalePCs: scalePCs) % 12
+            return !tones.contains(pc) && (tones.contains((pc + 1) % 12) || tones.contains((pc + 11) % 12))
+        }
+        var d = steps
+        if d[1] == 5 || d[1] == 6, rubs(d[1]), !rubs(11 - d[1]) { d[1] = 11 - d[1] }
+        if d[0] == 8, rubs(8) { d[0] = 9 }
+        return d
     }
 
     // MARK: - Primary bass (Sub-layer A)

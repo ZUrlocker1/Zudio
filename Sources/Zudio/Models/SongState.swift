@@ -28,7 +28,7 @@ struct GenerationLogEntry: Sendable {
     /// before the build ships; the "* " marks stay (Zack, 2026-11-13).
     static let fixMarkedRules: Set<String> = [
         "CHL-BASS-001", "CHL-BASS-003", "CHL-BASS-004", "CHL-BASS-009", "CHL-BASS-010", "CHL-BASS-011",
-        "CHL-BASS-012",
+        "CHL-BASS-012", "KOS-BASS-018",
     ]
 
     /// The testing markers a description can start with.
